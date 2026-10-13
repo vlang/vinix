@@ -310,6 +310,101 @@ only after verifying the new envelope and preserving a recovery path. Process
 termination, caches, hibernation and persistent credential protection retain the
 sealed-key limits above. See [credential rewrap qualification](../tests/storage-volumes/rewrap-keys.md).
 
+## Authenticated encrypted volume configurations
+
+`seal-volume DEVICE SLOT OFFSET_BYTES LENGTH_BYTES KEYFILE PASSPHRASE_FILE CONFIG
+[ro]` records an encrypted mapping's whole-disk identity and geometry alongside
+its wrapped volume key. `open-volume DEVICE CONFIG PASSPHRASE_FILE [ro]`
+authenticates that configuration, verifies the selected disk and imports the
+stored mapping. It needs no raw keyfile or separate geometry arguments.
+`unseal-volume-key CONFIG PASSPHRASE_FILE KEYFILE` explicitly recovers the exact
+volume key into a new private file without accessing a disk.
+
+```sh
+# The key and private credential files already exist; choose the exact extent.
+vinix-volume seal-volume /dev/vda 0 1048576 16777216 /root/data.key /root/volume.pass /root/data.vcrypt
+vinix-volume open-volume /dev/vda /root/data.vcrypt /root/volume.pass ro
+vinix-volume remove /dev/mapper/vinix0
+# Explicit offline key recovery, only into an absent filename.
+vinix-volume unseal-volume-key /root/data.vcrypt /root/volume.pass /root/restored.key
+```
+
+Sealing reads the physical parent through one retained read-only descriptor. It
+records the disk byte count, native sector size and nonzero MBR signature or
+CRC-checked GPT GUID, plus slot, offset, length and readonly mode. Only whole
+physical disks and the mapper's 512/4096-byte native sectors are supported.
+Bounds, alignment, distinct XTS halves and the fixed scrypt profile are checked.
+The disk is probed again after the output-directory lock is acquired and before
+publication; identity, byte count, sector size, runtime disk identity and physical
+readonly changes observed during the operation reject publication. Sealing
+does not import a mapping, write the disk, verify its ciphertext or convert
+existing plaintext into encrypted data.
+
+Opening validates the canonical format/work profile and authenticates the full
+configuration before decrypting or releasing its key or opening a physical
+parent. It verifies the exact saved identity and geometry twice on the same
+retained descriptor, then imports through that descriptor. Wrong credentials,
+tampering, wrong disks, partitions, existing mapper parents and observed identity
+or geometry changes reject before import. A saved readonly mapping stays
+readonly when opened without an override; optional `ro` can also restrict a
+writable configuration. Slot and extent come only from authenticated metadata.
+Kernel privilege, extent protection and conflict checks still govern import.
+Reporting failure after a successful import can leave the mapping active.
+
+The private `VINIXVC1` envelope is exactly 320 bytes. Header fields are
+little-endian; metadata is readable and authenticated:
+
+| Offset | Bytes | Value |
+| --- | --- | --- |
+| 0 | 8 | ASCII `VINIXVC1` |
+| 8 | 4 | Version 1 |
+| 12 | 4 | Algorithm 1: scrypt, ChaCha20, HMAC-SHA256 |
+| 16 | 4 | Total bytes 320 |
+| 20 | 4 | Volume key bytes 64 |
+| 24 | 8 | N=32768 |
+| 32 | 4 | r=8 |
+| 36 | 4 | p=3 |
+| 40 | 16 | Fresh salt |
+| 56 | 12 | Fresh nonce |
+| 68 | 12 | Reserved, zero |
+| 80 | 8 | Physical disk bytes |
+| 88 | 8 | Native sector bytes, 512 or 4096 |
+| 96 | 4 | Identity kind: 1 MBR, 2 GPT |
+| 100 | 4 | Reserved, zero |
+| 104 | 16 | Identity; MBR uses four bytes with a zero suffix |
+| 120 | 4 | Mapping request version 1 |
+| 124 | 4 | Slot, 0–63 |
+| 128 | 8 | Physical offset bytes |
+| 136 | 8 | Mapping length bytes |
+| 144 | 8 | Mode: 0 writable, 1 readonly |
+| 152 | 40 | Reserved, zero |
+| 192 | 64 | Encrypted volume key |
+| 256 | 32 | Reserved, zero |
+| 288 | 32 | Full authentication tag |
+
+The first 32 scrypt-derived bytes key one ChaCha20 block at counter 1. The last
+32 key HMAC-SHA256 over the first 32 derived bytes followed by envelope bytes
+0–287. This binds both wrapping-key halves, all disk/mapping metadata, salt,
+nonce and ciphertext. The same private 1–1024-byte credential policy, fixed
+32 MiB KDF vector, normal-return erasure and no-overwrite private publication
+rules apply as for sealed keys. Source key/configuration/credential files stay
+intact. Controlled input, authentication, resource or I/O failures return 1;
+syntax returns 2 and complete operation/reporting returns 0. Post-publication
+cleanup or durability failure can leave a complete private output with status 1.
+
+Identifiers are partition-table identifiers: cloned or deliberately duplicated
+identities are not a proof of unique hardware. Verification samples a pinned
+device; it cannot prevent a privileged actor from changing disk metadata after
+the final check. Physical capacity or sector-size changes require a fresh
+configuration, as do desired slot/extent/mode changes. Existing configurations
+remain usable with their saved credentials and matching geometry. The separate
+`rewrap-key` command accepts `VINIXKP1` key envelopes, not this configuration
+format. Keep an independent key backup and retain the sealed-key limits for
+persistent credentials, process termination, caches and hibernation. Volume
+data retains AES-XTS's unverified confidentiality semantics; encrypted-root boot
+and volume-key rotation remain separate work. See
+[configuration qualification](../tests/storage-volumes/volume-config.md).
+
 ## Saved volume plans
 
 ```sh

@@ -269,6 +269,14 @@ rewrap with no raw keyfile, unlock with new credentials, reject old credentials
 against the new envelope, measure full-cost repeated lifetimes and unlock after
 reboot/device reordering. See [rewrap qualification](rewrap-keys.md).
 
+Encrypted configuration tests authenticate disk identity, native sectors,
+slot/extent/mode and wrapped key together. They cover complete bit mutations,
+invalid authenticated payloads, pinned MBR/GPT probes, physical changes before
+publication/import, preserved readonly mode, private recovery and error cleanup.
+Guests verify real data without raw keyfiles or geometry arguments, wrong-disk
+and tamper refusal, full-cost retention, reordered boot and rejection of changed
+physical capacity. See [configuration qualification](volume-config.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,

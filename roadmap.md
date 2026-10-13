@@ -192,6 +192,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Authenticated volume-key backups and exact private recovery with independent recovery keys, no-overwrite publication, erased secret workspaces and ciphertext reopen after key loss/reboot](docs/storage-volumes.md#authenticated-volume-key-recovery).
   - [x] [Passphrase-sealed volume keys with bounded salted scrypt, authenticated private unseal, direct RW/RO unlock without raw keyfiles, erased KDF workspaces and reboot persistence](docs/storage-volumes.md#passphrase-sealed-volume-keys).
   - [x] [Authenticated sealed-key credential changes with fresh salt/nonce, no plaintext keyfiles, preserved envelopes, erased credential buffer reuse and reboot persistence](docs/storage-volumes.md#changing-sealed-key-credentials).
+  - [x] [Authenticated encrypted-volume configurations binding disk identity, native sectors, slot/extent/mode and wrapped keys, pinned-device rechecks, private recovery and reboot persistence](docs/storage-volumes.md#authenticated-encrypted-volume-configurations).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

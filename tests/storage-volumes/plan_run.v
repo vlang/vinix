@@ -40,7 +40,7 @@ fn check_generated(path string) ! {
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test', 'data_scrub_test', 'crypt_test', 'recovery_test', 'sealed_test', 'sealed_rewrap_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test', 'data_scrub_test', 'crypt_test', 'recovery_test', 'sealed_test', 'sealed_rewrap_test', 'volume_seal_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -56,6 +56,7 @@ fn host(root string, work string) ! {
 	crypt_io_tests(root, work, v)!
 	recovery_io_tests(root, work, v)!
 	sealed_io_tests(root, work, v)!
+	volume_seal_io_tests(root, work, v)!
 	for arch in ['aarch64', 'x86_64'] {
 		path := work + '/volume-' + arch + '.c'
 		generate(root, root + '/tools/volumes/volumecli', path, arch)!
@@ -95,6 +96,35 @@ fn sealed_io_tests(root string, work string, v string) ! {
 		'-fsanitize=address,undefined', '-o', binary, fixture + '/sealed_io_test.v'])!
 	print(command([binary])!)
 	println('PASS sealed keys: source/entropy and publication faults, bounded memory allocation, complete vector erasure, release failure/EINTR, pre-KDF metadata validation, authentication before parent import and credential rewrap stage faults under ASan/UBSan')
+}
+
+fn volume_seal_io_tests(root string, work string, v string) ! {
+	fixture := work + '/volumesealio'; os.mkdir(fixture)!
+	for file in os.ls(root + '/tools/volumes/volumecli')! {
+		if !file.ends_with('.v') || file.ends_with('_test.v') { continue }
+		mut source := os.read_file(root + '/tools/volumes/volumecli/' + file)!
+		if file in ['crypt.v', 'recovery_io.v', 'volume_seal_io.v', 'plan_io.v'] {
+			for name in ['open', 'close', 'ioctl', 'pread', 'openat', 'write', 'fsync', 'linkat', 'unlinkat'] {
+				source = source.replace('C.' + name + '(', 'volume_seal_mock_' + name + '(').replace('fn volume_seal_mock_' + name + '(', 'fn C.' + name + '(')
+			}
+		}
+		if file == 'plan_lock.v' {
+			for name in ['open', 'close', 'flock'] { source = source.replace('C.' + name + '(', 'volume_seal_mock_' + name + '(').replace('fn volume_seal_mock_' + name + '(', 'fn C.' + name + '(') }
+		}
+		if file == 'volume_seal_io.v' { source = source.replace('sealed_derive(', 'volume_seal_mock_derive(') }
+		if file == 'plan_check.v' { source = source.replace('C.fflush(', 'volume_seal_mock_fflush(') }
+		if file in ['volume_seal_io.v', 'volume_seal_crypto.v', 'crypt.v', 'recovery_crypto.v', 'data_sha256.v', 'recovery_io.v'] {
+			source = source.replace('erase_key(', 'volume_seal_mock_erase(').replace('fn volume_seal_mock_erase(', 'fn erase_key(')
+		}
+		os.write_file(fixture + '/' + file, source)!
+	}
+	os.cp(root + '/tests/storage-volumes/volume_seal_io_test.v', fixture + '/volume_seal_io_test.v')!
+	binary := work + '/volume-seal-io-test'
+	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
+		'-I' + root + '/tools/volumes/volumecli -O2 -fsanitize=address,undefined', '-ldflags',
+		'-fsanitize=address,undefined', '-o', binary, fixture + '/volume_seal_io_test.v'])!
+	print(command([binary])!)
+	println('PASS sealed volume configurations: canonical authenticated metadata, pinned MBR/GPT identity, 512/4096-byte sectors, RW/RO downgrade, physical changes before publication/import, private recovery and fault cleanup under ASan/UBSan')
 }
 
 fn recovery_io_tests(root string, work string, v string) ! {
@@ -555,6 +585,8 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 		|| !first.contains('PLAN SEALED LARGE ') || first.count('PLAN SEALED RETAIN ') == 0 { return error('Missing sealed-key unlock and full-cost scrypt retention qualification') }
 	if !first.contains('PLAN REWRAP PASSED:') || first.count('PLAN REWRAP CYCLES count=4') != 2
 		|| !first.contains('PLAN REWRAP LARGE ') || first.count('PLAN REWRAP RETAIN ') == 0 { return error('Missing credential rewrap and full-cost lifetime qualification') }
+	if !first.contains('PLAN VOLUME SEAL PASSED:') || first.count('PLAN VOLUME SEAL CYCLES count=4') != 2
+		|| !first.contains('PLAN VOLUME SEAL LARGE ') || first.count('PLAN VOLUME SEAL RETAIN ') == 0 { return error('Missing authenticated volume configuration and full-cost lifetimes') }
 	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
 	if !first.contains('STORAGE MONITOR PASSED:') { return error('Missing periodic storage monitor qualification') }
 	if nvme && !first.contains('NVME HEALTH PASSED') { return error('Missing NVMe health ABI qualification') }
@@ -575,6 +607,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !second.contains('PLAN RECOVERY REORDERED BOOT PRESERVED') { return error('Key recovery failed after original key deletion and physical reorder') }
 	if !second.contains('PLAN SEALED REORDERED BOOT PRESERVED') { return error('Passphrase unlock failed after raw key deletion and physical reorder') }
 	if !second.contains('PLAN REWRAP REORDERED BOOT PRESERVED') { return error('Rewrapped passphrase unlock failed after raw key deletion and physical reorder') }
+	if !second.contains('PLAN VOLUME SEAL REORDERED BOOT PRESERVED') { return error('Authenticated configuration failed after device reorder and raw-key deletion') }
 	// Enlarge the existing disposable backing file without changing its MBR or
 	// prior bytes. The saved bundle and all guest files remain guest-produced.
 	mut disk := os.open_file(work + '/volume.raw', 'r+')!
@@ -585,6 +618,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !third.contains('init: volume restore failed; continuing') || !third.contains('PLAN CAPACITY PASSED:') {
 		return error('Missing rejection of old geometry or explicit physical capacity adoption')
 	}
+	if !third.contains('PLAN VOLUME SEAL CHANGED CAPACITY REFUSED') { return error('Sealed configuration did not reject changed physical capacity') }
 	fourth := boot(second_args, work + '/capacity-restored-boot.log')!
 	if !fourth.contains('PLAN CAPACITY BOOT RESTORED:') || fourth.contains('init: volume restore failed; continuing') {
 		return error('Production init did not restore the adopted physical capacity')

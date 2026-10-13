@@ -4,6 +4,14 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`seal-volume DEVICE SLOT OFFSET_BYTES LENGTH_BYTES KEYFILE PASSPHRASE_FILE
+CONFIG [ro]` binds disk identity and mapping geometry to a wrapped key.
+`open-volume DEVICE CONFIG PASSPHRASE_FILE [ro]` authenticates before verifying
+the pinned disk and importing that mapping; saved readonly mode cannot escalate.
+`unseal-volume-key CONFIG PASSPHRASE_FILE KEYFILE` explicitly recovers a private
+key offline. Outputs never replace existing entries. See
+[authenticated configuration format and limits](../../docs/storage-volumes.md#authenticated-encrypted-volume-configurations).
+
 `rewrap-key ENVELOPE OLD_PASSPHRASE_FILE NEW_PASSPHRASE_FILE NEW_ENVELOPE`
 authenticates a sealed volume key and protects the same key with new credential
 bytes, fresh salt and nonce, without a plaintext keyfile. It publishes a separate

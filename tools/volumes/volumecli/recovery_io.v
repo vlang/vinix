@@ -64,7 +64,7 @@ fn key_random_bytes(output &u8, size int) bool {
 // publication and reporting. An owned directory prevents temporary-file swaps.
 @[direct_array_access]
 fn publish_recovery(edit &PlanEdit, bytes &u8, size int) bool {
-	if edit.directory < 0 || !edit.locked || (size != 64 && size != recovery_bytes && size != sealed_bytes) { return false }
+	if edit.directory < 0 || !edit.locked || (size != 64 && size != recovery_bytes && size != sealed_bytes && size != volume_seal_bytes) { return false }
 	mut info := C.stat{}
 	if C.fstat(edit.directory, unsafe { &info }) != 0 || info.st_mode & C.S_IFMT != C.S_IFDIR
 		|| info.st_uid != C.geteuid() || info.st_mode & 0o022 != 0 { plan_error(c'key destination directory must be owned and not writable by group or others'); return false }
