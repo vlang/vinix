@@ -1,0 +1,4 @@
+error writing /private/tmp/vinix-seekextent-1013/completion-x86/runtime/serial.c: failed to write /private/tmp/vinix-seekextent-1013/completion-x86/runtime/serial.c: No space left on device
+note: diagnostic replay for compiler_error produced no output; re-run with `-new-compiler` to investigate.
+
+Linux compatibility qualification failed; see /private/tmp/vinix-seekextent-1013/completion-x86/receipt.json

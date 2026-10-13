@@ -24,6 +24,8 @@ pub const at_eaccess = 0x200
 pub const seek_cur = 1
 pub const seek_end = 2
 pub const seek_set = 0
+pub const seek_data = 3
+pub const seek_hole = 4
 pub const resolve_no_xdev = u64(0x01)
 pub const resolve_no_magiclinks = u64(0x02)
 pub const resolve_no_symlinks = u64(0x04)
@@ -2009,7 +2011,7 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 	// otherwise seekable nodes. Refuse it before policy/type/argument checks.
 	if handle.flags & resource.o_path != 0 { return errno.err, errno.ebadf }
 	// Reject selectors outside Linux's 0..4 range before resource-type checks.
-	if whence < 0 || whence > 4 { return errno.err, errno.einval }
+	if whence < seek_set || whence > seek_hole { return errno.err, errno.einval }
 	handle.mac_check(proc.mac_inspect) or { return errno.err, errno.get() }
 
 	handle.l.acquire()
@@ -2034,6 +2036,17 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 		}
 		seek_end {
 			base = i64(handle.resource.stat.size) + offset
+		}
+		seek_data, seek_hole {
+			// Generic Linux reporting treats every in-file byte as data and the
+			// final EOF as a hole, without claiming physical extent discovery.
+			if handle.resource.stat.mode & stat.ifmt != stat.ifreg {
+				return errno.err, errno.einval
+			}
+			if offset < 0 || offset >= handle.resource.stat.size {
+				return errno.err, errno.enxio
+			}
+			base = if whence == seek_data { offset } else { handle.resource.stat.size }
 		}
 		else {
 			return errno.err, errno.einval

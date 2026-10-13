@@ -687,6 +687,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   and before pipe/socket/device type errors; qualify unchanged aliases,
   metadata, bytes/cursors/queues/readiness and flat storage on both architectures.
   See [the selector-error receipts](docs/linux-posix-qualification.md#native-seek-selector-error-precedence).
+- [x] Support generic native SEEK_DATA/SEEK_HOLE reporting and real ENXIO
+  boundaries; qualify signed64 sparse positions, shared aliases, retained
+  bytes/metadata/blocks, bounded backup-style copies and flat storage on both
+  architectures. See [the DATA/HOLE receipts](docs/linux-posix-qualification.md#generic-native-data-and-hole-seeks).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

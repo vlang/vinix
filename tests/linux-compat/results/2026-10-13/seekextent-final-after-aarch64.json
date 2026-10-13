@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "65b199f67334c2c421d5b1d02dc8bd12592c9700de6434b90c17dbf21ed31f15",
+    "results": [
+        {
+            "name": "seekextent",
+            "source_sha256": "b84d060a0e206f0ee7701bb91b6ac3576094b0f806f881ef44a6c3079a55bf31",
+            "init_sha256": "d7c9599e909e826bde69c16ef1b323a3d3f429724c7a310ece121e1258b6011d",
+            "iso_sha256": "591c0faf0bb2e30e85eac0568eb526abb2c615b4b58736467a4ce3f2fb659d6b",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

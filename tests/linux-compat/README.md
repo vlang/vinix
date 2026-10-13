@@ -134,6 +134,22 @@ character devices, GNU wrappers, foreign ABIs, actual cap-sized transfers,
 disk-backed vectors and shared-offset atomicity remain open. See the
 [qualification and receipts](../../docs/linux-posix-qualification.md#native-positioned-vector-imports-and-errors).
 
+The `seekextent` case checks 9,000 raw/musl SEEK_DATA/SEEK_HOLE calls in each
+root and UID/GID1000 child. Generic reporting treats every in-file byte as
+data and EOF as the final hole. Five sizes cover empty, small, page-crossing
+and sparse files above 4GiB/across 8GiB. Three access modes and original/dup/
+F_DUPFD_CLOEXEC aliases check signed64 boundaries, upper FD/selector words,
+shared cursors, ENXIO outside the file and retained metadata/blocks/bytes.
+Invalid/O_PATH and pipe/socket errors remain controls. Forty-five stable
+descriptors warm 32 and measure 200 cycles of 900 raw/libc seeks plus three
+temporary aliases, requiring flat slab objects and big pages. A bounded
+backup-style walker copies empty/small/page-crossing contents byte for byte.
+Its copy directory is explicitly writable for ordinary users; initial failed
+copy-setup runs remain published alongside fresh corrected baseline/candidate
+runs. Physical extent discovery, concurrent truncation, disk-backed paths and
+GNU/foreign ABIs remain separate. See
+[the DATA/HOLE receipts](../../docs/linux-posix-qualification.md#generic-native-data-and-hole-seeks).
+
 The `seekerror` case checks 3,888 native lseek refusals in each root and
 UID/GID1000 child. Twelve descriptor classes, original/dup/F_DUPFD_CLOEXEC
 handles, three FD/selector upper-word patterns and four signed64 offsets
@@ -143,7 +159,7 @@ stream selectors, ordinary file/directory cursors, sparse file seeks, alias
 flags/metadata and real queued bytes/FIONREAD/poll/EAGAIN stay valid. Sixteen
 stable descriptors warm 32 and measure 200 cycles of 1,296 invalid seeks plus
 valid controls and three transient dup/seek/close operations, with flat slab
-objects and big pages. Regular DATA/HOLE seeks, valid character-device seeks,
+objects and big pages. Physical extent discovery, valid character-device seeks,
 overflow/concurrency, GNU/foreign ABIs and disk-backed handles remain separate.
 See [the selector-error receipts](../../docs/linux-posix-qualification.md#native-seek-selector-error-precedence).
 

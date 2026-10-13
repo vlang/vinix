@@ -2537,3 +2537,84 @@ Regular SEEK_DATA/SEEK_HOLE, valid character-device seek behavior, relative/end
 overflow, shared-offset races, GNU wrappers, foreign/ELF32 paths, disk-backed
 files, allocation exhaustion and complete Linux installation/sandbox/portal/
 runtime support remain separate work. The three broad section-15 gates stay open.
+
+## Generic native data and hole seeks
+
+Regular files previously rejected SEEK_DATA and SEEK_HOLE with EINVAL.
+They now use conservative Linux reporting: an in-file offset is data and
+the final hole is EOF. Negative positions, empty files and positions at or
+beyond EOF return ENXIO without moving the cursor. Invalid/O_PATH descriptors
+and unseekable pipes/sockets retain their existing EBADF/ESPIPE ordering.
+Directories and other nonregular resources do not acquire generic extents.
+
+[Linux v6.12 generic seek](https://raw.githubusercontent.com/torvalds/linux/refs/tags/v6.12/fs/read_write.c)
+uses this model, and the [Linux lseek contract](https://raw.githubusercontent.com/mkerrisk/man-pages/master/man2/lseek.2)
+permits filesystems to conservatively report zero regions as data. These
+results do not claim discovery of physically unallocated extents.
+
+The V `seekextent` fixture checks 9,000 raw/musl calls in each root and
+UID/GID1000 child. Five sizes cover empty, four-byte, page-crossing and sparse
+files above 4GiB/across 8GiB. Three access modes and original/dup/
+F_DUPFD_CLOEXEC aliases combine ten signed64 positions, two selectors, three
+upper FD patterns and three upper-selector patterns. Libc calls exercise the
+same boundaries. Fresh baseline kernels fail every check; candidates pass
+all **18,000 checks per architecture**.
+
+Every probe resets its shared open description and verifies both alias and
+original cursors after success or refusal. Metadata inode/device/type/size/
+blocks and descriptor flags remain unchanged. Real A/zero/Z bytes at the
+beginning/middle/end and untouched EOF buffers retain file contents. Invalid,
+pathname and pipe/socket error controls pass both baseline and candidate.
+
+Two 200-cycle storage cohorts keep forty-five descriptors live, after 32
+warm-ups. Each cycle makes 900 raw/libc seeks plus three transient alias probes
+and metadata/byte controls. Every slab class remains flat, with big pages
+**451/451 ARM and 6,308/6,308 x86** in both credential groups. A bounded
+backup-style DATA/HOLE walker copies empty, small and page-crossing files,
+including zero regions, then compares every byte and the destination size.
+
+The first candidate aggregates remain failed. Their syscall and storage
+checks pass in both cohorts and root copies pass, but the ordinary-user copy
+attempted creation directly beneath the minimal image's root-owned 0755 /tmp.
+The final fixture creates and chmods its own writable copy directory. Fresh
+baseline and candidate runs bind that corrected source/C; both credential
+copy cohorts then pass on the identical candidate kernels. All checking,
+ownership, observer and copy routines otherwise remain byte-identical in
+generated C after canonicalizing source-position-derived unused loop-counter
+names, except the two target path strings. Original failures remain
+published alongside final results.
+
+The original x86 aggregate additionally failed to open its final receipt for
+writing after a logged runtime PASS, leaving four recorded rows. A fresh
+runtime-only completion receipt passes on the identical kernel with identical
+generated fixture C. The original partial receipt remains unchanged.
+Its first completion attempt failed before init/image creation when host disk
+exhaustion stopped serial-helper C generation; that failure is also preserved.
+
+Independent lifetime review verifies each new error path releases the handle
+lock before its one FD unref. Success changes only the scalar cursor under
+the existing lock. No allocation, reference or lock owner is added. Removing
+the extent branch, equivalent selector constants and generated return-name
+changes restores the complete seek body. Replacing that body and removing
+two new constants restores the entire baseline generated kernel C. The
+fixture uses bounded Handles/Slabs/copy buffers and initialized-owner cleanup;
+all final before/after fixture C captures match its final preview.
+
+Four additional cases pass on both candidates: seekerror, opathseek, scalarabi
+and runtime. Eight host test files, fresh kernel builds and inventory checks
+pass. Existing allocation allowance failures retain **406 ARM / 295 x86**
+sites and identical NEW rows; no allowance is increased.
+
+[ARM evidence](../tests/linux-compat/results/2026-10-13/seekextent-aarch64-evidence.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-13/seekextent-x86_64-evidence.json)
+and the [assertion-enabled V auditor](../tests/linux-compat/results/2026-10-13/seekextent-audit.v)
+bind raw original/final logs, source/init/image hashes, kernel binaries/C,
+host/allocation checks and both executed failing controls. Private worktrees
+pin `001a3b9967`; only `fs/vfs.v` differs. The compiler is the clean
+`f6358ecff9` snapshot. All 63 isolated semantic inputs are fingerprinted
+separately from the public committed-parent dispatch inventory.
+
+Physical extent discovery, concurrent truncation/shared-offset races,
+disk-backed qualification, GNU wrappers, foreign/ELF32 paths, allocation
+exhaustion and complete Linux installation/sandbox/portal/runtime support
+remain separate work. The three broad section-15 gates stay open.
