@@ -149,6 +149,7 @@ fn swift_array_arena() u64 {
 fn swift_array_symbol(symbol string) ?u64 {
 	return match symbol {
 		'_$ss27_allocateUninitializedArrayySayxG_BptBwlF' { u64(unsafe { voidptr(swift_array_allocate) }) }
+		'_$sSa28_allocateBufferUninitialized15minimumCapacitys06_ArrayB0VyxGSi_tFZ' { u64(unsafe { voidptr(swift_array_buffer_allocate) }) }
 		'_$sSaMa' { swift_array_arena() }
 		'_$sSaMn' { swift_array_arena() + u64(C.getpagesize()) + 160 }
 		else { none }

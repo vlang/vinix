@@ -114,7 +114,19 @@ fn swift_array_empty() u64 {
 
 fn swift_array_allocate(count i64, element u64) SwiftArrayAllocation {
 	layout := swift_array_layout(count, element) or { panic(err) }
-	if count == 0 {
+	return swift_array_allocate_layout(layout, u64(count))
+}
+
+// Unlike _allocateUninitializedArray, _ArrayBuffer reserves a tail with no
+// initialized elements. Publish count zero before registering its owner; the
+// caller constructs values and then publishes their initialized count.
+fn swift_array_buffer_allocate(minimum_capacity i64, element u64) u64 {
+	layout := swift_array_layout(minimum_capacity, element) or { panic(err) }
+	return swift_array_allocate_layout(layout, 0).owner
+}
+
+fn swift_array_allocate_layout(layout SwiftArrayLayout, initialized_count u64) SwiftArrayAllocation {
+	if layout.storage.capacity == 0 {
 		owner := swift_array_empty()
 		return SwiftArrayAllocation{ owner: owner, bytes: owner + layout.storage.tail }
 	}
@@ -128,8 +140,8 @@ fn swift_array_allocate(count i64, element u64) SwiftArrayAllocation {
 	unsafe {
 		*(&u64(owner)) = u64(&swift_array_storage_descriptor)
 		*(&u64(owner + 8)) = 3
-		*(&u64(owner + 16)) = u64(count)
-		*(&u64(owner + 24)) = (u64(count) << 1) | if layout.storage.verbatim { u64(1) } else { u64(0) }
+		*(&u64(owner + 16)) = initialized_count
+		*(&u64(owner + 24)) = (layout.storage.capacity << 1) | if layout.storage.verbatim { u64(1) } else { u64(0) }
 	}
 	C.ios_objc_initialize_lock()
 	ios_runtime.swift_arrays[owner] = layout.storage

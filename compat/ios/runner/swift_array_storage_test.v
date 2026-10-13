@@ -4,10 +4,12 @@ module main
 $if macos {
 	#flag -framework CoreFoundation
 	#include <CoreFoundation/CFString.h>
+	#include <objc/runtime.h>
 }
 #include <dlfcn.h>
 fn C.dlopen(&char, i32) voidptr
 fn C.dlsym(voidptr, &char) voidptr
+fn C.objc_getClass(&char) voidptr
 fn C.CFStringCreateMutable(voidptr, i64) voidptr
 fn C.CFGetRetainCount(voidptr) i64
 fn C.CFRetain(voidptr) voidptr
@@ -15,6 +17,7 @@ fn C.CFRelease(voidptr)
 fn C.mincore(voidptr, usize, &u8) i32
 
 type StorageAllocate = fn (i64, u64) SwiftArrayAllocation
+type StorageBufferAllocate = fn (i64, u64) u64
 type StorageRetain = fn (u64) u64
 type StorageRelease = fn (u64)
 type StorageUnique = fn (u64) bool
@@ -22,13 +25,17 @@ type StorageAccess = fn (u64, u64) SwiftAssociatedMetadata
 type StorageCopy = fn (u64, u64, u64) u64
 type StorageSign = fn (u64, u64) u64
 type StorageCString = fn (&u8) SwiftStringWords
+type StorageObjCMetadata = fn (u64) u64
 
 struct StorageApi {
 	native bool
 	string_metadata u64
 	int_metadata u64
+	objc_metadata u64
 	@[required]
 	allocate StorageAllocate
+	@[required]
+	buffer_allocate StorageBufferAllocate
 	@[required]
 	retain StorageRetain
 	@[required]
@@ -70,16 +77,19 @@ fn storage_string_refs(api StorageApi, object u64) u64 {
 	return u64(obj_header(object).refs)
 }
 
-fn storage_strings(api StorageApi) {
+fn storage_strings(api StorageApi, buffer bool) {
 	mut object := u64(0)
 	$if macos { if api.native { object = u64(C.CFStringCreateMutable(unsafe { nil }, 0)) } }
 	if !api.native { object = owned_string('Array Element destroy owner') }
-	value := api.allocate(3, api.string_metadata)
+	owner := if buffer { api.buffer_allocate(3, api.string_metadata) } else { api.allocate(3, api.string_metadata).owner }
+	value := SwiftArrayAllocation{ owner: owner, bytes: owner + 32 }
+	if buffer { assert read64(owner + 16) == 0 && read64(owner + 24) >> 1 >= 3 }
 	for i in 0 .. 3 {
 		$if macos { if api.native { C.CFRetain(unsafe { voidptr(object) }) } }
 		if !api.native { objc_retain(object) }
 		unsafe { *(&SwiftStringWords(value.bytes + u64(i * 16))) = SwiftStringWords{ first: 0, second: object | 0x5000000000000000 } }
 	}
+	if buffer { unsafe { *(&u64(owner + 16)) = 3 } }
 	assert storage_string_refs(api, object) == 4
 	metadata := api.access(0, api.string_metadata).metadata
 	copy_witness := unsafe { StorageCopy(voidptr(read64(read64(metadata - 8) + 16))) }
@@ -211,6 +221,19 @@ fn storage_custom(api StorageApi, probe u64, alignment u64, size u64, count i64,
 	assert api.retain(value.owner) == value.owner
 	api.release(value.owner); assert scenario.visited == 0
 	api.release(value.owner); assert scenario.visited == if size == 0 { u64(0) } else { u64(count) }
+	// Reserve the same layout with no live elements. Empty and partially
+	// initialized tails must not invoke destroy for unused capacity.
+	uninitialized := api.buffer_allocate(count, metadata)
+	assert read64(uninitialized + 16) == 0 && read64(uninitialized + 24) >> 1 >= u64(count)
+	assert (uninitialized + tail) % alignment == 0
+	api.release(uninitialized)
+	scenario.visited = 0
+	scenario.owner = api.buffer_allocate(count, metadata)
+	scenario.bytes = scenario.owner + tail
+	if size != 0 { for i in i64(0) .. count { unsafe { *(&u64(scenario.bytes + u64(i) * stride)) = u64(i + 1) } } }
+	unsafe { *(&u64(scenario.owner + 16)) = u64(count) }
+	api.release(scenario.owner)
+	assert scenario.visited == if size == 0 { u64(0) } else { u64(count) }
 	// Native generic metadata permanently caches the supplied Element key.
 	// Keep its fixture mapping alive until this test process exits.
 	if !api.native { assert C.munmap(unsafe { voidptr(words) }, page) == 0 }
@@ -224,13 +247,71 @@ fn storage_worker(api StorageApi) {
 		assert api.retain(value.owner) == value.owner
 		api.release(value.owner); api.release(value.owner)
 		assert api.access(0, api.int_metadata).state == 0
+		buffer := api.buffer_allocate(5, api.string_metadata)
+		assert read64(buffer + 16) == 0 && read64(buffer + 24) >> 1 >= 5
+		api.release(buffer)
 	}
+}
+
+fn storage_buffers(api StorageApi, element u64, stride u64) {
+	for capacity in [i64(0), 1, 2, 3, 7, 8, 15, 16, 31, 32, 257]! {
+		for initialized in [i64(0), capacity / 2, capacity]! {
+			owner := api.buffer_allocate(capacity, element)
+			assert owner != 0 && read64(owner + 16) == 0
+			if capacity == 0 {
+				assert owner == api.allocate(0, api.int_metadata).owner
+				assert read64(owner + 8) == 0x80000004ffffffff && read64(owner + 24) == 1
+				assert !api.unique(owner)
+			} else {
+				assert read64(owner + 8) == 3 && api.unique(owner)
+				assert read64(owner + 24) & 1 == 0 && read64(owner + 24) >> 1 >= u64(capacity)
+				for i in i64(0) .. initialized {
+					bytes := owner + 32 + u64(i) * stride
+					if stride == 16 { unsafe { *(&SwiftStringWords(bytes)) = SwiftStringWords{ second: 0xe000000000000000 } } }
+					else { unsafe { *(&u64(bytes)) = u64(i) } }
+				}
+				unsafe { *(&u64(owner + 16)) = u64(initialized) }
+			}
+			assert api.retain(owner) == owner && !api.unique(owner)
+			api.release(owner)
+			assert api.unique(owner) == (capacity != 0)
+			api.release(owner)
+		}
+	}
+}
+
+fn storage_buffer_objects(api StorageApi) {
+	mut object := u64(0)
+	$if macos { if api.native { object = u64(C.CFStringCreateMutable(unsafe { nil }, 0)) } }
+	if !api.native { object = owned_string('partially initialized ObjC Array buffer') }
+	owner := api.buffer_allocate(3, api.objc_metadata)
+	assert read64(owner + 16) == 0 && read64(owner + 24) & 1 == 1 && read64(owner + 24) >> 1 >= 3
+	for i in 0 .. 2 {
+		$if macos { if api.native { C.CFRetain(unsafe { voidptr(object) }) } }
+		if !api.native { objc_retain(object) }
+		unsafe { *(&u64(owner + 32 + u64(i * 8))) = object }
+	}
+	// Poison the uninitialized slot: destruction must only visit the live prefix.
+	unsafe { *(&u64(owner + 48)) = 0xdeadbeef; *(&u64(owner + 16)) = 2 }
+	assert storage_string_refs(api, object) == 3
+	assert api.retain(owner) == owner
+	api.release(owner); assert storage_string_refs(api, object) == 3
+	api.release(owner); assert storage_string_refs(api, object) == 1
+	$if macos { if api.native { C.CFRelease(unsafe { voidptr(object) }) } }
+	if !api.native { objc_release(object) }
+	empty := api.buffer_allocate(0, api.objc_metadata)
+	assert empty == api.allocate(0, api.int_metadata).owner && read64(empty + 24) == 1
+	api.release(empty)
 }
 
 fn storage_run(api StorageApi, probe u64) {
 	storage_primitive(api, api.int_metadata, 8)
 	storage_primitive(api, api.string_metadata, 16)
-	storage_strings(api)
+	storage_strings(api, false)
+	storage_strings(api, true)
+	storage_buffers(api, api.int_metadata, 8)
+	storage_buffers(api, api.string_metadata, 16)
+	storage_buffer_objects(api)
 	storage_nested(api)
 	storage_owned_tail(api)
 	for alignment in [u64(1), 8, 16, 32, 64, 128, 256]! {
@@ -288,17 +369,22 @@ fn test_swift_array_storage() {
 	defer { assert C.munmap(unsafe { voidptr(probe) }, page) == 0 }
 	$if macos {
 		lib := C.dlopen(c'/usr/lib/swift/libswiftCore.dylib', C.RTLD_NOW)
+		objc_metadata := unsafe { StorageObjCMetadata(C.dlsym(lib, c'swift_getObjCClassMetadata')) }
 		api := StorageApi{ native: true, string_metadata: u64(C.dlsym(lib, c'$sSSN')), int_metadata: u64(C.dlsym(lib, c'$sSiN')),
+			objc_metadata: objc_metadata(u64(C.objc_getClass(c'NSString'))),
 			allocate: unsafe { StorageAllocate(C.dlsym(lib, c'$ss27_allocateUninitializedArrayySayxG_BptBwlF')) },
+			buffer_allocate: unsafe { StorageBufferAllocate(C.dlsym(lib, c'$sSa28_allocateBufferUninitialized15minimumCapacitys06_ArrayB0VyxGSi_tFZ')) },
 			retain: unsafe { StorageRetain(C.dlsym(lib, c'swift_bridgeObjectRetain')) }, release: unsafe { StorageRelease(C.dlsym(lib, c'swift_bridgeObjectRelease')) },
 			unique: unsafe { StorageUnique(C.dlsym(lib, c'swift_isUniquelyReferenced_nonNull_native')) }, access: unsafe { StorageAccess(C.dlsym(lib, c'$sSaMa')) } }
 		storage_run(api, probe)
+		println('IOS-SWIFT-ARRAY-BUFFER-NATIVE: 66 Int/String capacity and initialized-count cases, owned String aliases, custom alignments through 256, zero-sized elements, uninitialized destruction, reentrant callbacks and eight workers')
 		println('IOS-SWIFT-ARRAY-STORAGE-NATIVE: allocator result/header ABI, canonical immortal empty storage, alignments through 256, POD/zero-sized/String/custom elements, Array witness aliases, forward destruction, reentrant callbacks and eight allocation workers')
 	}
 	for _ in 0 .. 2 {
 		objc_start(); library := '/usr/lib/swift/libswiftCore.dylib'
-		api := StorageApi{ string_metadata: swift_string_metadata(), int_metadata: runtime_symbol(library, '_$sSiN') or { panic(err) },
+		api := StorageApi{ string_metadata: swift_string_metadata(), int_metadata: runtime_symbol(library, '_$sSiN') or { panic(err) }, objc_metadata: swift_objc_metadata(ios_runtime.names['NSString']),
 			allocate: unsafe { StorageAllocate(voidptr(runtime_symbol(library, '_$ss27_allocateUninitializedArrayySayxG_BptBwlF') or { panic(err) })) },
+			buffer_allocate: unsafe { StorageBufferAllocate(voidptr(runtime_symbol(library, '_$sSa28_allocateBufferUninitialized15minimumCapacitys06_ArrayB0VyxGSi_tFZ') or { panic(err) })) },
 			retain: swift_bridge_retain, release: swift_bridge_release, unique: swift_is_unique_native, access: swift_array_access }
 		storage_run(api, probe); storage_invalid(api.string_metadata)
 		assert ios_runtime.swift_arrays.len == 0 && ios_runtime.swift_strings.len == 0 && ios_runtime.swift_buffers.len == 0 && ios_runtime.objects.len == 0
@@ -308,4 +394,5 @@ fn test_swift_array_storage() {
 		storage_retired(empty)
 	}
 	println('IOS-SWIFT-ARRAY-STORAGE: checked typed allocation and alignment, real Element destruction after registry retirement without locked callbacks, immutable canonical empty owner, POD/zero-sized/String/custom values, Array aliases, overflow/rejected layouts, concurrent workers and two drained/unmapped teardowns')
+	println('IOS-SWIFT-ARRAY-BUFFER: capacity reservation publishes count zero, caller initializes live prefix, aliases preserve ownership, unused tails never destroy, checked typed layouts and two drained runtime lifetimes')
 }

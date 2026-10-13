@@ -4484,17 +4484,50 @@ Five published runners remain unchanged. Fortnite passes the former
 first(where:) import and exits with status 1 before entry at `_$sSa28_allocateBufferUninitialized15minimumCapacitys06_ArrayB0VyxGSi_tFZ`.
 Full regression remains unpassed; entry, rendering and gameplay are unverified.
 
+`Swift Array buffer allocation` now implements the measured storage helper
+`_$sSa28_allocateBufferUninitialized15minimumCapacitys06_ArrayB0VyxGSi_tFZ`.
+Installed Swift code and the MarketplaceKitWrapper callsite establish minimum
+capacity in x0, Element metadata in x1 and an owned one-word buffer in x0.
+The native delegate reserves an aligned tail using Element stride, writes
+count zero and derives capacity from allocated bytes. Vinix reserves the
+exact requested minimum with the existing checked typed storage allocator.
+Its count is zero before owner registration; callers construct the live
+prefix and publish its count before release. Unused capacity is never
+destroyed. Registered Objective-C wrapper elements keep their verbatim
+capacity flag and ARC witnesses. Empty buffers share the immutable immortal
+owner. Negative/overflowing capacities and unsupported or incomplete Element
+layouts reject through the existing checks. Native capacity rounding,
+arbitrary Swift storage classes, reflection and bridging remain unsupported.
+
+The fixture checks the native and Vinix contract in 66 Int/String capacity
+and initialized-count cases, owned String aliases, partially initialized
+Objective-C buffers with a poisoned unused slot, custom alignments through
+256, zero-sized elements, reentrant destroy callbacks, eight allocation
+workers and two drained/unmapped runtime lifetimes. All 88 programs build;
+130 original generated C streams restore to their hashes. Forty-two host
+suites pass ASAN/UBSAN in both hashing modes, and Vinix passes 32 Objective-C
+and 43 Swift/loader programs. Generated C confirms the stack out parameter
+and initialized count before registration without hidden helper allocations.
+Evidence is retained under `build/ios/fortnite/array-buffer-checks`, with
+native/callsite inspection, pinned copies of actual compiler inputs, original
+generated C and executable/debug archives. The mutable canonical V checkout
+is outside the build inputs. Evidence and compiler bytes are hash-verified
+after persistence from the owned 8 GiB RAM volume, which is then detached.
+Five published runners remain unchanged. Fortnite passes the former buffer
+allocator import and exits with status 1 before entry at `_$sSayxGSTsMc`.
+Full regression remains unpassed; entry, rendering and gameplay are unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,449 | 711 | 79 |
+| Fortnite executable | 1,450 | 710 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 130 | 46 | 23 |
-| All images | 2,238 | 760 | 120 |
+| MarketplaceKitWrapper | 131 | 45 | 23 |
+| All images | 2,240 | 758 | 120 |
 
-The C++/GLES/Text variant reports 2,251 resolved imports, 747 unresolved strong
+The C++/GLES/Text variant reports 2,253 resolved imports, 745 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
