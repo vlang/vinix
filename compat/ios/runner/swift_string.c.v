@@ -233,6 +233,7 @@ fn swift_buffers_stop() {
 }
 
 fn swift_core_symbol(symbol string) ?u64 {
+	if address := swift_raw_alloc_symbol(symbol) { return address }
 	if address := swift_once_symbol(symbol) { return address }
 	if address := swift_witness_symbol(symbol) { return address }
 	if address := swift_mangled_symbol(symbol) { return address }

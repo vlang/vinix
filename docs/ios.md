@@ -4696,20 +4696,63 @@ The supplied IPA passes this import and exits with status 1 before entry at
 MarketplaceKitWrapper's required `UnsafeMutablePointer.deallocate` import,
 `_$sSp10deallocateyyF`. Native disassembly on this Mac shows its shared pointer
 deallocation entry sets size and alignment-mask arguments to -1 and tail-calls
-`swift_slowDealloc`. That entry is still unimplemented. Fortnite has not
-entered application code and remains unplayable.
+`swift_slowDealloc`. That entry was unimplemented at that stage. Fortnite had
+not entered application code.
+
+Swift raw allocation now uses V adapters for `swift_slowAlloc`,
+`swift_slowDealloc` and the typed/raw, mutable/immutable pointer `deallocate`
+methods. Native SwiftCore disassembly and the installed SDK establish a raw
+pointer in x0; the pointer methods replace size/alignment-mask arguments with
+-1 and tail-call the raw deallocator. They inspect neither Pointee metadata
+nor pointed-to values and perform no ARC release. The caller must deinitialize
+stored values before freeing their storage.
+
+Zero-size allocation provides one addressable byte. Valid masks request a
+power-of-two alignment; -1 requests the native ARM64 default of 16 bytes.
+Larger alignments use POSIX `posix_memalign`, and ordinary allocations use
+`malloc`. Both return storage compatible with the runner's libSystem `free`.
+The deallocator ignores its byte count, including the unknown-size sentinel,
+and frees aligned storage through the same POSIX allocator. There is no
+private header or Swift owner registry for raw memory. Overflowing allocation
+sizes, malformed masks and allocation failures reject before returning a
+pointer. These contracts follow Swift's public [heap implementation](https://github.com/swiftlang/swift/blob/main/stdlib/public/runtime/Heap.cpp).
+
+Ten ASan/UBSan runs pass across raw allocation, heap, task allocation,
+Collection and Array storage fixtures in normal/deterministic hashing modes.
+The same five suites pass in a fresh ARM64 Vinix guest. Native comparisons
+cover 63 raw layouts, 84 pointer frees and libSystem interoperability. Runtime
+checks additionally preserve reference counts of stored objects, run eight
+workers through 300 allocation/free cycles each, reject overflow/malformed
+layouts and drain two runtime lifetimes. The dedicated `build-swift-raw-alloc`
+target is included in public full-build, regression and Swift guest modes.
+Thirteen generated-C streams/executables, native SDK/LLVM measurements and VM
+evidence are retained under `build/ios/fortnite/raw-alloc-checks`. The initial
+temporary driver catalogue omission and stale resume invocation are retained
+as rejected trials; the missing fixture was freshly built before all five
+guest suites passed. Generated C verifies only caller-owned payload allocation,
+stack pointer scratch and borrowed static errors; its initial symbol-spelling
+audit mismatch is also retained. Full iOS regression remains unpassed.
+
+Both import audits resolve four more required imports across the supplied
+images. The actual IPA probe now exits with status 1 before entry at
+MarketplaceKitWrapper's required `UnsafeMutablePointer.deinitialize(count:)`
+import, `_$sSp12deinitialize5countSvSi_tF`. Native disassembly records count in
+x0, the raw pointer in x1 and the returned raw pointer in x0; the SDK describes
+destroying initialized Pointee values without freeing their storage. This
+entry remains unimplemented. Fortnite has not entered application code and
+remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,456 | 704 | 79 |
+| Fortnite executable | 1,458 | 702 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 135 | 41 | 23 |
-| All images | 2,250 | 748 | 120 |
+| MarketplaceKitWrapper | 137 | 39 | 23 |
+| All images | 2,254 | 744 | 120 |
 
-The C++/GLES/Text variant reports 2,263 resolved imports, 735 unresolved strong
+The C++/GLES/Text variant reports 2,267 resolved imports, 731 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

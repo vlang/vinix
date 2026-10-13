@@ -114,6 +114,7 @@ fn main() {
 		require_child('/opt/ios/swift-void-checks')
 		require_child('/opt/ios/swift-version-checks')
 		require_child('/opt/ios/swift-initializer-checks')
+		require_child('/opt/ios/swift-raw-alloc-checks')
 		require_child('/opt/ios/swift-heap-checks')
 		require_child('/opt/ios/swift-error-checks')
 		require_child('/opt/ios/swift-error-value-checks')
@@ -144,7 +145,7 @@ fn main() {
 		if os.is_dir('/opt/ios/lookup-native') { os.setenv('VINIX_IOS_LOOKUP_NATIVE', '/opt/ios/lookup-native', true) }
 		require_child('/opt/ios/module-lookup-checks')
 		for name in ['unknown-value', 'string', 'empty-string', 'describing', 'cstring', 'foreign-count', 'foreign-index', 'foreign-offset', 'foreign-subscript', 'utf16-offset', 'sequence', 'array-sequence', 'collection', 'set', 'metadata', 'protocol', 'hash', 'hasher', 'raw-representable',
-			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg', 'void', 'version', 'initializer', 'heap', 'error', 'error-value', 'object-type', 'mangled', 'witness', 'once', 'objc-bool', 'actor-executor', 'task-priority', 'task-alloc', 'task-create', 'task-switch', 'nslog', 'string-unbridge', 'error-description'] {
+			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg', 'void', 'version', 'initializer', 'raw-alloc', 'heap', 'error', 'error-value', 'object-type', 'mangled', 'witness', 'once', 'objc-bool', 'actor-executor', 'task-priority', 'task-alloc', 'task-create', 'task-switch', 'nslog', 'string-unbridge', 'error-description'] {
 			require_child('/opt/ios/swift-' + name + '-checks')
 		}
 		println('VINIX iOS SWIFT: PASS')
