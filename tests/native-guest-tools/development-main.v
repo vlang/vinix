@@ -11,6 +11,7 @@ import tools.development.sourcecore
 import tools.packages.pkgcore
 import crypto.ed25519
 import encoding.hex
+import tests.development.referencecore
 
 struct Pin {
 	path   string
@@ -72,6 +73,8 @@ struct NativeStep {
 }
 
 struct NativeBuild {
+	schema int
+	plan_sha256 string
 	source   Pin
 	inputs   []Pin
 	tools    map[string]Pin
@@ -135,6 +138,10 @@ struct Receipt {
 	v_root_sha256   string
 	v_smoke_root_sha256 string
 	selfhost_v bool
+	reference_sdk_sha256 string
+	reference_runtime_sha256 string
+	reference_profiles []string
+	reference_tools map[string]Pin
 	native_source_sha256 string
 	native_source_revision string
 	tools           map[string]string
@@ -213,6 +220,11 @@ fn run() !int {
 	}
 	arch := os.args[1]
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported architecture') }
+	reference := referencecore.options(os.getenv('VINIX_DEVELOPMENT_REFERENCE_SDK'),
+		os.getenv('VINIX_DEVELOPMENT_REFERENCE_PROFILES'), arch)!
+	if reference.root != '' && os.args.len != 5 {
+		return error('reference SDK mode uses only the base arguments; prepare one complete reference SDK instead of mixing runtimes')
+	}
 	selfhost_option := os.getenv('VINIX_DEVELOPMENT_SELFHOST_V')
 	if selfhost_option !in ['', '0', '1'] { return error('VINIX_DEVELOPMENT_SELFHOST_V must be 0 or 1') }
 	selfhost_v := selfhost_option == '1'
@@ -332,6 +344,66 @@ fn run() !int {
 	mut native_plan := BuildPlan{}
 	mut profiles := []string{}
 	mut compiler_hashes := map[string]string{}
+	mut reference_plan := BuildPlan{}
+	mut reference_plan_sha := ''
+	mut reference_hash := ''
+	mut reference_runtime_hash := ''
+	mut reference_tools := map[string]Pin{}
+	if reference.root != '' {
+		os.mkdir_all(root + '/opt')!
+		mut hash := sha256.new()
+		copy_sdk(reference.root, root + '/opt/reference', reference.root, '.', mut hash)!
+		// The imported prefix and default musl loader path are independently
+		// pinned. No runtime from a second compiler SDK is overwritten.
+		copy_sdk(root + '/opt/reference/lib', root + '/lib', root + '/opt/reference', './runtime-lib', mut hash)!
+		loader := 'ld-musl-' + arch + '.so.1'
+		if !os.exists(root + '/lib/' + loader) && !os.is_link(root + '/lib/' + loader) {
+			os.symlink('libc.so', root + '/lib/' + loader)!
+		}
+		for directory in ['/opt/reference/lib', '/lib'] {
+			for name in os.ls(root + directory)! {
+				path := root + directory + '/' + name
+				if os.is_link(path) && os.readlink(path)! == '/lib/libc.so' {
+					os.rm(path)!
+					os.symlink('libc.so', path)!
+				}
+			}
+		}
+		reference_hash = devcore.tree_hash(root + '/opt/reference')!
+		reference_runtime_hash = devcore.tree_hash(root + '/lib')!
+		mut steps := []BuildStep{}
+		for name in referencecore.required_tools(reference.profiles) {
+			pin := reference.tools[name]
+			copied := root + '/opt/reference/bin/' + name
+			if digest(copied)! != pin.sha256 { return error('reference tool changed during copy: ' + name) }
+			reference_tools[name] = Pin{'/opt/reference/bin/' + name, pin.sha256}
+			if name == 'sh' {
+				os.mkdir_all(root + '/bin')!
+				os.symlink('/opt/reference/bin/sh', root + '/bin/sh')!
+			} else {
+				steps << BuildStep{ name: 'version-' + name, argv: ['{' + name + '}', '--version'], artifacts: []string{} }
+			}
+		}
+		source := root + '/home/developer/reference-source'
+		os.mkdir(source, mode: 0o755)!
+		os.write_file(source + '/profiles.txt', reference.profiles.join(',') + '\n')!
+		os.chmod(source + '/profiles.txt', 0o644)!
+		steps << BuildStep{ name: 'qualify', argv: ['{qualifier}', '--require-vinix', '{work}/qualification', reference.profiles.join(',')],
+			artifacts: referencecore.artifacts(reference.profiles) }
+		mut tools := reference_tools.clone()
+		tools['qualifier'] = Pin{'/usr/bin/vinix-qualify', hashes['vinix-qualify']}
+		reference_plan = BuildPlan{
+			source: Pin{'/home/developer/reference-source', devcore.tree_hash(source)!}
+			inputs: [Pin{'/opt/reference', reference_hash}, Pin{'/lib', reference_runtime_hash}]
+			tools: tools
+			environment: { 'PATH': '/opt/reference/bin:/usr/bin:/bin', 'VINIX_QUALIFY_TIMEOUT_SECONDS': '600' }
+			timeout_seconds: 1800
+			steps: steps
+		}
+		plan_text := json2.encode(reference_plan)
+		reference_plan_sha = sha256.sum(plan_text.bytes()).hex()
+		os.write_file(root + '/home/developer/reference-build.json', plan_text)!
+	}
 	if os.args.len >= 6 {
 		sdk := os.real_path(os.args[5])
 		os.mkdir_all(root + '/opt')!
@@ -502,7 +574,7 @@ fn run() !int {
 	if arch == 'x86_64' {
 		if cpu := os.getenv_opt('VINIX_QEMU_CPU') { command[command.index('-cpu') + 1] = cpu }
 	}
-	if sdk_hash != '' {
+	if sdk_hash != '' || reference_hash != '' {
 		for i, argument in command { if argument == '-m' {
 			command[i + 1] = if selfhost_v { '8192' } else if v_root_hash == '' { '2048' } else { '3072' }
 		} }
@@ -520,6 +592,7 @@ fn run() !int {
 	if v_root_hash != '' { expected << 'DEVELOPMENT USERLAND PASS:' }
 	if v_root_hash != '' { expected << 'DEVELOPMENT PACKAGES PASS:' }
 	if selfhost_v { expected << 'DEVELOPMENT SELFHOST PASS:' }
+	if reference_hash != '' { expected << 'DEVELOPMENT REFERENCE PASS:' }
 	if 'lscpu-smoke' in hashes { expected << 'DEVELOPMENT CPU PASS:' }
 	if 'v-smoke' in hashes { expected << 'DEVELOPMENT V SMOKE PASS:' }
 	result := guesthost.boot(command, launch.env, state, expected,
@@ -539,16 +612,53 @@ fn run() !int {
 			'/home/developer/native-a/work/release/index.sig', '/home/developer/native-b/work/release/index.sig',
 			'/home/developer/deadline-state/state.json', '/home/developer/term-state/state.json',
 			'/home/developer/int-state/state.json', '/home/developer/watch-state/state.json',
-			'/home/developer/interrupted-before.json', '/home/developer/interrupted-state/state.json'] {
+			'/home/developer/interrupted-before.json', '/home/developer/interrupted-state/state.json',
+			'/home/developer/reference-build.json', '/home/developer/reference-a/receipt.json', '/home/developer/reference-b/receipt.json',
+			'/home/developer/reference-a/work/qualification/report.json', '/home/developer/reference-b/work/qualification/report.json'] {
 			return error('unexpected guest receipt path')
 		}
 		json2.decode[json2.Any](body)!
 		receipts[path] = body
 	}
-	if result == 0 && receipts.len != if sdk_hash == '' { 12 } else if v_root_hash == '' { 13 } else { 20 } {
+	if result == 0 && receipts.len != if reference_hash != '' { 17 } else if sdk_hash == '' { 12 } else if v_root_hash == '' { 13 } else { 20 } {
 		return error('missing native workflow receipts')
 	}
 	if result == 0 {
+		if reference_hash != '' {
+			mut common := map[string]string{}
+			mut tool_pins := map[string]devcore.Pin{}
+			for name, pin in reference_tools { tool_pins[name] = devcore.Pin{pin.path, pin.sha256} }
+			for output in ['reference-a', 'reference-b'] {
+				work := '/home/developer/' + output + '/work'
+				receipt := json2.decode[NativeBuild](receipts['/home/developer/' + output + '/receipt.json'], strict: true)!
+				if receipt.schema != 1 || receipt.plan_sha256 != reference_plan_sha
+					|| !receipt.complete || receipt.uid != 1000 || receipt.kernel != 'Vinix' || receipt.epoch != 1700000000
+					|| receipt.source != reference_plan.source || receipt.inputs != reference_plan.inputs || receipt.tools != reference_plan.tools
+					|| receipt.steps.len != reference_plan.steps.len || receipt.steps.any(it.exit_code != 0 || it.detail != '') {
+					return error('reference SDK build inputs, account or completion failed validation')
+				}
+				for i, step in receipt.steps {
+					planned := reference_plan.steps[i]
+					mut argv := planned.argv.map(it.replace('{work}', work))
+					for name, pin in reference_plan.tools { argv = argv.map(it.replace('{' + name + '}', pin.path)) }
+					if step.name != planned.name || step.argv != argv || step.artifacts.len != planned.artifacts.len {
+						return error('reference SDK command order, argv or artifacts changed')
+					}
+					for name in planned.artifacts {
+						hash := step.artifacts[name]
+						if hash.len != 64 { return error('missing reference output hash') }
+						if name == 'qualification/report.json' { continue }
+						if output == 'reference-a' { common[name] = hash }
+						else if common[name] != hash { return error('reference artifact differs between workspaces: ' + name) }
+						if name.ends_with('/project.data') && hash != sha256.sum('42'.bytes()).hex() {
+							return error('reference project readback artifact changed')
+						}
+					}
+				}
+				referencecore.verify_report(receipts[work + '/qualification/report.json'], arch, reference.profiles,
+					hashes['vinix-qualify'], tool_pins, work, receipt.steps.last().artifacts)!
+			}
+		}
 		for name in ['deadline', 'term', 'int', 'watch', 'interrupted', 'interrupted-before'] {
 			path := '/home/developer/' + if name == 'interrupted-before' { name + '.json' } else { name + '-state/state.json' }
 			state_receipt := json2.decode[NativeSchedule](receipts[path], strict: true)!
@@ -659,6 +769,10 @@ fn run() !int {
 		v_root_sha256:   v_root_hash
 		v_smoke_root_sha256: v_smoke_hash
 		selfhost_v: selfhost_v
+		reference_sdk_sha256: reference_hash
+		reference_runtime_sha256: reference_runtime_hash
+		reference_profiles: reference.profiles
+		reference_tools: reference_tools
 		native_source_sha256: native_plan.source.sha256
 		native_source_revision: source_revision
 		tools:           hashes

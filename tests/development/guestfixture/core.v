@@ -519,6 +519,7 @@ fn account_checks() {
 		C.puts(c'DEVELOPMENT ACCOUNT PASS: UID 1000 jobs, credentials, environment, receipts, interval, unsafe-file refusal')
 		job_lifecycle_checks()
 		build_checks()
+		reference_checks()
 		sdk := C.open(c'/home/developer/qualify-sdk', C.O_RDONLY)
 		if sdk >= 0 {
 			mut profiles := [64]char{}
@@ -571,6 +572,11 @@ pub fn run() i32 {
 			mut path := [256]char{}
 			C.snprintf(&path[0], path.len, c'/home/developer/%s-jobs.json', name)
 			check(C.chown(&path[0], 1000, 1000) == 0 && C.chmod(&path[0], 0o600) == 0, 361)
+		}
+		reference_plan := C.open(c'/home/developer/reference-build.json', C.O_RDONLY)
+		if reference_plan >= 0 {
+			check(C.close(reference_plan) == 0 && C.chown(c'/home/developer/reference-build.json', 1000, 1000) == 0
+				&& C.chmod(c'/home/developer/reference-build.json', 0o600) == 0, 382)
 		}
 		check(C.chown(c'/home/developer/source', 1000, 1000) == 0 && C.chmod(c'/home/developer/source', 0o755) == 0, 177)
 		check(C.chown(c'/home/developer/source/input.txt', 1000, 1000) == 0 && C.chmod(c'/home/developer/source/input.txt', 0o644) == 0, 178)

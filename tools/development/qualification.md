@@ -64,6 +64,18 @@ checks the runner/compiler hashes and the successful compile/run receipts.
 Other profiles retain their own acceptance gates; supplying this SDK does not
 qualify the complete catalog or IDE workflows.
 
+The guest controller also accepts a separate prepared reference prefix through
+`VINIX_DEVELOPMENT_REFERENCE_SDK`, with an explicit comma-separated
+`VINIX_DEVELOPMENT_REFERENCE_PROFILES` selection from `make,cmake,ninja,sqlite,node`.
+Its [reference-mode instructions](../../tests/development/README.md) describe the
+flat prefix, required tool entries and native runtime closure. Each selected
+workflow runs twice as UID/GID 1000 through a pinned build plan. The controller
+checks the exact plan, SDK/runtime and executable hashes, executed project argv,
+native reports and matching project artifacts. Startup/version checks cannot
+replace a project. AArch64 has passed GNU make, Samurai/Ninja and SQLite;
+x86_64 has passed SQLite. The remaining reference-mode profiles are supported
+test gates awaiting native qualification, alongside the wider catalog.
+
 Python and Python-based build tooling, including Meson, are not executed by this
 runner because the repository requires V tooling and forbids running Python.
 Their roadmap qualification remains open. Native ptrace/core dumping, kernel

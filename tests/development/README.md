@@ -75,6 +75,87 @@ the expected bytes. Altering the pinned source must stop the next build before
 execution. This tests runner behavior with a prebuilt payload; compiling all
 Vinix layers inside an installed system remains open.
 
+For additional reference workflows, prepare one native SDK prefix and select
+its profiles explicitly:
+
+```
+VINIX_DEVELOPMENT_REFERENCE_SDK=/path/to/reference-prefix \
+VINIX_DEVELOPMENT_REFERENCE_PROFILES=make,ninja,sqlite \
+tests/development/run-guest aarch64 /path/to/kernel /path/to/staged-tools /path/to/new-state
+```
+
+This mode uses the four base arguments and a separate SDK, with commands under
+`bin`, native musl and other runtime libraries under `lib`, and the complete
+compiler/modules/data closure needed by the selected tools. `lib/libc.so` must
+be an ordinary file. Internal relative tool aliases are preserved. Selected
+executables must be native ELF64 without set-ID bits; escaped aliases, wrong
+architectures, duplicate/unknown profiles and incomplete option pairs are
+refused before creating state. The current reference catalog is:
+
+| Profile | Required `bin` entries |
+| --- | --- |
+| `make` | `make`, `cc`, `sh` |
+| `ninja` | `ninja`, `cc`, `sh` |
+| `cmake` | `cmake`, `ninja`, `cc`, `sh` |
+| `sqlite` | `sqlite3` |
+| `node` | `node` |
+
+The controller imports the prefix as `/opt/reference`, excludes Python helpers,
+installs its runtime in `/lib` and pins both complete trees separately. It
+normalizes the musl loader alias and supplies `/bin/sh` only from the selected
+pinned shell. Prepare one coherent prefix; this mode cannot be mixed with the
+positional GCC/V SDK arguments. No host tool is silently substituted.
+
+UID/GID 1000 runs a generated build plan twice in fresh private workspaces.
+Pinned version commands precede `vinix-qualify --require-vinix`, whose project
+commands retain the 600-second budget. The plan uses 1800-second step deadlines
+and the guest receives 2 GiB of RAM. Both input trees are verified before and
+after the build. The fixture checks account ownership and mode-0700 output
+directories. Receipts include the plan, both build receipts and both native
+qualification reports, for 17 records with the baseline account/job/build checks.
+
+The host independently checks the exact plan hash, source/SDK/tool pins, epoch,
+account, kernel, command order and complete executed argv. It also checks each
+reference report's selected profiles, actual tool or produced executable hash,
+successful exit status and command-log path. Compiled programs, readback files,
+JavaScript sources and databases must match across workspaces. Readback files
+must contain the expected `42`. Reports retain workspace paths and timestamps;
+their contents are validated independently rather than required to hash equally.
+Missing tools, failed projects and differing artifacts fail the gate. Failed
+runs retain version/command diagnostics and the failed build receipt.
+
+On 13 October 2026 AArch64 HVF passed GNU make 4.4.1, Samurai's Ninja-compatible
+CLI reporting `1.9`, and SQLite 3.53.4 in
+`build/development17-20261013/guest-arm-reference-buildtools-c`. GCC reported
+11.2.1 (20211120); the prepared prefix combines its native compiler closure with
+the recorded tool binaries, BusyBox 1.36.1 and the SQLite/musl runtime. Its SDK
+pin is `6db053f3742cc0fa282c5297242ccc40ad27505f39248d391fe7e9c87893c590`
+and runtime pin is
+`08ba65716281d6d539cc2e65e27a9cdf0234bee5b0a42971eb4be59c4e310789`.
+Both make and Ninja compiled and executed the real C thread/file project; their
+matching program hash is
+`7396f1241c2c26c5dd351f0bd10b3247bb21d4c3faabfa060c0f640304f7d655`.
+
+x86_64 TCG passed SQLite 3.53.4 in
+`build/development17-20261013/guest-x86-reference-sqlite-c`, with SDK pin
+`213079cfa99e3e47d72300cec720e8e8496f51f98f1ee635b2a7d0b202ee3a9e`
+and runtime pin
+`f777d9cdc108c3981be80850d3bcdd0fb22cdd53a2f00d733b6c05761871a16a`.
+Both architectures committed/rolled back transactions, reopened the database
+and checked integrity as UID 1000. All fresh-workspace database artifacts had
+hash `fd435e2532e289f73d37c4363ce05638e0bd33156e8e0345b72906c06b86e7d0`.
+The prepared SQLite binaries/runtime come from the existing
+[pinned upstream input build](../packages/sqlite-profile-check.md). These are
+developer reference projects; the package suite separately qualifies WAL and
+application lifecycle workflows. CMake, Node, native x86 build systems and
+production server/SSH/CI workloads retain their own acceptance gates.
+
+Host option/receipt refusal tests run with:
+
+```
+V_C_ERROR_BUG_REPORT_DISABLED=1 v -cc cc test tests/development/referencecore
+```
+
 To compile and execute the C/C++ reference projects in the guest, supply a
 prepared native musl GCC SDK for the selected architecture:
 
@@ -278,6 +359,7 @@ V runs additionally record `v_root_sha256`, `native_source_sha256`, the `v`/`sh`
 executable pins, `native_source_revision`, the build plan, two native build
 receipts and four signed-release proofs, for 20 native receipt records. The
 compiler-rebuild run recorded above predates the six added lifecycle records.
+Reference-SDK runs instead add five records for a total of 17.
 Once the initramfs archive is complete, its duplicate staging tree is removed
 before ISO assembly. The standalone archive is removed once the ISO is complete.
 The ISO, compiled fixture, receipts and transcripts remain; obsolete

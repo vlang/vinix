@@ -13,7 +13,7 @@ missing kernel isolation, debugger or hardware virtualization interfaces.
 | OCI and rootless containers | Existing mount/PID/IPC/UTS namespaces, resource-group controls and overlay copy-up provide parts of container support; see [resource groups](resource-groups.md) and [compatibility status](linux-posix-compatibility.md). | User ID mapping, user/network namespace ownership, network isolation, complete delegation and OCI security semantics; mainstream-runtime and rootless adversarial qualification. Existing refusal of unsupported isolation stays intact. |
 | Practical hardware VM hosting | QEMU provides practical RAM sizes and multiple virtual CPUs. The [VM manager](../tools/development/virtual-machines.md) selects an accelerator explicitly. The native Intel backend supports page-backed RAM up to 1 GiB, with allocation rollback, shared mapping lifetimes and EPT invalidation. | Native Intel still has one vCPU and a real-mode entry API. Larger-memory VM entry requires physical/nested VT-x qualification. AMD SVM, ARM virtualization, interrupts and device integration remain open. QEMU TCG inside Vinix does not satisfy hardware acceleration acceptance. |
 | VM integration and lifecycle | Private per-VM qcow2 disks/firmware variables, QMP lifecycle, offline paired snapshots, explicit user networking/loopback SSH forwarding, read-only 9p shares and a guest-agent transport. | Qualify guest OS workflows inside Vinix, provide Vinix guest tools/drivers, qualify shared folders and network behavior, and implement running-state snapshots and crash-atomic snapshot transactions if required. |
-| Server/SSH/CI and automation | SQLite transaction/reopen checks and [per-account interval jobs](../tools/development/scheduled-jobs.md) with pinned executables, selected environment, protected credential files and persisted status. [Native x86_64/AArch64 job checks](../tests/development/README.md) qualify UID/GID 1000 execution, private receipts, credential/output isolation, unsafe-file refusal, deadlines, INT/TERM group retirement, watcher ticks with one PID, concurrent-owner refusal and killed-owner retry/acknowledgement. | Installed-system service/boot integration and complete database/server, authenticated SSH development and CI project workflows under ordinary-user policy. |
+| Server/SSH/CI and automation | Native SQLite transaction/rollback/reopen/integrity projects on both architectures and [per-account interval jobs](../tools/development/scheduled-jobs.md) with pinned executables, selected environment, protected credential files and persisted status. [Native x86_64/AArch64 job checks](../tests/development/README.md) qualify UID/GID 1000 execution, private receipts, credential/output isolation, unsafe-file refusal, deadlines, INT/TERM group retirement, watcher ticks with one PID, concurrent-owner refusal and killed-owner retry/acknowledgement. | Installed-system service/boot integration and complete database/server, authenticated SSH development and CI project workflows under ordinary-user policy. |
 
 Validation on 12 October 2026 used the Darwin ARM host, V 0.5.2 `f6358ec`,
 QEMU 11.1.1 and the installed musl cross-compilers. All checks below passed:
@@ -154,6 +154,22 @@ foreign-account refusal and `ESRCH` after reap. The account, job-control and bui
 gates also passed in `build/development17-20261013/guest-arm-signal-fixed` and
 `build/development17-20261013/guest-x86-signal-fixed`. This fixes exit-time signal
 identity; it does not implement the remaining debugger or container interfaces.
+
+The additional [reference-SDK gate](../tests/development/README.md) imports a
+prepared native prefix, independently pins its runtime and selects explicit
+`make,cmake,ninja,sqlite,node` workflows. It runs pinned versions and real
+projects through the build runner twice as UID/GID 1000, validating exact plan,
+input and executed-command pins and matching produced artifacts. On 13 October
+2026 AArch64 passed GNU make 4.4.1 and the Ninja-compatible Samurai CLI with
+GCC 11.2.1, plus SQLite 3.53.4. x86_64 passed SQLite 3.53.4. Native transaction,
+rollback, reopen and integrity checks produced matching database files on both
+architectures. The 17-record receipts and complete versions remain in
+`build/development17-20261013/guest-arm-reference-buildtools-c` and
+`build/development17-20261013/guest-x86-reference-sqlite-c`. The existing
+[SQLite package qualification](../tests/packages/sqlite-profile-check.md)
+separately covers WAL and signed application/runtime lifecycle workflows.
+CMake/Node reference gates, native x86 build systems, other language/IDE profiles
+and complete server/SSH/CI projects remain open.
 
 Do not check off section 17 until an installed Vinix system builds, debugs,
 tests and packages a real project, runs a container with the requested isolation,
