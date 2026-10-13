@@ -31,6 +31,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	header.auth_owned = objc_is_kind(object, ios_runtime.names['ASWebAuthenticationSession'])
 	header.image_view_owned = objc_is_kind(object, ios_runtime.names['UIImageView'])
 	header.uuid_owned = objc_is_kind(object, ios_runtime.names['NSUUID'])
+	header.pool_owned = objc_is_kind(object, ios_runtime.names['NSAutoreleasePool'])
 	header.cookie_owned = objc_is_kind(object, ios_runtime.names['NSHTTPCookie'])
 	header.webview_owned = objc_is_kind(object, ios_runtime.names['WKWebView'])
 	header.request_owned = objc_is_kind(object, ios_runtime.names['NSURLRequest'])
@@ -65,6 +66,7 @@ fn objc_destruct_instance(object u64) u64 {
 
 fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	if header.destroyed || header.destroying { return }
+	ns_pool_require_inactive(header)
 	header.destroying = true
 	if destructors {
 		mut cls := header.cls

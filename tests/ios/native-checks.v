@@ -76,6 +76,7 @@ fn native_fixture_source(item string) string {
 		'json-serialization-checks' { 'json_serialization_test.v' }
 		'nsuuid-checks' { 'ns_uuid_test.v' }
 		'filemanager-checks' { 'ns_file_manager_test.v' }
+		'autopool-checks' { 'ns_autorelease_pool_test.v' }
 		'keyboard-checks' { 'game_keyboard_test.v' }
 		'image-view-checks' { 'image_view_test.v' }
 		'auth-session-checks' { 'web_auth_test.v' }
@@ -143,7 +144,7 @@ fn native_fixture_source(item string) string {
 }
 
 fn build(root string, out string, only string) {
-	for item in ['run-ios', 'run-ios-gles', 'objc-constant-dictionary-checks', 'layout-constraint-checks', 'json-serialization-checks', 'condition-checks', 'cookie-checks', 'webkit-configuration-checks', 'user-script-checks', 'webview-checks', 'request-checks', 'value-checks', 'response-checks', 'alert-checks', 'set-checks', 'thread-checks', 'auth-session-checks', 'image-view-checks', 'keyboard-checks', 'nsuuid-checks', 'filemanager-checks', 'select-checks', 'semaphore-checks', 'signal-checks',
+	for item in ['run-ios', 'run-ios-gles', 'objc-constant-dictionary-checks', 'layout-constraint-checks', 'json-serialization-checks', 'condition-checks', 'cookie-checks', 'webkit-configuration-checks', 'user-script-checks', 'webview-checks', 'request-checks', 'value-checks', 'response-checks', 'alert-checks', 'set-checks', 'thread-checks', 'auth-session-checks', 'image-view-checks', 'keyboard-checks', 'nsuuid-checks', 'filemanager-checks', 'autopool-checks', 'select-checks', 'semaphore-checks', 'signal-checks',
 		'error-checks', 'sysctl-checks', 'terminal-checks', 'thread-policy-checks', 'file-time-checks', 'uuid-checks', 'audio-session-checks', 'cf-dictionary-checks', 'objc-storage-checks', 'objc-associated-checks', 'objc-property-checks', 'objc-sync-checks', 'swift-string-checks', 'swift-metadata-checks', 'swift-protocol-checks', 'swift-hash-checks', 'swift-hasher-checks', 'swift-raw-representable-checks', 'swift-array-checks', 'swift-integer-checks', 'swift-integer-hash-checks', 'swift-fatal-checks', 'swift-interpolation-checks', 'swift-array-storage-checks', 'swift-vararg-checks', 'swift-void-checks', 'swift-version-checks', 'swift-initializer-checks', 'swift-heap-checks', 'swift-error-checks', 'swift-error-value-checks', 'swift-object-type-checks', 'swift-mangled-checks', 'swift-witness-checks', 'swift-once-checks', 'swift-objc-bool-checks', 'swift-actor-executor-checks', 'swift-task-priority-checks', 'swift-task-alloc-checks', 'swift-task-create-checks', 'swift-task-switch-checks', 'swift-nslog-checks', 'swift-string-unbridge-checks', 'swift-error-description-checks', 'module-lookup-checks', 'native-init'] {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
@@ -285,6 +286,7 @@ fn regression_root(root string, out string, fs string) {
 	copy_file(out + '/keyboard-checks', fs + '/opt/ios/keyboard-checks')
 	copy_file(out + '/nsuuid-checks', fs + '/opt/ios/nsuuid-checks')
 	copy_file(out + '/filemanager-checks', fs + '/opt/ios/filemanager-checks')
+	copy_file(out + '/autopool-checks', fs + '/opt/ios/autopool-checks')
 	copy_file(out + '/objc-storage-checks', fs + '/opt/ios/objc-storage-checks')
 	copy_file(out + '/objc-associated-checks', fs + '/opt/ios/objc-associated-checks')
 	copy_file(out + '/objc-property-checks', fs + '/opt/ios/objc-property-checks')
@@ -389,7 +391,7 @@ fn vm(root string, out string, mode string) {
 	} else if mode == 'objc' {
 		for directory in ['sbin', 'proc', 'sys', 'dev', 'tmp', 'opt/ios'] { os.mkdir_all(fs + '/' + directory) or { panic(err) } }
 		copy_file(root + '/build/ios/fortnite/local/Payload/FortniteClient-IOS-Shipping.app/Frameworks/EOSSDK.framework/EOSSDK', fs + '/opt/ios/constant-dictionary-image')
-		for name in ['objc-constant-dictionary', 'layout-constraint', 'json-serialization', 'condition', 'cookie', 'webkit-configuration', 'user-script', 'webview', 'request', 'value', 'response', 'alert', 'set', 'thread', 'auth-session', 'image-view', 'keyboard', 'nsuuid', 'filemanager', 'cf-dictionary', 'objc-storage', 'objc-associated', 'objc-property', 'objc-sync'] {
+		for name in ['objc-constant-dictionary', 'layout-constraint', 'json-serialization', 'condition', 'cookie', 'webkit-configuration', 'user-script', 'webview', 'request', 'value', 'response', 'alert', 'set', 'thread', 'auth-session', 'image-view', 'keyboard', 'nsuuid', 'filemanager', 'autopool', 'cf-dictionary', 'objc-storage', 'objc-associated', 'objc-property', 'objc-sync'] {
 			copy_file(out + '/' + name + '-checks', fs + '/opt/ios/' + name + '-checks')
 		}
 	} else if mode == 'swift' {
@@ -469,7 +471,7 @@ fn vm(root string, out string, mode string) {
 
 fn main() {
 	if os.args.len < 2 {
-		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|build-terminal|build-thread-policy|build-file-time|build-uuid|build-audio-session|build-cf-dictionary|build-objc-storage|build-objc-associated|build-objc-property|build-objc-sync|build-objc-constant-dictionary|build-layout-constraint|build-json-serialization|build-condition|build-cookie|build-webkit-configuration|build-user-script|build-webview|build-request|build-value|build-response|build-alert|build-set|build-thread|build-auth-session|build-image-view|build-keyboard|build-nsuuid|build-filemanager|build-swift-string|build-swift-metadata|build-swift-protocol|build-swift-hash|build-swift-hasher|build-swift-raw-representable|build-swift-array|build-swift-integer|build-swift-integer-hash|build-swift-fatal|build-swift-interpolation|build-swift-array-storage|build-swift-vararg|build-swift-void|build-swift-version|build-swift-initializer|build-swift-heap|build-swift-error|build-swift-error-value|build-swift-object-type|build-swift-mangled|build-swift-witness|build-swift-once|build-swift-objc-bool|build-swift-actor-executor|build-swift-task-priority|build-swift-task-alloc|build-swift-task-create|build-swift-task-switch|build-swift-nslog|build-swift-string-unbridge|build-swift-error-description|build-module-lookup|verify-monitor|regression|swift|objc|probe|audit|static-audit|hash FILE')
+		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|build-terminal|build-thread-policy|build-file-time|build-uuid|build-audio-session|build-cf-dictionary|build-objc-storage|build-objc-associated|build-objc-property|build-objc-sync|build-objc-constant-dictionary|build-layout-constraint|build-json-serialization|build-condition|build-cookie|build-webkit-configuration|build-user-script|build-webview|build-request|build-value|build-response|build-alert|build-set|build-thread|build-auth-session|build-image-view|build-keyboard|build-nsuuid|build-filemanager|build-autopool|build-swift-string|build-swift-metadata|build-swift-protocol|build-swift-hash|build-swift-hasher|build-swift-raw-representable|build-swift-array|build-swift-integer|build-swift-integer-hash|build-swift-fatal|build-swift-interpolation|build-swift-array-storage|build-swift-vararg|build-swift-void|build-swift-version|build-swift-initializer|build-swift-heap|build-swift-error|build-swift-error-value|build-swift-object-type|build-swift-mangled|build-swift-witness|build-swift-once|build-swift-objc-bool|build-swift-actor-executor|build-swift-task-priority|build-swift-task-alloc|build-swift-task-create|build-swift-task-switch|build-swift-nslog|build-swift-string-unbridge|build-swift-error-description|build-module-lookup|verify-monitor|regression|swift|objc|probe|audit|static-audit|hash FILE')
 	}
 	root := os.real_path(os.getwd())
 	requested := os.getenv('VINIX_IOS_CHECK_NAME')
@@ -525,6 +527,8 @@ fn main() {
 		build(root, out, 'layout-constraint-checks')
 	} else if mode == 'build-json-serialization' {
 		build(root, out, 'json-serialization-checks')
+	} else if mode == 'build-autopool' {
+		build(root, out, 'autopool-checks')
 	} else if mode == 'build-filemanager' {
 		build(root, out, 'filemanager-checks')
 	} else if mode == 'build-nsuuid' {

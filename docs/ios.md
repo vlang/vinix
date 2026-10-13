@@ -3720,17 +3720,81 @@ at the required `_OBJC_CLASS_$_NSAutoreleasePool` import. Evidence is retained u
 five published runners are unchanged, and game entry, rendering and gameplay
 remain unverified.
 
+`NSAutoreleasePool` now resolves its class/metaclass imports and supports
+manual pool scopes in V. Installed Foundation measures a 40-byte NSObject
+subclass with retainCount 1. EOS contains addObject:, retainCount, release,
+alloc and init selectors. Native probes measured pool lifetimes using a bare
+NSObject probe class; no application code was executed.
+
+New/init and allocWithZone:/initWithCapacity: create scopes shared with
+objc_autoreleasePoolPush/Pop. drain and release consume the pool's constructor
+reference. Both addObject: routes target the current innermost pool, even when
+the receiver is an outer pool. Draining an outer boundary releases nested
+contents and retires their Vinix pool wrappers. Destructor autoreleases and
+new nested scopes remain within the draining boundary. Capacity is a hint;
+native deprecated-method diagnostics and private pool caches are not emulated.
+
+One reusable noslices boundary array accompanies each thread's existing
+autorelease object list. Distinct opaque tokens cannot identify a different
+thread's active scope. Fixed object metadata stores the owner thread and token,
+so wrapper retirement still works after isa changes. Thread exit and quiescent
+shutdown drain active scopes and free both arrays. Zeroing weak slots clear
+when a wrapper retires; retained weak loads cannot bypass pool ownership rules.
+
+At most 1,024 boundaries may be active on one thread. Retain, autorelease,
+copy, reinitialization, subclass construction, caller-storage initialization,
+active raw destruction, foreign tokens/thread drainage, nil addObject: and
+reentrant drainage reject explicitly. Uninitialized caller storage can be
+destructed normally. Exhaustive deprecated counters and private ivars remain
+unsupported. Reentrant drainage uses a deliberate guard rather than attempting
+to reproduce native undefined misuse.
+
+All 71 programs build and 94 original generated C streams restore to recorded
+hashes. Twenty-three host suites pass ASAN/UBSAN in both hashing modes. Vinix
+passes twenty-five Objective-C and 33 Swift/loader programs. Shared native and
+runtime fixtures verify nesting, C/class scope interoperation, current-pool
+routing, capacity hints, destructor autoreleases, 500 empty boundaries and
+404 threaded object retirements per cycle, including thread exit. Runtime
+checks cover 100 isa changes with zeroed weak slots per cycle, uninitialized
+caller storage, thirteen exact rejection reasons and two zero-live-object
+shutdowns. Generated C confirms pop/retirement allocate no scratch and both
+TLS arrays are freed. Earlier compatibility checks remain enabled.
+
+The Mac restarted before the original RAM batch finished, losing its
+temporary outputs. The final batch was rebuilt from persistent V helpers and
+runs entirely on disk. No results from the lost RAM batch are reused. The compiler
+executable is copied and pinned; its canonical V library and source/header
+snapshots are hash-recorded and verified with the evidence. The native C++
+fixture was restored from its recorded hash.
+
+A retained disk trial found a driver argument list still selecting PATH v and
+a native module-lookup helper inheriting Boehm C macros despite gc none. All
+cross-build outputs were archived and rebuilt with the pinned compiler. The
+helper's in-batch compile still failed after its passing preflight. Final
+native-helper C is generated with the pinned compiler and compiled through
+explicit Clang arguments, selecting malloc/free. Four native dyld orders
+then pass. The seventy successful pinned cross-builds remain unchanged;
+only the failed module fixture is rebuilt. Recovery-script differences
+between driver templates and the earlier scoped-path compile failure are
+retained. No production or fixture input changed during recovery.
+
+Fortnite passes the NSAutoreleasePool binding and exits with status 1 before
+entry at the required `_OBJC_CLASS_$_NSProcessInfo` import. Evidence is retained under
+`build/ios/fortnite/autopool-checks`. Full regression remains unpassed, the five
+published runners are unchanged, and game entry, rendering and gameplay remain
+unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,437 | 723 | 79 |
-| EOSSDK | 652 | 10 | 18 |
+| Fortnite executable | 1,438 | 722 | 79 |
+| EOSSDK | 653 | 9 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,204 | 794 | 120 |
+| All images | 2,206 | 792 | 120 |
 
-The C++/GLES/Text variant reports 2,217 resolved imports, 781 unresolved strong
+The C++/GLES/Text variant reports 2,219 resolved imports, 779 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

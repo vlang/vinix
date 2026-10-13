@@ -111,6 +111,10 @@ mut:
 	image_view &ImageViewState = unsafe { nil }
 	image_view_array bool
 	uuid_owned bool
+	pool_owned bool
+	pool_initialized bool
+	pool_thread u64
+	pool_token u64
 	uuid_bytes [16]u8
 	cookie_owned bool
 	webkit &WebKitState = unsafe { nil }
@@ -199,6 +203,7 @@ mut:
 	swift_fatal_code u64 // Assertion argument capture and BRK, retired at quiescent teardown.
 	names        map[string]u64
 	pool_key u64
+	pool_sequence i64 = 2 // Globally distinct opaque tokens for this runtime lifetime.
 	thread_key u64
 	foundation_main_thread u64
 	foundation_multithreaded bool
@@ -272,7 +277,7 @@ fn objc_start() {
 	ios_runtime.observers.flags |= .noslices
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
-	for name in ['NSObject', 'NSFileManager', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
+	for name in ['NSObject', 'NSAutoreleasePool', 'NSFileManager', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
@@ -332,6 +337,7 @@ fn objc_start() {
 			'UIImageView' { u32(512) }
 			'GCKeyboard' { u32(32) }
 			'NSFileManager' { u32(32) }
+			'NSAutoreleasePool' { u32(40) }
 			'NSUUID', '_NSUUIDBridge' { u32(8) }
 			'__NSConcreteUUID' { u32(24) }
 			'NSHTTPCookie' { u32(sizeof(AbiHTTPCookie)) }
@@ -400,6 +406,7 @@ fn obj_header(object u64) &ObjHeader {
 }
 
 fn objc_allocate(cls u64) u64 {
+	ns_pool_require_class(cls)
 	allocation_class := ns_uuid_allocation_class(cls)
 	objc_initialize(allocation_class)
 	info := ios_runtime.classes[allocation_class] or { panic('iOS: allocation of an unknown class') }
@@ -411,6 +418,7 @@ fn objc_allocate(cls u64) u64 {
 }
 
 fn objc_retain(object u64) u64 {
+	ns_pool_reject_ownership(object)
 	if object != 0 && dispatch_objc_retain(object) { return object }
 	if object != 0 && is_block(object) { return block_retain(object) }
 	if object != 0 && object !in ios_runtime.classes && object !in ios_runtime.constants {
@@ -439,6 +447,11 @@ fn native_method(cls u64, selector string) u64 {
 }
 
 fn objc_release(object u64) {
+	if object != 0 && ns_pool_release(object) { return }
+	objc_release_regular(object)
+}
+
+fn objc_release_regular(object u64) {
 	if object == 0 || object in ios_runtime.classes || object in ios_runtime.constants { return }
 	if dispatch_objc_release(object) { return }
 	if is_block(object) {
@@ -483,6 +496,7 @@ fn objc_new(cls u64) u64 {
 	imp := native_method(cls, 'init')
 	if imp != 0 { return unsafe { ObjInit(voidptr(imp))(object, c'init') } }
 	game_keyboard_require_discovery(cls)
+	if obj_header(object).pool_owned { ns_pool_initialize(object); return object }
 	if obj_header(object).uuid_owned { ns_uuid_initialize(object, 0, true); return object }
 	if obj_header(object).value_owned { objc_release(object); return 0 }
 	if obj_header(object).auth_owned { panic('iOS: authentication session requires designated construction') }
@@ -540,7 +554,7 @@ fn objc_stop() {
 	// attach values to immortal objects. Drain both before deleting the TLS pool.
 	for {
 		objc_associations_stop()
-		objc_pool_pop(1)
+		objc_pool_drain_all()
 		if ios_runtime.associations.len == 0 { break }
 	}
 	objc_pool_free(C.pthread_getspecific(ios_runtime.pool_key))

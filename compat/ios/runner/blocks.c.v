@@ -155,6 +155,7 @@ fn objc_load_weak(location &u64) u64 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	object := unsafe { *location }
+	ns_pool_reject_ownership(object)
 	if object == 0 || object in ios_runtime.classes || object in ios_runtime.constants || is_block(object) { return objc_retain(object) }
 	header := obj_header(object)
 	return if C.ios_ref_try_retain(unsafe { &header.refs }) != 0 { object } else { u64(0) }
