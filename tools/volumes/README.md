@@ -4,6 +4,11 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`scrub-volume-auto` and `scrub-recovery-volume-auto` authenticate, validate their
+reference, then discover and retain the matching physical disk for a complete
+read-only scrub. Reports match explicit-device scrubs, including after device
+reordering. See [automatic scans](../../docs/storage-volumes.md#identity-based-automatic-ciphertext-scrubbing).
+
 `compare-volume-scrubs BEFORE_REPORT AFTER_REPORT` compares complete private
 scrub findings against the same exact reference. It reports stable data, new
 change, restoration or further change without accessing devices or credentials.

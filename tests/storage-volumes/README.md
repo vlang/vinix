@@ -1,5 +1,11 @@
 # Storage-volume qualification
 
+`--host-auto-scrub` and `--auto-scrub` qualify authenticated identity-based
+automatic ciphertext scanning, validation/erasure before discovery, retained
+physical identity/mode, complete manual/automatic report equality, existing
+destination refusal, live descriptors, real-KDF lifetimes and reordered boot.
+See [automatic scrubbing](auto-scrub.md).
+
 `--host-scrub-compare` and `--scrub-compare` qualify offline encrypted scrub
 history comparisons, exact reference binding, all four transitions, complete
 private input validation, output failure precedence, bounded lifetimes and

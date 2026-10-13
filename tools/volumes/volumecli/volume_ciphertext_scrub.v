@@ -100,9 +100,9 @@ fn scrub_volume_ciphertext(device &char, input &char, credential &char, referenc
 	mut saved := [128]u8{}; mut observed := [32]u8{}; mut bytes := [224]u8{}
 	if !read_recovery_file(reference, &saved[0], volume_ciphertext_bytes)
 		|| !volume_ciphertext_matches(&saved[0], volume_ciphertext_bytes, &work.disk, &work.request.data) { return plan_error(c'ciphertext reference does not match authenticated geometry') }
-	fd := C.open(device, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
+	fd := ciphertext_scrub_parent(device, &work.disk, mut work.status)
 	if fd < 0 { C.perror(c'vinix-volume: open ciphertext scrub parent'); return 1 }; defer { C.close(fd) }
-	if !probe_disk(fd, mut work.after, mut work.status) || !key_matches(&work.disk, &work.after)
+	if !check_ciphertext_scrub_parent(fd, device, mut *work)
 		|| !volume_seal_recheck(fd, mut *work) || !volume_seal_recheck(fd, mut *work)
 		|| !read_volume_ciphertext(fd, &work.disk, &work.request.data, unsafe { &observed })
 		|| !volume_seal_recheck(fd, mut *work) { return plan_error(c'ciphertext scrub disk or complete read changed') }

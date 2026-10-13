@@ -826,6 +826,46 @@ or output failures return 1, and invalid syntax returns 2. Diagnostics may be
 printed on failure; output failure can leave a partial report. See
 [recovery inspection qualification](../tests/storage-volumes/recovery-inspect.md).
 
+## Identity-based automatic ciphertext scrubbing
+
+`scrub-volume-auto CONFIG PASSPHRASE_FILE REFERENCE REPORT` and
+`scrub-recovery-volume-auto BACKUP RECOVERY_KEYFILE REFERENCE REPORT` run the
+complete ciphertext scrub without requiring a current physical device path:
+
+```sh
+vinix-volume scrub-volume-auto /root/data.vcrypt /root/volume.pass /root/data.vchash /root/auto-1.vcscrub
+vinix-volume scrub-recovery-volume-auto /root/data.vrecover /root/recovery.key /root/data.vchash /root/auto-2.vcscrub
+```
+
+Authentication, full secret erasure and exact reference validation happen
+before opening `/dev`. Discovery uses the existing bounded read-only scan of
+at most 4096 entries. It matches saved MBR/GPT identity, physical capacity and
+native sector size, ignores partitions/logical views, accepts physical aliases
+sharing a disk ID, and refuses distinct matching physical disks. Unreadable
+matching-geometry candidates or enumeration failures prevent establishing a
+unique disk and return failure. It never opens a writable device.
+
+The selected descriptor stays pinned through the entire scan, private
+no-overwrite publication and output finalization; the utility never reopens
+the selected pathname. The first identity/geometry recheck preserves the
+physical ID and mode selected by discovery. Two further pre-read rechecks,
+one post-read recheck and one recheck after destination locking follow the
+existing scrub rules. Changes or incomplete reads publish no report.
+
+Reports and output are exactly the same `VINIXCS1` findings as an explicit-device
+scrub against the same reference and ciphertext. Matching/changed findings
+return 0/2; authentication, reference, discovery, scan, publication and output
+failures return 1, with operational errors taking precedence. Invalid syntax
+returns 2 without a finding. Existing destinations and inputs are preserved;
+late cleanup/durability/output failures may leave a complete private report.
+Automatic scanning imports no mapping and preserves existing live descriptors,
+status, generations, counters and plaintext reads.
+
+Trusted-reference, quiescent-write and historical-report limits still apply.
+Automatic discovery does not authenticate ciphertext or provide a snapshot,
+repair or encrypted-root boot integration. See
+[automatic scrub qualification](../tests/storage-volumes/auto-scrub.md).
+
 ## Comparing encrypted ciphertext scrub history
 
 `compare-volume-scrubs BEFORE_REPORT AFTER_REPORT` compares two completed
