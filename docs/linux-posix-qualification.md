@@ -4585,3 +4585,75 @@ Concurrent CUR/END changes, nonregular/disk/network/overlay filesystems,
 arbitrary persistent lock populations, POSIX deadlock detection and close
 races, fairness, cancellation/descriptor pressure and GNU/translated/ELF32
 paths remain separate. The three broad section 15 acceptance gates stay open.
+
+## Native advisory-lock access and words
+
+Record read locks previously accepted access mode 3, which grants neither
+read nor write access. Whole-file flock also accepted that mode and O_PATH
+handles, and accepted LOCK_UN combined with SH/EX. Native raw flock calls
+interpreted register-sized descriptor/operation values rather than Linux
+unsigned-int words, so nonzero upper operation bits incorrectly returned
+EINVAL. The handler now narrows both words before validation/lookup, admits
+exact SH, EX or UN with optional NB, rejects O_PATH, and requires ordinary
+read/write access for acquisition. Mode3 unlock remains a real accepted
+operation. Record read acquisition requires O_RDONLY or O_RDWR; queries
+and unlock retain their existing rules. Access checks precede OFD PID checks
+and follow range/type conversion as previously qualified. The
+[pinned Linux 6.12.51 implementation](https://github.com/gregkh/linux/blob/v6.12.51/fs/locks.c)
+and same-ELF references establish the selected Linux contract. Deprecated
+LOCK_MAND compatibility remains outside this qualification.
+
+The maintained V fixture runs 12,720 controls on each architecture as root
+and UID/GID1000. Per credential: 2,700 record/header controls, 480 whole-file
+error controls and 3,180 lock/file-state controls. All six POSIX/OFD commands
+combine reader/writer/unlock types, five range/kind/PID variants, O_RDONLY,
+O_WRONLY, O_RDWR, mode3 and O_PATH, original/dup/CLOEXEC aliases and libc/raw
+upper-word calls. Sixteen flock operations distinguish exact accepted forms,
+invalid unlock combinations, unknown low bits and nonzero ignored high words.
+The five record variants exercise valid ranges, PID errors, bad origins,
+signed overflow and invalid kinds with real EBADF/EINVAL/EOVERFLOW precedence.
+
+Successful queries report exact conflict headers; errors and setters preserve
+all 32 flock bytes. Independent descriptions observe actual acquired ranges
+and unchanged seed locks. Whole-file readers/writers distinguish shared,
+exclusive and removed locks after acquisition/conversion/unlock, and prove
+that rejected unlock combinations preserve the prior exclusive lock. Bytes,
+size/mode/UID/GID/inode, status/descriptor flags and actual shared offsets stay
+correct. O_PATH metadata/flags are checked without attempting shared seeks.
+Both frozen baselines reproduce 1,458 failures in the same counts (per
+credential: 48 record, 165 flock and 516 state failures). Candidates and actual
+Linux 6.12.51 pass identical respective native probe C/ELF. These are native
+musl/raw controls, not GNU-wrapper or foreign-ABI qualification.
+
+Two 200-cycle cohorts combine rejected mode3 read locks, mode3/O_PATH flock
+requests and invalid unlock combinations with real OFD/flock alias locks,
+queries, unlocks and final close. After 32 warmups and settling, all 18 ARM
+and 14 x86 live slab classes stay flat; large pages remain 63/63 ARM and
+160/160 x86. Probe C has 11 explicit allocas and no hidden heap/index helpers.
+Whole kernel C remains byte-identical after removing exactly the two reviewed
+function definitions/prototypes (syscall_flock and fcntl_lock), with no
+whitespace or helper normalization. No ownership/table/reclamation/lock-order
+change is introduced. Allocation scans retain 400 ARM/292 x86 sites and the
+same existing allowance refusals. An independent
+[lifetime review](../tests/linux-compat/results/2026-10-14/lockaccess-lifetime-review.md)
+binds the retained descriptor, scalar imports, stack buffers and completed
+source/C/ELF/capture evidence.
+
+Both production kernels build. Ordinary five-case native controller runs
+(lockaccess, lockrange, ofdlocks, open, runtime) pass on each architecture,
+plus eight host test files. The audit pins exact counts/failures, flat
+storage, all 64 dispatch/lock inputs, actual source/C/ELF/kernel/ISO/reference
+receipts and the independent review. Deliberate assertion and passing-as-
+baseline controls must fail. Runtime evidence uses frozen commit
+`0c12e1656b633b2f7d8365a47361a812414d4eb1` plus the sole reviewed locks.v
+change. Public dispatch fingerprints are refreshed from committed inputs in
+an isolated publication view, separately from this frozen runtime evidence.
+
+- [AArch64 receipt](../tests/linux-compat/results/2026-10-14/lockaccess-after-aarch64.json), [capture](../tests/linux-compat/results/2026-10-14/lockaccess-after-aarch64-native.log), [Linux reference](../tests/linux-compat/results/2026-10-14/lockaccess-reference-aarch64.json), [evidence](../tests/linux-compat/results/2026-10-14/lockaccess-evidence-aarch64.json).
+- [x86-64 receipt](../tests/linux-compat/results/2026-10-14/lockaccess-after-x86_64.json), [capture](../tests/linux-compat/results/2026-10-14/lockaccess-after-x86_64-native.log), [Linux reference](../tests/linux-compat/results/2026-10-14/lockaccess-reference-x86_64.json), [evidence](../tests/linux-compat/results/2026-10-14/lockaccess-evidence-x86_64.json).
+- [Audit source](../tests/linux-compat/results/2026-10-14/lockaccess-audit.v) and [verdict](../tests/linux-compat/results/2026-10-14/lockaccess-audit.log); baseline captures, build/host/scope logs, allocation scans and negative controls sit beside them.
+
+Nonregular/disk/network/overlay filesystems, deprecated LOCK_MAND, restrictive
+policy and concurrent close, descriptor pressure/fairness/cancellation, POSIX
+deadlock detection and GNU/translated/ELF32 paths remain separate. The three
+broad section 15 acceptance gates stay open.

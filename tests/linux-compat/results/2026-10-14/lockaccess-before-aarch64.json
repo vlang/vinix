@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "77a62bb4fc62a5a85b74043b634c59d63a442e45da221efb75533d626ae6dd2f",
+    "results": [
+        {
+            "name": "lockaccess",
+            "source_sha256": "b5fd936dc832038917edfb496857d0bc5ed490cc8755e8aa69f7ef9f373b3107",
+            "init_sha256": "1bf302cc78809d6a576e1a29bf1a003a1d66ee93c3cb1fe24687beaf76f211c0",
+            "iso_sha256": "8e0e03178b60cc7a05fd2e36c956fe5a3321e85d9b2906dfeb1d586eb68cb028",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

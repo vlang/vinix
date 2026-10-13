@@ -704,7 +704,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/fs/mount_policy.v` | `6755ca918d30d05263520d1f3d25a2e4c31d7f1b7e619aabcf7e276218f9bc4a` |
 | `kernel/fs/procfs.v` | `af0227fabd79200a4731b4835d9e09a01bddd12ae8f7198230fc0d083911fcc9` |
 | `kernel/fs/tmpfs.v` | `99a10d885597ccb745530e639685f282703332667066a28dd79f18195ec3e010` |
-| `kernel/fs/vfs.v` | `0d0b97bca1632aa83ead2e94fcfba38d22253ed1f11baae0293debcad5e7d833` |
+| `kernel/fs/vfs.v` | `dc75ba4feff7bcb636ea94872cedafeeb9fcd5fa9f35e14dc6262c5809eca65b` |
 | `kernel/futex/futex.v` | `171c2e30ac47d2b0d682e00e7aca04a8a1ddd7d3c65e27fae4a2e7d7dd9e015d` |
 | `kernel/futex/pi.v` | `69a0a836bcaba1fc18b7e3298d31cb848f885798e37a8d6fdd095b910ba073ba` |
 | `kernel/kbudget/budget.v` | `980b9ae894bda6376f920e22bbca0aa953e02bd0349977bfe054a24580869b06` |
@@ -739,7 +739,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/sched/reap.v` | `58ba75716ed70697e25209943e38d798b8b4f297a4b8d8e5eb63a38d21411423` |
 | `kernel/sched/sched_amd64.v` | `cc87d7c997c2efc44e5fc86a287e7575c9954493db5eb40a1813fb19ba557642` |
 | `kernel/sched/sched_arm64.v` | `ee720be0a1a43198508cdca76c1afe9eab31220ee31b0da77d01935acb669a77` |
-| `kernel/socket/unix/unix.v` | `1d9dabc77d4224ee57455cdc8024355a71259d7d6f32b0265be60f0e435a0bfe` |
+| `kernel/socket/unix/unix.v` | `2a6d0b43a255da34437b2740d49be5d4c52a2e37266674c8974bd7acb9d3e510` |
 | `kernel/syscall/table/container.v` | `3bd7f741353d73549d61affa8e6a9ee822fef466f997e10498dfd94cbd11c04f` |
 | `kernel/syscall/table/linux_common.v` | `e02ca1595fcc117e237c44cfd5634218184c328592f9e4fcb82af3be15047f68` |
 | `kernel/syscall/table/linux_compat.v` | `3cff2259bc5463ef6d5b0cad84231e9c93139566dbf8ef31b29d73364b3642d6` |

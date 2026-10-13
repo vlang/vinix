@@ -304,14 +304,24 @@ fn release_description_locks(handle &Handle, only_flock bool) {
 	if changed { notify_lock_waiters() }
 }
 
-pub fn syscall_flock(_ voidptr, fdnum int, operation int) (u64, u64) {
-	if operation & ~(lock_sh | lock_ex | lock_nb | lock_un) != 0
-		|| (operation & lock_un == 0 && (operation & lock_sh == 0) == (operation & lock_ex == 0)) {
+pub fn syscall_flock(_ voidptr, fdword int, opword int) (u64, u64) {
+	// Linux imports unsigned-int descriptor/operation words. Kernel int is
+	// register-sized, so discard upper bits before validation and lookup.
+	fdnum := int(u32(fdword))
+	operation := int(u32(opword))
+	kind := operation & ~lock_nb
+	if kind != lock_sh && kind != lock_ex && kind != lock_un {
 		return errno.err, errno.einval
 	}
 	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.ebadf }
 	defer { fd.unref() }
 	mut handle := fd.handle
+	access := handle.flags & resource.o_accmode
+	if handle.flags & resource.o_path != 0
+		|| (kind != lock_un && access != resource.o_rdonly
+			&& access != resource.o_wronly && access != resource.o_rdwr) {
+		return errno.err, errno.ebadf
+	}
 	handle.mac_check(proc.mac_metadata) or { return errno.err, errno.get() }
 	if !stat.isreg(handle.resource.stat.mode) && !stat.isdir(handle.resource.stat.mode) {
 		return errno.err, errno.einval
@@ -380,7 +390,7 @@ fn fcntl_lock(mut handle Handle, cmd int, arg u64) (u64, u64) {
 		return 0, 0
 	}
 	access := handle.flags & resource.o_accmode
-	if flock.l_type == f_rdlck && access == resource.o_wronly {
+	if flock.l_type == f_rdlck && access != resource.o_rdonly && access != resource.o_rdwr {
 		return errno.err, errno.ebadf
 	}
 	if flock.l_type == f_wrlck && access != resource.o_wronly && access != resource.o_rdwr {

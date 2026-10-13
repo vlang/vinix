@@ -790,6 +790,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   boundary splits/merges, aliases, unchanged file state and flat storage.
   See [the range receipts](docs/linux-posix-qualification.md#native-signed-record-lock-ranges).
 
+- [x] Enforce native advisory-lock access and exact flock operations, including
+  mode3/O_PATH errors and low32 descriptor/operation words; qualify all six
+  record commands, aliases, retained locks/file state and flat storage.
+  See [the access receipts](docs/linux-posix-qualification.md#native-advisory-lock-access-and-words).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

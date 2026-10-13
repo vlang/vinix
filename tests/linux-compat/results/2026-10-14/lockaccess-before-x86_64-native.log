@@ -1,0 +1,497 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=79976
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX LOCKACCESS DETAIL: kind=2 call=91 tag=whole-file locks bytes metadata flags cursors
+LINUX LOCKACCESS DETAIL: kind=2 call=92 tag=whole-file locks bytes metadata flags cursors
+LINUX LOCKACCESS DETAIL: kind=2 call=93 tag=whole-file locks bytes metadata flags cursors
+LINUX LOCKACCESS DETAIL: kind=2 call=94 tag=whole-file locks bytes metadata flags cursors
+LINUX LOCKACCESS DETAIL: kind=2 call=95 tag=whole-file locks bytes metadata flags cursors
+LINUX LOCKACCESS DETAIL: kind=2 call=96 tag=whole-file locks bytes metadata flags cursors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL: kind=1 call=7 tag=whole-file access and operation errors
+LINUX LOCKACCESS DETAIL: kind=2 call=97 tag=whole-file locks bytes metadata flags cursors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL: kind=1 call=8 tag=whole-file access and operation errors
+LINUX LOCKACCESS DETAIL: kind=2 call=98 tag=whole-file locks bytes metadata flags cursors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL: kind=1 call=9 tag=whole-file access and operation errors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL: kind=1 call=23 tag=whole-file access and operation errors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL: kind=1 call=24 tag=whole-file access and operation errors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL: kind=1 call=25 tag=whole-file access and operation errors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL: kind=1 call=39 tag=whole-file access and operation errors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL: kind=1 call=40 tag=whole-file access and operation errors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=6 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL: kind=0 call=826 tag=record access errno and complete header
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=6 type=0 variant=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL: kind=0 call=827 tag=record access errno and complete header
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=7 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL: kind=0 call=841 tag=record access errno and complete header
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=7 type=0 variant=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL: kind=0 call=842 tag=record access errno and complete header
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=37 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL: kind=0 call=871 tag=record access errno and complete header
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=37 type=0 variant=1 raw=0 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL: kind=0 call=872 tag=record access errno and complete header
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=38 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL: kind=0 call=886 tag=record access errno and complete header
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=38 type=0 variant=1 raw=0 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL: kind=0 call=887 tag=record access errno and complete header
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=2 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=5 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=6 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=6 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=6 type=0 variant=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=7 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=7 type=0 variant=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=37 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=37 type=0 variant=1 raw=0 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=38 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=38 type=0 variant=1 raw=0 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=2 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=5 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=6 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=6 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=6 type=0 variant=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=7 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=7 type=0 variant=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=37 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=37 type=0 variant=1 raw=0 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=38 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=38 type=0 variant=1 raw=0 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=2 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=5 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=6 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=2 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=8 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=5 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=6 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=12 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=2 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=8 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=5 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=6 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=12 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=2 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=8 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=5 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=6 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=12 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=6 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=6 type=0 variant=1 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=7 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=7 type=0 variant=1 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=37 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=37 type=0 variant=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=38 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=38 type=0 variant=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=2 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=5 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=6 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=6 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=6 type=0 variant=1 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=7 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=7 type=0 variant=1 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=37 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=37 type=0 variant=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=38 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=38 type=0 variant=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=2 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=5 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=6 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=6 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=6 type=0 variant=1 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=7 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=7 type=0 variant=1 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=37 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=37 type=0 variant=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=38 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=38 type=0 variant=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=2 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=5 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=6 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=2 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=8 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=5 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=6 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=12 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=2 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=8 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=5 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=6 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=12 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=2 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=8 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=5 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=6 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=12 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS CASES: ordinary=1 kind=0 calls=2700 failures=48
+LINUX LOCKACCESS CASES: ordinary=1 kind=1 calls=480 failures=165
+LINUX LOCKACCESS CASES: ordinary=1 kind=2 calls=3180 failures=516
+LINUX LOCKACCESS DETAIL: kind=2 call=91 tag=whole-file locks bytes metadata flags cursors
+LINUX LOCKACCESS DETAIL: kind=2 call=92 tag=whole-file locks bytes metadata flags cursors
+LINUX LOCKACCESS DETAIL: kind=2 call=93 tag=whole-file locks bytes metadata flags cursors
+LINUX LOCKACCESS DETAIL: kind=2 call=94 tag=whole-file locks bytes metadata flags cursors
+LINUX LOCKACCESS DETAIL: kind=2 call=95 tag=whole-file locks bytes metadata flags cursors
+LINUX LOCKACCESS DETAIL: kind=2 call=96 tag=whole-file locks bytes metadata flags cursors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL: kind=1 call=7 tag=whole-file access and operation errors
+LINUX LOCKACCESS DETAIL: kind=2 call=97 tag=whole-file locks bytes metadata flags cursors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL: kind=1 call=8 tag=whole-file access and operation errors
+LINUX LOCKACCESS DETAIL: kind=2 call=98 tag=whole-file locks bytes metadata flags cursors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL: kind=1 call=9 tag=whole-file access and operation errors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL: kind=1 call=23 tag=whole-file access and operation errors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL: kind=1 call=24 tag=whole-file access and operation errors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL: kind=1 call=25 tag=whole-file access and operation errors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL: kind=1 call=39 tag=whole-file access and operation errors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL: kind=1 call=40 tag=whole-file access and operation errors
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=6 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL: kind=0 call=826 tag=record access errno and complete header
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=6 type=0 variant=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL: kind=0 call=827 tag=record access errno and complete header
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=7 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL: kind=0 call=841 tag=record access errno and complete header
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=7 type=0 variant=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL: kind=0 call=842 tag=record access errno and complete header
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=37 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL: kind=0 call=871 tag=record access errno and complete header
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=37 type=0 variant=1 raw=0 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL: kind=0 call=872 tag=record access errno and complete header
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=38 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL: kind=0 call=886 tag=record access errno and complete header
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=38 type=0 variant=1 raw=0 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL: kind=0 call=887 tag=record access errno and complete header
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=2 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=5 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=6 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=6 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=6 type=0 variant=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=7 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=7 type=0 variant=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=37 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=37 type=0 variant=1 raw=0 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=38 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=38 type=0 variant=1 raw=0 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=2 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=5 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=6 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=6 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=6 type=0 variant=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=7 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=7 type=0 variant=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=37 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=37 type=0 variant=1 raw=0 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=38 type=0 variant=0 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=38 type=0 variant=1 raw=0 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=2 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=5 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=6 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=2 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=8 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=5 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=6 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=12 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=2 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=8 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=5 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=6 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=12 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=1 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=2 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=8 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=5 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=6 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=12 raw=0 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=9 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=10 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=11 raw=0 ret=0 errno=0 wanted=22
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=0 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=1 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=0 form=2 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=0 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=1 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=1 form=2 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=0 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=1 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=1 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=2 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=5 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=6 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2 form=2 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=6 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=6 type=0 variant=1 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=7 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=7 type=0 variant=1 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=37 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=37 type=0 variant=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=38 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=0 cmd=38 type=0 variant=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=2 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=5 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=6 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=0 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=6 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=6 type=0 variant=1 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=7 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=7 type=0 variant=1 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=37 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=37 type=0 variant=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=38 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=1 cmd=38 type=0 variant=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=2 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=5 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=6 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=1 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=6 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=6 type=0 variant=1 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=7 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=7 type=0 variant=1 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=37 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=37 type=0 variant=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=38 type=0 variant=0 raw=1 ret=0 errno=0 wanted=9
+LINUX LOCKACCESS DETAIL RESULT: access=3 form=2 cmd=38 type=0 variant=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=2 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=8 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=5 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=6 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=3 form=2 op=12 raw=1 ret=-1 errno=22 wanted=0
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=2 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=8 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=5 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=6 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=0 op=12 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=2 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=8 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=5 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=6 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=1 op=12 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=1 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=2 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=8 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=5 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=6 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS DETAIL FLOCK: access=2097152 form=2 op=12 raw=1 ret=-1 errno=22 wanted=9
+LINUX LOCKACCESS CASES: ordinary=0 kind=0 calls=2700 failures=48
+LINUX LOCKACCESS CASES: ordinary=0 kind=1 calls=480 failures=165
+LINUX LOCKACCESS CASES: ordinary=0 kind=2 calls=3180 failures=516
+LINUX LOCKACCESS FAIL: access, operation, state or retention
+QEMU: Terminated
+

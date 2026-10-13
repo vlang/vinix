@@ -1169,3 +1169,14 @@ The dated x86 qualification combines three original successful cases with
 recovered open/runtime cases after host setup/log-write failure, with exact
 source/kernel/ISO/capture provenance. See the
 [range receipts and limits](../../docs/linux-posix-qualification.md#native-signed-record-lock-ranges).
+
+The `lockaccess` case qualifies native advisory-lock access and operation
+errors with 12,720 controls per architecture as root and UID/GID1000. All six
+record commands cover five access modes, three aliases, three lock types,
+five range/kind/PID variants and libc/raw calls. Sixteen flock operations
+check exact SH/EX/UN forms with optional NB, mode3/O_PATH refusals and low32
+descriptor/operation imports. Full headers, observed locks, bytes, metadata,
+flags and real shared cursors are checked; two 200-cycle cohorts measure
+refused calls plus actual OFD/flock alias cleanup. The same native musl ELF
+passes actual Linux 6.12.51; both unchanged kernels reproduce 1,458 failures.
+See the [access receipts and limits](../../docs/linux-posix-qualification.md#native-advisory-lock-access-and-words).
