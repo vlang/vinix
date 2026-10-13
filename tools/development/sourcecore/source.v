@@ -9,7 +9,9 @@ import time
 
 fn git(root string, args []string, limit int) !string {
 	mut process := os.new_process(os.find_abs_path_of_executable('git')!)
-	process.set_args(['--literal-pathspecs', '-C', root, ...args])
+	// Local replace refs must not substitute a different tree for the pinned
+	// commit while leaving its reported object ID unchanged.
+	process.set_args(['--no-replace-objects', '--literal-pathspecs', '-C', root, ...args])
 	process.set_redirect_stdio()
 	process.run()
 	defer { process.close() }

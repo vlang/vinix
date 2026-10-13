@@ -25,6 +25,14 @@ fn test_export_uses_committed_files_and_excludes_untracked_and_python() {
 	assert os.read_file(base + '/out/src/main.v')! == 'module main\nfn main() {}\n'
 	assert !os.exists(base + '/out/src/untracked.v')
 	assert !os.is_link(base + '/out/src/excluded.py')
+	git(base, ['add', 'src/main.v'], 1024)!
+	git(base, ['-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', '-c',
+		'user.name=Vinix test', '-c', 'user.email=test@example.invalid', 'commit', '-q', '-m',
+		'replacement tree'], 1024)!
+	git(base, ['replace', commit, revision(base)!], 1024)!
+	os.mkdir(base + '/replaced')!
+	export(base, commit, ['src'], base + '/replaced', selected)!
+	assert os.read_file(base + '/replaced/src/main.v')! == 'module main\nfn main() {}\n'
 	os.symlink('main.v', base + '/src/alias.v')!
 	git(base, ['add', 'src/alias.v'], 1024)!
 	git(base, ['-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', '-c',
