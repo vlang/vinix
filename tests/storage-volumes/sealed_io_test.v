@@ -26,16 +26,28 @@ mut:
 	unmaps int
 	vector_wipes int
 	core_wipes int
+	next_path &char = unsafe { nil }
+	next_fd i32 = -1
+	next_opens int
+	next_stats int
+	credential_erases int
 }
 __global sealed_io SealedIO
 
 fn sealed_mock_open(path &char, flags i32) i32 {
 	assert flags & C.O_CLOEXEC != 0 && flags & C.O_NOFOLLOW != 0
+	next := sealed_io.next_path != unsafe { nil } && C.strcmp(path, sealed_io.next_path) == 0
+	if next {
+		assert sealed_io.derive_calls == 1 && sealed_io.credential_erases == 1
+		sealed_io.next_opens++
+		if sealed_io.mode == 41 { unsafe { C.errno = C.EACCES }; return -1 }
+	}
 	if C.strcmp(path, c'/dev/urandom') == 0 && sealed_io.mode == 6 { unsafe { C.errno = C.EACCES }; return -1 }
 	if C.strcmp(path, c'/sealed-parent') == 0 { sealed_io.parent_flags = flags; if sealed_io.mode == 26 { unsafe { C.errno = C.EACCES }; return -1 }; sealed_io.opened++; return 900 }
 	fd := C.open(path, flags)
 	if fd >= 0 {
 		sealed_io.opened++
+		if next { sealed_io.next_fd = fd }
 		if flags & C.O_DIRECTORY != 0 { sealed_io.directory = fd }
 		if C.strcmp(path, c'/dev/urandom') == 0 { sealed_io.random = fd }
 	}
@@ -53,6 +65,11 @@ fn sealed_mock_fstat(fd i32, info &C.stat) i32 {
 	result := C.fstat(fd, info); sealed_io.stats++
 	if result == 0 {
 		unsafe {
+			if fd == sealed_io.next_fd {
+				sealed_io.next_stats++
+				if sealed_io.mode == 42 { info.st_uid = C.geteuid() + 1 }
+				if sealed_io.mode == 43 && sealed_io.next_stats == 2 { info.st_mode |= 0o004 }
+			}
 			if sealed_io.mode == 4 && sealed_io.stats == 1 { info.st_uid = C.geteuid() + 1 }
 			if sealed_io.mode == 5 && sealed_io.stats == 2 { info.st_mode |= 0o004 }
 			if fd == sealed_io.random && sealed_io.mode == 7 { info.st_mode = C.S_IFREG | 0o600 }
@@ -64,6 +81,7 @@ fn sealed_mock_fstat(fd i32, info &C.stat) i32 {
 }
 fn sealed_mock_read(fd i32, buffer voidptr, size usize) i64 {
 	sealed_io.reads++
+	if fd == sealed_io.next_fd && sealed_io.mode == 44 && size == 1 { unsafe { *(&u8(buffer)) = 9 }; return 1 }
 	if sealed_io.mode == 1 && sealed_io.reads == 1 { unsafe { C.errno = C.EINTR }; return -1 }
 	if sealed_io.mode == 2 && sealed_io.reads == 2 { return 0 }
 	if sealed_io.mode == 3 && size == 1 { unsafe { *(&u8(buffer)) = 9 }; return 1 }
@@ -124,6 +142,7 @@ fn sealed_mock_erase(pointer voidptr, size usize) {
 	erase_key(pointer, size)
 	unsafe { for i in usize(0) .. size { assert (&u8(pointer))[i] == 0 } }
 	if size == sizeof(SealedFiles) { sealed_io.wipes++ }
+	if size == 1024 { sealed_io.credential_erases++ }
 	if size == sizeof(ScryptWork) { sealed_io.core_wipes++ }
 	if size == sealed_scrypt_memory { sealed_io.vector_wipes++ }
 }
@@ -131,8 +150,16 @@ fn sealed_mock_erase(pointer voidptr, size usize) {
 fn sealed_mock_derive(password &u8, size int, salt &u8, output &u8) bool {
 	assert size > 0 && size <= 1024
 	sealed_io.derive_calls++
+	if sealed_io.next_path != unsafe { nil } && sealed_io.derive_calls == 2 {
+		unsafe { for i in 0 .. 64 { assert output[i] == 0 }; for i in size .. 1024 { assert password[i] == 0 } }
+		if sealed_io.mode == 40 { return false }
+	}
 	if sealed_io.mode == 23 { return false }
-	unsafe { for i in 0 .. 64 { output[i] = u8(i * 29 + 41) }; if sealed_io.mode == 24 { output[0] ^= 1 } }
+	unsafe {
+		for i in 0 .. 64 { output[i] = u8(i * 29 + if password[0] == 0 { 73 } else { 41 }) }
+		if sealed_io.mode == 24 { output[0] ^= 1 }
+		if sealed_io.mode == 45 && sealed_io.derive_calls == 2 { for i in 0 .. 32 { output[i + 32] = output[i] } }
+	}
 	return true
 }
 fn sealed_mock_ioctl(fd i32, number u64, pointer voidptr) i32 {
@@ -228,5 +255,42 @@ fn test_scrypt_mapping_refusal_erasure_release_failure_and_eintr_do_not_release_
 		assert sealed_io.core_wipes == if mode == 30 { 0 } else { 1 }
 		assert output[0] == 0xa1 && output[65] == 0xa1
 		if mode in [30, 32] { for value in output { assert value == 0xa1 } }
+	}
+}
+
+fn test_rewrap_stage_faults_authentication_before_new_inputs_no_raw_key_and_erasure_between_credentials() {
+	work := os.join_path(os.temp_dir(), 'vinix-rewrap-io-${os.getpid()}')
+	os.mkdir(work)!; os.chmod(work, 0o700)!; defer { os.rmdir_all(work) or {} }
+	key := []u8{len: 64, init: u8(index * 13 + 7)}
+	old := []u8{len: 1024, init: u8(112)}
+	next := [u8(0), u8(10), u8(0x80), u8(0xff)]
+	for name in ['key', 'old', 'next'] {
+		os.write_file_array(work + '/' + name, if name == 'key' { key } else if name == 'old' { old } else { next })!
+		os.chmod(work + '/' + name, 0o600)!
+	}
+	sealed_io = SealedIO{}
+	assert sealed_key_file((work + '/key').str, (work + '/old').str, (work + '/source').str, true) == 0
+	source := os.read_bytes(work + '/source')!
+	os.rm(work + '/key')!
+	next_path := work + '/next'
+	for mode in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 40, 41, 42, 43, 44, 45] {
+		sealed_io = SealedIO{mode: mode, next_path: next_path.str}
+		destination := work + '/output'
+		assert rewrap_sealed_key((work + '/source').str, (work + '/old').str, next_path.str, destination.str) == if mode <= 1 { 0 } else { 1 }
+		assert sealed_io.opened == sealed_io.closed && sealed_io.wipes == 1 && !sealed_io.locked && sealed_io.parent_flags == 0 && sealed_io.ioctls == 0
+		assert os.exists(destination) == (mode <= 1 || mode in [19, 20, 21])
+		if mode in [2, 3, 4, 5, 22, 23, 24] { assert sealed_io.next_opens == 0 && sealed_io.directory == -1 && sealed_io.random == -1 }
+		if mode in [6, 7, 8, 40, 41, 42, 43, 44, 45] { assert sealed_io.directory == -1 }
+		if os.exists(destination) {
+			bytes := os.read_bytes(destination)!
+			assert bytes.len == 192
+			mut wrapping := [64]u8{}; mut output := [64]u8{}
+			for i in 0 .. 64 { wrapping[i] = u8(i * 29 + 73) }
+			assert decode_sealed_key(bytes.data, 192, &wrapping[0], &output[0])
+			for i in 0 .. 64 { assert output[i] == key[i] }
+			os.rm(destination)!
+		}
+		assert os.read_bytes(work + '/source')! == source && os.read_bytes(next_path)! == next && os.read_bytes(work + '/old')! == old
+		assert !os.exists(work + '/key') && os.ls(work)!.all(!it.starts_with('.vinix-key-'))
 	}
 }

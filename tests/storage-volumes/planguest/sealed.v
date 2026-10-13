@@ -9,9 +9,13 @@ fn sealed_file_tool(input &char, password &char, output &char, seal bool, expect
 }
 
 fn sealed_open_tool(parent &char, password &char, readonly bool, expected i32) {
+	sealed_open_path_tool(parent, c'/root/crypt.sealed', password, readonly, expected)
+}
+
+fn sealed_open_path_tool(parent &char, envelope &char, password &char, readonly bool, expected i32) {
 	unsafe {
 		args := [&char(c'/usr/sbin/vinix-volume'), &char(c'open-sealed'), parent,
-			&char(c'60'), &char(c'15728640'), &char(c'4096'), &char(c'/root/crypt.sealed'), password,
+			&char(c'60'), &char(c'15728640'), &char(c'4096'), envelope, password,
 			if readonly { &char(c'ro') } else { &char(nil) }, &char(nil)]!
 		run_utility(&args[0], expected)
 	}

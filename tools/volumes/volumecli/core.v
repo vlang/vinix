@@ -56,6 +56,7 @@ fn decimal(text &char) ?u64 {
 }
 
 fn usage() i32 {
+	C.printf(c'       vinix-volume rewrap-key ENVELOPE OLD_PASSPHRASE_FILE NEW_PASSPHRASE_FILE NEW_ENVELOPE\n')
 	C.printf(c'       vinix-volume seal-key KEYFILE PASSPHRASE_FILE ENVELOPE\n       vinix-volume unseal-key ENVELOPE PASSPHRASE_FILE KEYFILE\n       vinix-volume open-sealed DEVICE SLOT OFFSET_BYTES LENGTH_BYTES ENVELOPE PASSPHRASE_FILE [ro]\n')
 	C.printf(c'       vinix-volume backup-key KEYFILE RECOVERY_KEYFILE ENVELOPE\n       vinix-volume recover-key ENVELOPE RECOVERY_KEYFILE KEYFILE\n')
 	C.printf(c'       vinix-volume open-crypt DEVICE SLOT OFFSET_BYTES LENGTH_BYTES KEYFILE [ro]\n')
@@ -91,6 +92,10 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && C.strcmp(argv[1], c'rewrap-key') == 0 {
+			if argc != 6 || argv[2][0] == 0 || argv[3][0] == 0 || argv[4][0] == 0 || argv[5][0] == 0 { return usage() }
+			return rewrap_sealed_key(argv[2], argv[3], argv[4], argv[5])
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'seal-key') == 0 || C.strcmp(argv[1], c'unseal-key') == 0) {
 			if argc != 5 || argv[2][0] == 0 || argv[3][0] == 0 || argv[4][0] == 0 { return usage() }
 			return sealed_key_file(argv[2], argv[3], argv[4], C.strcmp(argv[1], c'seal-key') == 0)

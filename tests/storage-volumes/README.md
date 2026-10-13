@@ -261,6 +261,14 @@ recovered bytes, measure repeated full-cost KDF lifetimes separately, and unlock
 after raw-key deletion and device reordering. The earlier 400-cycle workload and
 nine boot assertions stay enabled. See [sealed-key qualification](sealed-keys.md).
 
+Credential rewrap tests check authentication before new input/output access,
+old credential erasure before buffer reuse, long-to-short binary passwords,
+fresh salt/nonce, same-key recovery and preservation of every existing entry.
+Faults cover both stages, entropy, publication, cleanup and reporting. Guests
+rewrap with no raw keyfile, unlock with new credentials, reject old credentials
+against the new envelope, measure full-cost repeated lifetimes and unlock after
+reboot/device reordering. See [rewrap qualification](rewrap-keys.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,

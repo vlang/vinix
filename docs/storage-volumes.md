@@ -265,6 +265,51 @@ existing confidentiality-only semantics. It does not verify disk data, convert
 plaintext storage, rotate the volume key or arrange encrypted-root boot. See
 [sealed-key qualification](../tests/storage-volumes/sealed-keys.md).
 
+## Changing sealed-key credentials
+
+`rewrap-key ENVELOPE OLD_PASSPHRASE_FILE NEW_PASSPHRASE_FILE NEW_ENVELOPE`
+changes the credential protecting a sealed volume key without creating a
+plaintext keyfile. It authenticates the original envelope with the old
+passphrase, generates a fresh salt and nonce, and publishes the same volume key
+under the new passphrase in a separate private envelope. The volume's geometry,
+native sector size and ciphertext stay exact. No volume device is opened.
+
+```sh
+# Both credential files already contain private bytes and have mode 0600.
+vinix-volume rewrap-key /root/data.sealed /root/old.pass /root/new.pass /root/data-next.sealed
+# Verify the new envelope against the original extent before retiring old copies.
+vinix-volume open-sealed /dev/vda 0 1048576 16777216 /root/data-next.sealed /root/new.pass ro
+vinix-volume remove /dev/mapper/vinix0
+```
+
+The input envelope and both credential files use the same private-file policy,
+exact-byte passphrase semantics and fixed scrypt profile as `seal-key`.
+Malformed profiles and wrong old credentials reject before opening the new
+credential, obtaining fresh entropy or accessing the output directory. Each KDF
+allocates, erases and releases its own 32 MiB vector in sequence, so rewrapping
+needs one vector at a time. Old passphrase and derived-key buffers are erased
+before reading the next credential, including any unused suffix when the new
+passphrase is shorter. The authenticated volume key stays in a bounded stack
+workspace and is erased on every ordinary return. Credentials never enter
+arguments, diagnostics or reports. Identical old/new passphrase bytes are
+allowed for a fresh salt/nonce refresh.
+
+Publication follows the same directory lock, mode-0600 temporary, file flush,
+atomic no-replacement link, temporary cleanup and directory flush as sealed-key
+creation. Existing destinations, source aliases and both credential files are
+preserved. A failure before publication creates no destination; cleanup,
+directory-flush or stdout failure after publication can leave a complete private
+new envelope with exit status 1. Verify that envelope before retrying. Syntax
+errors return 2; successful publication and reporting return 0.
+
+The old envelope remains usable with its old credential. Rewrapping does not
+revoke access through retained envelopes, recovered raw keys or independent key
+backups, and does not rotate the volume key or rewrite disk data. Retire old
+credential/envelope copies according to their storage's protection requirements
+only after verifying the new envelope and preserving a recovery path. Process
+termination, caches, hibernation and persistent credential protection retain the
+sealed-key limits above. See [credential rewrap qualification](../tests/storage-volumes/rewrap-keys.md).
+
 ## Saved volume plans
 
 ```sh

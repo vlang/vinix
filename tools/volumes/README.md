@@ -4,6 +4,12 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`rewrap-key ENVELOPE OLD_PASSPHRASE_FILE NEW_PASSPHRASE_FILE NEW_ENVELOPE`
+authenticates a sealed volume key and protects the same key with new credential
+bytes, fresh salt and nonce, without a plaintext keyfile. It publishes a separate
+private envelope without replacing existing entries; retained old envelopes
+remain usable. See [credential changes and limits](../../docs/storage-volumes.md#changing-sealed-key-credentials).
+
 `seal-key KEYFILE PASSPHRASE_FILE ENVELOPE` wraps an existing volume key with
 salted scrypt. `unseal-key ENVELOPE PASSPHRASE_FILE KEYFILE` authenticates before
 restoring a private keyfile. `open-sealed DEVICE SLOT OFFSET_BYTES LENGTH_BYTES
