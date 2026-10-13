@@ -281,9 +281,18 @@ lower-source rename. Hidden paths survive clean volume and overlay remounts;
 recreation replaces the marker only after metadata setup and the backing rename
 succeed. Private staging validates the work directory, preserves final-parent
 identity and refuses further operations after work-directory removal.
-Slab samples still show the pre-existing overlay-node retention leak. Persistent
-opaque directories, crash consistency, full OCI/rootless-runtime acceptance and
-broader server-load qualification remain open. Full pins and native CI
+The [directory-opacity qualification](../tests/overlay-rename/opacity.md) adds
+persistent ext2 markers for recreated and renamed directories, preserving
+hidden lower children through clean remounts. Repeated actual `ENOSPC` failures
+preserve the whiteout and restore exact disk block/inode counts; recovery and
+four read-only filesystem checks pass on both architectures. A separate ext2
+fix persists the destination parent's link count when a staged whiteout replaces
+an upper directory. Trusted-attribute authorization remains enforced.
+Slab samples still show the pre-existing overlay-node retention leak.
+Allocation tracking attributes the four small objects across two further
+failed creations to the existing `statfs` measurement-interface allocation.
+Crash consistency, full OCI/rootless-runtime acceptance and broader server-load
+qualification remain open. Full pins and native CI
 instructions are recorded in [the guest evidence](../tests/development/README.md).
 Boot services, remote CI, deployment, broader projects and SSH remain open.
 

@@ -26,9 +26,13 @@ fn main() {
 		hosttest.Option{ name: '--arch', value: true, choices: ['aarch64', 'x86_64'] },
 		hosttest.Option{ name: '--kernel-dir', value: true },
 		hosttest.Option{ name: '--state-dir', value: true },
-		hosttest.Option{ name: '--case', value: true, choices: ['atomic', 'failure', 'disk', 'all'] },
+		hosttest.Option{
+			name:    '--case'
+			value:   true
+			choices: ['atomic', 'failure', 'disk', 'opaque', 'opaque-full', 'all']
+		},
 		hosttest.Option{ name: '--timeout', value: true },
-	], [], 'Usage: run.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case atomic|failure|disk|all] [--timeout SECONDS]')!
+	], [], 'Usage: run.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case atomic|failure|disk|opaque|opaque-full|all] [--timeout SECONDS]')!
 	for key in ['--arch', '--kernel-dir', '--state-dir'] {
 		if !options.has(key) {
 			eprintln('missing ' + key)
@@ -55,14 +59,17 @@ fn main() {
 	os.mkdir_all(state + '/sources')!
 	hosttest.module_copy_tree(@DIR + '/overlayfixture', state + '/sources/overlayfixture')!
 	mut inputs := {
-		'kernel':     sha256.sum(kernel).hex()
-		'fixture':    digest(state + '/sources/overlayfixture/core.v')!
-		'abi_header': digest(state + '/sources/overlayfixture/native-abi.h')!
+		'kernel':              sha256.sum(kernel).hex()
+		'fixture':             digest(state + '/sources/overlayfixture/core.v')!
+		'opaque_fixture':      digest(state + '/sources/overlayfixture/opaque.v')!
+		'opaque_full_fixture': digest(state + '/sources/overlayfixture/opaque_full.v')!
+		'abi_header':          digest(state + '/sources/overlayfixture/native-abi.h')!
 	}
 	disk := state + '/store.ext2'
 	if case_name != 'atomic' {
 		os.write_file(disk, '')!
-		if unsafe { C.truncate(disk.str, 128 * 1024 * 1024) } != 0 {
+		size_mb := if case_name == 'opaque-full' { 4 } else { 128 }
+		if unsafe { C.truncate(disk.str, i64(size_mb) * 1024 * 1024) } != 0 {
 			eprintln('cannot size private volume')
 			exit(1)
 		}
@@ -138,6 +145,10 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 			'OVERLAY PRIVATE WORK: PASS', 'OVERLAY RECREATION PERSISTENCE: PASS']
 	}
 	if case_name == 'all' { expected << 'OVERLAY REMOVED WORK: PASS' }
+	if case_name in ['opaque', 'all'] {
+		expected << ['OVERLAY OPAQUE CHANGES: PASS', 'OVERLAY OPAQUE REMOUNT: PASS']
+	}
+	if case_name == 'opaque-full' { expected << 'OVERLAY OPAQUE STORAGE FULL: PASS' }
 	positive, negative := guesthost.verdict_policy(expected, ['FAIL: overlay'], false)
 	return guesthost.boot(command, configured.env, state, positive, negative, timeout, true)!
 }

@@ -1,8 +1,9 @@
 # Overlay rename qualification
 
 This V controller runs native Vinix guests with a private tmpfs overlay and,
-for disk cases, a fresh 128-MiB ext2 volume. Root prepares the mounts and transfers
-the private directories; all rename workloads run as UID/GID 1000 after clearing
+for disk cases, a fresh 128-MiB ext2 volume (4 MiB for `opaque-full`). Root prepares
+the mounts and transfers the private directories; all rename workloads run as
+UID/GID 1000 after clearing
 supplementary groups. An unprivileged mount attempt must fail with `EPERM`.
 An unprivileged device-node creation attempt must also fail with `EPERM`.
 The parent performs the final unmount/remount check after the worker exits.
@@ -56,6 +57,19 @@ The default `--case all` includes:
   directory's setgid bit must not leak into the recreated directory.
   A removed work directory reached through `/proc/self/fd` must be refused
   with `ENOENT` while its descriptor still holds it alive.
+- `opaque`: lower directories are removed, then recreated or replaced by an
+  upper-directory rename. The new contents stay visible and former lower
+  children stay absent from opens and listings before and after both layers
+  remount. Trusted opacity attributes remain inaccessible to the ordinary
+  user. Root checks persisted markers, final identity, unchanged lower content
+  and the remounted upper parent's link count.
+
+`--case opaque-full` separately fills a 4-MiB ext2 volume to force real
+`ENOSPC` during opacity installation. It checks repeated failed mkdir rollback,
+exact disk block/inode recovery, failed rename path preservation, successful
+recovery after space is released and persisted markers after remount. It prints
+slab samples after the first and third failures. This longer case is not part
+of the default `all` selection.
 
 The default `all` case additionally removes the shared work directory beneath
 two mounted overlays, waits past the grace period and verifies that both refuse
@@ -67,8 +81,9 @@ volume without modifying it:
 e2fsck -f -n /path/to/result/store.ext2
 ```
 
-[Durable whiteout evidence and limits](whiteouts.md) records the current storage
-qualification. The following results and pins describe the earlier rename
+[Durable whiteout evidence and limits](whiteouts.md) and
+[persistent directory opacity](opacity.md) record the current storage
+qualifications. The following results and pins describe the earlier rename
 fix in commit `9a20f3de8`, whose fixture did not yet check persisted whiteouts.
 
 Results from 2026-10-13 are retained under `build/development17-20261013`:
@@ -129,6 +144,6 @@ claiming a leak-free overlay. `overlay-evidence.log` records the comparisons.
 
 The earlier disk persistence test qualified regular upper files. Durable ext2
 whiteout hiding is now covered by the additional qualification linked above.
-General overlay retention, opaque-directory persistence, crash consistency,
+General overlay retention, crash consistency,
 unsupported rename flags, full OCI security/delegation and mainstream
 rootless-runtime acceptance remain open.

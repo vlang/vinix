@@ -146,7 +146,8 @@ fn is_opaque(node &VFSNode) bool {
 		|| !stat.isdir(node.resource.stat.mode) {
 		return false
 	}
-	return xattr_equals(node.resource, 'trusted.overlay.opaque', 'y')
+	// An unreadable marker must never turn into permission to merge lower data.
+	return xattr_equals(node.resource, 'trusted.overlay.opaque', 'y') or { true }
 }
 
 // A name in a real directory, made as the kernel makes it, without the
@@ -698,15 +699,22 @@ fn overlay_create_locked(mut dir VFSNode, name string, mode u32) ?&VFSNode {
 	staged := previous != unsafe { nil } && overlay_persistent_storage(mut upper_dir.filesystem)
 	real := if staged { overlay_stage_create(mut dir, mode, '', false)? }
  else { overlay_prepare_real_create(mut upper_dir, name, mode, dir.resource)? }
+	mut node := overlay_new_node(dir, name, real, replaced_whiteout, previous)
+ node.overlay.staged = staged
 	// A directory made where a lower one was removed must not show what that
 	// one held.
 	if stat.isdir(mode) && replaced_whiteout {
-		install_opaque_xattr(real.resource, marker)
+		install_opaque_xattr(real.resource, marker) or {
+   failure := errno.get()
+   // The factory returns nil, so generic creation still owns this name.
+   node.name = ''
+   overlay_discard_created_locked(mut dir, mut node)
+   errno.set(failure)
+   return none
+  }
   marker = unsafe { nil }
 	}
 	// internal_create() adds `.` and `..` to a new directory and links it in.
-	mut node := overlay_new_node(dir, name, real, replaced_whiteout, previous)
- node.overlay.staged = staged
  return node
 }
 
@@ -1057,6 +1065,10 @@ fn overlay_mount(parent &VFSNode, mount_parent &VFSNode, name string, options st
 fn overlay_discard_created(mut dir VFSNode, mut node VFSNode) {
  overlay_lock.acquire()
  defer { overlay_lock.release() }
+ overlay_discard_created_locked(mut dir, mut node)
+}
+
+fn overlay_discard_created_locked(mut dir VFSNode, mut node VFSNode) {
  mut real := node.overlay.upper
  assert node.overlay.uncommitted
  // Generic creation has not published this real or alias in either tree.

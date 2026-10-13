@@ -109,7 +109,9 @@ registration checks required another build.
 This qualifies clean remount persistence and real name-rejection rollback on the
 tested ext2 volumes. Plain ext2 does not provide crash-atomic transactions. This
 suite does not qualify power-cut recovery, journaled overlay crash cuts,
-persistent opaque-directory markers, foreign device-node encodings or a
-mainstream rootless OCI runtime. Existing upper/lower overlay ownership still
+foreign device-node encodings or a mainstream rootless OCI runtime.
+Existing upper/lower overlay ownership still
 retains nodes across repeated replacement; that broader lifetime issue remains
-open. Roadmap section 17 remains incomplete.
+open. The subsequent [directory-opacity qualification](opacity.md) covers
+persistent ext2 markers, real out-of-space rollback and the parent link-count
+correction. Roadmap section 17 remains incomplete.

@@ -112,7 +112,7 @@ fn volume_device() &char {
 	return $if arm64 { c'/dev/vda' } $else { c'/dev/sd0' }
 }
 
-fn prepare_disk() {
+fn prepare_disk(opaque bool, full bool) {
 	unsafe {
 		owned_directory(c'/tmp/overlay-volume', 51)
 		check(C.mount(volume_device(), c'/tmp/overlay-volume', c'ext2', 0, nil) == 0
@@ -132,6 +132,8 @@ fn prepare_disk() {
 		long_path(&target[0], c'/tmp/overlay-state/disklower')
 		write_file(&target[0], c'AAAAAAAA', 60)
 		check(C.chown(&target[0], 1000, 1000) == 0, 61)
+		if opaque { prepare_opaque() }
+		if full { prepare_opaque_full() }
 		reject_work()
 		check(C.mount(c'overlay', c'/tmp/overlay-state/diskmerged', c'overlay', 0,
 			c'lowerdir=/tmp/overlay-state/disklower,upperdir=/tmp/overlay-volume/upper,workdir=/tmp/overlay-volume/work') == 0, 62)
@@ -517,10 +519,12 @@ pub fn run() int {
 		concurrent := all || C.strcmp(&selected[0], c'atomic') == 0
 		failure := all || C.strcmp(&selected[0], c'failure') == 0
 		disk := all || C.strcmp(&selected[0], c'disk') == 0
-		check(concurrent || failure || disk, 86)
+		opaque := all || C.strcmp(&selected[0], c'opaque') == 0
+		full := C.strcmp(&selected[0], c'opaque-full') == 0
+		check(concurrent || failure || disk || opaque || full, 86)
 		owned_directory(c'/tmp/overlay-state', 30)
 		if concurrent { prepare() }
-		if failure || disk { prepare_disk() }
+		if failure || disk || opaque || full { prepare_disk(opaque, full) }
 		worker := C.fork()
 		check(worker >= 0, 87)
 		if worker == 0 {
@@ -538,13 +542,22 @@ pub fn run() int {
 			}
 			if failure { backend_failure() }
 			if disk { disk_replace() }
+			if opaque { opaque_changes() }
+			if full { opaque_full_prepare_worker() }
 			C.fflush(nil)
 			C._exit(0)
 		}
 		mut status := 0
 		check(C.waitpid(worker, &status, 0) == worker && C.WIFEXITED(status) != 0
 			&& C.WEXITSTATUS(status) == 0, 88)
-		if disk { persistence(all) }
+		if opaque { opaque_persistence() }
+		if full { opaque_full() }
+		if disk {
+			persistence(all)
+		} else if opaque {
+			C.sync()
+			check(C.umount(c'/tmp/overlay-state/diskmerged') == 0 && C.umount(c'/tmp/overlay-volume') == 0, 171)
+		}
 		C.puts(c'OVERLAY GUEST: PASS')
 		C.fflush(nil)
 		for { C.pause() }

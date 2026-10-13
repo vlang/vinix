@@ -415,11 +415,22 @@ fn (mut res TmpFSResource) delete_xattr(name string) ? {
 	res.stat.ctim = realtime_clock
 }
 
-// Whether a tmpfs file has the attribute `name` set to `expected`.
-fn xattr_equals(res &resource.Resource, name string, expected string) bool {
+// Compare an internal attribute using the backing filesystem's owned snapshot.
+// Missing/unsupported attributes are absent; an I/O error is not absence.
+fn xattr_equals(res &resource.Resource, name string, expected string) ?bool {
 	mut tfile := tmpfs_resource_of(res)
 	if tfile == unsafe { nil } {
-		return false
+		mut backend := unsafe { res }
+		mut value := []u8{} @[freed]
+		value.flags |= .noslices
+		defer { unsafe { value.free() } }
+		resource.get_xattr(mut backend, name, mut value) or {
+			if errno.get() == errno.enodata || errno.get() == errno.enotsup { return false }
+			return none
+		}
+		if value.len != expected.len { return false }
+		for i in 0 .. value.len { if value[i] != expected[i] { return false } }
+		return true
 	}
 	tfile.l.acquire()
 	defer {
@@ -464,11 +475,14 @@ fn xattr_put_bytes(mut tfile TmpFSResource, name string, value []u8) ? {
 	installed = true
 }
 
-// Set an attribute from inside the kernel, as overlay marks a directory
-// opaque. Files that keep none are left alone.
+// Internal metadata still has to reach the backend before overlay publication.
 fn xattr_put(res &resource.Resource, name string, value string) ? {
 	mut tfile := tmpfs_resource_of(res)
 	if tfile == unsafe { nil } {
+		mut backend := unsafe { res }
+		data := value.bytes() @[freed]
+		defer { unsafe { data.free() } }
+		resource.set_xattr(mut backend, name, data, 0)?
 		return
 	}
 	tfile.l.acquire()
@@ -641,9 +655,15 @@ fn prepare_opaque_xattr() ?&XAttrSet {
  set.entries << XAttr{kernel_charge: charge, name: 'trusted.overlay.opaque'.clone(), value: value}
  return set
 }
-fn install_opaque_xattr(res &resource.Resource, prepared &XAttrSet) {
+// Ownership transfers only on success. The caller frees a rejected preparation.
+fn install_opaque_xattr(res &resource.Resource, prepared &XAttrSet) ? {
  mut tfile := tmpfs_resource_of(res)
- if tfile == unsafe { nil } { free_xattrs(prepared); return }
+ if tfile == unsafe { nil } {
+  mut backend := unsafe { res }
+  resource.set_xattr(mut backend, 'trusted.overlay.opaque', prepared.entries[0].value, 0)?
+  free_xattrs(prepared)
+  return
+ }
  tfile.l.acquire()
  defer { tfile.l.release() }
  if tfile.xattrs == unsafe { nil } { tfile.xattrs = unsafe { prepared }; return }
