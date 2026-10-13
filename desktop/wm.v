@@ -339,6 +339,9 @@ fn (mut d Desktop) close_window(id int) {
 		if mut app is RemoteApp {
 			app.close()
 		}
+		if mut app is FramebufferApp {
+			app.close()
+		}
 	}
 	d.release_window_thumbnail(index)
 	d.release_taskbar_status(index)
@@ -1180,6 +1183,9 @@ fn (mut d Desktop) close_apps() {
 	for index in 0 .. d.apps.len {
 		mut app := d.apps[index]
 		if mut app is RemoteApp {
+			app.close()
+		}
+		if mut app is FramebufferApp {
 			app.close()
 		}
 	}

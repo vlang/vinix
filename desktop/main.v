@@ -288,6 +288,12 @@ fn main() {
 	}
 
 	desktop.session.saving = true
+	mut framebuffer_server := start_framebuffer_server() or {
+		eprintln('vinix-desktop: framebuffer window service: ${err}')
+		unsafe { err.free() }
+		FramebufferServer{}
+	}
+	defer { framebuffer_server.close() }
 	// Whether the kernel can sleep, and the lid action and performance profile
 	// that were saved: the kernel keeps those two only while it runs.
 	gpu_present_startup_stage(c'taking up power settings')
@@ -335,6 +341,7 @@ fn main() {
 		stats_started := if options.stats { desktop_monotonic_us() } else { i64(0) }
 
 		desktop.update_taskbar_clock()
+		desktop.poll_framebuffer_server(mut framebuffer_server)
 		desktop.poll_apps()
 		desktop.poll_shell_services()
 		if frame_started-desktop.session.last_output_check>=2000 {
@@ -416,7 +423,7 @@ fn main() {
 			desktop.frame_damage = FrameDamage{}
 			desktop.drag_damage = DamageRect{}
 			elapsed := monotonic_millis() - frame_started
-			desktop_wait_for_input(pointer.fd, keyboard.fd, desktop_frame_wait_ms(elapsed,
+			desktop.wait_framebuffer_input(&framebuffer_server, pointer.fd, keyboard.fd, desktop_frame_wait_ms(elapsed,
 				desktop.idle_wait(options.idle_interval)))
 			continue
 		}
@@ -474,7 +481,7 @@ fn main() {
 			clock_interval := desktop.taskbar_clock_idle_interval(status_interval)
 			interval := desktop.idle_wait(clock_interval)
 			wait := desktop_frame_wait_ms(elapsed, interval)
-			desktop_wait_for_input(pointer.fd, keyboard.fd, wait)
+			desktop.wait_framebuffer_input(&framebuffer_server, pointer.fd, keyboard.fd, wait)
 			continue
 		}
 

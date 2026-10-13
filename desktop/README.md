@@ -142,6 +142,9 @@ What it does:
 - native **Blender**: a Vinix GHOST backend renders with surfaceless EGL and
   publishes directly into a compositor-owned Vinix window, with no Xorg or
   Wayland server in the path
+- **framebuffer windows for any language**: request a shared XRGB pixel buffer
+  over a Unix socket and wait on that descriptor for input, resize, focus, close,
+  and frame acknowledgements; see [the protocol and client](FRAMEBUFFER.md)
 - **Cmd/Super+Tab and Alt+Tab**, which switch windows on the current workspace
   on a tap and show them in the middle of the screen when held; Shift reverses
 

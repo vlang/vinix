@@ -98,7 +98,7 @@ pub fn spawn(argv []string, environment []string, directory string, rows int, co
 			C._exit(126)
 		}
 		$if linux {
-			if C.syscall(C.SYS_close_range, u32(3), u32(-1), u32(0)) != 0 { C._exit(126) }
+			if unsafe { C.syscall(C.SYS_close_range, u32(3), u32(-1), u32(0)) } != 0 { C._exit(126) }
 		} $else {
 			for fd in inherited { C.close(fd) }
 		}
