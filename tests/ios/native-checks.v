@@ -436,7 +436,7 @@ fn vm(root string, out string, mode string) {
 		for directory in ['sbin', 'proc', 'sys', 'dev', 'tmp', 'opt/ios'] {
 			os.mkdir_all(fs + '/' + directory) or { panic(err) }
 		}
-		for name in ['unknown-value', 'string', 'empty-string', 'describing', 'cstring', 'foreign-count', 'foreign-index', 'foreign-offset', 'foreign-subscript', 'utf16-offset', 'sequence', 'metadata', 'protocol', 'hash', 'hasher', 'raw-representable',
+		for name in ['unknown-value', 'string', 'empty-string', 'describing', 'cstring', 'foreign-count', 'foreign-index', 'foreign-offset', 'foreign-subscript', 'utf16-offset', 'sequence', 'array-sequence', 'metadata', 'protocol', 'hash', 'hasher', 'raw-representable',
 			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg', 'void', 'version', 'initializer', 'heap', 'error', 'error-value', 'object-type', 'mangled', 'witness', 'once', 'objc-bool', 'actor-executor', 'task-priority', 'task-alloc', 'task-create', 'task-switch', 'nslog', 'string-unbridge', 'error-description'] {
 			copy_file(out + '/swift-' + name + '-checks', fs + '/opt/ios/swift-' + name + '-checks')
 		}

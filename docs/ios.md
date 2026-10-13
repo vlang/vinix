@@ -4551,8 +4551,12 @@ executable/debug archives are retained under
 `build/ios/fortnite/array-sequence-checks`. Evidence and compiler bytes are
 hash-verified after persistence from the owned 8 GiB RAM volume, which is then
 detached. The initial fixture's malformed Int Optional.nil encoding and its
-correction are retained separately. The mutable canonical V checkout is
-outside the actual build inputs; five published runners remain unchanged.
+correction are retained separately. The first evidence recorder caught an
+omitted fixture in the dedicated Swift VM staging and launch lists. Both lists
+were corrected, PID 1 rebuilt and all 44 programs passed in a fresh VM; the
+original logs and inputs remain under `guest-launch-recovery`. The mutable
+canonical V checkout is outside the actual build inputs; five published
+runners remain unchanged.
 
 Supported storage consists of registered native typed tails and canonical
 empty storage with complete supported Element witnesses. Foreign/bridged
