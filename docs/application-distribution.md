@@ -152,6 +152,13 @@ without changing the persistent offline policy. No key is learned from an index.
 Keep configuration/state owned by the administrator and unwritable by ordinary
 users. The commands share the package writer lock, reject unsafe configuration
 files/directories and flush private temporary files before atomic replacement.
+Configuration reads reject unknown or duplicate fields, including escaped
+spellings of the same key, null values and incorrectly typed policy entries.
+Omitted fields retain their documented defaults; an explicit empty permissions
+list or zero disk reserve stays explicit. A misspelled allowlist or permissions
+field fails before acquisition, cleanup or activation. Correct the configuration
+under the package lock, then retry; no state reset is needed. See
+[configuration qualification](../tests/packages/configuration-check.md).
 `repo-revoke` requires no reachable repository or valid catalog/history. It
 revokes acquisition, rollback and subsequent launches from that publisher while
 retaining payloads, personal data and history for inspection and uninstall.

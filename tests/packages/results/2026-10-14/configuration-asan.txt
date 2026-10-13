@@ -1,0 +1,30 @@
+ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1. Both runners exited 0.
+PASS configuration ASan/UBSan; leak detection disabled
+PASS service ASan/UBSan; leak detection disabled
+
+configuration assertion output:
+
+service assertion output:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Rolled back to generation 2; application data was retained
+
+Corrected allocation fixture, same sanitizer flags, exit 0:
+Configuration schema: retained 0 tracked bytes in 1000 cycles

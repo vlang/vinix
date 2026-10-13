@@ -1,0 +1,33 @@
+Unmodified f39e27e31 load_config, native client exit 0:
+ACCEPTED {"architecture":"aarch64","policy":{"permissons":[]}} -> offline=false permissions=network,files,process,display,audio allowed=0
+REFUSED 
+1:47: Invalid json: Data: Expected boolean, but got string
+{"architecture":"aarch64","policy":{"offline":\e[31m"false"\e[0m}}
+                                              \e[31m~~~~~~~\e[0m
+ACCEPTED {"architecture":"aarch64","policy":{"allowed":null}} -> offline=false permissions=network,files,process,display,audio allowed=0
+ACCEPTED {"architecture":"aarch64","policy":{"offline":true,"off\u006cine":false}} -> offline=false permissions=network,files,process,display,audio allowed=0
+
+Same input client after schema admission, exit 0:
+REFUSED invalid package configuration: unknown administration document field: permissons
+REFUSED invalid package configuration: 
+1:47: Invalid json: Data: Expected boolean, but got string
+{"architecture":"aarch64","policy":{"offline":\e[31m"false"\e[0m}}
+                                              \e[31m~~~~~~~\e[0m
+REFUSED invalid package configuration: invalid metadata document field type: allowed
+REFUSED invalid package configuration: duplicate administration document field: offline
+
+Initial allocation-fixture failure: the fixture did not release returned error objects/messages. It was corrected without changing production configuration handling.
+PASS configuration_test.v
+PASS service_test.v
+PASS administration_test.v
+PASS policy_test.v
+PASS review_test.v
+PASS deployment_test.v
+PASS mirror_test.v
+Configuration schema: retained 241000 tracked bytes in 1000 cycles
+tools/packages/pkgcore/configuration_test.v:125: fn test_configuration_schema_scanning_retires_owned_keys
+   > assert kept == 0
+     Left value (len: 6): `241000`
+    Right value (len: 1): `0`
+
+

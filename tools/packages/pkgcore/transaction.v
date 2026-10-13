@@ -20,8 +20,9 @@ pub fn load_config(root string) !Config {
 			}
 		}
 	}
-	config := json2.decode[Config](read_metadata(path)!)!
-	config.validate()!
+	text := read_metadata(path)!
+	defer { unsafe { text.free() } }
+	config := decode_configuration(text) or { return error('invalid package configuration: ${err}') }
 	if root == '' || root == '/' {
 		$if arm64 {
 			if config.architecture != 'aarch64' { return error('package configuration targets another architecture') }

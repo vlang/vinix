@@ -1,0 +1,20 @@
+Pinned V 0.5.2 826e96f56ca12fcb8fd02dfd6edf1551008e62a8; V_MACOS_V3_NO_FALLBACK=1.
+Seven affected core assertion runners: -no-skip-unused -gc none -manualfree, exit 0.
+PASS configuration_test.v
+PASS service_test.v
+PASS administration_test.v
+PASS policy_test.v
+PASS review_test.v
+PASS deployment_test.v
+PASS mirror_test.v
+Configuration schema: retained 0 tracked bytes in 1000 cycles
+PASS signed CLI contracts
+PASS all baseline configuration ambiguities now refused
+
+Signed CLI contracts:
+Package CLI: ambiguous configuration refused without activation, cache or trust changes
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed
+
+Static target builds:
+PASS aarch64 static ELF service build; build only, no guest execution
+PASS x86_64 static ELF service build; build only, no guest execution

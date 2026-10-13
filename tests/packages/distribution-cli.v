@@ -140,6 +140,41 @@ fn qualify_busy_configuration(binary string, root string) ! {
 	}
 }
 
+fn qualify_configuration_schema(binary string, root string) ! {
+	path := root + '/etc/vinix-packages/config.json'
+	original := os.read_file(path)!
+	defer { os.write_file(path, original) or { panic(err) } }
+	store := pkgcore.state_directory(root)
+	current := os.readlink(store + '/current')!
+	retained := ['catalog.json', 'trust-history.json', current + '/state.json']
+	mut hashes := []string{}
+	for file in retained { hashes << pkgcore.hash_file(store + '/' + file)! }
+	objects := os.ls(store + '/objects')!
+	sentinel := store + '/generations/.stage-configuration-schema'
+	os.mkdir_all(sentinel)!
+	defer { os.rmdir_all(sentinel) or {} }
+	os.write_file(sentinel + '/keep', 'retained recovery state')!
+	for invalid in [original.replace('"permissions":', '"permissons":'),
+		original.replace('"allowed":[]', '"allowed":null'),
+		original.replace('"offline":false', '"offline":true,"off\\u006cine":false'),
+		original.replace('"reserve_bytes":0', '"reserve_bytes":"0"')] {
+		assert invalid != original
+		os.write_file(path, invalid)!
+		for arguments in [['update'], ['--json', 'verify'], ['install', 'app'], ['remove', 'app'],
+			['rollback'], ['gc'], ['repo-revoke', 'fixture']] {
+			reply := command(binary, ['--root', root, ...arguments])!
+			assert reply.code == 1 && reply.text.contains('invalid package configuration:') && !reply.text.contains('V panic:'), reply.text
+		}
+		assert os.read_file(path)! == invalid && os.readlink(store + '/current')! == current
+		for i, file in retained { assert pkgcore.hash_file(store + '/' + file)! == hashes[i] }
+		assert os.ls(store + '/objects')! == objects
+		assert os.read_file(sentinel + '/keep')! == 'retained recovery state'
+	}
+	os.write_file(path, original)!
+	assert json2.decode[pkgcore.State](success(binary, ['--root', root, '--json', 'verify'])!)!.generation == 1
+	println('Package CLI: ambiguous configuration refused without activation, cache or trust changes')
+}
+
 fn qualify(binary string) ! {
 	work := os.real_path(os.temp_dir()) + '/vinix-package-cli-' + os.getpid().str()
 	os.mkdir_all(work + '/root/etc/vinix-packages')!
@@ -241,6 +276,7 @@ fn qualify(binary string) ! {
 	installed := json2.decode[pkgcore.State](success(binary, [...root_args, 'status'])!)!
 	assert installed.generation == 1
 	assert installed.packages[0].package.id == 'app'
+	qualify_configuration_schema(binary, work + '/root')!
 	mut launchers := packagecore.Registry{}
 	defer { launchers.close() }
 	store := pkgcore.state_directory(work + '/root')

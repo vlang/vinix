@@ -1175,6 +1175,17 @@ On a fresh image, status/verification do not initialize package state. Direct
 administrator edits to configuration must honor the same lock or quiesce package
 operations; arbitrary root filesystem writes are outside this contract.
 
+Configuration JSON preserves legacy omitted-field defaults, including partial
+policy objects. Present fields must have the declared JSON types; null values,
+unknown keys and duplicate keys (including escaped equivalent spellings) are
+rejected at the envelope, repository, policy and version-pin levels. Explicit
+empty arrays, false booleans and zero reserves keep their meaning. This prevents
+a policy typo from silently selecting default permissions or an unrestricted
+allowlist. Rejection happens before transaction cleanup or acquisition and
+preserves configuration bytes, cached metadata and installed generations. Restore
+valid configuration under the same package lock before retrying. See
+[configuration qualification](../../tests/packages/configuration-check.md).
+
 V administrative clients can use [`pkgcore.Service`](pkgcore/service.v) with
 `root` and a per-command `offline` flag. It retains no configuration snapshot.
 Its `refresh`, `transact`, `deploy`, `plan`, `review`, `rollback`, `collect`,

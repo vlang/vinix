@@ -43,6 +43,11 @@ Read [administration/recovery](../../docs/application-distribution.md) and
 [SDK 1](SDK.md) for enrollment, policy, packaging and limits. Release publisher
 enrollment and catalog/runtime guest qualification remain required.
 
+Configuration reads reject ambiguous keys, null values and incorrect field
+types while preserving legacy defaults for omitted fields. Policy typos fail
+before acquisition, cleanup or activation; correcting the configuration permits
+a normal retry. See [qualification](../../tests/packages/configuration-check.md).
+
 Use `pack-catalog CATALOG.json PREPARED_ROOTS NEW_WORKSPACE` to assemble reviewed
 prepared-root recipes and pinned inventories atomically, with complete declared
 architecture/version/runtime coverage. It emits a canonical catalog lock and a

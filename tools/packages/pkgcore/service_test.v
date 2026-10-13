@@ -137,3 +137,49 @@ fn test_service_offline_overlay_fresh_status_and_unsafe_lock() {
 	(Service{ root: 'relative' }).state() or { refused = err.msg().contains('absolute') }
 	assert refused
 }
+
+fn test_service_refuses_ambiguous_configuration_before_mutating_package_state() {
+	work, service, config := service_fixture('configuration-schema')!
+	defer { os.rmdir_all(work) or {} }
+	directory := state_directory(service.root)
+	path := service.root + '/etc/vinix-packages/config.json'
+	service.transact('install', ['app'], TransactionOptions{})!
+	service.transact('remove', ['app'], TransactionOptions{})!
+	mut review := service.review('install', ['app'])!
+	defer { review.close() }
+	original := json2.encode(config)
+	retained := ['catalog.json', 'trust-history.json', 'generations/1/state.json', 'generations/2/state.json']
+	mut snapshots := []string{}
+	for file in retained { snapshots << os.read_file(directory + '/' + file)! }
+	objects := os.ls(directory + '/objects')!
+	os.mkdir_all(directory + '/generations/.stage-sentinel')!
+	os.write_file(directory + '/generations/.stage-sentinel/keep', 'retained recovery data')!
+	for invalid in [original.replace('"permissions":', '"permissons":'),
+		original.replace('"allowed":[]', '"allowed":null'),
+		original.replace('"offline":false', '"offline":true,"off\\u006cine":false'),
+		original.replace('"url":', '"url":"https://example.invalid","url":')] {
+		assert invalid != original
+		os.write_file(path, invalid)!
+		mut errors := []string{}
+		service.refresh() or { errors << err.msg() }
+		service.transact('install', ['app'], TransactionOptions{expected_review: review.fingerprint}) or { errors << err.msg() }
+		service.rollback('') or { errors << err.msg() }
+		service.collect() or { errors << err.msg() }
+		service.state() or { errors << err.msg() }
+		service.review('install', ['app']) or { errors << err.msg() }
+		service.mirror(work + '/invalid-mirror', ['app']) or { errors << err.msg() }
+		revoke_repository(service.root, 'fixture') or { errors << err.msg() }
+		assert errors.len == 8 && errors.all(it.contains('invalid package configuration:')), errors.str()
+		assert os.read_file(path)! == invalid && os.readlink(directory + '/current')! == 'generations/2'
+		for i, file in retained { assert os.read_file(directory + '/' + file)! == snapshots[i] }
+		assert os.ls(directory + '/objects')! == objects
+		assert os.read_file(directory + '/generations/.stage-sentinel/keep')! == 'retained recovery data'
+		assert !os.exists(work + '/invalid-mirror') && !os.exists(directory + '/generations/3')
+	}
+	os.write_file(path, original)!
+	assert service.state()!.generation == 2 && service.state()!.previous == 1
+	assert service.verify()!.packages.len == 0
+	assert service.transact('install', ['app'], TransactionOptions{expected_review: review.fingerprint})!.generation == 3
+	assert service.verify()!.packages.len == 1
+	assert service.rollback('')!.generation == 2
+}
