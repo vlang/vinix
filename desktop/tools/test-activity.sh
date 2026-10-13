@@ -8,39 +8,12 @@ trap 'rm -rf "$work"' EXIT HUP INT TERM
 "$root/desktop/tools/stage_ui2" "$work/modules/ui2" "$root/third_party/ui2" "$root/desktop/tools/ui2_headless_bounds.v"
 "$root/desktop/tools/stage_app" "$work/ui" "$root/desktop" "$root/third_party/ui2/examples/calculator" >/dev/null
 "$root/desktop/tools/stage_host_gpu" "$work/ui" --v "$v"
-python3 - "$work/ui" <<'PYFREEZE'
-from pathlib import Path
-import sys
-for path in Path(sys.argv[1]).iterdir():
-    if path.is_symlink() and path.is_file():
-        contents = path.read_bytes()
-        path.unlink()
-        path.write_bytes(contents)
-PYFREEZE
+"$root/build-support/run-v-tool.sh" "$root/desktop/tools/native-utility-source.v" materialize "$work/ui"
 rm "$work/ui/main.v"
 printf "Module { name: 'activity_tests' }\n" > "$work/ui/v.mod"
 # Compile the related cases together to validate their shared integration and
 # avoid repeatedly compiling the entire desktop for each small test module.
-python3 - "$root" "$work/ui/activity_test.v" <<'PY'
-from pathlib import Path
-import sys
-root = Path(sys.argv[1])
-files = [root / 'desktop/tools/tests/activity_kill_test.v', root / 'desktop/tools/tests/activity_controls_test.v']
-files += [path for path in sorted(root.glob('tests/activity_*_test.v')) if 'lifetime' not in path.name and 'memory' not in path.name]
-imports = set()
-bodies = []
-for path in files:
-    body = []
-    for line in path.read_text().splitlines():
-        if line.startswith('module '):
-            continue
-        if line.startswith('import '):
-            imports.add(line)
-        else:
-            body.append(line)
-    bodies.append('\n'.join(body))
-Path(sys.argv[2]).write_text('module main\n' + '\n'.join(sorted(imports)) + '\n\n' + '\n\n'.join(bodies))
-PY
+"$root/build-support/run-v-tool.sh" "$root/desktop/tools/native-utility-source.v" merge-activity "$root" "$work/ui/activity_test.v"
 "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/activity_test.v"
 

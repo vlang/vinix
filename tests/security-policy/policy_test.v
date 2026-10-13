@@ -3,6 +3,23 @@ module security
 
 import proc
 
+fn test_policy_decisions_emit_one_typed_event() {
+	proc.set_test_euid(0)
+	proc.set_test_caps(u64(-1))
+	proc.set_test_domain(0)
+	before := test_event_count
+	assert permitted(filesystem_mount)
+	assert test_event_count == before + 1
+	assert test_event_kind == event_policy && !test_event_denied && test_event_arg == 0
+	assert test_event_label == filesystem_mount
+	proc.set_test_euid(1000)
+	assert !permitted(system_clock_set)
+	assert test_event_count == before + 2
+	assert test_event_kind == event_policy && test_event_denied && test_event_arg == 0
+	assert test_event_label == system_clock_set
+	proc.set_test_euid(0)
+}
+
 fn test_confined_root_cannot_administer_host_policy() {
 	proc.set_test_euid(0)
 	proc.set_test_caps(u64(-1))

@@ -9,42 +9,12 @@ trap 'rm -rf "$work"' EXIT HUP INT TERM
 "$root/desktop/tools/stage_ui2" "$work/modules/ui2" "$root/third_party/ui2" "$root/desktop/tools/ui2_headless_bounds.v"
 "$root/desktop/tools/stage_app" "$work/ui" "$root/desktop" "$root/third_party/ui2/examples/calculator" >/dev/null
 "$root/desktop/tools/stage_host_gpu" "$work/ui" --v "$v"
-python3 - "$work/ui" <<'PY'
-from pathlib import Path
-import sys
-# Freeze staged symlinks so another editing session cannot mix source versions
-# during the test compiler's later generation phases.
-for path in Path(sys.argv[1]).iterdir():
-    if path.is_symlink() and path.is_file():
-        contents = path.read_bytes()
-        path.unlink()
-        path.write_bytes(contents)
-PY
+"$root/build-support/run-v-tool.sh" "$root/desktop/tools/native-utility-source.v" materialize "$work/ui"
 rm "$work/ui/main.v"
 printf "Module { name: 'utility_parity_tests' }\n" > "$work/ui/v.mod"
 # Compile related model and UI cases together, with the same complete desktop
 # and compiler as production. Each file can also run independently when staged.
-python3 - "$root" "$work/ui/utility_parity_test.v" <<'PY'
-from pathlib import Path
-import sys
-root, destination = Path(sys.argv[1]), Path(sys.argv[2])
-names = ['utility_parity', 'calculator_features', 'disk_usage_features',
-         'editor_features', 'editor_selection', 'calendar_events', 'calendar_search', 'clock_utility', 'files_info',
-         'capture_features', 'text_copy_client', 'terminal_selection']
-imports, bodies = set(), []
-for name in names:
-    source = root / 'desktop/tools/tests' / (name + '_test.v')
-    body = []
-    for line in source.read_text().splitlines():
-        if line.startswith('module '):
-            continue
-        if line.startswith('import '):
-            imports.add(line)
-        else:
-            body.append(line)
-    bodies.append('\n'.join(body))
-destination.write_text('module main\n' + '\n'.join(sorted(imports)) + '\n\n' + '\n\n'.join(bodies))
-PY
+"$root/build-support/run-v-tool.sh" "$root/desktop/tools/native-utility-source.v" merge-parity "$root" "$work/ui/utility_parity_test.v"
 "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/utility_parity_test.v"
 

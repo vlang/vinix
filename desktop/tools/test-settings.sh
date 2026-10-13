@@ -37,15 +37,7 @@ mkdir "$work/ui"
 "$root/desktop/tools/stage_app" "$work/ui" "$root/desktop" \
     "$root/third_party/ui2/examples/calculator" >/dev/null
 "$root/desktop/tools/stage_host_gpu" "$work/ui" --v "$v"
-python3 - "$work/ui" <<'PYFREEZE'
-from pathlib import Path
-import sys
-for path in Path(sys.argv[1]).iterdir():
-    if path.is_symlink() and path.is_file():
-        contents = path.read_bytes()
-        path.unlink()
-        path.write_bytes(contents)
-PYFREEZE
+"$root/build-support/run-v-tool.sh" "$root/desktop/tools/native-utility-source.v" materialize "$work/ui"
 rm -f "$work/ui/main.v"
 cp "$root/desktop/tools/tests/settings_test.v" "$work/ui/"
 cp "$root/desktop/tools/tests/settings_search_test.v" "$work/ui/"

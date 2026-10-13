@@ -25,15 +25,7 @@ mkdir "$work/ui"
     "$ui2/examples/calculator" >/dev/null
 # Other sessions may edit the checkout while a test compiles. Materialize
 # staged links once so each suite reads the same complete source snapshot.
-python3 - "$work/ui" <<'PY'
-import sys
-from pathlib import Path
-for path in Path(sys.argv[1]).iterdir():
-    if path.is_symlink() and path.is_file():
-        data = path.read_bytes()
-        path.unlink()
-        path.write_bytes(data)
-PY
+"$root/build-support/run-v-tool.sh" "$root/desktop/tools/native-utility-source.v" materialize "$work/ui"
 "$root/desktop/tools/stage_host_gpu" "$work/ui" --v "$v"
 rm -f "$work/ui/main.v"
 printf "Module { name: 'window_experience_tests' }\n" > "$work/ui/v.mod"

@@ -8,42 +8,8 @@ mkdir -p "$work/modules/mmap" "$work/modules/memory" "$work/modules/resource" "$
 cp "$root/kernel/kbudget/budget.v" "$work/modules/kbudget/"
 cp "$root/kernel/cgcontrol/control.v" "$work/modules/cgcontrol/"
 cp "$root/kernel/memory/mmap/page_source.v" "$work/modules/mmap/"
-python3 - "$root/tests/private-pages/source_test.v" "$work/modules/mmap" <<'PY'
-from pathlib import Path
-import sys
-source = Path(sys.argv[1]).read_text()
-begin = source.index('fn test_')
-header = source[:source.index('const page_size')]
-Path(sys.argv[2], 'fixture.v').write_text(source[:begin])
-Path(sys.argv[2], 'source_test.v').write_text(header + source[begin:])
-PY
-python3 - "$root/kernel/memory/mmap/mmap.v" "$work/modules/mmap/install.v" <<'PY'
-from pathlib import Path
-import sys
-source = Path(sys.argv[1]).read_text()
-functions = ['page_table_flags', 'range_page_has_file_data', 'install_range_page', 'resolve_cow_fault', 'unshare_private_page_unlocked']
-result = 'module mmap\nimport memory\nimport numa\nimport lib\nimport proc\nimport pager\nimport errno\nimport resource\n'
-if __import__('os').environ.get('VINIX_FILE_PAGES_HOST') != '1':
-    result += 'fn resolve_shared_file_write(_pm &memory.Pagemap, _address u64) bool { return false }\nfn pageout_file_span(_pm &memory.Pagemap, _begin u64, _end u64) u64 { return 0 }\n'
-page_source = Path(sys.argv[1]).with_name('paging.v').read_text()
-result += page_source[page_source.index('struct PagedPage'):page_source.index('fn reclaim_uncovered_paged_locked')]
-if __import__('os').environ.get('VINIX_PAGING_HOST') == '1':
-    result = result[:result.index('struct PagedPage')] + page_source[page_source.index('struct PagedPage'):page_source.index('__global (')]
-    result = result.replace('import errno\n', 'import errno\nimport sched\nimport kbudget\n')
-    result += '__global (pageout_process_cursor = int(1))\n'
-    for name in ['reclaim_anonymous', 'max_u64']:
-        begin = page_source.index('fn ' + name + '(')
-        if page_source[begin-4:begin] == 'pub ': begin -= 4
-        end = page_source.index('\n', begin) + 1 if name == 'max_u64' else page_source.index('\n}\n', begin) + 3
-        result += page_source[begin:end] + '\n'
-    functions += ['range_priority']
-for name in functions:
-    begin = source.index('fn ' + name + '(')
-    if source[begin-4:begin] == 'pub ': begin -= 4
-    end = source.index('\n}\n', begin) + 3
-    result += source[begin:end] + '\n'
-Path(sys.argv[2]).write_text(result)
-PY
+"$root/build-support/source-tools/run" private-fixture "$root/tests/private-pages/source_test.v" "$work/modules/mmap"
+"$root/build-support/source-tools/run" private-install "$root/kernel/memory/mmap/mmap.v" "$work/modules/mmap/install.v"
 cat > "$work/v.mod" <<'VEOF'
 Module { name: 'private_page_host_tests' }
 VEOF
@@ -338,14 +304,14 @@ pub fn pageout_mapping(mut _res Resource, _page u64) u64 { return 0 }
 VEOF
 fi
 if [ "${VINIX_HOST_SANITIZE:-0}" = 1 ]; then
-    VMODULES="$work/modules" "$v" -cc clang -cflags '-fsanitize=address,undefined' -ldflags '-fsanitize=address,undefined' -enable-globals -gc none test "$work/modules/mmap"
+    VMODULES="$work/modules" "$root/build-support/source-tools/run" test-directory "$v" "$work/modules/mmap" -cc clang -cflags '-fsanitize=address,undefined' -ldflags '-fsanitize=address,undefined' -enable-globals -gc none
 else
-    VMODULES="$work/modules" "$v" -enable-globals -gc none test "$work/modules/mmap"
+    VMODULES="$work/modules" "$root/build-support/source-tools/run" test-directory "$v" "$work/modules/mmap" -enable-globals -gc none
 fi
 if [ "${VINIX_PAGING_HOST:-0}" = 1 ]; then
     if [ "${VINIX_HOST_SANITIZE:-0}" = 1 ]; then
-        VMODULES="$work/modules" "$v" -cc clang -cflags '-fsanitize=address,undefined' -ldflags '-fsanitize=address,undefined' -enable-globals -gc none test "$work/modules/pager"
+        VMODULES="$work/modules" "$root/build-support/source-tools/run" test-directory "$v" "$work/modules/pager" -cc clang -cflags '-fsanitize=address,undefined' -ldflags '-fsanitize=address,undefined' -enable-globals -gc none
     else
-        VMODULES="$work/modules" "$v" -enable-globals -gc none test "$work/modules/pager"
+        VMODULES="$work/modules" "$root/build-support/source-tools/run" test-directory "$v" "$work/modules/pager" -enable-globals -gc none
     fi
 fi

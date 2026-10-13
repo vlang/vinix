@@ -22,8 +22,12 @@ mut:
 	ctim TestTime
 }
 struct TestTime { mut: tv_sec i64 tv_nsec i64 }
+// This fixture models the existing non-journaled volume path. Unexpected
+// journal transactions must fail the host model rather than appear supported.
+struct TestJournal { mut: failed bool }
 struct EXT2Filesystem {
 mut:
+	journal &TestJournal = unsafe { nil }
 	l klock.Lock
 	bytes [4096]u8
 	fail_read bool
@@ -32,6 +36,21 @@ mut:
 	read_only bool
 	writes int
 	during_write fn () = unsafe { nil }
+}
+fn (mut filesystem EXT2Filesystem) journal_healthy() bool {
+	filesystem.l.acquire()
+	defer { filesystem.l.release() }
+	return filesystem.journal == unsafe { nil } || !filesystem.journal.failed
+}
+fn (mut filesystem EXT2Filesystem) begin_transaction() ? {
+	if filesystem.read_only { return none }
+	assert filesystem.journal == unsafe { nil }
+}
+fn (mut filesystem EXT2Filesystem) abort_transaction() {
+	assert filesystem.journal == unsafe { nil }
+}
+fn (mut filesystem EXT2Filesystem) commit_transaction() ? {
+	assert filesystem.journal == unsafe { nil }
 }
 struct EXT2Inode {
 mut:

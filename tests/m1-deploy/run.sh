@@ -14,20 +14,7 @@ cp "$repo/scripts/deploy-m1-efi.sh" "$fixture/scripts/"
 
 # A minimal ELF64/AArch64 header is enough for the deployment architecture
 # guard and keeps this test independent of generated kernel artifacts.
-python3 - "$fixture/kernel/bin/vinix" <<'PY'
-import struct
-import sys
-
-header = bytearray(64)
-header[:7] = b"\x7fELF\x02\x01\x01"
-struct.pack_into("<HHI", header, 16, 2, 183, 1)
-with open(sys.argv[1], "wb") as output:
-    output.write(header)
-    output.write(bytes.fromhex(
-        "888b4cdf30ddb1c77bf094a183e8820a"
-        "7e851b9a817ba695e0736a3b721bb6a0"
-    ))
-PY
+"$repo/build-support/source-tools/run" m1-kernel "$fixture/kernel/bin/vinix"
 
 printf '%s\n' 'Limine 12.8.0 (aarch64, UEFI)' \
     > "$fixture/boot-image/limine-bin/BOOTAA64.EFI"

@@ -7,14 +7,7 @@ trap 'rm -rf "$work"' EXIT HUP INT TERM
 mkdir -p "$work/modules/ext2" "$work/modules/memory/mmap" "$work/modules/klock" "$work/modules/errno" "$work/modules/katomic" "$work/modules/pagecache" "$work/modules/stat" "$work/modules/sched"
 cp "$root/kernel/fs/ext2/mapping.v" "$root/kernel/fs/ext2/writeback.v" "$work/modules/ext2/"
 cp "$root/tests/mapped-writeback/mapping_test.v" "$work/modules/ext2/"
-python3 - "$root/kernel/fs/ext2/ext2.v" "$work/modules/ext2/acquire.v" <<'PY'
-from pathlib import Path
-import sys
-source = Path(sys.argv[1]).read_text()
-begin = source.index('fn (mut this EXT2Resource) mmap(')
-end = source.index('fn (mut this EXT2Resource) read(', begin)
-Path(sys.argv[2]).write_text('module ext2\nimport errno\nimport memory\nimport memory.mmap as mmap_mod\nimport stat\n' + source[begin:end])
-PY
+"$root/build-support/source-tools/run" ext2-mmap "$root/kernel/fs/ext2/ext2.v" "$work/modules/ext2/acquire.v"
 cat > "$work/v.mod" <<'EOF'
 Module { name: 'mapped_writeback_host_tests' }
 EOF
@@ -97,7 +90,7 @@ module sched
 pub fn yield(_save bool) {}
 EOF
 if [ "${VINIX_HOST_SANITIZE:-0}" = 1 ]; then
-    VMODULES="$work/modules" "$v" -cc clang -cflags '-fsanitize=address,undefined' -ldflags '-fsanitize=address,undefined' -enable-globals -gc none test "$work/modules/ext2"
+    VMODULES="$work/modules" "$root/build-support/source-tools/run" test-directory "$v" "$work/modules/ext2" -cc clang -cflags '-fsanitize=address,undefined' -ldflags '-fsanitize=address,undefined' -enable-globals -gc none
 else
-    VMODULES="$work/modules" "$v" -enable-globals -gc none test "$work/modules/ext2"
+    VMODULES="$work/modules" "$root/build-support/source-tools/run" test-directory "$v" "$work/modules/ext2" -enable-globals -gc none
 fi

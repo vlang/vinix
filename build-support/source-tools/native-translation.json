@@ -1,0 +1,167 @@
+{
+    "changes": "Eleven embedded source/test preparation blocks become V. Desktop callers reuse native materialization and two merge profiles. Kernel source selection preserves original text policies and environment variants. Direct V test-file driver avoids the shared SDK vtest architecture/cache issues and detects false-zero assertions. Native SDK stat header fixes Darwin inode ABI under Rosetta. Two stale host fixtures model the current audit and non-journaled transaction hooks, retaining all existing regressions.",
+    "embedded_blocks": [
+        {
+            "bytes": 216,
+            "lines": 7,
+            "path": "desktop/tools/test-activity.sh",
+            "sha256": "4e1b9026684a5213049152f1fee62a1b60a3216454826a0d5607db7abd888ad4"
+        },
+        {
+            "bytes": 732,
+            "lines": 18,
+            "path": "desktop/tools/test-activity.sh",
+            "sha256": "a3ee4d99ec620605ebbd5a32711f102b46880d17f7d006f6704227e60cb0eb6d"
+        },
+        {
+            "bytes": 216,
+            "lines": 7,
+            "path": "desktop/tools/test-settings.sh",
+            "sha256": "4e1b9026684a5213049152f1fee62a1b60a3216454826a0d5607db7abd888ad4"
+        },
+        {
+            "bytes": 349,
+            "lines": 9,
+            "path": "desktop/tools/test-utility-parity.sh",
+            "sha256": "9adcd1c3551feefda917ec29ed99d518882c1a803af5061182272c00a16256ff"
+        },
+        {
+            "bytes": 835,
+            "lines": 19,
+            "path": "desktop/tools/test-utility-parity.sh",
+            "sha256": "b29abc986a17fd905e6da943ec66a1b2f2ada5e64e2bb13edecb371d580f6ff2"
+        },
+        {
+            "bytes": 208,
+            "lines": 7,
+            "path": "desktop/tools/test-window-experience.sh",
+            "sha256": "a9b546b4a54c229be67e88eaf8a88b1e9133564e0040d49b47ef228e6d96edd5"
+        },
+        {
+            "bytes": 225,
+            "lines": 5,
+            "path": "tests/clock-control/run-host.sh",
+            "sha256": "55b46c19230c1e10669759669a917845ca27052fba2e10eb170ba2bc4eb79a1c"
+        },
+        {
+            "bytes": 334,
+            "lines": 6,
+            "path": "tests/mapped-writeback/run-host.sh",
+            "sha256": "8221d054d57e25ae6ee39b3ec1c44602c286fa8edf0433d255be620d54a06e64"
+        },
+        {
+            "bytes": 287,
+            "lines": 7,
+            "path": "tests/private-pages/run-host.sh",
+            "sha256": "f00f35b17500c3a24c33ddd27018ba6503c96d790febce8cdb26d90def37eef0"
+        },
+        {
+            "bytes": 1723,
+            "lines": 25,
+            "path": "tests/private-pages/run-host.sh",
+            "sha256": "e7033cd7a5765adc320ad785cd752d18e6b0126bedc47e803e31ade98c0e3847"
+        },
+        {
+            "bytes": 323,
+            "lines": 12,
+            "path": "tests/m1-deploy/run.sh",
+            "sha256": "6268ab9ccfae20477998aee2c24a7ddff95b1702630fb745267cade3ba77cf8f"
+        }
+    ],
+    "embedded_bytes": 5448,
+    "embedded_lines": 122,
+    "evidence": "~/.cache/vinix-source-tools-native-20261013",
+    "limits": "No Python, GUI application, complete desktop UI suite, live ESP, Vinix guest or kernel execution. Kernel implementations and lifetimes are unchanged; host model passes establish the test preparation and existing behaviors only. No journal or new guest runtime claim. Shell containing files receive zero Python-file credit.",
+    "original_sha256": {
+        "desktop/tools/native-utility-source.v": "fddbdb2ea97c1f7e78cda0e97e3fb4898a795a2a2ee607c83e21a9f031dddd26",
+        "desktop/tools/test-activity.sh": "412142f92a4c33ea45a821f192cab1915f9fd78486cc487145df3c1e13f02cdb",
+        "desktop/tools/test-settings.sh": "517881fd5ce6c1259c18e71c8431c574628728ac96b43d3c71c7445fe5787018",
+        "desktop/tools/test-utility-parity.sh": "7d537e709c05d4c549393274c236c9d07b581a72e9dabd874c1fff89228ff615",
+        "desktop/tools/test-window-experience.sh": "79a2ee4c43da745a86f34b7ceac0967261f3ce5db610d5167912993cede84229",
+        "desktop/tools/utilitysource/core.v": "846a011d5800870a80ee21e61021bb3bbd87186b4171c1a2c668e4afceb3239a",
+        "tests/clock-control/run-host.sh": "1227b3d26c5a449b3d45bb25ed2b51ad1e41b5e22dbbf5042f3de1a31c193245",
+        "tests/m1-deploy/run.sh": "bc7ad7e2685a481fc6a4b46e85eacf4d46d23e16e4fd62ca82cccdf0a2d2a947",
+        "tests/mapped-writeback/mapping_test.v": "cb0603887e195888a8407ce72bb5ba339e46c67c1ff8b8a6fba90b5d53cf6a92",
+        "tests/mapped-writeback/run-host.sh": "476ed37acb85bda9760b2e19db6fb6cf606645e3df499d4b0a2a2d27b0055a7e",
+        "tests/private-pages/run-host.sh": "50146e77f2f6974ccef207d608644c6f61b676f1c3b51948047ce9095b389856",
+        "tests/security-policy/policy_test.v": "70e225bb195bf3f35ee22c123c562a515c2e41c5a51f17d5ca4977339cbb16e8",
+        "tests/security-policy/run.sh": "c121a7307b9f920634c56b994b5fdfd2f34f4f214d9f8252adaf9d1117183985"
+    },
+    "profiles": [
+        {
+            "default_merge_sha256": "f3cda162f9193348c1dfb692517e7dca34e8e6520a5e1ec65d4cc0f3bb0d9bab",
+            "limits": "Native source behavior and unchanged clock/security-policy, ext2 mapping, private/file/paging host models plus disposable M1 deployment. Frozen V default merge matches byte-for-byte. No Python, live ESP, GUI application, Vinix kernel/guest or new kernel lifetime claim. Desktop UI tests are preserved; this qualification checks their preparation, not complete UI suites.",
+            "profile": "arm",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "ae323c1797f3fc919eceb3e5b6f451d5cac8f5315dacc7b33a9b89f3dd310f98"
+                },
+                {
+                    "name": "utility",
+                    "sha256": "fb2e2638339173854b6cd5169b9cbc37742789531b6ee7fb5964564cc708325f"
+                },
+                {
+                    "name": "check",
+                    "sha256": "5135a7c6fe684bab0edbbaeada588a6e4ef5a0268f3c8fde81a951bb01993a77"
+                },
+                {
+                    "name": "utility-test",
+                    "sha256": "ec15548994b2778ff2e9e2d362ecb253c6d1cc36b210377f4f3568505792e207"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "default_merge_sha256": "f3cda162f9193348c1dfb692517e7dca34e8e6520a5e1ec65d4cc0f3bb0d9bab",
+            "limits": "Native source behavior and unchanged clock/security-policy, ext2 mapping, private/file/paging host models plus disposable M1 deployment. Frozen V default merge matches byte-for-byte. No Python, live ESP, GUI application, Vinix kernel/guest or new kernel lifetime claim. Desktop UI tests are preserved; this qualification checks their preparation, not complete UI suites.",
+            "profile": "x86",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "fd093100f9e517e85ff054c3054d588b42959d56d6f5e35bff68162222496b38"
+                },
+                {
+                    "name": "utility",
+                    "sha256": "c0a4dd2b8205fb239120db683a46346151a6c6d6e49fab2f4ccda2f81769908b"
+                },
+                {
+                    "name": "check",
+                    "sha256": "cc68b1c8fe34af7d2c71047cd5220e377b4b8da17001a91f7814bb9cdac103c0"
+                },
+                {
+                    "name": "utility-test",
+                    "sha256": "5ec09d3dae5e40a241b225048a06ccc17fe0baefd8c1ecb0474f6b217a36efef"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "default_merge_sha256": "f3cda162f9193348c1dfb692517e7dca34e8e6520a5e1ec65d4cc0f3bb0d9bab",
+            "limits": "Native source behavior and unchanged clock/security-policy, ext2 mapping, private/file/paging host models plus disposable M1 deployment. Frozen V default merge matches byte-for-byte. No Python, live ESP, GUI application, Vinix kernel/guest or new kernel lifetime claim. Desktop UI tests are preserved; this qualification checks their preparation, not complete UI suites.",
+            "profile": "san",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "e9ed8fe1af14bd95f42eaaa10621a2fbbc898cca28fb50d60823f70f8442db74"
+                },
+                {
+                    "name": "utility",
+                    "sha256": "eb49e4ed501eb8be6bf45330485ecd93e0b8f416ddc210f40beca9416baa1053"
+                },
+                {
+                    "name": "check",
+                    "sha256": "6752987469bcfb1fd98b729f3acb4af55e416f73e91e0470ea5b97c8e9336f72"
+                },
+                {
+                    "name": "utility-test",
+                    "sha256": "34069ccbb4e0cb96e26d5f83a18dd55f5576be744e9afe4ef69129869b3ead0c"
+                }
+            ],
+            "status": "PASS"
+        }
+    ],
+    "python_file_retirement_credit": 0,
+    "qualification": "15 cold main/desktop-source/check/existing-utility-test/frozen-reference builds across ARM, Rosetta x86 and ARM ASanUBSan; strict UTF-8/universal newline/source marker/public-prefix/variant/ELF cases; exact merged fixture and activity exclusions, binary link freezing; actual current activity/parity source preparation and byte-identical old default profile. Driver continues after an actual failed test and rejects empty directories. The actual clock discipline/security policy including typed audit checks, non-journaled EXT2 mapping, all four private/file/paging combinations and disposable M1 deployment pass on every profile. Eight translated caller syntax checks per profile.",
+    "source_commit": "9b01dbca2f16504e5adf4533e713e84067f2e2c1"
+}

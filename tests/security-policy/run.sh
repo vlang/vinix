@@ -15,6 +15,22 @@ mkdir -p "$work/security" "$work/proc"
 cp "$root/kernel/security/policy.v" "$root/tests/security-policy/policy_test.v" \
     "$work/security/"
 
+# Audit storage is separate from authorization. Record the production hook
+# here so policy cases also check each decision's typed event and denial bit.
+cat > "$work/security/events.v" <<'EOF'
+@[has_globals]
+module security
+pub const event_policy = u32(1)
+__global (test_event_count u64 test_event_kind u32 test_event_denied bool test_event_arg u64 test_event_label string)
+pub fn event(kind u32, denied bool, arg u64, label string) {
+    test_event_count++
+    test_event_kind = kind
+    test_event_denied = denied
+    test_event_arg = arg
+    test_event_label = label
+}
+EOF
+
 # The policy's sole kernel dependency is the trusted current process: its
 # effective UID and capability sets. Stage a controlled credential source so the
 # production policy can be tested on the host without linking the rest of the
