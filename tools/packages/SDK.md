@@ -128,6 +128,71 @@ order or the upstream aliases. Do not select account databases, host settings,
 devices or unrelated applications. Proprietary and firmware flags stay explicit
 publisher declarations, subject to administrator policy.
 
+### Build a pinned application catalog
+
+`pack-catalog catalog.json /build/prepared-roots /build/new-workspace` builds an
+entire publisher workspace in one operation. Prepare authenticated upstream
+sources and their redistribution notices first. Inventory them with `pack-root`,
+review its returned package metadata and complete file records, then retain those
+records in the catalog lock. The builder never guesses libraries, architecture,
+permissions, licenses or publisher trust from an upstream installation.
+
+| Field | Meaning |
+| --- | --- |
+| `format` | Required integer `1`. |
+| `architectures` | Required nonempty list of distinct `aarch64`/`x86_64` targets. |
+| `packages` | Required nonempty list of at most 4,096 imports. |
+| `packages[].source` | `aarch64`, `x86_64` or `shared`, naming an ordinary directory beneath the prepared-roots directory. |
+| `packages[].recipe` | A format-1 prepared-root recipe, with its complete manifest and explicit selectors. |
+| `recipe.manifest.files` | Required, nonempty pinned inventory: every file has explicit `path`, `sha256`, `bytes` and `executable`. |
+| `recipe.manifest.proprietary`, `firmware` | Required booleans, including explicit `false` declarations. |
+
+Each target-specific import's source must match its manifest architecture. Data
+declared `all` uses `shared`. Every ID/version must cover every declared target;
+duplicate identities and mixed shared/target-specific versions fail. Explicit
+runtime runners and every dependency must resolve for each advertised version.
+As in release publication, `all` data must resolve on both supported hosts.
+The recipe rejects unknown fields, duplicate fields (including escaped spelling),
+missing disclosures and missing file pins. The existing 8 MiB metadata limit
+applies, and normal package/selector bounds still apply.
+
+The builder captures every selected source directory before copying any package.
+Guest symlinks resolve beneath that captured architecture root using `pack-root`
+rules. Unexpected files, wrong sizes or changed executable status fail before
+copying those files; changed bytes and missing pins also fail. There is no
+fallback to an unpinned source, another architecture or a host library.
+
+Imports remain in a private staging directory. Space checks cover unique objects,
+metadata, the largest materialized package and a 64 MiB reserve, with a separate
+check of the temporary filesystem. Before publication, the builder verifies all
+manifests, objects and canonical recipe again. Success atomically publishes a
+new 0700 workspace containing `objects`, `manifests` and `catalog.json`; an
+existing destination is never replaced. Failed builds remove their staging
+directory. An abrupt process kill can leave an unpublished private
+`.vinix-catalog-*` directory; inspect/remove that owned directory and retry with
+a new destination. A reported parent-directory flush failure means the workspace
+is already visible and needs storage verification before signing.
+
+Success emits one format-1 JSON object with `directory`, sorted `architectures`,
+`package_count`, `object_count` and `catalog_sha256`. The digest covers the exact
+canonical `catalog.json` bytes. Package/selector/file ordering and input JSON
+whitespace do not change canonical output. Identical pinned inputs produce
+identical workspace manifests; the normal release publisher then produces the
+same index/signature for the same sequence, expiry and seed.
+
+```sh
+vinix-package pack-catalog catalog.json /build/prepared-roots /build/new-workspace
+vinix-package publish-release /build/new-workspace company /secure/publisher-seed 1 EXPIRES_UNIX /build/new-release
+```
+
+Expose the release directory to consumers and enroll its authenticated public key
+through the existing repository workflow. Catalog construction emits no signed
+index, generates no key and accepts no license on behalf of consumers. The
+canonical workspace lock records that import; later manual `pack`/`pack-root`
+changes require a newly reviewed lock/build for reproducible catalog assembly.
+This publisher workflow does not authenticate upstream archives or qualify the
+applications' executable/runtime ABI or graphical sessions.
+
 ## Manifest
 
 ```json

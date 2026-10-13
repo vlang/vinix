@@ -47,6 +47,33 @@ fn package_template(id string, version string) pkgcore.Package {
 	}
 }
 
+fn qualify_catalog_cli(binary string, work string) ! {
+	roots := work + '/catalog roots; $literal'
+	os.mkdir_all(roots + '/aarch64/bin')!
+	os.write_file(roots + '/aarch64/bin/app', 'pinned catalog application')!
+	os.chmod(roots + '/aarch64/bin/app', 0o755)!
+	p := pkgcore.Package{ ...package_template('catalog-app', '1.0.0'), files: [pkgcore.Payload{
+		path: 'bin/app', bytes: os.file_size(roots + '/aarch64/bin/app'),
+		sha256: pkgcore.hash_file(roots + '/aarch64/bin/app')!, executable: true }] }
+	recipe := pkgcore.CatalogRecipe{ format: 1, architectures: ['aarch64'], packages: [
+		pkgcore.CatalogImport{ source: 'aarch64', recipe: pkgcore.RootRecipe{ manifest: p,
+			entries: [pkgcore.RootEntry{ source: 'bin/app', path: 'bin/app' }] } },
+	] }
+	path := work + '/catalog recipe.json'
+	os.write_file(path, json2.encode(recipe))!
+	workspace := work + '/catalog workspace'
+	info := json2.decode[pkgcore.CatalogInfo](success(binary, ['pack-catalog', path, roots, workspace])!)!
+	assert info.format == 1 && info.directory == workspace && info.architectures == ['aarch64']
+	assert info.package_count == 1 && info.object_count == 1
+	assert info.catalog_sha256 == pkgcore.hash_file(workspace + '/catalog.json')!
+	assert !os.exists(workspace + '/index.json') && !os.exists(workspace + '/.publisher')
+	assert command(binary, ['pack-catalog', path, roots, workspace])!.code != 0
+	assert command(binary, ['pack-catalog', path, roots])!.code != 0
+	os.write_file(roots + '/aarch64/bin/app', 'changed source')!
+	refused := command(binary, ['pack-catalog', path, roots, work + '/catalog-changed'])!
+	assert refused.code != 0 && refused.text.contains('payload inventory differs') && !os.exists(work + '/catalog-changed')
+}
+
 fn qualify_busy_configuration(binary string, root string) ! {
 	guard := pkgcore.acquire(pkgcore.state_directory(root))!
 	defer { guard.release() }
@@ -73,6 +100,7 @@ fn qualify(binary string) ! {
 	os.mkdir_all(work + '/root/etc/vinix-packages')!
 	os.mkdir_all(work + '/payload/bin')!
 	defer { os.rmdir_all(work) or {} }
+	qualify_catalog_cli(binary, work)!
 	key := success(binary, ['keygen', work + '/seed'])!.trim_space()
 	assert key.len == 64
 	assert os.stat(work + '/seed')!.mode & 0o777 == 0o600

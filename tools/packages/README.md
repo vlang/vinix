@@ -31,3 +31,9 @@ history. The legacy `publish` command remains available for workspace metadata.
 Read [administration/recovery](../../docs/application-distribution.md) and
 [SDK 1](SDK.md) for enrollment, policy, packaging and limits. Release publisher
 enrollment and catalog/runtime guest qualification remain required.
+
+Use `pack-catalog CATALOG.json PREPARED_ROOTS NEW_WORKSPACE` to assemble reviewed
+prepared-root recipes and pinned inventories atomically, with complete declared
+architecture/version/runtime coverage. It emits a canonical catalog lock and a
+private publisher workspace for `publish-release`. See the
+[catalog contract](SDK.md#build-a-pinned-application-catalog).

@@ -50,7 +50,8 @@ fn qualify_package_linux(mut t Test) ! {
 	t.say('PACKAGE SIGNING rfc8032 reference-keys reference-signatures tamper-refusal PASS')
 	db := t.make_accounts()
 	architecture := $if arm64 { 'aarch64' } $else { 'x86_64' }
-	prepared := '/tmp/linux-root'
+	source_roots := '/tmp/linux-catalog-roots'
+	prepared := source_roots + '/' + architecture
 	for directory in ['bin', 'lib', 'usr/lib', 'licenses'] {
 		os.mkdir_all(prepared + '/' + directory)!
 	}
@@ -89,6 +90,7 @@ fn qualify_package_linux(mut t Test) ! {
 			'a space; $literal', '@unchanged']
 		dependencies: [pkgcore.Dependency{ id: runtime.id, minimum: '1.0.0', before: '2.0.0' }]
 	}
+	mut catalog_imports := []pkgcore.CatalogImport{}
 	for recipe in [
 		pkgcore.RootRecipe{
 			manifest: runtime
@@ -109,9 +111,31 @@ fn qualify_package_linux(mut t Test) ! {
 	] {
 		os.write_file('/tmp/linux-recipe.json', json2.encode(recipe))!
 		packed := json2.decode[pkgcore.Package](package_success(['pack-root', '/tmp/linux-recipe.json',
-			prepared, repository])!)!
+			prepared, '/tmp/linux-single-imports'])!)!
 		assert packed.id == recipe.manifest.id && packed.files.len > 0
+		catalog_imports << pkgcore.CatalogImport{ source: architecture,
+			recipe: pkgcore.RootRecipe{ ...recipe, manifest: packed } }
 	}
+	catalog_path := '/tmp/linux-catalog.json'
+	os.write_file(catalog_path, json2.encode(pkgcore.CatalogRecipe{ format: 1,
+		architectures: [architecture], packages: catalog_imports }))!
+	catalog := json2.decode[pkgcore.CatalogInfo](package_success(['pack-catalog', catalog_path, source_roots, repository])!)!
+	assert catalog.package_count == 2 && catalog.architectures == [architecture]
+	assert os.stat(repository)!.mode & 0o777 == 0o700
+	catalog_imports.reverse_in_place()
+	os.write_file(catalog_path, json2.encode(pkgcore.CatalogRecipe{ format: 1,
+		architectures: [architecture], packages: catalog_imports }))!
+	second_catalog := json2.decode[pkgcore.CatalogInfo](package_success(['pack-catalog', catalog_path,
+		source_roots, '/tmp/linux-catalog-reordered'])!)!
+	assert second_catalog.catalog_sha256 == catalog.catalog_sha256
+	catalog_probe_bytes := os.read_bytes(prepared + '/bin/probe')!
+	os.write_file(prepared + '/bin/probe', 'changed bytes')!
+	changed_catalog := run(['/usr/bin/vinix-package', 'pack-catalog', catalog_path,
+		source_roots, '/tmp/linux-catalog-changed'], '', none, none)
+	assert changed_catalog.status != 0 && changed_catalog.output.contains('payload inventory differs'), changed_catalog.output
+	assert !os.exists('/tmp/linux-catalog-changed') && os.ls('/tmp')!.all(!it.starts_with('.vinix-catalog-'))
+	os.write_file_array(prepared + '/bin/probe', catalog_probe_bytes)!
+	t.say('PACKAGE CATALOG pinned-import architecture-closure canonical-workspace refusal-cleanup PASS')
 	key := pkgcore.keygen('/tmp/linux-signing-seed')!
 	pkgcore.publish(repository, 'fixture', '/tmp/linux-signing-seed', 1, time.now().unix() + 3600)!
 	first_index := os.read_file(repository + '/index.json')!

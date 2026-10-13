@@ -21,6 +21,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  run ID [ABSOLUTE_FILE...] | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
+	'  pack-catalog CATALOG.json PREPARED_ROOTS NEW_WORKSPACE\n' +
 	'  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX\n' +
 	'  publish-release REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY\n'
 
@@ -80,6 +81,11 @@ fn checked(arguments []string) !int {
 		'pack-root' {
 			if names.len != 3 { return error('pack-root requires a recipe, prepared guest root and repository directory') }
 			println(json2.encode(pkgcore.pack_root(names[0], names[1], names[2])!))
+			return 0
+		}
+		'pack-catalog' {
+			if names.len != 3 { return error('pack-catalog requires a catalog recipe, prepared roots and a new workspace directory') }
+			println(json2.encode(pkgcore.pack_catalog(names[0], names[1], names[2])!))
 			return 0
 		}
 		'publish', 'publish-release' {

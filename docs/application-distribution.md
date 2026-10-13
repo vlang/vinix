@@ -11,6 +11,15 @@ Existing Alpine ports and special downloads still use that frontend and its
 persistence rules. They do **not** acquire these rollback guarantees. Release
 migration of that catalog remains part of roadmap acceptance.
 
+The [pinned catalog builder](../tools/packages/SDK.md#build-a-pinned-application-catalog)
+assembles a complete publisher workspace atomically from reviewed prepared-root
+recipes and file inventories. It checks every declared target/version and runtime
+closure, rejects changed sources and retains a canonical import lock. The normal
+release publisher signs and exports this workspace. Catalog assembly does not
+enroll a publisher or accept proprietary/firmware terms for consumers.
+The [catalog qualification](../tests/packages/catalog-build-check.md) covers
+canonical release reproduction, refusal/cleanup and real Linux guest execution.
+
 ## Trust and configuration
 
 The image stage creates `/etc/vinix-packages/config.json` with an empty

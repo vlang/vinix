@@ -152,6 +152,7 @@ fn import_names(fd int) ![]string {
 struct RootImport {
 	root   int
 	output string
+	pins map[string]Payload // populated only by a catalog lock
 mut:
 	files     int
 	bytes     u64
@@ -179,6 +180,12 @@ fn (mut importer RootImport) copy(source string, target string) ! {
 	}
 	if node.mode & 0o170000 != 0o100000 {
 		return error('prepared root contains a special file: ${source}')
+	}
+	if importer.pins.len > 0 {
+		if target !in importer.pins || importer.pins[target].bytes != node.bytes
+			|| importer.pins[target].executable != (node.mode & 0o111 != 0) {
+			return error('catalog payload inventory differs from its lock: ${target}')
+		}
 	}
 	if node.bytes > u64(4) << 30 || importer.bytes > (u64(64) << 30) - node.bytes
 		|| importer.files >= max_files {
@@ -212,10 +219,12 @@ fn (mut importer RootImport) copy(source string, target string) ! {
 	}
 	if copied != node.bytes { return error('prepared payload changed during import: ${source}') }
 	os.chmod(path, if node.mode & 0o111 != 0 { 0o755 } else { 0o644 })!
+	if importer.pins.len > 0 && hash_file(path)! != importer.pins[target].sha256 {
+		return error('catalog payload inventory differs from its lock: ${target}')
+	}
 }
 
-pub fn pack_root(recipe_file string, source_root string, repository string) !Package {
-	recipe := json2.decode[RootRecipe](read_metadata(recipe_file)!)!
+fn validate_root_recipe(recipe RootRecipe) ! {
 	if recipe.format != 1 || recipe.entries.len == 0 || recipe.entries.len > 1024 {
 		return error('unsupported or empty prepared-root recipe')
 	}
@@ -230,16 +239,30 @@ pub fn pack_root(recipe_file string, source_root string, repository string) !Pac
 			}
 		}
 	}
+}
+
+pub fn pack_root(recipe_file string, source_root string, repository string) !Package {
+	recipe := json2.decode[RootRecipe](read_metadata(recipe_file)!)!
+	validate_root_recipe(recipe)!
 	root := C.open(source_root.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
 	if root < 0 { return error('prepared source root must be an ordinary directory') }
 	defer { C.close(root) }
+	return pack_root_descriptor(recipe, root, repository, false)
+}
+
+// The catalog captures each architecture root once, so namespace aliases cannot
+// switch its source directory between package imports.
+fn pack_root_descriptor(recipe RootRecipe, root int, repository string, pinned bool) !Package {
+	validate_root_recipe(recipe)!
 	mut template := (os.temp_dir() + '/vinix-pack-root-XXXXXX').bytes()
 	template << u8(0)
 	created := C.mkdtemp(&char(template.data))
 	if created == unsafe { nil } { return error('cannot create private import workspace') }
 	work := unsafe { cstring_to_vstring(created).clone() }
 	defer { os.rmdir_all(work) or {} }
-	mut importer := RootImport{ root: root, output: work + '/payload' }
+	mut pins := map[string]Payload{}
+	if pinned { for file in recipe.manifest.files { pins[file.path] = file } }
+	mut importer := RootImport{ root: root, output: work + '/payload', pins: pins }
 	for entry in recipe.entries { importer.copy(entry.source, entry.path)! }
 	os.write_file(work + '/manifest.json', json2.encode(recipe.manifest))!
 	return pack(work + '/manifest.json', work + '/payload', repository)!
