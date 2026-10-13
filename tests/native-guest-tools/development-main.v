@@ -119,6 +119,7 @@ struct NativeJobState {
 	exit_code int
 	detail string
 	runs u64
+	attempts u64
 }
 
 struct NativeSchedule {
@@ -696,6 +697,7 @@ fn run() !int {
 				else if interrupted_before { 'running' } else { 'finished' }
 			if job.in_flight != interrupted_before || job.detail != expected_detail
 				|| job.runs != if interrupted_before { u64(0) } else if name == 'watch' { u64(2) } else { u64(1) }
+				|| job.attempts != if name in ['watch', 'interrupted'] { u64(2) } else { u64(1) }
 				|| job.exit_code != if failed { -1 } else { 0 }
 				|| job.started <= 0 || (!interrupted_before && (job.finished < job.started
 					|| job.next_due != job.finished + if name == 'watch' { 2 } else { 3600 })) {

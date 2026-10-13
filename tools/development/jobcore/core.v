@@ -30,6 +30,7 @@ pub:
 	id               string
 	executable       devcore.Pin
 	arguments        []string
+	expand_attempt   bool
 	directory        string
 	interval_seconds int
 	timeout_seconds  int = 300
@@ -53,6 +54,7 @@ pub mut:
 	exit_code int
 	detail    string
 	runs      u64
+	attempts  u64
 }
 
 pub struct State {
@@ -187,7 +189,7 @@ fn wait_job(pid int, raw voidptr) ! {
 	}
 }
 
-fn execute(job Job) !int {
+fn execute(job Job, attempt u64) !int {
 	devcore.verify(job.executable)!
 	mut env := devcore.environment(0)
 	for name, value in job.environment { env[name] = value }
@@ -195,7 +197,8 @@ fn execute(job Job) !int {
 	clock := Clock{time.sys_mono_now() + u64(job.timeout_seconds) * u64(time.second)}
 	// Receipts contain only status/times. Child output and credential values
 	// never enter a scheduler log. The job can explicitly write its own files.
-	result := sourcecommand.run_logged_owned([job.executable.path, ...job.arguments], env,
+	arguments := if job.expand_attempt { job.arguments.map(it.replace('{attempt}', attempt.str())) } else { job.arguments }
+	result := sourcecommand.run_logged_owned([job.executable.path, ...arguments], env,
 		unsafe { nil }, '/dev/null', false, job.directory, wait_job, unsafe { &clock }, 1)!
 	return result.status
 }
@@ -210,13 +213,19 @@ pub fn run_due(path string, now i64) !State {
 		mut current := state.jobs[job.id] or { JobState{} }
 		if current.in_flight || current.next_due > now { continue }
 		if stdatomic.load_u64(&interrupted) != 0 { break }
+		// Reserve before exec and keep the number after acknowledgement. A
+		// killed owner may have already created its output, even with runs=0.
+		// Older receipts have only completed runs; continue beyond that count.
+		previous := if current.attempts > current.runs { current.attempts } else { current.runs }
+		if previous == u64(0xffffffffffffffff) { return error('job attempt counter exhausted') }
+		current.attempts = previous + 1
 		current.in_flight = true
 		current.started = now
 		current.detail = 'running'
 		state.jobs[job.id] = current
 		write_atomic(path + '/state.json', json2.encode(state) + '\n')!
 		mut detail := 'finished'
-		status := execute(job) or {
+		status := execute(job, current.attempts) or {
 			detail = err.msg()
 			-1
 		}

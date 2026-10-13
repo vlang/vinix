@@ -19,6 +19,22 @@ serially. The next run is scheduled one interval after the last completion;
 missed intervals are coalesced. There is no backlog or overlapping replay.
 SIGINT/SIGTERM retire an active owned child group before the runner exits.
 
+For repeatable CI builds, set `expand_attempt: true` on the job and put
+`{attempt}` in its output argument. For example, pin `vinix-build` as the
+executable and use arguments
+`["build", "/home/developer/project-build.json", "/home/developer/ci-{attempt}"]`.
+Each dispatch then gets a new numbered output directory. Expansion applies
+only to argument strings and performs no shell or environment evaluation;
+it is disabled by default, preserving literal braces in existing jobs.
+
+State records both completed `runs` and reserved `attempts`. The runner
+persists the next attempt before starting the child, including attempts
+that fail a pin/credential check or time out. A killed owner can therefore
+leave an unfinished attempt without reusing its output on retry. Explicit
+acknowledgement keeps the reserved number; the next dispatch advances it.
+Older receipts without `attempts` continue after their completed run count.
+Counter exhaustion refuses execution instead of wrapping back to an old path.
+
 ```json
 {
   "schema": 1,
@@ -74,3 +90,16 @@ blocked retry after a killed owner. Recovery is qualified only after the fixture
 retires its freshly observed group and explicitly acknowledges the interruption.
 The host controller independently checks the native state and exact plan pins.
 Service/boot and production server/SSH/CI acceptance remain open.
+
+Attempt reservation validation on 13 October 2026 passed the host job suite,
+including literal arguments, fresh numbered outputs, acknowledged interruption,
+legacy-state migration and counter exhaustion. AArch64 HVF retained the HTTP
+reference and account/job/build regressions in
+`build/development17-20261013/guest-arm-job-attempt-a` (19 records). The x86_64
+TCG account/job/build run passed in `guest-x86-job-attempt-b` (12 records).
+The controller checks one reserved attempt for ordinary/deadline/signal jobs,
+two for watcher ticks, and two attempts with one completion after interrupted
+recovery. The first x86 run, `guest-x86-job-attempt-a`, failed the existing
+watcher-state read assertion; that failed receipt remains retained. Its
+intermittent read failure still needs investigation; the repeat used the same
+kernel, tools and fixture inputs.
