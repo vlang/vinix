@@ -582,9 +582,17 @@ fn (mut filesystem EXT2Filesystem) rename_persistent(old_parent &vfs.VFSNode,
 	if new_name in new_parent.children {
 		new_node := unsafe { new_parent.children[new_name] }
 		replaced := filesystem.dir_replace_inode(mut new_dir, new_parent_index,
-			new_name, old_inode_index, old_kind)?
-		filesystem.decrement_replaced_inode(replaced)?
-		if stat.isdir(new_node.resource.stat.mode) && new_dir.hard_link_cnt > 0 {
+			new_name, old_inode_index, old_kind) or {
+			// Overlay whiteouts may be VFS device wrappers with no disk
+			// directory entry. Preserve the wrapper until rename commits;
+			// add the actual inode only when the disk lookup found no name.
+			if errno.get() != errno.enoent || !vfs.is_whiteout(new_node) { return none }
+			filesystem.dir_add(mut new_dir, new_parent_index, old_inode_index, old_kind,
+				new_name)?
+			u32(0)
+		}
+		if replaced != 0 { filesystem.decrement_replaced_inode(replaced)? }
+		if replaced != 0 && stat.isdir(new_node.resource.stat.mode) && new_dir.hard_link_cnt > 0 {
 			new_dir.hard_link_cnt--
 		}
 	} else {
@@ -603,4 +611,11 @@ fn (mut filesystem EXT2Filesystem) rename_persistent(old_parent &vfs.VFSNode,
 	}
 	filesystem.commit_transaction()?
 	flush_on_return()
+	// Overlay replaces the destination through this transaction rather than
+	// unlinking it first. Mirror the committed directory link counts in the
+	// cached resources, including cross-parent moves and directory replacement.
+	mut old_parent_resource := old_parent.resource
+	mut new_parent_resource := new_parent.resource
+	old_parent_resource.stat.nlink = old_dir.hard_link_cnt
+	new_parent_resource.stat.nlink = new_dir.hard_link_cnt
 }

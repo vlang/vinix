@@ -131,7 +131,7 @@ fn (mut this OverlayFS) rename(old_parent &VFSNode, old_name string, new_parent 
 
 // ── Layers ───────────────────────────────────────────────────────────────────
 
-fn is_whiteout(node &VFSNode) bool {
+pub fn is_whiteout(node &VFSNode) bool {
 	return node != unsafe { nil } && node.resource != unsafe { nil }
 		&& node.resource.stat.mode & stat.ifmt == stat.ifchr && node.resource.stat.rdev == 0
 }
@@ -223,10 +223,17 @@ fn overlay_prepare_real_symlink(mut dir VFSNode, dest string, name string, label
 fn overlay_dispose_real(mut real VFSNode, held bool) {
  if real.resource == unsafe { nil } { return }
  mut res := real.resource
- mode := res.stat.mode
  // A failed disk unlink may still leave this inode named. Keep its
  // reference and reservation until a safe cleanup is possible.
  res.unlink(voidptr(real)) or { return }
+ overlay_release_unlinked_real(mut real, held)
+}
+
+// A successful backend rename already removed the replaced name. Share its
+// ordinary retirement path without unlinking that name a second time.
+fn overlay_release_unlinked_real(mut real VFSNode, held bool) {
+ mut res := real.resource
+ mode := res.stat.mode
  if stat.isdir(mode) { real.removed = true; res.stat.nlink = 0 }
  if !held { release_resource_after_grace(res) }
  orphan_node(mut real, mode)
@@ -731,48 +738,58 @@ fn overlay_rename(mut old_dir VFSNode, old_name string, mut old_node VFSNode, mu
  // This directory has no lower layer at its old name; an opacity marker
  // installed here does not alter its contents if the later rename fails.
  if is_dir && hides_lower { xattr_put(real.resource, 'trusted.overlay.opaque', 'y')? }
-	if replaced != unsafe { nil } {
-		hides_lower = replaced.overlay.has_lower
-		replaced_is_dir := stat.isdir(replaced.resource.stat.mode)
-		held := replaced_is_dir && proc.directory_in_use(voidptr(replaced))
-		if replaced.overlay.upper != unsafe { nil } {
-			if replaced_is_dir {
-				mut replaced_real := replaced.overlay.upper
-				overlay_drop_whiteouts_locked(mut replaced_real)
-			}
-			overlay_drop_real_locked(mut new_upper, new_name, held)
-		}
-		hold_parent(mut replaced)
-		remove_child(new_dir, new_name)
-		if replaced_is_dir {
-			replaced.removed = true
-		}
-	} else if new_name in new_upper.children {
-		if is_whiteout(unsafe { new_upper.children[new_name] }) {
-			overlay_drop_real_locked(mut new_upper, new_name, false)
-			hides_lower = true
-		}
-	}
+	mut replaced_real := &VFSNode(unsafe { nil })
+	if new_name in new_upper.children { replaced_real = unsafe { new_upper.children[new_name] } }
+	replaced_is_dir := replaced != unsafe { nil } && stat.isdir(replaced.resource.stat.mode)
+	held := replaced_is_dir && proc.directory_in_use(voidptr(replaced))
+	// Keep both destination slots and their resources until the backend has
+	// committed. In particular, a rejected disk name must leave the lower
+	// destination visible and an existing upper inode must be replaced by
+	// the backend transaction, rather than a separate destructive unlink.
+	upper_name := new_name.clone()
+	merged_name := new_name.clone()
+	mut names_adopted := false
+	defer { if !names_adopted { unsafe { upper_name.free(); merged_name.free() } } }
 
 	old_upper.filesystem.rename(old_upper, old_name, new_upper, new_name, 0)?
-	remove_child(old_upper, old_name)
+	// Upper and merged paths publish together, with no destination deletion.
+	// Readers copy child pointers under this same lock; backend callbacks and
+	// retirement remain outside it.
+	children_lock.acquire()
 	unsafe {
-		publish_child(new_upper, new_name, real)
+		if replaced_real != nil {
+			mut slot := &new_upper.children[new_name]
+			*slot = real
+		} else { new_upper.children[new_name] = real }
+		old_upper.children.delete(old_name)
+		if old_whiteout != nil { old_upper.children[old_name] = old_whiteout }
+		if replaced != nil {
+			mut slot := &new_dir.children[new_name]
+			*slot = old_node
+		} else { new_dir.children[new_name] = old_node }
+		old_dir.children.delete(old_name)
 	}
-	adopt(mut real, mut new_upper, new_name.clone())
+	children_lock.release()
+	adopt(mut real, mut new_upper, upper_name)
+	adopt(mut old_node, mut new_dir, merged_name)
+	names_adopted = true
 	if old_node.overlay.has_lower {
-		publish_child(old_upper, old_name, old_whiteout)
   old_whiteout = unsafe { nil }
 	}
 	old_node.overlay.has_lower = hides_lower
 	unsafe { old_node.overlay.lowers.free() }
 	old_node.overlay.lowers = []&VFSNode{}
 
-	remove_child(old_dir, old_name)
-	unsafe {
-		publish_child(new_dir, new_name, old_node)
+	if replaced_real != unsafe { nil } {
+		if replaced_is_dir { overlay_drop_whiteouts_locked(mut replaced_real) }
+		hold_parent(mut replaced_real)
+		if replaced_real.resource.stat.nlink > 0 { replaced_real.resource.stat.nlink-- }
+		overlay_release_unlinked_real(mut replaced_real, held)
 	}
-	adopt(mut old_node, mut new_dir, new_name.clone())
+	if replaced != unsafe { nil } {
+		hold_parent(mut replaced)
+		if replaced_is_dir { replaced.removed = true }
+	}
 }
 
 // ── Mounting ─────────────────────────────────────────────────────────────────

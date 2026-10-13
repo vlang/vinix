@@ -270,7 +270,13 @@ pass 8,000 replacements per architecture with concurrent listings and old
 descriptors retained beyond the grace period. Its final kernels passed the
 AArch64 scheduled Go CI and x86 HTTP/account/job gates. An earlier HTTP run on
 the final x86 kernel failed with a connection-aborted error; its failed receipt
-is retained separately. Atomic overlay replacement and broader server-load
+is retained separately. The separate [overlay rename qualification](../tests/overlay-rename/README.md)
+passes 2,000 concurrent replacements per architecture, preserves both paths on
+an ext2 backend error, replaces whiteouts, verifies directory parent link counts
+and checks regular upper files after volume remount. Both kernels also pass the
+native authenticated HTTP/account/job/build gate with 19 validated records each.
+Slab samples still show the pre-existing overlay-node retention leak, and durable
+whiteouts, full OCI/rootless-runtime acceptance and broader server-load
 qualification remain open. Full pins and native CI instructions are recorded
 in [the guest evidence](../tests/development/README.md).
 Boot services, remote CI, deployment, broader projects and SSH remain open.

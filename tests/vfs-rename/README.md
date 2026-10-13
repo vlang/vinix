@@ -79,5 +79,7 @@ earlier x86 HTTP run, `rename-x86-http-synced`, failed a connection with errno
 103; its failed receipt remains retained separately from the rename controls.
 
 These results qualify this regular-filesystem replacement and map-access fix.
-Atomic overlay replacement still has a separate delete/publish gap, and full
-OCI/runtime, service and server-load acceptance remains open.
+The separate overlay replacement gap and failed-backend destination loss are
+covered by [the overlay fix and native qualification](../overlay-rename/README.md).
+Overlay retention and durable whiteouts, full OCI/runtime, service and server-load
+acceptance remain open.
