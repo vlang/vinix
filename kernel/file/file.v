@@ -139,7 +139,7 @@ fn (mut this Handle) unref() {
 	}
 
 	kbudget.release(this.kernel_charge)
-	release_flock(this)
+	release_description_locks(this, false)
 	mut res := this.resource
 	res.unref(voidptr(this)) or {}
  if this.origin_resource != unsafe { nil } {
@@ -1538,15 +1538,7 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 			fd.unref()
 		}
 		f_ofd_getlk, f_ofd_setlk, f_ofd_setlkw {
-			// Open-file-description locks are served by the per-process record
-			// locks: every lock a process holds is on one of its descriptions,
-			// and Vinix threads never contend for one against each other.
-			posix_cmd := match cmd {
-				f_ofd_getlk { f_getlk }
-				f_ofd_setlk { f_setlk }
-				else { f_setlkw }
-			}
-			lock_ret, lock_errno := fcntl_lock(mut handle, posix_cmd, arg)
+			lock_ret, lock_errno := fcntl_lock(mut handle, cmd, arg)
 			fd.unref()
 			if lock_errno != 0 {
 				return lock_ret, lock_errno

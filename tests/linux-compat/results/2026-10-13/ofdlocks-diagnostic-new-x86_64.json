@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "f47ce965f07053295d2437b04d64d3f8c9e5ea04ba056f84826647ee57878b7b",
+    "results": [
+        {
+            "name": "ofdlocks",
+            "source_sha256": "8006b7179837d5d99b6a0b5da1ffebf839a1f4794d2c35bdecbc80026e763998",
+            "init_sha256": "108a258f1b710ae503fc9795bf8b87f349ddce430ae6df53f00c3a593c342f33",
+            "iso_sha256": "",
+            "exit_code": 1,
+            "detail": "Command failed"
+        }
+    ]
+}

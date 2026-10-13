@@ -4434,3 +4434,74 @@ sessions' dirty kernel inputs.
 Direct/noatime/async flags, append-only permissions, physical durability,
 concurrent status changes, GNU wrappers and translated/ELF32 paths remain
 separate. The three broad section 15 acceptance gates remain open.
+
+## Native open-description record locks
+
+The former OFD shortcut reused process-owned POSIX locks. Separate opens in
+one process could silently replace each other's locks, closing any descriptor
+could discard OFD locks, and queries omitted the correct owner identity.
+Record locks now distinguish process ownership from the retained open
+description. POSIX and OFD locks share a conflict domain; flock remains
+independent. Final Handle disposal removes its OFD/flock entries before the
+resource and Handle are freed. Closing an alias, unrelated open or a parent
+after fork keeps locks while another owner reference survives.
+
+The Linux reference also caught the special F_OFD_GETLK/F_UNLCK operation:
+it queries this description's own overlapping reader/writer locks. It does
+not unlock them. POSIX F_GETLK/F_UNLCK retains EINVAL. This follows the
+[pinned Linux 6.12.51 implementation](https://github.com/gregkh/linux/blob/v6.12.51/fs/locks.c),
+and the actual reference runs exercise both behaviors.
+
+The maintained V fixture performs 464 checks per architecture as root and
+UID/GID1000. Each cohort has 74 ownership/alias/flock controls, 44 range
+controls, 94 error/query controls, 12 blocking controls and eight fork controls.
+Both libc and raw native fcntl calls retain full-width flock pointers while
+upper descriptor/command words narrow as Linux C ints. Baselines fail 152 of
+424 completed checks; blocking/fork controls are skipped after those failures.
+Final candidates and actual Linux 6.12.51 references pass the identical native
+C/ELF. GNU wrappers and foreign ABIs are not part of these native musl runs.
+
+Tests cover compatible readers, upgrade conflicts, own/other-owner queries,
+POSIX PID versus OFD -1, unchanged no-conflict fields, partial unlocks, bridge
+coalescing, write-to-read conversion, negative lengths, CUR/END normalization,
+ranges above 4 GiB and length-zero unbounded ranges. Invalid pointers, nonzero
+OFD PID, type/whence/range errors and descriptor/access refusals are checked.
+File bytes remain intact. A child keeps the inherited description after its
+parent closes all aliases, and child exit releases the final lock. Three
+independent child opens per credential are observed sleeping in procfs; unlock
+and downgrade wake eligible waiters, while non-restarting SIGUSR1 returns EINTR.
+
+Two 200-cycle cohorts repeatedly acquire/split/merge locks, refuse conflicts,
+close aliases and release the final description. All 18 ARM/14 x86 slab classes
+stay flat, as do 63/63 ARM and 160/160 x86 large pages in each cohort.
+Production kernel C changes only the reviewed
+lock functions, newly emitted array trim helper and blank separators. The new
+own-query branch copies scalar records under the table lock. Replacement
+arrays are freed, have noslices, and contain stack value copies. Conflict
+records leave the lock as values, and usercopy/PID translation stay outside it.
+The fixture emits 14 explicit allocas with no hidden heap/index helpers. Both
+allocation scans complete with unchanged 400 ARM/292 x86 sites; preexisting
+allowance failures remain visible. An independent
+[lifetime review](../tests/linux-compat/results/2026-10-13/ofdlocks-lifetime-review.md)
+binds final sources, generated C and measured captures.
+
+Initial probes exposed a UID1000 fixture setup error, host ENOSPC interruptions
+and an incorrect Linux unlock-query expectation. Their receipts/captures remain
+[diagnostics](../tests/linux-compat/results/2026-10-13/ofdlocks-diagnostic-reference-aarch64.log).
+Final kernels were rebuilt after the oracle correction, and all five cases
+(ofdlocks, fcntlpath, fcntlsync, open and runtime) ran on the final kernel hashes;
+these final receipts are ordinary controller executions. Eight host test files
+pass. The V audit verifies matching baseline/candidate/reference source/C/ELF,
+real receipt/ISO/kernel identities, exact counts, flat retention and all 64
+dispatch/lock source inputs; deliberately failing assertions and passing-as-
+baseline controls must fail. Completed private artifacts were losslessly
+compressed with verified SHA manifests to recover host space.
+
+- [AArch64 final receipt](../tests/linux-compat/results/2026-10-13/ofdlocks-after-aarch64.json), [capture](../tests/linux-compat/results/2026-10-13/ofdlocks-after-aarch64-native.log), [Linux reference](../tests/linux-compat/results/2026-10-13/ofdlocks-reference-aarch64.json), [evidence](../tests/linux-compat/results/2026-10-13/ofdlocks-evidence-aarch64.json).
+- [x86-64 final receipt](../tests/linux-compat/results/2026-10-13/ofdlocks-after-x86_64.json), [capture](../tests/linux-compat/results/2026-10-13/ofdlocks-after-x86_64-native.log), [Linux reference](../tests/linux-compat/results/2026-10-13/ofdlocks-reference-x86_64.json), [evidence](../tests/linux-compat/results/2026-10-13/ofdlocks-evidence-x86_64.json).
+- [Audit source](../tests/linux-compat/results/2026-10-13/ofdlocks-audit.v) and [verdict](../tests/linux-compat/results/2026-10-13/ofdlocks-audit.log); baseline captures, build logs, allocation scans, scope and host checks sit beside these files.
+
+Disk/network/overlay filesystems, signed maximum-end boundaries, POSIX deadlock
+detection and concurrent close races, fairness, cancellation/descriptor pressure
+and GNU/translated/ELF32 paths remain unqualified. The three broad section 15
+semantics/installation/foreign-runtime gates stay open.

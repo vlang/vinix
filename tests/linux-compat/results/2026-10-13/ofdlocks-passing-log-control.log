@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-13/ofdlocks-audit.v:75: FAIL: fn main.failure: assert log.contains('LINUX OFDLOCKS DETAIL:'), 'ofdlocks baseline failure markers required';
+      message: ofdlocks baseline failure markers required
+V panic: Assertion failed...

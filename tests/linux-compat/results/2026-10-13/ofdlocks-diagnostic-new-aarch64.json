@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "7d9526774dca4e2d82d018566d208f49f2a6e6d2c5b91e2d60f7442fa71e727a",
+    "results": [
+        {
+            "name": "ofdlocks",
+            "source_sha256": "8006b7179837d5d99b6a0b5da1ffebf839a1f4794d2c35bdecbc80026e763998",
+            "init_sha256": "f22d3f2402a110d11e28c85846c3bb18ab80d1424e96b53c8c888c4681cd6a08",
+            "iso_sha256": "7f57fe3fe1b3d9141d160dfaa2c83038f353c6178040dc37804ecd0ed21808f1",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

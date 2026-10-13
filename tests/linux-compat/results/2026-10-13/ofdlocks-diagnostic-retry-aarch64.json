@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "7d9526774dca4e2d82d018566d208f49f2a6e6d2c5b91e2d60f7442fa71e727a",
+    "results": [
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "d7e2765a3f2cdb83df34b3ec7d627bf0451b044b78ed47b92144e2be38c4f4bf",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

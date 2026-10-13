@@ -1,0 +1,31 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "f47ce965f07053295d2437b04d64d3f8c9e5ea04ba056f84826647ee57878b7b",
+    "results": [
+        {
+            "name": "ofdlocks",
+            "source_sha256": "33ea237fb5703bb26a7e7203c6c385e9edc540a934f3cd75a941f30340894dcf",
+            "init_sha256": "fb1fb5186e5cff485c7915683c9dfe31239910dfd3b16746ffbfbf33618c1a5e",
+            "iso_sha256": "7b18e85c588afb77c8b7de301594d0dace612ec7db5b82dfc1a9fab967584692",
+            "exit_code": 1,
+            "detail": ""
+        },
+        {
+            "name": "fcntlpath",
+            "source_sha256": "314b2cefc9567f5c6552d8b0534cd9e6039cd71c0d80689360ac7b1966dbea3e",
+            "init_sha256": "b0c820d141e0b7e7af9801761069655abf591d2e6e114c54cbcaba61b9555126",
+            "iso_sha256": "02499038f1fea250db5dc031a8a720cc735de1ec0dc3ccb77262fd382bcb4284",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "fcntlsync",
+            "source_sha256": "50f3f5237c0a6bd62b6e9a2642f21b130844ef8d66a2b6d0bb97334210885c02",
+            "init_sha256": "c3539dcdada450b5792817408f8c59415cd7161681691fff69958441012795d4",
+            "iso_sha256": "037fb4fa35d97697c245629b402c77ba1377bd2edd00db76192280b5f6c42c88",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

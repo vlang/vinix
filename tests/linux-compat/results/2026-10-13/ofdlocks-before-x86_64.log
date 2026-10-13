@@ -1,0 +1,132 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   192k      0  0:00:01  0:00:01 --:--:--  192k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  1 2880k    1 30896    0     0  23610      0  0:02:04  0:00:01  0:02:03 23602 27 2880k   27  792k    0     0   352k      0  0:00:08  0:00:02  0:00:06  352k 54 2880k   54 1566k    0     0   486k      0  0:00:05  0:00:03  0:00:02  486k 89 2880k   89 2579k    0     0   605k      0  0:00:04  0:00:04 --:--:--  605k100 2880k  100 2880k    0     0   629k      0  0:00:04  0:00:04 --:--:--  706k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0100 22528  100 22528    0     0  10569      0  0:00:02  0:00:02 --:--:-- 10571
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   175k      0  0:00:01  0:00:01 --:--:--  175k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  62414      0 --:--:-- --:--:-- --:--:-- 62378
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   128k      0 --:--:-- --:--:-- --:--:--  128k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/ofdlocks-20261013/verified-before-x86/ofdlocks/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/ofdlocks-20261013/verified-before-x86/ofdlocks/.vinix-amd64.iso.Z6OptK'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data,  705m free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/ofdlocks-20261013/verified-before-x86/ofdlocks/iso-build/.iso-staging.riYAYS/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13592 sectors
+Written to medium : 13592 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/ofdlocks-20261013/verified-before-x86/ofdlocks/.vinix-amd64.iso.Z6OptK' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd45f.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/ofdlocks-20261013/verified-before-x86/ofdlocks/test.iso (27836416 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/ofdlocks-20261013/verified-before-x86/ofdlocks
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=84696
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000038043000
+initramfs: Done (9 entries)
+LINUX OFDLOCKS DETAIL: kind=0 call=2 tag=query own writer
+LINUX OFDLOCKS DETAIL: kind=0 call=3 tag=own query excludes other owners
+LINUX OFDLOCKS DETAIL: kind=0 call=8 tag=reopened OFD conflict
+LINUX OFDLOCKS DETAIL: kind=0 call=9 tag=POSIX query sees OFD
+LINUX OFDLOCKS DETAIL: kind=0 call=10 tag=reopen write refused
+LINUX OFDLOCKS DETAIL: kind=0 call=11 tag=POSIX same-handle conflict
+LINUX OFDLOCKS DETAIL: kind=0 call=13 tag=query own reader through alias
+LINUX OFDLOCKS DETAIL: kind=0 call=15 tag=upgrade conflicts with reader
+LINUX OFDLOCKS DETAIL: kind=1 call=3 tag=left split
+LINUX OFDLOCKS DETAIL: kind=1 call=5 tag=right split
+LINUX OFDLOCKS DETAIL: kind=1 call=7 tag=coalesced bridge
+LINUX OFDLOCKS DETAIL: kind=1 call=9 tag=middle converted
+LINUX OFDLOCKS DETAIL: kind=1 call=13 tag=normalized negative length
+LINUX OFDLOCKS DETAIL: kind=1 call=15 tag=normalized cursor
+LINUX OFDLOCKS DETAIL: kind=1 call=17 tag=normalized EOF
+LINUX OFDLOCKS DETAIL: kind=1 call=19 tag=64-bit query
+LINUX OFDLOCKS DETAIL: kind=2 call=1 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=2 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=3 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=14 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=15 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=16 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=27 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=28 tag=nonzero OFD PID
+LINUX OFDLOCKS CASES: ordinary=1 kind=0 calls=74 failures=34
+LINUX OFDLOCKS CASES: ordinary=1 kind=1 calls=44 failures=18
+LINUX OFDLOCKS CASES: ordinary=1 kind=2 calls=94 failures=24
+LINUX OFDLOCKS CASES: ordinary=1 kind=3 calls=0 failures=0
+LINUX OFDLOCKS CASES: ordinary=1 kind=4 calls=0 failures=0
+LINUX OFDLOCKS DETAIL: kind=0 call=2 tag=query own writer
+LINUX OFDLOCKS DETAIL: kind=0 call=3 tag=own query excludes other owners
+LINUX OFDLOCKS DETAIL: kind=0 call=8 tag=reopened OFD conflict
+LINUX OFDLOCKS DETAIL: kind=0 call=9 tag=POSIX query sees OFD
+LINUX OFDLOCKS DETAIL: kind=0 call=10 tag=reopen write refused
+LINUX OFDLOCKS DETAIL: kind=0 call=11 tag=POSIX same-handle conflict
+LINUX OFDLOCKS DETAIL: kind=0 call=13 tag=query own reader through alias
+LINUX OFDLOCKS DETAIL: kind=0 call=15 tag=upgrade conflicts with reader
+LINUX OFDLOCKS DETAIL: kind=1 call=3 tag=left split
+LINUX OFDLOCKS DETAIL: kind=1 call=5 tag=right split
+LINUX OFDLOCKS DETAIL: kind=1 call=7 tag=coalesced bridge
+LINUX OFDLOCKS DETAIL: kind=1 call=9 tag=middle converted
+LINUX OFDLOCKS DETAIL: kind=1 call=13 tag=normalized negative length
+LINUX OFDLOCKS DETAIL: kind=1 call=15 tag=normalized cursor
+LINUX OFDLOCKS DETAIL: kind=1 call=17 tag=normalized EOF
+LINUX OFDLOCKS DETAIL: kind=1 call=19 tag=64-bit query
+LINUX OFDLOCKS DETAIL: kind=2 call=1 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=2 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=3 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=14 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=15 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=16 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=27 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=28 tag=nonzero OFD PID
+LINUX OFDLOCKS CASES: ordinary=0 kind=0 calls=74 failures=34
+LINUX OFDLOCKS CASES: ordinary=0 kind=1 calls=44 failures=18
+LINUX OFDLOCKS CASES: ordinary=0 kind=2 calls=94 failures=24
+LINUX OFDLOCKS CASES: ordinary=0 kind=3 calls=0 failures=0
+LINUX OFDLOCKS CASES: ordinary=0 kind=4 calls=0 failures=0
+LINUX OFDLOCKS FAIL: ownership, ranges, errors, blocking or storage
+QEMU: Terminated
+Missing verdicts: ['LINUX OFDLOCKS: PASS']; failures: ['FAIL:', 'LINUX OFDLOCKS FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/ofdlocks-20261013/verified-before-x86/receipt.json

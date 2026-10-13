@@ -1,0 +1,75 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=84696
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000038043000
+initramfs: Done (9 entries)
+LINUX OFDLOCKS DETAIL: kind=0 call=2 tag=query own writer
+LINUX OFDLOCKS DETAIL: kind=0 call=3 tag=own query excludes other owners
+LINUX OFDLOCKS DETAIL: kind=0 call=8 tag=reopened OFD conflict
+LINUX OFDLOCKS DETAIL: kind=0 call=9 tag=POSIX query sees OFD
+LINUX OFDLOCKS DETAIL: kind=0 call=10 tag=reopen write refused
+LINUX OFDLOCKS DETAIL: kind=0 call=11 tag=POSIX same-handle conflict
+LINUX OFDLOCKS DETAIL: kind=0 call=13 tag=query own reader through alias
+LINUX OFDLOCKS DETAIL: kind=0 call=15 tag=upgrade conflicts with reader
+LINUX OFDLOCKS DETAIL: kind=1 call=3 tag=left split
+LINUX OFDLOCKS DETAIL: kind=1 call=5 tag=right split
+LINUX OFDLOCKS DETAIL: kind=1 call=7 tag=coalesced bridge
+LINUX OFDLOCKS DETAIL: kind=1 call=9 tag=middle converted
+LINUX OFDLOCKS DETAIL: kind=1 call=13 tag=normalized negative length
+LINUX OFDLOCKS DETAIL: kind=1 call=15 tag=normalized cursor
+LINUX OFDLOCKS DETAIL: kind=1 call=17 tag=normalized EOF
+LINUX OFDLOCKS DETAIL: kind=1 call=19 tag=64-bit query
+LINUX OFDLOCKS DETAIL: kind=2 call=1 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=2 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=3 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=14 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=15 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=16 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=27 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=28 tag=nonzero OFD PID
+LINUX OFDLOCKS CASES: ordinary=1 kind=0 calls=74 failures=34
+LINUX OFDLOCKS CASES: ordinary=1 kind=1 calls=44 failures=18
+LINUX OFDLOCKS CASES: ordinary=1 kind=2 calls=94 failures=24
+LINUX OFDLOCKS CASES: ordinary=1 kind=3 calls=0 failures=0
+LINUX OFDLOCKS CASES: ordinary=1 kind=4 calls=0 failures=0
+LINUX OFDLOCKS DETAIL: kind=0 call=2 tag=query own writer
+LINUX OFDLOCKS DETAIL: kind=0 call=3 tag=own query excludes other owners
+LINUX OFDLOCKS DETAIL: kind=0 call=8 tag=reopened OFD conflict
+LINUX OFDLOCKS DETAIL: kind=0 call=9 tag=POSIX query sees OFD
+LINUX OFDLOCKS DETAIL: kind=0 call=10 tag=reopen write refused
+LINUX OFDLOCKS DETAIL: kind=0 call=11 tag=POSIX same-handle conflict
+LINUX OFDLOCKS DETAIL: kind=0 call=13 tag=query own reader through alias
+LINUX OFDLOCKS DETAIL: kind=0 call=15 tag=upgrade conflicts with reader
+LINUX OFDLOCKS DETAIL: kind=1 call=3 tag=left split
+LINUX OFDLOCKS DETAIL: kind=1 call=5 tag=right split
+LINUX OFDLOCKS DETAIL: kind=1 call=7 tag=coalesced bridge
+LINUX OFDLOCKS DETAIL: kind=1 call=9 tag=middle converted
+LINUX OFDLOCKS DETAIL: kind=1 call=13 tag=normalized negative length
+LINUX OFDLOCKS DETAIL: kind=1 call=15 tag=normalized cursor
+LINUX OFDLOCKS DETAIL: kind=1 call=17 tag=normalized EOF
+LINUX OFDLOCKS DETAIL: kind=1 call=19 tag=64-bit query
+LINUX OFDLOCKS DETAIL: kind=2 call=1 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=2 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=3 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=14 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=15 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=16 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=27 tag=nonzero OFD PID
+LINUX OFDLOCKS DETAIL: kind=2 call=28 tag=nonzero OFD PID
+LINUX OFDLOCKS CASES: ordinary=0 kind=0 calls=74 failures=34
+LINUX OFDLOCKS CASES: ordinary=0 kind=1 calls=44 failures=18
+LINUX OFDLOCKS CASES: ordinary=0 kind=2 calls=94 failures=24
+LINUX OFDLOCKS CASES: ordinary=0 kind=3 calls=0 failures=0
+LINUX OFDLOCKS CASES: ordinary=0 kind=4 calls=0 failures=0
+LINUX OFDLOCKS FAIL: ownership, ranges, errors, blocking or storage
+QEMU: Terminated
+

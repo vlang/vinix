@@ -1,0 +1,47 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "7d9526774dca4e2d82d018566d208f49f2a6e6d2c5b91e2d60f7442fa71e727a",
+    "results": [
+        {
+            "name": "ofdlocks",
+            "source_sha256": "33ea237fb5703bb26a7e7203c6c385e9edc540a934f3cd75a941f30340894dcf",
+            "init_sha256": "4235b9d76834432bba4442d3e95795b2f2f82dc05e1d01d31774f87d21831d80",
+            "iso_sha256": "5958ea5e720a8064723b9ef205de642dcaaf53d381cd51883d2d8c0c85f585d8",
+            "exit_code": 1,
+            "detail": ""
+        },
+        {
+            "name": "fcntlpath",
+            "source_sha256": "314b2cefc9567f5c6552d8b0534cd9e6039cd71c0d80689360ac7b1966dbea3e",
+            "init_sha256": "11b8c3ffb5a640d607c362244b6b3816acb3b7315c83b9f6c0d6ba8add464510",
+            "iso_sha256": "a7fb1b79234454d8097d2b10ce72360b0b1ed94b0158fb7b49a7f3342c941997",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "fcntlsync",
+            "source_sha256": "50f3f5237c0a6bd62b6e9a2642f21b130844ef8d66a2b6d0bb97334210885c02",
+            "init_sha256": "c098ccba02da4dfe3c57572d749f28b0352f87f5746fd9e8149cac462fe2d520",
+            "iso_sha256": "c07b35d404794c37d6f3674d08a9a27b474bb3ba52e874c2391cea0a67534d18",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "open",
+            "source_sha256": "923b9cfdaa49bf37b0c82d235294b2785f61366c39d9af8f1d5dfe45cbe65262",
+            "init_sha256": "b41456ec1e04ca2e2e83e39ac5f01da498edfc8011f4eb71541bbc9ec9ec7c6a",
+            "iso_sha256": "fda397fa1722b3aeda00ccac04de173f96723ea6815b622728bd33ecfb54723e",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "",
+            "iso_sha256": "",
+            "exit_code": 1,
+            "detail": "Command failed"
+        }
+    ]
+}

@@ -778,6 +778,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   append/nonblocking state, native words, exact refusals, descriptor replacement
   and flat retention on both architectures. See [the status receipts](docs/linux-posix-qualification.md#fcntl-synchronization-status-preservation).
 
+- [x] Implement real native open-description record locks, including POSIX
+  conflicts, own-lock queries, range conversion and final-alias/fork lifetime;
+  qualify blocking unlock/downgrade/EINTR and flat storage on both architectures.
+  See [the lock receipts](docs/linux-posix-qualification.md#native-open-description-record-locks).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

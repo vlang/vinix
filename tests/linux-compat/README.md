@@ -1141,3 +1141,17 @@ and their guest modules. Linux boots the same native musl ELF. The dated
 qualification composes successful unchanged-kernel cases with recorded original
 receipts, excluding provisional sync probes and failed ISO setup. See
 [receipts and limits](../../docs/linux-posix-qualification.md#fcntl-synchronization-status-preservation).
+
+The `ofdlocks` case qualifies native regular-file open-description record
+locks as root and UID/GID1000. Its 464 checks per architecture cover aliases and
+separate opens, POSIX/OFD conflicts, query records and PID values, splitting/
+coalescing/conversion, selected errors, flock independence and final-close/
+fork inheritance. F_OFD_GETLK with F_UNLCK queries this description's own
+locks; F_GETLK with F_UNLCK returns EINVAL. Three child waiters per credential
+are observed sleeping in procfs before unlock, downgrade or non-restarting
+SIGUSR1; returns must be success or EINTR as appropriate. Two 200-cycle cohorts
+measure every slab class and large-page count after repeated lock/alias cleanup.
+The reference controller boots the identical musl ELF on Linux 6.12.51 and
+mounts procfs for the same wait checkpoints. Sources and executed C/ELF must
+match across baseline, candidate and reference. See the
+[qualification receipts and limits](../../docs/linux-posix-qualification.md#native-open-description-record-locks).

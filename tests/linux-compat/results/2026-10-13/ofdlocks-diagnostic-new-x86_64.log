@@ -1,0 +1,44 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   510k      0 --:--:-- --:--:-- --:--:--  510k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 33 2880k   33  970k    0     0   999k      0  0:00:02 --:--:--  0:00:02  998k100 2880k  100 2880k    0     0  1623k      0  0:00:01  0:00:01 --:--:-- 1624k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  39769      0 --:--:-- --:--:-- --:--:-- 39731
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   318k      0 --:--:-- --:--:-- --:--:--  318k100  207k  100  207k    0     0   318k      0 --:--:-- --:--:-- --:--:--  318k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0   115k      0 --:--:-- --:--:-- --:--:--  115k
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   220k      0 --:--:-- --:--:-- --:--:--  220k100  117k  100  117k    0     0   220k      0 --:--:-- --:--:-- --:--:--  220k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/ofdlocks-20261013/new-after-x86/ofdlocks/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/ofdlocks-20261013/new-after-x86/ofdlocks/.vinix-amd64.iso.UqMFM5'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data,  127m free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/ofdlocks-20261013/new-after-x86/ofdlocks/iso-build/.iso-staging.gNCPNI/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :  9.18% done
+libisofs: MISHAP : Image write cancelled
+libburn : SORRY : Cannot write desired amount of 32768 bytes. write(2) returned -1. : No space left on device
+libburn : FATAL : Burn run failed
+xorriso : FATAL : -abort_on 'FAILURE' encountered 'FATAL' during image writing
+xorriso : NOTE : libburn has now been urged to cancel its operation
+xorriso : FAILURE : libburn indicates failure with writing.
+xorriso : NOTE : -return_with SORRY 32 triggered by problem severity FATAL
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/ofdlocks-20261013/new-after-x86/receipt.json
