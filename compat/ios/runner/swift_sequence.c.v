@@ -2,7 +2,7 @@
 module main
 
 struct SwiftSequenceFailure {}
-fn (_ &SwiftSequenceFailure) msg() string { return 'iOS: unsupported Swift Sequence compactMap representation' }
+fn (_ &SwiftSequenceFailure) msg() string { return 'iOS: unsupported Swift Sequence representation' }
 fn (_ &SwiftSequenceFailure) code() int { return 1 }
 __global swift_sequence_failure_value = SwiftSequenceFailure{}
 fn swift_sequence_failure() IError { return unsafe { &swift_sequence_failure_value } }
@@ -25,6 +25,14 @@ struct SwiftSequenceLayout {
 	make_iterator u64
 	next u64
 	array SwiftArrayLayout
+}
+struct SwiftSequenceWitnesses {
+	sequence SwiftSequenceValue
+	element SwiftSequenceValue
+	iterator SwiftSequenceValue
+	iterator_table u64
+	make_iterator u64
+	next u64
 }
 struct SwiftSequenceResult {
 	array u64
@@ -60,9 +68,9 @@ fn swift_sequence_value_checked(metadata u64) !SwiftSequenceValue {
 // Element metadata at 2, Iterator metadata at 3, makeIterator at 4. Complete
 // direct associated witnesses are supported; tagged mangled/accessor entries
 // must be instantiated separately, never mistaken for metadata or code.
-fn swift_sequence_layout_checked(sequence u64, result u64, table u64) !SwiftSequenceLayout {
+fn swift_sequence_witnesses_checked(sequence u64, table u64) !SwiftSequenceWitnesses {
 	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired
-		|| sequence < 8 || sequence & 7 != 0 || result < 8 || result & 7 != 0
+		|| sequence < 8 || sequence & 7 != 0
 		|| table == 0 || table & 7 != 0 { return swift_sequence_failure() }
 	iterator_table := C.ios_load_pointer(unsafe { &u64(table + 8) })
 	element := C.ios_load_pointer(unsafe { &u64(table + 16) })
@@ -74,10 +82,18 @@ fn swift_sequence_layout_checked(sequence u64, result u64, table u64) !SwiftSequ
 	}
 	make_iterator := read64(table + 32); next := read64(iterator_table + 16)
 	if make_iterator == 0 || next == 0 || make_iterator & 3 != 0 || next & 3 != 0 { return swift_sequence_failure() }
-	return SwiftSequenceLayout{ sequence: swift_sequence_value_checked(sequence)!,
+	return SwiftSequenceWitnesses{ sequence: swift_sequence_value_checked(sequence)!,
 		element: swift_sequence_value_checked(element)!, iterator: swift_sequence_value_checked(iterator)!,
-		result: swift_sequence_value_checked(result)!, iterator_table: iterator_table,
-		make_iterator: make_iterator, next: next, array: swift_array_layout(0, result)! }
+		iterator_table: iterator_table, make_iterator: make_iterator, next: next }
+}
+
+fn swift_sequence_layout_checked(sequence u64, result u64, table u64) !SwiftSequenceLayout {
+	if result < 8 || result & 7 != 0 { return swift_sequence_failure() }
+	witnesses := swift_sequence_witnesses_checked(sequence, table)!
+	return SwiftSequenceLayout{ sequence: witnesses.sequence, element: witnesses.element,
+		iterator: witnesses.iterator, iterator_table: witnesses.iterator_table,
+		make_iterator: witnesses.make_iterator, next: witnesses.next,
+		result: swift_sequence_value_checked(result)!, array: swift_array_layout(0, result)! }
 }
 
 fn swift_sequence_grow(owner u64, count u64, capacity u64, layout SwiftSequenceLayout) !u64 {
@@ -193,7 +209,20 @@ fn swift_sequence_arena() u64 {
 		0xa9425bf5, 0xa94153f3, 0xa8c37bfd, 0xd65f03c0]! {
 		write32(base + 128 + u64(i * 4), op)
 	}
-	C.__builtin___clear_cache(allocation, unsafe { voidptr(base + 184) })
+	// Swift first(where:) -> C: borrowed self x20, indirect Optional x8;
+	// C returns the original owned error, published in Swift's x21.
+	for i, op in [u32(0xa9bf7bfd), 0xaa1403e4, 0xaa0803e5, 0x580000b0,
+		0xd63f0200, 0xaa0003f5, 0xa8c17bfd, 0xd65f03c0]! {
+		write32(base + 256 + u64(i * 4), op)
+	}
+	unsafe { *(&u64(base + 288)) = u64(voidptr(swift_sequence_first)) }
+	// C -> throwing predicate: Element x0, context x20, Bool x0/error x21.
+	for i, op in [u32(0xa9bd7bfd), 0xa90153f3, 0xa9025bf5, 0xaa0003f0,
+		0xaa0103f4, 0xaa0203e0, 0xaa1f03f5, 0xd63f0200, 0xaa1503e1,
+		0xa9425bf5, 0xa94153f3, 0xa8c37bfd, 0xd65f03c0]! {
+		write32(base + 320 + u64(i * 4), op)
+	}
+	C.__builtin___clear_cache(allocation, unsafe { voidptr(base + 372) })
 	if C.mprotect(allocation, page, C.PROT_READ | C.PROT_EXEC) != 0 {
 		C.munmap(allocation, page); panic('iOS: cannot seal Swift Sequence adapters')
 	}

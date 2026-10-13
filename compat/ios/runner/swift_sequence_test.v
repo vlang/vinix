@@ -26,6 +26,7 @@ type SequenceProbeObjCMetadata = fn (u64) u64
 struct SequenceProbeApi {
 	native bool
 	entry u64
+	first_entry u64
 	code u64
 	int_type u64
 	string_type u64
@@ -47,6 +48,7 @@ struct SequenceScenario {
 	owner u64
 	error_owner u64
 	reenter bool
+	first bool
 mut:
 	sequence_metadata u64
 	iterator_metadata u64
@@ -59,6 +61,7 @@ mut:
 	next_calls int
 	transforms int
 	kept int
+	first_output u64
 }
 fn sequence_keep(api SequenceProbeApi, owner u64) {
 	$if macos { if api.native { C.CFRetain(unsafe { voidptr(owner) }); return } }
@@ -83,7 +86,11 @@ fn sequence_destroy(_value u64, metadata u64) {
 fn sequence_iterator_destroy(value u64, metadata u64) {
 	mut s := unsafe { &SequenceScenario(read64(metadata + 8)) }
 	assert read64(value) == u64(s) && metadata == s.iterator_metadata
-	assert read64(value + 8) == u64(if s.throw_at >= 0 { s.throw_at + 1 } else { s.count })
+	assert read64(value + 8) == u64(if s.first { s.transforms } else if s.throw_at >= 0 { s.throw_at + 1 } else { s.count })
+	if s.first {
+		assert sequence_refs(s.api, s.owner) == 1 + if s.kept != 0 && s.input_string { i64(1) } else { i64(0) }
+		assert read64(s.first_output) == 0x7171717171717171 && read64(s.first_output + 8) == 0x8181818181818181
+	}
 	s.iterator_destroys++
 }
 fn sequence_pod_copy(destination u64, source u64, metadata u64) u64 {
@@ -118,6 +125,22 @@ fn sequence_next(metadata u64, table u64, output u64, receiver u64) {
 }
 fn sequence_lookup_worker(entry u64) {
 	assert runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sSTsE10compactMapySayqd__Gqd__Sg7ElementQzKXEKlF') or { panic(err) } == entry
+}
+fn sequence_first_lookup_worker(entry u64) {
+	assert runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sSTsE5first5where7ElementQzSgSbADKXE_tKF') or { panic(err) } == entry
+}
+fn sequence_predicate(input u64, context u64) SwiftSequenceResult {
+	mut s := unsafe { &SequenceScenario(context) }; index := s.transforms
+	assert s.first && s.copies == 1 && s.next_calls == index + 1
+	if s.objc_values { assert read64(input) == s.owner }
+	else if s.input_string { assert read64(input) == 21 && read64(input + 8) == s.owner | u64(0x5000000000000000) }
+	else { assert read64(input) == u64(index) }
+	assert sequence_refs(s.api, s.owner) == 1 + if s.input_string { i64(1) } else { i64(0) }
+	if s.reenter && !s.api.native { worker := spawn sequence_first_lookup_worker(s.api.first_entry); worker.wait() }
+	s.transforms++
+	if index == s.throw_at { sequence_keep(s.api, s.error_owner); return SwiftSequenceResult{ error: s.error_owner } }
+	if index == s.selection { s.kept++; return SwiftSequenceResult{ array: 1 } }
+	return SwiftSequenceResult{}
 }
 fn sequence_transform(input u64, context u64, output u64) u64 {
 	mut s := unsafe { &SequenceScenario(context) }; index := s.transforms
@@ -163,6 +186,15 @@ fn sequence_probe_emit(code u64) {
 	unsafe { *(&u64(code + 240)) = u64(voidptr(sequence_transform)) }
 	write32(code + 256, 0xdac10020); write32(code + 260, 0xd65f03c0)
 	write32(code + 272, 0xdac10820); write32(code + 276, 0xd65f03c0)
+	// Same C arguments as compactMap; argument four is the Optional output.
+	for i, op in [u32(0xa9bc7bfd), 0xa90153f3, 0xa9025bf5, 0xaa0003f0, 0xaa0703f3,
+		0xaa0603f4, 0xaa0103e0, 0xaa0203e1, 0xaa0303e2, 0xaa0503e3, 0xaa0403e8,
+		0xaa1f03f5, 0xd63f0200, 0xf9000260, 0xf9000675, 0xf9000a74,
+		0xa9425bf5, 0xa94153f3, 0xa8c47bfd, 0xd65f03c0]! { write32(code + 384 + u64(i * 4), op) }
+	// Swift predicate -> C fixture; Bool x0 and original owned error x21.
+	for i, op in [u32(0xa9be7bfd), 0xa90153f3, 0xaa1403e1, 0x58000130,
+		0xd63f0200, 0xaa0103f5, 0xa94153f3, 0xa8c27bfd, 0xd65f03c0]! { write32(code + 480 + u64(i * 4), op) }
+	unsafe { *(&u64(code + 528)) = u64(voidptr(sequence_predicate)) }
 }
 fn sequence_probe_api(native bool, code u64) SequenceProbeApi {
 	$if macos { if native {
@@ -170,16 +202,21 @@ fn sequence_probe_api(native bool, code u64) SequenceProbeApi {
 		metadata := unsafe { SequenceProbeObjCMetadata(C.dlsym(core, c'swift_getObjCClassMetadata')) }
 		return SequenceProbeApi{native: true, code: code,
 			entry: u64(C.dlsym(core, c'$sSTsE10compactMapySayqd__Gqd__Sg7ElementQzKXEKlF')),
+			first_entry: u64(C.dlsym(core, c'$sSTsE5first5where7ElementQzSgSbADKXE_tKF')),
 			int_type: u64(C.dlsym(core, c'$sSiN')), string_type: u64(C.dlsym(core, c'$sSSN')),
 			objc_type: metadata(u64(C.objc_getClass(c'NSObject'))), objc_result_type: metadata(u64(C.objc_getClass(c'NSString'))),
 			retain: unsafe { SequenceProbeRetain(C.dlsym(core, c'swift_bridgeObjectRetain')) },
 			release: unsafe { SequenceProbeRelease(C.dlsym(core, c'swift_bridgeObjectRelease')) }}
 	} }
 	return SequenceProbeApi{ code: code, entry: runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sSTsE10compactMapySayqd__Gqd__Sg7ElementQzKXEKlF') or { panic(err) },
+		first_entry: runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sSTsE5first5where7ElementQzSgSbADKXE_tKF') or { panic(err) },
 		int_type: swift_integer_metadata(), string_type: swift_string_metadata(),
 		objc_type: swift_objc_metadata(ios_runtime.names['NSObject']), objc_result_type: swift_objc_metadata(ios_runtime.names['NSString']), retain: swift_bridge_retain, release: swift_bridge_release }
 }
 fn sequence_scenario(api SequenceProbeApi, count int, input_string bool, output_string bool, selection int, throw_at int, limited bool, objc_values bool) {
+	sequence_scenario_checked(api, count, input_string, output_string, selection, throw_at, limited, objc_values, false)
+}
+fn sequence_scenario_checked(api SequenceProbeApi, count int, input_string bool, output_string bool, selection int, throw_at int, limited bool, objc_values bool, first bool) {
 	mut owner := u64(0); mut error_owner := u64(0)
 	$if macos { if api.native {
 		owner = u64(C.CFStringCreateWithBytes(unsafe { nil }, c'compactMap owner text', 21, 0x08000100, false))
@@ -188,9 +225,10 @@ fn sequence_scenario(api SequenceProbeApi, count int, input_string bool, output_
 	} }
 	if !api.native { owner = owned_string('compactMap owner text'); error_owner = objc_allocate(cf_error_type_id()) }
 	mut s := SequenceScenario{ api: api, count: count, input_string: input_string, output_string: output_string,
+		first: first,
 		objc_values: objc_values,
 		selection: selection, throw_at: throw_at, owner: owner, error_owner: error_owner,
-		reenter: count == 9 && input_string && output_string && selection == 1 }
+		reenter: count == 9 && input_string && if first { selection == 3 } else { output_string && selection == 1 } }
 	mut seq_vwt := [12]u64{}; mut iter_vwt := [12]u64{}
 	mut seq_meta := [u64(0), 0x200, u64(unsafe { &s })]!
 	mut iter_meta := [u64(0), 0x200, u64(unsafe { &s })]!
@@ -215,7 +253,7 @@ fn sequence_scenario(api SequenceProbeApi, count int, input_string bool, output_
 	s.sequence_table = u64(unsafe { &seq_table[0] }); s.iterator_table = u64(unsafe { &iter_table[0] })
 	mut source := [u64(unsafe { &s }), 0x123456789abcdef0]!
 	s.source = u64(unsafe { &source[0] })
-	mut closure := api.code + 192
+	mut closure := api.code + if first { u64(480) } else { u64(192) }
 	$if macos { if api.native {
 		sign_code := unsafe { SequenceProbeSign(voidptr(api.code + 256)) }; sign_data := unsafe { SequenceProbeSign(voidptr(api.code + 272)) }
 		seq_meta[0] = sign_data(seq_meta[0], u64(unsafe { &seq_meta[0] }) | (u64(11839) << 48))
@@ -227,9 +265,45 @@ fn sequence_scenario(api SequenceProbeApi, count int, input_string bool, output_
 		seq_table[3] = sign_data(seq_table[3], (s.sequence_table + 24) | (u64(0xcbc) << 48))
 		seq_table[4] = sign_code(seq_table[4], (s.sequence_table + 32) | (u64(27944) << 48))
 		iter_table[2] = sign_code(iter_table[2], (s.iterator_table + 16) | (u64(65124) << 48))
-		closure = sign_code(closure, 55683)
+		closure = sign_code(closure, if first { u64(8404) } else { u64(55683) })
 	} }
 	mut observed := [u64(0xaaaa), 0, 0, 0, 0xbbbb]!
+	if first {
+		mut optional := [u64(0xaaaa), 0x7171717171717171, 0x8181818181818181, 0x9191919191919191, 0xbbbb]!
+		s.first_output = u64(unsafe { &optional[1] })
+		invoke := unsafe { SequenceProbeCall(voidptr(api.code + 384)) }
+		invoke(api.first_entry, closure, u64(unsafe { &s }), s.sequence_metadata,
+			u64(unsafe { &optional[1] }), s.sequence_table, s.source, unsafe { &observed[1] })
+		assert observed[0] == 0xaaaa && observed[4] == 0xbbbb && observed[3] == s.source
+		assert optional[0] == 0xaaaa && optional[4] == 0xbbbb && optional[3] == 0x9191919191919191
+		assert source[0] == u64(unsafe { &s }) && source[1] == 0x123456789abcdef0
+		assert s.copies == 1 && s.sequence_destroys == 0 && s.iterator_destroys == 1
+		thrown := throw_at >= 0 && (selection < 0 || throw_at <= selection)
+		matched := !thrown && selection >= 0
+		expected := if thrown { throw_at + 1 } else if matched { selection + 1 } else { count }
+		assert s.transforms == expected && s.next_calls == expected + if !thrown && !matched { 1 } else { 0 }
+		assert s.kept == if matched { 1 } else { 0 }
+		if thrown {
+			assert observed[2] == error_owner && sequence_refs(api, error_owner) == 2
+			assert optional[1] == 0x7171717171717171 && optional[2] == 0x8181818181818181
+			sequence_drop(api, error_owner)
+		} else {
+			assert observed[2] == 0
+			if matched {
+				if objc_values { assert optional[1] == owner }
+				else if input_string { assert optional[1] == 21 && optional[2] == owner | u64(0x5000000000000000) }
+				else { assert optional[1] == u64(selection) && u8(optional[2]) == 0 }
+			} else {
+				if objc_values { assert optional[1] == 0 }
+				else if input_string { assert optional[1] == 0x7171717171717171 && optional[2] == 0 }
+				else { assert optional[1] == 0 && u8(optional[2]) == 1 }
+			}
+		}
+		assert sequence_refs(api, owner) == 1 + if matched && input_string { i64(1) } else { i64(0) }
+		if matched && input_string { sequence_drop(api, owner) }
+		assert sequence_refs(api, owner) == 1 && sequence_refs(api, error_owner) == 1
+		sequence_drop(api, owner); sequence_drop(api, error_owner); return
+	}
 	if limited {
 		if _ := swift_compact_map_checked(closure, u64(unsafe { &s }), s.sequence_metadata, result, s.sequence_table, s.source) { assert false }
 		assert s.copies == 1 && s.sequence_destroys == 0 && s.iterator_destroys == 1
@@ -280,6 +354,36 @@ fn sequence_values(api SequenceProbeApi) {
 	assert cases == 150
 }
 fn sequence_reader(api SequenceProbeApi) { sequence_scenario(api, 33, true, true, 1, -1, false, true) }
+fn sequence_first_values(api SequenceProbeApi) {
+	mut cases := 0
+	for kind in 0 .. 3 { for count in [0, 1, 9, 33]! { for selection in [-1, 0, 3, 31]! { for throw_at in [-1, 0, 3, 31]! {
+		if selection >= count || throw_at >= count { continue }
+		sequence_scenario_checked(api, count, kind != 0, false, selection, throw_at, false, kind == 2, true); cases++
+	} } } }
+	assert cases == 90
+}
+fn sequence_first_reader(api SequenceProbeApi) { sequence_scenario_checked(api, 33, true, false, 31, -1, false, true, true) }
+fn sequence_first_reject(code u64) {
+	page := usize(C.getpagesize()); guard := C.mmap(unsafe { nil }, page, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0); assert guard != unsafe { voidptr(-1) }
+	for args in [[u64(0), 0]!, [u64(1), 1]!, [u64(0), u64(guard)]!]! {
+		if _ := swift_sequence_first_checked(code + 480, 0, args[0], args[1], u64(guard), u64(guard)) { assert false }
+	}
+	integer := swift_integer_metadata(); mut vwt := [12]u64{}
+	for i in 0 .. 12 { vwt[i] = read64(read64(integer - 8) + u64(i * 8)) }
+	mut metadata := [u64(unsafe { &vwt[0] }), 0x200, 0]!
+	element := u64(unsafe { &metadata[1] })
+	mut iterator := [u64(0), element, code + 160]!
+	mut sequence := [u64(0), u64(unsafe { &iterator[0] }), element, integer, code + 128]!
+	for address in [u64(0), 1]! {
+		vwt[7] = address
+		if _ := swift_sequence_first_checked(code + 480, 0, integer, u64(unsafe { &sequence[0] }), u64(guard), u64(guard)) { assert false }
+	}
+	ios_runtime.swift_concurrency_retired = true
+	if _ := swift_sequence_first_checked(code + 480, 0, integer, u64(guard), u64(guard), u64(guard)) { assert false }
+	ios_runtime.swift_concurrency_retired = false
+	if _ := swift_sequence_first_checked(0, 0, 0, 0, 0, 0) { assert false }
+	assert C.munmap(guard, page) == 0
+}
 fn sequence_reject(code u64) {
 	page := usize(C.getpagesize()); guard := C.mmap(unsafe { nil }, page, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0); assert guard != unsafe { voidptr(-1) }
 	before := ios_runtime.swift_sequence_arena
@@ -313,19 +417,26 @@ fn sequence_reject(code u64) {
 }
 fn test_swift_compact_map() {
 	page := usize(C.getpagesize()); base := u64(C.mmap(unsafe { nil }, page, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)); assert base != u64(-1)
-	sequence_probe_emit(base); C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 280) })
+	sequence_probe_emit(base); C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 536) })
 	assert C.mprotect(unsafe { voidptr(base) }, page, C.PROT_READ | C.PROT_EXEC) == 0
 	$if macos {
 		sequence_values(sequence_probe_api(true, base))
+		sequence_first_values(sequence_probe_api(true, base))
+		println('IOS-SEQUENCE-FIRST-NATIVE: 90 first(where:) cases; consuming copy and Iterator teardown before output construction, indirect Int/String/ObjC Optional results, predicate Bool/context and x21 throws, early termination, exact input/result/error ownership and untouched output on throws')
 		println('IOS-SEQUENCE-NATIVE: 150 protocol-dispatched compactMap cases; consuming sequence copy, indirect iterator/Optional returns, borrowed transform input, context preservation, ordered kept Int/String/ObjC results and reference capacity flags, x21 throws and exact input/result/error ownership')
 		if os.getenv('VINIX_IOS_COMPACT_MAP_NATIVE_ONLY') == '1' { assert C.munmap(unsafe { voidptr(base) }, page) == 0; return }
 	}
 	for _ in 0 .. 2 {
 		objc_start(); baseline := ios_runtime.live; api := sequence_probe_api(false, base)
 		sequence_values(api)
+		sequence_first_values(api)
 		mut readers := []thread{}; for _ in 0 .. 4 { readers << spawn sequence_reader(api) }; readers.wait(); unsafe { readers.free() }
+		mut first_readers := []thread{}; for _ in 0 .. 4 { first_readers << spawn sequence_first_reader(api) }; first_readers.wait(); unsafe { first_readers.free() }
+		sequence_first_reject(base)
 		sequence_scenario(api, 1, true, true, 0, -1, true, false); sequence_reject(base)
 		for library in ['/usr/lib/libSystem.B.dylib', '/usr/lib/swift/libswiftFoundation.dylib']! { assert runtime_symbol(library, '_$sSTsE10compactMapySayqd__Gqd__Sg7ElementQzKXEKlF') == none }
+		for library in ['/usr/lib/libSystem.B.dylib', '/usr/lib/swift/libswiftFoundation.dylib']! { assert runtime_symbol(library, '_$sSTsE5first5where7ElementQzSgSbADKXE_tKF') == none }
+		assert runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '$sSTsE5first5where7ElementQzSgSbADKXE_tKF') == none
 		assert runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '$sSTsE10compactMapySayqd__Gqd__Sg7ElementQzKXEKlF') == none
 		if _ := swift_compact_map_checked(0, 0, 0, 0, 0, 0) { assert false }
 		assert ios_runtime.live == baseline && ios_runtime.swift_arrays.len == 0
@@ -334,5 +445,6 @@ fn test_swift_compact_map() {
 		$else { mut residency := u8(0); assert C.mincore(unsafe { voidptr(arena) }, page, unsafe { &residency }) == -1 }
 	}
 	assert C.munmap(unsafe { voidptr(base) }, page) == 0
+	println('IOS-SEQUENCE-FIRST: borrowed Sequence copy, owned Iterator and matched element transfer; empty/missing/early matches, original owned throws and untouched indirect output, registered value witnesses, four readers, reentrant lookup, guarded/tagged/missing-store/retired rejection and two drained lifetimes')
 	println('IOS-SEQUENCE: protocol-dispatched compactMap, nil filtering and ordered typed result tails; balanced consuming copy/iterator/input/result cleanup on exhaustion, throws and result-limit failure, no locks across reentrant workers, four readers, guarded/tagged/mismatched/incomplete/retired rejection, sealed adapters and two drained lifetimes')
 }

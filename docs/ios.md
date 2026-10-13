@@ -4441,6 +4441,49 @@ remain unchanged. Fortnite passes the former compactMap import and exits
 with status 1 before entry at `_$sSTsE5first5where7ElementQzSgSbADKXE_tKF`. Full regression remains unpassed;
 entry, rendering and gameplay are unverified.
 
+`Swift Sequence first(where:)` now implements the measured predicate helper
+`_$sSTsE5first5where7ElementQzSgSbADKXE_tKF` from libswiftCore.
+Installed macOS code and the MarketplaceKitWrapper callsite establish
+predicate/context in x0/x1, Sequence metadata/witnesses in x2/x3, borrowed
+self in x20, indirect Optional result in x8 and the original owned error
+in x21. All 90 native comparisons match Int/String/Objective-C Optional
+results, empty/missing/early matches, predicate throws and exact ownership.
+The combined fixture also retains all 150 compactMap native comparisons.
+
+The V helper shares checked complete direct Sequence/Iterator witnesses
+with compactMap, copies borrowed self before consuming makeIterator, and
+borrows each owned input temporary for the predicate. Rejected inputs are
+destroyed; a match transfers ownership into the returned Optional. Iterator
+is destroyed before successful output construction. Throws destroy input
+and Iterator, forward the owned error without ARC changes, and leave output
+untouched. Element's complete single-payload enum store-tag witness constructs
+None/Some. Aligned stack scratch uses values bounded to 64 KiB; first(where:)
+allocates no result array. Both helpers share one sealed adapter page per
+runtime and hold no registry lock across a witness or callback. Tagged
+associated-witness instantiation remains unsupported; caller metadata,
+direct witnesses and borrowed storage must remain live throughout the call.
+
+All 88 programs build and 129 generated C streams restore to their hashes.
+Forty-one host suites pass ASAN/UBSAN in both hashing modes; Vinix passes
+32 Objective-C and 43 Swift/loader programs. The combined Sequence fixture
+checks four first(where:) readers and four compactMap readers, reentrant
+lookup, guarded/tagged/missing-store/retired rejection and two drained
+runtime lifetimes. Evidence is retained under
+`build/ios/fortnite/sequence-first-checks`, with native and callsite inspection,
+pinned copies of the actual compiler inputs, executable/debug archives and
+verified committed sources. The mutable canonical V checkout is outside
+the build inputs. Completed evidence and compiler bytes are hash-verified
+after persistence from an owned 8 GiB RAM volume, which is then detached.
+The first Swift guest staging stopped at a copied fixture-name mismatch;
+its original build/staging evidence is retained separately. The one affected
+fixture was rebuilt under its expected name, then remaining checks resumed.
+Persistence was interrupted under shared-disk space pressure. The verified
+RAM source was preserved, the identified partial copy was removed and the
+copy resumed with additional free-space headroom before final verification.
+Five published runners remain unchanged. Fortnite passes the former
+first(where:) import and exits with status 1 before entry at `_$sSa28_allocateBufferUninitialized15minimumCapacitys06_ArrayB0VyxGSi_tFZ`.
+Full regression remains unpassed; entry, rendering and gameplay are unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
@@ -4448,10 +4491,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,449 | 711 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 129 | 47 | 23 |
-| All images | 2,237 | 761 | 120 |
+| MarketplaceKitWrapper | 130 | 46 | 23 |
+| All images | 2,238 | 760 | 120 |
 
-The C++/GLES/Text variant reports 2,250 resolved imports, 748 unresolved strong
+The C++/GLES/Text variant reports 2,251 resolved imports, 747 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
