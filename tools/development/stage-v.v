@@ -93,6 +93,9 @@ fn stage_v() ! {
 	cli_source := 'cmd/v/v.v'
 	patches[cli_source] = patch_source(root + '/' + cli_source,
 		vsource.stamped_cli(os.read_file(root + '/' + cli_source)!, commit)!)!
+	assert_source := 'vlib/v/gen/c/stmt.v'
+	patches[assert_source] = patch_source(root + '/' + assert_source,
+		vsource.reproducible_assert_sources(os.read_file(root + '/' + assert_source)!)!)!
 	patched_hash := devcore.tree_hash(root)!
 	os.write_file(root + '/VERSION', commit + '\n')!
 	work := output + '/.build'

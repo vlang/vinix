@@ -27,3 +27,17 @@ fn test_portable_bootstrap_requires_exact_source_and_stamps_revision() {
 		assert false
 	}
 }
+
+fn test_reproducible_assert_sources_require_one_exact_generator_anchor() {
+	source := '\tposition := file.logical_position_at(start)\n\treturn AssertSourceDetail{\n\t\tfile:       position.filename\n\t\tline:       position.line\n\t\texpression: expression\n\t}\n'
+	patched := reproducible_assert_sources(source)!
+	assert patched.contains("os.getenv('SOURCE_DATE_EPOCH').len > 0 && diagnostic_file == file.name")
+	assert patched.contains("project_prefix := os.getwd().trim_right('/') + '/'")
+	assert patched.contains('diagnostic_file.starts_with(project_prefix)')
+	assert patched.ends_with('\n\t\tline:       position.line\n\t\texpression: expression\n\t}\n')
+	for unsupported in ['', source + source, source.replace('position.filename', 'file.name')] {
+		if _ := reproducible_assert_sources(unsupported) {
+			assert false, 'unknown/ambiguous assertion source must be refused'
+		}
+	}
+}

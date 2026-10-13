@@ -38,3 +38,19 @@ pub fn stamped_cli(source string, revision string) !string {
 	if source.count(anchor) != 1 { return error('unsupported V CLI version source') }
 	return source.replace('\${@VCURRENTHASH}', revision[..7])
 }
+
+// Assertions stay enabled. Reproducible builds report project source paths
+// relative to their working directory; explicit #line filenames keep their
+// requested meaning, and sources outside the project keep their full path.
+pub fn reproducible_assert_sources(source string) !string {
+	anchor := '\tposition := file.logical_position_at(start)\n\treturn AssertSourceDetail{\n\t\tfile:       position.filename'
+	replacement := '\tposition := file.logical_position_at(start)\n' +
+		'\tmut diagnostic_file := position.filename\n' +
+		"\tif os.getenv('SOURCE_DATE_EPOCH').len > 0 && diagnostic_file == file.name {\n" +
+		"\t\tproject_prefix := os.getwd().trim_right('/') + '/'\n" +
+		'\t\tif diagnostic_file.starts_with(project_prefix) {\n' +
+		'\t\t\tdiagnostic_file = diagnostic_file[project_prefix.len..]\n' +
+		'\t\t}\n\t}\n' +
+		'\treturn AssertSourceDetail{\n\t\tfile:       diagnostic_file'
+	return replace_one(source, anchor, replacement)
+}

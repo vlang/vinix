@@ -46,6 +46,13 @@ because the export has no `.git` directory. The receipt records each source
 file's original/resulting SHA-256 and the complete patched-source tree hash.
 An unfamiliar or ambiguous source layout is refused rather than partly patched.
 
+The C backend also retains assertion diagnostics without embedding a changing
+workspace prefix: when `SOURCE_DATE_EPOCH` is set, project source filenames in
+assertion failures are relative to the compiler's working directory. Line
+numbers, expressions, assertions, explicit `#line` filenames and paths outside
+that directory retain their meaning. This adaptation is recorded with the
+other source hashes. Build each project from its source root.
+
 The host V compiler translates that committed compiler source, then the selected
 musl C compiler builds a static native compiler and the adjacent runtime objects
 needed by the reference projects. These include process capture, pthreads,
@@ -86,6 +93,17 @@ completed in `build/development17-20261013/native-v-arm-qualified` and
 The x86 UID 1000 version/help gate passed in
 `build/development17-20261013/guest-x86-v-smoke-b`, reporting
 `V 0.5.2 f6358ec`; compiler-project acceptance still requires a native GCC SDK.
+
+The stages including the assertion-path adaptation completed in
+`build/development17-20261013/native-v-arm-repro` and
+`build/development17-20261013/native-v-x86-repro`. Their patched-source pin is
+`52fcbeedc7e63e13aaaac79bc870aa274ef17e1a87683541001a648fe8f21d46`.
+The x86 UID 1000 startup/help gate passed in
+`build/development17-20261013/guest-x86-v-repro`. The AArch64 native compiler,
+userland and signed-package reproducibility gate passed in
+`build/development17-20261013/guest-arm-package-repro`; it builds the same
+package CLI and payload in two different workspace paths and independently
+verifies their matching hashes and release signatures.
 
 `vinix-build` is a V build runner for installed Vinix systems and build hosts.
 It runs a pinned build plan in a new private workspace, preserves source links
@@ -159,7 +177,7 @@ A plan has this shape (replace paths and hashes with actual values):
     },
     {
       "name": "package-cli",
-      "argv": ["{v}", "-os", "linux", "-gc", "none", "-cc", "{cc}", "-path", "@vlib|{work}|{work}/tools/accounts", "-o", "{work}/vinix-package", "{work}/tools/packages/main.v"],
+      "argv": ["{v}", "-new-compiler", "-nocache", "-no-retry-compilation", "-no-parallel", "-no-memory-limit", "-os", "linux", "-musl", "-gc", "none", "-cc", "{cc}", "-path", "@vlib|{work}", "-o", "{work}/vinix-package", "{work}/tools/packages/main.v"],
       "artifacts": ["vinix-package"]
     }
   ]
