@@ -248,6 +248,71 @@ fn test_luna_redraws_release_all_temporary_allocations() {
 	assert !desktop.glass.allocated
 }
 
+// A frame with the pointer over one of the menu's rows.
+fn luna_memory_hover(mut desktop Desktop, action string) {
+	desktop.set_hover(action)
+	render_and_release(mut desktop)
+}
+
+fn test_luna_start_menu_redraws_release_all_temporary_allocations() {
+	mut desktop := memory_fixture_desktop()
+	desktop.settings.theme = .windows_xp
+	desktop.start_pins = [2]
+	// Warm the frame pool for each of the menu's layouts before measuring.
+	desktop.toggle_start_menu()
+	render_and_release(mut desktop)
+	desktop.start_menu_key_input('term')
+	render_and_release(mut desktop)
+	desktop.start_menu_key_input('\x7f\x7f\x7f\x7f')
+	desktop.handle_start_action(action_start_all)
+	render_and_release(mut desktop)
+	desktop.handle_start_action(action_start_back)
+	desktop.handle_start_action(action_start_panel)
+	desktop.start_menu_open = false
+	render_and_release(mut desktop)
+
+	C.vinix_heap_begin()
+	for _ in 0 .. 4 {
+		// Windows XP's menu builds three elements a row, measures its labels
+		// and trims All Programs' arrow: none of it may outlive the frame.
+		// The menu is shown by its flag: opening it for real reads the list of
+		// packaged programs again, which is not what is measured here.
+		desktop.start_menu_open = true
+		render_and_release(mut desktop)
+		luna_memory_hover(mut desktop, app_start_actions[2])
+		luna_memory_hover(mut desktop, action_start_documents)
+		luna_memory_hover(mut desktop, action_start_all)
+		luna_memory_hover(mut desktop, action_start_shutdown)
+		luna_memory_hover(mut desktop, action_start_toggle)
+		desktop.set_hover('')
+		desktop.handle_start_action(action_start_search)
+		render_and_release(mut desktop)
+		desktop.start_menu_key_input('term')
+		render_and_release(mut desktop)
+		desktop.start_menu_key_input('\x7f\x7f\x7f\x7f')
+		desktop.handle_start_action(action_start_all)
+		render_and_release(mut desktop)
+		desktop.handle_start_action(action_start_back)
+		tree := desktop.build_tree()
+		desktop.render_clipped(tree, desktop.damage_clip(DamageRect{
+			x:     0
+			y:     300
+			w:     480
+			h:     468
+			valid: true
+		}), false)
+		free_tree(tree)
+		desktop.handle_start_action(action_start_panel)
+		desktop.start_menu_open = false
+		render_and_release(mut desktop)
+	}
+	desktop.start_menu_open = true
+	desktop.close_start_menu()
+	live := C.vinix_heap_end()
+	if live != 0 { print_heap_sizes('Windows XP Start menu allocations by size') }
+	assert live == 0, 'the Windows XP Start menu retained ${live} bytes'
+}
+
 fn glass_memory_backdrops(desktop &Desktop) int {
 	mut count := 0
 	for slot in desktop.glass.slots {

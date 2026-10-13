@@ -287,3 +287,366 @@ fn test_luna_gradient_runs_through_its_stops() {
 	middle := luna_gradient([LunaStop{0, 0x000000}, LunaStop{1000, 0xfefefe}], 1, 3)
 	assert middle == 0x7f7f7f || middle == 0x7e7e7e || middle == 0x808080
 }
+
+// A screen wide enough for the bar's buttons, and tall enough for the menu.
+fn luna_menu_test_desktop(scale int) Desktop {
+	mut desktop := Desktop{
+		canvas: new_scaled_canvas(1024, 600, 1024 * scale, 600 * scale, scale)
+		fonts:  load_fonts_for_scale(scale)
+	}
+	desktop.tray.preferences_loaded = true
+	desktop.settings.theme = .windows_xp
+	desktop.update_taskbar_clock_at(1_760_000_000)
+	return desktop
+}
+
+// luna_test_find is the element of this tree with this id.
+fn luna_test_find(root &ui2.Element, id string) ?ui2.Element {
+	for child in root.children {
+		if child.id == id {
+			return child
+		}
+		if found := luna_test_find(&child, id) {
+			return found
+		}
+	}
+	return none
+}
+
+// luna_test_labelled is the first element of this tree showing this text.
+fn luna_test_labelled(root &ui2.Element, text string) ?ui2.Element {
+	for child in root.children {
+		if child.text == text {
+			return child
+		}
+		if found := luna_test_labelled(&child, text) {
+			return found
+		}
+	}
+	return none
+}
+
+fn luna_test_pictured(root &ui2.Element, image string) bool {
+	for child in root.children {
+		if child.image_path == image || luna_test_pictured(&child, image) {
+			return true
+		}
+	}
+	return false
+}
+
+fn luna_test_red(color u32) int {
+	return int((color >> 16) & 0xff)
+}
+
+fn luna_test_green(color u32) int {
+	return int((color >> 8) & 0xff)
+}
+
+fn luna_test_blue(color u32) int {
+	return int(color & 0xff)
+}
+
+fn test_windows_xp_start_menu_is_laid_out_as_windows_xps() {
+	for scale in [1, 2] {
+		mut desktop := luna_menu_test_desktop(scale)
+		desktop.spawn('Welcome', .welcome, 520, 60, 300, 220)
+		luna_test_full_frame(mut desktop)
+		top := 600 - taskbar_height
+		rect := desktop.start_menu_rect()
+		y := int(rect.y)
+		width := int(rect.width)
+		height := int(rect.height)
+		// It rises from the Start button, in the screen's corner.
+		assert int(rect.x) == 0
+		assert width == luna_menu_width
+		assert y + height == top
+		behind := luna_test_pixel(&desktop, 0, y)
+		desktop.toggle_start_menu()
+		luna_test_full_frame(mut desktop)
+
+		// The blue header, its upper corners cut round, and the orange line
+		// under it, which fades out toward the far end.
+		assert luna_test_pixel(&desktop, width - 20, y + 10) == luna_gradient(luna_menu_header, 10,
+			luna_menu_header_rows)
+		assert luna_test_pixel(&desktop, 0, y) == behind
+		assert luna_test_pixel(&desktop, width - 1, y) == luna_test_pixel(&desktop, width + 2, y)
+		orange := luna_test_pixel(&desktop, width * 3 / 10, y + luna_menu_header_rows)
+		assert luna_test_red(orange) > 0xe0 && luna_test_blue(orange) < 0x60
+		faded := luna_test_pixel(&desktop, width - 2, y + luna_menu_header_rows)
+		assert luna_test_blue(faded) > luna_test_red(faded)
+
+		// The white column of programs and the pale blue one of places, with
+		// the menu's own line down each side of them.
+		body_y := y + luna_menu_header_rows + luna_menu_line_rows
+		body_height := luna_menu_pane_height(height)
+		assert body_y + body_height == top - luna_menu_foot_rows
+		assert desktop.start_menu_pane_height() == body_height
+		assert luna_test_pixel(&desktop, 3, body_y + 3) == luna_menu_pane
+		assert luna_test_pixel(&desktop, width - 3, body_y + body_height - 3) == luna_menu_places
+		assert luna_test_pixel(&desktop, 1 + luna_menu_left_width, body_y + 20) == luna_menu_places_edge
+		assert luna_test_pixel(&desktop, 0, body_y + 20) == luna_menu_edge
+		assert luna_test_pixel(&desktop, width - 1, body_y + 20) == luna_menu_edge
+		// The blue foot.
+		assert luna_test_pixel(&desktop, 30, top - 20) == luna_gradient(luna_menu_foot, luna_menu_foot_rows - 20,
+			luna_menu_foot_rows)
+
+		// The session buttons run leftward from the foot's right end, each with
+		// its coloured square.
+		shut := desktop.hit_target_named(action_start_shutdown) or { panic('no Shut down') }
+		restart := desktop.hit_target_named(action_start_restart) or { panic('no Restart') }
+		assert shut.y >= top - luna_menu_foot_rows && shut.y + shut.height <= top
+		assert shut.x + shut.width == width - 8
+		assert restart.x + restart.width < shut.x && restart.y == shut.y
+		red := luna_test_pixel(&desktop, shut.x + 6 + 3, shut.y + shut.height / 2)
+		assert luna_test_red(red) > luna_test_green(red) + 0x40
+		assert luna_test_red(red) > luna_test_blue(red) + 0x40
+		green := luna_test_pixel(&desktop, restart.x + 6 + 3, restart.y + restart.height / 2)
+		assert luna_test_green(green) > luna_test_red(green) + 0x30
+		assert luna_test_green(green) > luna_test_blue(green) + 0x30
+		assert desktop.hit_target_named(action_start_sleep) == none
+
+		// A program's row is the whole width of its column, and under the
+		// pointer it is the selection's blue.
+		first := desktop.hit_action(60, body_y + 9 + 19)
+		assert first in app_start_actions
+		row := desktop.hit_target_named(first) or { panic('no program row') }
+		assert row.x == 1 + 7 && row.y == body_y + 9 && row.height == 38
+		assert luna_test_pixel(&desktop, row.x + 2, row.y + 19) == luna_menu_pane
+		place := desktop.hit_target_named(action_start_documents) or { panic('no Documents') }
+		assert place.x > luna_menu_left_width && place.x + place.width < width
+		assert luna_test_pixel(&desktop, place.x + 2, place.y + place.height / 2) == luna_menu_places
+		desktop.set_hover(first)
+		luna_test_full_frame(mut desktop)
+		assert luna_test_pixel(&desktop, row.x + 2, row.y + 19) == luna_menu_select
+		desktop.set_hover(action_start_documents)
+		luna_test_full_frame(mut desktop)
+		assert luna_test_pixel(&desktop, row.x + 2, row.y + 19) == luna_menu_pane
+		assert luna_test_pixel(&desktop, place.x + 2, place.y + place.height / 2) == luna_menu_select
+		desktop.set_hover(action_start_shutdown)
+		luna_test_full_frame(mut desktop)
+		assert luna_test_pixel(&desktop, shut.x + shut.width - 3, shut.y + 3) == luna_menu_foot_hover
+		desktop.set_hover('')
+
+		// What the rows say: the user's name in white on the header, the first
+		// group of places in bold dark blue and the rest plain, and All
+		// Programs in bold before its green arrow rather than a typed one.
+		tree := desktop.build_tree()
+		menu := luna_test_find(&tree, action_start_panel) or { panic('no Start menu') }
+		assert int(menu.box.radius) == 0
+		name := luna_test_find(&menu, 'start.user.name') or { panic('no user name') }
+		assert name.text_style.color == 0xffffff && name.text_style.bold && name.text_style.shadow
+		documents := luna_test_labelled(&menu, tr('start.documents')) or { panic('no Documents') }
+		assert documents.text_style.bold && documents.text_style.color == luna_menu_places_text
+		system := luna_test_labelled(&menu, tr('window.system')) or { panic('no System') }
+		assert !system.text_style.bold && system.text_style.color == luna_menu_places_text
+		all := luna_test_labelled(&menu, 'All Programs') or { panic('no All Programs') }
+		assert all.text_style.bold
+		assert luna_test_labelled(&menu, tr('start.all_programs')) == none
+		assert luna_test_pictured(&menu, 'builtin:luna_arrow')
+		assert luna_test_pictured(&menu, 'builtin:luna_power')
+		assert luna_test_pictured(&menu, 'builtin:luna_restart')
+		assert !luna_test_pictured(&menu, 'builtin:luna_sleep')
+		// Nothing is pinned, so no program is in bold.
+		firefox := luna_test_labelled(&menu, app_title_text(available_apps[1].title)) or {
+			panic('no Firefox')
+		}
+		assert !firefox.text_style.bold
+		arrow_x := 1 + int(all.frame.x) + int(all.frame.width) + 4
+		free_tree(tree)
+		lit := desktop.hit_target_named(action_start_all) or { panic('no All Programs row') }
+		arrow := luna_test_pixel(&desktop, arrow_x + 2, lit.y + lit.height / 2)
+		assert luna_test_green(arrow) > luna_test_red(arrow) + 0x30
+		assert luna_test_green(arrow) > luna_test_blue(arrow) + 0x30
+
+		// What is pinned is in bold, above a rule; a machine that can sleep
+		// has a third session button, before the other two.
+		desktop.start_pins = [2]
+		desktop.idle.sleep_available = true
+		luna_test_full_frame(mut desktop)
+		pinned_tree := desktop.build_tree()
+		pinned_menu := luna_test_find(&pinned_tree, action_start_panel) or { panic('no Start menu') }
+		pinned := luna_test_labelled(&pinned_menu, app_title_text(available_apps[2].title)) or {
+			panic('no pinned program')
+		}
+		assert pinned.text_style.bold
+		unpinned := luna_test_labelled(&pinned_menu, app_title_text(available_apps[1].title)) or {
+			panic('no Firefox')
+		}
+		assert !unpinned.text_style.bold
+		assert luna_test_find(&pinned_menu, 'start.pins.rule') != none
+		assert luna_test_pictured(&pinned_menu, 'builtin:luna_sleep')
+		free_tree(pinned_tree)
+		sleep := desktop.hit_target_named(action_start_sleep) or { panic('no Sleep') }
+		again := desktop.hit_target_named(action_start_restart) or { panic('no Restart') }
+		assert sleep.x + sleep.width < again.x && sleep.x > 0
+		yellow := luna_test_pixel(&desktop, sleep.x + 6 + 3, sleep.y + sleep.height / 2)
+		assert luna_test_red(yellow) > luna_test_blue(yellow) + 0x60
+		assert luna_test_green(yellow) > luna_test_blue(yellow) + 0x40
+	}
+}
+
+fn test_windows_xp_start_button_is_green_in_the_corner() {
+	for scale in [1, 2] {
+		mut desktop := luna_menu_test_desktop(scale)
+		luna_test_full_frame(mut desktop)
+		top := 600 - taskbar_height
+		middle := top + taskbar_height / 2
+		start := desktop.hit_target_named(action_start_toggle) or { panic('no Start button') }
+		// The whole height of the bar from the screen's corner, as wide as its
+		// mark and its word need.
+		assert start.x == 0 && start.y == top && start.height == taskbar_height
+		assert start.width == desktop.luna_start_width()
+		assert start.width > start_button_width
+		tree := desktop.build_tree()
+		button := luna_test_find(&tree, action_start_toggle) or { panic('no Start button') }
+		assert button.text == tr('start.button') && button.text == 'start'
+		assert button.text_style.bold
+		free_tree(tree)
+		// Green, square where it meets the screen's edge and round at its
+		// other end, where the bar shows in the corners.
+		rest := luna_test_pixel(&desktop, 3, middle)
+		for corner in [luna_test_pixel(&desktop, 0, top + 1), rest,
+			luna_test_pixel(&desktop, 0, top + taskbar_height - 2)] {
+			assert luna_test_green(corner) > luna_test_red(corner) + 0x30
+			assert luna_test_green(corner) > luna_test_blue(corner) + 0x30
+		}
+		assert luna_test_pixel(&desktop, start.width - 1, top) == luna_gradient(luna_bar, 0, taskbar_height)
+		assert luna_test_pixel(&desktop, start.width - 1, top + taskbar_height - 1) == luna_gradient(luna_bar,
+			taskbar_height - 1, taskbar_height)
+		// Its mark and its word are white.
+		mut white := 0
+		for x in 0 .. start.width {
+			if luna_test_pixel(&desktop, x, middle) == 0xffffff {
+				white++
+			}
+		}
+		assert white > 6
+		// The next button on the bar starts after it.
+		next := desktop.hit_action(start.width + 8 + 2, middle)
+		assert next.len > 0 && next != action_start_toggle
+		assert desktop.hit_action(start.width - 14, middle) == action_start_toggle
+
+		// Brighter under the pointer, and darker, pressed in, while its menu
+		// is open -- which rises from it.
+		desktop.set_hover(action_start_toggle)
+		luna_test_full_frame(mut desktop)
+		hot := luna_test_pixel(&desktop, 3, middle)
+		desktop.set_hover('')
+		desktop.toggle_start_menu()
+		luna_test_full_frame(mut desktop)
+		held := luna_test_pixel(&desktop, 3, middle)
+		assert luna_test_green(hot) > luna_test_green(rest)
+		assert luna_test_green(held) < luna_test_green(rest)
+		rect := desktop.start_menu_rect()
+		assert int(rect.x) == start.x && int(rect.y + rect.height) == start.y
+		desktop.close_start_menu()
+
+		// The other themes keep their own button and their own menu.
+		for kind in [ThemeKind.default_, ThemeKind.windows7] {
+			desktop.settings.theme = kind
+			luna_test_full_frame(mut desktop)
+			plain := desktop.hit_target_named(action_start_toggle) or { panic('no Start button') }
+			assert plain.x > 0 && plain.width == start_button_width
+			assert plain.height < taskbar_height
+			assert !desktop.start_menu_luna()
+			own := desktop.start_menu_rect()
+			assert int(own.x) > 0 && int(own.width) == start_menu_preferred_width
+			assert desktop.start_menu_pane_height() == int(own.height) - 14
+			assert desktop.start_menu_search_y(400) == 400 - start_menu_search_height - 8
+		}
+		desktop.settings.theme = .windows_xp
+	}
+}
+
+fn test_windows_xp_start_menu_shows_its_search_field_only_when_searching() {
+	mut desktop := luna_menu_test_desktop(1)
+	desktop.toggle_start_menu()
+	luna_test_full_frame(mut desktop)
+	rect := desktop.start_menu_rect()
+	pane := desktop.start_menu_pane_height()
+	bottom := int(rect.y) + luna_menu_header_rows + luna_menu_line_rows + pane
+	shown := pane - start_menu_search_height - 8
+	// Windows XP's menu has no search field: All Programs ends the column, and
+	// Search is one of the places.
+	assert desktop.start_menu_search_y(pane) == pane
+	assert desktop.hit_action(40, bottom - 20) == action_start_all
+	find := desktop.hit_target_named(action_start_search) or { panic('no Search') }
+	assert find.x > luna_menu_left_width
+
+	// Typing brings the field out, under what it finds.
+	desktop.start_menu_key_input('c')
+	luna_test_full_frame(mut desktop)
+	assert desktop.start_menu_search_y(pane) == shown
+	assert desktop.hit_action(40, bottom - 20) == action_start_search
+	assert luna_test_pixel(&desktop, luna_menu_left_width - 12, bottom - 12) == luna_menu_search
+	page := desktop.start_menu_current_page()
+	assert page.rows_bottom <= shown - 5
+	first := desktop.hit_action(60, int(rect.y) + luna_menu_header_rows + luna_menu_line_rows + 12)
+	assert first in app_start_actions
+
+	// It stays while the query is edited, and goes when the menu is clicked
+	// somewhere else.
+	desktop.start_menu_key_input('\x7f')
+	assert desktop.start_menu_query.len == 0
+	assert desktop.start_menu_search_y(pane) == shown
+	desktop.handle_start_action(action_start_panel)
+	luna_test_full_frame(mut desktop)
+	assert desktop.start_menu_search_y(pane) == pane
+	assert desktop.hit_action(40, bottom - 20) == action_start_all
+
+	// Search, among the places, brings it out with nothing typed; All Programs
+	// moves up to make room.
+	desktop.handle_start_action(action_start_search)
+	luna_test_full_frame(mut desktop)
+	assert desktop.start_menu_search_y(pane) == shown
+	assert desktop.hit_action(40, bottom - 20) == action_start_search
+	all := desktop.hit_target_named(action_start_all) or { panic('no All Programs') }
+	assert all.y + all.height <= bottom - start_menu_search_height - 8
+
+	// Every program, a page at a time, uses the room the field leaves.
+	desktop.handle_start_action(action_start_all)
+	assert desktop.start_menu_search_y(pane) == pane
+	luna_test_full_frame(mut desktop)
+	listed := desktop.start_menu_current_page()
+	assert listed.capacity > 0 && listed.rows_bottom <= pane
+	assert desktop.hit_target_named(action_start_back) != none
+}
+
+fn test_windows_xp_start_menu_partial_frames_match_full_ones() {
+	for scale in [1, 2] {
+		mut desktop := luna_menu_test_desktop(scale)
+		desktop.spawn('Welcome', .welcome, 300, 80, 300, 220)
+		desktop.start_pins = [2]
+		desktop.toggle_start_menu()
+		desktop.set_hover(action_start_documents)
+		luna_test_full_frame(mut desktop)
+		before := luna_test_pixels(&desktop)
+		top := 600 - taskbar_height
+		y := int(desktop.start_menu_rect().y)
+		// The header's corner and the line under it, the two columns, the
+		// menu's edge over a window, and the foot with the Start button.
+		for area in [[0, y - 4, 90, 100], [100, y + 50, 200, 40], [200, y + 200, 120, 90],
+			[400, y + 30, 80, 300], [0, top - 60, 300, 60 + taskbar_height],
+			[luna_menu_width - 150, top - 44, 200, 50]] {
+			luna_test_partial_frame(mut desktop, area[0], area[1], area[2], area[3])
+			luna_test_same(&desktop, luna_test_pixels(&desktop), before)
+		}
+
+		// The Start button lit by the pointer in a partial frame.
+		desktop.close_start_menu()
+		luna_test_full_frame(mut desktop)
+		desktop.set_hover(action_start_toggle)
+		assert desktop.damage_hover_change('', action_start_toggle)
+		hover := desktop.frame_damage
+		desktop.frame_damage = FrameDamage{}
+		assert hover.count > 0
+		for i in 0 .. hover.count {
+			luna_test_partial_frame(mut desktop, hover.rects[i].x, hover.rects[i].y, hover.rects[i].w,
+				hover.rects[i].h)
+		}
+		lit := luna_test_pixels(&desktop)
+		luna_test_full_frame(mut desktop)
+		luna_test_same(&desktop, lit, luna_test_pixels(&desktop))
+	}
+}

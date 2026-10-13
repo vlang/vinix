@@ -1257,6 +1257,11 @@ fn (mut d Desktop) draw_button(el &ui2.Element, x int, y int, w int, h int) {
 	// backing-store resolution instead.
 	is_title_button := el.id.ends_with('.close') || el.id.ends_with('.minimize')
 		|| el.id.ends_with('.maximize')
+	if el.id == action_start_toggle && d.walk.on_bar && d.walk.kind == .luna {
+		// Windows XP's Start button is all its own: luna.v.
+		d.draw_luna_start(el, x, y, w, h)
+		return
+	}
 	if is_title_button && el.id.starts_with('win.') {
 		if d.theme().button_look == .aero {
 			d.draw_aero_caption_button(el, x, y, w, h)
@@ -2033,6 +2038,10 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 				d.canvas.fill_circle(cx - 2, cy - 2, radius - 2, d.surface_under(x, y))
 			}
 			d.canvas.draw_line(cx + radius / 2, cy + radius / 2, cx + radius, cy + radius, color, 2)
+		}
+		'luna_arrow', 'luna_power', 'luna_restart', 'luna_sleep' {
+			// The coloured marks of Windows XP's Start menu. See luna.v.
+			d.draw_luna_glyph(name, x, y, w, h)
 		}
 		else {
 			if name.starts_with('battery_') {

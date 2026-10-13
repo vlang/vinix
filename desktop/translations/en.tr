@@ -1309,6 +1309,9 @@ All Programs  >
 start.back
 <  Back
 -----
+start.button
+start
+-----
 start.context.forget
 Remove from this list
 -----
@@ -1329,6 +1332,9 @@ Unpin from taskbar
 -----
 start.documents
 Documents
+-----
+start.find
+Search
 -----
 start.help
 Help

@@ -80,8 +80,15 @@ const start_menu_search_bg = u32(0xffffff)
 const start_menu_power = u32(0x3d6592)
 const start_menu_power_hover = u32(0x527ba9)
 
+// start_menu_luna says whether the menu is Windows XP's: the same programs and
+// places, laid out and dressed as start_menu_luna.v has them.
+fn (d &Desktop) start_menu_luna() bool {
+	return d.theme().chrome == .luna
+}
+
 fn (d &Desktop) start_menu_rect() ui2.Rect {
-	mut width := start_menu_preferred_width
+	luna := d.start_menu_luna()
+	mut width := if luna { luna_menu_width } else { start_menu_preferred_width }
 	if width > d.canvas.width - 2 * start_menu_margin {
 		width = d.canvas.width - 2 * start_menu_margin
 	}
@@ -107,7 +114,29 @@ fn (d &Desktop) start_menu_rect() ui2.Rect {
 	if x < start_menu_margin {
 		x = start_menu_margin
 	}
+	if luna {
+		// Windows XP's menu rises from the Start button, in the screen's corner.
+		x = 0
+	}
 	return ui2.rect(f64(x), f64(d.canvas.height - taskbar_height - height), f64(width), f64(height))
+}
+
+// start_menu_pane_height is the height of the program pane: the menu less
+// its margins, or under Windows XP less its header and its foot.
+fn (d &Desktop) start_menu_pane_height() int {
+	height := int(d.start_menu_rect().height)
+	return if d.start_menu_luna() { luna_menu_pane_height(height) } else { height - 14 }
+}
+
+// start_menu_search_y is where the search field starts in a pane of this
+// height. Windows XP's menu has no such field, so there it only takes its
+// place, at the bottom, once something has been typed or Search has been
+// chosen from the places.
+fn (d &Desktop) start_menu_search_y(pane_height int) int {
+	if d.start_menu_luna() && d.start_menu_query.len == 0 && !d.start_menu_searching {
+		return pane_height
+	}
+	return pane_height - start_menu_search_height - 8
 }
 
 fn (mut d Desktop) toggle_start_menu() {
@@ -160,6 +189,9 @@ fn (d &Desktop) start_menu_query_text() string {
 }
 
 fn (mut d Desktop) start_menu_element() ui2.Element {
+	if d.start_menu_luna() {
+		return d.luna_start_menu_element()
+	}
 	frame := d.start_menu_rect()
 	width := int(frame.width)
 	height := int(frame.height)
@@ -266,16 +298,19 @@ fn (d &Desktop) start_menu_power_rise() int {
 }
 
 fn (mut d Desktop) start_menu_program_pane(x int, y int, width int, height int) ui2.Element {
-	mut children := frame_elements(24)
-	search_y := height - start_menu_search_height - 8
+	luna := d.start_menu_luna()
+	// A Windows XP row is three elements: the row, its icon and its label.
+	mut children := frame_elements(if luna { 64 } else { 24 })
+	search_y := d.start_menu_search_y(height)
 	if d.start_menu_query.len > 0 {
 		d.start_menu_filtered_programs(mut children, 8, search_y - 5, width)
 	} else if d.start_menu_all_apps {
+		back_lit := d.hover == action_start_back
 		children << ui2.button(action_start_back, tr('start.back'), ui2.rect(7, 7, f64(width - 14), 30), ui2.BoxStyle{
-			bg: if d.hover == action_start_back { start_menu_item_hover } else { start_menu_left }
-			radius: 4
+			bg: if back_lit { d.start_menu_hover_color() } else { d.start_menu_pane_color() }
+			radius: if luna { 2 } else { 4 }
 		}, ui2.TextStyle{
-			color: start_menu_text
+			color: if luna && back_lit { luna_menu_select_text } else { start_menu_text }
 			size: 12
 			bold: true
 			align: .left
@@ -290,7 +325,8 @@ fn (mut d Desktop) start_menu_program_pane(x int, y int, width int, height int) 
 			if index < 0 || index >= available_apps.len || row_y + 38 > limit {
 				continue
 			}
-			d.start_menu_app_row(mut children, index, 7, row_y, width - 14, 38)
+			// Windows XP sets what is pinned in bold.
+			d.start_menu_app_row(mut children, index, 7, row_y, width - 14, 38, luna)
 			row_y += 38
 		}
 		if d.start_pins.len > 0 && row_y + 8 < limit {
@@ -307,42 +343,64 @@ fn (mut d Desktop) start_menu_program_pane(x int, y int, width int, height int) 
 			if row_y + 38 > limit {
 				break
 			}
-			d.start_menu_app_row(mut children, index, 7, row_y, width - 14, 38)
+			d.start_menu_app_row(mut children, index, 7, row_y, width - 14, 38, false)
 			row_y += 38
 		}
 		all_y := search_y - 39
 		children << ui2.view('start.programs.rule', ui2.rect(12, f64(all_y - 2), f64(width - 24), 1), ui2.BoxStyle{
 			bg: start_menu_separator
 		}, [])
-		children << ui2.button(action_start_all, tr('start.all_programs'), ui2.rect(7, f64(all_y + 2), f64(width - 14), 33), ui2.BoxStyle{
-			bg: if d.hover == action_start_all { start_menu_item_hover } else { start_menu_left }
-			radius: 4
+		if luna {
+			d.luna_menu_all_programs(mut children, 7, all_y + 2, width - 14, 33)
+		} else {
+			children << ui2.button(action_start_all, tr('start.all_programs'), ui2.rect(7, f64(all_y + 2), f64(width - 14), 33), ui2.BoxStyle{
+				bg: if d.hover == action_start_all { start_menu_item_hover } else { start_menu_left }
+				radius: 4
+			}, ui2.TextStyle{
+				color: start_menu_text
+				size: 12
+				bold: true
+				align: .right
+			})
+		}
+	}
+
+	if search_y < height {
+		search_text := if d.start_menu_query.len > 0 {
+			d.start_menu_query_text()
+		} else {
+			tr('start.search')
+		}
+		children << ui2.button_with_image(action_start_search, search_text, 'builtin:search', ui2.rect(7, f64(search_y), f64(width - 14), f64(start_menu_search_height)), ui2.BoxStyle{
+			bg: if luna {
+				luna_menu_search
+			} else if d.start_menu_searching {
+				u32(0xffffff)
+			} else {
+				start_menu_search_bg
+			}
+			radius: if luna { 2 } else { 4 }
 		}, ui2.TextStyle{
-			color: start_menu_text
-			size: 12
-			bold: true
-			align: .right
+			color: if d.start_menu_query.len > 0 { start_menu_text } else { start_menu_muted }
+			size: 11
+			align: .left
 		})
 	}
 
-	search_text := if d.start_menu_query.len > 0 {
-		d.start_menu_query_text()
-	} else {
-		tr('start.search')
-	}
-	children << ui2.button_with_image(action_start_search, search_text, 'builtin:search', ui2.rect(7, f64(search_y), f64(width - 14), f64(start_menu_search_height)), ui2.BoxStyle{
-		bg: if d.start_menu_searching { u32(0xffffff) } else { start_menu_search_bg }
-		radius: 4
-	}, ui2.TextStyle{
-		color: if d.start_menu_query.len > 0 { start_menu_text } else { start_menu_muted }
-		size: 11
-		align: .left
-	})
-
 	return ui2.view('start.programs', ui2.rect(f64(x), f64(y), f64(width), f64(height)), ui2.BoxStyle{
-		bg: start_menu_left
-		radius: 6
+		bg: d.start_menu_pane_color()
+		radius: if luna { 0 } else { 6 }
 	}, children)
+}
+
+// The program pane's sheet, and a row of it under the pointer: the desktop's
+// own pale colours, or Windows XP's white and its selection's blue.
+fn (d &Desktop) start_menu_pane_color() u32 {
+	return if d.start_menu_luna() { luna_menu_pane } else { start_menu_left }
+}
+
+fn (d &Desktop) start_menu_hover_color() u32 {
+	return if d.start_menu_luna() { luna_menu_select } else { start_menu_item_hover }
 }
 
 // A page keeps program rows readable instead of dividing the remaining height
@@ -385,9 +443,9 @@ fn (d &Desktop) start_menu_result_count() int {
 }
 
 fn (d &Desktop) start_menu_current_page() StartMenuPage {
-	height := int(d.start_menu_rect().height) - 14
+	height := d.start_menu_pane_height()
 	top := if d.start_menu_query.len == 0 && d.start_menu_all_apps { 40 } else { 8 }
-	bottom := height - start_menu_search_height - 8 - 5
+	bottom := d.start_menu_search_y(height) - 5
 	return start_menu_page_layout(top, bottom, d.start_menu_result_count(), d.start_menu_page)
 }
 
@@ -411,11 +469,18 @@ fn (d &Desktop) start_menu_page_controls(mut children []ui2.Element, page StartM
 		id := if slot == 0 { action_start_previous } else { action_start_next }
 		title := if slot == 0 { tr('start.previous_page') } else { tr('start.next_page') }
 		enabled := if slot == 0 { page.page > 0 } else { page.page < page.pages - 1 }
+		lit := enabled && d.hover == id
 		children << ui2.button(id, title, ui2.rect(f64(7 + slot * (button_width + 6)),
 			f64(page.controls_y), f64(button_width), f64(start_menu_page_height)), ui2.BoxStyle{
-			bg: if enabled && d.hover == id { start_menu_item_hover } else { start_menu_left }
-			radius: 4
-		}, ui2.TextStyle{ color: if enabled { start_menu_text } else { start_menu_muted },
+			bg: if lit { d.start_menu_hover_color() } else { d.start_menu_pane_color() }
+			radius: if d.start_menu_luna() { 2 } else { 4 }
+		}, ui2.TextStyle{ color: if !enabled {
+				start_menu_muted
+			} else if lit && d.start_menu_luna() {
+				luna_menu_select_text
+			} else {
+				start_menu_text
+			},
 			size: 12, align: .center })
 	}
 }
@@ -426,7 +491,8 @@ fn (mut d Desktop) start_menu_all_programs(mut children []ui2.Element, top int, 
 	mut row_y := top
 	for index in page.first .. page.end {
 		if row_y + start_menu_row_height > page.rows_bottom { break }
-		children << d.start_menu_app_button(index, 7, row_y, width - 14, start_menu_row_height)
+		d.start_menu_program_row(mut children, index, 7, row_y, width - 14, start_menu_row_height,
+			false)
 		row_y += start_menu_row_height
 	}
 	d.start_menu_page_controls(mut children, page, top, width)
@@ -452,7 +518,8 @@ fn (mut d Desktop) start_menu_filtered_programs(mut children []ui2.Element, top 
 		if !desktop_menu_matches(index, d.start_menu_query_text()) { continue }
 		if slot >= page.end || row_y + start_menu_row_height > page.rows_bottom { break }
 		if slot >= page.first {
-			children << d.start_menu_app_button(index, 7, row_y, width - 14, start_menu_row_height)
+			d.start_menu_program_row(mut children, index, 7, row_y, width - 14, start_menu_row_height,
+				false)
 			row_y += start_menu_row_height
 		}
 		slot++
@@ -474,23 +541,45 @@ fn (d &Desktop) start_menu_app_button(index int, x int, y int, width int, height
 	})
 }
 
+// start_menu_program_row appends a program's row: one button carrying its
+// icon and its name, or Windows XP's row with the icon at its full size.
+fn (d &Desktop) start_menu_program_row(mut children []ui2.Element, index int, x int, y int, width int,
+	height int, bold bool) {
+	if !d.start_menu_luna() {
+		children << d.start_menu_app_button(index, x, y, width, height)
+		return
+	}
+	if index >= available_apps.len {
+		app := &packaged_apps.apps[index - available_apps.len]
+		d.luna_menu_row(mut children, app.start_action, app.name, 'builtin:window', x, y, width,
+			height, luna_menu_program_icon, bold, start_menu_text)
+		return
+	}
+	factory := &available_apps[index]
+	d.luna_menu_row(mut children, app_start_actions[index], app_title_text(factory.title), factory.icon,
+		x, y, width, height, luna_menu_program_icon, bold, start_menu_text)
+}
+
 // start_menu_app_row is a program's row with, for a program that keeps a
 // history, the arrow that shows its recent items in the right column.
 fn (d &Desktop) start_menu_app_row(mut children []ui2.Element, index int, x int, y int, width int,
-	height int) {
-	children << d.start_menu_app_button(index, x, y, width, height)
+	height int, bold bool) {
+	d.start_menu_program_row(mut children, index, x, y, width, height, bold)
 	if index >= app_start_jump_actions.len || !jump_list_has_recent(available_apps[index].process_name) {
 		return
 	}
 	id := app_start_jump_actions[index]
 	open := d.start_menu_recent_app == index
+	luna := d.start_menu_luna()
+	// On a row lit in Windows XP's blue the arrow is white, as its label is.
+	row_lit := luna && (d.hover == app_start_actions[index] || d.hover == id || open)
 	children << ui2.button_with_image(id, '', 'builtin:arrow_right', ui2.rect(f64(x + width - 30),
 		f64(y + 4), 26, f64(height - 8)), ui2.BoxStyle{
-		bg:          start_menu_item_hover
-		radius:      4
+		bg:          d.start_menu_hover_color()
+		radius:      if luna { 2 } else { 4 }
 		transparent: !open && d.hover != id
 	}, ui2.TextStyle{
-		color: start_menu_muted
+		color: if row_lit { luna_menu_select_text } else { start_menu_muted }
 	})
 }
 

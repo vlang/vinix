@@ -1309,6 +1309,9 @@ Tous les programmes  >
 start.back
 <  Retour
 -----
+start.button
+démarrer
+-----
 start.context.forget
 Retirer de cette liste
 -----
@@ -1329,6 +1332,9 @@ Détacher de la barre des tâches
 -----
 start.documents
 Documents
+-----
+start.find
+Rechercher
 -----
 start.help
 Aide

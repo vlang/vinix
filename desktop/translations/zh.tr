@@ -1309,6 +1309,9 @@ start.all_programs
 start.back
 <  返回
 -----
+start.button
+开始
+-----
 start.context.forget
 从此列表移除
 -----
@@ -1329,6 +1332,9 @@ start.context.unpin_taskbar
 -----
 start.documents
 文档
+-----
+start.find
+搜索
 -----
 start.help
 帮助

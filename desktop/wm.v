@@ -1550,18 +1550,36 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 
 	// The Start orb is the taskbar's anchor. Its standalone V is the first
 	// letterform of the wallpaper wordmark, not a font-dependent character.
-	children << ui2.button_with_image(action_start_toggle, '', 'builtin:vinix', ui2.rect(f64(edge_padding), f64(item_y), f64(start_button_width), f64(item_height)), ui2.BoxStyle{
-		bg:     if d.start_menu_open || d.hover == action_start_toggle {
-			theme.accent
-		} else {
-			theme.accent_dim
-		}
-		radius: item_height / 2
-	}, ui2.TextStyle{
-		color: theme.taskbar_text_active
-	})
+	start_x, start_width := d.start_button_span(edge_padding)
+	if d.start_button_luna() {
+		// Windows XP's is the bar's whole height in the screen's corner, and
+		// says so beside the mark.
+		children << ui2.button_with_image(action_start_toggle, tr('start.button'), 'builtin:vinix',
+			ui2.rect(f64(start_x), 0, f64(start_width), f64(taskbar_height)), ui2.BoxStyle{
+			bg: if d.start_menu_open || d.hover == action_start_toggle {
+				theme.accent
+			} else {
+				theme.accent_dim
+			}
+		}, ui2.TextStyle{
+			color: theme.taskbar_text_active
+			size:  luna_start_text_size
+			bold:  true
+		})
+	} else {
+		children << ui2.button_with_image(action_start_toggle, '', 'builtin:vinix', ui2.rect(f64(start_x), f64(item_y), f64(start_width), f64(item_height)), ui2.BoxStyle{
+			bg:     if d.start_menu_open || d.hover == action_start_toggle {
+				theme.accent
+			} else {
+				theme.accent_dim
+			}
+			radius: item_height / 2
+		}, ui2.TextStyle{
+			color: theme.taskbar_text_active
+		})
+	}
 	children << ui2.button_with_image(action_window_overview, '', 'builtin:overview',
-		ui2.rect(f64(edge_padding + start_button_width + 8), f64(item_y),
+		ui2.rect(f64(start_x + start_width + 8), f64(item_y),
 			f64(window_overview_button_width), f64(item_height)), ui2.BoxStyle{
 		bg: if d.overview.active || d.hover == action_window_overview {
 			theme.taskbar_item_hover
@@ -1734,6 +1752,22 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	}, children)
 }
 
+// start_button_luna says whether the Start button is Windows XP's: in the
+// screen's corner, the bar's whole height, with the word beside its mark.
+fn (d &Desktop) start_button_luna() bool {
+	theme := d.theme()
+	return theme.chrome == .luna && !theme.dock
+}
+
+// start_button_span is where the Start button starts along the bar and how
+// wide it is.
+fn (d &Desktop) start_button_span(edge_padding int) (int, int) {
+	if d.start_button_luna() {
+		return 0, d.luna_start_width()
+	}
+	return edge_padding, start_button_width
+}
+
 // TaskbarLayout is where the bar's parts go, in the taskbar's coordinates.
 // Drawing and dragging share it, so a dragged button lands in the slot that is
 // actually drawn under the pointer.
@@ -1752,7 +1786,8 @@ fn (d &Desktop) taskbar_layout(entry_count int) TaskbarLayout {
 	theme := d.theme()
 	dock := theme.dock
 	edge_padding := if dock { theme.dock_padding } else { taskbar_padding }
-	entries_left := edge_padding + start_button_width + 8 + window_overview_button_width + taskbar_item_gap
+	start_x, start_width := d.start_button_span(edge_padding)
+	entries_left := start_x + start_width + 8 + window_overview_button_width + taskbar_item_gap
 	// Reserve the status area before sizing entries. The clock therefore stays
 	// in the physical lower-right corner, just inside Show Desktop, after 2x M1
 	// presentation as well as on an unscaled framebuffer.

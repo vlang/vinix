@@ -1309,6 +1309,9 @@ start.all_programs
 start.back
 <  Назад
 -----
+start.button
+пуск
+-----
 start.context.forget
 Удалить из этого списка
 -----
@@ -1329,6 +1332,9 @@ start.context.unpin_taskbar
 -----
 start.documents
 Документы
+-----
+start.find
+Поиск
 -----
 start.help
 Справка

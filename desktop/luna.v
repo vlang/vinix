@@ -81,7 +81,14 @@ const luna_start = [LunaStop{0, 0x3f9a3c}, LunaStop{70, 0x84d17e}, LunaStop{140,
 	LunaStop{320, 0x46a444}, LunaStop{700, 0x3a9338}, LunaStop{900, 0x2f842f},
 	LunaStop{1000, 0x236d24}]
 const luna_start_edge = u32(0x1c5a1e)
-const luna_start_radius = 8
+// Its right end is rounded this far; its left is the screen's edge. The mark
+// and the word on it are white on this shadow.
+const luna_start_radius = 12
+const luna_start_shadow = u32(0x1b5a1d)
+const luna_start_mark = 22
+const luna_start_text_size = 18
+const luna_start_hover_alpha = u32(40)
+const luna_start_pressed_alpha = u32(52)
 // A button on the bar: a window's, at rest, under the pointer, and pressed in
 // for the window that is in front.
 const luna_bar_button = u32(0x3c81f3)
@@ -97,12 +104,18 @@ const luna_menu_header = [LunaStop{0, 0x1868ce}, LunaStop{120, 0x0e60cb}, LunaSt
 const luna_menu_foot = [LunaStop{0, 0x4282d6}, LunaStop{50, 0x418ae3}, LunaStop{170, 0x418ae3},
 	LunaStop{290, 0x3482e3}, LunaStop{490, 0x2374df}, LunaStop{620, 0x196edb},
 	LunaStop{750, 0x1468d5}, LunaStop{880, 0x0f61cb}, LunaStop{1000, 0x0f61cb}]
-const luna_menu_header_rows = 66
-const luna_menu_foot_rows = 56
-const luna_menu_body_top = u32(0x4791eb)
-const luna_menu_body_bottom = u32(0x4282d6)
 const luna_menu_edge = u32(0x0a48b4)
 const luna_menu_radius = 6
+// The line under the header, strongest a third of the way along it.
+const luna_menu_orange = u32(0xf59a3a)
+// The small coloured squares Windows XP sets its marks on, lit from the upper
+// left: All Programs' arrow, and the session buttons.
+const luna_tile_green_light = u32(0x7fd873)
+const luna_tile_green = u32(0x2c8a2c)
+const luna_tile_red_light = u32(0xf5927c)
+const luna_tile_red = u32(0xb92f18)
+const luna_tile_yellow_light = u32(0xfbd978)
+const luna_tile_yellow = u32(0xcf8610)
 
 // luna_gradient is the colour `position` of the way through `span` steps of a
 // gradient.
@@ -340,17 +353,15 @@ fn (mut d Desktop) draw_luna_tray(x int, y int, w int, h int) {
 // declares. The colour says which state the control is in.
 fn (mut d Desktop) draw_luna_bar_box(el &ui2.Element, x int, y int, w int, h int, bg u32) {
 	theme := d.theme()
-	if el.id == action_start_toggle {
-		d.draw_luna_start_button(x, y, w, h, bg == theme.accent)
-		return
-	}
-	if bg == start_menu_shell {
-		// A Start menu row at rest is the shell's own blue.
+	if d.walk.on_menu {
+		// A row of the Start menu that is drawn at all is under the pointer,
+		// in the colour its element says: start_menu_luna.v.
+		d.canvas.fill_round_rect(x, y, w, h, int(el.box.radius), bg)
 		return
 	}
 	mut fill := luna_bar_button
 	mut pressed := false
-	if bg == theme.taskbar_item_hover || bg == start_menu_right_hover || bg == start_menu_power_hover {
+	if bg == theme.taskbar_item_hover {
 		fill = luna_bar_button_hover
 	} else if bg == theme.taskbar_item_active || bg == theme.accent {
 		fill = luna_bar_button_pressed
@@ -360,7 +371,7 @@ fn (mut d Desktop) draw_luna_bar_box(el &ui2.Element, x int, y int, w int, h int
 			// At rest the corner is the tray's own blue.
 			return
 		}
-	} else if bg != start_menu_power {
+	} else {
 		// A colour with a meaning of its own, such as a button asking for
 		// attention.
 		fill = bg
@@ -387,23 +398,56 @@ fn (mut d Desktop) draw_luna_bar_box(el &ui2.Element, x int, y int, w int, h int
 	}
 }
 
-// draw_luna_start_button is the green Start button, lit when the pointer is
-// over it or the menu is open. The V is drawn over it by the caller.
-fn (mut d Desktop) draw_luna_start_button(x int, y int, w int, h int, lit bool) {
+// luna_start_width is how wide the Start button is: its mark, the word and
+// the round end.
+fn (d &Desktop) luna_start_width() int {
+	style := ui2.TextStyle{
+		size: luna_start_text_size
+		bold: true
+	}
+	return 12 + luna_start_mark + 6 + d.luna_menu_text_width(tr('start.button'), style) + 18
+}
+
+// draw_luna_start is the green Start button in the screen's corner: square
+// where it meets the screen's edge and round at its other end, with the V and
+// the word in white on their shadow. It is brighter under the pointer, and
+// darker, pressed in, while the menu is open.
+fn (mut d Desktop) draw_luna_start(el &ui2.Element, x int, y int, w int, h int) {
+	pressed := d.start_menu_open
+	lit := !pressed && el.box.bg == d.theme().accent
 	radius := if luna_start_radius * 2 < h { luna_start_radius } else { h / 2 }
 	for row in 0 .. h {
 		mut color := luna_gradient(luna_start, row, h)
-		if lit {
-			color = blend(color, 0xffffff, 40)
+		if pressed {
+			color = blend(color, 0x000000, luna_start_pressed_alpha)
+		} else if lit {
+			color = blend(color, 0xffffff, luna_start_hover_alpha)
 		}
-		for column in 0 .. w {
-			coverage := round_rect_coverage(x + column, y + row, x, y, w, h, radius)
+		// The shape reaches past the left edge, so only its right end is round.
+		d.canvas.fill_rect(x, y + row, w - radius, 1, color)
+		for column in w - radius .. w {
+			coverage := round_rect_coverage(x + column, y + row, x - radius, y, w + radius, h,
+				radius)
 			if coverage > 0 {
 				d.canvas.blend_pixel(x + column, y + row, color, coverage)
 			}
 		}
 	}
-	d.canvas.stroke_round_rect(x, y, w, h, radius, luna_start_edge, 170)
+	saved := d.canvas.push_clip_rect(x, y, w, h)
+	d.canvas.stroke_round_rect(x - radius, y, w + radius, h, radius, luna_start_edge, 150)
+	d.canvas.restore_clip(saved)
+	mark_x := x + 12
+	mark_y := y + (h - luna_start_mark) / 2
+	d.canvas.draw_vinix_v(mark_x + 1, mark_y + 1, luna_start_mark, luna_start_mark, luna_start_shadow)
+	d.canvas.draw_vinix_v(mark_x, mark_y, luna_start_mark, luna_start_mark, 0xffffff)
+	if el.text.len == 0 || d.fonts.len == 0 {
+		return
+	}
+	face := d.face_for(el.text_style)
+	text_x := mark_x + luna_start_mark + 6
+	text_y := y + (h - face.line_height) / 2
+	d.canvas.draw_text(face, text_x + 1, text_y + 1, el.text, luna_start_shadow)
+	d.canvas.draw_text(face, text_x, text_y, el.text, 0xffffff)
 }
 
 // draw_luna_menu paints the Start menu's shell: its header, its foot, the
@@ -411,21 +455,122 @@ fn (mut d Desktop) draw_luna_start_button(x int, y int, w int, h int, lit bool) 
 fn (mut d Desktop) draw_luna_menu(x int, y int, w int, h int) {
 	header := if luna_menu_header_rows < h / 2 { luna_menu_header_rows } else { h / 2 }
 	foot := if luna_menu_foot_rows < h - header { luna_menu_foot_rows } else { h - header }
-	between := h - header - foot
 	for row in 0 .. h {
+		// Between the header and the foot the two columns cover everything
+		// but the menu's own line down each side.
 		color := if row < header {
 			luna_gradient(luna_menu_header, row, header)
 		} else if row >= h - foot {
 			luna_gradient(luna_menu_foot, row - (h - foot), foot)
 		} else {
-			mix(luna_menu_body_top, luna_menu_body_bottom, u32((row - header) * 255 / (if between > 1 {
-				between - 1
-			} else {
-				1
-			})))
+			luna_menu_edge
 		}
 		d.luna_row(x, y, w, row, luna_menu_radius, color)
 	}
+	// The orange line under the header fades out toward both of its ends.
+	under := luna_gradient(luna_menu_header, header - 1, header)
+	peak := w * 3 / 10
+	for column in 1 .. w - 1 {
+		reach := if column < peak { peak } else { w - peak }
+		strength := 255 - abs_int(column - peak) * 255 / reach
+		d.canvas.fill_rect(x + column, y + header, 1, luna_menu_line_rows, blend(under, luna_menu_orange,
+			u32(strength)))
+	}
 	d.luna_top_edge(x, y, w, h, luna_menu_radius, luna_menu_edge)
 	d.canvas.fill_rect(x, y + h - 1, w, 1, luna_menu_edge)
+}
+
+// draw_luna_tile paints one of the small coloured squares, lit from its
+// upper left inside a pale line.
+fn (mut d Desktop) draw_luna_tile(x int, y int, size int, light u32, dark u32) {
+	if size < 4 {
+		return
+	}
+	for row in 0 .. size {
+		for column in 0 .. size {
+			coverage := round_rect_coverage(x + column, y + row, x, y, size, size, 3)
+			if coverage > 0 {
+				d.canvas.blend_pixel(x + column, y + row, mix(light, dark, u32((row + column) * 255 / (2 * size - 2))),
+					coverage)
+			}
+		}
+	}
+	d.canvas.stroke_round_rect(x, y, size, size, 3, 0xffffff, 120)
+}
+
+// draw_luna_glyph draws the marks Windows XP's Start menu needs that are not
+// a program's artwork: All Programs' green arrow, and the session buttons'
+// squares -- red with the power mark, green with the star that means
+// restart, yellow with a crescent for sleep. The white marks are measured
+// against the backing pixels, so they stay smooth at either scale.
+fn (mut d Desktop) draw_luna_glyph(name string, x int, y int, w int, h int) {
+	size := if w < h { w } else { h }
+	left := x + (w - size) / 2
+	top := y + (h - size) / 2
+	match name {
+		'luna_arrow' { d.draw_luna_tile(left, top, size, luna_tile_green_light, luna_tile_green) }
+		'luna_restart' { d.draw_luna_tile(left, top, size, luna_tile_green_light, luna_tile_green) }
+		'luna_sleep' { d.draw_luna_tile(left, top, size, luna_tile_yellow_light, luna_tile_yellow) }
+		else { d.draw_luna_tile(left, top, size, luna_tile_red_light, luna_tile_red) }
+	}
+	scale := f64(d.canvas.scale)
+	unit := f64(size) * scale
+	center_x := (f64(left) + f64(size) / 2) * scale
+	center_y := (f64(top) + f64(size) / 2) * scale
+	stroke := unit * 0.055
+	first_x := left * d.canvas.scale
+	first_y := top * d.canvas.scale
+	for py in first_y .. first_y + size * d.canvas.scale {
+		for px in first_x .. first_x + size * d.canvas.scale {
+			sample_x := f64(px) + 0.5 - center_x
+			sample_y := f64(py) + 0.5 - center_y
+			// How far inside the mark this pixel is, negative outside it.
+			mut inside := -1.0
+			match name {
+				'luna_arrow' {
+					// A triangle pointing right: its height shrinks to the tip.
+					across := sample_x + unit * 0.16
+					if across >= 0 && across <= unit * 0.36 {
+						half := (unit * 0.36 - across) * 0.75
+						inside = half - math.abs(sample_y)
+						if across < 0.5 {
+							inside = math.min(inside, across)
+						}
+					}
+				}
+				'luna_restart' {
+					// Three strokes crossing: the star on Windows XP's Restart.
+					reach := unit * 0.27
+					mut nearest := distance_to_segment(sample_x, sample_y, 0, -reach, 0, reach)
+					nearest = math.min(nearest, distance_to_segment(sample_x, sample_y, -reach * 0.866,
+						-reach * 0.5, reach * 0.866, reach * 0.5))
+					nearest = math.min(nearest, distance_to_segment(sample_x, sample_y, -reach * 0.866,
+						reach * 0.5, reach * 0.866, -reach * 0.5))
+					inside = stroke - nearest
+				}
+				'luna_sleep' {
+					// A crescent: a disc with another cut out of its upper right.
+					disc := unit * 0.29 - math.sqrt(sample_x * sample_x + sample_y * sample_y)
+					cut_x := sample_x - unit * 0.14
+					cut_y := sample_y + unit * 0.10
+					cut := math.sqrt(cut_x * cut_x + cut_y * cut_y) - unit * 0.24
+					inside = math.min(disc, cut)
+				}
+				else {
+					// The power mark: a ring open at the top, and a bar in the gap.
+					radius := math.sqrt(sample_x * sample_x + sample_y * sample_y)
+					ring := stroke - math.abs(radius - unit * 0.25)
+					gap := sample_y < 0 && math.abs(sample_x) < unit * 0.13
+					bar := stroke - distance_to_segment(sample_x, sample_y, 0, -unit * 0.34, 0,
+						-unit * 0.04)
+					inside = if gap { bar } else { math.max(ring, bar) }
+				}
+			}
+			if inside <= -0.5 {
+				continue
+			}
+			coverage := if inside >= 0.5 { u32(255) } else { u32((inside + 0.5) * 255) }
+			d.canvas.blend_physical_pixel(px, py, 0xffffff, coverage)
+		}
+	}
 }

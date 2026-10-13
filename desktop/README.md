@@ -41,7 +41,9 @@ What it does:
   sixteen glass colours
 - a **Windows XP theme**: Luna's blue title bars with round upper corners and
   white bold titles, three square caption buttons with a red close, a blue
-  frame, and the blue taskbar with a green Start button
+  frame, the blue taskbar with the green Start button in its corner, and
+  Windows XP's Start menu: the user in a blue header, programs in a white
+  column, places in a pale blue one, and the session buttons in a blue foot
 - dragging a window by its title bar, with top-edge maximize, side halves,
   corner quarters and a translucent placement preview; shake the title bar to
   hide other windows on its workspace, and shake again to restore them
@@ -241,6 +243,7 @@ typing any word with a q in it drop the user back to the console.
     theme.v        every colour and measurement in one place
     glass.v        Aero glass for the Windows 7 theme: blur, tint, caption buttons
     luna.v         Luna for the Windows XP theme: blue title bars, frame, taskbar
+    start_menu_luna.v  the Start menu as Windows XP lays it out
 
 The interesting part is the split between `wm.v` and `render.v`. The window
 manager never draws: it describes the whole screen as a `ui2.Element` tree —
@@ -844,11 +847,28 @@ pixels apart, six in from the edge and five down, lit from the upper left
 inside a white line: blue for minimise and maximise, red for close. The frame
 is four pixels of blue, brighter on the left than on the right and the
 bottom, and a window casts no shadow. An unfocused window keeps every shape
-and loses the colour. The taskbar is the blue bar with a green Start button,
-labelled window buttons that are pressed in for the window in front, and the
-notification area and the clock in a lighter panel; the Start menu's shell
-takes the same blues. `luna.v` paints all of it from gradients given as
-stops.
+and loses the colour. The taskbar is the blue bar with labelled window
+buttons that are pressed in for the window in front, and the notification
+area and the clock in a lighter panel. The Start button is green and the
+whole height of the bar, square in the screen's corner and round at its other
+end, with the V and the word *start* in white; it is brighter under the
+pointer and darker while its menu is open. `luna.v` paints all of it from
+gradients given as stops.
+
+The Start menu under this theme is Windows XP's (`start_menu_luna.v`). It
+holds what the desktop's own menu holds and does what it does; only the
+layout and the dress differ. It rises from the Start button in the screen's
+corner. The header is blue, with the user's tile in a pale frame and the name
+in white, and an orange line under it that fades toward its ends. The
+programs are a white column of 32-pixel icons: what is pinned in bold above a
+rule, then what was used recently, and at the foot *All Programs* with its
+green arrow. The places are a pale blue column of dark blue names, the first
+group in bold, with rules between the groups. The session buttons are in the
+blue foot, each after its coloured square: red for Shut down, green for
+Restart, yellow for Sleep. A row under the pointer is the selection's blue
+with white text. Windows XP's menu has no search field, so there is none
+until something is typed or *Search* is chosen from the places; then it
+takes its place at the foot of the programs.
 
 The discs are grey until a window is focused and show their glyphs only while
 the pointer is over the set, as macOS does. They also keep red-yellow-green

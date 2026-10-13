@@ -1309,6 +1309,9 @@ start.all_programs
 start.back
 <  戻る
 -----
+start.button
+スタート
+-----
 start.context.forget
 この一覧から削除
 -----
@@ -1329,6 +1332,9 @@ start.context.unpin_taskbar
 -----
 start.documents
 書類
+-----
+start.find
+検索
 -----
 start.help
 ヘルプ

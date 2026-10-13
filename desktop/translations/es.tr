@@ -1309,6 +1309,9 @@ Todos los programas  >
 start.back
 <  Atrás
 -----
+start.button
+inicio
+-----
 start.context.forget
 Quitar de esta lista
 -----
@@ -1329,6 +1332,9 @@ Desanclar de la barra de tareas
 -----
 start.documents
 Documentos
+-----
+start.find
+Buscar
 -----
 start.help
 Ayuda
