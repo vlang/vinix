@@ -15,6 +15,22 @@ fn qualify_package_metadata(mut t Test, db accountcore.Database, alex accountcor
 	os.write_file(lock_path, json2.encode(service.lock_deployment([])!))!
 	os.chmod(lock_path, 0o644)!
 	for user in [alex, sam] {
+		view_response := run(['/usr/bin/vinix-package', 'view'], '', db, user)
+		assert view_response.status == 0, view_response.output
+		mut view := pkgprotocol.decode_software_view(view_response.output)!
+		assert view.generation == before.generation && view.rows.len == 1 && view.launch_user == ''
+		assert view.rows[0].id == 'admin-fixture' && view.rows[0].installed_version == '1.0.0'
+		assert view.rows[0].kind == 'data' && view.rows[0].installed_kind == 'data'
+		assert !view.rows[0].firmware && !view.rows[0].proprietary && !view.rows[0].updatable
+		assert view.rows[0].installed_permissions.len == 0 && view.rows[0].installed_window_protocol == 0
+		view.close()
+		for malformed in [view_response.output.replace('"firmware":false,', ''),
+			view_response.output.replace('"installed_window_protocol":0', '"installed_window_protocol":false'),
+			view_response.output.replace('"installed_permissions":[]', '"installed_permissions":[],"installed_permission\\u0073":["files"]')] {
+			mut invalid := false
+			pkgprotocol.decode_software_view(malformed) or { invalid = true }
+			assert invalid
+		}
 		status_response := run(['/usr/bin/vinix-package', '--json', 'repo-list'], '', db, user)
 		assert status_response.status == 0, status_response.output
 		mut status := pkgprotocol.decode_repositories(status_response.output)!
@@ -51,4 +67,5 @@ fn qualify_package_metadata(mut t Test, db accountcore.Database, alex accountcor
 	assert service.state()! == before && os.read_file('/etc/vinix-packages/config.json')! == config
 	assert !os.exists('/tmp/metadata export é; $literal') && !os.exists('/tmp/metadata locked export')
 	t.say('PACKAGE METADATA ordinary-admin-standard complete-package-trust-history-offline-lock typed-flags nested-refusal read-only PASS')
+	t.say('PACKAGE VIEW ordinary-admin-standard complete-catalog installed-launch-fields typed-flags nested-refusal read-only PASS')
 }

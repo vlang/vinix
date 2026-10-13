@@ -15,41 +15,8 @@ const software_row_actions = ['software.row.0', 'software.row.1', 'software.row.
 	'software.row.14', 'software.row.15']
 const software_output_limit = 8 * 1024 * 1024
 
-struct SoftwareRow {
-	id                string
-	name              string
-	description       string
-	version           string
-	installed_version string
-	installed_name    string
-	installed_kind    string
-	installed_permissions []string
-	installed_window_protocol int
-	architecture      string
-	kind              string
-	runtime           string
-	repository        string
-	public_key        string
-	license           string
-	proprietary       bool
-	firmware          bool
-	permissions       []string
-	requested         bool
-	updatable         bool
-	update_action     string
-	diagnostic        string
-}
-
-struct SoftwareView {
-	format        int
-	generation    u64
-	architecture  string
-	offline       bool
-	catalog_error string
-	update_error  string
-	rows          []SoftwareRow
-	launch_user   string
-}
+type SoftwareRow = pkgprotocol.SoftwareRow
+type SoftwareView = pkgprotocol.SoftwareView
 
 struct SoftwareApp {
 mut:
@@ -274,15 +241,38 @@ fn software_free_row(row SoftwareRow) {
 	}
 }
 
+// The pinned string.to_lower keeps its rune buffer and the rune-to-string
+// builder descriptor under manualfree. Stream Unicode scalar values into one
+// owned byte buffer instead; lowercasing can change the UTF-8 byte length.
+fn software_search_lower(value string) string {
+	if value.len == 0 { return '' }
+	mut bytes := []u8{cap: value.len}
+	unsafe { bytes.flags |= .noslices }
+	defer { unsafe { bytes.free() } }
+	mut iterator := value.runes_iterator()
+	for {
+		character := iterator.next() or { break }
+		lower := u32(character.to_lower())
+		if lower < 0x80 { bytes << u8(lower) }
+		else if lower < 0x800 { bytes << u8(0xc0 | (lower >> 6)); bytes << u8(0x80 | (lower & 63)) }
+		else if lower < 0x10000 {
+			bytes << u8(0xe0 | (lower >> 12)); bytes << u8(0x80 | ((lower >> 6) & 63)); bytes << u8(0x80 | (lower & 63))
+		} else {
+			bytes << u8(0xf0 | (lower >> 18)); bytes << u8(0x80 | ((lower >> 12) & 63)); bytes << u8(0x80 | ((lower >> 6) & 63)); bytes << u8(0x80 | (lower & 63))
+		}
+	}
+	return bytes.bytestr()
+}
+
 fn (mut a SoftwareApp) filter_rows() {
 	a.matching.clear()
-	query := editor_bytes_text(a.query).to_lower()
+	query := software_search_lower(editor_bytes_text(a.query))
 	defer { unsafe { query.free() } }
 	for i, row in a.rows {
 		if a.filter == 1 && row.installed_version == '' { continue }
 		if a.filter == 2 && !row.updatable { continue }
 		combined := '${row.id} ${row.name} ${row.description}'
-		text := combined.to_lower()
+		text := software_search_lower(combined)
 		if query.len == 0 || text.contains(query) { a.matching << i }
 		unsafe {
 			text.free()
@@ -299,20 +289,10 @@ fn (mut a SoftwareApp) load_view() {
 	a.deployment_mode = false
 	a.mirror_mode = false
 	text := editor_bytes_text(a.output)
-	view := json2.decode[SoftwareView](text) or {
-		a.set_status('Invalid response from the package service. Reload the catalog or check its configuration.')
-		return
-	}
-	if view.format != 1 || view.rows.len > 4096 {
-		for row in view.rows { software_free_row(row) }
-		unsafe {
-			view.rows.free()
-			view.architecture.free()
-			view.catalog_error.free()
-			view.update_error.free()
-			view.launch_user.free()
-		}
-		a.set_status('Unsupported package service response')
+	view := pkgprotocol.decode_software_view(text) or {
+		message := 'Invalid response from the package service: ' + err.msg() + '. Reload the catalog or check its configuration.'
+		a.set_status(message)
+		unsafe { message.free(); err.free() }
 		return
 	}
 	for row in a.rows { software_free_row(row) }

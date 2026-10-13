@@ -1,0 +1,34 @@
+The first Unicode UI allocation run exhausted the 16,384-record tracker. A 100-cycle diagnostic measured retained rune buffers/descriptors; an explicitly owned Unicode conversion then passed 1,000 cycles. The standalone reader already retained zero bytes.
+
+Initial x86 boot lacked the default Limine cache; a fresh retry with the existing hash-verified bootloader directory passed. No guest bound or assertion was relaxed.
+
+The first signed-CLI view assertion incorrectly assumed the view contained only the installed application. It includes the available uninstalled application too; the final assertion checks both rows and distinguishes installed fields.
+
+The Unicode keyboard fixture needed focus initialization; this was corrected before the final Software suite and final Software ASan run.
+
+diagnostic.txt
+Live allocation sizes: {48: 6400, 1927: 4400, 1923: 2000}
+build/package-view-reader-work/diagnostic/software_view_fixture.v:99: FAIL: fn main.check_software_view_memory: assert kept == 0, 'Software catalog reloads retained ${kept} bytes'
+   left value: kept = 12632000
+  right value: 0
+      message: Software catalog reloads retained 12632000 bytes
+V panic: Assertion failed...
+
+guest-x86.txt
+FAIL x86_64 packages-admin (0.1s)
+  folder: /Users/alex/code/vinix/build-amd64-iso/limine/, error: No such file or directory
+  nothing was printed on the serial port
+  logs: /Users/alex/code/vinix/build/package-view-reader-work/x86/packages-admin
+
+cli.txt
+tests/packages/distribution-cli.v:239: FAIL: fn main.qualify: assert installed_view.generation == installed.generation && installed_view.rows.len == 1
+V panic: Assertion failed...
+
+launcher-build.txt
+desktop/tools/workflowbuild/stage.v:6:1: builder error: cannot import module "hosttest" (not found)
+    4 | import os
+    5 | import strings
+    6 | import hosttest
+      | ~~~~~~~~~~~~~~~
+    7 | 
+    8 | pub fn run(program string, args []string) ! {

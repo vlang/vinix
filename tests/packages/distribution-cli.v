@@ -235,7 +235,12 @@ fn qualify(binary string) ! {
 	mut associations := sessioncore.Associations{}
 	associations.set('text/plain', 'package.' + 'a'.repeat(128), false)!
 	assert sessioncore.decode_associations(associations.encode())!.count == 1
-	assert success(binary, [...root_args, 'view'])!.contains('installed_version')
+	mut installed_view := pkgprotocol.decode_software_view(success(binary, [...root_args, 'view'])!)!
+	assert installed_view.generation == installed.generation && installed_view.rows.map(it.id) == ['app', 'other']
+	assert installed_view.rows[0].installed_version == '1.0.0' && installed_view.rows[0].installed_kind == 'native'
+	assert installed_view.rows[0].permissions == ['files'] && installed_view.rows[0].installed_permissions == ['files']
+	assert installed_view.rows[1].installed_version == '' && installed_view.rows[1].installed_kind == ''
+	installed_view.close()
 	// An unsatisfiable installed closure is a useful failure, not an empty
 	// successful Updates result. View still exposes the installed provenance.
 	enrolled_config := pkgcore.load_config(work + '/root')!
@@ -266,9 +271,10 @@ fn qualify(binary string) ! {
 	stale_policy := command(binary, [...root_args, 'policy-apply', policy_review.fingerprint, policy_path])!
 	assert stale_policy.code != 0 && stale_policy.text.contains('stale')
 	assert pkgcore.load_config(work + '/root')!.repositories == enrolled_config.repositories
-	blocked_view := json2.decode[pkgcore.SoftwareView](success(binary, [...root_args, 'view'])!)!
+	mut blocked_view := pkgprotocol.decode_software_view(success(binary, [...root_args, 'view'])!)!
 	assert blocked_view.update_error.contains('permissions blocked') && blocked_view.rows.all(!it.updatable)
 	assert blocked_view.rows.any(it.id == 'app' && it.installed_version == '1.0.0' && it.repository == 'fixture')
+	blocked_view.close()
 	blocked_updates := command(binary, [...root_args, '--json', 'updates'])!
 	assert blocked_updates.code != 0 && blocked_updates.text.contains('permissions blocked')
 	assert pkgcore.read_state(store, 'aarch64')!.generation == installed.generation

@@ -20,6 +20,10 @@ The current controller also requires the public
 [complete review-metadata workflow](review-metadata-check.md), covering package,
 repository/history and both offline-export envelopes under administrator and
 standard accounts without mutation or a password.
+The controller additionally requires the
+[catalog metadata workflow](view-metadata-check.md), checking complete views,
+installed launch declarations and malformed-field refusal under both roles.
+Older receipts retain their original scope.
 Launches, arbitrary executables, alternate roots, publisher tooling and raw
 unreviewed transactions are refused before authentication.
 

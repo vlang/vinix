@@ -396,12 +396,13 @@ fn test_repository_management_redraw_decode_and_retirement_release_storage() {
 	assert C.vinix_heap_end() == 0
 }
 
-const software_updates_fixture = '{"format":1,"architecture":"aarch64","rows":[{"id":"runtime","name":"Runtime","description":"Explicit runtime","version":"2.0.0","installed_version":"1.0.0","architecture":"aarch64","kind":"runtime","repository":"trusted","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","license":"MIT","permissions":["process"],"updatable":true,"update_action":"update"},{"id":"assets","name":"Retired assets","version":"1.0.0","installed_version":"1.0.0","architecture":"all","kind":"data","repository":"trusted","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","license":"MIT","updatable":true,"update_action":"remove"}]}'
-const software_blocked_updates_fixture = '{"format":1,"architecture":"aarch64","update_error":"runtime: permissions blocked by organization policy","rows":[{"id":"runtime","name":"Runtime","description":"Explicit runtime","version":"1.0.0","installed_version":"1.0.0","architecture":"aarch64","kind":"runtime","repository":"trusted","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","license":"MIT","permissions":["process"],"diagnostic":"runtime: permissions blocked by organization policy"}]}'
+const software_updates_fixture = '{"format":1,"generation":1,"architecture":"aarch64","offline":false,"catalog_error":"","update_error":"","launch_user":"","rows":[{"id":"runtime","name":"Runtime","description":"Explicit runtime","version":"2.0.0","installed_version":"1.0.0","installed_name":"Runtime","installed_kind":"runtime","installed_permissions":[],"installed_window_protocol":0,"architecture":"aarch64","kind":"runtime","runtime":"","repository":"trusted","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","license":"MIT","proprietary":false,"firmware":false,"permissions":["process"],"requested":false,"updatable":true,"update_action":"update","diagnostic":""},{"id":"assets","name":"Retired assets","description":"","version":"1.0.0","installed_version":"1.0.0","installed_name":"Retired assets","installed_kind":"data","installed_permissions":[],"installed_window_protocol":0,"architecture":"all","kind":"data","runtime":"","repository":"trusted","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","license":"MIT","proprietary":false,"firmware":false,"permissions":[],"requested":false,"updatable":true,"update_action":"remove","diagnostic":""}]}'
+const software_blocked_updates_fixture = '{"format":1,"generation":1,"architecture":"aarch64","offline":false,"catalog_error":"","update_error":"runtime: permissions blocked by organization policy","launch_user":"","rows":[{"id":"runtime","name":"Runtime","description":"Explicit runtime","version":"1.0.0","installed_version":"1.0.0","installed_name":"Runtime","installed_kind":"runtime","installed_permissions":["process"],"installed_window_protocol":0,"architecture":"aarch64","kind":"runtime","runtime":"","repository":"trusted","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","license":"MIT","proprietary":false,"firmware":false,"permissions":["process"],"requested":false,"updatable":false,"update_action":"","diagnostic":"runtime: permissions blocked by organization policy"}]}'
 
 fn test_software_resolved_update_redraw_reload_and_failure_storage_are_released() {
 	mut app := SoftwareApp{ output: software_updates_fixture.bytes() }
 	app.load_view()
+	assert app.rows.len == 2 && app.rows[0].updatable && app.rows[1].update_action == 'remove'
 	app.selected = 0
 	begin_frame_elements()
 	free_tree(app.build(ui2.rect(0, 0, 900, 660))!)
@@ -415,12 +416,9 @@ fn test_software_resolved_update_redraw_reload_and_failure_storage_are_released(
 	}
 	package_assert_heap_flat('Software resolved updates redraw')
 	C.vinix_heap_begin()
-	for _ in 0 .. 100 { assert json2.decode[bool]('true')! }
-	baseline := C.vinix_heap_end()
-	C.vinix_heap_begin()
 	for _ in 0 .. 100 { app.load_view() }
 	app.close_app()
-	assert C.vinix_heap_end() == baseline
+	package_assert_heap_flat('Software resolved updates reload/retirement')
 	mut blocked := SoftwareApp{ output: software_blocked_updates_fixture.bytes() }
 	blocked.load_view()
 	blocked.handle('software.updates')!
@@ -431,7 +429,7 @@ fn test_software_resolved_update_redraw_reload_and_failure_storage_are_released(
 		blocked.handle('software.updates')!
 	}
 	blocked.close_app()
-	assert C.vinix_heap_end() == baseline
+	package_assert_heap_flat('Software failed resolution reload/retirement')
 }
 
 fn test_software_review_redraw_cancel_and_decoded_storage_are_released() {

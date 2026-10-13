@@ -1002,7 +1002,7 @@ cache is refused until refreshed. The administrator owns this local history;
 it is not a hardware trust anchor. See the
 [administration and recovery contract](../../docs/application-distribution.md#trust-and-configuration).
 
-`view` emits one `{format:1,generation,architecture,offline,catalog_error,update_error,rows}`
+`view` emits one `{format:1,generation,architecture,offline,catalog_error,update_error,rows,launch_user}`
 JSON object. Rows include ID/name/description, available/installed version, target,
 kind, repository/key, license/proprietary/firmware flags, permissions, explicit
 install/update flags and policy diagnostic. Additive `installed_name`,
@@ -1010,6 +1010,7 @@ install/update flags and policy diagnostic. Additive `installed_name`,
 manifest for launch controls; an explicitly empty installed permission set must
 not inherit the planned candidate's permissions. Older consumers may ignore
 these fields; older services retain the previous presentation fallback.
+`installed_window_protocol` adds the installed native-window declaration.
 Pending rows include `update_action`
 (`install`, `update`, `remove`; otherwise empty), with `updatable:true`. They
 come from one complete `upgrade` resolution and include runtime/data additions,
@@ -1032,6 +1033,27 @@ state; `plan` emits `{requested,packages}`; `--json search/info/updates` emits o
 row per line. Consumers ignore additional fields and reject unknown formats.
 Success is exit 0; failures are nonzero with stderr diagnostics. Human progress
 text is not a machine protocol.
+
+[`pkgprotocol.decode_software_view`](pkgprotocol/view_reader.v) returns an owned
+`SoftwareView`; call `.close()` on cancellation, replacement or retirement.
+All eight header fields and eighteen base row fields are required, including
+empty diagnostics/strings/arrays, zero counters and false flags. Duplicate known
+keys (including escaped spellings), null/coerced fields, invalid UTF-8/Unicode,
+noncanonical/overflowing counters and trailing input are refused. Row identities
+must be unique, architectures must match the header (or `all` for data), and
+update flags/actions must agree with installed versions and error status.
+
+Installed launch columns support three complete shapes: none (legacy),
+name/kind/permissions, or all four including window protocol. Partial groups and
+empty installed name/kind in a supplied group are refused. Explicitly empty
+installed permissions remain empty; they never inherit the displayed candidate's
+grants. Unknown additive fields are ignored after bounded JSON syntax/Unicode
+checking, with an extension recursion limit of 32. Known field bounds still
+apply: 8 MiB per reply, 4096 rows, five permissions per set, and the existing
+package text limits. Partial records, arrays and temporary extension buffers
+are freed on refusal under manual memory management. Software publishes only a
+complete valid view and frees refusal errors. See
+[catalog metadata qualification](../../tests/packages/view-metadata-check.md).
 
 For live operation progress, pass `--progress` to `update`, `install`, `remove`,
 `upgrade`, `apply`, `deploy`, `deployment-apply`, `rollback`, `mirror` or

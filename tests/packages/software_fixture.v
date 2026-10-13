@@ -365,11 +365,13 @@ fn main() {
 	if os.args.len == 2 && os.args[1] == 'policy-memory' { check_software_policy_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'metadata-memory' { check_software_metadata_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'details-memory' { check_software_details_memory() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'view-memory' { check_software_view_memory() or { panic(err) }; return }
 	mut args := os.args.clone()
 	if args.len > 1 && args[1] == '--progress' { args.delete(1) }
 	// This same executable is a literal-argv service fixture for asynchronous
 	// view/run transitions. It deliberately returns useful launch diagnostics.
 	if args.len > 1 {
+		if software_view_service_fixture(args) { return }
 		if software_policy_service_fixture(args) or { panic(err) } { return }
 		if software_metadata_service_fixture(args) { return }
 		if args[1] == 'admin' {
@@ -437,14 +439,16 @@ fn main() {
 	mut app := SoftwareApp{ query: []u8{cap: 256}, output: []u8{cap: 8192} }
 	view := SoftwareView{
 		format:       1
+		generation:   1
 		architecture: 'aarch64'
 		launch_user: 'alex'
 		rows:         [
-			SoftwareRow{ id: 'editor', name: 'Editor', description: 'Write text documents', version: '2.0.0', installed_version: '1.0.0', requested: true, updatable: true, repository: 'trusted', public_key: 'a'.repeat(64), permissions: ['files'] },
-			SoftwareRow{ id: 'browser', name: 'Browser', description: 'Browse websites', version: '1.0.0' },
-			SoftwareRow{ id: 'runtime', name: 'Runtime', description: 'Shared runtime', installed_version: '1.0.0' },
-			SoftwareRow{ id: 'blocked', name: 'Blocked', description: 'License required', version: '1.0.0', diagnostic: 'License acceptance required' },
-		]
+			SoftwareRow{ id: 'editor', name: 'Editor', description: 'Write text documents', kind: 'native', version: '2.0.0', installed_version: '1.0.0', requested: true, updatable: true, update_action: 'update', permissions: ['files'] },
+			SoftwareRow{ id: 'browser', name: 'Browser', description: 'Browse websites', kind: 'native', version: '1.0.0' },
+			SoftwareRow{ id: 'runtime', name: 'Runtime', description: 'Shared runtime', kind: 'runtime', version: '1.0.0', installed_version: '1.0.0' },
+			SoftwareRow{ id: 'blocked', name: 'Blocked', description: 'License required', kind: 'native', version: '1.0.0', diagnostic: 'License acceptance required' },
+		].map(SoftwareRow{ ...it, architecture: 'aarch64', repository: 'trusted', public_key: 'a'.repeat(64), license: 'MIT',
+			installed_name: if it.installed_version == '' { '' } else { it.name }, installed_kind: if it.installed_version == '' { '' } else { it.kind } })
 	}
 	encoded := json2.encode(view)
 	for byte in encoded { app.output << byte }
@@ -557,6 +561,7 @@ fn main() {
 	check_software_policy() or { panic(err) }
 	check_software_metadata() or { panic(err) }
 	check_software_details() or { panic(err) }
+	check_software_view_reader() or { panic(err) }
 	println('Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed')
 }
 
@@ -1261,13 +1266,14 @@ fn check_repository_management() ! {
 
 fn check_resolved_updates() ! {
 	mut app := SoftwareApp{ service_path: os.executable(), query: []u8{cap: 256}, output: []u8{cap: 8192} }
-	view := SoftwareView{ format: 1, architecture: 'aarch64', rows: [
-		SoftwareRow{ id: 'editor', name: 'Editor', kind: 'linux', version: '1.0.0', installed_version: '1.0.0', requested: true },
+	view := SoftwareView{ format: 1, generation: 1, architecture: 'aarch64', rows: [
+		SoftwareRow{ id: 'editor', name: 'Editor', kind: 'linux', runtime: 'runtime', version: '1.0.0', installed_version: '1.0.0', requested: true },
 		SoftwareRow{ id: 'runtime', name: 'Explicit runtime', kind: 'runtime', version: '2.0.0', installed_version: '1.0.0', updatable: true, update_action: 'update' },
 		SoftwareRow{ id: 'new-data', name: 'New data', kind: 'data', version: '1.0.0', updatable: true, update_action: 'install' },
 		SoftwareRow{ id: 'old-data', name: 'Retired data', kind: 'data', version: '1.0.0', installed_version: '1.0.0', updatable: true, update_action: 'remove' },
 		SoftwareRow{ id: 'unchanged-data', name: 'Retained dependency', kind: 'data', version: '1.0.0', installed_version: '1.0.0' },
-	] }
+	].map(SoftwareRow{ ...it, architecture: if it.kind == 'data' { 'all' } else { 'aarch64' }, repository: 'trusted', public_key: 'a'.repeat(64), license: 'MIT',
+		installed_name: if it.installed_version == '' { '' } else { it.name }, installed_kind: if it.installed_version == '' { '' } else { it.kind } }) }
 	app.output << json2.encode(view).bytes()
 	app.load_view()
 	app.handle('software.updates')!

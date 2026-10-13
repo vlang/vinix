@@ -385,6 +385,15 @@ present. **Back to review** or Escape returns to the unchanged confirmation and
 selection. Only navigation is active while details are open. See the
 [package-details UI checks](../tests/packages/details-ui-check.md).
 
+Catalog replies now use a bounded typed reader. Missing/coerced flags, duplicate
+known fields, partial installed launch metadata, incompatible architectures and
+incoherent update actions are refused with a specific diagnostic. Software keeps
+the previous valid view on refusal. Valid additive fields and complete older
+installed-metadata shapes remain supported. Unicode search preserves case
+matching, including characters whose lowercase spelling changes byte length,
+and frees its temporary buffers. See
+[catalog metadata checks](../tests/packages/view-metadata-check.md).
+
 For an installed CLI application, **Launch in Terminal** opens an interactive
 terminal inside Software. Type commands there; for SQLite, `.quit` exits and
 reveals **Back to Software**. Keyboard input, paste, resize and bounded output
