@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror,pathio,iovpin,iovimport,iovrange,iovoffset,iovposition` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror,pathio,iovpin,iovimport,iovrange,iovoffset,iovposition,iovflags` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -133,6 +133,19 @@ positioned close/dup2/header races require separate qualification. Flags,
 character devices, GNU wrappers, foreign ABIs, actual cap-sized transfers,
 disk-backed vectors and shared-offset atomicity remain open. See the
 [qualification and receipts](../../docs/linux-posix-qualification.md#native-positioned-vector-imports-and-errors).
+
+The `iovflags` case checks 1,540 native preadv2/pwritev2 cases in each root
+and UID/GID 1000 child. Unknown low flag bits must follow negative-offset,
+descriptor/access/seek, header/count/range and explicit-position overflow
+errors. Valid empty vectors succeed without I/O; malformed zero tails still
+fail import. Refusals retain regular-file data/cursors and pipe/socket queues.
+High-only flag patterns perform real I/O, verifying the native low-32-bit
+flag argument. Two 200-cycle cohorts cover empty 0/8/9/1024-entry imports,
+error cleanup, unsupported nonempty requests and flags0 I/O, comparing every
+slab class and big-page count. Recognized nonzero RWF modes remain unsupported;
+MAC denials, current-position overflow, character devices, GNU/foreign ABIs,
+disk-backed vectors and shared-offset atomicity need separate qualification.
+See the [qualification and receipts](../../docs/linux-posix-qualification.md#native-vector-flags-and-error-precedence).
 
 The `sharedmem` case drops to UID 1000/GID 2000 and checks memfd creator
 ownership, mode 0777 independent of umask, zero links, owner chmod and a

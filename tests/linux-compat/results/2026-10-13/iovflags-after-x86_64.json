@@ -1,0 +1,103 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "7bb957d7917088a25748f04217865e9cbc2c3c44875215650ab2aee309ddc68c",
+    "results": [
+        {
+            "name": "iovflags",
+            "source_sha256": "6f078e2a0eadfdac70fa87426d50348ded177356d7931aa1a01c02547d9c8567",
+            "init_sha256": "5eeb9df16e638e07d854e6f22e2715ad745f660e6d84bb1131c99cf2c271f617",
+            "iso_sha256": "9e1808172b5b1a33b36710799d60c4b3a02491e3a2dec629fa111a7dc4623aaa",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "iovposition",
+            "source_sha256": "7291e5e38e16fa2b3fa99392bdf68361a7315c5232a23cb421c9d6d654756770",
+            "init_sha256": "2991cba2fa71cb9a6206581acb6a2b0a67229776ae32dad6cd9b342710c4e3f2",
+            "iso_sha256": "fe8ce5c97237558e184254d31d967ddb880c8846e95a1711528c45d67bad466f",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "iovoffset",
+            "source_sha256": "1c3c52db711f413f511e41355b1ebfc2e4b376949af10fe106cab3afcc5560f7",
+            "init_sha256": "fdf43935eb5f002f8d364a470adb297b2ea1f02a293a474fc31fca25a0fc9389",
+            "iso_sha256": "b01a32ecda1b37b3668f0043c3c7a969a54545bb1270651a5703e646883aad13",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "iovrange",
+            "source_sha256": "a19883facc6f1fc864e6f5ba6998e2d8451ee752bd4dcce37614fff6a2c6e902",
+            "init_sha256": "d4e7282a19ca61f6c0647d5070099d584dd3eeda939cdbfb20a7352febe4fe94",
+            "iso_sha256": "c6307fd82f706a503cb85d58e3e82a594dc4c808ae236ba95ad9778d446d344a",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "iovimport",
+            "source_sha256": "a4f51939b98773010a466a4d040870f6c68889c007f047e921d11fe8110395ca",
+            "init_sha256": "db9a5417627faecb9586c1993c7566ee0c82a8628146a99a4235b7ab65818d2c",
+            "iso_sha256": "5331cec9e1f5c6eaff078d4d50f4b51cd3a979d84eb4e51a581d3f19292e7d8f",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "iovpin",
+            "source_sha256": "3a4e4decb1c124fcf4470a94e5fd3a7d4efb31767abef4bb2a71b9164be2df61",
+            "init_sha256": "103ed0c0236d663b541c7ee0dc8435a669b7151225781c20e45e4b949871fb86",
+            "iso_sha256": "f0718b1eb635b529de48c83297c3283fae9ad35ddb201a79aaa822d8aaceb225",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "pathio",
+            "source_sha256": "28a7d58e04956b559c2024bcf6a3c081a770982a357724b7f52a54c536720d16",
+            "init_sha256": "7c27300260b8997b6f9510119b6db4464aed54c2d5f15eb7d2bdd6a4d0c49cfe",
+            "iso_sha256": "0e4d714c25615f1a42f3168f056675637de1a241e3e331a4130e5d68217898be",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "open",
+            "source_sha256": "923b9cfdaa49bf37b0c82d235294b2785f61366c39d9af8f1d5dfe45cbe65262",
+            "init_sha256": "377071b25bf7f8a9b3a048c8eab9ec87c689beb7ca5791e8439a46a4131f222a",
+            "iso_sha256": "c65e9cc978be68b18fa354761f5a858e2b9d75364923462df422714f9711f61f",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "readerror",
+            "source_sha256": "f9d31a081f68f7de6f75651da8b10389202b2457e2bda232a45141ac1369ea64",
+            "init_sha256": "8295f538b9a80ca2ec99b4f666a0f45e38301562391e926aa080d1c8abc0d9e1",
+            "iso_sha256": "3a1a6c5d68a2b436533c34b9aa6e81083bcf0a666744b9336584e2ce2dbc9858",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "pipezero",
+            "source_sha256": "45e03f2ebcc0806aba964d20b1e9ba0f89910264ad92f0c991687e1e41d34c96",
+            "init_sha256": "f27a096de650fd4feeef2fe01a2d127b955bf4f82be1e3ff8f05ee4317928ef8",
+            "iso_sha256": "0a4155a6451c4dfcf0c6ad263d05e77824c8253db2555d4af53db16fcc894b96",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "3c22f6e44700a031e0c6e9bd04427095e423d595d3f9b81e09f07539d1ea3b9f",
+            "iso_sha256": "d34855a9a59471d80c7e5b756bdef1ce82ac11c2e801ebdd94007f05314fd0ce",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "sharedmem",
+            "source_sha256": "99ee2c57a20feb6bcf30b333373985c214e4142769506e76374626e4ccc71f44",
+            "init_sha256": "d58f5693f10e7729ec5d4602879c605e0599b04a94015c3c243a971b6a92117a",
+            "iso_sha256": "c32e18cb002a761bda79228094ce72fe0d57f0d3cabfbcf0a7927eb8caa456bf",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

@@ -40,33 +40,27 @@ fn syscall_linux_pwritev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int, 
 fn syscall_linux_preadv2(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int, pos_low u64, pos_high u64, flags u32) (u64, u64) {
 	offset := native_vector_offset(pos_low, pos_high)
 	if offset < -1 { return errno.err, errno.einval }
-	if flags != 0 {
-		return errno.err, errno.eopnotsupp
-	}
 
 	if offset == -1 {
-		return syscall_linux_readv(gpr_state, fdnum, iov_ptr, iovcnt)
+		return linux_readv_flags(gpr_state, fdnum, iov_ptr, iovcnt, flags)
 	}
-	return linux_positioned_iov(fdnum, iov_ptr, iovcnt, offset, false)
+	return linux_positioned_iov(fdnum, iov_ptr, iovcnt, offset, false, flags)
 }
 
 fn syscall_linux_pwritev2(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int, pos_low u64, pos_high u64, flags u32) (u64, u64) {
 	offset := native_vector_offset(pos_low, pos_high)
 	if offset < -1 { return errno.err, errno.einval }
-	if flags != 0 {
-		return errno.err, errno.eopnotsupp
-	}
 
 	if offset == -1 {
-		return syscall_linux_writev(gpr_state, fdnum, iov_ptr, iovcnt)
+		return linux_writev_flags(gpr_state, fdnum, iov_ptr, iovcnt, flags)
 	}
-	return linux_positioned_iov(fdnum, iov_ptr, iovcnt, offset, true)
+	return linux_positioned_iov(fdnum, iov_ptr, iovcnt, offset, true, flags)
 }
 
 // Keep the selected open description and the imported headers through every
 // segment. Descriptor/access and pipe/socket seek errors precede header import,
 // including for empty vectors. Validate the aggregate position before I/O.
-fn linux_positioned_iov(fdnum int, iov_ptr u64, iovcnt int, offset i64, write bool) (u64, u64) {
+fn linux_positioned_iov(fdnum int, iov_ptr u64, iovcnt int, offset i64, write bool, flags u32) (u64, u64) {
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
 		return errno.err, errno.get()
 	}
@@ -83,6 +77,10 @@ fn linux_positioned_iov(fdnum int, iov_ptr u64, iovcnt int, offset i64, write bo
 	defer { vector.release() }
 	if vector.total == 0 { return 0, 0 }
 	if vector.total > u64(0x7fffffffffffffff) - u64(offset) { return errno.err, errno.einval }
+	if flags != 0 {
+		fd.handle.mac_check(if write { proc.mac_write } else { proc.mac_read }) or { return errno.err, errno.get() }
+		return errno.err, errno.eopnotsupp
+	}
 
 	mut total := u64(0)
 	for i := 0; i < iovcnt; i++ {

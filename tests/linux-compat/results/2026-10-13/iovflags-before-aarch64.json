@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "8d33d7eaf14c1873ef08a22f34c404583b67630dc5398fbc8ab3ef08600c9dd8",
+    "results": [
+        {
+            "name": "iovflags",
+            "source_sha256": "6f078e2a0eadfdac70fa87426d50348ded177356d7931aa1a01c02547d9c8567",
+            "init_sha256": "048e20298ada467bdeb53b562a5d521ee74af49bff57e10c0370eca55fb10c32",
+            "iso_sha256": "bada25a20dbd94921181f24516f4c081134e9750f9c800c1a05d17f4ecdbb1bb",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

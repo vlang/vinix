@@ -2017,3 +2017,77 @@ Flags and character-device positioned I/O, GNU libc wrappers, native ELF32
 and translated variants, actual payload transfers at the 2 GiB cap,
 disk-backed vector behavior, shared-offset atomicity and allocation exhaustion
 remain separate qualification work. The three broad section-15 gates stay open.
+
+## Native vector flags and error precedence
+
+Native preadv2/pwritev2 now check unsupported flags in the consuming helper,
+after descriptor/access/seek checks and a complete immutable vector import.
+Explicit positive positions also undergo aggregate signed-overflow validation.
+Valid empty transfers return zero before flag dispatch, including valid
+all-zero arrays; invalid bases on zero-length tails still fail import.
+Nonempty unsupported modes check the handle's read/write MAC permission before
+returning EOPNOTSUPP. This follows [Linux 6.12's vector import, empty-transfer,
+permission and flag order](https://github.com/torvalds/linux/blob/v6.12/fs/read_write.c#L940).
+Offsets below -1 continue to fail first, and -1 continues through the existing
+current-position path. Public readv/writev wrappers pass flags0 to their
+original consuming bodies. The same FD reference and imported-vector owner
+cover every return; no new allocation owner is introduced.
+
+The V `iovflags` fixture runs 1,540 checks in each root and UID/GID 1000
+child, combining seven descriptor/resource kinds, read/write, explicit/current
+position, five raw flag patterns and eleven vector/offset variants. Unknown
+bits alone or combined with a recognized bit must preserve earlier EBADF,
+ESPIPE, EFAULT and EINVAL errors. Empty 0/1/1024-entry vectors succeed only
+after the applicable descriptor and import checks. Nonempty valid requests
+return EOPNOTSUPP without changing file contents/cursors, destination bytes
+or nonblocking pipe/UNIX stream queues. High-only flag patterns exercise
+actual reads/writes and shared-cursor updates, checking the low-32-bit native
+flag argument. Negative offsets and high-only controls already pass on both
+unchanged kernels; the remaining 1,088 checks per credential group fail there
+because an early flag refusal displaces the required result. Both candidates
+pass all 3,080 checks per architecture with identical before/after fixture C.
+
+Each credential group warms 32 cycles and measures 200 cycles through empty
+0/8/9/1024-entry imports, malformed headers/counts/ranges/positions, unknown
+nonempty refusals and flags0 I/O. All slab classes stay flat, with big pages
+71/71 on ARM and 186/186 on x86. Independent review of source and final emitted
+code confirms synchronous fixture borrows, one descriptor/import per consumer
+and vector-before-FD cleanup on permission and flag errors.
+
+Twelve native guest cases pass per architecture: flags, positioned imports,
+offsets, ranges, immutable headers, descriptor lifetime, O_PATH access,
+openat2, directory errors, zero-byte pipes, runtime and shared memory. Eight
+compatibility host test files and mapping-storage geometry checks pass.
+Allocation-site audits still fail the same existing allowances at 406 ARM and
+295 x86 sites; only diagnostic line numbers move, with no increased allowance.
+The generated inventory retains 62 source fingerprints.
+
+The [dated receipts](../tests/linux-compat/results/2026-10-13/) publish
+`iovflags-before-*`, `iovflags-after-*`, host/geometry/allocation logs and the
+[assertion-enabled auditor](../tests/linux-compat/results/2026-10-13/iovflags-audit.v).
+Its two negative controls prove assertions execute and passing output cannot
+qualify as an unchanged-kernel failure. Private kernel trees pin inputs at
+`7e5ad1a49`; only the two vector syscall source files differ. The compiler
+still pins clean V sources at `f6358ecff9`.
+
+The broader candidate-only ARM run repeats the maintained retention harness:
+all 36 workloads retain zero bytes across 200 operations, and all four
+300-process churn workloads retain zero memory/slab objects. The cache
+workload records the expected cost of writing 32 MiB. Idle, app startup and
+dragging each pass a five-second sample, with seven measured app/compositor
+processes and an inspected screenshot. The desktop binary, cached image and
+V controller match the preceding positioned-import comparison; those paired
+results remain separate runs on separate kernel binaries. The
+[performance evidence](../tests/linux-compat/results/2026-10-13/iovflags-performance-evidence.json)
+and raw `iovflags-perf-after`/`iovflags-desktop-after` logs preserve this
+candidate's runs. These checks cover startup and retention; full Linux
+application lifecycle, x86 desktop performance and physical hardware remain
+unqualified.
+
+Recognized nonzero RWF modes still return EOPNOTSUPP for nonempty transfers;
+this change qualifies unknown-flag behavior and flags0 preservation.
+Direct MAC-denial/current-position-overflow checks, character-device
+positioned I/O, GNU wrappers and ELF32/translated paths, disk-backed vectors,
+deterministic positioned descriptor/header races, shared-offset atomicity and
+allocation exhaustion remain separate work. The three broad section-15 gates
+stay open.

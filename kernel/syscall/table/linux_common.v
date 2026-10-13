@@ -246,6 +246,10 @@ fn linux_iov_access_error(fd &file.FD, write bool) u64 {
 // one resource write per iovec lets the peer consume an incomplete message and
 // close before the payload is written.
 fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u64, u64) {
+	return linux_writev_flags(gpr_state, fdnum, iov_ptr, iovcnt, 0)
+}
+
+fn linux_writev_flags(_ voidptr, fdnum int, iov_ptr u64, iovcnt int, flags u32) (u64, u64) {
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 	defer { fd.unref() }
 	access_error := linux_iov_access_error(fd, true)
@@ -256,6 +260,12 @@ fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (
 	total := vector.total
 	if total == 0 {
 		return 0, 0
+	}
+	// Linux ignores flags on an empty iterator. Nonempty unsupported modes
+	// are refused only after validating access and importing every header.
+	if flags != 0 {
+		fd.handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
+		return errno.err, errno.eopnotsupp
 	}
 
 	// One buffer and one write for anything up to linux_writev_max, which is
@@ -808,6 +818,10 @@ fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, _m
 
 // readv(fd, iov, iovcnt)
 fn syscall_linux_readv(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u64, u64) {
+	return linux_readv_flags(gpr_state, fdnum, iov_ptr, iovcnt, 0)
+}
+
+fn linux_readv_flags(_ voidptr, fdnum int, iov_ptr u64, iovcnt int, flags u32) (u64, u64) {
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 	defer { fd.unref() }
 	access_error := linux_iov_access_error(fd, false)
@@ -815,8 +829,12 @@ fn syscall_linux_readv(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u
 	fast := C.vinix_stack_alloc(linux_iov_fast * sizeof(LinuxIOVec))
 	vector := import_linux_iov(iov_ptr, iovcnt, fast) or { return errno.err, errno.get() }
 	defer { vector.release() }
-	if iovcnt == 0 {
+	if vector.total == 0 {
 		return 0, 0
+	}
+	if flags != 0 {
+		fd.handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
+		return errno.err, errno.eopnotsupp
 	}
 
 	mut total := u64(0)

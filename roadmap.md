@@ -651,6 +651,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   original ranges and signed positions before I/O. Qualify readonly headers,
   unchanged data/cursors/queues, copied prefixes and flat retention on both
   architectures, with independent lifetime review. See [the positioned-import receipts](docs/linux-posix-qualification.md#native-positioned-vector-imports-and-errors).
+- [x] Validate native preadv2/pwritev2 access, imported vectors and explicit
+  positions before unknown flag errors; preserve valid empty transfers and
+  low-32-bit flag decoding without changing data, cursors or pipe/socket queues.
+  Qualify both credential groups and flat storage on both architectures. See
+  [the vector-flag receipts](docs/linux-posix-qualification.md#native-vector-flags-and-error-precedence).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
