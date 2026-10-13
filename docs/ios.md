@@ -4232,6 +4232,36 @@ runners remain unchanged. Fortnite passes the former CString import and exits
 with status 1 before entry at `_$sSS8UTF8ViewV13_foreignCountSiyF`. Full regression remains unpassed;
 entry, rendering and gameplay are unverified.
 
+`Swift foreign UTF-8 counts` now implement the measured borrowed view helper
+`_$sSS8UTF8ViewV13_foreignCountSiyF` from libswiftCore. Native library
+measurements and MarketplaceKitWrapper's guarded call establish the borrowed
+two-word UTF8View in x0/x1 and signed UTF-8 byte count in x0. Five real native
+NSString-backed views verify UTF-16 code-unit counts versus UTF-8 byte counts,
+Unicode expansion, surrogate pairs and embedded NUL, with unchanged ownership.
+The application's call checks the foreign storage flag before this helper.
+
+The V implementation accepts full UTF-16-indexed views over live registered
+NSString owners or loader-validated constants, bounded to 1 MiB of UTF-8 text.
+It validates the owner before reading isa or fields and keeps borrowed bytes
+under the registry lock through UTF-8 and full UTF-16 extent validation.
+UTF-16 constants use the loader's existing decoded UTF-8 cache. No owner,
+temporary buffer, cloned text or boxed error is allocated; reference counts
+remain unchanged. Native/inline/shared views and foreign UTF-8 indexing are
+explicitly rejected by this foreign-only helper. Other Swift String operations
+retain their existing storage limitations.
+
+All 83 programs build and 119 generated C streams restore to their hashes.
+Thirty-six host suites pass ASAN/UBSAN in both hashing modes; Vinix passes
+32 Objective-C and 38 Swift/loader programs. The new fixture covers full UTF-16
+extents, Unicode/NUL, decoded constants, four concurrent readers, guarded/dead
+owners, invalid type/flags/count/UTF-8/bounds and two drained runtime lifetimes.
+Evidence is retained under `build/ios/fortnite/foreign-count-checks`, with pinned
+source/toolchain inputs, native ABI and actual callsite measurements, allocation
+audits and verified executable/debug archives. Five published runners remain
+unchanged. Fortnite passes the former foreign-count import and exits with
+status 1 before entry at `_$sSS8UTF8ViewV13_foreignIndex5afterSS0D0VAF_tF`.
+Full regression remains unpassed; entry, rendering and gameplay are unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
@@ -4239,10 +4269,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,448 | 712 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 123 | 53 | 23 |
-| All images | 2,230 | 768 | 120 |
+| MarketplaceKitWrapper | 124 | 52 | 23 |
+| All images | 2,231 | 767 | 120 |
 
-The C++/GLES/Text variant reports 2,243 resolved imports, 755 unresolved strong
+The C++/GLES/Text variant reports 2,244 resolved imports, 754 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
