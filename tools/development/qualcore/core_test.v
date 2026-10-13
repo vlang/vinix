@@ -6,6 +6,23 @@ import json2
 import os
 import sourcecommand
 
+fn test_qualification_command_budget_is_bounded_and_records_timeout() {
+	assert command_timeout('600')! == 600
+	assert command_timeout('86400')! == 86400
+	for invalid in ['', '0', '-1', '86401', '9999999999999', ' 120', '120\n'] {
+		if _ := command_timeout(invalid) { assert false, 'invalid budget must be rejected' }
+	}
+	root := sourcecommand.temporary('vinix-qualification-budget')!
+	defer { os.rmdir_all(root) or {} }
+	mut runner := Runner{ work: root, env: devcore.environment(0), timeout_seconds: 1 }
+	runner.command('sleep', ['5']) or {
+		assert err.msg().contains('deadline'), err.msg()
+		assert runner.commands.len == 1 && runner.commands[0].exit_code == -1
+		return
+	}
+	assert false, 'expired commands must fail and retain their receipt'
+}
+
 fn test_qualification_compiles_executes_and_reopens_database_with_receipts() {
 	root := sourcecommand.temporary('vinix-qualification')!
 	defer { os.rmdir_all(root) or {} }

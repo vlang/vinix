@@ -19,6 +19,13 @@ downloads. No system package is installed. Compiler invocations and test
 executables use bounded owned child processes. Logs remain private under the
 result directory; inherited environment credentials are omitted.
 
+Each command has a 120-second default deadline. Set
+`VINIX_QUALIFY_TIMEOUT_SECONDS` to an integer from 1 through 86400 for larger
+projects or emulated guests. Invalid values are rejected before output creation;
+`report.json` records the selected command budget. Expiry retires the owned
+process group and retains a failing command receipt. Automatic V compiler bug
+uploads are disabled in project command environments.
+
 | Profile | Workflow |
 | --- | --- |
 | C / C++ | Compile with symbols, create/join a thread, use collections (C++), write and read back a file, execute the resulting binary. |

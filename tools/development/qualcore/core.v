@@ -45,6 +45,7 @@ pub:
 	runner_sha256 string
 	started       string
 	requested     []string
+	command_timeout_seconds int = 120
 pub mut:
 	complete            bool
 	all_selected_passed bool
@@ -54,6 +55,7 @@ pub mut:
 struct Runner {
 	work string
 	env  map[string]string
+	timeout_seconds int = 120
 mut:
 	commands []CommandReceipt
 }
@@ -67,7 +69,7 @@ fn (mut runner Runner) command(program string, arguments []string) !string {
 	argv := [executable, ...arguments]
 	log := runner.work + '/command-${runner.commands.len}.log'
 	hash := devcore.file_hash(executable)!
-	status := devcore.run(argv, runner.work, runner.env, 120, log) or {
+	status := devcore.run(argv, runner.work, runner.env, runner.timeout_seconds, log) or {
 		runner.commands << CommandReceipt{argv, hash, -1, log}
 		return err
 	}
@@ -86,7 +88,16 @@ fn (mut runner Runner) verify_binary(name string) ! {
 	if output.trim_space() != marker { return error('compiled project returned unexpected output') }
 }
 
+fn command_timeout(value string) !int {
+	if value.len < 1 || value.len > 5 || !value.bytes().all(it >= `0` && it <= `9`)
+		|| value.int() < 1 || value.int() > 86400 {
+		return error('VINIX_QUALIFY_TIMEOUT_SECONDS must be 1..86400 seconds')
+	}
+	return value.int()
+}
+
 pub fn qualify(profiles []string, output_path string, require_vinix bool) !Report {
+	timeout := if value := os.getenv_opt('VINIX_QUALIFY_TIMEOUT_SECONDS') { command_timeout(value)! } else { 120 }
 	if profiles.len == 0 || profiles.any(it !in catalog) {
 		return error('unknown or empty qualification profile')
 	}
@@ -111,6 +122,7 @@ pub fn qualify(profiles []string, output_path string, require_vinix bool) !Repor
 		runner_sha256: devcore.file_hash(os.executable())!
 		started:       time.now().format_rfc3339()
 		requested:     profiles
+		command_timeout_seconds: timeout
 	}
 	mut passed := true
 	os.write_file(output + '/report.json', json2.encode(report, prettify: true) + '\n')!
@@ -129,7 +141,8 @@ pub fn qualify(profiles []string, output_path string, require_vinix bool) !Repor
 		env['GOSUMDB'] = 'off'
 		env['npm_config_cache'] = work + '/home/npm-cache'
 		env['VJOBS'] = '1'
-		mut runner := Runner{ work: work, env: env }
+		env['V_C_ERROR_BUG_REPORT_DISABLED'] = '1'
+		mut runner := Runner{ work: work, env: env, timeout_seconds: timeout }
 		mut status := 'passed'
 		mut detail := 'project compiled and completed its checks'
 		runner.profile(profile) or {
