@@ -4568,17 +4568,60 @@ status 1 before entry at `_$sSayxGSlsMc`. Full regression remains unpassed;
 entry, rendering and gameplay are unverified.
 
 
+`Swift Array Collection conformance` now implements `_$sSayxGSlsMc` in V,
+with usable direct associated tables for Int:Comparable, ArraySlice<Element>
+and Range<Int>. Native SwiftCore, LLVM disassembly and the installed Swift
+interface establish 24 Collection requirements, a four-word ArraySlice,
+two-word Range and five-/three-word IndexingIterator payloads. Private
+canonical metadata and tables are sealed after construction and cached by
+the exact Element pointer. Unsupported metadata and mismatched conformance
+families reject before dereferencing their contents.
+
+The implementation supports borrowed subscript coroutines with normal/abort
+cleanup, owned nested slices preserving original indices, indices ranges,
+count/empty queries, signed index arithmetic, directional limits and early
+range checks. Array/Slice search optimizations return the native unknown
+result; Range<Int> supplies the known search/contains result. Slice and Range
+Sequence tables support consuming iteration, contiguous copies, explicit
+indirect copyContents results and contiguous-storage callbacks. Element
+witnesses and closures run without registry locks; original x21 errors leave
+the caller's output untouched. Larger value-buffer witnesses share compatible
+registered Collection boxes and release the initialized payload at deallocation.
+
+Twelve native Int/String/Objective-C Array fixtures exercise all operations
+and the associated Slice/Range tables. Validation includes 100 signed Int
+comparisons, copy/take/assignment, enum tags, boxed value buffers, callback
+success/throws, constructor trampolines, concurrent first specialization and
+two drained/unmapped lifetimes. Seven related host suites pass ASAN/UBSAN in
+both hashing modes with errors configured to stop execution. Seven freshly
+built suites pass in Vinix. All 17 host/guest programs, original C streams,
+debug archives, input pins and actual game probe/audit logs are retained under
+`build/ios/fortnite/array-collection-checks`. Native fixture input corrections,
+the initial unaligned trampoline literal report and the executable archiver
+path correction remain in the logs. The immutable predecessor compiler is
+reused; compressed evidence is stored on Data and the owned RAM disk detached.
+
+Support covers registered native typed Array tails, their native slices and
+Int ranges. Foreign/bridged arrays, arbitrary Swift classes, general box
+allocation, reflection/type discovery, generic conformance discovery and
+Mutable/Bidirectional/RandomAccessCollection remain outside this subset.
+Caller metadata and storage must stay live; callback results retain the
+existing 64 KiB limit. Fortnite now passes the Array Collection import and
+exits with status 1 before entry at MarketplaceKitWrapper's Set:Sequence
+descriptor, `_$sShyxGSTsMc`. Full regression remains unpassed; entry,
+rendering and gameplay remain unverified. Five published runners are unchanged.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,455 | 705 | 79 |
+| Fortnite executable | 1,456 | 704 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 132 | 44 | 23 |
-| All images | 2,246 | 752 | 120 |
+| MarketplaceKitWrapper | 133 | 43 | 23 |
+| All images | 2,248 | 750 | 120 |
 
-The C++/GLES/Text variant reports 2,259 resolved imports, 739 unresolved strong
+The C++/GLES/Text variant reports 2,261 resolved imports, 737 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

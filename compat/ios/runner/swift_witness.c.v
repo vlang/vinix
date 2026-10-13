@@ -9,6 +9,24 @@ fn swift_witness_table_checked(conformance u64, metadata u64, _arguments u64) !u
 	if conformance == 0 || conformance & 3 != 0 || conformance > ~u64(0) - 15 {
 		return error('iOS: invalid Swift conformance descriptor')
 	}
+	if ios_runtime != unsafe { nil } && ios_runtime.swift_collection_arena != 0 {
+		data := ios_runtime.swift_collection_arena + u64(C.getpagesize())
+		if conformance in [data + 32, data + 64, data + 96]! {
+			kind := swift_collection_kind_checked(metadata, false)!
+			if conformance != data + 32 + u64(kind * 32) { return swift_sequence_failure() }
+			return swift_collection_table_checked(metadata)
+		}
+		if conformance in [data + 640, data + 672]! {
+			kind := swift_collection_kind_checked(metadata, false)!
+			if kind == 0 || conformance != data + 608 + u64(kind * 32) { return swift_sequence_failure() }
+			return swift_collection_sequence_checked(metadata)
+		}
+		if conformance in [data + 704, data + 736]! {
+			kind := swift_collection_kind_checked(metadata, true)!
+			if conformance != data + 672 + u64(kind * 32) { return swift_sequence_failure() }
+			return swift_collection_iterator_checked(metadata)
+		}
+	}
 	if ios_runtime != unsafe { nil } && ios_runtime.swift_array_sequence_arena != 0
 		&& conformance == ios_runtime.swift_array_sequence_arena + u64(C.getpagesize()) + 128 {
 		return swift_array_sequence_table_checked(metadata)

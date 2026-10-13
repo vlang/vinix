@@ -202,6 +202,8 @@ mut:
 	swift_array_metadata map[u64]u64 // Element metadata -> sealed Array metadata, under the runtime lock.
 	swift_array_sequence_arena u64 // Array Sequence/iterator descriptors, adapters and generic pattern.
 	swift_array_sequence_metadata map[u64]u64 // Element -> sealed iterator metadata and complete Sequence tables.
+	swift_collection_arena u64
+	swift_collection_metadata map[u64]u64
 	swift_integer_arena u64 // Int metadata, value witnesses and Equatable/Hashable conformances.
 	swift_foundation_arena u64 // Sealed CVarArg calls and Foundation's concrete String conformance.
 	swift_void_arena u64 // Sealed empty-tuple full metadata and zero-size value witnesses.
