@@ -4364,6 +4364,43 @@ runners remain unchanged. Fortnite passes the former foreign-subscript import
 and exits with status 1 before entry at `_$sSS9UTF16ViewV5index_8offsetBySS5IndexVAF_SitF`.
 Full regression remains unpassed; entry, rendering and gameplay are unverified.
 
+`Swift UTF-16 offsets` now implement the measured borrowed index helper
+`_$sSS9UTF16ViewV5index_8offsetBySS5IndexVAF_SitF` from libswiftCore.
+Installed macOS code and the MarketplaceKitWrapper callsite establish index
+in x0, signed UTF-16 distance in x1, borrowed view in x2/x3 and raw result
+in x0. All 18,706 native raw-index comparisons match across inline,
+native-tail and bridged foreign Strings, forward/backward/zero/endpoints,
+large distances, Unicode, NUL, combining marks and surrogate interiors.
+Zero distance normalizes encoding/alignment flags; native backward jumps
+of at least 64 units to zero use the cached start index. The initial native
+flag mismatch and its original input/C/binary are retained separately.
+
+The V helper uses stack inline scratch, bounded UTF-8 validation and linear
+scans under the recursive registry lock, without allocation or ARC changes.
+Foreign views retain their UTF-16 encoded offset; native views use UTF-8
+encoded offsets with one transcoding unit inside a surrogate pair. Supported
+storage is inline or native-tail String and the existing full registered
+NSString/decoded constant subset, bounded to 1 MiB. Cross-encoding index
+repair and shared/non-tail native storage reject; immortal native-tail bytes
+remain caller-borrowed. Mortal native storage must be registered and fit its
+capacity. Signed bounds are checked before addition, including INT64_MIN/MAX.
+
+All 87 programs build and 127 generated C streams restore to their hashes.
+Forty host suites pass ASAN/UBSAN in both hashing modes; Vinix passes
+32 Objective-C and 42 Swift/loader programs. The fixture also tests four
+concurrent readers, owned native storage, decoded constants, normalized
+zero flags, guarded/dead/malformed/index/encoding rejection and two drained
+runtime lifetimes. Evidence is retained under
+`build/ios/fortnite/utf16-offset-checks` with pinned inputs and verified
+executable/debug archives. The first broad run stopped at ENOSPC on the shared
+Data volume. Completed evidence was preserved through a hash-verified move
+to a verified owned 8 GiB RAM volume, where remaining checks resumed.
+All evidence and compiler bytes are verified after persistence back to the
+repository; both owned temporary RAM volumes are detached after retirement.
+Five published runners remain unchanged. Fortnite passes the former UTF-16
+offset import and exits with status 1 before entry at `_$sSTsE10compactMapySayqd__Gqd__Sg7ElementQzKXEKlF`.
+Full regression remains unpassed; entry, rendering and gameplay are unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
@@ -4371,10 +4408,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,448 | 712 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 127 | 49 | 23 |
-| All images | 2,234 | 764 | 120 |
+| MarketplaceKitWrapper | 128 | 48 | 23 |
+| All images | 2,235 | 763 | 120 |
 
-The C++/GLES/Text variant reports 2,247 resolved imports, 751 unresolved strong
+The C++/GLES/Text variant reports 2,248 resolved imports, 750 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
