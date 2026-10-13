@@ -77,6 +77,11 @@ before launch. Required markers:
 - `PACKAGE ISOLATED account-admin-standard own-identity groups-zero literal-argv stdin-stdout-stderr exit-code private-data PASS`
 - `PACKAGE ISOLATED native-window terminal-tty geometry input trust-and-payload-refusal audit clean-runtime PASS`
 
+The current fixture/controller also require the document-grant marker described
+in [the subsequent regular-file qualification](document-grants-check.md).
+The receipts below retain the original isolation/stream qualification; that
+followup records its own guest inputs and results.
+
 Run the package host driver with the reviewed V compiler and headless UI module:
 
 ```sh

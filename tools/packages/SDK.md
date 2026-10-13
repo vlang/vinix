@@ -771,7 +771,12 @@ with at most 64 KiB total including terminators.
 
 `--file` is an access grant, separate from the argument vector. Each document
 must be an existing absolute regular file and the application must declare
-`files`; grants retain the normal read/write semantics. Documents are **not**
+`files`; grants retain the normal read/write semantics. Symbolic links remain
+usable when their resolved target is a regular file. Directories, devices,
+FIFOs, sockets, missing paths and links to those targets are refused before
+application data is created or the executable starts. The diagnostic identifies
+the refused path. Update a granted file without `O_CREAT`; the grant adds no
+create/remove permission. Documents are **not**
 automatically appended in this mode. A path appearing in an argument grants
 no access by itself. New output files can be created in private application
 data; outside that directory, an existing file requires an explicit grant.

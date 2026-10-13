@@ -204,6 +204,10 @@ Command-line applications can receive literal flags through
 `run-terminal-args` uses the same syntax in a terminal. Package-declared arguments
 come first. Each `--file` grants an existing document under the application's
 declared `files` permission; it does not append that path to the command.
+Only regular files, including symbolic links resolving to regular files, are
+accepted. Devices, FIFOs, sockets, directories and unavailable targets fail with
+the offending path before application data is created. See the
+[document-grant qualification](../tests/packages/document-grants-check.md).
 Include the path explicitly among the application arguments when needed.
 Arguments alone grant no paths, remain literal across the ordinary-account
 handoff and do not expand `@APP@`, `@DATA@` or `@RUNTIME@`. Outputs belong in the

@@ -1,0 +1,5 @@
+Expected assertion failure against d222572e5:tools/packages/pkgcore/launch.v
+Previous source SHA256 821ccc852e807abbecc4022b22f5080882c0e728c31ae825164b7bc9d81cb1fa
+/Users/alex/code/vinix/build/package-document-work/grant-baseline/pkgcore/document_test.v:47: fn test_document_grants_require_regular_targets_in_every_launch_mode
+    assert refused, path
+        Message: /private/tmp/vdoc-84463-1791903003591491/fifo

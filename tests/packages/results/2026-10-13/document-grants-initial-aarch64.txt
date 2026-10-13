@@ -1,0 +1,46 @@
+Initial fixture failure; complete original log remains build/pkd/arm/packages-isolated-launch/serial.log
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x250bf0
+unix accept: got connection, setting up peer
+unix accept: done
+unix accept: waiting for connection
+unix accept: waiting for connection
+unix accept: got connection, setting up peer
+unix accept: done
+unix accept: waiting for connection
+unix accept: waiting for connection
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x237560
+unix accept: got connection, setting up peer
+unix accept: done
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x250bf0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4001dc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x276750
+PACKAGE ISOLATED account-admin-standard own-identity groups-zero literal-argv stdin-stdout-stderr exit-code private-data PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x250bf0
+unix accept: got connection, setting up peer
+unix accept: done
+unix accept: waiting for connection
+unix accept: waiting for connection
+unix accept: got connection, setting up peer
+unix accept: done
+unix accept: waiting for connection
+unix accept: waiting for connection
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x237560
+unix accept: got connection, setting up peer
+unix accept: done
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x250bf0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4001dc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x276750
+/Users/alex/code/vinix/tests/accounts/guest/package_isolated_launch.v:194: FAIL: fn main.qualify_package_isolated_launch: assert accepted.status == 0 && accepted.output.contains('PACKAGE ISOLATED DOCUMENT ' + path), accepted.output
+      message: failed to open file "/tmp/isolated-documents/regular with spaces"; code: 13
+
+V panic: Assertion failed...

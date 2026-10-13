@@ -11,6 +11,20 @@ pub:
 	directory string
 }
 
+fn validate_launch_document(path string) ! {
+	if !path.starts_with('/') || !printable(path, 4096) {
+		return error('document must be an existing absolute regular file')
+	}
+	// Follow document aliases as before, but inspect the target type. os.is_file
+	// only excludes directories and would also admit devices, FIFOs and sockets.
+	info := os.stat(path) or {
+		return error('document must be an existing absolute regular file: ${path}')
+	}
+	if info.get_filetype() != .regular {
+		return error('document must be an existing absolute regular file: ${path}')
+	}
+}
+
 fn application_closure(state State, id string) []Installed {
 	mut pending := [id]
 	mut seen := map[string]bool{}
@@ -103,9 +117,7 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	}
 	if 'audio' in p.permissions { args << ['--unveil', '/dev/snd', 'rw'] }
 	for document in input.documents {
-		if !document.starts_with('/') || !printable(document, 4096) || !os.is_file(document) {
-			return error('document must be an existing absolute regular file')
-		}
+		validate_launch_document(document)!
 		if 'files' !in p.permissions { return error('${id}: file permission is not declared') }
 		args << ['--unveil', document, 'rw']
 	}

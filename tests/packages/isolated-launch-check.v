@@ -36,6 +36,7 @@ fn suite(repository string, sandbox string) !hwhost.Suite {
 			required: ['HWTEST START packages-isolated-launch',
 				'PACKAGE ISOLATED account-admin-standard own-identity groups-zero literal-argv stdin-stdout-stderr exit-code private-data PASS',
 				'PACKAGE ISOLATED native-window terminal-tty geometry input trust-and-payload-refusal audit clean-runtime PASS',
+				'PACKAGE DOCUMENTS ordinary-admin-standard regular-and-alias read-write outside-denied special-target-refusal before-data clean-runtime PASS',
 				'HWTEST PASS packages-isolated-launch'], forbidden: ['V panic:'], ending: .poweroff, timeout: 300 }]
 	}
 }

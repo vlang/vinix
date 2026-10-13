@@ -4,6 +4,7 @@ module main
 import accountcore
 import desktop.ptycore
 import json2
+import net.unix
 import os
 import sessioncore
 import authclient
@@ -13,6 +14,19 @@ import tools.packages.appsdk
 import tools.packages.pkgcore
 import tools.packages.pkgadmin
 import tools.packages.pkglaunch
+
+fn C.mkfifo(&char, u32) int
+
+fn package_isolated_document(path string) ! {
+	assert os.read_file(path)! == 'ordinary document'
+	// A document grant is rw, so update the existing file without O_CREAT.
+	fd := C.open(path.str, C.O_WRONLY | C.O_TRUNC)
+	assert fd >= 0
+	defer { C.close(fd) }
+	assert C.write(fd, c'updated document', usize(16)) == 16
+	assert C.open(c'/tmp/isolated-documents/outside', C.O_RDONLY) < 0
+	eprintln('PACKAGE ISOLATED DOCUMENT ' + path)
+}
 
 fn package_isolated_application_probe() !int {
 	uid := C.getuid()
@@ -26,6 +40,14 @@ fn package_isolated_application_probe() !int {
 	mut context := appsdk.load()!
 	defer { context.close() }
 	assert context.data_directory == '/home/' + (if uid == 1000 { 'alex' } else { 'sam' }) + '/.local/share/vinix-apps/isolated-cli'
+	if os.args.len == 3 && os.args[2].starts_with('/tmp/isolated-documents/') {
+		package_isolated_document(os.args[2])!
+		return 0
+	}
+	if os.args.len == 4 && os.args[2] == 'document' {
+		package_isolated_document(os.args[3])!
+		return 0
+	}
 	if os.args[2..] == ['root-attempt'] {
 		println('PACKAGE ISOLATED ROOT ATTEMPT'); flush_stdout()
 		if C.setuid(0) == 0 { println('REGained root'); return 0 }
@@ -51,6 +73,7 @@ fn package_isolated_application_probe() !int {
 
 fn package_isolated_window_probe() !int {
 	assert C.getuid() == 1000 && C.getgroups(0, unsafe { nil }) == 0
+	if os.args.len == 3 { package_isolated_document(os.args[2])! }
 	appsdk.publish_window_frame(appsdk.WindowFrame{ sequence: 1, title: 'Ordinary window', width: 160, height: 80,
 			elements: [appsdk.WindowElement{ kind: 'label', id: '', text: 'isolated window', x: 8, y: 8, width: 140, height: 20, color: 0x111111, background: 0 }] })!
 	mut event := appsdk.read_window_event()!
@@ -90,6 +113,38 @@ fn isolated_terminal_output(fd int, marker string) !string {
 	return error('terminal timeout: ' + output)
 }
 
+fn qualify_isolated_document_refusals(db accountcore.Database, users []accountcore.User) ! {
+	work := '/tmp/isolated-documents'
+	os.mkdir_all(work + '/directory')!
+	os.write_file(work + '/regular with spaces', 'ordinary document')!
+	os.chmod(work + '/regular with spaces', 0o666)!
+	os.write_file(work + '/outside', 'must remain hidden')!
+	os.chmod(work + '/outside', 0o666)!
+	os.symlink('regular with spaces', work + '/alias')!
+	os.symlink('missing', work + '/dangling')!
+	os.symlink('cycle', work + '/cycle')!
+	assert C.mkfifo((work + '/fifo').str, 0o666) == 0
+	assert C.mknod((work + '/block').str, 0o060666, u64((8 << 8) | 0)) == 0
+	mut socket := unix.listen_stream(work + '/socket', unix.ListenOptions{})!
+	defer { socket.close() or {} }
+	for name in ['fifo', 'socket', 'directory', 'block'] { os.symlink(name, work + '/' + name + '-alias')! }
+	os.symlink('/dev/null', work + '/device-alias')!
+	for user in users {
+		for path in [work + '/fifo', work + '/socket', work + '/block', work + '/directory', work + '/missing', work + '/dangling', work + '/cycle',
+			work + '/fifo-alias', work + '/socket-alias', work + '/block-alias', work + '/directory-alias', work + '/device-alias', '/dev/null'] {
+			for command in [['run', 'isolated-cli', path], ['run-args', 'isolated-cli', '--file', path, '--', 'document', path],
+				['run-window', 'isolated-window', path]] {
+				refused := run(['/usr/bin/vinix-package', ...command], '', db, user)
+				assert refused.status != 0 && refused.output.contains('document must be an existing absolute regular file: ' + path), refused.output
+				assert !refused.output.contains('PACKAGE ISOLATED DOCUMENT '), refused.output
+				assert !os.exists(user.home + '/.local/share/vinix-apps/isolated-cli')
+				assert !os.exists(user.home + '/.local/share/vinix-apps/isolated-window')
+			}
+		}
+		assert os.ls('/run/user/' + user.uid.str())!.all(!it.starts_with('pkg-'))
+	}
+}
+
 fn qualify_package_isolated_launch(mut t Test) ! {
 	db := t.make_accounts()
 	alex := must_user(db, 'alex')
@@ -106,7 +161,7 @@ fn qualify_package_isolated_launch(mut t Test) ! {
 		manifest := '/tmp/' + id + '.json'
 		os.write_file(manifest, json2.encode(pkgcore.Package{ id: id, version: '1.0.0', architecture: architecture,
 			name: 'Ordinary launch fixture', license: 'GPL-2.0-or-later', kind: 'native', entrypoint: 'bin/probe', arguments: [probe],
-			window_protocol: if id == 'isolated-window' { 1 } else { 0 }, permissions: if id == 'isolated-window' { ['display'] } else { []string{} } }))!
+			window_protocol: if id == 'isolated-window' { 1 } else { 0 }, permissions: if id == 'isolated-window' { ['display', 'files'] } else { ['files'] } }))!
 		pkgcore.pack(manifest, root, repository)!
 	}
 	key := pkgcore.keygen('/tmp/isolated-seed')!
@@ -124,6 +179,7 @@ fn qualify_package_isolated_launch(mut t Test) ! {
 	planted.close()
 	assert peer_probe.status == 0, peer_probe.output
 	assert !os.exists('/home/alex/.local/share/vinix-apps/isolated-cli')
+	qualify_isolated_document_refusals(db, [alex, sam])!
 	for user in [alex, sam] {
 		assert db.supplementary_gids(user).len > 0
 		launched := run(['/usr/bin/vinix-package', 'run-args', 'isolated-cli', '--', '', '-flag', 'a space; $(literal)'], 'ordinary stdin\n', db, user)
@@ -133,6 +189,17 @@ fn qualify_package_isolated_launch(mut t Test) ! {
 		assert os.ls('/run/user/' + user.uid.str())!.all(!it.starts_with('pkg-'))
 	}
 	t.say('PACKAGE ISOLATED account-admin-standard own-identity groups-zero literal-argv stdin-stdout-stderr exit-code private-data PASS')
+	for user in [alex, sam] {
+		for name in ['regular with spaces', 'alias'] {
+			path := '/tmp/isolated-documents/' + name
+			for command in [['run', 'isolated-cli', path], ['run-args', 'isolated-cli', '--file', path, '--', 'document', path]] {
+				os.write_file('/tmp/isolated-documents/regular with spaces', 'ordinary document')!
+				accepted := run(['/usr/bin/vinix-package', ...command], '', db, user)
+				assert accepted.status == 0 && accepted.output.contains('PACKAGE ISOLATED DOCUMENT ' + path), accepted.output
+				assert os.read_file('/tmp/isolated-documents/regular with spaces')! == 'updated document'
+			}
+		}
+	}
 	root_attempt := run(['/usr/bin/vinix-package', 'run-args', 'isolated-cli', '--', 'root-attempt'], '', db, alex)
 	assert root_attempt.status != 0 && root_attempt.output.contains('PACKAGE ISOLATED ROOT ATTEMPT') && !root_attempt.output.contains('REGained root'), root_attempt.output
 	window_input := appsdk.WindowEvent{ kind: 'close', sequence: 1 }.encode()! + '\n'
@@ -141,6 +208,13 @@ fn qualify_package_isolated_launch(mut t Test) ! {
 	mut frames := window_guest_frames(window.output)!
 	assert frames.len == 1 && frames[0].elements[0].text == 'isolated window'
 	for mut frame in frames { frame.close() }
+	for name in ['regular with spaces', 'alias'] {
+		os.write_file('/tmp/isolated-documents/regular with spaces', 'ordinary document')!
+		document_window := run(['/usr/bin/vinix-package', 'run-window', 'isolated-window', '/tmp/isolated-documents/' + name], window_input, db, alex)
+		assert document_window.status == 0 && document_window.output.contains('PACKAGE ISOLATED DOCUMENT '), document_window.output
+		assert os.read_file('/tmp/isolated-documents/regular with spaces')! == 'updated document'
+	}
+	t.say('PACKAGE DOCUMENTS ordinary-admin-standard regular-and-alias read-write outside-denied special-target-refusal before-data clean-runtime PASS')
 	terminal := ptycore.spawn(['/sbin/init', 'package-isolated-terminal-client'], [], '/', 24, 80, 640, 384)!
 	defer { C.close(terminal.terminal) }
 	isolated_terminal_output(terminal.terminal, 'PACKAGE ISOLATED TERMINAL READY')!
