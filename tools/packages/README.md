@@ -37,3 +37,9 @@ prepared-root recipes and pinned inventories atomically, with complete declared
 architecture/version/runtime coverage. It emits a canonical catalog lock and a
 private publisher workspace for `publish-release`. See the
 [catalog contract](SDK.md#build-a-pinned-application-catalog).
+
+`sqlite-catalog SQLITE_VERSION RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY`
+creates the concrete SQLite CLI/musl runtime lock for both supported hosts. It
+retains redistribution notices and separates compatible library updates from
+the CLI. See the [publisher profile](SDK.md#sqlite-cli-publisher-profile) and
+[real SQLite lifecycle qualification](../../tests/packages/sqlite-profile-check.md).

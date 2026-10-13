@@ -20,6 +20,14 @@ enroll a publisher or accept proprietary/firmware terms for consumers.
 The [catalog qualification](../tests/packages/catalog-build-check.md) covers
 canonical release reproduction, refusal/cleanup and real Linux guest execution.
 
+The [SQLite publisher profile](../tools/packages/SDK.md#sqlite-cli-publisher-profile)
+provides a concrete dual-architecture CLI and separately versioned musl/SQLite
+runtime, with pinned payloads and redistribution notices. Its
+[guest qualification](../tests/packages/sqlite-profile-check.md) uses real SQLite
+to check WAL/database reopen, ordinary-account isolation, library-only updates,
+rollback and cached offline reinstall while retaining application data. It does
+not enroll a public publisher or migrate the other advertised applications.
+
 ## Trust and configuration
 
 The image stage creates `/etc/vinix-packages/config.json` with an empty

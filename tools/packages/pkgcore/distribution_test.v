@@ -205,6 +205,9 @@ fn test_policy_runtime_and_literal_launch_arguments() {
 	state := State{ generation: 1, architecture: 'x86_64', requested: plan.requested, packages: plan.packages }
 	launch := launch_plan(config, '/var/lib/vinix-packages', state, 'app', '/home/user/data', 1000, 1000, []) or { panic(err) }
 	assert launch.program == '/usr/bin/vinix-sandbox'
+	promises := launch.arguments[launch.arguments.index('--promises') + 1].split(' ')
+	assert 'flock' in promises && 'inet' !in promises && 'proc' !in promises
+	assert '/home/user/data' in launch.arguments && '/home/user' !in launch.arguments
 	assert launch.arguments.last() == 'literal;$(do-not-run)'
 	assert '/var/lib/vinix-packages/generations/1/apps/wine/bin/app' in launch.arguments
 	assert 'LD_LIBRARY_PATH=/var/lib/vinix-packages/generations/1/apps/app/lib:/var/lib/vinix-packages/generations/1/apps/app/usr/lib:/var/lib/vinix-packages/generations/1/apps/wine/lib:/var/lib/vinix-packages/generations/1/apps/wine/usr/lib' in launch.arguments

@@ -42,6 +42,7 @@ fn main() {
 		'packages' { scenario_packages(mut t) }
 		'packages-enforced' { scenario_packages_enforced(mut t) }
 		'packages-linux' { scenario_packages_linux(mut t) }
+		'packages-sqlite' { scenario_packages_sqlite(mut t) }
 		'packages-crash-staged', 'packages-crash-published', 'packages-crash-activated' {
 			scenario_package_recovery(mut t)
 		}

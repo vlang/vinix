@@ -22,6 +22,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
 	'  pack-catalog CATALOG.json PREPARED_ROOTS NEW_WORKSPACE\n' +
+	'  sqlite-catalog SQLITE_VERSION RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
 	'  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX\n' +
 	'  publish-release REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY\n'
 
@@ -86,6 +87,11 @@ fn checked(arguments []string) !int {
 		'pack-catalog' {
 			if names.len != 3 { return error('pack-catalog requires a catalog recipe, prepared roots and a new workspace directory') }
 			println(json2.encode(pkgcore.pack_catalog(names[0], names[1], names[2])!))
+			return 0
+		}
+		'sqlite-catalog' {
+			if names.len != 4 { return error('sqlite-catalog requires SQLite version, runtime version, prepared roots and a new lock directory') }
+			println(json2.encode(pkgcore.sqlite_catalog(names[0], names[1], names[2], names[3])!))
 			return 0
 		}
 		'publish', 'publish-release' {

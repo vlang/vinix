@@ -193,6 +193,74 @@ changes require a newly reviewed lock/build for reproducible catalog assembly.
 This publisher workflow does not authenticate upstream archives or qualify the
 applications' executable/runtime ABI or graphical sessions.
 
+### SQLite CLI publisher profile
+
+`sqlite-catalog SQLITE_VERSION RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY`
+inventories a specific Linux application closure and emits its reviewed catalog
+lock. Both `PREPARED_ROOTS/aarch64` and `PREPARED_ROOTS/x86_64` must exist, each
+with these ordinary payloads and redistribution notices:
+
+```text
+bin/sqlite3                 musl PIE command-line executable
+bin/vinix-linux-runner      static SDK 1 runner
+lib/libc.so                musl shared loader/libc
+lib/libsqlite3.so.0         shared SQLite library
+licenses/sqlite-COPYRIGHT
+licenses/musl-COPYRIGHT
+licenses/vinix-COPYING
+```
+
+The profile checks ELF64 little-endian target/type and bounded program headers,
+requires an interpreter on the CLI and no interpreter on the static runner or
+shared libraries, and checks the imported object headers again. Executable
+payloads are limited to 512 MiB each; notices must be nonempty and at most 1 MiB.
+This structural check does not identify an arbitrary file as genuine SQLite,
+authenticate its source or certify its library ABI. The publisher declares the
+numeric SQLite version and a runtime version in `>=1.0.0,<2.0.0`, and must build
+and qualify that closure before signing it.
+
+The lock contains four pinned packages: `org.sqlite.cli` and
+`org.vinix.sqlite-runtime` for each architecture. The application contains the
+CLI and SQLite notice. Its separate runtime contains the runner, library, musl
+loader/libc and all three notices; the same musl bytes are also installed at
+`lib/ld-musl-ARCH.so.1`. The application declares a runtime dependency in
+`>=1.0.0,<2.0.0`, so a qualified compatible library update can leave the CLI
+package unchanged. Changes outside that range require a revised application
+contract. Licenses remain visible in package metadata and payloads; proprietary
+and firmware disclosures are explicitly false for this profile.
+
+The CLI requests no optional permissions or associations. From Terminal, use
+`vinix-package run org.sqlite.cli`; it opens
+`@DATA@/database.sqlite3` in the ordinary account's private app data directory.
+SQLite WAL, journals and temporary files stay inside the existing sandbox
+contract. The baseline file operations include advisory locks (`flock`), which
+operate on open file descriptors and grant no additional paths. The launcher's
+descriptor-closing rules still apply. Arbitrary home-directory databases,
+document arguments, extension loading and an interactive terminal launched from
+Software are outside this profile. Uninstall removes the app/runtime closure
+and registrations while retaining the database; rollback also retains it.
+
+Success atomically publishes a new 0700 directory containing only `catalog.json`
+and returns format-1 JSON with `profile: "sqlite-cli"`, `directory`, `catalog`,
+`catalog_sha256`, both versions and `architectures`. No key, signed index or
+consumer enrollment is created. The usual captured-root import, free-space
+checks, canonical metadata and no-overwrite rules apply. Handled failures remove
+temporary payloads; an abrupt kill can leave a private `.vinix-sqlite-profile-*`
+directory for inspection and removal. Keep prepared roots stable and review the
+lock; `pack-catalog` rejects changes to its pinned inputs.
+
+```sh
+vinix-package sqlite-catalog 3.53.4 1.0.0 /build/sqlite-roots /build/sqlite-lock
+vinix-package pack-catalog /build/sqlite-lock/catalog.json /build/sqlite-roots /build/sqlite-workspace
+vinix-package publish-release /build/sqlite-workspace company /secure/publisher-seed 1 EXPIRES_UNIX /build/sqlite-release
+```
+
+The maintained [SQLite qualification](../../tests/packages/sqlite-profile-check.md)
+builds unmodified, hash-pinned upstream SQLite using V orchestration, then checks
+real database, library upgrade, rollback and offline reinstall behavior on both
+hosts. The fixture publisher key is for testing; it is not a supported public
+repository or an enrollment decision for users.
+
 ## Manifest
 
 ```json
@@ -285,9 +353,10 @@ The explicit environment includes `HOME`, `TMPDIR`, `WINEPREFIX`, `PATH`,
 `LD_LIBRARY_PATH`, `LANG`, and declared `DISPLAY`. Argument substitutions
 `@APP@`, `@DATA@`, `@RUNTIME@` are literal paths, never shell evaluation. Supplied
 document paths follow those arguments. Apps receive read/execute payload/runtime
-access and write/create private-data access. `files` grants supplied documents,
-not the entire home; `network`, `process`, `display`, `audio` request corresponding
-sandbox promises/device or IPC paths. Organization policy can refuse requests.
+access and write/create private-data access, including advisory file locking.
+`files` grants supplied documents, not the entire home; `network`, `process`,
+`display`, `audio` request corresponding sandbox promises/device or IPC paths.
+Organization policy can refuse requests.
 See [actual enforcement limits](../sandbox/README.md).
 
 Apps must handle denied access/missing services and save in private data or a

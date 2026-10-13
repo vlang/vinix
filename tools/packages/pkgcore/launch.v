@@ -46,7 +46,9 @@ pub fn launch_plan(config Config, directory string, state State, id string, data
 	app := generation + '/apps/' + id
 	runtime := if p.runtime == '' { app } else { generation + '/apps/' + p.runtime }
 	mut args := ['--uid', uid.str(), '--gid', gid.str()]
-	mut promises := ['stdio', 'rpath', 'wpath', 'cpath', 'exec', 'prot_exec']
+	// Advisory locks coordinate writes to already unveiled app data. They grant
+	// no additional paths or inherited descriptors; SQLite requires F_SETLK.
+	mut promises := ['stdio', 'rpath', 'wpath', 'cpath', 'flock', 'exec', 'prot_exec']
 	if 'network' in p.permissions { promises << ['inet', 'dns'] }
 	if 'process' in p.permissions { promises << 'proc' }
 	if 'display' in p.permissions { promises << 'unix' }
