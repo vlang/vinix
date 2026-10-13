@@ -508,7 +508,7 @@ pub fn init_syscall_table() {
 	syscall_table[22] = voidptr(file.syscall_epoll_pwait) // __NR_epoll_pwait
 
 	syscall_table[32] = voidptr(file.syscall_flock) // __NR_flock
-	syscall_table[46] = voidptr(file.syscall_ftruncate) // __NR_ftruncate
+	syscall_table[46] = voidptr(syscall_linux_ftruncate) // __NR_ftruncate
 	syscall_table[71] = voidptr(syscall_linux_sendfile) // __NR_sendfile
 	syscall_table[88] = voidptr(fs.syscall_utimensat) // __NR_utimensat
 	syscall_table[102] = voidptr(syscall_linux_getitimer) // __NR_getitimer

@@ -680,6 +680,10 @@ fn syscall_linux_lseek(gpr_state voidptr, fdnum int, offset i64, whence int) (u6
 	return fs.syscall_seek(gpr_state, int(u32(fdnum)), offset, int(u32(whence)))
 }
 
+fn syscall_linux_ftruncate(gpr_state voidptr, fdnum int, length i64) (u64, u64) {
+	return file.syscall_ftruncate(gpr_state, int(u32(fdnum)), length)
+}
+
 // pread64: read at offset without changing file position.
 fn syscall_linux_pread64(gpr_state voidptr, fdnum int, buf voidptr, count u64, offset i64) (u64, u64) {
 	return file.syscall_pread(gpr_state, int(u32(fdnum)), buf, count, offset)

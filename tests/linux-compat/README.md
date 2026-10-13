@@ -134,6 +134,18 @@ character devices, GNU wrappers, foreign ABIs, actual cap-sized transfers,
 disk-backed vectors and shared-offset atomicity remain open. See the
 [qualification and receipts](../../docs/linux-posix-qualification.md#native-positioned-vector-imports-and-errors).
 
+The `truncateabi` case checks 2,784 native ftruncate calls in each root and
+UID/GID1000 child. Five raw upper-descriptor patterns and one libc control
+combine twenty descriptor classes, aliases and eight signed64 lengths.
+Lower-32-bit FD decoding must preserve real resizing/zero-fill/metadata/flags,
+shared cursors, private permissions, queued bytes/readiness and negative/
+access/type errors. Sixty stable cohort descriptors plus temporary aliases
+require flat storage through 200 high-word cycles. The emitted adapter changes
+only the descriptor cast, preserving the signed64 length and existing callee
+ownership. Other FD APIs, huge growth, concurrent truncation, disk and
+GNU/foreign ABIs remain separate. See
+[the descriptor-word receipts](../../docs/linux-posix-qualification.md#native-ftruncate-descriptor-words).
+
 The `truncateaccess` case checks 928 native raw/musl ftruncate calls in each
 root and UID/GID1000 child. Twenty descriptor classes, original/dup/
 F_DUPFD_CLOEXEC aliases and eight signed64 lengths require negative-length
@@ -145,7 +157,8 @@ pipe/socket/FIFO bytes and readiness. Sixty stable cohort descriptors plus
 temporary aliases warm 32 and measure 200 cycles of eighty probes and three
 duplicate controls, requiring flat slab objects and big pages. Initial strict-C
 compile rejections remain published alongside corrected native baselines and
-candidates. Upper descriptor words, GNU/foreign ABIs, protected attributes,
+candidates. Upper descriptor words are qualified by `truncateabi` above.
+GNU/foreign ABIs, protected attributes,
 privilege-bit clearing, readonly mounts, disk, concurrent close/truncate and
 huge growth remain separate. See
 [the ftruncate receipts](../../docs/linux-posix-qualification.md#native-ftruncate-descriptor-eligibility).

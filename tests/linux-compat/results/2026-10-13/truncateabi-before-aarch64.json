@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "d49620bf73c8376060884d16b052e712ce7a53ea523a33a1160d4d7a8755574c",
+    "results": [
+        {
+            "name": "truncateabi",
+            "source_sha256": "4130103bf13ab1524f817785a5f5b7eb67fa23cc33377625c3fcd1c046fedd00",
+            "init_sha256": "5332aadfaeb5c6bc4365719d704c37405a2509d6f6cdf46b0d2977bfd46a2f68",
+            "iso_sha256": "a19f3e486926645ea1800d048b877484e0fff9e855132f6a395b36f865a27052",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

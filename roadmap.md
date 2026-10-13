@@ -696,6 +696,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   enforce O_PATH EBADF and nonregular/readonly/mode3 EINVAL, qualifying real
   shrink/grow bytes, metadata, aliases, queued data and flat storage on both
   architectures. See [the ftruncate receipts](docs/linux-posix-qualification.md#native-ftruncate-descriptor-eligibility).
+- [x] Decode native ftruncate descriptors from the lower 32 register bits;
+  preserve signed64 lengths and existing ownership, qualifying real resizing,
+  access/type/negative errors, bytes, aliases, queued data and flat storage on
+  both architectures. See [the descriptor-word receipts](docs/linux-posix-qualification.md#native-ftruncate-descriptor-words).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

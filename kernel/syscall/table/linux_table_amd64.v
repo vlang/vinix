@@ -364,7 +364,7 @@ pub fn init_syscall_table() {
 	syscall_table[74] = voidptr(file.syscall_fsync) // fsync
 	syscall_table[75] = voidptr(file.syscall_fsync) // fdatasync
 	syscall_table[76] = voidptr(fs.syscall_truncate) // truncate
-	syscall_table[77] = voidptr(file.syscall_ftruncate) // ftruncate
+	syscall_table[77] = voidptr(syscall_linux_ftruncate) // ftruncate
 	syscall_table[78] = voidptr(syscall_linux_getdents) // getdents
 	syscall_table[79] = voidptr(fs.syscall_getcwd) // getcwd
 	syscall_table[80] = voidptr(fs.syscall_chdir) // chdir

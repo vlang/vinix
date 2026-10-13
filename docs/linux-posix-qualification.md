@@ -2695,3 +2695,70 @@ privilege-bit clearing, readonly mounts, disk-backed qualification,
 concurrent close/truncate, huge growth/allocation exhaustion and complete
 Linux installation/sandbox/portal/runtime support remain separate work. The
 three broad section-15 gates stay open.
+
+## Native ftruncate descriptor words
+
+Both native syscall tables previously dispatched ftruncate directly to a
+handler that treated the complete register word as the descriptor. Valid
+lower-32-bit descriptors with nonzero upper bits therefore returned EBADF.
+One common native adapter now casts only the descriptor to u32 and preserves
+the signed64 length before invoking the existing handler. ARM slot46 and
+x86 slot77 use that adapter. Linux defines ftruncate's descriptor as an
+unsigned int in [its native syscall declaration](https://raw.githubusercontent.com/torvalds/linux/refs/tags/v6.12/fs/open.c).
+
+The V `truncateabi` fixture checks 2,784 calls in each root and UID/GID1000
+child, passing **5,568 checks per architecture**. Five raw upper-word patterns
+(zero, bit32, all upper bits, the sign bit and DEADBEEF) plus one musl call
+combine twenty descriptor classes, original/dup/F_DUPFD_CLOEXEC aliases and
+eight signed64 lengths. Valid writeonly/readwrite files actually resize;
+readonly/mode3/nonregular/O_PATH/invalid handles retain their real errors.
+Negative -1/INT64_MIN still return EINVAL before descriptor validation.
+
+Fresh baseline kernels fail **864 checks in every cohort**, including 144
+valid resizes. Every failure is a high-word raw call receiving incorrect
+EBADF; zero-word, libc and negative-length controls pass. Candidates have
+zero failures. The auditor requires those exact baseline counts and refuses
+to accept a passing guest log as a baseline failure.
+
+The fixture checks inode/device/type/UID/GID/size, descriptor flags, real
+shrink/grow prefixes and zero-filled tails, both shared cursors, private-open
+permissions and FIONREAD/poll on actual queued pipe/socket/FIFO AB bytes.
+Final controls drain and compare those bytes. Sixty stable cohort descriptors
+plus temporary aliases run 32 warm-ups and 200 measured cycles of eighty
+high-word probes plus three duplicate controls. Every slab live-object count
+stays flat in both credential groups, with big pages **75/75 ARM and 198/198
+x86**.
+
+The first ARM candidate build failed when host disk exhaustion stopped a
+dependency-file write. Its failed build log remains published alongside the
+successful retry. Only audited rebuildable images/build objects from earlier
+owned work areas were retired; kernel binaries, generated C, fixture sources,
+init files, logs and receipts remain preserved. The retried build uses the
+same implementation and compiler. Both actual before/after fixture C
+captures equal the preview without hidden allocation or promotion.
+
+Independent final lifetime review confirms this adapter adds no allocation,
+reference or lock. The ftruncate eligibility, pin/cleanup and grow body remain
+byte-identical in generated C. Removing the single adapter prototype/body and
+restoring one native dispatch assignment restores each entire baseline
+kernel C. The length reaches the callee unchanged as i64.
+
+Both candidates additionally pass truncateaccess, scalarabi, pathio and
+runtime. Eight host test files, fresh kernel builds and inventory checks
+pass. Existing allocation allowance failures retain **406 ARM / 295 x86**
+sites and identical NEW rows; no allowance is increased.
+
+[ARM evidence](../tests/linux-compat/results/2026-10-13/truncateabi-aarch64-evidence.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-13/truncateabi-x86_64-evidence.json)
+and the [assertion-enabled V auditor](../tests/linux-compat/results/2026-10-13/truncateabi-audit.v)
+bind original before/after logs, source/init/image hashes, kernel binaries/C,
+host/allocation checks, the ARM build failure/retry and both executed failing
+controls. Private worktrees pin `7c502af1b`; only three syscall table files
+differ. The compiler is the clean `f6358ecff9` snapshot. All 63 isolated
+semantic inputs are fingerprinted separately from the public committed-parent
+dispatch inventory.
+
+Other FD APIs, huge growth, protected attributes/privilege-bit clearing,
+readonly mounts/disk, concurrent close/truncate, allocation exhaustion,
+GNU/foreign/ELF32 paths and complete Linux installation/sandbox/portal/runtime
+support remain separate work. The three broad section-15 gates stay open.

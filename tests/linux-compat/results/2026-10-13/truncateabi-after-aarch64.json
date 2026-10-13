@@ -1,0 +1,47 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "450364ccd8a19ef1d7731d284142d8d12e29424d3e241cf163f619b1b7c91e4e",
+    "results": [
+        {
+            "name": "truncateabi",
+            "source_sha256": "4130103bf13ab1524f817785a5f5b7eb67fa23cc33377625c3fcd1c046fedd00",
+            "init_sha256": "5332aadfaeb5c6bc4365719d704c37405a2509d6f6cdf46b0d2977bfd46a2f68",
+            "iso_sha256": "c9ef4c46eaa2ebedb927921cc4019beacaeb3ef81ce00a523ef0cce509317917",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "truncateaccess",
+            "source_sha256": "3eda3db3ade5797e9efd918839c9bcd00f2ffb3c6f59db43a76af3147803e940",
+            "init_sha256": "3fca44f0ddda55aa049427ab5e1169eed6f142e0aac1504a6fa44325f55568a1",
+            "iso_sha256": "6abf86cdbe345ae2c51a373dacd518506167e2a4de99389432bcbdb5e634e121",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "scalarabi",
+            "source_sha256": "61164821366b0ea5cb014c48282e70ba16eae88d4dc15ecf67278ad4d0e31614",
+            "init_sha256": "5fadd80095168bceae1cef0cad5f36ab12e9cf6f0f91f7a15dc19a2d850305c3",
+            "iso_sha256": "adcd4484ce0fc871d360148d982e7cf6f096c941c9885d07139a71506358bc8a",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "pathio",
+            "source_sha256": "28a7d58e04956b559c2024bcf6a3c081a770982a357724b7f52a54c536720d16",
+            "init_sha256": "48bf8c1b2a50662dfe0f1c976cb1b0884776ba756486cbf5ff95596890df79d0",
+            "iso_sha256": "bad777e3476875f1fc47ae73f1539428a5e44f088a137de6da607de0bb0eafa9",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "2c3d9db0c1f79bcd0b0af7b7653e75012f964bb5be79417a54b4fa3af2a8fa08",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}
