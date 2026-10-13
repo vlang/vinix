@@ -244,6 +244,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 	if address := swift_hash_symbol(symbol) { return address }
 	if address := swift_string_protocol_symbol(symbol) { return address }
 	return match symbol {
+		'_$sSS8UTF8ViewV17_foreignSubscript8positions5UInt8VSS5IndexV_tF' { u64(unsafe { voidptr(swift_foreign_subscript) }) }
 		'_$sSS8UTF8ViewV13_foreignIndex_8offsetBySS0D0VAF_SitF' { u64(unsafe { voidptr(swift_foreign_offset) }) }
 		'_$sSS8UTF8ViewV13_foreignIndex5afterSS0D0VAF_tF' { u64(unsafe { voidptr(swift_foreign_index_after) }) }
 		'_$sSS8UTF8ViewV13_foreignCountSiyF' { u64(unsafe { voidptr(swift_foreign_count) }) }

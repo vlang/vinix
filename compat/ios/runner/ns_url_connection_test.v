@@ -75,7 +75,10 @@ fn connection_cases(api ConnApi) {
 	pool := api.pool(); path := '/tmp/vinix-connection-' + os.getpid().str() + if api.native { '-native.txt' } else { '-runtime.txt' }
 	os.write_file(path, 'abcde') or { panic(err) }
 	defer { os.rm(path) or { panic(err) } }
-	for index, filename in [path, path + '-missing', '/tmp'] {
+	directory := path + '-directory'
+	os.mkdir(directory) or { panic(err) }
+	defer { os.rmdir(directory) or { panic(err) } }
+	for index, filename in [path, path + '-missing', directory] {
 		request := api.request(filename, false)
 		assert api.msg(api.cls, c'canHandleRequest:', request, 0, 0) == 1 && api.msg(api.cls, c'canHandleRequest:', 0, 0, 0) == 0;
 		mut responses := [u64(0x123456789abcdef0), 0, 0xfedcba9876543210]!
@@ -91,9 +94,15 @@ fn connection_cases(api ConnApi) {
 			assert api.msg(api.cls, c'sendSynchronousRequest:returningResponse:error:', request, 0, 0) != 0;
 		} else {
 			assert data == 0 && responses[1] == 0 && errors[1] != 0;
-			assert i64(api.msg(errors[1], c'code', 0, 0, 0)) == if index == 1 { i64(-1100) } else { i64(21) };
+			code := i64(api.msg(errors[1], c'code', 0, 0, 0))
 			domain := ctext(api.msg(api.msg(errors[1], c'domain', 0, 0, 0), c'UTF8String', 0, 0, 0))
-			assert domain == if index == 1 { 'NSURLErrorDomain' } else { 'NSPOSIXErrorDomain' };
+			if index == 1 { assert code == -1100 && domain == 'NSURLErrorDomain' }
+			else if api.native {
+				// Native Foundation can reject a directory before POSIX I/O or
+				// report EISDIR from that I/O; require the matching error domain.
+				assert (code == -1101 && domain == 'NSURLErrorDomain')
+					|| (code == 21 && domain == 'NSPOSIXErrorDomain')
+			} else { assert code == 21 && domain == 'NSPOSIXErrorDomain' }
 		}
 		assert responses[0] == 0x123456789abcdef0 && responses[2] == 0xfedcba9876543210 && errors[0] == 0x123456789abcdef0 && errors[2] == 0xfedcba9876543210;
 	}
