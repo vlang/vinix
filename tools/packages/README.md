@@ -78,9 +78,10 @@ private data paths and declared permissions. All launch modes receive the same
 versioned environment contract. See [the SDK interface](SDK.md#application-context-interface)
 and [native guest qualification](../../tests/packages/sdk-context-check.md).
 
-Software's **Export offline** action reviews current catalog versions and their
-dependency closure, publisher provenance, licenses, permissions, destination and
-cache disk requirements before exporting to new local media. The equivalent
+Software's **Export offline** action reviews current catalog versions or the
+exact versions in an organization deployment lock, with their dependency closure,
+publisher provenance, licenses, permissions, destination and cache disk requirements
+before exporting to new local media. The equivalent catalog
 `mirror-review` / `mirror-apply` commands bind confirmation to signed metadata,
 policy and destination filesystem identity. Both direct and reviewed exports
 support `--progress`. See [offline administration](../../docs/application-distribution.md#offline-and-organization-deployment)
@@ -91,4 +92,10 @@ and runtime versions pinned by a nonempty format-2 organization deployment lock.
 The media includes the captured lock as `_deployment.json`, published with the
 verified closure. This preserves older approved runtimes when catalog mirrors
 would select newer versions. Publisher keys still require consumer enrollment.
+In Software, cycle the export scope to **Organization deployment lock** and enter
+its absolute file path. Visit every destination/source path part and the document
+digest, then review the package closure before confirming. The source and
+destination arguments stay frozen; changes to the document require a new review.
 See [locked mirror qualification](../../tests/packages/locked-mirror-check.md).
+See [Software locked export qualification](../../tests/packages/software-locked-mirror-check.md)
+for graphical presentation, argument and memory checks.

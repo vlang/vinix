@@ -108,10 +108,16 @@ mut:
 	mirror_mode bool
 	mirror_path []u8
 	mirror_all bool
+	mirror_locked bool
+	mirror_lock_path []u8
+	mirror_lock_focus bool
+	mirror_lock_pending string
+	mirror_lock_sha256 string
 	mirror_pending string
 	mirror_snapshot pkgprotocol.MirrorReview // review rows are owned by review_snapshot
 	mirror_details bool
 	mirror_pages []string
+	mirror_page_labels []string
 	mirror_page int
 	mirror_seen int
 	mirror_summary string
@@ -362,7 +368,9 @@ fn (mut a SoftwareApp) load_review() {
 		reserve.free()
 	}
 	if a.mirror_pending != '' {
-		a.set_status('Review the destination and every application and dependency. Export uses the authenticated catalog versions; it preserves the installed application set.')
+		a.set_status(if a.mirror_lock_pending != '' {
+			'Review the destination, deployment source and digest, then every application and dependency. Export preserves the exact locked versions and bundles _deployment.json.'
+		} else { 'Review the destination and every application and dependency. Export uses the authenticated catalog versions; it preserves the installed application set.' })
 	} else if a.deployment_pending != '' {
 		message := 'Deployment file: ' + a.deployment_pending + '\nReview all dependencies and removals. This replaces the installed application set; personal data stays on disk.'
 		a.set_status(message)
@@ -574,7 +582,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		a.initialize_mirror_field()
 		a.focus = false
 		a.select_all = false
-		a.set_status('Choose the selected catalog application or all installed application roots, then enter a new export directory.')
+		a.set_status('Choose a catalog application, installed application roots or an organization deployment lock, then enter a new export directory.')
 		return
 	}
 	if a.mirror_mode && (a.review == '' || a.mirror_details) { a.handle_mirror(event_id); return }
@@ -701,7 +709,9 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		'software.confirm' {
 			if a.review_ready {
 				mirroring := a.mirror_pending != ''
-				a.start(if mirroring {
+				a.start(if a.mirror_lock_pending != '' {
+					['mirror-deployment-apply', a.review_snapshot.fingerprint, a.mirror_pending, a.mirror_lock_pending]
+				} else if mirroring {
 					['mirror-apply', a.review_snapshot.fingerprint, a.mirror_pending, ...a.review_snapshot.names]
 				} else if a.deployment_pending != '' {
 					['deployment-apply', a.review_snapshot.fingerprint, a.deployment_pending]
@@ -917,7 +927,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		}
 		children << software_button('software.cancel', 'Cancel', 416, height - 138, 110)
 		if a.mirror_pending != '' {
-			children << software_button('software.mirror.details', 'Destination', width - 150, 8, 136)
+			children << software_button('software.mirror.details', 'Export details', width - 150, 8, 136)
 		}
 	} else {
 		children << software_button('software.upgrade', 'Update all', 274, height - 138, 130)
@@ -979,6 +989,7 @@ fn (mut a SoftwareApp) close_app() {
 		a.repository_result.free()
 		a.deployment_path.free()
 		a.mirror_path.free()
+		a.mirror_lock_path.free()
 	}
 	a = SoftwareApp{}
 }

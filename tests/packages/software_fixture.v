@@ -305,13 +305,42 @@ fn main() {
 	check_software_progress() or { panic(err) }
 	check_software_deployment() or { panic(err) }
 	check_software_mirror() or { panic(err) }
+	check_software_locked_mirror() or { panic(err) }
 	check_software_launch_options() or { panic(err) }
 	println('Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed')
 }
 
 const mirror_fixture_destination = '/private/tmp/offline export; $literal'
+const mirror_fixture_lock = '/etc/company/approved apps; $literal.json'
 
 fn software_mirror_service_fixture(args []string) !bool {
+	if args[1] == 'mirror-deployment-review' {
+		assert args.len == 4
+		if args[3] == '/missing-lock' { eprintln('fixture: deployment lock is unreadable'); exit(18) }
+		if args[3] == '/root-only-lock' { eprintln('fixture: offline deployment export requires a nonempty format-2 lock'); exit(18) }
+		base := fixture_review('mirror', ['editor'])
+		review := pkgprotocol.Review{ ...base, generation: 0, fingerprint: 'd'.repeat(64),
+			rows: base.rows.map(pkgprotocol.ReviewPackage{ ...it, version: '1.0.0', installed_version: '', action: 'export' }) }
+		mirror := pkgprotocol.MirrorReview{ format: 1, input_destination: if args[3] == '/wrong-destination' { '/other' } else { args[2] },
+			destination: args[2], review: review, cache_needed: 1024, cache_available: 65536, shared_disk: true }
+		if args[3] == '/catalog-response' { println(json2.encode(mirror)); return true }
+		text := json2.encode(pkgprotocol.DeploymentMirrorReview{ format: 1,
+			deployment: if args[3] == '/wrong-source' { '/other.json' } else { args[3] },
+			deployment_sha256: if args[3] == '/invalid-digest' { 'invalid' } else { 'e'.repeat(64) }, mirror: mirror })
+		println(if args[3] == '/missing-digest' { text.replace('"deployment_sha256":"' + 'e'.repeat(64) + '",', '') } else { text })
+		return true
+	}
+	if args[1] == 'mirror-deployment-apply' {
+		assert os.args[1] == '--progress'
+		assert args.len == 5 && args[2] == 'd'.repeat(64) && args[3] == mirror_fixture_destination
+		if args[4] == '/changed-lock' { eprintln('fixture: offline mirror review is stale; review again'); exit(23) }
+		assert args[4] == mirror_fixture_lock || args[4].len > 200
+		os.write_file(os.getenv('VINIX_SOFTWARE_MIRROR_FIXTURE'), json2.encode(args[2..]))!
+		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'copy', package: 'runtime', repository: 'runtime-publisher', path: 'bin/app', current: 4096, total: 4096 }))
+		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 }))
+		println('Offline deployment mirror ready: ' + args[3] + '/_deployment.json')
+		return true
+	}
 	if args[1] == 'mirror-review' {
 		assert args.len >= 4
 		if args[2] == '/missing' { eprintln('fixture: signed payload is unavailable'); exit(18) }
@@ -419,6 +448,100 @@ fn check_software_mirror() ! {
 	unsafe { bytes.free(); joined.free() }
 	malformed.close_app()
 	println('Software offline export: destination paging, dependency provenance, literal confirmation, installed scope, progress, stale diagnostics and close guard passed')
+}
+
+fn check_software_locked_mirror() ! {
+	receipt := os.temp_dir() + '/vinix-software-locked-mirror-' + os.getpid().str()
+	os.setenv('VINIX_SOFTWARE_MIRROR_FIXTURE', receipt, true)
+	defer { os.rm(receipt) or {}; os.unsetenv('VINIX_SOFTWARE_MIRROR_FIXTURE') }
+	// Organization locks work even when this machine has no catalog selection
+	// or installed roots. The reviewed document supplies the package intent.
+	mut app := SoftwareApp{ service_path: os.executable(), output: []u8{cap: 8192}, selected: -1 }
+	defer { app.close_app() }
+	app.handle('software.mirror')!
+	software_repository_text(mut app.mirror_path, mirror_fixture_destination)
+	app.handle('software.mirror.scope')!
+	assert app.mirror_all && !app.mirror_locked
+	app.handle('software.mirror.scope')!
+	assert app.mirror_locked && !app.mirror_all
+	assert app.build(ui2.rect(0, 0, 640, 610))!.children.any(it.id == 'software.mirror.lock')
+	app.handle('software.mirror.review')!
+	assert app.worker == unsafe { nil } && app.status.contains('absolute organization')
+	app.handle('software.mirror.lock')!
+	app.paste_input('relative')
+	app.handle('software.mirror.review')!
+	assert app.worker == unsafe { nil }
+	app.key_input('\x01')
+	app.paste_input(mirror_fixture_lock)
+	app.key_input('\x01')
+	for invalid in ['/bad\npath', '/bad\x80', '/' + 'x'.repeat(4096)] {
+		app.paste_input(invalid)
+		assert editor_bytes_text(app.mirror_lock_path) == mirror_fixture_lock
+	}
+	assert editor_bytes_text(app.mirror_path) == mirror_fixture_destination
+	for source in [mirror_fixture_lock, '/media/' + 'approved-'.repeat(35), '/wrong-source', '/wrong-destination',
+		'/invalid-digest', '/missing-digest', '/catalog-response', '/missing-lock', '/root-only-lock', '/changed-lock'] {
+		software_repository_text(mut app.mirror_lock_path, source)
+		app.handle('software.mirror.review')!
+		assert app.worker_review && app.prepare_close()
+		app.handle('software.mirror.scope')! // blocked while resolving
+		app.handle('software.confirm')!
+		assert !os.exists(receipt)
+		wait_for_software(mut app)
+		if source.starts_with('/wrong-') || source in ['/invalid-digest', '/missing-digest', '/catalog-response', '/missing-lock', '/root-only-lock'] {
+			assert !app.review_ready && app.mirror_lock_pending == '' && app.mirror_lock_sha256 == ''
+			assert app.mirror_pages.len == 0 && app.mirror_snapshot.destination == ''
+			continue
+		}
+		assert app.review_ready && app.mirror_locked && app.mirror_details
+		assert app.mirror_lock_pending == source && app.mirror_lock_sha256 == 'e'.repeat(64)
+		assert app.review_names == ['editor'] && app.review_snapshot.rows.all(it.version == '1.0.0')
+		assert app.mirror_page_labels.last().contains('SHA-256')
+		assert app.mirror_pages.last() == 'e'.repeat(64)
+		app.handle('software.mirror.packages')!
+		assert app.mirror_details // source path and digest must also be visited
+		app.handle('software.confirm')!
+		assert !os.exists(receipt)
+		mut source_parts := ''
+		for i, part in app.mirror_pages {
+			if app.mirror_page_labels[i].contains('source path') { source_parts += part }
+		}
+		assert source_parts == source
+		for app.mirror_seen + 1 < app.mirror_pages.len { app.handle('software.mirror.next')! }
+		assert app.build(ui2.rect(0, 0, 640, 610))!.children.any(it.text == 'e'.repeat(64))
+		app.handle('software.mirror.packages')!
+		app.handle('software.row.1')!
+		tree := app.build(ui2.rect(0, 0, 900, 660))!
+		assert tree.children.any(it.text.contains('runtime-publisher'))
+		assert tree.children.any(it.text.contains('Vendor-EULA (proprietary)') && it.text.contains('firmware'))
+		assert tree.children.any(it.text.contains('Permissions: network, process'))
+		app.handle('software.mirror.details')!
+		assert app.mirror_details
+		app.handle('software.mirror.packages')!
+		// Form storage is no longer authoritative once the review is accepted.
+		software_repository_text(mut app.mirror_path, '/other')
+		software_repository_text(mut app.mirror_lock_path, '/other-lock')
+		app.handle('software.confirm')!
+		assert app.worker_mirror && !app.prepare_close() && app.mirror_lock_pending == ''
+		wait_for_software(mut app)
+		if source == '/changed-lock' { assert app.status.contains('stale') && !os.exists(receipt) }
+		else {
+			assert app.progress_seen && app.status.contains('/_deployment.json')
+			assert json2.decode[[]string](os.read_file(receipt)!)! == ['d'.repeat(64), mirror_fixture_destination, source]
+			os.rm(receipt)!
+		}
+		software_repository_text(mut app.mirror_path, mirror_fixture_destination)
+	}
+	software_repository_text(mut app.mirror_lock_path, mirror_fixture_lock)
+	app.handle('software.mirror.review')!
+	wait_for_software(mut app)
+	app.handle('software.cancel')!
+	assert app.review_names.len == 0 && app.mirror_lock_pending == '' && app.mirror_lock_sha256 == ''
+	assert app.mirror_page_labels.len == 0 && app.mirror_pages.len == 0
+	app.handle('software.mirror.scope')!
+	assert !app.mirror_locked && !app.mirror_all
+	assert !app.build(ui2.rect(0, 0, 640, 610))!.children.any(it.id == 'software.mirror.lock')
+	println('Software locked offline export: exact older runtime, source/digest paging, literal frozen confirmation, invalid responses, stale diagnostics, progress and cancellation passed')
 }
 
 fn check_software_launch_options() ! {

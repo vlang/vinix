@@ -546,16 +546,34 @@ fn test_software_progress_redraw_and_stream_storage_are_released() {
 }
 
 fn test_software_mirror_form_destination_pages_closure_and_cancel_release_storage() {
+	software_mirror_memory(false)!
+}
+
+fn test_software_locked_mirror_source_digest_pages_and_cancel_release_storage() {
+	software_mirror_memory(true)!
+}
+
+fn software_mirror_memory(locked bool) ! {
 	path := '/media/' + 'offline-export-'.repeat(24)
 	mut app := SoftwareApp{ mirror_mode: true, mirror_pending: path.clone(), review: 'mirror'.clone(),
-		review_names: ['editor'.clone()] }
+		mirror_locked: locked, review_names: if locked { []string{} } else { ['editor'.clone()] } }
 	app.initialize_mirror_field()
 	software_repository_text(mut app.mirror_path, path)
+	source := '/company/' + 'approved-apps-'.repeat(24) + '.json'
+	if locked {
+		software_repository_text(mut app.mirror_lock_path, source)
+		app.mirror_lock_pending = source.clone()
+	}
 	row_text := software_review_fixture.replace('"operation":"install"', '"operation":"mirror"')
 		.replace('"generation":1', '"generation":0').replace('"action":"update"', '"action":"export"')
 	text := '{"format":1,"input_destination":"${path}","destination":"${path}","cache_needed":1024,"cache_available":65536,"shared_disk":true,"review":${row_text}}'
-	app.output = text.bytes()
-	unsafe { row_text.free(); text.free(); path.free() }
+	if locked {
+		digest := 'e'.repeat(64)
+		wrapper := '{"format":1,"deployment":"${source}","deployment_sha256":"${digest}","mirror":${text}}'
+		app.output = wrapper.bytes()
+		unsafe { wrapper.free(); digest.free() }
+	} else { app.output = text.bytes() }
+	unsafe { row_text.free(); text.free(); path.free(); source.free() }
 	app.load_review()
 	assert app.review_ready && app.mirror_details && app.mirror_pages.len > 1
 	begin_frame_elements()
@@ -590,8 +608,9 @@ fn test_software_mirror_form_destination_pages_closure_and_cancel_release_storag
 	C.vinix_heap_begin()
 	for _ in 0 .. 100 {
 		app.review = 'mirror'.clone()
-		app.review_names = ['editor'.clone()]
+		app.review_names = if locked { []string{} } else { ['editor'.clone()] }
 		app.mirror_pending = editor_bytes_text(app.mirror_path).clone()
+		if locked { app.mirror_lock_pending = editor_bytes_text(app.mirror_lock_path).clone() }
 		app.load_review()
 		assert app.review_ready
 		app.clear_review()
@@ -599,5 +618,5 @@ fn test_software_mirror_form_destination_pages_closure_and_cancel_release_storag
 	app.close_app()
 	retained := C.vinix_heap_end()
 	assert retained == baseline
-	println('Software offline export memory: redraw/paging=0; review retirement=${retained} bytes (decoder baseline ${baseline})')
+	println('Software offline export memory (deployment lock=${locked}): redraw/paging=0; review retirement=${retained} bytes (decoder baseline ${baseline})')
 }

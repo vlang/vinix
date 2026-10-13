@@ -5,7 +5,7 @@ import ui2
 import tools.packages.pkgprotocol
 
 fn software_progress_command(arguments []string) bool {
-	return arguments.len > 0 && arguments[0] in ['update', 'install', 'remove', 'upgrade', 'apply', 'deploy', 'deployment-apply', 'rollback', 'mirror', 'mirror-apply']
+	return arguments.len > 0 && arguments[0] in ['update', 'install', 'remove', 'upgrade', 'apply', 'deploy', 'deployment-apply', 'rollback', 'mirror', 'mirror-apply', 'mirror-deployment-apply']
 }
 
 fn (mut a SoftwareApp) clear_progress() {

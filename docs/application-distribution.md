@@ -407,9 +407,10 @@ with the same ID/key, then `update`. Expiry and sequence checks still apply;
 publishers must plan suitable expiry for offline use. Indexes may advertise apps
 outside the exported closure; those requests report missing payloads.
 
-Software's **Export offline** action exports either the selected catalog package
-or all explicitly installed application roots, with their dependencies. It
-resolves current authenticated catalog versions under organization policy;
+Software's **Export offline** action exports the selected catalog package,
+all explicitly installed application roots, or an organization deployment lock,
+with their dependencies. The catalog scopes
+resolve current authenticated catalog versions under organization policy;
 installed versions and personal data remain unchanged. Enter a new absolute
 directory on local disk or mounted media, review the complete destination path
 (long paths are paged), then review every package's publisher, permissions,
@@ -417,6 +418,17 @@ license and runtime before confirming. Destination requirements include missing
 cache objects when both paths share a filesystem. A separate cache filesystem
 has its own requirement and the same reserved-space policy. Export progress and
 failure diagnostics stay visible, and the window remains open during export.
+
+Cycle the scope button to **Organization deployment lock** to preserve exact
+approved versions, including older runtimes. Enter the absolute path of a
+nonempty format-2 lock; this works without an installed application set or catalog
+selection. The details screen pages the complete destination, source filename
+and SHA-256 before opening package review. Confirm uses the reviewed literal
+paths and fingerprint even if form storage changes. The service checks the
+document and other bound inputs again before exporting; a stale review reports
+the failure and requires another review. Successful media includes the exact
+document as `_deployment.json`. Export preserves the installed generation and
+personal data. See [Software locked export qualification](../tests/packages/software-locked-mirror-check.md).
 
 Administrative clients use `mirror-review NEW_DIRECTORY ID...`, then
 `mirror-apply FINGERPRINT NEW_DIRECTORY ID...`. Review reads authenticated cached
