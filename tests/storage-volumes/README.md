@@ -1,5 +1,10 @@
 # Storage-volume qualification
 
+`--host-data-scrub-view` and `--data-scrub-view` qualify validated offline plain
+scrub inspection: complete canonical syntax and semantic checks, ordinary
+reader/output faults, unchanged live mappings, repeated utility lifetimes and
+reordered reboot. See [scrub report inspection](data-scrub-view.md).
+
 `--host-data-reference` and `--data-reference` qualify offline plain multi-disk
 reference comparisons: exact saved metadata, every recorded digest, complete
 reports/fingerprints, ordinary reader and output failures, unchanged inputs/live

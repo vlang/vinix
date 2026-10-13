@@ -4,6 +4,11 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`show-data-scrub REPORT` validates and prints a complete saved plain-disk scrub
+report. Valid clean and changed reports return 0; malformed inputs or output
+failure return 1. See
+[scrub inspection](../../docs/storage-volumes.md#offline-multi-disk-scrub-report-inspection).
+
 `compare-data-references BEFORE_MANIFEST AFTER_MANIFEST` compares all recorded
 digests in plain multi-disk references when their complete saved metadata agrees.
 It reports both full reference fingerprints offline, returning 0 for stable,

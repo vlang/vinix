@@ -3154,6 +3154,44 @@ changing caller state; embedded identities, bounds, pools and global slots
 retain the ordinary bundle validation. See
 [qualification](../tests/storage-volumes/data-checksums.md).
 
+## Offline multi-disk scrub report inspection
+
+`show-data-scrub REPORT` validates and displays a saved plain-data `VINIXSR1`
+report from `scrub-data` or `scrub-data-auto`. It reads no devices or credentials,
+takes no writer lock and creates no output file. The complete report is
+validated before any report bytes reach stdout; the original canonical text is
+then printed exactly, including every clean or changed row and the reference
+SHA-256 fingerprint.
+
+```sh
+vinix-volume show-data-scrub /root/scrub.txt
+```
+
+The input must be an ordinary regular file of 1–32767 bytes. Read-only,
+no-follow, nonblocking descriptors pin the file and parent directory through
+stdout finalization. Ordinary readable modes and hard links work, including
+while a saved-state writer holds the directory lock. Final symlinks, directories,
+FIFOs, missing/unbounded files, incomplete reads and trailing bytes fail.
+
+Validation requires exact SR1 labels, spacing and newlines, canonical unsigned
+decimal fields and 64 lowercase hexadecimal characters per digest. There must
+be 1–64 saved disks and 0–64 complete mapping rows, ordered by saved disk index
+with globally unique slots. Extents must be positive, 512-byte aligned,
+nonoverlapping within each disk, and within signed-I/O and SHA-256 length bounds.
+Every row's `match`/`changed` result must agree with its two digests, and header
+counts must agree with every row. Saved slot/extent order within a disk is
+preserved; empty saved disks and zero-mapping reports remain valid.
+
+Status **0** means a valid report was displayed, including historical changed
+findings. Status **1** means input, validation or output failure; invalid CLI
+syntax returns **2**. A late stdout failure can expose text with status 1.
+SR1 stores no disk capacities or native sector sizes: inspection cannot validate
+those missing fields or bind the recorded fingerprint to a supplied reference.
+The text has no authentication or checksum over the report itself. Inspection
+checks structural consistency of trusted historical evidence; use verification
+or scrubbing to check current disk contents. See
+[inspection qualification](../tests/storage-volumes/data-scrub-view.md).
+
 ## Offline multi-disk data reference comparison
 
 `compare-data-references BEFORE_MANIFEST AFTER_MANIFEST` compares the recorded
