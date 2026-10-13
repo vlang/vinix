@@ -4369,15 +4369,15 @@ missing iOS executable.
 ```sh
 VMODULES="$PWD/compat/ios" v -enable-globals -cc clang test compat/ios
 ./tests/ios/run-objc-calculator.sh
-python3 tests/ios/uikit.py # after building build/ios/run-ios-host above
+./tests/ios/uikit # after building build/ios/run-ios-host above
 python3 tests/ios/run.py
-python3 tests/ios/desktop.py --desktop build/vinix-desktop
+./tests/ios/desktop --desktop build/vinix-desktop
 # Upstream iOS-2048, including original model tests and real guest swipes:
 ./tests/ios/build-2048-model.sh # after building the app
 build/ios/run-ios-host build/ios/2048/model-tests
-python3 tests/ios/game2048.py
+./tests/ios/game2048
 python3 tests/ios/run.py --with-2048
-python3 tests/ios/desktop.py --app 2048 --desktop build/vinix-desktop
+./tests/ios/desktop --app 2048 --desktop build/vinix-desktop
 ```
 
 Host tests cover malformed file/command/section/segment/chain ranges, universal

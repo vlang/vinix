@@ -171,6 +171,11 @@ fn capture_policy_arch(argv []string, env map[string]string, timeout f64, limit 
 
 fn capture_stream_policy_arch(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
  observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64, combined bool, inherited bool, executable string, log string, append bool, directory string, host_arch string, stderr_inherited bool, stderr_limit int, strict_stderr bool) !Output {
+	return capture_stream_input_arch(argv, env, timeout, limit, cancel, observe, spawned, context, shutdown_grace, combined, inherited, executable, log, append, directory, host_arch, stderr_inherited, stderr_limit, strict_stderr, -1)!
+}
+
+fn capture_stream_input_arch(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
+ observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64, combined bool, inherited bool, executable string, log string, append bool, directory string, host_arch string, stderr_inherited bool, stderr_limit int, strict_stderr bool, input i32) !Output {
 	if argv.len == 0 || argv.any(it.contains('\x00')) { return error('invalid command') }
 	mut pipes := [i32(-1), -1, -1, -1]!
 	defer { for fd in pipes { if fd >= 0 { C.close(fd) } } }
@@ -198,6 +203,9 @@ fn capture_stream_policy_arch(argv []string, env map[string]string, timeout f64,
 	mut actions := C.posix_spawn_file_actions_t{}
 	if C.posix_spawn_file_actions_init(&actions) != 0 { return error('cannot initialize spawn actions') }
 	defer { C.posix_spawn_file_actions_destroy(&actions) }
+	if input >= 3 {
+		if C.posix_spawn_file_actions_adddup2(&actions, input, 0) != 0 || C.posix_spawn_file_actions_addclose(&actions, input) != 0 { return error('cannot configure command input') }
+	}
 	if directory != '' {
 		if directory.contains('\x00') { return error('invalid command directory') }
 		status := C.posix_spawn_file_actions_addchdir_np(&actions, directory.str)
@@ -229,7 +237,7 @@ fn capture_stream_policy_arch(argv []string, env map[string]string, timeout f64,
 	mut flags := i16(C.POSIX_SPAWN_SETPGROUP | C.POSIX_SPAWN_SETSIGDEF)
 	$if macos {
 		flags |= i16(C.POSIX_SPAWN_CLOEXEC_DEFAULT)
-		if C.fcntl(0, C.F_GETFD) >= 0 && C.posix_spawn_file_actions_addinherit_np(&actions, 0) != 0 { return error('cannot preserve command stdin') }
+		if input < 3 && C.fcntl(0, C.F_GETFD) >= 0 && C.posix_spawn_file_actions_addinherit_np(&actions, 0) != 0 { return error('cannot preserve command stdin') }
 		if inherited && log_fd < 0 { for fd in [1,2] { if C.fcntl(fd, C.F_GETFD) >= 0 && C.posix_spawn_file_actions_addinherit_np(&actions, fd) != 0 { return error('cannot preserve command output') } } }
 		if !inherited && stderr_inherited && log_fd < 0 && C.fcntl(2, C.F_GETFD) >= 0 && C.posix_spawn_file_actions_addinherit_np(&actions, 2) != 0 { return error('cannot preserve command stderr') }
 	}

@@ -1,0 +1,132 @@
+{
+    "bytes": 17035,
+    "evidence": "~/.cache/vinix-ios-ui-native-20261013",
+    "files": 3,
+    "lines": 373,
+    "originals": [
+        {
+            "bytes": 7962,
+            "lines": 153,
+            "path": "tests/ios/desktop.py",
+            "sha256": "d7d4c49b6dce26a246c71d355dfc6d80a6ad6a69db482475b554b82acd8f4dc0"
+        },
+        {
+            "bytes": 5993,
+            "lines": 144,
+            "path": "tests/ios/uikit.py",
+            "sha256": "f0f99fb03ae9b9385591fc1b8d60461903ef39f1f101cf16d716ae453ac2c380"
+        },
+        {
+            "bytes": 3080,
+            "lines": 76,
+            "path": "tests/ios/game2048.py",
+            "sha256": "ff88e5a0e83ff6d6fd2c655491b5ca929abb83407b902799680aa2c123544ea6"
+        }
+    ],
+    "profiles": [
+        {
+            "profile": "arm",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "6ed315ace171c796985026ec155abd2f5fe62d5455047bf0957680476dc1ce5c"
+                },
+                {
+                    "name": "tests",
+                    "sha256": "18d997e60ed6846449860ee1d46840374442d834cee55bccbca4dab57f1cc2bf"
+                },
+                {
+                    "name": "qmp",
+                    "sha256": "5d510418cfa192e8b7e2ea0de0272979a22ec055c7055e04c469068b9ad2d3d8"
+                },
+                {
+                    "name": "shims",
+                    "sha256": "86e96f77c29fea928328ed30fa13c0e4168d9d30d7963b4404ca93a207b71800"
+                },
+                {
+                    "input": "build/ios/run-ios-host",
+                    "sha256": "8cd0ef90e8894d7b4b7703ba36003db32dbc0bbc97de39708caae23fa88440b9"
+                },
+                {
+                    "input": "build/ios/objc/Calculator.app/Calculator",
+                    "sha256": "30d37e7090850ce0822df338542b9861550e1c827587eff9e78541464a0218f1"
+                },
+                {
+                    "input": "build/ios/2048/NumberTileGame.app/NumberTileGame",
+                    "sha256": "ff492524e54fc83d8af2467360bd0786534fa0e69ba40047d3ff15e057d76c6d"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "profile": "x86",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "f65eb377c20bc610847aee06cd3aa4422ceea991f2dd24ec69d0dd712316ba44"
+                },
+                {
+                    "name": "tests",
+                    "sha256": "536491de7c3f1bdf64ec7a49c55b2a2459b223df6f754e9ff54c48225f995455"
+                },
+                {
+                    "name": "qmp",
+                    "sha256": "6d75f59f896b8ba86e1367f3f77b2ed3d5e818443c5e71c92f3352909b486da9"
+                },
+                {
+                    "name": "shims",
+                    "sha256": "9e1dd53025aae7a6d9482dc228281de5069f76a6260531cc2ea40a90a5878214"
+                },
+                {
+                    "input": "build/ios/run-ios-host",
+                    "sha256": "8cd0ef90e8894d7b4b7703ba36003db32dbc0bbc97de39708caae23fa88440b9"
+                },
+                {
+                    "input": "build/ios/objc/Calculator.app/Calculator",
+                    "sha256": "30d37e7090850ce0822df338542b9861550e1c827587eff9e78541464a0218f1"
+                },
+                {
+                    "input": "build/ios/2048/NumberTileGame.app/NumberTileGame",
+                    "sha256": "ff492524e54fc83d8af2467360bd0786534fa0e69ba40047d3ff15e057d76c6d"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "profile": "san",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "a974e7b99482e2613f74de511fdc575d586c6eda268cc7ec69de1aabb64e5917"
+                },
+                {
+                    "name": "tests",
+                    "sha256": "bb205034bf1946f9c0c51d941a0bc4e86aebb371604709f375e56a3c6b874d25"
+                },
+                {
+                    "name": "qmp",
+                    "sha256": "686e0d9bf8b1549252975c9cce49924e7da619badbbcec513dd541f94dc968c7"
+                },
+                {
+                    "name": "shims",
+                    "sha256": "44289e82411e502d8f4e6e4bfbf47980fe221fda8a2bc8f42e9d33d4a2e1c4fb"
+                },
+                {
+                    "input": "build/ios/run-ios-host",
+                    "sha256": "8cd0ef90e8894d7b4b7703ba36003db32dbc0bbc97de39708caae23fa88440b9"
+                },
+                {
+                    "input": "build/ios/objc/Calculator.app/Calculator",
+                    "sha256": "30d37e7090850ce0822df338542b9861550e1c827587eff9e78541464a0218f1"
+                },
+                {
+                    "input": "build/ios/2048/NumberTileGame.app/NumberTileGame",
+                    "sha256": "ff492524e54fc83d8af2467360bd0786534fa0e69ba40047d3ff15e057d76c6d"
+                }
+            ],
+            "status": "PASS"
+        }
+    ],
+    "qualification": "Twelve cold ARM/x86/ASanUBSan builds; actual retained UIKit/2048 Mach-O workflows; per-profile truncated/Unicode/nesting codec cases, 16 real duplex protocol/diagnostic/exit/signal cases, 100 EOF/spawn cleanup cycles and 11 logged-pipe/Unix-QMP desktop cases with real static AArch64 init and native USTAR; existing QMP/archive/reader regressions and public fronts. No Python or Vinix guest executed.",
+    "source_commit": "b463fe892f479445ad56fba4815e36c770b15cef"
+}

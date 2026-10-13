@@ -65,7 +65,7 @@ and keyboard input. The runtime handles resize callbacks and ARC teardown.
 `python3 tests/ios/run.py` runs the C probe and UIKit binary in an isolated Vinix
 VM. The UIKit test clicks all 27 model cases through the desktop protocol,
 checks resize and keyboard input, and runs 1,000 update cycles before closing.
-`python3 tests/ios/desktop.py --desktop build/vinix-desktop` additionally verifies
+`./tests/ios/desktop --desktop build/vinix-desktop` additionally verifies
 real QEMU pointer clicks and saves a screenshot. Unknown imports or selectors
 fail explicitly; this is not general iOS framework compatibility.
 

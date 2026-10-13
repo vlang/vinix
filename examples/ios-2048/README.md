@@ -69,13 +69,13 @@ v -enable-globals -cc clang -gc none \
   -o build/ios/run-ios-host compat/ios/runner
 ./tests/ios/build-2048-model.sh
 build/ios/run-ios-host build/ios/2048/model-tests
-python3 tests/ios/game2048.py
+./tests/ios/game2048
 
 # Real isolated Vinix guest: upstream model tests and interactive app protocol.
 python3 tests/ios/run.py --with-2048
 
 # Actual compositor and QEMU pointer swipes; writes build/ios/2048.ppm.
-python3 tests/ios/desktop.py --app 2048 --desktop build/vinix-desktop
+./tests/ios/desktop --app 2048 --desktop build/vinix-desktop
 ```
 
 The model harness compiles all eight original upstream merge tests with a small
