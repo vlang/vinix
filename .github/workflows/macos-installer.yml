@@ -6,12 +6,14 @@ on:
       - .github/workflows/macos-installer.yml
       - scripts/build-macos-installer.sh
       - build-support/find-v.sh
+      - build-support/cpythonapi/**
       - installer/macos/**
   pull_request:
     paths:
       - .github/workflows/macos-installer.yml
       - scripts/build-macos-installer.sh
       - build-support/find-v.sh
+      - build-support/cpythonapi/**
       - installer/macos/**
   workflow_dispatch:
 
@@ -61,6 +63,8 @@ jobs:
           test ! -e "build/vinix-installer/Vinix Installer.app/Contents/Resources/payload"
           test "$(uname -m)" = arm64
           file "build/vinix-installer/Vinix Installer.app/Contents/MacOS/vinix-installer" | grep -q arm64
+          file "build/vinix-installer/Vinix Installer.app/Contents/Resources/vinix-auto" | grep -q arm64
+          test ! -e "build/vinix-installer/Vinix Installer.app/Contents/Resources/vinix_auto.py"
 
       - name: Create compressed DMG and checksum
         run: |

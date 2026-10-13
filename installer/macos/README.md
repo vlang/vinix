@@ -18,7 +18,7 @@ make macos-installer
 open "build/vinix-installer/Vinix Installer.app"
 ```
 
-The normal build contains only the app and its support scripts. During
+The normal build contains the app, native V installer policy and support scripts. During
 installation it displays byte and percentage progress while downloading the
 approximately 1 GB `Vinix-M1-Payload.zip` from the rolling GitHub release, then
 verifies its pinned SHA-256 checksum before any disk changes. A local checkout
@@ -87,6 +87,8 @@ Disk mutation and boot-policy authentication are performed by the upstream
 pins and SHA-256-verifies installer v0.9.1 and the 2026-09-05 UEFI-only m1n1
 package before running either. Administrator and Apple machine-owner passwords
 are read by the upstream terminal UI and are never passed through the V app.
+The first-party policy is implemented in [V](asahipolicy/README.md). The verified
+upstream archive retains its own third-party CPython framework and modules.
 
 ## First boot
 

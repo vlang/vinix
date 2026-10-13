@@ -542,5 +542,34 @@
         }
     ],
     "qualification": "Nine cold ARM/x86/ASanUBSan main/model/builder builds; exact original static check-label coverage, all eleven imports retained; owned/borrowed/stolen/error/retired reference tests, signed i32 error results, method layout, Unicode/NUL, retained callback and creation-failure ownership. Six real ARM/x86 guest ELF builds with verified interpreter and source/compiler/runtime/executable manifests; all 36 required exports in both real staged CPython libraries verified as data; six failed compiles preserve existing output; cold public help and real ARM build. No Python or guest execution.",
+    "shared_api_installer_requalification": {
+        "evidence": "~/.cache/vinix-installer-native-20261013",
+        "limits": "Historical 36-symbol receipts above are unchanged; these new receipts qualify the extended 40-symbol API. No interpreter or guest execution.",
+        "profiles": [
+            {
+                "evidence": "~/.cache/vinix-installer-native-20261013/smoke-arm/qualification.json",
+                "profile": "arm",
+                "qualification_sha256": "9d0432bed09955353e0ba3bb98a0e4d7a998c790abcdb32e733cb58179892e79",
+                "status": "PASS",
+                "symbols": 40
+            },
+            {
+                "evidence": "~/.cache/vinix-installer-native-20261013/smoke-x86/qualification.json",
+                "profile": "x86",
+                "qualification_sha256": "b9381b7813384a93943bc12d30bd566a0e7454b77bfae81121a0abef60f6c26c",
+                "status": "PASS",
+                "symbols": 40
+            },
+            {
+                "evidence": "~/.cache/vinix-installer-native-20261013/smoke-san/qualification.json",
+                "profile": "san",
+                "qualification_sha256": "87980da0c87101e4f0a924118465b1b935a21f292e1625358be2889b5b013bbe",
+                "status": "PASS",
+                "symbols": 40
+            }
+        ],
+        "source_commit": "8dc58b195e5ef9ccc237dc2cc5c19299d9c8da3b",
+        "symbols": 40
+    },
     "source_commit": "538d93af8085bf773b2cba2bf4b0f71bdf7fc02e"
 }

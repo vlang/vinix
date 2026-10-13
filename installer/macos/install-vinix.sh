@@ -57,7 +57,7 @@ if [ "${1:-}" = "--run-prepared" ]; then
     TARGET_DISK=$3
     SPACE_BYTES=$4
     [ "$(id -u)" -eq 0 ] || fail "prepared installer must run as root"
-    [ -f "$WORK/vinix_auto.py" ] && [ -f "$WORK/installer_data.json" ] \
+    [ -x "$WORK/vinix-auto" ] && [ -f "$WORK/installer_data.json" ] \
         || fail "prepared installer is incomplete"
     cd "$WORK"
     export LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
@@ -71,7 +71,7 @@ if [ "${1:-}" = "--run-prepared" ]; then
     export DISTRO_DOCS=https://github.com/vlang/vinix/tree/master/installer/macos
     export VINIX_TARGET_DISK="$TARGET_DISK"
     export VINIX_SPACE_BYTES="$SPACE_BYTES"
-    exec "$WORK/Frameworks/Python.framework/Versions/3.13/bin/python3.13" "$WORK/vinix_auto.py"
+    exec "$WORK/vinix-auto"
 fi
 
 CONFIRMED=0
@@ -111,6 +111,20 @@ WORK=$(mktemp -d "${TMPDIR:-/tmp}/vinix-install.XXXXXX")
 INSTALLER_ARCHIVE="$WORK/installer.tar.gz"
 UEFI_ARCHIVE="$WORK/uefi.zip"
 
+# Distributed apps carry the native policy. Source-checkout use builds the same
+# V entry point before downloading or preparing any installer components.
+if [ -x "$SCRIPT_DIR/vinix-auto" ]; then
+    /bin/cp "$SCRIPT_DIR/vinix-auto" "$WORK/vinix-auto"
+else
+    ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
+    [ -f "$SCRIPT_DIR/native-auto/main.v" ] || fail "native installer policy is missing"
+    V=${V:-}
+    . "$ROOT/build-support/find-v.sh"
+    V_C_ERROR_BUG_REPORT_DISABLED=1 V_MACOS_V3_NO_FALLBACK=1 \
+        "$V" -nocache -cc /usr/bin/clang -prod -gc none \
+        -o "$WORK/vinix-auto" "$SCRIPT_DIR/native-auto"
+fi
+
 echo
 echo "Vinix Installer"
 echo "  target:     $TARGET_DISK"
@@ -145,7 +159,6 @@ echo "Downloading verified m1n1/Asahi installer components..."
 
 echo "Preparing Vinix boot package..."
 /usr/bin/tar -xzf "$INSTALLER_ARCHIVE" -C "$WORK"
-/bin/cp "$SCRIPT_DIR/vinix_auto.py" "$WORK/vinix_auto.py"
 /bin/mkdir -p "$WORK/os" "$WORK/package/esp/EFI/BOOT" \
     "$WORK/package/esp/boot" "$WORK/package/esp/m1n1"
 /usr/bin/unzip -p "$UEFI_ARCHIVE" esp/m1n1/boot.bin > "$WORK/package/esp/m1n1/boot.bin"

@@ -16,3 +16,13 @@ whose destructor releases every strong SDK reference before freeing the context.
 The native [CPython smoke controller](../../tests/native-python-smoke/README.md)
 is the initial consumer. Its ownership/callback tests use V models rather than
 executing Python. No interpreter or first-party Python source is bundled here.
+
+The [macOS installer policy](../../installer/macos/asahipolicy/README.md) also
+uses native method descriptors with keyword arguments. A descriptor borrows its
+`Method` definition, so keep the definition array and callback context alive
+through interpreter finalization. `set_attr` retains no caller reference;
+`dictionary_value` increments a found borrowed dictionary value in its arena.
+An optional `error_factory` receives borrowed exception type/value/traceback
+references; retain each reference needed after it returns. Restore transfers
+those references to the SDK, while retirement decrements them exactly once.
+The default error handler remains unchanged for the smoke controller.

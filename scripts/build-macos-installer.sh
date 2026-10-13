@@ -55,12 +55,15 @@ case "$APP" in "$BUILD_DIR"/*.app) /bin/rm -rf -- "$APP" ;; *) exit 1 ;; esac
 /bin/mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 /bin/cp "$SCRIPT_DIR/Info.plist" "$APP/Contents/Info.plist"
 /bin/cp "$SCRIPT_DIR/install-vinix.sh" "$SCRIPT_DIR/fetch-vinix-payload.sh" \
-    "$SCRIPT_DIR/vinix_auto.py" "$APP/Contents/Resources/"
+    "$APP/Contents/Resources/"
 /bin/chmod 755 "$APP/Contents/Resources/install-vinix.sh" \
     "$APP/Contents/Resources/fetch-vinix-payload.sh"
 
 echo "==> Compiling native ui2 installer"
-"$V" -prod -gc none -path "@vlib|@vmodules|$ROOT/third_party" \
+export V_C_ERROR_BUG_REPORT_DISABLED=1 V_MACOS_V3_NO_FALLBACK=1
+"$V" -nocache -cc /usr/bin/clang -prod -gc none \
+    -o "$APP/Contents/Resources/vinix-auto" "$SCRIPT_DIR/native-auto"
+"$V" -nocache -cc /usr/bin/clang -prod -gc none -path "@vlib|@vmodules|$ROOT/third_party" \
     -d "vinix_source_root=$ROOT" \
     -o "$APP/Contents/MacOS/vinix-installer" "$SCRIPT_DIR"
 

@@ -1,0 +1,125 @@
+{
+    "evidence": "~/.cache/vinix-installer-native-20261013",
+    "limits": "No SDK initialization, Python, interpreter modules, authentication, APFS mutation, installation, shutdown or Vinix guest executed. Third-party Asahi SDK/runtime remains pinned and is consumed through the C API during future user installations. Current compiler reports pre-existing main.v/installer_test.v formatter differences; aggregate test.sh stops at that unchanged guard. Existing UI tests and all policy suites run directly; public payload and argument checks run separately. No aggregate test.sh pass is claimed.",
+    "original": {
+        "bytes": 8147,
+        "lines": 203,
+        "path": "installer/macos/vinix_auto.py",
+        "sha256": "ed977ab6f621e405854f5a38d4a36fbd8b47060fd673d0f35078e8d659d39f9d"
+    },
+    "profiles": [
+        {
+            "limits": "Native policy/reference/callback and existing ui2 tests only. Shutdown and delay are replaced by V recorders. Both SDK Mach-O slices inspected as data. No SDK initialization, Python execution, authentication, APFS mutation, installation, shutdown, or Vinix guest executed.",
+            "profile": "arm",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "f5cdc4028ec972c70a2849ba1a09e5b80600d9799709d3496dece5bea9a44543"
+                },
+                {
+                    "name": "core",
+                    "sha256": "5c794c351c18910d47e084fac0f0a0c11bbdd73f042e39e25b3675abc5dd868e"
+                },
+                {
+                    "name": "bridge",
+                    "sha256": "b019981c3c68c7cff2affa96092d5039b19f6c405e101f5b7c651b0b91c99315"
+                },
+                {
+                    "name": "ui",
+                    "sha256": "fe6d61257a47a9a90f19db1f813a1861f6d235cfaddede75dbf165dc18f560e4"
+                },
+                {
+                    "name": "smoke-ownership",
+                    "sha256": "42f1ac64a88b55563c59bbec62edab2b25a64107a2546efebfa146ab18fba8dc"
+                }
+            ],
+            "sdk_exports": 40,
+            "sdk_sha256": "899a095fe42694d0ba610e201df29eb2d2f275623a26160d35f46853277a0a9c",
+            "status": "PASS"
+        },
+        {
+            "limits": "Native policy/reference/callback and existing ui2 tests only. Shutdown and delay are replaced by V recorders. Both SDK Mach-O slices inspected as data. No SDK initialization, Python execution, authentication, APFS mutation, installation, shutdown, or Vinix guest executed.",
+            "profile": "x86",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "baa27ad19665d4e9ee684d90d6103dc05ddeea0527d427fa0350457177a8c272"
+                },
+                {
+                    "name": "core",
+                    "sha256": "462092a904dbcacf657f8549d34c9774f156282835a91444af1bd26337985e5f"
+                },
+                {
+                    "name": "bridge",
+                    "sha256": "5d6f8bc61522cb1fee5b4005d57b3883894c7a5108bf5c62d129bb96bac42a2a"
+                },
+                {
+                    "name": "ui",
+                    "sha256": "4010f1679166663d767f9f24869b0b8b68daa03c34783629531622723e551487"
+                },
+                {
+                    "name": "smoke-ownership",
+                    "sha256": "97d9a869e51ab4c9e1a91b7623c131a4b6a0a6600b141ba1cc693604a5ad50ba"
+                }
+            ],
+            "sdk_exports": 40,
+            "sdk_sha256": "899a095fe42694d0ba610e201df29eb2d2f275623a26160d35f46853277a0a9c",
+            "status": "PASS"
+        },
+        {
+            "limits": "Native policy/reference/callback and existing ui2 tests only. Shutdown and delay are replaced by V recorders. Both SDK Mach-O slices inspected as data. No SDK initialization, Python execution, authentication, APFS mutation, installation, shutdown, or Vinix guest executed.",
+            "profile": "san",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "0bb5e7db7e7dff16b65428a6eed927c335aa58e0c884cb4d55ca39b4fcba6e7c"
+                },
+                {
+                    "name": "core",
+                    "sha256": "d485d842ba4bdc6ee628edeb15be2a0606fb0b1aba819a720cdae9b52fa8ab13"
+                },
+                {
+                    "name": "bridge",
+                    "sha256": "ed40c42c6b1ed9bfb3c6416a30a8632f5478606bec42a81c7c5eff6ed171768a"
+                },
+                {
+                    "name": "ui",
+                    "sha256": "a7278b253e82225e1ba5b5cda1d37740239c62383df71da8f6515b045af2e75c"
+                },
+                {
+                    "name": "smoke-ownership",
+                    "sha256": "0587b26a2bed2451421b3d494b14446510a5870e3ad095a8a79399bf0f2cdd63"
+                }
+            ],
+            "sdk_exports": 40,
+            "sdk_sha256": "899a095fe42694d0ba610e201df29eb2d2f275623a26160d35f46853277a0a9c",
+            "status": "PASS"
+        }
+    ],
+    "qualification": "15 cold main/core/bridge/ui/smoke-ownership builds across ARM, Rosetta x86 and ARM ASanUBSan; 256 actions and 1023 unique-container masks; keyword/positional/default guards, fallback/external/resize/stub/profile/completion and full saved error ownership with interrupt/exit and retired callbacks. Both actual SDK framework slices expose all 40 symbols as data. Shared CPython smoke controller requalified with 9 cold host builds, 6 real guest ELF builds and compiler-failure preservation. Actual signed thin app built and verified, public payload file-download bytes and three argument guards pass.",
+    "sdk_archive_sha256": "bc5bbca9d4c57cdf3a418c52b6b402a84ae6db776dd5ad55640fdb5d119ee4b0",
+    "smoke_requalification": [
+        {
+            "evidence": "~/.cache/vinix-installer-native-20261013/smoke-arm/qualification.json",
+            "profile": "arm",
+            "qualification_sha256": "9d0432bed09955353e0ba3bb98a0e4d7a998c790abcdb32e733cb58179892e79",
+            "status": "PASS",
+            "symbols": 40
+        },
+        {
+            "evidence": "~/.cache/vinix-installer-native-20261013/smoke-x86/qualification.json",
+            "profile": "x86",
+            "qualification_sha256": "b9381b7813384a93943bc12d30bd566a0e7454b77bfae81121a0abef60f6c26c",
+            "status": "PASS",
+            "symbols": 40
+        },
+        {
+            "evidence": "~/.cache/vinix-installer-native-20261013/smoke-san/qualification.json",
+            "profile": "san",
+            "qualification_sha256": "87980da0c87101e4f0a924118465b1b935a21f292e1625358be2889b5b013bbe",
+            "status": "PASS",
+            "symbols": 40
+        }
+    ],
+    "source_commit": "8dc58b195e5ef9ccc237dc2cc5c19299d9c8da3b"
+}

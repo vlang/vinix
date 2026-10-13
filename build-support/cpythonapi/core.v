@@ -9,6 +9,9 @@ type Finalize = fn () i32
 type RefOp = fn (Ref)
 type Import = fn (&char) Ref
 type Attribute = fn (Ref, &char) Ref
+type AttributeSet = fn (Ref, &char, Ref) i32
+type DictionaryGet = fn (Ref, &char) Ref
+type DescriptorNew = fn (Ref, &Method) Ref
 type Call = fn (Ref, Ref, Ref) Ref
 type UnaryRef = fn (Ref) Ref
 type UnaryInt = fn (Ref) i32
@@ -30,6 +33,8 @@ type BytesData = fn (Ref, &&char, &isize) i32
 type ErrorOccurred = fn () Ref
 type ErrorFetch = fn (&Ref, &Ref, &Ref)
 type ErrorString = fn (Ref, &char)
+type ErrorRestore = fn (Ref, Ref, Ref)
+type ErrorFactory = fn (Ref, Ref, Ref, &Api) IError
 type HasAttribute = fn (Ref, &char) i32
 type CapsuleNew = fn (voidptr, &char, voidptr) Ref
 type CapsulePointer = fn (Ref, &char) voidptr
@@ -55,6 +60,9 @@ pub:
 	dec             RefOp          = unsafe { nil }
 	import_module   Import         = unsafe { nil }
 	attribute       Attribute      = unsafe { nil }
+	attribute_set   AttributeSet   = unsafe { nil }
+	dictionary_get  DictionaryGet  = unsafe { nil }
+	descriptor_new  DescriptorNew  = unsafe { nil }
 	call            Call           = unsafe { nil }
 	stringify       UnaryRef       = unsafe { nil }
 	truth           UnaryInt       = unsafe { nil }
@@ -79,6 +87,8 @@ pub:
 	error_occurred  ErrorOccurred  = unsafe { nil }
 	error_fetch     ErrorFetch     = unsafe { nil }
 	error_string    ErrorString    = unsafe { nil }
+	error_restore   ErrorRestore   = unsafe { nil }
+	error_factory   ErrorFactory   = unsafe { nil }
 	has_attribute   HasAttribute   = unsafe { nil }
 	capsule_new     CapsuleNew     = unsafe { nil }
 	capsule_pointer CapsulePointer = unsafe { nil }
@@ -95,7 +105,8 @@ pub const symbols = ['Py_InitializeEx', 'Py_FinalizeEx', 'Py_IncRef', 'Py_DecRef
 	'PyList_Append', 'PyDict_New', 'PyDict_SetItemString', 'PyUnicode_AsUTF8AndSize',
 	'PyBytes_AsStringAndSize', 'PyErr_Occurred', 'PyErr_Fetch', 'PyErr_SetString',
 	'PyObject_HasAttrString', 'PyCapsule_New', 'PyCapsule_GetPointer', 'PyCFunction_NewEx',
-	'_Py_NoneStruct', 'PyExc_RuntimeError', 'PyBool_FromLong']
+	'_Py_NoneStruct', 'PyExc_RuntimeError', 'PyBool_FromLong', 'PyObject_SetAttrString',
+	'PyDict_GetItemString', 'PyDescr_NewMethod', 'PyErr_Restore']
 
 pub fn open(path string) !Api {
 	handle := dl.open_opt(path, dl.rtld_now | dl.rtld_global)!
@@ -141,6 +152,10 @@ pub fn open(path string) !Api {
 		none:            Ref(found[33])
 		runtime_error:   unsafe { *(&Ref(found[34])) }
 		boolean:         unsafe { NewInt(found[35]) }
+		attribute_set:   unsafe { AttributeSet(found[36]) }
+		dictionary_get:  unsafe { DictionaryGet(found[37]) }
+		descriptor_new:  unsafe { DescriptorNew(found[38]) }
+		error_restore:   unsafe { ErrorRestore(found[39]) }
 	}
 	retained = true
 	return api
@@ -154,6 +169,7 @@ pub fn (api &Api) exception() IError {
 	defer {
 		for item in [kind, value, trace] { if item != unsafe { nil } { api.dec(item) } }
 	}
+	if api.error_factory != unsafe { nil } { return api.error_factory(kind, value, trace, api) }
 	mut message := 'CPython operation failed'
 	if kind != unsafe { nil } {
 		name := api.attribute(kind, c'__name__')
@@ -281,6 +297,24 @@ pub fn (mut arena Arena) call(target Ref, args []Ref, keywords map[string]Ref) !
 pub fn (mut arena Arena) method(reference Ref, name string, args []Ref, keywords map[string]Ref) !Ref {
 	arena.require_live()!
 	return arena.call(arena.attr(reference, name)!, args, keywords)!
+}
+
+pub fn (mut arena Arena) call_refs(target Ref, args Ref, keywords Ref) !Ref {
+	arena.require_live()!
+	return arena.take(arena.api.call(target, args, keywords))!
+}
+
+pub fn (arena &Arena) set_attr(reference Ref, name string, value Ref) ! {
+	arena.require_live()!
+	if arena.api.attribute_set(reference, name.str, value) != 0 { return arena.api.exception() }
+}
+
+pub fn (mut arena Arena) dictionary_value(reference Ref, name string) !(bool, Ref) {
+	arena.require_live()!
+	if reference == unsafe { nil } { return false, Ref(unsafe { nil }) }
+	value := arena.api.dictionary_get(reference, name.str)
+	if value == unsafe { nil } { return false, Ref(unsafe { nil }) }
+	return true, arena.borrow(value)!
 }
 
 pub fn (arena &Arena) integer(reference Ref) !i64 {

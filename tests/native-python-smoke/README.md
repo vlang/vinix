@@ -16,7 +16,8 @@ scheduling queries; and the 100-row SQLite transaction. The original check label
 and `PYTHON3 SMOKE PASS/FAIL` summary remain. CPython and its standard library
 remain the third-party runtime being tested.
 
-The binding resolves 36 exports from `libpython3.12.so.1.0`. Set
+The shared binding resolves 40 exports from `libpython3.12.so.1.0`, including four
+descriptor/attribute/exception operations added for the macOS installer. Set
 `VINIX_CPYTHON_LIBRARY` for another compatible SDK library. C integer slots and
 the method flags use `i32`; ssize_t and long-long slots use their 64-bit types.
 Owned references retire in reverse order. Tuple insertion transfers a separately
