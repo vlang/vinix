@@ -56,6 +56,7 @@ fn decimal(text &char) ?u64 {
 }
 
 fn usage() i32 {
+	C.printf(c'       vinix-volume hash-volume-auto CONFIG PASSPHRASE_FILE REFERENCE\n       vinix-volume verify-volume-auto CONFIG PASSPHRASE_FILE REFERENCE\n       vinix-volume hash-recovery-volume-auto BACKUP RECOVERY_KEYFILE REFERENCE\n       vinix-volume verify-recovery-volume-auto BACKUP RECOVERY_KEYFILE REFERENCE\n')
 	C.printf(c'       vinix-volume scrub-volume-auto CONFIG PASSPHRASE_FILE REFERENCE REPORT\n       vinix-volume scrub-recovery-volume-auto BACKUP RECOVERY_KEYFILE REFERENCE REPORT\n')
 	C.printf(c'       vinix-volume compare-volume-scrubs BEFORE_REPORT AFTER_REPORT\n')
 	C.printf(c'       vinix-volume scrub-volume DEVICE CONFIG PASSPHRASE_FILE REFERENCE REPORT\n       vinix-volume scrub-recovery-volume DEVICE BACKUP RECOVERY_KEYFILE REFERENCE REPORT\n       vinix-volume show-volume-scrub REPORT\n')
@@ -107,6 +108,12 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'hash-volume-auto') == 0 || C.strcmp(argv[1], c'verify-volume-auto') == 0
+			|| C.strcmp(argv[1], c'hash-recovery-volume-auto') == 0 || C.strcmp(argv[1], c'verify-recovery-volume-auto') == 0) {
+			if argc != 5 || argv[2][0] == 0 || argv[3][0] == 0 || argv[4][0] == 0 { return usage() }
+			return volume_ciphertext_file(nil, argv[2], argv[3], argv[4], C.strcmp(argv[1], c'hash-recovery-volume-auto') == 0 || C.strcmp(argv[1], c'verify-recovery-volume-auto') == 0,
+				C.strcmp(argv[1], c'verify-volume-auto') == 0 || C.strcmp(argv[1], c'verify-recovery-volume-auto') == 0)
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'scrub-volume-auto') == 0 || C.strcmp(argv[1], c'scrub-recovery-volume-auto') == 0) {
 			if argc != 6 || argv[2][0] == 0 || argv[3][0] == 0 || argv[4][0] == 0 || argv[5][0] == 0 { return usage() }
 			return scrub_volume_ciphertext(nil, argv[2], argv[3], argv[4], argv[5], C.strcmp(argv[1], c'scrub-recovery-volume-auto') == 0)

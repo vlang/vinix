@@ -826,6 +826,50 @@ or output failures return 1, and invalid syntax returns 2. Diagnostics may be
 printed on failure; output failure can leave a partial report. See
 [recovery inspection qualification](../tests/storage-volumes/recovery-inspect.md).
 
+## Identity-based automatic ciphertext checksums
+
+`hash-volume-auto CONFIG PASSPHRASE_FILE REFERENCE` and
+`hash-recovery-volume-auto BACKUP RECOVERY_KEYFILE REFERENCE` create a complete
+ciphertext checksum reference after discovering the saved physical disk.
+`verify-volume-auto` and `verify-recovery-volume-auto` take the same arguments
+and verify its complete extent against an existing reference:
+
+```sh
+vinix-volume hash-volume-auto /root/data.vcrypt /root/volume.pass /root/data.vchash
+vinix-volume verify-recovery-volume-auto /root/data.vrecover /root/recovery.key /root/data.vchash
+```
+
+Both credential domains authenticate the saved geometry and erase passwords,
+wrapping keys and decoded volume keys before discovery. Recording validates
+the signed positioned-I/O bounds, SHA-256 length and native-sector alignment
+first. Verification also validates the complete private 128-byte reference,
+including its exact geometry and saved read-only mode, before opening `/dev`.
+
+Discovery uses the bounded read-only whole-disk scan described for automatic
+scrubbing below: MBR/GPT identity, physical capacity and native sector size
+must match; aliases of the same physical ID are accepted, distinct matching
+disks are refused. Enumeration failures and unreadable matching-geometry
+candidates prevent establishing a unique match. The selected descriptor stays
+pinned through streaming, publication and output; its name is never reopened.
+The first recheck retains discovery's physical ID and read-only state. Two
+additional pre-read rechecks and one post-read recheck detect changes, with a
+final recheck under the destination lock when recording.
+
+The fixed 64-KiB reader, exact `VINIXCH1` reference bytes, two-line output and
+private no-overwrite publication are identical to explicit-device checksum
+commands. Either credential domain can verify manual or automatic references
+for the same metadata. Verification scans the complete extent, returns failure
+on digest mismatch and never locks or publishes a destination. Success returns
+0, authentication/reference/discovery/read/publication/output failure returns
+1, and invalid syntax returns 2. Existing inputs and destinations are preserved;
+late durability, cleanup or output failures can leave a complete new reference.
+
+Automatic checksums preserve live mapping descriptors, status, generations,
+counters and plaintext reads. Trusted-reference and quiescent-write rules from
+[checksum references](#encrypted-ciphertext-checksum-references) still apply;
+discovery provides no snapshot or ciphertext authentication. See
+[automatic checksum qualification](../tests/storage-volumes/ciphertext-auto.md).
+
 ## Identity-based automatic ciphertext scrubbing
 
 `scrub-volume-auto CONFIG PASSPHRASE_FILE REFERENCE REPORT` and

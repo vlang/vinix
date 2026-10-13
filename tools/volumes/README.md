@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`hash-volume-auto`/`verify-volume-auto` and
+`hash-recovery-volume-auto`/`verify-recovery-volume-auto` create or verify a
+complete ciphertext checksum without a device path. Authentication and secret
+erasure precede read-only identity discovery; verification also validates the
+reference first. Manual and automatic reference bytes match, including after
+device reordering. See [automatic checksums](../../docs/storage-volumes.md#identity-based-automatic-ciphertext-checksums).
+
 `scrub-volume-auto` and `scrub-recovery-volume-auto` authenticate, validate their
 reference, then discover and retain the matching physical disk for a complete
 read-only scrub. Reports match explicit-device scrubs, including after device

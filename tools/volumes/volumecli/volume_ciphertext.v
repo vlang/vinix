@@ -92,9 +92,9 @@ fn volume_ciphertext_file(device &char, input &char, credential &char, reference
 			return plan_error(c'ciphertext reference format or authenticated geometry does not match')
 		}
 	}
-	fd := C.open(device, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
+	fd := ciphertext_scrub_parent(device, &work.disk, mut work.status)
 	if fd < 0 { C.perror(c'vinix-volume: open ciphertext parent'); return 1 }; defer { C.close(fd) }
-	if !probe_disk(fd, mut work.after, mut work.status) || !key_matches(&work.disk, &work.after)
+	if !check_ciphertext_scrub_parent(fd, device, mut *work)
 		|| !volume_seal_recheck(fd, mut *work) || !volume_seal_recheck(fd, mut *work)
 		|| !read_volume_ciphertext(fd, &work.disk, &work.request.data, &digest)
 		|| !volume_seal_recheck(fd, mut *work) { return plan_error(c'ciphertext disk identity, geometry or read changed') }

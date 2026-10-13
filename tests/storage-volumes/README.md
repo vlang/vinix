@@ -1,5 +1,12 @@
 # Storage-volume qualification
 
+`--host-ciphertext-auto` and `--ciphertext-auto` qualify automatic checksum
+creation and verification in both credential domains and saved modes. They
+check validation/erasure before discovery, selected physical pin continuity,
+exact manual/automatic references, complete corruption detection, no-overwrite
+publication, occupied views, real-KDF lifetimes and reordered reboot. See
+[automatic checksums](ciphertext-auto.md).
+
 `--host-auto-scrub` and `--auto-scrub` qualify authenticated identity-based
 automatic ciphertext scanning, validation/erasure before discovery, retained
 physical identity/mode, complete manual/automatic report equality, existing

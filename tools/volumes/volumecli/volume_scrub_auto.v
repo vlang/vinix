@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module volumecli
 
-// Called only after authentication, secret erasure and reference validation.
+// Called only after authentication, secret erasure and operation-specific
+// geometry/reference validation.
 // Discovery returns its existing read-only pin; no path is reopened afterward.
 @[direct_array_access]
 fn ciphertext_scrub_parent(device &char, disk &DiskKey, mut status Status) i32 {
