@@ -27,8 +27,18 @@ reusing space that a published inode pointer might still address.
 Run the production codec and I/O fault tests on the host:
 
 ```sh
-V=/path/to/v VEXE=/path/to/v python3 tests/ext2-xattr/host.py
+V=/path/to/v tests/ext2-xattr/host
 ```
+
+The host command is V. It copies the production codec, persistence, attribute
+copy and ACL sources into a fresh isolated directory and runs all four unchanged
+test suites against the original in-memory V fixtures. `--state-dir NEW_DIR`
+retains the generated sources and log; compiler flags follow `--`.
+`qualify-host.v COMPILER NEW_EVIDENCE arm|x86|san` cold-builds the command,
+runs those suites with the selected profile and records every generated V source
+hash. This qualification executes no Python or guest and changes no kernel code.
+The command builds each `_test.v` suite directly with V and owns its process,
+preserving compiler argument boundaries and avoiding a shared cached test driver.
 
 Build each kernel in a separate worktree, then run the native test with an
 existing musl sysroot or x86 musl cross compiler:

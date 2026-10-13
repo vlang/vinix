@@ -1,0 +1,207 @@
+{
+    "bytes": 6852,
+    "evidence": "~/.cache/vinix-ext2-host-native-20261013",
+    "files": 1,
+    "lines": 147,
+    "originals": [
+        {
+            "bytes": 6852,
+            "lines": 147,
+            "path": "tests/ext2-xattr/host.py",
+            "sha256": "278fbae46a1745e31b7e4d2190ee9843368d01c703b94053f3e1c26317f3d051"
+        }
+    ],
+    "profiles": [
+        {
+            "generated": [
+                {
+                    "path": "ext2/codec.v",
+                    "sha256": "14e792919ee566f6a4cf29178cc43b8d9d72bb49520ef01715c63234020b8081"
+                },
+                {
+                    "path": "ext2/codec_test.v",
+                    "sha256": "1d31acd02df5ebae85e58138eea23c47dfb473cef5446beb1b3e7ff1eed06b5f"
+                },
+                {
+                    "path": "ext2/helper.v",
+                    "sha256": "a3074114f6a3a8d17a3eeb491d92fb081096a580097e44a6caf10191c944118a"
+                },
+                {
+                    "path": "ext2/model.v",
+                    "sha256": "2b8294bea3a212fca4f870e137f3912c06014a077de333d2b42f810d84830093"
+                },
+                {
+                    "path": "ext2/persistence_test.v",
+                    "sha256": "6d998b334dbdec50a39a745cf0941ca9f7ad99ff37bbcf307b6d1955f633e4ae"
+                },
+                {
+                    "path": "ext2/xattr.v",
+                    "sha256": "306e98cd90de1c5f28f30ea482a910236421d1d1bea76f62bee8344b50b6b3dd"
+                },
+                {
+                    "path": "fs/copy.v",
+                    "sha256": "be5cb9eccff5e54b8ecadbcaa98f77e2baffdf291b01698d1f1aa4a6ecb9f2c1"
+                },
+                {
+                    "path": "fs/copy_test.v",
+                    "sha256": "1f2fb9d0fc67b8a4c01e38b78ccb1cd4a120383db218c65a46820dbccd534e36"
+                },
+                {
+                    "path": "errno/errno.v",
+                    "sha256": "481afa6a9eb177fb2b17701bdd5772f1871bec3dcc9daef85ffa180301d86db5"
+                },
+                {
+                    "path": "memory/memory.v",
+                    "sha256": "d15d9d7ea79af328d598aad7d5ef79867aa0609f84eb622d7badcf884578d0ac"
+                },
+                {
+                    "path": "resource/resource.v",
+                    "sha256": "6406228ce724da1369ed751d17f45fdd14f92739ae4d60f8775e945c4cc56539"
+                },
+                {
+                    "path": "posix_acl/acl.v",
+                    "sha256": "4267d143c356c6000f4005effce7e6ea9632de314f9c8db9f96ead18b6759300"
+                },
+                {
+                    "path": "posix_acl/acl_test.v",
+                    "sha256": "0d811732519ad032a010e35f07bfe664c1c86c534358527c4428b1edba4af8bf"
+                },
+                {
+                    "path": "time/time.v",
+                    "sha256": "cf0d3186ed003d6207384d8bdd781b34116bf7483478408b528921932b502f24"
+                }
+            ],
+            "host_sha256": "047c4fe331fe8564ba7c534b5ba7131a1c1de818c588014f9e58674e40f43468",
+            "profile": "arm",
+            "status": "PASS"
+        },
+        {
+            "generated": [
+                {
+                    "path": "ext2/codec.v",
+                    "sha256": "14e792919ee566f6a4cf29178cc43b8d9d72bb49520ef01715c63234020b8081"
+                },
+                {
+                    "path": "ext2/codec_test.v",
+                    "sha256": "1d31acd02df5ebae85e58138eea23c47dfb473cef5446beb1b3e7ff1eed06b5f"
+                },
+                {
+                    "path": "ext2/helper.v",
+                    "sha256": "a3074114f6a3a8d17a3eeb491d92fb081096a580097e44a6caf10191c944118a"
+                },
+                {
+                    "path": "ext2/model.v",
+                    "sha256": "2b8294bea3a212fca4f870e137f3912c06014a077de333d2b42f810d84830093"
+                },
+                {
+                    "path": "ext2/persistence_test.v",
+                    "sha256": "6d998b334dbdec50a39a745cf0941ca9f7ad99ff37bbcf307b6d1955f633e4ae"
+                },
+                {
+                    "path": "ext2/xattr.v",
+                    "sha256": "306e98cd90de1c5f28f30ea482a910236421d1d1bea76f62bee8344b50b6b3dd"
+                },
+                {
+                    "path": "fs/copy.v",
+                    "sha256": "be5cb9eccff5e54b8ecadbcaa98f77e2baffdf291b01698d1f1aa4a6ecb9f2c1"
+                },
+                {
+                    "path": "fs/copy_test.v",
+                    "sha256": "1f2fb9d0fc67b8a4c01e38b78ccb1cd4a120383db218c65a46820dbccd534e36"
+                },
+                {
+                    "path": "errno/errno.v",
+                    "sha256": "481afa6a9eb177fb2b17701bdd5772f1871bec3dcc9daef85ffa180301d86db5"
+                },
+                {
+                    "path": "memory/memory.v",
+                    "sha256": "d15d9d7ea79af328d598aad7d5ef79867aa0609f84eb622d7badcf884578d0ac"
+                },
+                {
+                    "path": "resource/resource.v",
+                    "sha256": "6406228ce724da1369ed751d17f45fdd14f92739ae4d60f8775e945c4cc56539"
+                },
+                {
+                    "path": "posix_acl/acl.v",
+                    "sha256": "4267d143c356c6000f4005effce7e6ea9632de314f9c8db9f96ead18b6759300"
+                },
+                {
+                    "path": "posix_acl/acl_test.v",
+                    "sha256": "0d811732519ad032a010e35f07bfe664c1c86c534358527c4428b1edba4af8bf"
+                },
+                {
+                    "path": "time/time.v",
+                    "sha256": "cf0d3186ed003d6207384d8bdd781b34116bf7483478408b528921932b502f24"
+                }
+            ],
+            "host_sha256": "7a7b90c4bf4e903d91dd3fa522c780744caad14f4a53205182bb528fc5f6b65f",
+            "profile": "x86",
+            "status": "PASS"
+        },
+        {
+            "generated": [
+                {
+                    "path": "ext2/codec.v",
+                    "sha256": "14e792919ee566f6a4cf29178cc43b8d9d72bb49520ef01715c63234020b8081"
+                },
+                {
+                    "path": "ext2/codec_test.v",
+                    "sha256": "1d31acd02df5ebae85e58138eea23c47dfb473cef5446beb1b3e7ff1eed06b5f"
+                },
+                {
+                    "path": "ext2/helper.v",
+                    "sha256": "a3074114f6a3a8d17a3eeb491d92fb081096a580097e44a6caf10191c944118a"
+                },
+                {
+                    "path": "ext2/model.v",
+                    "sha256": "2b8294bea3a212fca4f870e137f3912c06014a077de333d2b42f810d84830093"
+                },
+                {
+                    "path": "ext2/persistence_test.v",
+                    "sha256": "6d998b334dbdec50a39a745cf0941ca9f7ad99ff37bbcf307b6d1955f633e4ae"
+                },
+                {
+                    "path": "ext2/xattr.v",
+                    "sha256": "306e98cd90de1c5f28f30ea482a910236421d1d1bea76f62bee8344b50b6b3dd"
+                },
+                {
+                    "path": "fs/copy.v",
+                    "sha256": "be5cb9eccff5e54b8ecadbcaa98f77e2baffdf291b01698d1f1aa4a6ecb9f2c1"
+                },
+                {
+                    "path": "fs/copy_test.v",
+                    "sha256": "1f2fb9d0fc67b8a4c01e38b78ccb1cd4a120383db218c65a46820dbccd534e36"
+                },
+                {
+                    "path": "errno/errno.v",
+                    "sha256": "481afa6a9eb177fb2b17701bdd5772f1871bec3dcc9daef85ffa180301d86db5"
+                },
+                {
+                    "path": "memory/memory.v",
+                    "sha256": "d15d9d7ea79af328d598aad7d5ef79867aa0609f84eb622d7badcf884578d0ac"
+                },
+                {
+                    "path": "resource/resource.v",
+                    "sha256": "6406228ce724da1369ed751d17f45fdd14f92739ae4d60f8775e945c4cc56539"
+                },
+                {
+                    "path": "posix_acl/acl.v",
+                    "sha256": "4267d143c356c6000f4005effce7e6ea9632de314f9c8db9f96ead18b6759300"
+                },
+                {
+                    "path": "posix_acl/acl_test.v",
+                    "sha256": "0d811732519ad032a010e35f07bfe664c1c86c534358527c4428b1edba4af8bf"
+                },
+                {
+                    "path": "time/time.v",
+                    "sha256": "cf0d3186ed003d6207384d8bdd781b34116bf7483478408b528921932b502f24"
+                }
+            ],
+            "host_sha256": "22c2a0683b7b3044a0efb5b80bf1cebd585bf5443a6e01f6b7e5721b7b218bf3",
+            "profile": "san",
+            "status": "PASS"
+        }
+    ],
+    "qualification": "Three cold ARM/x86/ASanUBSan host builds and twelve direct V production test-suite builds/runs; all 23 unchanged codec, persistence, copy and ACL test functions; byte-identical original embedded V fixture templates; generated source hashes; existing-directory and CLI guards; direct SDK test compilation preserves argv and avoids shared cached vtest driver; no Python or Vinix guest, no kernel edits",
+    "source_commit": "ad4c6f638d04ae77ea8bcc0b1db755ee32323d83"
+}
