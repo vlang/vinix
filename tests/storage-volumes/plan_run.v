@@ -41,7 +41,7 @@ fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
 	volume_recovery_native_tests(root, work, v)!
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test', 'data_scrub_test', 'crypt_test', 'recovery_test', 'sealed_test', 'sealed_rewrap_test', 'volume_seal_test', 'volume_rewrap_test', 'volume_discovery_test', 'volume_growth_test', 'volume_boot_test', 'volume_boot_set_test', 'volume_recovery_inspect_test', 'volume_inspect_test', 'volume_growth_preview_test', 'volume_ciphertext_test', 'volume_ciphertext_scrub_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test', 'data_scrub_test', 'crypt_test', 'recovery_test', 'sealed_test', 'sealed_rewrap_test', 'volume_seal_test', 'volume_rewrap_test', 'volume_discovery_test', 'volume_growth_test', 'volume_boot_test', 'volume_boot_set_test', 'volume_recovery_inspect_test', 'volume_inspect_test', 'volume_growth_preview_test', 'volume_ciphertext_test', 'volume_ciphertext_scrub_test', 'volume_scrub_compare_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -304,6 +304,7 @@ fn recovery_io_tests(root string, work string, v string) ! {
 			for name in ['open', 'close'] { source = source.replace('C.' + name + '(', 'recovery_mock_' + name + '(') }
 			source = source.replace('finish_bundle_report(show_volume_ciphertext_scrub(', 'finish_bundle_report(volume_scrub_mock_report(').replace('erase_key(', 'recovery_mock_erase(')
 		}
+		if file == 'volume_scrub_compare.v' { source = source.replace('finish_bundle_report(show_volume_scrub_comparison(', 'finish_bundle_report(volume_scrub_compare_mock_report(') }
 		if file == 'plan_io.v' { for name in ['ioctl', 'pread'] { source = source.replace('C.' + name + '(', 'ciphertext_dispatch_' + name + '(').replace('fn ciphertext_dispatch_' + name + '(', 'fn C.' + name + '(') } }
 		if file in ['recovery_io.v', 'recovery_crypto.v', 'data_sha256.v', 'volume_recovery.v', 'volume_recovery_rewrap.v', 'volume_recovery_growth.v', 'volume_recovery_crypto.v', 'volume_seal_io.v', 'volume_seal_crypto.v'] { source = source.replace('erase_key(', 'recovery_mock_erase(') }
 		os.write_file(fixture + '/' + file, source)!
@@ -314,7 +315,8 @@ fn recovery_io_tests(root string, work string, v string) ! {
 		+ '\n' + os.read_file(root + '/tests/storage-volumes/volume_recovery_growth_io_test.v')!.all_after('import os\n')
 		+ '\n' + os.read_file(root + '/tests/storage-volumes/volume_growth_preview_io_test.v')!.all_after('import os\n')
 		+ '\n' + os.read_file(root + '/tests/storage-volumes/volume_ciphertext_io_test.v')!.all_after('import os\n').replace('import crypto.sha256\n', '').replace('import encoding.hex\n', '')
-		+ '\n' + os.read_file(root + '/tests/storage-volumes/volume_ciphertext_scrub_io_test.v')!.all_after('import os\n'))!
+		+ '\n' + os.read_file(root + '/tests/storage-volumes/volume_ciphertext_scrub_io_test.v')!.all_after('import os\n')
+		+ '\n' + os.read_file(root + '/tests/storage-volumes/volume_scrub_compare_io_test.v')!.all_after('import os\n'))!
 	binary := work + '/recovery-io-test'
 	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 		'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -563,7 +565,9 @@ fn plan_filesystem(work string) ! {
 
 fn compile_guest(root string, work string, arch string, nvme bool, recovery_mode string) ! {
 	source := work + '/guest.c'
-	if recovery_mode == 'ciphertext-scrub' {
+	if recovery_mode == 'scrub-compare' {
+		command(['sh', root + '/build-support/run-v-tool.sh', root + '/tests/linuxkpi/generate_module.v', root + '/tests/storage-volumes/planguest', source, '--arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-d', 'volume_scrub_compare_test'])!
+	} else if recovery_mode == 'ciphertext-scrub' {
 		command(['sh', root + '/build-support/run-v-tool.sh', root + '/tests/linuxkpi/generate_module.v', root + '/tests/storage-volumes/planguest', source, '--arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-d', 'volume_ciphertext_scrub_test'])!
 	} else if recovery_mode == 'ciphertext' {
 		command(['sh', root + '/build-support/run-v-tool.sh', root + '/tests/linuxkpi/generate_module.v', root + '/tests/storage-volumes/planguest', source, '--arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-d', 'volume_ciphertext_test'])!
@@ -934,6 +938,8 @@ fn main() {
 	mut ciphertext := false
 	mut ciphertext_scrub_host_only := false
 	mut ciphertext_scrub := false
+	mut scrub_compare_host_only := false
+	mut scrub_compare := false
 	mut index := 1
 	for index < os.args.len {
 		name := os.args[index]
@@ -950,6 +956,8 @@ fn main() {
 		if name == '--ciphertext' { ciphertext = true; index++; continue }
 		if name == '--host-ciphertext-scrub' { is_host = true; ciphertext_scrub_host_only = true; index++; continue }
 		if name == '--ciphertext-scrub' { ciphertext_scrub = true; index++; continue }
+		if name == '--host-scrub-compare' { is_host = true; scrub_compare_host_only = true; index++; continue }
+		if name == '--scrub-compare' { scrub_compare = true; index++; continue }
 		if name == '--nvme' { nvme = true; index++; continue }
 		if name == '--volume-recovery' { recovery = true; index++; continue }
 		if name == '--recovery-unlock' { recovery_unlock = true; index++; continue }
@@ -957,7 +965,7 @@ fn main() {
 		if name == '--recovery-growth' { recovery_growth = true; index++; continue }
 		if name == '--recovery-inspect' { recovery_inspect = true; index++; continue }
 		if name !in ['--arch', '--work', '--kernel'] || index + 1 >= os.args.len || name in options {
-			eprintln('Usage: plan_run.v --work NEW_DIRECTORY [--host | --host-recovery-unlock | --host-recovery-rewrap | --host-recovery-growth | --host-recovery-inspect | --host-volume-inspect | --host-growth-preview | --host-ciphertext | --host-ciphertext-scrub | --arch amd64|aarch64 --kernel KERNEL [--nvme | --volume-recovery | --recovery-unlock | --recovery-rewrap | --recovery-growth | --recovery-inspect | --volume-inspect | --growth-preview | --ciphertext | --ciphertext-scrub]]'); exit(2)
+			eprintln('Usage: plan_run.v --work NEW_DIRECTORY [--host | --host-recovery-unlock | --host-recovery-rewrap | --host-recovery-growth | --host-recovery-inspect | --host-volume-inspect | --host-growth-preview | --host-ciphertext | --host-ciphertext-scrub | --host-scrub-compare | --arch amd64|aarch64 --kernel KERNEL [--nvme | --volume-recovery | --recovery-unlock | --recovery-rewrap | --recovery-growth | --recovery-inspect | --volume-inspect | --growth-preview | --ciphertext | --ciphertext-scrub | --scrub-compare]]'); exit(2)
 		}
 		options[name] = os.args[index + 1]; index += 2
 	}
@@ -976,12 +984,15 @@ fn main() {
 		|| (ciphertext && (is_host || nvme || recovery || recovery_unlock || recovery_rewrap || recovery_growth || recovery_inspect || volume_inspect || growth_preview))
 		|| (ciphertext_host_only && (focused_host || rewrap_host || growth_host || inspect_host || volume_inspect_host_only || preview_host))
 		|| (ciphertext_scrub && (is_host || nvme || recovery || recovery_unlock || recovery_rewrap || recovery_growth || recovery_inspect || volume_inspect || growth_preview || ciphertext))
-		|| (ciphertext_scrub_host_only && (focused_host || rewrap_host || growth_host || inspect_host || volume_inspect_host_only || preview_host || ciphertext_host_only)) {
+		|| (ciphertext_scrub_host_only && (focused_host || rewrap_host || growth_host || inspect_host || volume_inspect_host_only || preview_host || ciphertext_host_only))
+		|| (scrub_compare && (is_host || nvme || recovery || recovery_unlock || recovery_rewrap || recovery_growth || recovery_inspect || volume_inspect || growth_preview || ciphertext || ciphertext_scrub))
+		|| (scrub_compare_host_only && (focused_host || rewrap_host || growth_host || inspect_host || volume_inspect_host_only || preview_host || ciphertext_host_only || ciphertext_scrub_host_only)) {
 		eprintln('Select a new private work directory and supported architecture'); exit(2)
 	}
 	os.mkdir(work) or { eprintln(err); exit(1) }
 	root := os.dir(os.dir(os.dir(@FILE)))
-	if ciphertext_scrub_host_only { ciphertext_scrub_host(root, work) or { eprintln(err); exit(1) } }
+	if scrub_compare_host_only { scrub_compare_host(root, work) or { eprintln(err); exit(1) } }
+	else if ciphertext_scrub_host_only { ciphertext_scrub_host(root, work) or { eprintln(err); exit(1) } }
 	else if ciphertext_host_only { ciphertext_host(root, work) or { eprintln(err); exit(1) } }
 	else if preview_host { growth_preview_host(root, work) or { eprintln(err); exit(1) } }
 	else if volume_inspect_host_only { volume_inspect_host(root, work) or { eprintln(err); exit(1) } }
@@ -990,6 +1001,7 @@ fn main() {
 	else if rewrap_host { recovery_rewrap_host(root, work) or { eprintln(err); exit(1) } }
 	else if focused_host { recovery_unlock_host(root, work) or { eprintln(err); exit(1) } }
 	else if is_host { host(root, work) or { eprintln(err); exit(1) } }
+	else if scrub_compare { scrub_compare_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
 	else if ciphertext_scrub { ciphertext_scrub_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
 	else if ciphertext { ciphertext_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
 	else if growth_preview { growth_preview_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
@@ -1135,4 +1147,29 @@ fn ciphertext_scrub_guest(root string, work string, arch string, kernel string) 
 	second := boot(if arch == 'aarch64' { arm_boot(root, work, kernel, true)! } else { amd64_boot(root, work, kernel, true, false)! }, work + '/second-boot.log')!
 	if !second.contains('PLAN CIPHERTEXT SCRUB REORDERED BOOT PRESERVED') || second.contains('init: volume restore failed; continuing') { return error('Ciphertext scrub reports failed after reordered boot') }
 	println('PASS ' + arch + ': complete encrypted scrub findings/offline reports, fault cleanup, real-KDF retention and reordered reboot')
+}
+
+fn scrub_compare_host(root string, work string) ! {
+	v := os.getenv_opt('V') or { @VEXE }; os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
+	volume_recovery_native_tests(root, work, v)!; recovery_io_tests(root, work, v)!
+	for entry in ['volume_seal_test', 'volume_ciphertext_scrub_test', 'volume_scrub_compare_test'] {
+		binary := work + '/' + entry
+		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags', '-I' + root + '/tools/volumes/volumecli -O2 -fsanitize=address,undefined', '-ldflags', '-fsanitize=address,undefined', '-o', binary, root + '/tools/volumes/volumecli/' + entry + '.v'])!
+		print(command([binary])!); println('PASS ' + entry + ': ASan/UBSan')
+	}
+	for arch in ['aarch64', 'x86_64'] { path := work + '/volume-' + arch + '.c'; generate(root, root + '/tools/volumes/volumecli', path, arch)!; check_generated(path)! }
+	println('PASS scrub comparison native/model/syntax and both target allocation audits')
+}
+
+fn scrub_compare_guest(root string, work string, arch string, kernel string) ! {
+	if kernel == '' || !os.is_file(kernel) || work.contains(',') { return error('Select an existing kernel and safe work directory') }
+	compile_guest(root, work, arch, false, 'scrub-compare')!
+	write_disk(work + '/volume.raw', false)!; write_disk(work + '/wrong.raw', true)!
+	plan_filesystem(work)!; pack(work)!
+	first := boot(if arch == 'aarch64' { arm_boot(root, work, kernel, false)! } else { amd64_boot(root, work, kernel, false, false)! }, work + '/first-boot.log')!
+	if !first.contains('PLAN SCRUB COMPARE PASSED:') || first.count('PLAN SCRUB COMPARE CYCLES count=100') != 2
+		|| !first.contains('PLAN SCRUB COMPARE LARGE ') || first.count('PLAN SCRUB COMPARE RETAIN ') == 0 { return error('Missing complete scrub comparison and retention qualification') }
+	second := boot(if arch == 'aarch64' { arm_boot(root, work, kernel, true)! } else { amd64_boot(root, work, kernel, true, false)! }, work + '/second-boot.log')!
+	if !second.contains('PLAN SCRUB COMPARE REORDERED BOOT PRESERVED') || second.contains('init: volume restore failed; continuing') { return error('Scrub comparisons failed after reordered boot') }
+	println('PASS ' + arch + ': offline ciphertext history comparisons, exact reference refusal, bounded lifetimes and reordered reboot')
 }

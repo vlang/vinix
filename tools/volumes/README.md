@@ -4,6 +4,11 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`compare-volume-scrubs BEFORE_REPORT AFTER_REPORT` compares complete private
+scrub findings against the same exact reference. It reports stable data, new
+change, restoration or further change without accessing devices or credentials.
+See [history comparison](../../docs/storage-volumes.md#comparing-encrypted-ciphertext-scrub-history).
+
 `scrub-volume` and `scrub-recovery-volume` publish complete private ciphertext
 findings with expected/observed SHA-256, exact reference fingerprints and
 clean/changed/operational exit status. `show-volume-scrub` validates and displays

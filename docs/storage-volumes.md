@@ -826,6 +826,52 @@ or output failures return 1, and invalid syntax returns 2. Diagnostics may be
 printed on failure; output failure can leave a partial report. See
 [recovery inspection qualification](../tests/storage-volumes/recovery-inspect.md).
 
+## Comparing encrypted ciphertext scrub history
+
+`compare-volume-scrubs BEFORE_REPORT AFTER_REPORT` compares two completed
+`VINIXCS1` findings offline. Both exact private reports must validate in full,
+and their embedded 128-byte references must be identical, including saved
+geometry/mode, expected digest and CRC. Reports produced through passphrase and
+recovery credentials are comparable when they used that same reference.
+Different references are refused even if their observed digests agree.
+
+```sh
+vinix-volume compare-volume-scrubs /root/scan-1.vcscrub /root/scan-2.vcscrub
+```
+
+| Observed digests | Before / after finding | Comparison result | Exit status |
+| --- | --- | --- | --- |
+| Equal | Both match or both changed | `stable` | 0 |
+| Different | Match / changed | `new-change` | 2 |
+| Different | Changed / match | `restored` | 2 |
+| Different | Changed / changed | `changed-again` | 2 |
+
+Status 0 means the observed ciphertext digest stayed equal; a stable changed
+finding still differs from the trusted reference. Status 2 means the observed
+digest changed, including restoration to the reference. Input, validation,
+reference mismatch or output failure returns 1 and overrides these findings;
+invalid syntax returns 2 without a comparison. Both files validate before any
+successful output. Output failure can leave a partial comparison on stdout.
+
+The two-record output header is `format=VINIXCS1 operation=compared-ciphertext
+mappings=1 stable=0|1 changed=0|1 algorithm=sha256 reference_sha256=HEX`. Its row
+contains `disk_bytes=N sector=N identity=ID slot=N offset=N bytes=N readonly=0|1
+before=match|changed after=match|changed result=stable|new-change|restored|changed-again
+expected_sha256=HEX before_sha256=HEX after_sha256=HEX`.
+
+Input ownership, exact length, private permissions, final-symlink refusal and
+pinned-reader rechecks follow `show-volume-scrub`. Comparing a file with itself
+or a hard-link alias is allowed. The command reads no credentials, performs no
+KDF, opens no device, acquires no writer lock and changes no files or mappings.
+All workspaces are bounded stack storage containing public metadata and hashes.
+
+The caller supplies historical order; reports contain no timestamps, and this
+command does not infer which scan happened first. Keep the input reports stable
+while comparing them. This does not take a new disk snapshot, authenticate
+report provenance or plaintext, or prove that current contents are repaired.
+Trusted references and the original scan's quiescent-write requirements remain
+applicable. See [comparison qualification](../tests/storage-volumes/scrub-compare.md).
+
 ## Persistent encrypted ciphertext scrub findings
 
 `scrub-volume DEVICE CONFIG PASSPHRASE_FILE REFERENCE REPORT` and

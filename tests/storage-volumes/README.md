@@ -1,5 +1,10 @@
 # Storage-volume qualification
 
+`--host-scrub-compare` and `--scrub-compare` qualify offline encrypted scrub
+history comparisons, exact reference binding, all four transitions, complete
+private input validation, output failure precedence, bounded lifetimes and
+persisted history across reordered reboot. See [comparison](scrub-compare.md).
+
 Persistent encrypted scrub findings extend the actual recovery/ciphertext model
 with complete clean/changed reports, operational failure precedence, private
 no-overwrite cleanup and offline report validation. `--host-ciphertext-scrub`
