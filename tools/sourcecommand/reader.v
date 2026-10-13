@@ -15,7 +15,11 @@ mut:
 }
 
 pub fn spawn_reader(argv []string, environment map[string]string) !ReaderChild {
-	if argv.len == 0 || argv.any(it.contains('\x00')) { return error('invalid reader command') }
+	return spawn_reader_at(argv,environment,'',false)!
+}
+
+pub fn spawn_reader_at(argv []string, environment map[string]string, directory string, merged bool) !ReaderChild {
+	if argv.len == 0 || argv.any(it.contains('\x00')) || directory.contains('\x00') { return error('invalid reader command') }
 	mut pipes := [i32(-1), -1]!
 	if C.pipe(&pipes[0]) != 0 { return os.error_posix() }
 	defer { for fd in pipes { if fd >= 0 { C.close(fd) } }
@@ -35,6 +39,8 @@ pub fn spawn_reader(argv []string, environment map[string]string) !ReaderChild {
 		return error('cannot initialize reader actions')
 	}
 	defer { C.posix_spawn_file_actions_destroy(&actions) }
+	if directory!=''&&C.posix_spawn_file_actions_addchdir_np(&actions,directory.str)!=0{return error('cannot set reader working directory')}
+	if merged&&C.posix_spawn_file_actions_adddup2(&actions,pipes[1],2)!=0{return error('cannot merge reader stderr')}
 	for status in [C.posix_spawn_file_actions_adddup2(&actions, pipes[1], 1),
 		C.posix_spawn_file_actions_addclose(&actions, pipes[0]),
 		C.posix_spawn_file_actions_addclose(&actions, pipes[1])] {
@@ -59,6 +65,7 @@ pub fn spawn_reader(argv []string, environment map[string]string) !ReaderChild {
 	$if macos {
 		flags |= i16(C.POSIX_SPAWN_CLOEXEC_DEFAULT)
 		for fd in [0, 2] {
+			if merged&&fd==2{continue}
 			if C.fcntl(fd, C.F_GETFD) >= 0 && C.posix_spawn_file_actions_addinherit_np(&actions, fd) != 0 {
 				return error('cannot preserve reader standard descriptors')
 			}

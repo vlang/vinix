@@ -1,0 +1,34 @@
+{
+    "bytes": 26216,
+    "evidence": "~/.cache/vinix-vm-tools-native-20261013",
+    "files": 4,
+    "lines": 524,
+    "originals": [
+        {
+            "bytes": 5357,
+            "lines": 96,
+            "path": "tests/browsers/_native.py",
+            "sha256": "269c5b73db5544f1f6f8876623720d34b942d0a8d6e091a5b4ebe190238022fd"
+        },
+        {
+            "bytes": 9438,
+            "lines": 209,
+            "path": "tests/browsers/run_vm.py",
+            "sha256": "fd540b595664d787869f7c07b17570fc7fd75d36842623c6134f2511b1a4e5fd"
+        },
+        {
+            "bytes": 5933,
+            "lines": 106,
+            "path": "tests/activity-monitor/run.py",
+            "sha256": "2b882eb25e14a51db440a6dd19ed7e67f20b86596fff7b14997e3ec2eb045c1c"
+        },
+        {
+            "bytes": 5488,
+            "lines": 113,
+            "path": "tests/pointer-scroll/run.py",
+            "sha256": "37f1876274f5dc7cf3ce50ab9c94421a3f135b3c3819d2fc6b6476ae3bb6c68b"
+        }
+    ],
+    "qualification": "ARM/x86/ASanUBSan cold builds; 1280 independent frozen-profile marker cases, 27 real owned process cases and 100 real serial-EOF/QMP races per profile; nine real static guest ELFs and native initramfs byte/mode checks; existing QMP/archive/decoder regressions and cold public fronts; no Python or Vinix guest executed",
+    "source_commit": "bae17754e29ab3468517676cdb29250fa267274c"
+}

@@ -20,6 +20,7 @@ mut:
 	cancel fn () bool = unsafe { nil }
 	accept_errors bool
 	sequence u64
+	byte_json bool
 }
 pub fn connect(path string) !Monitor {
 	return connect_bounded(path, 0, unsafe { nil })
@@ -37,9 +38,17 @@ pub fn connect_policy(path string, deadline u64, cancel fn () bool, accept_error
 pub fn connect_checked(path string, deadline u64, cancel fn () bool) !Monitor {
 	return connect_body(path, deadline, cancel, false, true)
 }
+// The pointer regression parses one JSON greeting, without requiring a QMP
+// object or skipping events. Keep this consumer's original greeting policy.
+pub fn connect_json(path string, deadline u64, cancel fn () bool) !Monitor {
+	return connect_greeting(path,deadline,cancel,false,false,true)
+}
 fn connect_body(path string, deadline u64, cancel fn () bool, accept_errors bool, checked bool) !Monitor {
+	return connect_greeting(path,deadline,cancel,accept_errors,checked,false)
+}
+fn connect_greeting(path string, deadline u64, cancel fn () bool, accept_errors bool, checked bool, parse_json bool) !Monitor {
 	mut connection := unix.connect_stream(path)!
-	mut monitor := Monitor{connection: connection, deadline: deadline, cancel: cancel, accept_errors: accept_errors}
+	mut monitor := Monitor{connection: connection, deadline: deadline, cancel: cancel, accept_errors: accept_errors,byte_json:parse_json}
 	mut open := false
 	defer { if !open { monitor.close() } }
 	if C.fcntl(connection.sock.handle, C.F_SETFD, C.FD_CLOEXEC) != 0 || C.fcntl(connection.sock.handle, C.F_SETFL, C.O_NONBLOCK) != 0 { return os.error_posix() }
@@ -51,7 +60,7 @@ fn connect_body(path string, deadline u64, cancel fn () bool, accept_errors bool
 			if value !is map[string]json2.Any { return error('invalid QMP greeting') }
 			break
 		}
-	} else { monitor.read_line()! }
+	} else if parse_json {text:=monitor.read_line()!;hosttest.module_decode_utf8(text)!;json2.decode[json2.Any](json_text(text))!} else { monitor.read_line()! }
 	monitor.command('qmp_capabilities', {})!
 	open = true
 	return monitor
@@ -64,8 +73,9 @@ pub fn (mut monitor Monitor) set_cancel(cancel fn () bool) { monitor.cancel = ca
 fn (mut monitor Monitor) line() !map[string]json2.Any {
 	text := monitor.read_line()!
 	hosttest.module_decode_utf8(text)!
-	return json2.decode[json2.Any](text)!.as_map()
+	return json2.decode[json2.Any](if monitor.byte_json{json_text(text)}else{text})!.as_map()
 }
+fn json_text(text string) string {return if text.starts_with('\xef\xbb\xbf'){text[3..]}else{text}}
 fn (monitor &Monitor) ready(writing bool) ! {
 	mut descriptor := C.pollfd{fd: monitor.connection.sock.handle, events: i16(if writing { C.POLLOUT } else { C.POLLIN })}
 	for {

@@ -3,7 +3,7 @@
 # the registration screen, choose apps in the picker that follows it, and check
 # that the Terminal the desktop then opens installs exactly those apps.
 #
-# Run it with: tests/browsers/run_vm.py --first-run
+# Run it with: tests/browsers/run_vm --first-run
 #
 # Keystrokes reach the compositor through its standard input, which is where a
 # desktop session reads the keyboard. A recorder named pkg is put first on PATH,

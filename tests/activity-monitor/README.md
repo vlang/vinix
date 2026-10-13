@@ -10,8 +10,8 @@ blocking wait. Every target is a child created by the test.
 Build the desired kernel architecture first, then boot its regression:
 
 ```sh
-python3 tests/activity-monitor/run.py --repo /Users/alex/code/vinix --kernel /tmp/worktree/kernel --arch aarch64
-python3 tests/activity-monitor/run.py --repo /Users/alex/code/vinix --kernel /tmp/worktree/kernel --arch x86_64
+tests/activity-monitor/run --repo /Users/alex/code/vinix --kernel /tmp/worktree/kernel --arch aarch64
+tests/activity-monitor/run --repo /Users/alex/code/vinix --kernel /tmp/worktree/kernel --arch x86_64
 ```
 
 `--repo` supplies the existing boot dependencies and userland sysroot; `--kernel`

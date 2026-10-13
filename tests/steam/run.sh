@@ -34,7 +34,7 @@ if [ "$minimum_mem" -lt 32768 ]; then
 fi
 mem=${VINIX_QEMU_MEM:-$minimum_mem}
 
-exec python3 "$repo/tests/browsers/run_vm.py" \
+exec "$repo/tests/browsers/run_vm" \
 	--steam \
 	--initramfs "$initramfs" \
 	--state-dir "${VINIX_STEAM_STATE_DIR:-$repo/build/steam-vm}" \

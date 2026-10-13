@@ -4,7 +4,7 @@ Build an AArch64 kernel with the horizontal pointer axis, then run:
 
 ```sh
 scripts/build-qemu-input.sh
-python3 tests/pointer-scroll/run.py --kernel-dir=/path/to/worktree/kernel
+tests/pointer-scroll/run --kernel-dir=/path/to/worktree/kernel
 ```
 
 The test compiles a small V guest, boots it on a private temporary disk, and

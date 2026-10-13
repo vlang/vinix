@@ -24,7 +24,7 @@ fi
 image_mb=$(( $(wc -c < "$initramfs") / 1024 / 1024 ))
 mem=${VINIX_QEMU_MEM:-$(( image_mb * 2 + 4096 ))}
 
-exec python3 "$repo/tests/browsers/run_vm.py" \
+exec "$repo/tests/browsers/run_vm" \
 	--libreoffice \
 	--initramfs "$initramfs" \
 	--state-dir "${VINIX_OFFICE_STATE_DIR:-$repo/build/office-vm}" \

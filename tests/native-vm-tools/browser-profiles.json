@@ -1,0 +1,99 @@
+{
+    "profiles": {
+        "chromium": {
+            "failures": [
+                "VINIX CHROMIUM TEST: FAIL"
+            ],
+            "features": [
+                "VINIX CHROMIUM PASS: version",
+                "VINIX CHROMIUM PASS: the hosted display has a framebuffer",
+                "VINIX CHROMIUM PASS: browser window mapped",
+                "VINIX CHROMIUM PASS: the bridge reports drawing"
+            ],
+            "init": "tests/browsers/chromium-init.sh",
+            "pass": "VINIX CHROMIUM TEST: PASS",
+            "persist": "256"
+        },
+        "desktop": {
+            "failures": [
+                "VINIX DESKTOP FIREFOX TEST: FAIL"
+            ],
+            "features": [
+                "VINIX DESKTOP FIREFOX PASS: the hosted display has a framebuffer",
+                "VINIX DESKTOP FIREFOX PASS: browser window mapped",
+                "VINIX DESKTOP FIREFOX PASS: the page was drawn"
+            ],
+            "init": "tests/browsers/desktop-init.sh",
+            "pass": "VINIX DESKTOP FIREFOX TEST: PASS",
+            "persist": "256"
+        },
+        "firefox": {
+            "failures": [
+                "VINIX FIREFOX TEST: FAIL"
+            ],
+            "features": [
+                "VINIX FIREFOX PASS: the hosted display has a framebuffer",
+                "VINIX FIREFOX PASS: browser window mapped",
+                "VINIX FIREFOX PASS: the page was drawn"
+            ],
+            "init": "tests/browsers/firefox-init.sh",
+            "pass": "VINIX FIREFOX TEST: PASS",
+            "persist": "256"
+        },
+        "first-run": {
+            "failures": [
+                "VINIX FIRST RUN TEST: FAIL"
+            ],
+            "features": [
+                "VINIX FIRST RUN PASS: registration created the user",
+                "VINIX FIRST RUN PASS: the app picker follows registration",
+                "VINIX FIRST RUN PASS: the picker finished and the desktop started",
+                "VINIX FIRST RUN PASS: the Terminal installed the chosen apps"
+            ],
+            "init": "tests/desktop/first-run-apps-init.sh",
+            "pass": "VINIX FIRST RUN TEST: PASS",
+            "persist": "256"
+        },
+        "libreoffice": {
+            "failures": [
+                "VINIX LIBREOFFICE TEST: FAIL"
+            ],
+            "features": [
+                "VINIX LIBREOFFICE PASS: the hosted display has a framebuffer",
+                "VINIX LIBREOFFICE PASS: Writer window mapped",
+                "VINIX LIBREOFFICE PASS: the document was drawn"
+            ],
+            "init": "tests/office/libreoffice-init.sh",
+            "pass": "VINIX LIBREOFFICE TEST: PASS",
+            "persist": "256"
+        },
+        "package": {
+            "failures": [
+                "VINIX CHROMIUM PACKAGE TEST: FAIL"
+            ],
+            "features": [
+                "VINIX CHROMIUM PASS: the image ships the launcher but not the browser",
+                "VINIX CHROMIUM PASS: pkg installed Chromium and its runtime",
+                "VINIX CHROMIUM PASS: the installed browser runs"
+            ],
+            "init": "tests/browsers/pkg-init.sh",
+            "pass": "VINIX CHROMIUM PACKAGE TEST: PASS",
+            "persist": "256"
+        },
+        "steam": {
+            "failures": [
+                "VINIX STEAM TEST: FAIL"
+            ],
+            "features": [
+                "VINIX STEAM PASS: translated glibc runtime",
+                "VINIX STEAM PASS: System V semaphore wake",
+                "VINIX STEAM PASS: the hosted display has a framebuffer",
+                "VINIX STEAM PASS: client window mapped"
+            ],
+            "init": "tests/steam/steam-init.sh",
+            "pass": "VINIX STEAM TEST: PASS",
+            "persist": "12288"
+        }
+    },
+    "source_sha256": "fd540b595664d787869f7c07b17570fc7fd75d36842623c6134f2511b1a4e5fd"
+}
