@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `f0a0c4f67620863544a5108338277569f9c6e8d4`,
+at source commit `8d358c7a2c432da93a053c273a5818ab52d91f99`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 599 | 2,396,555 | 5.69% |
-| Python | 18 | 145,483 | 0.35% |
-| Shell | 811 | 1,373,463 | 3.26% |
+| C | 599 | 2,396,555 | 5.66% |
+| Python | 15 | 123,734 | 0.29% |
+| Shell | 813 | 1,373,764 | 3.25% |
 
-All `.v` files are classified as V. The resulting V share is 83.31%, with no
+All `.v` files are classified as V. The resulting V share is 83.42%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 145,483 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 123,734 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev f0a0c4f67620863544a5108338277569f9c6e8d4 --breakdown --json
+github-linguist --rev 8d358c7a2c432da93a053c273a5818ab52d91f99 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -664,9 +664,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/android/_boot_native.py` | 20,549 |
 | `build-support/cpython_host.py` | 1,007 |
 | `build-support/native_host.py` | 6,504 |
-| `desktop/tools/_font_native.py` | 9,708 |
-| `desktop/tools/genfont.py` | 4,935 |
-| `desktop/tools/tests/test_font_data.py` | 7,106 |
 | `installer/macos/vinix_auto.py` | 8,147 |
 | `tests/ext2-xattr/run.py` | 11,512 |
 | `tests/ios/desktop.py` | 7,962 |
@@ -830,6 +827,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/xorg-server/startx` | 2,994 |
 | `desktop/tools/build_voffice` | 147 |
 | `desktop/tools/fetch_wallpapers` | 147 |
+| `desktop/tools/genfont` | 151 |
 | `desktop/tools/input` | 171 |
 | `desktop/tools/screenshot.sh` | 258 |
 | `desktop/tools/stage_app` | 143 |
@@ -846,6 +844,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/tools/test-utilities.sh` | 10,608 |
 | `desktop/tools/test-utility-parity.sh` | 2,858 |
 | `desktop/tools/test-window-experience.sh` | 2,089 |
+| `desktop/tools/tests/test_font_data` | 150 |
 | `gl-triangle/compile-v` | 564 |
 | `gl-triangle/run-gl-triangle` | 2,351 |
 | `gl-triangle/run-gl-triangle-agx` | 1,206 |

@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `f0a0c4f67620863544a5108338277569f9c6e8d4`,
-Linguist 7.27.0 reports **Python 0.35%** (18 files, 145,483 bytes) and
-**V 83.31%** (3,828 files, 35,112,854 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `8d358c7a2c432da93a053c273a5818ab52d91f99`,
+Linguist 7.27.0 reports **Python 0.29%** (15 files, 123,734 bytes) and
+**V 83.42%** (3,854 files, 35,300,007 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **5,060,802 Python bytes**. All remaining
-145,483 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **5,082,551 Python bytes**. All remaining
+123,734 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -24,7 +24,7 @@ to an archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 85 stages below remove **510 Python files / 2,215,381 original bytes** and
+The 86 stages below remove **513 Python files / 2,237,130 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -117,6 +117,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Android binding closure | native `androidrun`/`androidtools` contexts, cold dispatchers and actual native suites | 21,866 / 537 | `3fe13236` |
 | Native wallpaper generation | libjpeg-turbo SDK, V Lanczos-3, native cache/download/index and CLI owners | 5,952 / 144 | `1a9c278d` |
 | Ext2 host fixture generator and runner | native generator, original V fixtures and direct production test-suite builds | 6,852 / 147 | `f0a0c4f6` |
+| Native font generator and atlas test closure | direct FreeType/HarfBuzz owners, native SFNT metadata, cached SDK driver and PNG previews | 21,749 / 574 | `8d358c7a` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -749,9 +750,9 @@ V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 85 stages.
+or hidden in these 86 stages.
 
-The next forty-seven stages remove 358 Python files / 1,717,038 original bytes.
+The next forty-eight stages remove 361 Python files / 1,738,787 original bytes.
 The nine process commands retain seventeen target build profiles, independent
 C controls, exact retention/progress assertions, real musl signal return and
 private PTY/QMP ownership. ARM, Rosetta x86 and host ASan/UBSan qualification
@@ -764,7 +765,7 @@ guards, genuine instruction probes, physical volumes and original C controls;
 see [optin-tools.md](../build-support/native-compat-tools/optin-tools.md) and
 [policy-guests.md](../build-support/native-compat-tools/policy-guests.md).
 No Python was run. Together with the previous three batches, this continuation
-translates **388 Python files / 1,851,315 original bytes**. Earlier qualification
+translates **391 Python files / 1,873,064 original bytes**. Earlier qualification
 caches were cleared during shared-machine disk cleanup, and later RAM volumes
 detached. Those older local receipts are no longer available. Fresh Minecraft
 and saved-campaign analysis checks and inputs are retained on disk under
@@ -3257,3 +3258,18 @@ shared cached test driver. No kernel source or test assertion changes.
 See [native ext2 host tests](../tests/ext2-xattr/README.md).
 
 No Python or Vinix guest is executed during these three qualifications.
+
+The font closure stage retires three unchanged Python files, totaling 21,749
+bytes and 574 lines. Twenty-one cold ARM/x86/ASanUBSan builds pass all 20,672
+original glyph masks and headers across 16 faces in normal, subset-regenerating
+and native-driver workflows. The translated atlas tests retain catalog coverage,
+real source/notdef/fallback identities, line boxes, scale and terminal advances
+and distinct weights. Actual PNG previews pass; labels use baked small Roboto.
+Native ownership, malformed-font/SFNT, Unicode/numeric policy and variable font
+coverage/names/timestamps/weight/checksum controls pass. FreeType 2.13.3 and
+HarfBuzz 14.5.0 static SDKs build on ARM and x86; the public frontend also passes
+a real native cold SDK build, warm hash-qualified reuse and controlled CMake
+failure with old libraries preserved. Regenerated font table packing can differ
+while every captured glyph mask and header remains identical. SDK libraries are
+external dependencies; sanitizers instrument V. No Python or Vinix guest is
+executed. See [native font tools](../desktop/tools/fonthost/README.md).
