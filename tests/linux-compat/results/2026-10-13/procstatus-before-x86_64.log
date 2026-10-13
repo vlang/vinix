@@ -1,0 +1,86 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   470k      0 --:--:-- --:--:-- --:--:--  470k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 11 2880k   11  335k    0     0   490k      0  0:00:05 --:--:--  0:00:05  489k 80 2880k   80 2304k    0     0  1358k      0  0:00:02  0:00:01  0:00:01 1358k100 2880k  100 2880k    0     0  1505k      0  0:00:01  0:00:01 --:--:-- 1505k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  43178      0 --:--:-- --:--:-- --:--:-- 43239
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   372k      0 --:--:-- --:--:-- --:--:--  372k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  97074      0 --:--:-- --:--:-- --:--:-- 97211
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   234k      0 --:--:-- --:--:-- --:--:--  234k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/procstatus-20261013/before-x86/procself/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/procstatus-20261013/before-x86/procself/.vinix-amd64.iso.muXAvL'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 9157m free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/procstatus-20261013/before-x86/procself/iso-build/.iso-staging.7yWB8a/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13545 sectors
+Written to medium : 13545 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/procstatus-20261013/before-x86/procself/.vinix-amd64.iso.muXAvL' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd3a3.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/procstatus-20261013/before-x86/procself/test.iso (27740160 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/procstatus-20261013/before-x86/procself
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=85960
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000038062400
+initramfs: Done (9 entries)
+LINUX PROCSELF OUTCOMES: ordinary=1 slot=0 pid=10565 tid=10565 cases=270 failures=0 status=1
+LINUX PROCSELF OUTCOMES: ordinary=1 slot=1 pid=10565 tid=27716 cases=270 failures=0 status=0
+LINUX PROCSELF OUTCOMES: ordinary=1 slot=2 pid=10565 tid=1387 cases=270 failures=0 status=0
+LINUX PROCSELF OUTCOMES: ordinary=0 slot=0 pid=35416 tid=35416 cases=270 failures=0 status=1
+LINUX PROCSELF OUTCOMES: ordinary=0 slot=1 pid=35416 tid=35513 cases=270 failures=0 status=0
+LINUX PROCSELF OUTCOMES: ordinary=0 slot=2 pid=35416 tid=49220 cases=270 failures=0 status=0
+LINUX PROCSELF CHROOT: no-/proc relative-self/thread-self-status PASS
+LINUX PROCSELF TASKIDS: local=0 leader=1 pid=50759/50759 tgid=50759/50759 nspid=50759:1 count=2 expected_count=2 PASS
+LINUX PROCSELF TASKIDS: local=1 leader=1 pid=1/1 tgid=1/1 nspid=1:-1 count=1 expected_count=1 PASS
+LINUX PROCSELF TASKIDS: local=0 leader=0 pid=50759/25959 tgid=50759/50759 nspid=50759:1 count=2 expected_count=2 FAIL
+LINUX PROCSELF TASKIDS: local=1 leader=0 pid=1/2 tgid=1/1 nspid=1:-1 count=1 expected_count=1 FAIL
+LINUX PROCSELF PIDVIEW: outer-and-own leader/worker Pid/Tgid/NSpid FAIL
+LINUX PROCSELF FAIL: relative target, reader identity, resolution or storage
+QEMU: Terminated
+Missing verdicts: ['LINUX PROCSELF: PASS']; failures: ['FAIL:', 'LINUX PROCSELF FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/procstatus-20261013/before-x86/receipt.json

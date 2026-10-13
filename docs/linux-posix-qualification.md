@@ -3110,3 +3110,83 @@ This qualifies the native relative-link subset. Symlink atime, restrictive
 policy, close/unlink/exec races, partial copying, full mount retention and
 glibc/translated/ELF32 installation/sandbox/portal acceptance remain separate.
 The three broad section 15 gates stay open.
+
+## Selected task status identities
+
+Native task status now reports the selected TID in `Pid` and `NSpid`, preserving
+the process ID in `Tgid`. Linux distinguishes these fields in
+[proc task_state](https://github.com/torvalds/linux/blob/master/fs/proc/array.c).
+Previously every worker's status used its leader's PID, including the local
+entry of a root-view `NSpid`. The existing table lock retains the validated
+selected task through `tid_in`, namespace-local ID reads and Text completion.
+No pointer escapes and no ownership or allocation path changes.
+
+The extended native musl `procself` fixture retains its 1,620 relative-link
+probes per architecture and adds exact `Pid`/`Tgid`/`NSpid` to all 36 selected
+status checks across root/UID1000 forked main/pthread readers and three procfs
+aliases. A worker reading `self/status` still sees the leader's ID; its
+`thread-self/status` identifies the worker. Named and explicit numeric paths
+continue to select equal inode/device/mode values.
+
+A separate PID namespace runs a leader and worker against both an inherited
+root-view directory and an independently mounted procfs tree. Four status
+checks require root-view selected TID/process ID and two `NSpid` entries, or
+the own-view local TID/process ID and exactly one entry. The local worker is
+TID 2, distinct from PID 1; its outer TID also differs from the outer process ID.
+The test reads expected outer identities from the preceding qualified relative
+links. Status paths remain in their selected procfs view.
+
+| Architecture | Baseline | Candidate | Large pages before/after, root and UID1000 |
+| --- | --- | --- | --- |
+| AArch64 | Four worker matrices fail status; both namespace worker views fail; leaders pass | All selected fields and link probes pass | 63/63 in both groups |
+| x86-64 | Four worker matrices fail status; both namespace worker views fail; leaders pass | All selected fields and link probes pass | 160/160 in both groups |
+
+After 32 warmups, each credential group performs 200 cycles of 120 link probes
+and six status checks. All 18 ARM and 14 x86 live slab classes stay exact.
+Namespace construction occurs once before the root sample; these results do
+not qualify repeated namespace creation or whole-tree reclamation. Both
+architectures also pass `nnpthread`, `seccompthread`, `namespace`, `open` and
+`runtime`. The existing per-task security fields retain their separate task
+state. Eight host test files pass. Allocation audits still exit 1 with unchanged
+406 ARM/295 x86 sites, 657/653 source files and identical `NEW:` rows. No
+allowance is raised.
+
+Both baseline and candidate kernels build from isolated worktrees at
+`b4337df12f97e7b2ba12df3b3f9613ff9e7600a6`. Only `kernel/proc/proc.v` differs.
+Restoring `process_status_text` and normalizing only compiler unused-loop source
+offset names reproduces the complete baseline generated C. Both before/after
+guest C files equal the final previews. Fixture functions outside status checks
+and namespace helpers remain byte-identical to the preceding relative-link
+qualification. Independent lifetime review verifies table locking, stack
+NamespaceWorker state through successful joins, `_exit` on join failure, and
+descriptor cleanup through both forks.
+
+The first namespace test mounted its new view over `/proc`; setup failed before
+the namespace field markers, while the ordinary worker status failures were
+still reproduced. Both original failed receipts, raw logs and the exact draft
+source/C hashes remain published. Final tests keep the inherited root mount
+uncovered and mount the new tree separately. Overmounted directory-descriptor
+view preservation remains unqualified. A draft declaration placed in the wrong
+formatter was corrected before candidate builds.
+
+The assertion-enabled [auditor](../tests/linux-compat/results/2026-10-13/procstatus-audit.v)
+requires the baseline's wrong leader IDs, candidate's exact namespace columns,
+all compatibility verdicts, source/compiled-source/ELF/ISO/kernel receipts,
+generated-C scope, review hashes and flat retention. Both deliberately failing
+controls execute. The evidence files bind all 63 isolated semantic inputs and
+the compiler/controller/build/C/capture/receipt hashes:
+[AArch64](../tests/linux-compat/results/2026-10-13/procstatus-evidence-aarch64.json),
+[x86-64](../tests/linux-compat/results/2026-10-13/procstatus-evidence-x86_64.json),
+[ARM baseline](../tests/linux-compat/results/2026-10-13/procstatus-before-aarch64.log),
+[ARM candidate](../tests/linux-compat/results/2026-10-13/procstatus-after-aarch64.log),
+[x86 baseline](../tests/linux-compat/results/2026-10-13/procstatus-before-x86_64.log)
+and [x86 candidate](../tests/linux-compat/results/2026-10-13/procstatus-after-x86_64.log).
+Public inventory fingerprints are regenerated from the committed parent plus
+this fix, separately from the tested kernel's input set.
+
+This closes the selected native task `Pid`/`NSpid` gap exposed in the preceding
+relative-link work. Nested namespaces beyond Vinix's existing one-level model,
+zombie/task retirement, overmount/unmount and concurrent teardown, additional
+status/stat fields, full mount retention and glibc/translated/ELF32 or application
+installation/sandbox/portal acceptance remain separate. The three broad section
+15 gates remain open.

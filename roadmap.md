@@ -718,6 +718,9 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 - [x] Return relative procfs self/thread-self targets for each reading process
   and thread; qualify inherited handles, alternate mounts, chroot resolution
   and flat native storage on both architectures. See [the procfs link receipts](docs/linux-posix-qualification.md#relative-procfs-self-and-thread-self-links).
+- [x] Report selected task Pid/NSpid with process Tgid; qualify main/pthread
+  readers, inherited root and own PID views, namespace columns and flat storage
+  on both native architectures. See [the task-status receipts](docs/linux-posix-qualification.md#selected-task-status-identities).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

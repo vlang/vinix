@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-13/procstatus-audit.v:109: FAIL: fn main.failure: assert log.contains('cases=270 failures=0 status=0'), 'task-status baseline failure markers required'
+      message: task-status baseline failure markers required
+V panic: Assertion failed...

@@ -6,6 +6,7 @@ module procselffixture
 #include <fcntl.h>
 #include <grp.h>
 #include <pthread.h>
+#include <sched.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mount.h>
@@ -20,6 +21,7 @@ struct C.stat { st_mode u32 st_ino u64 st_dev u64 }
 struct Handles { mut: dirs [3]i32 links [6]i32 }
 struct Worker { bank &Handles ordinary bool slot i32 mut: tid i32 failed bool }
 struct Slabs { mut: sizes [32]u64 live [32]u64 rows i32 large u64 }
+struct NamespaceWorker { outer i32 inner i32 outer_pid i32 mut: failed bool }
 fn C.alloca(usize) voidptr
 fn C.__errno_location() &i32
 fn C.syscall(isize, ...) isize
@@ -34,6 +36,7 @@ fn C.readlinkat(i32, &char, voidptr, usize) isize
 fn C.mkdir(&char, u32) i32
 fn C.mount(&char, &char, &char, usize, voidptr) i32
 fn C.chroot(&char) i32
+fn C.unshare(i32) i32
 fn C.chdir(&char) i32
 fn C.setgroups(usize, voidptr) i32
 fn C.setgid(u32) i32
@@ -108,10 +111,12 @@ fn status(dirfd i32, kind i32) bool {
 		mut left := C.stat{}; mut right := C.stat{}; mut data := [4096]char{}
 		if C.fstat(fd, &left) != 0 || C.fstat(explicit_fd, &right) != 0 || left.st_ino != right.st_ino || left.st_dev != right.st_dev || left.st_mode != right.st_mode { return false }
 		length := C.read(fd, &data[0], 4095); if length <= 0 || length >= 4096 { return false }; data[int(length)] = 0
-		// The target inode and Tgid identify the chosen tree. Per-task Pid
-		// reporting is a separate status-file conformance gap.
-		tgid_line := C.strstr(&data[0], c'\nTgid:'); mut actual_tgid := i32(-1)
-		return tgid_line != nil && C.sscanf(tgid_line, c'\nTgid: %d', &actual_tgid) == 1 && actual_tgid == pid
+		tgid_line := C.strstr(&data[0], c'\nTgid:'); pid_line := C.strstr(&data[0], c'\nPid:'); ns_line := C.strstr(&data[0], c'\nNSpid:')
+		mut actual_tgid := i32(-1); mut actual_pid := i32(-1); mut actual_ns := i32(-1); mut extra := i32(-1)
+		return tgid_line != nil && pid_line != nil && ns_line != nil
+			&& C.sscanf(tgid_line, c'\nTgid: %d', &actual_tgid) == 1 && actual_tgid == pid
+			&& C.sscanf(pid_line, c'\nPid: %d', &actual_pid) == 1 && actual_pid == tid
+			&& C.sscanf(ns_line, c'\nNSpid: %d %d', &actual_ns, &extra) == 1 && actual_ns == tid
 	}
 }
 fn matrix(bank &Handles, ordinary bool, slot i32) bool {
@@ -182,6 +187,62 @@ fn chroot_test() bool {
 		mut outcome := i32(-1); return C.waitpid(child, &outcome, 0) == child && outcome == 0
 	}
 }
+fn namespace_identity(fd i32, local bool, outer_pid i32) bool {
+	unsafe {
+		mut link := [64]char{}; mut outer_tid := i32(-1); mut parsed_pid := i32(-1)
+		length := C.readlinkat(fd, c'thread-self', &link[0], 63)
+		if length <= 0 || length >= 64 { return false }; link[int(length)] = 0
+		if C.sscanf(&link[0], c'%d/task/%d', &parsed_pid, &outer_tid) != 2 { return false }
+		local_tid := i32(C.syscall(isize(C.SYS_gettid)))
+		if parsed_pid != if local { 1 } else { outer_pid } || (local && outer_tid != local_tid) { return false }
+		status_fd := C.openat(fd, c'thread-self/status', C.O_RDONLY); if status_fd < 0 { return false }; defer { C.close(status_fd) }
+		mut data := [4096]char{}; n := C.read(status_fd, &data[0], 4095); if n <= 0 || n >= 4096 { return false }; data[int(n)] = 0
+		pid_line := C.strstr(&data[0], c'\nPid:'); tgid_line := C.strstr(&data[0], c'\nTgid:'); ns_line := C.strstr(&data[0], c'\nNSpid:')
+		if pid_line == nil || tgid_line == nil || ns_line == nil { return false }
+		mut pid := i32(-1); mut tgid := i32(-1); mut first := i32(-1); mut second := i32(-1); mut third := i32(-1)
+		if C.sscanf(pid_line, c'\nPid: %d', &pid) != 1 || C.sscanf(tgid_line, c'\nTgid: %d', &tgid) != 1 { return false }
+		count := C.sscanf(ns_line, c'\nNSpid: %d %d %d', &first, &second, &third)
+		valid := pid == outer_tid && tgid == parsed_pid && first == outer_tid && count == if local { 1 } else { 2 } && (local || second == local_tid)
+		C.printf(c'LINUX PROCSELF TASKIDS: local=%d leader=%d pid=%d/%d tgid=%d/%d nspid=%d:%d count=%d expected_count=%d %s\n', i32(local), i32(local_tid == 1), pid, outer_tid, tgid, parsed_pid, first, second, count, if local { 1 } else { 2 }, if valid { &char(c'PASS') } else { &char(c'FAIL') }); C.fflush(nil)
+		return valid
+	}
+}
+fn namespace_worker(arg voidptr) voidptr {
+	unsafe {
+		mut state := &NamespaceWorker(arg)
+		if C.getpid() != 1 || C.syscall(isize(C.SYS_gettid)) <= 1 { state.failed = true; return nil }
+		outer := namespace_identity(state.outer, false, state.outer_pid); inner := namespace_identity(state.inner, true, state.outer_pid)
+		state.failed = !outer || !inner; return nil
+	}
+}
+fn namespace_child(outer i32) i32 {
+	unsafe {
+		// Keep the inherited proc mount uncovered so its directory descriptor
+		// continues to select the root view while testing the new tree.
+		if C.getpid() != 1 || C.mkdir(c'/tmp/linux-procself/ns-view', u32(0o755)) != 0
+			|| C.mount(c'proc', c'/tmp/linux-procself/ns-view', c'proc', 0, nil) != 0 { return 1 }
+		inner := C.open(c'/tmp/linux-procself/ns-view', C.O_PATH | C.O_DIRECTORY); if inner < 0 { return 1 }; defer { C.close(inner) }
+		mut link := [64]char{}; n := C.readlinkat(outer, c'self', &link[0], 63); if n <= 0 || n >= 64 { return 1 }; link[int(n)] = 0
+		mut outer_pid := i32(-1); if C.sscanf(&link[0], c'%d', &outer_pid) != 1 || outer_pid <= 1 { return 1 }
+		mut valid := namespace_identity(outer, false, outer_pid) && namespace_identity(inner, true, outer_pid)
+		mut state := NamespaceWorker{outer: outer, inner: inner, outer_pid: outer_pid}; mut helper := C.pthread_t{}
+		if C.pthread_create(&helper, nil, namespace_worker, &state) != 0 { return 1 }
+		if C.pthread_join(helper, nil) != 0 { C._exit(1) }; if state.failed { valid = false }
+		C.printf(c'LINUX PROCSELF PIDVIEW: outer-and-own leader/worker Pid/Tgid/NSpid %s\n', if valid { &char(c'PASS') } else { &char(c'FAIL') }); C.fflush(nil)
+		return if valid { 0 } else { 1 }
+	}
+}
+fn namespace_test(outer i32) bool {
+	unsafe {
+		parent := C.fork(); if parent < 0 { return false }
+		if parent == 0 {
+			if C.unshare(C.CLONE_NEWNS) != 0 || C.unshare(C.CLONE_NEWPID) != 0 { C._exit(1) }
+			child := C.fork(); if child < 0 { C._exit(1) }; if child == 0 { C._exit(namespace_child(outer)) }
+			mut outcome := i32(-1); C._exit(if C.waitpid(child, &outcome, 0) == child && outcome == 0 { 0 } else { 1 })
+		}
+		mut outcome := i32(-1); return C.waitpid(parent, &outcome, 0) == parent && outcome == 0
+	}
+}
 fn qualify(bank &Handles, ordinary bool) bool {
 	unsafe {
 		defer { cleanup(bank) }
@@ -197,6 +258,7 @@ fn qualify(bank &Handles, ordinary bool) bool {
 		}
 		if started != 2 || states[0].tid == states[1].tid { good = false }
 		if !ordinary && !chroot_test() { good = false }
+		if !ordinary && !namespace_test(bank.dirs[0]) { good = false }
 		if !good || !storage(bank, ordinary) { return false }
 		C.alarm(0); return true
 	}

@@ -148,9 +148,11 @@ pages flat. Failed pthread joins terminate the process before stack state or
 shared descriptions can unwind. The independent `procfs-mount --case reuse`
 suite checks PID-view numbering, inactive views and retargeted aliases.
 
-Initial wider assertions exposed the separate per-task status `Pid` reporting
-gap; this target suite does not qualify that field. Initial failure artifacts
-remain published. The full procfs mount suite fails its unchanged 16 KiB
+Status controls now require the selected Pid/NSpid and process Tgid. A root
+cohort also checks leader/worker IDs through inherited root-view and fresh
+PID-namespace proc mounts, including exact two/one-column NSpid values. The
+original wider assertions exposed this field bug; their failure artifacts remain
+published. See [the task-status receipts](../../docs/linux-posix-qualification.md#selected-task-status-identities). The full procfs mount suite fails its unchanged 16 KiB
 retention bound on both baseline and candidate; those failures remain visible.
 See [the relative-link receipts and limits](../../docs/linux-posix-qualification.md#relative-procfs-self-and-thread-self-links).
 

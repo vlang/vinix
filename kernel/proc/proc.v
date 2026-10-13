@@ -1552,6 +1552,8 @@ pub fn process_status_text(pid int, tid int, viewer &Namespace) string {
 	seccomp_state, seccomp_filters := seccomp_status(process, target)
 	state := match process_state(process) { `Z` { 'Z (zombie)' } `T` { 'T (stopped)' } `S` { 'S (sleeping)' } else { 'R (running)' } }
 	shown_pid := pid_in(process, viewer)
+	// Process status selects the leader; task status selects its own thread.
+	shown_tid := if tid == 0 { shown_pid } else { tid_in(target, viewer) }
 	shown_ppid := pid_in(process_at(process.ppid), viewer)
 	// Borrowed synchronously by formatting helpers; the owned bytes are consumed below.
 	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
@@ -1565,22 +1567,22 @@ pub fn process_status_text(pid int, tid int, viewer &Namespace) string {
 	text.add('\nTgid:\t')
 	text.add_decimal(shown_pid)
 	text.add('\nNgid:\t0\nPid:\t')
-	text.add_decimal(shown_pid)
+	text.add_decimal(shown_tid)
 	text.add('\nPPid:\t')
 	text.add_decimal(shown_ppid)
 	text.add('\nTracerPid:\t0\nUid:\t')
 	add_id_fields(mut text, process.uid, process.euid, process.suid)
 	text.add('\nGid:\t')
 	add_id_fields(mut text, process.gid, process.egid, process.sgid)
-	// NSpid lists the process's number in every namespace from the reader's
+	// NSpid lists the selected thread's number in every namespace from the reader's
 	// down to its own.
 	text.add('\nNSpid:\t')
 	if !numbers_own(viewer) && numbers_own(process.numbered_in) {
-		text.add_decimal(pid)
+		text.add_decimal(if tid == 0 { pid } else { tid })
 		text.add_byte(`\t`)
-		text.add_decimal(process.ns_pid)
+		text.add_decimal(if tid == 0 { process.ns_pid } else { target.ns_tid })
 	} else {
-		text.add_decimal(shown_pid)
+		text.add_decimal(shown_tid)
 	}
 	text.add('\nThreads:\t')
 	text.add_decimal(threads)
