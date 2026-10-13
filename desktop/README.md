@@ -918,7 +918,7 @@ layout.
 ## Wallpapers
 
 Vinix has no JPEG or PNG decoder, and writing one to show a backdrop would be a
-strange place to spend the effort. So `tools/fetch_wallpapers.py` downloads the
+strange place to spend the effort. So the V `tools/fetch_wallpapers` downloads the
 photographs at build time, decodes them, and writes each as a `.vwp`: a nine
 byte header and packed RGB, stored at half the display's resolution and scaled
 up when drawn. A photograph survives that at the size a wallpaper is looked at,

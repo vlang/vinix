@@ -6,7 +6,7 @@
 // Wallpapers: a flat gradient, or one of the photographs the build downloaded.
 //
 // Vinix has no JPEG or PNG decoder, so the photographs arrive already decoded:
-// desktop/tools/fetch_wallpapers.py turns each into a `.vwp`, which is a nine
+// desktop/tools/fetch_wallpapers turns each into a `.vwp`, which is a nine
 // byte header and packed RGB at half the display's resolution. Drawing one is
 // then a scale and a blit, with no format to parse beyond that header.
 //

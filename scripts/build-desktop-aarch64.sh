@@ -1611,7 +1611,7 @@ fi
 # the first build; with neither network nor cache it writes none and the
 # desktop offers only its colours.
 echo "==> Wallpapers..."
-python3 "$SCRIPT_DIR/desktop/tools/fetch_wallpapers.py" "$BUILD_DIR/wallpapers" \
+"$SCRIPT_DIR/desktop/tools/fetch_wallpapers" "$BUILD_DIR/wallpapers" \
     --cache "$BUILD_DIR/wallpapers-cache" || true
 
 rm -rf "$STAGING/usr/share/vinix/wallpapers"

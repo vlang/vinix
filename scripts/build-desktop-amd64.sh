@@ -289,7 +289,7 @@ done
     --destination "$STAGING/usr/share/vinix/dictionary"
 
 echo "==> Wallpapers..."
-python3 "$SCRIPT_DIR/desktop/tools/fetch_wallpapers.py" "$BUILD_DIR/wallpapers" \
+"$SCRIPT_DIR/desktop/tools/fetch_wallpapers" "$BUILD_DIR/wallpapers" \
     --cache "$BUILD_DIR/wallpapers-cache" || true
 if [ -d "$BUILD_DIR/wallpapers" ]; then
     cp "$BUILD_DIR/wallpapers"/*.vwp "$BUILD_DIR/wallpapers"/index.txt \

@@ -1,0 +1,137 @@
+{
+    "bytes": 5952,
+    "captures": [
+        {
+            "id": 1015,
+            "input_sha256": "0e430e75ff7f625d4522cf16a2d11ff9f1a1097dfed6b79cb78ffa60b3a0f916",
+            "output_sha256": "a0b0f5dbe261e6dd500be894c4ed10ceb9ef1df7341c02cd98f5a2101ed290a1",
+            "slot": 0
+        },
+        {
+            "id": 1016,
+            "input_sha256": "ad1e8c18cf8139a2fb6368102f252a1310569ff73f21f72422b3c3eff619f0c9",
+            "output_sha256": "6d06e68990d733fc7dedc2bf08b8e7afe5330c8bdd47807336ec8767327ee671",
+            "slot": 1
+        },
+        {
+            "id": 1018,
+            "input_sha256": "bacd447617a0c00111c045534a677460de7497b6aaa0b42ea8c725212c3ff25f",
+            "output_sha256": "1fa11c9e068c767bcea135d26a7350856303dd2b4ddc83e6b9cbb6cf8b5dc7e8",
+            "slot": 2
+        },
+        {
+            "id": 1019,
+            "input_sha256": "a3491969719f364c1c33000da61ebc96b96a75f1b9f1a322f2a4a25986312a7e",
+            "output_sha256": "155c3b3799b0e34847f323c2f581df09bf5f5c79b25a8496e059ca2dbc9fb3d8",
+            "slot": 3
+        },
+        {
+            "id": 1024,
+            "input_sha256": "94e88eff1a0df67136d06b74aadec84596db33fc2c032c5ea2f37e6052b11a78",
+            "output_sha256": "d3b2c1b70be9c8d5f44bbe0e6707edf4a61e3f28801f3bcf2042195fbaa89e54",
+            "slot": 4
+        },
+        {
+            "id": 1036,
+            "input_sha256": "4b21f2f42311458d199682140f9dea41d340c59fc6734ccc48d5f12e0d846a18",
+            "output_sha256": "a0fc84f5143a8d97a24d5c8126f1a5cdcf7439db7d7545d15cd107ebb794c5cb",
+            "slot": 5
+        },
+        {
+            "id": 1039,
+            "input_sha256": "5e7ea39c8f4ee0220c55ab6b1895629a863561d820d3e6d8faef5fab0beda7a0",
+            "output_sha256": "9512a9606bd4b3064f92d9c8d23e3a2361ada5fc0a76c62a91e63475d7f95dda",
+            "slot": 6
+        },
+        {
+            "id": 1043,
+            "input_sha256": "bbd83654976e44cd69f9f18a6c75e5be6fe6eaa88bf244fd4d981e7f17055a07",
+            "output_sha256": "91fc547aa0bbbdcb88413efaa9da6b40b88578cedb25b27bc7ce78547f2e0b19",
+            "slot": 7
+        },
+        {
+            "id": 1047,
+            "input_sha256": "59d251d6c164b1073abd70f5780597c3500097cee4650373f7a191cfbd489ec3",
+            "output_sha256": "0e7237370be2ef6e03ab16ed9edd4c6d2561812f3e69dc3097606da02a56aab6",
+            "slot": 8
+        },
+        {
+            "id": 1057,
+            "input_sha256": "1e7c217b673f5b03e2f59ffc9ed9c158dae8d6e5a5a5982487421e74c3ee12aa",
+            "output_sha256": "938ef61600a31a83e26ff6e8e7b9a61335206d81207e7d6c7d55b625a61c7212",
+            "slot": 9
+        }
+    ],
+    "evidence": "~/.cache/vinix-wallpapers-native-20261013",
+    "files": 1,
+    "jpeg_sdk_source_sha256": "6f30092cef9fb839779646608f4ee14ae3cbac989c47fa05e841b0841f09878e",
+    "jpeg_sdk_version": "3.2.0",
+    "limits": "Native JPEG decoder supports the pinned JPEG inputs; other Pillow image formats are outside this input set. Curl connection/stall limits replace urllib read timeouts. JPEG SDK remains an external dependency.",
+    "lines": 144,
+    "originals": [
+        {
+            "bytes": 5952,
+            "lines": 144,
+            "path": "desktop/tools/fetch_wallpapers.py",
+            "sha256": "5e92688ca09811e088b2dd972db26109c9eb2a60b7a2e3440b26923675d6643f"
+        }
+    ],
+    "profiles": [
+        {
+            "profile": "arm",
+            "programs": [
+                {
+                    "name": "check",
+                    "sha256": "5b87a508034668c992a36d529d08bc45e10b7cbe2430779efdc43eafc17467a6"
+                },
+                {
+                    "name": "test",
+                    "sha256": "18243020f6b140dc3b9b32876215cfeeba423c8047af67ad43c4afa1e087b7a6"
+                },
+                {
+                    "name": "cli",
+                    "sha256": "c2af7d21b68b2e81b662223f70ca12b9808d88413b472f9d9a745d789d932f84"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "profile": "x86",
+            "programs": [
+                {
+                    "name": "check",
+                    "sha256": "e50fd8378040888183fce969dc180d84064c34906f045b384df86cdd35c3f192"
+                },
+                {
+                    "name": "test",
+                    "sha256": "113e38d865f2886304454bc777a2713715cebd496cf403de82ea75e1880b5ebd"
+                },
+                {
+                    "name": "cli",
+                    "sha256": "73d7addd70d29be682032c304122d88bc9630ea8bc43d5784c69bfa40f30c1a1"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "profile": "san",
+            "programs": [
+                {
+                    "name": "check",
+                    "sha256": "88296148d4da608f14d8bd5b5a7a18fbf598bdb015a30602b08b3de165e5bb3a"
+                },
+                {
+                    "name": "test",
+                    "sha256": "8cb670a562e3e7d1fb7c8ebc7d7f04b252022283bec84ec4793d82ebb49032f2"
+                },
+                {
+                    "name": "cli",
+                    "sha256": "f11c94fbbb91dd04b62814c3c15ccfc42e3cdffbc75b83af5d6668e13461179f"
+                }
+            ],
+            "status": "PASS"
+        }
+    ],
+    "qualification": "Nine cold ARM/x86/ASanUBSan builds; all ten independently captured JPEG/VWP pairs match byte for byte (5898330 bytes/profile); native crop and Lanczos constant controls; offline and partial caches; exact index/source text; malformed-cache retention; 100 decoder error retirements; actual streamed file downloads and empty/missing response cleanup; complete warm CLI, help and argument guard; public cold bootstrap and shell syntax checks; no Python or Vinix guest",
+    "source_commit": "0f5e1cdca71f69b798d5451e86223002e067f86b"
+}
