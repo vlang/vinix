@@ -201,6 +201,7 @@ mut:
 	swift_integer_arena u64 // Int metadata, value witnesses and Equatable/Hashable conformances.
 	swift_foundation_arena u64 // Sealed CVarArg calls and Foundation's concrete String conformance.
 	swift_void_arena u64 // Sealed empty-tuple full metadata and zero-size value witnesses.
+	swift_unknown_value_arena u64 // Sealed Builtin.UnknownObject value witnesses.
 	swift_error_arena u64 // Sealed ObjC value witnesses and the concrete CFError: Error conformance.
 	swift_objc_metadata map[u64]u64 // Class -> canonical sealed Swift wrapper, under the runtime lock.
 	swift_concurrency_code u64 // Sealed actor witness dispatcher and indirect priority getter.

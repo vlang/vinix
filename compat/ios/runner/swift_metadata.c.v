@@ -144,6 +144,7 @@ fn swift_metadata_stop() {
 	swift_array_stop()
 	swift_integer_stop()
 	swift_void_stop()
+	swift_unknown_value_stop()
 	swift_interpolation_stop()
 	swift_error_metadata_stop()
 	if ios_runtime.swift_metadata_arena != 0 {

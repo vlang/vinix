@@ -4000,17 +4000,54 @@ at the required `_$sBOWV` import. Evidence is retained under
 `build/ios/fortnite/connection-checks`. Full regression remains unpassed.
 Game entry, rendering and gameplay remain unverified.
 
+`Builtin.UnknownObject` now resolves its Swift value-witness table
+(`_$sBOWV`) through a V implementation measured against this Mac's installed
+Swift runtime. All eight slots implement the eight-byte non-POD reference
+layout, unknown-object retain/release, copy/take/assignment/destruction and
+single-payload enum tags. Assignments publish the replacement before releasing
+the previous owner, allowing destructor reentry without holding the registry
+lock. The table occupies one read-only page per runtime lifetime and retires
+after ARC workers and owned storage drain. Enum accesses support guarded,
+unaligned eight/nine-byte storage without reading or writing adjacent bytes.
+Builtin.NativeObject (`_$sBoWV`) and UnknownObject metadata imports remain
+unsupported.
+
+All 76 programs build; 105 original generated C streams restore to their
+recorded hashes. Twenty-nine host suites pass ASAN/UBSAN in both hashing modes,
+and Vinix passes 29 Objective-C and 34 Swift/loader programs. The shared native
+and Vinix fixture checks Objective-C and native Swift owners, cross-domain
+assignments, nil/tagged references, self copy/take, concurrent copies, enum
+boundaries, eight concurrent publishers, destructor reentry and two drained,
+sealed/unmapped runtime lifetimes. Generated-C audits confirm no scratch
+allocations in the witness operations.
+
+Evidence remains on persistent disk under `build/ios/fortnite/unknown-checks`,
+with pinned tooling and input hashes. APFS cloning reclaims duplicate retained
+tooling blocks while preserving every byte hash. Completed executable archives
+restore to their original hashes, and guest payloads retire after joined success.
+Five published runners remain unchanged. Fortnite passes this import and exits
+with status 1 before entry at
+`iOS: Objective-C metadata string exceeds 1023 bytes`. Full regression remains unpassed;
+game entry, rendering and gameplay remain unverified.
+
+The launch reaches EOSSDK metadata registration, whose longest method type
+encoding is a valid 1,605-byte C++ unordered-map signature. The existing
+1,023-byte metadata-string limit rejects it before image initializers run.
+The initial next-blocker recorder expected another import failure; its failed
+attempt remains recorded. A corrected V recorder and joined continuation
+complete native module replay and generated-C validation.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,442 | 718 | 79 |
-| EOSSDK | 658 | 4 | 18 |
-| MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,215 | 783 | 120 |
+| Fortnite executable | 1,443 | 717 | 79 |
+| EOSSDK | 659 | 3 | 18 |
+| MarketplaceKitWrapper | 116 | 60 | 23 |
+| All images | 2,218 | 780 | 120 |
 
-The C++/GLES/Text variant reports 2,228 resolved imports, 770 unresolved strong
+The C++/GLES/Text variant reports 2,231 resolved imports, 767 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -82,6 +82,7 @@ fn main() {
 		require_child('/opt/ios/objc-associated-checks')
 		require_child('/opt/ios/objc-property-checks')
 		require_child('/opt/ios/objc-sync-checks')
+		require_child('/opt/ios/swift-unknown-value-checks')
 		require_child('/opt/ios/swift-string-checks')
 		require_child('/opt/ios/swift-metadata-checks')
 		require_child('/opt/ios/swift-protocol-checks')
@@ -127,7 +128,7 @@ fn main() {
 	} else if mode == 'swift' {
 		if os.is_dir('/opt/ios/lookup-native') { os.setenv('VINIX_IOS_LOOKUP_NATIVE', '/opt/ios/lookup-native', true) }
 		require_child('/opt/ios/module-lookup-checks')
-		for name in ['string', 'metadata', 'protocol', 'hash', 'hasher', 'raw-representable',
+		for name in ['unknown-value', 'string', 'metadata', 'protocol', 'hash', 'hasher', 'raw-representable',
 			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg', 'void', 'version', 'initializer', 'heap', 'error', 'error-value', 'object-type', 'mangled', 'witness', 'once', 'objc-bool', 'actor-executor', 'task-priority', 'task-alloc', 'task-create', 'task-switch', 'nslog', 'string-unbridge', 'error-description'] {
 			require_child('/opt/ios/swift-' + name + '-checks')
 		}
