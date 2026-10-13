@@ -609,6 +609,66 @@ returns owned strings; `command_vector` validates and builds owned CLI arguments
 Release either with `free_command_values`. SDK vectors accepted by `run-args`
 remain literal and never pass through this editor grammar again.
 
+### Application context interface
+
+Every package launch supplies these additive SDK-1 environment fields from the
+admitted installed manifest and generation. They are the same for ordinary,
+literal-argument and terminal launches, including the root-to-account handoff.
+The sandbox starts with an empty environment and the service supplies these
+values explicitly; ambient `VINIX_APP_*` values from the caller are discarded.
+
+| Variable | Meaning |
+| --- | --- |
+| `VINIX_APP_SDK` | Context interface version, currently `1`. |
+| `VINIX_APP_ID`, `VINIX_APP_VERSION` | Installed application ID and numeric three-component version. |
+| `VINIX_APP_ARCHITECTURE`, `VINIX_APP_KIND` | Host target (`aarch64`/`x86_64`) and installed `native`/`linux`/`windows`/`apple` kind. |
+| `VINIX_APP_GENERATION` | Canonical positive decimal generation counter. |
+| `VINIX_APP_REPOSITORY`, `VINIX_APP_PUBLIC_KEY`, `VINIX_APP_SEQUENCE` | The application's admitted publisher ID, lowercase Ed25519 key and positive index sequence. |
+| `VINIX_APP_DIR` | Absolute immutable app directory in the admitted generation. |
+| `VINIX_APP_DATA` | Absolute ordinary-account private data directory; equals `HOME`, with `TMPDIR` at its `tmp` child. |
+| `VINIX_APP_RUNTIME_ID` | Explicit runtime dependency ID, or empty for a self-contained app. |
+| `VINIX_APP_RUNTIME_VERSION`, `VINIX_APP_RUNTIME_DIR` | Installed runtime version and directory in the same generation; for a self-contained app these equal its own version and directory. |
+| `VINIX_APP_PERMISSIONS` | Sorted, space-separated declared permission names; empty when none are declared. |
+
+The context reports the admitted snapshot. Upgrade/rollback/removal changes the
+context of new launches. A running process retains its original fields and
+generation lease, including when it reads the environment again after those
+operations. It does not query a newer active state. The application index
+sequence can differ from its runtime's sequence; the application fields describe
+the application record. Determine the actual process identity with the normal
+OS user/group interfaces.
+
+The MIT-licensed [V application module](appsdk/context.v) exposes `Context`,
+`Fields`, `load`, `decode`, `Context.validate`, `Context.declares`,
+`Context.environment`, `Context.close` and `free_values`. It depends on V's
+standard `os` module and does not import the package manager or signing library.
+
+```v
+import tools.packages.appsdk
+
+mut context := appsdk.load()!
+defer { context.close() }
+println(context.id + ' ' + context.version)
+println(context.data_directory)
+```
+
+`load` reads the current process environment and verifies `HOME`/`TMPDIR`.
+`decode(Fields)` borrows input fields and returns an independently owned context.
+It refuses missing/unsupported SDK values, malformed IDs/versions/key, zero,
+noncanonical or overflowing counters, paths with controls/parent traversal,
+mixed generation directories and unknown/duplicate permissions. Paths are at
+most 4,096 bytes; IDs 128 bytes; numeric version components nine digits;
+permission text 64 bytes and five distinct names. No shell expansion occurs.
+`environment` returns owned literal `NAME=VALUE` strings; free them with
+`free_values`. Close decoded/loaded contexts when done under manual memory
+management. Older services without this interface produce a load error.
+
+`declares` reports manifest permissions. Paths, document access, network,
+process and device operations still use the actual sandbox and account policy.
+These environment values are metadata, not an authentication token for another
+process; applications can change their own environment. See
+[native SDK qualification](../../tests/packages/sdk-context-check.md).
+
 ## Repository and JSON interfaces
 
 ```text

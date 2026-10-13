@@ -80,6 +80,8 @@ fn stage() ! {
 	os.mkdir_all(notices)!
 	os.cp(repository + '/tools/packages/signing/LICENSE', notices + '/ed25519-MIT.txt')!
 	os.chmod(notices + '/ed25519-MIT.txt', 0o644)!
+	os.cp(repository + '/tools/packages/appsdk/LICENSE', notices + '/application-sdk-MIT.txt')!
+	os.chmod(notices + '/application-sdk-MIT.txt', 0o644)!
 	software := staging + '/usr/bin/vinix-software'
 	if os.exists(software) || os.is_link(software) { os.rm(software)! }
 	os.symlink('/usr/bin/vinix-desktop', software)!

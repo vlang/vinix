@@ -2,6 +2,7 @@
 module pkgcore
 
 import os
+import tools.packages.appsdk
 
 pub struct Launch {
 pub:
@@ -84,6 +85,14 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	args << ['--env', 'HOME=' + data, '--env', 'TMPDIR=' + data + '/tmp', '--env',
 		'PATH=' + runtime + '/bin', '--env', 'LD_LIBRARY_PATH=' + libraries.join(':'), '--env',
 		'WINEPREFIX=' + data + '/wine', '--env', 'LANG=C.UTF-8']
+	runtime_version := if p.runtime == '' { p.version } else { state.packages.filter(it.package.id == p.runtime)[0].package.version }
+	context := appsdk.Context{ id: p.id, version: p.version, architecture: config.architecture, kind: p.kind,
+		generation: state.generation, repository: installed.repository, public_key: installed.public_key, sequence: installed.sequence,
+		app_directory: app, data_directory: data, runtime_id: p.runtime, runtime_version: runtime_version,
+		runtime_directory: runtime, permissions: p.permissions }
+	mut environment := context.environment()!
+	defer { appsdk.free_values(mut environment) }
+	for value in environment { args << '--env'; args << value.clone() }
 	if input.terminal { args << ['--env', 'TERM=linux'] }
 	if 'display' in p.permissions {
 		args << ['--unveil', '/tmp/.X11-unix', 'rw', '--env', 'DISPLAY=' + os.getenv('DISPLAY')]

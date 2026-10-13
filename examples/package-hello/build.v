@@ -25,7 +25,12 @@ fn build(destination string) ! {
 		cc := os.find_abs_path_of_executable(architecture + '-linux-musl-gcc')!
 		payload := work + '/' + architecture
 		os.mkdir_all(payload + '/bin')!
-		command(v, ['-gc', 'none', '-d', 'no_backtrace', '-os', 'linux', '-arch',
+		os.mkdir_all(payload + '/licenses')!
+		os.cp(repository + '/tools/packages/appsdk/LICENSE', payload + '/licenses/application-sdk-MIT.txt')!
+		os.cp(os.dir(v) + '/LICENSE', payload + '/licenses/v-MIT.txt')!
+		os.cp(repository + '/build-support/musl/COPYRIGHT', payload + '/licenses/musl-MIT.txt')!
+		command(v, ['-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository,
+			'-d', 'no_backtrace', '-d', 'no_segfault_handler', '-os', 'linux', '-arch',
 			if architecture == 'aarch64' { 'arm64' } else { 'amd64' }, '-o', work + '/hello.c',
 			repository + '/examples/package-hello/main.v'])!
 		command(cc, ['-static', '-O2', '-std=gnu11', '-D_GNU_SOURCE', work + '/hello.c', '-o',

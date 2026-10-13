@@ -44,6 +44,9 @@ fn check() ! {
 		check_tests(v, ['-gc', 'none'], repository + '/tools/packages/signing', work)!
 		check_tests(v, ['-gc', 'none'], repository + '/tools/packages/pkgcore', work)!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgprotocol', work)!
+		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/appsdk', work)!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap', '-o', work + '/context-memory', repository + '/tests/packages/sdk-context-memory.v'])!
+		run(work + '/context-memory', [])!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/desktop/packagecore', work)!
 		run(v, [...helper_flags, '-gc', 'none', '-o', work + '/vinix-package', repository + '/tools/packages/main.v'])!
 		run(work + '/vinix-package', ['--help'])!
@@ -76,6 +79,8 @@ fn check() ! {
 			run(work + '/package-stage', ['--arch', architecture, '--staging', staging])!
 			assert os.read_file(staging + '/usr/share/licenses/vinix-packages/ed25519-MIT.txt')!
 				== os.read_file(repository + '/tools/packages/signing/LICENSE')!
+			assert os.read_file(staging + '/usr/share/licenses/vinix-packages/application-sdk-MIT.txt')!
+				== os.read_file(repository + '/tools/packages/appsdk/LICENSE')!
 			println('Package signing license staged (${architecture})')
 		}
 	}

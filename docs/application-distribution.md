@@ -338,6 +338,16 @@ the seat, even when a package declares those permissions. Graphical runtimes
 need a separately qualified display/audio broker. Full ordinary-user desktop
 sessions and a public native GUI protocol remain release work.
 
+Every admitted package process receives the
+[application-context interface](../tools/packages/SDK.md#application-context-interface):
+installed ID/version, app/runtime directories and version, generation, publisher
+provenance, private data paths and declared permissions. The V helper owns its
+decoded fields and supports explicit retirement. New launches see their admitted
+state; running apps keep their original context and lease through upgrade,
+rollback, uninstall and garbage collection. The
+[native SDK checks](../tests/packages/sdk-context-check.md) include the static V
+example, actual ordinary-account execution and unchanged running snapshots.
+
 Installed applications appear in Start's All Programs/search and Quick Launch.
 Search includes package IDs and descriptions. Both use one bounded registry read
 from an administrator-owned immutable generation; arbitrary XDG `Exec` commands

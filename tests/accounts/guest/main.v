@@ -23,6 +23,7 @@ fn main() {
 	if os.args.len > 1 && os.args[1] == '--uid' { exit(package_sandbox_handoff_probe()) }
 	if os.args.len > 1 && os.args[1] == 'package-probe' { exit(package_application_probe()) }
 	if os.args.len > 1 && os.args[1] == 'package-policy-probe' { exit(package_policy_probe()) }
+	if os.args.len > 1 && os.args[1] == 'package-context-probe' { exit(package_context_probe() or { eprintln(err); 89 }) }
 	if os.args.len > 1 && os.args[1] == 'probe' {
 		exit(run_probe(os.args[2..]))
 	}
@@ -45,6 +46,7 @@ fn main() {
 		'packages-sqlite' { scenario_packages_sqlite(mut t) }
 		'packages-ffmpeg' { scenario_packages_ffmpeg(mut t) }
 		'packages-composition' { scenario_packages_composition(mut t) }
+		'packages-context' { scenario_packages_context(mut t) }
 		'packages-crash-staged', 'packages-crash-published', 'packages-crash-activated' {
 			scenario_package_recovery(mut t)
 		}

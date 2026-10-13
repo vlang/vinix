@@ -71,3 +71,9 @@ with separate prepared-root directories for each profile. It retains pins,
 permissions and license declarations and rechecks targets and dependencies.
 See [catalog composition](SDK.md#compose-application-catalogs) and
 [qualification](../../tests/packages/composition-check.md).
+
+The [application SDK module](appsdk/context.v) supplies an owned launch context
+with installed app/runtime versions, publisher provenance, admitted generation,
+private data paths and declared permissions. All launch modes receive the same
+versioned environment contract. See [the SDK interface](SDK.md#application-context-interface)
+and [native guest qualification](../../tests/packages/sdk-context-check.md).
