@@ -683,6 +683,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   and seek-selector words while retaining full-width counts and signed offsets;
   qualify real bytes/cursors/queues, closure, sparse data and flat storage on
   both architectures. See [the scalar-word receipts](docs/linux-posix-qualification.md#native-scalar-syscall-argument-words).
+- [x] Return native lseek invalid-selector errors after descriptor validation
+  and before pipe/socket/device type errors; qualify unchanged aliases,
+  metadata, bytes/cursors/queues/readiness and flat storage on both architectures.
+  See [the selector-error receipts](docs/linux-posix-qualification.md#native-seek-selector-error-precedence).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

@@ -134,6 +134,19 @@ character devices, GNU wrappers, foreign ABIs, actual cap-sized transfers,
 disk-backed vectors and shared-offset atomicity remain open. See the
 [qualification and receipts](../../docs/linux-posix-qualification.md#native-positioned-vector-imports-and-errors).
 
+The `seekerror` case checks 3,888 native lseek refusals in each root and
+UID/GID1000 child. Twelve descriptor classes, original/dup/F_DUPFD_CLOEXEC
+handles, three FD/selector upper-word patterns and four signed64 offsets
+require EINVAL for invalid selectors after descriptor validation, before
+pipe/socket/device type errors. Invalid/O_PATH handles retain EBADF. Valid
+stream selectors, ordinary file/directory cursors, sparse file seeks, alias
+flags/metadata and real queued bytes/FIONREAD/poll/EAGAIN stay valid. Sixteen
+stable descriptors warm 32 and measure 200 cycles of 1,296 invalid seeks plus
+valid controls and three transient dup/seek/close operations, with flat slab
+objects and big pages. Regular DATA/HOLE seeks, valid character-device seeks,
+overflow/concurrency, GNU/foreign ABIs and disk-backed handles remain separate.
+See [the selector-error receipts](../../docs/linux-posix-qualification.md#native-seek-selector-error-precedence).
+
 The `scalarabi` case checks 2,795 native read/write/pread64/pwrite64/lseek/close
 probes in each root and UID/GID1000 child. Five upper-word patterns must use
 the lower 32 bits of descriptors and whence, while counts and signed offsets

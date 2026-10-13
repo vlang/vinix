@@ -1,0 +1,47 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "8e16f8d714d4f53d464115817a2ddb442d0678d2958e2300b2fc3d17201f9466",
+    "results": [
+        {
+            "name": "seekerror",
+            "source_sha256": "3636dfa9928d335521c24afd59161f17a2cd71ae358161a5e7bc664cb92adeec",
+            "init_sha256": "6572be4415724097b2c231e2ff6004b4f54563f71c7a7e0ec128e0024749fec5",
+            "iso_sha256": "9d34b4c9dff1010879934ab27e5b1683da0e315c0301d129e5f5095d89c788dd",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "scalarabi",
+            "source_sha256": "61164821366b0ea5cb014c48282e70ba16eae88d4dc15ecf67278ad4d0e31614",
+            "init_sha256": "5fadd80095168bceae1cef0cad5f36ab12e9cf6f0f91f7a15dc19a2d850305c3",
+            "iso_sha256": "97c55e031168268ff4a062deaa2de05057ca4c18516533640f12b1dbe839939d",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "opathseek",
+            "source_sha256": "cea2d706eab06e5bdade51d2095ca1ec5a8d87388c0691b81339110f74e08b5b",
+            "init_sha256": "540141c57a3bfeabf25e358ac7b5c5987eb1325c314cd1811a3286579f76a69c",
+            "iso_sha256": "89aaedb7902a3c08fdfd9aa04bf112460a5e9b8f951381d2cda942f873ab3b1f",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "pathio",
+            "source_sha256": "28a7d58e04956b559c2024bcf6a3c081a770982a357724b7f52a54c536720d16",
+            "init_sha256": "48bf8c1b2a50662dfe0f1c976cb1b0884776ba756486cbf5ff95596890df79d0",
+            "iso_sha256": "6db08e1016b114dd66635dc6d22657d2abade45d893381e0f3842c1e6b33821e",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "e1c5279674f6b7c230f58c7db907a5aa72b2290b88cc7ed3a2c0296bd2878c52",
+            "exit_code": 1,
+            "detail": "cp: failed to write to /private/tmp/vinix-seekselector-1013/after-arm/runtime/efivars.fd"
+        }
+    ]
+}

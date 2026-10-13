@@ -2469,3 +2469,71 @@ behavior, actual cap-sized transfers, ordinary SEEK_DATA/SEEK_HOLE, invalid
 selector precedence on streams, shared-offset concurrency, disk-backed paths,
 allocation exhaustion and complete Linux installation/sandbox/portal/runtime
 support remain separate work. The three broad section-15 gates stay open.
+
+## Native seek selector error precedence
+
+Valid pipe/socket/device descriptors previously returned ESPIPE before
+examining lseek's selector. The syscall now rejects selectors outside 0..4
+immediately after descriptor/O_PATH checks, before policy, locking and
+resource-type dispatch. Invalid and pathname-only descriptors retain EBADF.
+[Linux v6.12 lseek](https://raw.githubusercontent.com/torvalds/linux/refs/tags/v6.12/fs/read_write.c)
+checks the descriptor, validates whence against SEEK_MAX, then invokes the
+resource's seek behavior. Valid stream selectors still return ESPIPE.
+
+The V `seekerror` fixture makes 3,888 raw checks in each root and UID/GID1000
+child. Twelve classes cover regular files, directories, both anonymous pipe
+ends, a named FIFO, UNIX stream/datagram/seqpacket, /dev/null, an invalid FD
+and O_PATH file/FIFO handles. Original, dup and F_DUPFD_CLOEXEC aliases combine
+three upper FD patterns, three upper-selector patterns, four signed64 offsets
+and three invalid low selectors. Fresh unchanged kernels fail **2,268 checks
+per cohort**; candidates pass all **7,776 checks per architecture**.
+
+Both baseline and candidate retain metadata inode/device/size/type and alias
+flags. Ordinary relative/end/sparse file seeks and directory cursor queries
+remain valid; all five recognized selectors on streams still refuse with
+ESPIPE. Real queued AB bytes survive every malformed seek: FIONREAD and poll
+report readable data, a read returns AB, the emptied endpoint returns EAGAIN,
+then the same endpoints are replenished. Valid character-device seek behavior
+and regular DATA/HOLE semantics are outside this qualification.
+
+Two 200-cycle storage cohorts retain sixteen stable descriptors, after 32
+warm-up cycles. Each cycle makes 1,296 invalid seeks plus valid controls and
+three transient dup/seek/close operations. Every slab live count stays flat,
+with big pages **84/84 ARM and 223/223 x86** in both credential groups. The
+fixture initializes owners before setup, closes partial and duplicated owners
+on failure, and keeps borrowed handles alive through synchronous controls.
+Its handle table and two observer snapshots use bounded alloca. All four
+actual fixture C captures match preview without hidden heap promotion.
+
+Independent source/C/retention review finds no lifetime blocker. Generated
+early EINVAL releases exactly the pinned FD and returns before MAC/lock checks;
+later paths keep their lock-release-before-FD-unref order. Removing the new
+guard and canonicalizing generated return temporaries restores the entire
+seek body. Replacing only that body restores the complete baseline kernel C.
+
+Four additional cases pass on both candidates: scalarabi, opathseek, pathio
+and runtime. Eight host test files, both fresh kernel builds and inventory
+checks pass. Before/after allocation audits retain **406 ARM / 295 x86**
+existing sites and identical allowance failures; no allowance is increased.
+
+Host disk exhaustion interrupted both original candidate aggregates. ARM's
+runtime image exists, but its EFI-vars copy failed before boot, after four
+successful cases. The x86 capture is truncated during opathseek, with only
+two successful receipt rows. Both unsuccessful aggregates remain published.
+Fresh completion suites pass ARM runtime and x86 opathseek/pathio/runtime on
+the identical kernels and identical frozen fixture C. These completion results
+do not relabel the original aggregates as passing.
+
+[ARM evidence](../tests/linux-compat/results/2026-10-13/seekerror-aarch64-evidence.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-13/seekerror-x86_64-evidence.json)
+and the [assertion-enabled V auditor](../tests/linux-compat/results/2026-10-13/seekerror-audit.v)
+bind raw logs, source/init/image hashes, kernel binaries/C, host/allocation
+checks and both executed failing controls. Private trees pin `6e27e8ee3`;
+only the two-line guard in `fs/vfs.v` changes. The compiler remains the clean
+`f6358ecff9` snapshot. All 63 isolated semantic inputs are fingerprinted
+separately from the public committed-parent dispatch inventory.
+
+Regular SEEK_DATA/SEEK_HOLE, valid character-device seek behavior, relative/end
+overflow, shared-offset races, GNU wrappers, foreign/ELF32 paths, disk-backed
+files, allocation exhaustion and complete Linux installation/sandbox/portal/
+runtime support remain separate work. The three broad section-15 gates stay open.
