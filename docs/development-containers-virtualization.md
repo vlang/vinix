@@ -143,6 +143,18 @@ receipts are retained in `build/development17-20261013/guest-arm-job-control-d`
 and `build/development17-20261013/guest-x86-job-control-d`. Installed services
 and complete database/server/SSH/CI workflows remain open.
 
+The job-control work exposed ordinary signal authorization losing the target's
+user-namespace identity during exit. Both architecture baselines reproduced
+`EPERM` for UID 1000 probing its own unreaped child. Ordinary signals now consult
+the existing saved namespace identity under the process-table lock, matching
+pidfd authorization through namespace retirement. The UID, capability, session
+and mandatory security checks remain enforced. Both isolated production kernels
+built, and the native regression passed 100 authorized zombie probes/signals,
+foreign-account refusal and `ESRCH` after reap. The account, job-control and build
+gates also passed in `build/development17-20261013/guest-arm-signal-fixed` and
+`build/development17-20261013/guest-x86-signal-fixed`. This fixes exit-time signal
+identity; it does not implement the remaining debugger or container interfaces.
+
 Do not check off section 17 until an installed Vinix system builds, debugs,
 tests and packages a real project, runs a container with the requested isolation,
 and hosts a practical hardware-accelerated guest OS under supported authorization.

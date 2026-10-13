@@ -19,9 +19,14 @@ fn may_signal(caller &proc.Process, target &proc.Process, signal int) bool {
 }
 
 fn may_signal_now(caller &proc.Process, target &proc.Process, signal int) bool {
+	// Exit retires namespace references before the zombie loses its PID.
+	// Use its saved identity, as pidfd signals do, and serialize the live
+	// namespace read with exit/unshare so no namespace borrow escapes.
+	proc.lock_table()
+	defer { proc.unlock_table() }
 	if !proc.mac_peer_allowed(caller, target) { return false }
 	// Capabilities acquired in a user namespace cannot signal its host.
-	same_namespace := voidptr(caller.ns.user) == voidptr(target.ns.user)
+	same_namespace := proc.user_namespace_id(caller) == proc.user_namespace_id(target)
 	if proc.has_capability(caller, proc.cap_kill)
 		&& (same_namespace || proc.is_initial_namespace(caller.ns.user)) {
 		return true

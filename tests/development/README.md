@@ -48,6 +48,24 @@ serial transcripts are retained in
 `build/development17-20261013/guest-arm-job-control-d` and
 `build/development17-20261013/guest-x86-job-control-d`.
 
+Signal authorization also retains the exiting task's user-namespace identity
+until reap. As UID 1000, the fixture refuses probes and SIGTERM to root's PID 1,
+exits an owned child and uses `waitid(WNOWAIT)` to retain its zombie identity.
+All 100 signal-zero probes and SIGTERM calls must remain authorized; after
+`waitpid` reaps it, the same probe must return `ESRCH`. This regression reproduced
+`EPERM` on both unchanged kernels in
+`build/development17-20261013/guest-arm-signal-baseline-b` and
+`build/development17-20261013/guest-x86-signal-baseline-b`.
+
+On 13 October 2026 both production architectures built with the signal-identity
+fix in isolated worktrees from `776b9f0d3` plus the `116ba2c78` metadata policy.
+The native signal, account, job lifecycle and build-plan gates passed in
+`build/development17-20261013/guest-arm-signal-fixed` and
+`build/development17-20261013/guest-x86-signal-fixed`. Each passing receipt pins
+the actual kernel, fixture and staged commands. Authorization uses the existing
+saved namespace ID under the process-table lock; account, capability, session
+and mandatory-security-domain checks retain their existing rules.
+
 The same ordinary account then runs a pinned build plan in two new workspaces.
 Its prebuilt V payload reads through a copied internal symlink, checks the fixed
 build epoch and sanitized environment, and writes an artifact. The fixture

@@ -453,6 +453,7 @@ fn account_checks() {
 		check(C.setgroups(0, nil) == 0 && C.setgid(1000) == 0 && C.setuid(1000) == 0, 116)
 		check(C.chdir(c'/home/developer') == 0, 117)
 		command_log_checks()
+		signal_identity_checks()
 		check(C.setenv(c'UNSELECTED_PARENT_SECRET', c'parent-must-not-reach-job', 1) == 0, 118)
 		for program in [&char(c'/usr/bin/vinix-build'), &char(c'/usr/bin/vinix-qualify'),
 			&char(c'/usr/bin/vinix-vm'), &char(c'/usr/bin/vinix-jobs')]! {
