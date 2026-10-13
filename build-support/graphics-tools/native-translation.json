@@ -1,0 +1,141 @@
+{
+    "changes": "Four embedded first-party Python bodies become V; two deleted Python compiler-wrapper calls use the native entry point. Four obsolete staging prerequisites removed. Mesa generator SDK is separately provisioned with the original version pins instead of creating a Python environment and invoking pip.",
+    "embedded_blocks": [
+        {
+            "bytes": 1233,
+            "lines": 22,
+            "path": "scripts/build-venus-aarch64.sh",
+            "sha256": "be9f6defbe8d8b59e6ee704c8eb672c709f54271798f0504dc9940eb831340a3"
+        },
+        {
+            "bytes": 321,
+            "lines": 7,
+            "path": "scripts/build-venus-aarch64.sh",
+            "sha256": "e991809bb5f611aa52eb913347cbcb620f52865cd0469a5b5b72ae6cce69f382"
+        },
+        {
+            "bytes": 249,
+            "lines": 9,
+            "path": "scripts/build-asahi-aarch64.sh",
+            "sha256": "78309465a5ba53e36f75f8c0fa5bb22b87ac63e8bb616b12c22bb10c51c29a5c"
+        },
+        {
+            "bytes": 234,
+            "lines": 8,
+            "path": "scripts/build-hyprland-aarch64.sh",
+            "sha256": "19260948285053a78bd3eb549e7f37144277fd9b15c961460788fc5e9c477a02"
+        }
+    ],
+    "embedded_bytes": 2037,
+    "embedded_lines": 46,
+    "evidence": "~/.cache/vinix-graphics-build-native-20261013",
+    "limits": "No Python, Mesa external generator, graphics application, compiled guest probe or Vinix guest executes. Host sanitizer checks do not instrument linked Linux guest probes. Existing Mesa renderer/build options and runtime packages remain unchanged. Containing scripts were Shell, so Python-file retirement credit is zero.",
+    "original_sha256": {
+        "build-support/venus/README.md": "e482e561b78662347dd9266b7094cc250d1b523e12686f798afb14b9f43d065e",
+        "scripts/build-asahi-aarch64.sh": "e210f59d9aa9ea7fddefc7ca8e0b5f377da45b4b924ddcaebdf4409e1c21858b",
+        "scripts/build-chromium-aarch64.sh": "bed87e0a2af4526d812aa7c9dbaf32cdf4a61bf8918b4188bacfcd75734e2d0e",
+        "scripts/build-hyprland-aarch64.sh": "3b5e83646f422de18299d8c04067b23d64336116aba65d3b3ebf765718ee1536",
+        "scripts/build-libreoffice-aarch64.sh": "ef7a56055f0ecdeadddc791d0d4414c2e7317752d21bb5fc831ffbdc4de5a78e",
+        "scripts/build-qemu-system-aarch64.sh": "5931e6948bef1583c86e7df181bf4c729329d4440a0dfeec7d13cf89491733b3",
+        "scripts/build-venus-aarch64.sh": "a02fe5f30cfb84f78536df16fde3f0af00d17ac62cafded75f61784a0e77d14f",
+        "scripts/build-x86-translation-aarch64.sh": "f936eabf26befd0bc6440df1c6760b698237b94b5feed228bfa5daa393c4e4a9"
+    },
+    "profiles": [
+        {
+            "limits": "Native macOS behavior; actual cached Mesa/34 Alpine archives and library metadata; two real static musl Venus probes and one dynamic ARM musl VNC ELF. No Python, Mesa generators, graphics apps, probe ELF or Vinix guest executes. Sanitizers apply to host tools only.",
+            "profile": "arm",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "efbb44aca8f025a87d46ce68cfaeea36d37ab2c142b747444b8babfe8e2e9159"
+                },
+                {
+                    "name": "check",
+                    "sha256": "877227803ea7c752f9bf609db71936a27960a5db05e4f5f81cb665bdf2586686"
+                },
+                {
+                    "name": "generator",
+                    "sha256": "42d1647fad9ba1826171bc9204c7ce385f45f2e608c40e40dbcc36f0fd6bcfb5"
+                },
+                {
+                    "path": "/Users/alex/.cache/vinix-graphics-build-native-20261013/q3-arm/venus-available-arm64",
+                    "sha256": "f2ac7edb21048bb24efbd33f452af739da50c9fc7979f43f8344bdfea37a5ef2"
+                },
+                {
+                    "path": "/Users/alex/.cache/vinix-graphics-build-native-20261013/q3-arm/venus-available-amd64",
+                    "sha256": "bc88121c2c61921ed2808c58dbe2adbd8eeecca4b14dab76de20d277a11e294b"
+                },
+                {
+                    "path": "/Users/alex/.cache/vinix-graphics-build-native-20261013/q3-arm/vinix-vnc-window-arm64",
+                    "sha256": "36eec21fcca5d66670169b2578e716064ddf07bd01ce046fb4d3b6f48f132ef5"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "limits": "Native macOS behavior; actual cached Mesa/34 Alpine archives and library metadata; two real static musl Venus probes and one dynamic ARM musl VNC ELF. No Python, Mesa generators, graphics apps, probe ELF or Vinix guest executes. Sanitizers apply to host tools only.",
+            "profile": "x86",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "c51199304e76b5ca9bde56f0ba86104f1f5a511b9bdca8f3064e5aba4a5057e4"
+                },
+                {
+                    "name": "check",
+                    "sha256": "bf2482f66fecac442f13806bff38cca59f35188de9a3cbacc23861680c5aa34e"
+                },
+                {
+                    "name": "generator",
+                    "sha256": "ee2eddcf53d49383e4caa620b5ca1d989001cad11bd09e27ef2fced22ca7dbf9"
+                },
+                {
+                    "path": "/Users/alex/.cache/vinix-graphics-build-native-20261013/q3-x86/venus-available-arm64",
+                    "sha256": "f2ac7edb21048bb24efbd33f452af739da50c9fc7979f43f8344bdfea37a5ef2"
+                },
+                {
+                    "path": "/Users/alex/.cache/vinix-graphics-build-native-20261013/q3-x86/venus-available-amd64",
+                    "sha256": "bc88121c2c61921ed2808c58dbe2adbd8eeecca4b14dab76de20d277a11e294b"
+                },
+                {
+                    "path": "/Users/alex/.cache/vinix-graphics-build-native-20261013/q3-x86/vinix-vnc-window-arm64",
+                    "sha256": "36eec21fcca5d66670169b2578e716064ddf07bd01ce046fb4d3b6f48f132ef5"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "limits": "Native macOS behavior; actual cached Mesa/34 Alpine archives and library metadata; two real static musl Venus probes and one dynamic ARM musl VNC ELF. No Python, Mesa generators, graphics apps, probe ELF or Vinix guest executes. Sanitizers apply to host tools only.",
+            "profile": "san",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "d9977ea665a6a29cd5d819d245b58faabc72971cc25ff06cb29013e112462124"
+                },
+                {
+                    "name": "check",
+                    "sha256": "8a84eb7a3745700605eee760925edc1a024a3dfca7fc1006eab4ed4edc563283"
+                },
+                {
+                    "name": "generator",
+                    "sha256": "b705ef8825912f20ca98e55aeb69a69dfdd412893faf9b78311db970023e54e8"
+                },
+                {
+                    "path": "/Users/alex/.cache/vinix-graphics-build-native-20261013/q3-san/venus-available-arm64",
+                    "sha256": "f2ac7edb21048bb24efbd33f452af739da50c9fc7979f43f8344bdfea37a5ef2"
+                },
+                {
+                    "path": "/Users/alex/.cache/vinix-graphics-build-native-20261013/q3-san/venus-available-amd64",
+                    "sha256": "bc88121c2c61921ed2808c58dbe2adbd8eeecca4b14dab76de20d277a11e294b"
+                },
+                {
+                    "path": "/Users/alex/.cache/vinix-graphics-build-native-20261013/q3-san/vinix-vnc-window-arm64",
+                    "sha256": "36eec21fcca5d66670169b2578e716064ddf07bd01ce046fb4d3b6f48f132ef5"
+                }
+            ],
+            "status": "PASS"
+        }
+    ],
+    "python_file_retirement_credit": 0,
+    "qualification": "Nine cold host builds across ARM, Rosetta x86 and ARM ASanUBSan. Per profile: 27 streaming digest comparisons with OpenSSL, 17 actual curl fixture downloads/cache reuse, private-library bytes/modes/times/link cases, five failed preparation paths plus checksum failures, manifest guards. Actual pinned Mesa archive and all 34 Alpine packages are verified/extracted as inert SDK data; all 145 shared-library names are checked. Six real static ARM/x86 Venus probes and three dynamic ARM musl VNC ELFs link through the repaired native module producer. Seven shell syntax checks per profile and the cold public help entry point pass.",
+    "source_commit": "b4337df12f97e7b2ba12df3b3f9613ff9e7600a6"
+}

@@ -6,10 +6,19 @@ and the Alpine 3.21 build dependencies are checked against pinned hashes.
 The runtime is staged under `build-aarch64-venus/staging/opt/venus` and stays
 separate from the X11 and Lavapipe libraries.
 
-The build needs the ARM64 musl cross toolchain, Python, Ninja, pkg-config and
+The repository's checksums, package preparation, library staging and V-to-C
+generation run through native V tools. The build needs the ARM64 musl cross
+toolchain, V, Ninja, pkg-config and
 OpenGothic's staged Vulkan loader, headers and host glslang tools. Build the
 engine first with `./scripts/build-opengothic-aarch64.sh --demo` or `--game`.
 `VINIX_VENUS_BUILD_DIR` and `VINIX_OPENGOTHIC_BUILD_DIR` override those outputs.
+
+Mesa's upstream generator SDK must be provisioned separately. The default
+entry point is `build-aarch64-venus/tools/bin/meson`; `VINIX_VENUS_MESON` selects
+another executable. Keep Meson 1.11.2, Mako 1.3.12, MarkupSafe 3.0.3, PyYAML
+6.0.3 and packaging 26.3 in that private SDK. The builder no longer creates a
+Python environment or invokes pip. Its dependency checks and staging can be
+qualified without executing Mesa's external generators.
 
 Boot with `VINIX_KEKVM_DIR="$HOME/code/kekvm" ./scripts/run-desktop-aarch64.sh --venus`.
 KekVM must have its GPU backend prepared with `make setup-gpu`. The launch

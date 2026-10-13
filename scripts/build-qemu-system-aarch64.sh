@@ -8,7 +8,7 @@ DOWNLOADS="$BUILD_DIR/downloads"
 STAGING="$BUILD_DIR/staging"
 ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine/v3.21}"
 
-for tool in curl python3 tar; do
+for tool in curl tar; do
     command -v "$tool" >/dev/null 2>&1 || {
         echo "missing build tool: $tool" >&2
         exit 1
@@ -116,7 +116,7 @@ if [ -z "$CLANG" ] || [ -z "$GCCLIB" ] || \
     echo "AArch64 X11 sysroot or cross compiler is missing; build the X11 layer first." >&2
     exit 1
 fi
-python3 "$SCRIPT_DIR/build-support/compile-v-module.py" \
+"$SCRIPT_DIR/build-support/compile-v-module" \
     "$SCRIPT_DIR/build-support/qemu-system/vnccore" \
     "$BUILD_DIR/vinix-vnc-window.c" --arch arm64
 "$CLANG" --target=aarch64-linux-musl --sysroot="$X11_SYSROOT" \

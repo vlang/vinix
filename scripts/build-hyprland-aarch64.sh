@@ -135,16 +135,8 @@ if [ ! -f "$AQUAMARINE_ARCHIVE" ]; then
     echo "==> Downloading Aquamarine $AQUAMARINE_VERSION"
     curl -fL --retry 3 -o "$AQUAMARINE_ARCHIVE" "$AQUAMARINE_URL"
 fi
-python3 - "$AQUAMARINE_ARCHIVE" "$AQUAMARINE_SHA512" <<'PY'
-import hashlib
-import pathlib
-import sys
-
-archive = pathlib.Path(sys.argv[1])
-actual = hashlib.sha512(archive.read_bytes()).hexdigest()
-if actual != sys.argv[2]:
-    raise SystemExit(f"Aquamarine archive checksum mismatch: {actual}")
-PY
+"$SCRIPT_DIR/build-support/graphics-tools/run" checksum sha512 \
+    "$AQUAMARINE_ARCHIVE" "$AQUAMARINE_SHA512" 'Aquamarine archive'
 
 rm -rf "$SOURCE"
 tar xzf "$AQUAMARINE_ARCHIVE" -C "$BUILD_DIR"

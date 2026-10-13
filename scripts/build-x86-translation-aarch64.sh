@@ -35,7 +35,7 @@ case "${1:-}" in
         ;;
 esac
 
-for tool in curl python3 tar clang ld.lld file; do
+for tool in curl tar clang ld.lld file; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "missing build tool: $tool" >&2
         exit 1

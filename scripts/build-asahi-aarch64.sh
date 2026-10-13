@@ -49,17 +49,8 @@ if [ ! -f "$MESA_ARCHIVE" ] && [ ! -d "$MESA_SRC" ]; then
 fi
 
 if [ -f "$MESA_ARCHIVE" ]; then
-    python3 - "$MESA_ARCHIVE" "$MESA_BLAKE2B" <<'PY'
-import hashlib
-import pathlib
-import sys
-
-archive = pathlib.Path(sys.argv[1])
-expected = sys.argv[2]
-actual = hashlib.blake2b(archive.read_bytes()).hexdigest()
-if actual != expected:
-    raise SystemExit(f"Mesa archive checksum mismatch: {actual}")
-PY
+    "$SCRIPT_DIR/build-support/graphics-tools/run" checksum blake2b \
+        "$MESA_ARCHIVE" "$MESA_BLAKE2B" 'Mesa archive'
 fi
 
 if [ ! -d "$MESA_SRC" ]; then

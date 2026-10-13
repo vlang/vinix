@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+support=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+exec sh "$support/run-v-tool.sh" "$support/graphics-tools/main.v" "$@"

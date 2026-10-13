@@ -25,7 +25,7 @@ ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine}/$ALPINE_B
 ALPINE_ARCH=aarch64
 BRANCH_KEY="$(printf '%s' "$ALPINE_BRANCH" | tr '/:' '__')"
 
-for tool in curl python3 tar; do
+for tool in curl tar; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "missing build tool: $tool" >&2
         exit 1
