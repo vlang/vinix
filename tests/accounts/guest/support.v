@@ -111,12 +111,20 @@ struct Ran {
 fn run(argv []string, input string, db ?accountcore.Database, user ?accountcore.User) Ran {
 	mut to_child := [2]i32{}
 	mut from_child := [2]i32{}
-	if C.pipe(&to_child[0]) != 0 || C.pipe(&from_child[0]) != 0 {
+	if C.pipe(&to_child[0]) != 0 {
 		return Ran{
 			status: -1
 		}
 	}
+	if C.pipe(&from_child[0]) != 0 {
+		C.close(to_child[0]); C.close(to_child[1])
+		return Ran{status: -1, output: 'cannot create guest capture pipe'}
+	}
 	child := C.fork()
+	if child < 0 {
+		C.close(to_child[0]); C.close(to_child[1]); C.close(from_child[0]); C.close(from_child[1])
+		return Ran{status: -1, output: 'cannot fork guest command; check process/kernel resource limits'}
+	}
 	if child == 0 {
 		C.dup2(to_child[0], 0)
 		C.dup2(from_child[1], 1)

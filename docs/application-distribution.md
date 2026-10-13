@@ -183,6 +183,16 @@ accepts certificate-validated HTTPS or an absolute local `file://` repository.
 HTTP, unknown architectures, unsafe paths, special files, symlinks, conflicting
 file paths and ambiguous package ownership are rejected.
 
+Signed indexes require complete, typed format-1 envelopes, package declarations,
+dependency ranges and payload inventories. Unknown fields, duplicate fields
+(including escaped spellings), null collections and coerced counters are refused
+after signature verification. The legacy omitted `window_protocol` still means
+zero. Publisher templates keep their documented defaults but reject ambiguous
+fields; stored packed manifests require complete declarations before publication.
+A refused refresh or enrollment preserves the previous cached catalog, trust
+history, configuration and installed generation. See
+[signed metadata qualification](../tests/packages/index-schema-check.md).
+
 Dependency resolution uses an iterative worklist with bounded backtracking.
 Shared dependencies and cycles expand each selected identity once, and constraints
 discovered later can change an earlier choice. Runtime kind and executable

@@ -1,0 +1,197 @@
+Pre-change signed duplicate-field acceptance:
+
+tools/packages/pkgcore/index_schema_test.v:39: fn test_signed_index_rejects_ambiguous_or_coerced_metadata
+    assert refused, 'accepted signed ambiguous metadata: ' + invalid
+        Message: accepted signed ambiguous metadata: {"format":1,"repository":"fixture","sequence":1,"sequ\u0065nce":1,"expires":2000000000,"packages":[{"id":"data","version":"1.0.0","architecture":"all","name":"Data é🚀","description":"Quotes \"firmware\":false and brackets [] {}","homepage":"","license":"MIT","proprietary":false,"firmware":false,"kind":"data","runtime":"","entrypoint":"","arguments":[],"permissions":[],"associations":[],"dependencies":[{"id":"runtime","minimum":"1.0.0","before":"2.0.0"}],"files":[{"path":"share/data","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","bytes":1,"executable":false}],"sdk":1}]}
+
+The pinned strict decoder also accepted a null array. Explicit JSON kind checks were added; the field-omission fixture was corrected to preserve numeric spelling and array field order.
+
+tools/packages/pkgcore/index_schema_test.v:59: fn test_signed_index_rejects_ambiguous_or_coerced_metadata
+    assert refused, 'accepted signed ambiguous metadata: ' + invalid
+        Message: accepted signed ambiguous metadata: {"format":1,"repository":"fixture","sequence":1,"expires":2000000000,"packages":[{"id":"data","version":"1.0.0","architecture":"all","name":"Data é🚀","description":"Quotes \"firmware\":false and brackets [] {}","homepage":"","license":"MIT","proprietary":false,"firmware":false,"kind":"data","runtime":"","entrypoint":"","arguments":null,"permissions":[],"associations":[],"dependencies":[{"id":"runtime","minimum":"1.0.0","before":"2.0.0"}],"files":[{"path":"share/data","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","bytes":1,"executable":false}],"sdk":1}]}
+tools/packages/pkgcore/index_schema_test.v:66: fn schema_without
+    assert text.contains(',' + field), field
+        Message: "expires":2e+09
+
+Implicit string pushes retained decoded key allocations. A ten-cycle diagnostic retained 9710 bytes. The bounded reader then exposed its promoted 32-byte object: 990 objects/31680 bytes in ten cycles. Raw key ownership transfer and explicit reader release passed 1000 cycles.
+
+{6: 40, 13: 100, 7: 90, 1: 990, 11: 90, 9: 150, 8: 180, 3: 70, 4: 20, 5: 100, 12: 110, 10: 30, 36: 10}
+build/package-index-schema-work/diagnostic/index_schema_test.v:196: fn test_signed_index_shape_checks_retire_owned_key_sets
+   > assert kept == 0, 'signed index key/required-field scanner retained ${kept} bytes'
+     Left value (len: 4): `9710`
+    Right value (len: 1): `0`
+        Message: signed index key/required-field scanner retained 9710 bytes
+
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading data/share/data (30 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+
+{32: 990}
+build/package-index-schema-work/diagnostic/index_schema_test.v:196: fn test_signed_index_shape_checks_retire_owned_key_sets
+   > assert kept == 0, 'signed index key/required-field scanner retained ${kept} bytes'
+     Left value (len: 5): `31680`
+    Right value (len: 1): `0`
+        Message: signed index key/required-field scanner retained 31680 bytes
+
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading data/share/data (30 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+
+The first guest compile used os.exec, whose standalone cross-generated C omitted its capture helper. The fixture now uses the existing guest run transport.
+
+Disk exhaustion interrupted host linkage and some guest builds/image creation. Disposable media from completed/interrupted runs was removed while preserving program/source/log evidence. Fresh final checks passed.
+
+The combined AArch64 PID 1 workload reached allocation failure during a cached review. Diagnostics showed mmap ENOMEM despite over 811 MiB free RAM, a 61633536-byte owner budget and about 58 MiB of mapping charges. The first isolated metadata worker reached a fork refusal that the existing command helper incorrectly reported as status zero. The helper now closes pipes and reports fork/pipe failures. Separating the graph worker alone still exhausted the metadata worker before its canonical retry. Each metadata case now runs in a fresh worker and requires CLI exit 1 without a panic, matching the one-shot service model; all metadata/state assertions, resource limits and deadlines remain intact.
+
+FAIL aarch64 packages-admin (29.7s)
+  forbidden "FAIL: fn main.qualify_package_admin" in the line: /Users/alex/code/vinix/tests/accounts/guest/package_admin.v:75: FAIL: fn main.qualify_package_admin: assert index_schema.status == 0, index_schema.output
+  last 40 serial lines:
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x251a40
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | PACKAGE POLICY ordinary-admin-standard public-read complete-impact literal-path password-role stale-file-refusal atomic-policy-only reload clean-runtime PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x27f250
+  | PACKAGE INDEX case 0 update
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x251a40
+  | PACKAGE INDEX case 0 enrollment
+  | PACKAGE INDEX case 0 verify
+  | PACKAGE INDEX case 0 review
+  | PACKAGE INDEX case 1 update
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x251a40
+  | PACKAGE INDEX case 1 enrollment
+  | PACKAGE INDEX case 1 verify
+  | PACKAGE INDEX case 1 review
+  | PACKAGE INDEX case 2 update
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x251a40
+  | PACKAGE INDEX case 2 enrollment
+  | PACKAGE INDEX case 2 verify
+  | PACKAGE INDEX case 2 review
+  | PACKAGE INDEX case 3 update
+  | /Users/alex/code/vinix/tests/accounts/guest/package_admin.v:75: FAIL: fn main.qualify_package_admin: assert index_schema.status == 0, index_schema.output
+  |    left value: index_schema.status = 1
+  |   right value: 0
+  |       message: /Users/alex/code/vinix/tests/accounts/guest/package_index_schema.v:34: FAIL: fn main.qualify_package_index_schema: assert result.status != 0, result.output
+  |    left value: result.status = 0
+  |   right value: 0
+  |       message: 
+  | V panic: Assertion failed...
+  | 
+  | V panic: Assertion failed...
+  logs: /Users/alex/code/vinix/build/package-index-schema-work/arm-qualified-2/packages-admin
+
+FAIL aarch64 packages-admin (76.6s)
+  forbidden "FAIL: fn main.qualify_package_admin" in the line: /Users/alex/code/vinix/tests/accounts/guest/package_admin.v:76: FAIL: fn main.qualify_package_admin: assert index_schema.status == 0, index_schema.output
+  last 40 serial lines:
+  | unix accept: waiting for connection
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x251a40
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | PACKAGE POLICY ordinary-admin-standard public-read complete-impact literal-path password-role stale-file-refusal atomic-policy-only reload clean-runtime PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x27f3c0
+  | PACKAGE INDEX case 0 update
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x251a40
+  | PACKAGE INDEX case 0 enrollment
+  | PACKAGE INDEX case 0 verify
+  | PACKAGE INDEX case 0 review
+  | PACKAGE INDEX case 1 update
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x251a40
+  | PACKAGE INDEX case 1 enrollment
+  | PACKAGE INDEX case 1 verify
+  | PACKAGE INDEX case 1 review
+  | PACKAGE INDEX case 2 update
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x251a40
+  | PACKAGE INDEX case 2 enrollment
+  | PACKAGE INDEX case 2 verify
+  | PACKAGE INDEX case 2 review
+  | PACKAGE INDEX case 3 update
+  | PACKAGE INDEX case 3 enrollment
+  | PACKAGE INDEX case 3 verify
+  | PACKAGE INDEX case 3 review
+  | /Users/alex/code/vinix/tests/accounts/guest/package_admin.v:76: FAIL: fn main.qualify_package_admin: assert index_schema.status == 0, index_schema.output
+  |    left value: index_schema.status = 89
+  |   right value: 0
+  |       message: update: -1: cannot fork guest command; check process/kernel resource limits
+  | 
+  | V panic: Assertion failed...
+  logs: /Users/alex/code/vinix/build/package-index-schema-work/arm-complete/packages-admin
+
+FAIL aarch64 packages-admin (50.8s)
+  forbidden "V panic:" in the line: V panic: memory allocation failure
+  last 40 serial lines:
+  | MemFree:        811392 kB
+  | MemAvailable:   811392 kB
+  | Buffers:               0 kB
+  | Cached:         0 kB
+  | SwapTotal:      0 kB
+  | SwapFree:       0 kB
+  | Zswap:          0 kB
+  | Zswapped:       0 kB
+  | VinixPageouts:  0
+  | VinixRefaults:  0
+  | VinixSwapErrors: 0
+  | Slab:           3840 kB
+  | VinixMemoryPressure: 0
+  | Name:	init
+  | Umask:	022
+  | State:	R (running)
+  | Tgid:	1
+  | Ngid:	0
+  | Pid:	1
+  | PPid:	0
+  | TracerPid:	0
+  | Uid:	0	0	0	0
+  | Gid:	0	0	0	0
+  | NSpid:	1
+  | Threads:	1
+  | VmLck:	0 kB
+  | CapInh:	0000000000000000
+  | CapPrm:	000001ffffffffff
+  | CapEff:	000001ffffffffff
+  | CapBnd:	000001ffffffffff
+  | CapAmb:	0000000000000000
+  | NoNewPrivs:	0
+  | Seccomp:	0
+  | Seccomp_filters:	0
+  | PACKAGE INDEX case 1 review
+  | malloc(0x28)
+  | V panic: memory allocation failure
+  |  v hash: 826e96f
+  |     pid: 0x1
+  |     tid: 0x1
+  logs: /Users/alex/code/vinix/build/package-index-schema-work/arm-diagnostic-3/packages-admin
+
+PASS tools/packages/pkgcore/administration_test.v
+PASS tools/packages/pkgcore/catalog_test.v
+PASS tools/packages/pkgcore/collection_limit_test.v
+PASS tools/packages/pkgcore/command_test.v
+PASS tools/packages/pkgcore/composition_test.v
+/Users/alex/code/vinix/build/package-release-work/v-toolchain/v failed: 1
+C compilation error (from cc):
+ld: write() failed, errno=28 (No space left on device)
+clang: error: linker command failed with exit code 1 (use -v to see invocation)

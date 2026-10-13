@@ -16,6 +16,22 @@ module main
 import os
 
 fn main() {
+	if os.args.len == 3 && os.args[1] == 'package-index-case' {
+		mut test := new_test()
+		qualify_package_index_case(mut test, os.args[2].int()) or { eprintln(err); exit(89) }
+		exit(0)
+	}
+	if os.args.len == 2 && os.args[1] == 'package-resolver' {
+		mut test := new_test()
+		architecture := $if arm64 { 'aarch64' } $else { 'x86_64' }
+		qualify_package_resolver(mut test, architecture) or { eprintln(err); exit(89) }
+		exit(0)
+	}
+	if os.args.len == 2 && os.args[1] == 'package-index-schema' {
+		mut test := new_test()
+		qualify_package_index_schema(mut test) or { eprintln(err); exit(89) }
+		exit(0)
+	}
 	if os.args.len == 2 && os.args[1] == 'package-isolated-peer-probe' { exit(package_isolated_peer_probe() or { eprintln(err); 89 }) }
 	if os.args.len > 1 && os.args[1] == 'package-isolated-probe' { exit(package_isolated_application_probe() or { eprintln(err); 89 }) }
 	if os.args.len > 1 && os.args[1] == 'package-isolated-window-probe' { exit(package_isolated_window_probe() or { eprintln(err); 89 }) }

@@ -18,23 +18,17 @@ pub:
 pub fn verify_index(repository Repository, text string, signature string, now i64) !Index {
 	if text.len > max_metadata { return error('${repository.id}: repository index too large') }
 	key := hex.decode(repository.public_key)!
-	sig := hex.decode(signature.trim_space())!
-	if key.len != 32 || sig.len != 64 || !ed25519.verify(ed25519.PublicKey(key), text.bytes(), sig)! {
+	defer { unsafe { key.free() } }
+	trimmed := signature.trim_space()
+	defer { unsafe { trimmed.free() } }
+	sig := hex.decode(trimmed)!
+	defer { unsafe { sig.free() } }
+	bytes := text.bytes()
+	defer { unsafe { bytes.free() } }
+	if key.len != 32 || sig.len != 64 || !ed25519.verify(ed25519.PublicKey(key), bytes, sig)! {
 		return error('${repository.id}: repository signature verification failed; check administrator key enrollment')
 	}
-	index := json2.decode[Index](text)!
-	if index.format != 1 || index.repository != repository.id || index.sequence == 0
-		|| index.expires <= now || index.packages.len > 4096 {
-		return error('${repository.id}: expired, incompatible or misidentified repository metadata; refresh from its publisher')
-	}
-	mut seen := map[string]bool{}
-	for p in index.packages {
-		p.validate()!
-		identity := '${p.id}/${p.architecture}/${p.version}'
-		if identity in seen { return error('${repository.id}: duplicate package ${identity}') }
-		seen[identity] = true
-	}
-	return index
+	return decode_signed_index(repository.id, text, now)
 }
 
 pub fn snapshots_catalog(config Config, snapshots []Snapshot, now i64) !Catalog {

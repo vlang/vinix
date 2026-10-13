@@ -47,22 +47,7 @@ fn close_decoded_state(state State) {
 		(&array(&state.requested)).free()
 		for installed in state.packages {
 			installed.repository.free(); installed.public_key.free()
-			p := installed.package
-			p.id.free(); p.version.free(); p.architecture.free(); p.name.free()
-			p.description.free(); p.homepage.free(); p.license.free(); p.kind.free()
-			p.runtime.free(); p.entrypoint.free()
-			for value in p.arguments { value.free() }
-			(&array(&p.arguments)).free()
-			for value in p.permissions { value.free() }
-			(&array(&p.permissions)).free()
-			for value in p.associations { value.free() }
-			(&array(&p.associations)).free()
-			for dependency in p.dependencies {
-				dependency.id.free(); dependency.minimum.free(); dependency.before.free()
-			}
-			(&array(&p.dependencies)).free()
-			for file in p.files { file.path.free(); file.sha256.free() }
-			(&array(&p.files)).free()
+			close_decoded_package(installed.package)
 		}
 		(&array(&state.packages)).free()
 	}

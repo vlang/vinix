@@ -19,7 +19,8 @@ fn qualify_package_admin(mut t Test) ! {
 	sessioncore.make_runtime_directory(sam)!
 	t.start_authd()
 	architecture := $if arm64 { 'aarch64' } $else { 'x86_64' }
-	qualify_package_resolver(mut t, architecture)!
+	resolver := run(['/sbin/init', 'package-resolver'], '', none, none)
+	assert resolver.status == 0, resolver.output
 	root := '/tmp/admin-payload'
 	repository := '/tmp/admin-repository'
 	os.mkdir_all(root + '/share')!
@@ -69,6 +70,10 @@ fn qualify_package_admin(mut t Test) ! {
 	t.say('PACKAGE ADMIN ordinary-admin password-required peer-bound reviewed-install progress stale-refusal no-launch PASS')
 	qualify_package_metadata(mut t, db, alex, sam)!
 	qualify_package_policy_admin(mut t, db, alex, sam)!
+	// Keep the adversarial metadata loop independent of PID 1's accumulated
+	// graph/account mapping charge, using the same fresh-worker service model.
+	index_schema := run(['/sbin/init', 'package-index-schema'], '', none, none)
+	assert index_schema.status == 0, index_schema.output
 	mut removal := service.review('remove', ['admin-fixture'])!
 	defer { removal.close() }
 	removed := run(['/usr/bin/vinix-package', 'admin', 'apply', removal.fingerprint, 'remove', 'admin-fixture'], alex_password + '\n', db, alex)

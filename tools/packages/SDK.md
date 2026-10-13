@@ -955,6 +955,34 @@ process; applications can change their own environment. See
 
 ## Repository and JSON interfaces
 
+Signed format-1 indexes require all five envelope fields (`format`, `repository`,
+`sequence`, `expires`, `packages`). Each package requires all 18 base fields in
+the `Package` model, including empty description/homepage/runtime strings, false
+proprietary and firmware declarations, empty argument/permission/association/
+dependency lists and `sdk`. Only the legacy `window_protocol` field may be
+omitted, meaning zero. Each dependency declares `id`, `minimum` and `before`;
+each payload declares `path`, `sha256`, `bytes` and `executable`, including
+zero/false values.
+
+The consumer verifies the signature over the original bytes before decoding.
+JSON object/array/string/boolean/number types must match their fields. Null
+collections, quoted counters, fractional/overflowing integers and unknown or
+duplicate keys are refused, including duplicates written with Unicode escapes.
+Unique escaped keys, arbitrary object field order and ordinary JSON whitespace
+remain valid. Existing canonical publisher bytes and signatures are unchanged.
+
+`pack` source templates retain documented omitted-field defaults but reject
+unknown/duplicate fields and mismatched types. Packed inventory manifests require
+complete declarations before `publish` or `publish-release` signs them. A failed
+consumer refresh or enrollment leaves cached metadata, replay floors,
+configuration and activation unchanged. See
+[signed metadata qualification](../../tests/packages/index-schema-check.md).
+
+`pkgprotocol.decode_metadata_key` decodes one quoted JSON key into an owned
+string, with 32 UTF-8 bytes and 194 input bytes as limits. It handles Unicode
+escapes and surrogate pairs, rejects invalid UTF-8/escapes and trailing data, and
+allows surrounding JSON whitespace. Free the returned string when finished.
+
 ```text
 index.json                       format, repository, sequence, expires, packages[]
 index.sig                        hex Ed25519 signature of exact index.json bytes

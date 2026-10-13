@@ -44,7 +44,9 @@ pub fn pack(manifest string, source string, repository string) !Package {
 	if os.is_link(source) || !os.is_dir(source) {
 		return error('package source must be a directory')
 	}
-	template := json2.decode[Package](read_metadata(manifest)!)!
+	text := read_metadata(manifest)!
+	defer { unsafe { text.free() } }
+	template := decode_manifest(text, false)!
 	os.mkdir_all(repository + '/objects')!
 	mut files := []Payload{}
 	source_files(source, '', mut files, repository)!
@@ -79,7 +81,9 @@ fn publication(repository string, id string, seed_path string, sequence u64, exp
 	mut packages := []Package{}
 	for name in os.ls(repository + '/manifests')! {
 		if !name.ends_with('.json') { continue }
-		p := json2.decode[Package](read_metadata(repository + '/manifests/' + name)!)!
+		manifest := read_metadata(repository + '/manifests/' + name)!
+		p := decode_manifest(manifest, true) or { unsafe { manifest.free() }; return err }
+		unsafe { manifest.free() }
 		p.validate()!
 		for file in p.files {
 			if !verified_file(repository + '/objects/' + file.sha256, file) {

@@ -29,6 +29,10 @@ The current controller also requires the
 a dense 512-package cyclic graph and an explicit refusal at the global search
 limit. These graph checks call the public resolver with synthetic data metadata;
 the subsequent signed administrator workflow checks service transactions.
+The controller also requires the
+[signed index schema workflow](index-schema-check.md), checking signed duplicate,
+missing, null-array and coerced-counter refusals through the staged service and
+enrollment writer, unchanged catalog/trust/configuration/state and a clean retry.
 Launches, arbitrary executables, alternate roots, publisher tooling and raw
 unreviewed transactions are refused before authentication.
 
