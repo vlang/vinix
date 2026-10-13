@@ -497,6 +497,7 @@ fn first_boot(parent &char) {
 		planned_volume_growth(parent, wrong)
 		volume_growth_retention(parent)
 		volume_boot_retention(parent)
+		boot_set_retention(parent, wrong)
 		health_check(parent)
 		health_cycles(parent)
 		$if nvme_health_test ? { nvme_health_check(); nvme_health_cycles() }
@@ -533,6 +534,7 @@ fn first_boot(parent &char) {
 		tool(c'save-set', c'/etc/vinix/volumes.vset', parent, wrong, &char(nil), 0)
 		pool_members(c'/etc/vinix/volumes.vset')
 		boot_volume_prepare(c'/root/volume-grown-ro.sealed')
+		boot_set_prepare()
 		plan := C.open(c'/root/saved.vmap', C.O_RDONLY); check(plan >= 0, c'open exported plan')
 		mut bytes := [2112]u8{}
 		size := C.read(plan, &bytes[0], 2112)
@@ -571,6 +573,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		actual := $if amd64 { &char(c'/dev/sd1') } $else { &char(c'/dev/vdb') }
 		other := $if amd64 { &char(c'/dev/sd0') } $else { &char(c'/dev/vda') }
 		volume_boot_reboot_probe(actual)
+		boot_set_reboot_probe(actual, other)
 		data_phase := C.open(c'/data-boot', C.O_RDONLY)
 		if data_phase >= 0 {
 			check(C.close(data_phase) == 0, c'close checksum phase marker'); data_boot_phase(actual, other)
@@ -636,6 +639,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		boot_volume_view(actual, 8192, true)
 		check(status(c'/dev/mapper/vinix2').generation == before
 			&& status(c'/dev/mapper/vinix9').generation == second_before, c'reboot restore idempotence')
+		planned_boot_set(actual, other)
 	}
 	C.printf(c'PLAN DONE\n')
 	for { C.pause() }

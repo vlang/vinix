@@ -1,5 +1,11 @@
 # Storage-volume qualification
 
+Encrypted boot sets add all-64-slot/full-width metadata tests and extend the
+discovery model with sorted private pairs, complete authentication and physical
+preflight, independent disks/keys, late failures and retained directory replacement.
+Both guests measure two-volume unlock lifetimes and production init replay after
+device reordering and capacity changes. See [boot-set qualification](volume-boot-set.md).
+
 Opt-in encrypted boot unlock adds full-width plain/encrypted conflict tests
 and extends the discovery syscall model with root directory/input policy,
 pinned relative reads, disabled configuration, pre-import trust rechecks and
@@ -331,8 +337,11 @@ AMD64 uses the cached Alpine BusyBox and musl loader from
 On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
-output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 16400 utility processes across 200 warmup
+output into retained logs, limits each boot to 1800 seconds by default and
+terminates only its own process. `VINIX_STORAGE_BOOT_TIMEOUT` optionally selects
+a per-boot budget of 60..7200 decimal seconds; for slower TCG hosts,
+`VINIX_STORAGE_BOOT_TIMEOUT=2700` allows 45 minutes without changing workload
+counts or assertions. The allowance includes 16400 utility processes across 200 warmup
 and 200 measured forty-one-command cycles, with pool membership, query, batch
 allocation/growth/expansion batch previews/publications,
 physical-capacity batch previews/publications, offline mapping/disk edits and live preflight

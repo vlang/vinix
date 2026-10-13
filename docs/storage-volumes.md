@@ -454,13 +454,14 @@ credential storage, process-termination and cache limits apply. See
 
 ## Opt-in encrypted boot unlock
 
-The existing `boot-restore` startup hook can unlock one authenticated encrypted
+The existing `boot-restore` startup hook can unlock an authenticated encrypted
 volume after restoring the plain saved set. Enable it with
 `/etc/vinix/boot-volume.vcrypt`, a private `VINIXVC1` configuration, and
 `/etc/vinix/boot-volume.pass`, its private credential file. The saved disk
 identity, exact capacity/native sectors, key, slot, start, length and readonly
 mode remain authoritative. Device reordering is handled by the existing bounded
-identity scanner. No raw keyfile is created.
+identity scanner. No raw keyfile is created. Multiple configurations can form
+one [encrypted boot set](#multiple-encrypted-boot-volumes).
 
 ```sh
 # Install the credential first; the configuration enables automatic unlock.
@@ -484,13 +485,14 @@ wrong credentials fail before discovery or encrypted import. Invalid canonical
 headers fail before credential access and KDF work. Credential and wrapping-key
 buffers erase before any device scan; all secret state erases on normal returns.
 
-`boot-restore` loads and validates the plain set, authenticates the encrypted
-configuration, then rejects a duplicate global slot or overlapping saved plain
-extent before applying either. Directory trust is checked again after
-authentication and before encrypted import. Plain restore retains its complete
-preflight and pinned-device checks; a plain-set failure prevents encrypted
-unlock. Encrypted import follows the existing unique-device discovery, retained
-descriptor and two final identity/geometry/readonly checks. An occupied encrypted
+`boot-restore` loads and validates the plain set, authenticates every encrypted
+configuration, then rejects duplicate global slots or overlapping saved extents
+before applying either. It discovers, pins and rechecks every encrypted physical
+parent before applying the plain set. Directory trust is checked again after
+authentication and before each encrypted import. Plain restore retains its
+complete preflight and pinned-device checks; a plain-set failure prevents
+encrypted unlock. Encrypted import uses the retained descriptors and two final
+identity/geometry/readonly checks. An occupied encrypted
 slot refuses a second unlock; matching geometry cannot establish that an
 existing mapping uses the authenticated key.
 
@@ -514,6 +516,54 @@ changing the pair, install the new credential before the new configuration,
 and make both files and their directory durable before reboot. Physical capacity
 or sector changes still reject until a matching configuration is deliberately
 installed. See [boot-unlock qualification](../tests/storage-volumes/volume-boot.md).
+
+## Multiple encrypted boot volumes
+
+`boot-restore` and `boot-unlock` combine the legacy pair above with visible
+`NAME.vcrypt` configurations in `/etc/vinix/boot-volumes.d`. Each configuration
+uses the exact binary credential in `NAME.pass` in that same retained directory.
+The directory must be root-owned without group/world write permission; both
+files retain the private root-owned regular-file policy. Different configurations
+can use independent keys and credentials, different physical disks, or disjoint
+extents on the same disk. Saved readonly modes remain authoritative.
+
+```sh
+mkdir -m 700 /etc/vinix/boot-volumes.d
+install -m 600 /root/archive.pass /etc/vinix/boot-volumes.d/archive.pass
+install -m 600 /root/archive.vcrypt /etc/vinix/boot-volumes.d/archive.vcrypt
+vinix-volume boot-unlock
+```
+
+There are at most 64 encrypted configurations in total, including the legacy
+pair, and at most 4,096 non-dot directory entries. Only visible, nonempty
+`NAME.vcrypt` names participate; hidden files, orphan credentials and unrelated
+suffixes are ignored but count toward the enumeration bound. Named configurations
+are processed in bytewise filename order after the legacy configuration.
+Empty or missing configuration directories disable that portion of the set.
+An inaccessible directory, a symlink, a selected configuration disappearing
+after enumeration, or any invalid enabled input rejects the complete load.
+
+Every configuration authenticates before physical discovery or any mapping
+application. Credential and wrapping buffers erase after each authentication;
+decoded keys occupy bounded caller-owned stack storage, erased on every normal
+return. Global slots must be unique across the encrypted and plain desired sets.
+Saved extents on the same physical identity must not overlap; touching extents
+and equal offsets on distinct disks are valid. All encrypted disks are uniquely
+discovered and retained together, then rechecked after the final discovery.
+A later credential, metadata or physical preflight failure creates no earlier
+encrypted or plain mapping. Directory replacement cannot redirect the retained
+relative inputs or physical descriptors.
+
+Plain replay and the subsequent encrypted imports remain sequential. Existing
+live conflicts, a change after preflight, an import failure or a reporting
+failure can leave earlier mappings live. An occupied encrypted slot still
+refuses replay, preserving its existing mapping; the utility does not guess
+whether its key matches. No cross-mapping kernel transaction is added. Disable
+each configuration before changing its pair; publish the credential first and
+make its file, configuration and containing directories durable before reboot.
+This remains data-volume unlock after root is available, with the existing
+offline credential-storage and encrypted-root limits. See
+[encrypted boot-set qualification](../tests/storage-volumes/volume-boot-set.md).
 
 ## Authenticated encrypted-volume growth
 

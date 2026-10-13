@@ -29,6 +29,14 @@ mut:
 	config_stats int
 	etc_stats int
 	vinix_stats int
+	multi bool
+	goal_derives int = 1
+	set_stats int
+	set_wipes int
+	successful_imports int
+	expected_requests [64]EncryptedRequest
+	expected_slots [64]u32
+	imported_slots [64]u32
 }
 __global volume_discovery_io VolumeDiscoveryIO
 
@@ -44,7 +52,7 @@ fn volume_discovery_mock_open(path &char, flags i32) i32 {
 		return volume_discovery_track(C.open(volume_discovery_io.etc.str, flags), -2)
 	}
 	if C.strcmp(path, c'/dev') == 0 {
-		assert volume_discovery_io.derives == 1
+		assert volume_discovery_io.derives == volume_discovery_io.goal_derives
 		unsafe {
 			for i in 0 .. 1024 { assert volume_discovery_io.password[i] == 0 }
 			for i in 0 .. 64 { assert volume_discovery_io.wrapping[i] == 0 }
@@ -52,6 +60,7 @@ fn volume_discovery_mock_open(path &char, flags i32) i32 {
 		volume_discovery_io.scans++
 		assert flags == C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC
 		if volume_discovery_io.mode == 3 { unsafe { C.errno = C.EACCES }; return -1 }
+		if volume_discovery_io.mode == 137 && volume_discovery_io.scans == 2 { unsafe { C.errno = C.EACCES }; return -1 }
 		fd := volume_discovery_track(C.open(volume_discovery_io.directory.str, flags), -1)
 		volume_discovery_io.stream_fd = fd; return fd
 	}
@@ -65,8 +74,15 @@ fn volume_discovery_mock_close(fd i32) i32 {
 }
 
 fn volume_discovery_mock_fdopendir(fd i32) &C.DIR {
-	if volume_discovery_io.mode == 4 { unsafe { C.errno = C.EIO }; return unsafe { nil } }
+	if volume_discovery_io.mode in [4, 134] { unsafe { C.errno = C.EIO }; return unsafe { nil } }
+	volume_discovery_io.stream_fd = fd
 	return C.fdopendir(fd)
+}
+
+fn volume_discovery_mock_fcntl(fd i32, command i32, argument int) i32 {
+	assert command == C.F_DUPFD_CLOEXEC && argument == 0 && volume_discovery_io.live[fd]
+	if volume_discovery_io.mode == 132 { unsafe { C.errno = C.EIO }; return -1 }
+	return volume_discovery_track(C.fcntl(fd, command, argument), volume_discovery_io.indices[fd])
 }
 
 fn volume_discovery_mock_closedir(stream &C.DIR) i32 {
@@ -77,7 +93,7 @@ fn volume_discovery_mock_closedir(stream &C.DIR) i32 {
 
 fn volume_discovery_mock_readdir(stream &C.DIR) &C.dirent {
 	entry := C.readdir(stream)
-	if entry == unsafe { nil } && volume_discovery_io.mode == 5 { unsafe { C.errno = C.EIO } }
+	if entry == unsafe { nil } && volume_discovery_io.mode in [5, 135] { unsafe { C.errno = C.EIO } }
 	return entry
 }
 
@@ -95,10 +111,16 @@ fn volume_discovery_mock_openat(fd i32, name &char, flags i32) i32 {
 			if volume_discovery_io.mode in [102, 103] { unsafe { C.errno = if volume_discovery_io.mode == 102 { C.ENOENT } else { C.EACCES } }; return -1 }
 			return volume_discovery_track(C.openat(fd, name, flags), -3)
 		}
-		assert volume_discovery_io.indices[fd] == -3
+		if C.strcmp(name, c'boot-volumes.d') == 0 {
+			assert volume_discovery_io.indices[fd] == -3 && flags == C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC
+			if volume_discovery_io.mode == 130 { unsafe { C.errno = C.EACCES }; return -1 }
+			return volume_discovery_track(C.openat(fd, name, flags), -6)
+		}
+		assert volume_discovery_io.indices[fd] in [-3, -6]
 		if C.strcmp(name, c'volumes.d') == 0 { return volume_discovery_track(C.openat(fd, name, flags), -1) }
 		assert flags == C.O_RDONLY | C.O_NOFOLLOW | C.O_NONBLOCK | C.O_CLOEXEC
-		index := if C.strcmp(name, c'boot-volume.vcrypt') == 0 { -4 } else if C.strcmp(name, c'boot-volume.pass') == 0 { -5 } else { -1 }
+		length := C.strlen(name)
+		index := if boot_volume_filename(name) { -4 } else if length > 5 && unsafe { C.strcmp(&name[length - 5], c'.pass') == 0 } { -5 } else { -1 }
 		if index == -5 && volume_discovery_io.mode == 110 { unsafe { C.errno = C.EIO }; return -1 }
 		return volume_discovery_track(C.openat(fd, name, flags), index)
 	}
@@ -117,7 +139,9 @@ fn volume_discovery_mock_fstat(fd i32, info &C.stat) i32 {
 		if index == -2 { volume_discovery_io.etc_stats++ }
 		if index == -3 { volume_discovery_io.vinix_stats++ }
 		if index == -4 { volume_discovery_io.config_stats++ }
+		if index == -6 { volume_discovery_io.set_stats++ }
 		unsafe {
+			if index == -6 && (volume_discovery_io.mode == 131 || (volume_discovery_io.mode == 140 && volume_discovery_io.successful_imports == 1)) { info.st_uid = 1 }
 			if (index == -2 && volume_discovery_io.mode == 104) || (index == -4 && volume_discovery_io.mode == 106)
 				|| (index == -5 && volume_discovery_io.mode == 108) { info.st_uid = 1 }
 			if (index == -3 && volume_discovery_io.mode == 105) || (index == -4 && volume_discovery_io.mode == 107)
@@ -141,6 +165,7 @@ fn volume_discovery_mock_read(fd i32, output voidptr, size usize) i64 {
 		if volume_discovery_io.mode == 112 && volume_discovery_io.indices[fd] == -4 { return 0 }
 		if volume_discovery_io.mode == 113 && volume_discovery_io.input_reads == 1 { unsafe { C.errno = C.EINTR }; return -1 }
 		if volume_discovery_io.mode == 114 && volume_discovery_io.indices[fd] == -5 { unsafe { C.errno = C.EIO }; return -1 }
+		if volume_discovery_io.mode == 136 && volume_discovery_io.indices[fd] == -5 && volume_discovery_io.derives == 1 { unsafe { C.errno = C.EIO }; return -1 }
 	}
 	return C.read(fd, output, size)
 }
@@ -148,12 +173,21 @@ fn volume_discovery_mock_read(fd i32, output voidptr, size usize) i64 {
 fn volume_discovery_mock_ioctl(fd i32, number u64, output voidptr) i32 {
 	index := volume_discovery_io.indices[fd]; assert index >= 0 && index < 7
 	if number == 0x56560006 {
-		assert volume_discovery_io.statuses[index] == if volume_discovery_io.flags == 0 { 4 } else { 3 }
 		request := unsafe { &EncryptedRequest(output) }
-		assert request.data == Request{slot: 5, offset: volume_discovery_io.sector * 2, length: 4096, flags: volume_discovery_io.flags}
-		unsafe { for i in 0 .. 64 { assert request.key[i] == u8(i * 13 + 7) } }
+		if volume_discovery_io.multi {
+			assert request.data.slot < 64 && *request == volume_discovery_io.expected_requests[request.data.slot]
+			assert volume_discovery_io.statuses[index] >= 4
+			if volume_discovery_io.mode == 143 { assert index == if request.data.slot == 6 { 3 } else { 0 } }
+			volume_discovery_io.imported_slots[volume_discovery_io.imports] = request.data.slot
+		} else {
+			assert volume_discovery_io.statuses[index] == if volume_discovery_io.flags == 0 { if volume_discovery_io.boot { 5 } else { 4 } } else { if volume_discovery_io.boot { 4 } else { 3 } }
+			assert request.data == Request{slot: 5, offset: volume_discovery_io.sector * 2, length: 4096, flags: volume_discovery_io.flags}
+			unsafe { for i in 0 .. 64 { assert request.key[i] == u8(i * 13 + 7) } }
+		}
 		volume_discovery_io.imports++
 		if volume_discovery_io.mode == 20 { unsafe { C.errno = C.EBUSY }; return -1 }
+		if volume_discovery_io.mode == 139 && volume_discovery_io.imports == 2 { unsafe { C.errno = C.EBUSY }; return -1 }
+		volume_discovery_io.successful_imports++
 		return 0
 	}
 	assert number == 0x56560004
@@ -184,6 +218,16 @@ fn volume_discovery_mock_pread(fd i32, output voidptr, size usize, offset i64) i
 
 fn volume_discovery_mock_derive(password &u8, size int, salt &u8, output &u8) bool {
 	assert size == 6; volume_discovery_io.derives++
+	if volume_discovery_io.multi {
+		unsafe { assert salt[0] == u8(volume_discovery_io.expected_slots[volume_discovery_io.derives - 1]) }
+		if volume_discovery_io.mode == 133 && volume_discovery_io.derives == 2 { return false }
+		if volume_discovery_io.mode == 141 && volume_discovery_io.derives == 2 {
+			os.mv(volume_discovery_io.etc + '/vinix/boot-volumes.d', volume_discovery_io.etc + '/vinix/pinned-set') or { panic(err) }
+			os.mkdir(volume_discovery_io.etc + '/vinix/boot-volumes.d') or { panic(err) }
+			for name in ['a.vcrypt', 'a.pass', 'b.vcrypt', 'b.pass'] { os.write_file(volume_discovery_io.etc + '/vinix/boot-volumes.d/' + name, 'replacement ignored') or { panic(err) } }
+		}
+		if volume_discovery_io.mode == 142 && volume_discovery_io.derives == 1 { os.rm(volume_discovery_io.etc + '/vinix/boot-volumes.d/b.vcrypt') or { panic(err) } }
+	}
 	volume_discovery_io.password = password; volume_discovery_io.wrapping = output
 	if volume_discovery_io.boot {
 		expected := [u8(0), 10, 0xe2, 0x82, 0xac, 0xff]!
@@ -266,6 +310,107 @@ fn volume_discovery_mock_erase(pointer voidptr, size usize) {
 	erase_key(pointer, size)
 	unsafe { for i in usize(0) .. size { assert (&u8(pointer))[i] == 0 } }
 	if size == sizeof(VolumeSealFiles) { volume_discovery_io.wipes++ }
+	if size == sizeof(BootVolumeSet) { volume_discovery_io.set_wipes++ }
+}
+
+fn volume_boot_set_fixture(directory string, name string, slot u32, readonly bool) EncryptedRequest {
+	return volume_boot_set_identity_fixture(directory, name, slot, readonly, 1)
+}
+
+fn volume_boot_set_identity_fixture(directory string, name string, slot u32, readonly bool, identity u8) EncryptedRequest {
+	mut disk := DiskKey{bytes: 16777216, sector: 512, kind: 1}; disk.id[0] = identity
+	request := EncryptedRequest{data: Request{slot: slot, offset: 1024 + u64(slot) * 8192, length: 4096, flags: u64(readonly)}, key: [64]u8{init: u8(index * 13 + int(slot))}}
+	mut wrapping := [64]u8{init: u8(index * 29 + 41)}; mut random := [28]u8{init: u8(index * 11 + 3)}; random[0] = u8(slot)
+	mut envelope := [320]u8{}
+	assert encode_volume_seal(&disk, &request, &wrapping[0], &random[0], &envelope[0])
+	os.write_file_array(directory + '/' + name + '.vcrypt', envelope[..]) or { panic(err) }; os.chmod(directory + '/' + name + '.vcrypt', 0o600) or { panic(err) }
+	os.write_file_array(directory + '/' + name + '.pass', [u8(0), 10, 0xe2, 0x82, 0xac, 0xff]) or { panic(err) }; os.chmod(directory + '/' + name + '.pass', 0o600) or { panic(err) }
+	return request
+}
+
+fn volume_boot_set_check(etc string, directory string, requests []EncryptedRequest, mode int, restore bool, expected i32, attempts int, successes int) {
+	volume_discovery_io = VolumeDiscoveryIO{boot: true, multi: true, etc: etc, directory: directory, mode: mode, goal_derives: requests.len}
+	for i, request in requests { volume_discovery_io.expected_requests[request.data.slot] = request; volume_discovery_io.expected_slots[i] = request.data.slot }
+	assert (if restore { boot_restore() } else { boot_unlock_volume() }) == expected
+	assert volume_discovery_io.opened == volume_discovery_io.closed && volume_discovery_io.live.all(!it)
+	assert volume_discovery_io.wipes == 1 && volume_discovery_io.set_wipes == 1
+	assert volume_discovery_io.imports == attempts && volume_discovery_io.successful_imports == successes
+	for i in 0 .. attempts { assert volume_discovery_io.imported_slots[i] == requests[i].data.slot }
+}
+
+fn test_encrypted_boot_set_authenticates_every_member_before_discovery_and_pins_all_parents_before_import() {
+	work := os.join_path(os.temp_dir(), 'vinix-volume-boot-set-${os.getpid()}')
+	etc := work + '/etc'; root := etc + '/vinix'; directory := root + '/boot-volumes.d'; devices := work + '/dev'
+	os.mkdir_all(directory)!; os.mkdir(devices)!; defer { os.rmdir_all(work) or {} }
+	os.chmod(etc, 0o755)!; os.chmod(root, 0o700)!; os.chmod(directory, 0o700)!
+	volume_discovery_fixture(devices, 0, 512, 1)!
+	second := volume_boot_set_fixture(directory, 'b', 6, true)
+	first := volume_boot_set_fixture(directory, 'a', 5, false)
+	a := os.read_bytes(directory + '/a.vcrypt')!; b := os.read_bytes(directory + '/b.vcrypt')!
+	for restore in [false, true] {
+		for mode in [0, 130, 131, 132, 133, 134, 135, 136, 137, 139, 140, 141, 142] {
+			attempts := if mode in [0, 139, 141] { 2 } else if mode == 140 { 1 } else { 0 }
+			successes := if mode in [0, 141] { 2 } else if mode in [139, 140] { 1 } else { 0 }
+			volume_boot_set_check(etc, devices, [first, second], mode, restore, if mode in [0, 141] { 0 } else { 1 }, attempts, successes)
+			if mode in [130, 131, 132, 133, 134, 135, 136, 142] { assert volume_discovery_io.scans == 0 }
+			if mode == 137 { assert volume_discovery_io.scans == 2 }
+			if mode == 141 {
+				assert os.read_bytes(root + '/pinned-set/a.vcrypt')! == a && os.read_bytes(root + '/pinned-set/b.vcrypt')! == b
+				assert os.read_file(directory + '/b.vcrypt')! == 'replacement ignored'
+				os.rmdir_all(directory)!; os.mv(root + '/pinned-set', directory)!
+			}
+			if mode == 142 { assert !os.exists(directory + '/b.vcrypt'); os.write_file_array(directory + '/b.vcrypt', b)!; os.chmod(directory + '/b.vcrypt', 0o600)! }
+		}
+	}
+	for path in [directory + '/b.pass', directory + '/b.vcrypt'] {
+		os.chmod(path, 0o644)!; volume_boot_set_check(etc, devices, [first, second], 0, true, 1, 0, 0); assert volume_discovery_io.scans == 0; os.chmod(path, 0o600)!
+		os.mv(path, path + '.original')!; os.symlink(path + '.original', path)!
+		volume_boot_set_check(etc, devices, [first, second], 0, false, 1, 0, 0); assert volume_discovery_io.scans == 0
+		os.rm(path)!; os.mv(path + '.original', path)!
+	}
+	mut bad := b.clone(); bad[288] ^= 1; os.write_file_array(directory + '/b.vcrypt', bad)!
+	volume_boot_set_check(etc, devices, [first, second], 0, true, 1, 0, 0); assert volume_discovery_io.scans == 0
+	os.write_file_array(directory + '/b.vcrypt', b)!
+	legacy := volume_boot_set_fixture(root, 'boot-volume', 6, true)
+	os.rm(directory + '/b.vcrypt')!; os.rm(directory + '/b.pass')!
+	volume_boot_set_check(etc, devices, [legacy, first], 0, true, 0, 2, 2)
+	// A named member colliding with the legacy slot is rejected before discovery.
+	volume_boot_set_fixture(directory, 'b', 6, true)
+	volume_boot_set_check(etc, devices, [legacy, first, second], 0, true, 1, 0, 0); assert volume_discovery_io.scans == 0
+	os.rm(root + '/boot-volume.vcrypt')!; os.rm(root + '/boot-volume.pass')!
+	mut disk := DiskKey{bytes: 16777216, sector: 512, kind: 1}; disk.id[0] = 1
+	mut plain := Plan{key: disk, count: 1}; plain.rows[0] = Request{slot: 6, offset: 131072, length: 4096}
+	mut bytes := [2112]u8{}; size := encode_plan(&plain, &bytes[0]); assert size > 0
+	os.write_file_array(root + '/volumes.vmap', bytes[..size])!; os.chmod(root + '/volumes.vmap', 0o600)!
+	volume_boot_set_check(etc, devices, [first, second], 0, true, 1, 0, 0); assert volume_discovery_io.scans == 0
+	plain.rows[0] = Request{slot: 1, offset: second.data.offset, length: 4096}; assert encode_plan(&plain, &bytes[0]) == size
+	os.write_file_array(root + '/volumes.vmap', bytes[..size])!
+	volume_boot_set_check(etc, devices, [first, second], 0, true, 1, 0, 0); assert volume_discovery_io.scans == 0
+	os.rm(root + '/volumes.vmap')!
+	assert os.read_bytes(directory + '/a.vcrypt')! == a && os.read_bytes(directory + '/b.vcrypt')! == b
+	separate := volume_boot_set_identity_fixture(directory, 'b', 6, true, 2)
+	volume_discovery_fixture(devices, 3, 512, 1)!
+	volume_boot_set_check(etc, devices, [first, separate], 143, true, 0, 2, 2)
+}
+
+fn test_encrypted_boot_set_bounds_complete_enumeration_and_accepts_all_64_private_profiles() {
+	work := os.join_path(os.temp_dir(), 'vinix-volume-boot-limit-${os.getpid()}')
+	etc := work + '/etc'; root := etc + '/vinix'; directory := root + '/boot-volumes.d'; devices := work + '/dev'
+	os.mkdir_all(directory)!; os.mkdir(devices)!; defer { os.rmdir_all(work) or {} }
+	os.chmod(etc, 0o755)!; os.chmod(root, 0o700)!; os.chmod(directory, 0o700)!
+	volume_discovery_fixture(devices, 0, 512, 1)!
+	mut requests := []EncryptedRequest{}
+	for slot in 0 .. 64 { name := if slot < 10 { '0' + slot.str() } else { slot.str() }; requests << volume_boot_set_fixture(directory, name, u32(slot), slot & 1 != 0) }
+	os.write_file(directory + '/.ignored.vcrypt', 'ignored')!; os.write_file(directory + '/orphan.pass', 'ignored')!
+	volume_boot_set_check(etc, devices, requests, 0, false, 0, 64, 64)
+	os.write_file(directory + '/overflow.vcrypt', 'not read')!
+	volume_boot_set_check(etc, devices, requests, 0, true, 1, 0, 0); assert volume_discovery_io.derives == 0 && volume_discovery_io.scans == 0
+	os.rm(directory + '/overflow.vcrypt')!
+	for file in os.ls(directory)! { os.rm(directory + '/' + file)! }
+	for i in 0 .. 4097 { os.write_file(directory + '/ignored-' + i.str(), '')! }
+	volume_boot_set_check(etc, devices, [], 0, false, 1, 0, 0); assert volume_discovery_io.derives == 0 && volume_discovery_io.scans == 0
+	for file in os.ls(directory)! { os.rm(directory + '/' + file)! }
+	volume_boot_set_check(etc, devices, [], 0, false, 0, 0, 0)
 }
 
 fn volume_discovery_mock_fflush(stream voidptr) i32 {

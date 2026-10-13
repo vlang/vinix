@@ -148,14 +148,16 @@ fn boot_restore() i32 {
 	mut work := unsafe { &VolumeSealFiles(C.alloca(sizeof(VolumeSealFiles))) }
 	unsafe { *work = VolumeSealFiles{} }
 	defer { erase_key(work, sizeof(VolumeSealFiles)) }
-	loaded := load_boot_volume(etc, directory, mut *work)
-	if loaded < 0 { return 1 }
-	if set.count == 0 && loaded == 0 { return 0 }
+	mut volumes := unsafe { &BootVolumeSet(C.alloca(sizeof(BootVolumeSet))) }
+	unsafe { *volumes = BootVolumeSet{} }
+	defer { close_boot_volumes(volumes); erase_key(volumes, sizeof(BootVolumeSet)) }
+	if !load_boot_volumes(etc, directory, mut *volumes, mut *work) { return 1 }
+	if set.count == 0 && volumes.count == 0 { return 0 }
 	if !trusted_directory(etc, c'boot configuration directory must be owned by root and not writable by group or others')
 		|| !trusted_directory(directory, c'boot plan directory must be owned by root and not writable by group or others') { return 1 }
-	if loaded == 1 && !boot_volume_set_compatible(set, work) { return plan_error(c'boot encrypted mapping conflicts with the saved plain set') }
+	if !boot_volumes_plain_compatible(set, volumes) { return plan_error(c'boot encrypted mappings conflict with the saved plain set') }
+	if volumes.count > 0 && (!boot_volumes_trusted(etc, directory, volumes) || !prepare_boot_volumes(mut *volumes, mut *work)) { return 1 }
 	if restore_plan_set(set) != 0 { return 1 }
-	if loaded == 0 { return 0 }
-	if !boot_volume_directories(etc, directory) { return 1 }
-	return open_loaded_volume_seal_auto(mut *work, false)
+	if volumes.count == 0 { return 0 }
+	return apply_boot_volumes(etc, directory, volumes, mut *work)
 }
