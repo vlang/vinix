@@ -1003,3 +1003,24 @@ Use matching `--arch x86_64` and kernel/probe inputs for x86. `--reference`
 selects the same semantic matrix while skipping Vinix-specific slab reporting;
 the native audit still requires the allocation cohorts. NULL is tested through
 raw syscalls because musl's fstatat wrapper requires a non-NULL pathname.
+
+The `dupabi` case qualifies native dup/dup3 descriptor and flag words, x86
+dup2 words/self calls and ordinary musl dup/dup2/dup3 controls. Unknown dup3
+flags must return EINVAL before replacing a distinct seeded target; negative
+libc targets retain EBADF. Six source classes check alias metadata/status,
+descriptor CLOEXEC, shared cursor movement and preservation of source/target
+state on errors, plus unchanged bytes/queued pipe data and two allocation
+cohorts. The underlying descriptor owner and concurrent publication remain
+outside this subset; see [the dated limits](../../docs/linux-posix-qualification.md#native-descriptor-duplication-errors-and-words).
+
+```sh
+tests/linux-compat/run --arch aarch64 --kernel-dir ARM-KERNEL --state-dir FRESH-NATIVE --cases dupabi,statabi,open,runtime
+v -enable-globals -nocache -gc none -cc cc run tests/linux-compat/dupabi-reference.v --arch aarch64 --kernel LINUX-KERNEL --init FRESH-NATIVE/dupabi/init --state-dir FRESH-LINUX
+```
+
+Use matching x86 kernel/probe inputs and `--arch x86_64` for x86. The reference
+controller freezes the same native probe ELF and Linux kernel, builds a V
+wrapper/initramfs and retains exact hashes and serial output, including on
+failure. ARM uses macOS HVF; x86 uses TCG. `--reference` omits Vinix allocator
+reporting while running the identical semantic matrix. The native audit
+requires the allocation cohorts and refuses reference-only qualification.

@@ -369,7 +369,7 @@ pub fn init_syscall_table() {
 	syscall_table[seccomp_verdict_nr] = voidptr(syscall_seccomp_verdict)
 	syscall_table[19] = voidptr(file.syscall_eventfd2) // __NR_eventfd2
 	syscall_table[23] = voidptr(syscall_linux_dup) // __NR_dup
-	syscall_table[24] = voidptr(file.syscall_dup3) // __NR_dup3
+	syscall_table[24] = voidptr(syscall_linux_dup3) // __NR_dup3
 	syscall_table[25] = voidptr(file.syscall_fcntl) // __NR_fcntl
 	syscall_table[26] = voidptr(fs.syscall_inotify_init) // __NR_inotify_init1
 	syscall_table[27] = voidptr(fs.syscall_inotify_add_watch) // __NR_inotify_add_watch

@@ -1,0 +1,95 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=79328
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91a00
+initramfs: Done (9 entries)
+LINUX DUPABI DETAIL: ordinary=1 kind=0 op=0 old=1234567800000003 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=0 op=0 old=ffffffff00000003 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=1 op=1 old=3 new=123456780000003f flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=1 op=1 old=3 new=123456780000003f flags=80000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=1 op=1 old=3 new=123456780000003f flags=1234567800000000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=1 op=1 old=3 new=123456780000003f flags=1234567800080000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=1 op=1 old=3 new=123456780000003f flags=ffffffff00000000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=1 op=1 old=3 new=123456780000003f flags=ffffffff00080000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=4 op=2 old=3 new=1234567800000003 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=4 op=2 old=3 new=123456780000003f flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=4 op=2 old=3 new=ffffffff00000003 flags=0 ret=-1 errno=22 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=4 op=2 old=3 new=ffffffff0000003f flags=0 ret=-1 errno=22 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=4 op=2 old=1234567800000003 new=3 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=4 op=2 old=1234567800000003 new=3f flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=0 op=0 old=1234567800000004 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=0 op=0 old=ffffffff00000004 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=0 op=0 old=1234567800000005 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=0 op=0 old=ffffffff00000005 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=3 op=1 old=3f new=123456780000003f flags=0 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=3 op=1 old=3f new=123456780000003f flags=80000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=3 op=1 old=3f new=123456780000003f flags=1234567800000000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=3 op=1 old=3f new=123456780000003f flags=1234567800080000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=3 op=1 old=3f new=123456780000003f flags=ffffffff00000000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=3 op=1 old=3f new=123456780000003f flags=ffffffff00080000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=2 op=1 old=3 new=3f flags=1 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=2 op=1 old=3 new=3f flags=2 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=2 op=1 old=3 new=3f flags=4 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=2 op=1 old=3 new=3f flags=8 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=2 op=1 old=3 new=3f flags=10 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=2 op=1 old=3 new=3f flags=20 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=5 op=4 old=3 new=3f flags=1 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=5 op=4 old=3 new=ffffffff flags=0 ret=-1 errno=22 expected=9
+LINUX DUPABI DETAIL: ordinary=1 kind=5 op=5 old=3 new=ffffffff flags=0 ret=-1 errno=22 expected=9
+LINUX DUPABI CASES: ordinary=1 kind=0 calls=24 failures=12
+LINUX DUPABI CASES: ordinary=1 kind=1 calls=324 failures=288
+LINUX DUPABI CASES: ordinary=1 kind=2 calls=372 failures=279
+LINUX DUPABI CASES: ordinary=1 kind=3 calls=84 failures=30
+LINUX DUPABI CASES: ordinary=1 kind=4 calls=138 failures=96
+LINUX DUPABI CASES: ordinary=1 kind=5 calls=35 failures=3
+LINUX DUPABI DETAIL: ordinary=0 kind=0 op=0 old=1234567800000003 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=0 op=0 old=ffffffff00000003 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=1 op=1 old=3 new=123456780000003f flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=1 op=1 old=3 new=123456780000003f flags=80000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=1 op=1 old=3 new=123456780000003f flags=1234567800000000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=1 op=1 old=3 new=123456780000003f flags=1234567800080000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=1 op=1 old=3 new=123456780000003f flags=ffffffff00000000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=1 op=1 old=3 new=123456780000003f flags=ffffffff00080000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=4 op=2 old=3 new=1234567800000003 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=4 op=2 old=3 new=123456780000003f flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=4 op=2 old=3 new=ffffffff00000003 flags=0 ret=-1 errno=22 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=4 op=2 old=3 new=ffffffff0000003f flags=0 ret=-1 errno=22 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=4 op=2 old=1234567800000003 new=3 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=4 op=2 old=1234567800000003 new=3f flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=0 op=0 old=1234567800000004 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=0 op=0 old=ffffffff00000004 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=0 op=0 old=1234567800000005 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=0 op=0 old=ffffffff00000005 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=3 op=1 old=3f new=123456780000003f flags=0 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=3 op=1 old=3f new=123456780000003f flags=80000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=3 op=1 old=3f new=123456780000003f flags=1234567800000000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=3 op=1 old=3f new=123456780000003f flags=1234567800080000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=3 op=1 old=3f new=123456780000003f flags=ffffffff00000000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=3 op=1 old=3f new=123456780000003f flags=ffffffff00080000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=2 op=1 old=3 new=3f flags=1 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=2 op=1 old=3 new=3f flags=2 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=2 op=1 old=3 new=3f flags=4 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=2 op=1 old=3 new=3f flags=8 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=2 op=1 old=3 new=3f flags=10 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=2 op=1 old=3 new=3f flags=20 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=5 op=4 old=3 new=3f flags=1 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=5 op=4 old=3 new=ffffffff flags=0 ret=-1 errno=22 expected=9
+LINUX DUPABI DETAIL: ordinary=0 kind=5 op=5 old=3 new=ffffffff flags=0 ret=-1 errno=22 expected=9
+LINUX DUPABI CASES: ordinary=0 kind=0 calls=24 failures=12
+LINUX DUPABI CASES: ordinary=0 kind=1 calls=324 failures=288
+LINUX DUPABI CASES: ordinary=0 kind=2 calls=372 failures=279
+LINUX DUPABI CASES: ordinary=0 kind=3 calls=84 failures=30
+LINUX DUPABI CASES: ordinary=0 kind=4 calls=138 failures=96
+LINUX DUPABI CASES: ordinary=0 kind=5 calls=35 failures=3
+LINUX DUPABI FAIL: errors, aliases, target/source state or retained storage
+QEMU: Terminated
+

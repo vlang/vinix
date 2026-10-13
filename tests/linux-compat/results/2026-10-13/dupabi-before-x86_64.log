@@ -1,0 +1,152 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   296k      0 --:--:-- --:--:-- --:--:--  295k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0 2880k    0  8427    0     0  11692      0  0:04:12 --:--:--  0:04:12 11687 43 2880k   43 1245k    0     0   712k      0  0:00:04  0:00:01  0:00:03  712k 67 2880k   67 1949k    0     0   742k      0  0:00:03  0:00:02  0:00:01  742k100 2880k  100 2880k    0     0   853k      0  0:00:03  0:00:03 --:--:--  853k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  33805      0 --:--:-- --:--:-- --:--:-- 33775
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   192k      0  0:00:01  0:00:01 --:--:--  192k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  53663      0 --:--:-- --:--:-- --:--:-- 53652
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   134k      0 --:--:-- --:--:-- --:--:--  134k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/dupabi-20261013/final-before-x86/dupabi/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/dupabi-20261013/final-before-x86/dupabi/.vinix-amd64.iso.X8MJE0'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 4545m free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/dupabi-20261013/final-before-x86/dupabi/iso-build/.iso-staging.WvlcK4/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13588 sectors
+Written to medium : 13588 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/dupabi-20261013/final-before-x86/dupabi/.vinix-amd64.iso.X8MJE0' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd44f.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/dupabi-20261013/final-before-x86/dupabi/test.iso (27828224 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/dupabi-20261013/final-before-x86/dupabi
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=79328
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91a00
+initramfs: Done (9 entries)
+LINUX DUPABI DETAIL: ordinary=1 kind=0 op=0 old=1234567800000003 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=0 op=0 old=ffffffff00000003 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=1 op=1 old=3 new=123456780000003f flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=1 op=1 old=3 new=123456780000003f flags=80000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=1 op=1 old=3 new=123456780000003f flags=1234567800000000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=1 op=1 old=3 new=123456780000003f flags=1234567800080000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=1 op=1 old=3 new=123456780000003f flags=ffffffff00000000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=1 op=1 old=3 new=123456780000003f flags=ffffffff00080000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=4 op=2 old=3 new=1234567800000003 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=4 op=2 old=3 new=123456780000003f flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=4 op=2 old=3 new=ffffffff00000003 flags=0 ret=-1 errno=22 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=4 op=2 old=3 new=ffffffff0000003f flags=0 ret=-1 errno=22 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=4 op=2 old=1234567800000003 new=3 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=4 op=2 old=1234567800000003 new=3f flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=0 op=0 old=1234567800000004 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=0 op=0 old=ffffffff00000004 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=0 op=0 old=1234567800000005 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=0 op=0 old=ffffffff00000005 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=1 kind=3 op=1 old=3f new=123456780000003f flags=0 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=3 op=1 old=3f new=123456780000003f flags=80000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=3 op=1 old=3f new=123456780000003f flags=1234567800000000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=3 op=1 old=3f new=123456780000003f flags=1234567800080000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=3 op=1 old=3f new=123456780000003f flags=ffffffff00000000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=3 op=1 old=3f new=123456780000003f flags=ffffffff00080000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=2 op=1 old=3 new=3f flags=1 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=2 op=1 old=3 new=3f flags=2 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=2 op=1 old=3 new=3f flags=4 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=2 op=1 old=3 new=3f flags=8 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=2 op=1 old=3 new=3f flags=10 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=2 op=1 old=3 new=3f flags=20 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=5 op=4 old=3 new=3f flags=1 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=1 kind=5 op=4 old=3 new=ffffffff flags=0 ret=-1 errno=22 expected=9
+LINUX DUPABI DETAIL: ordinary=1 kind=5 op=5 old=3 new=ffffffff flags=0 ret=-1 errno=22 expected=9
+LINUX DUPABI CASES: ordinary=1 kind=0 calls=24 failures=12
+LINUX DUPABI CASES: ordinary=1 kind=1 calls=324 failures=288
+LINUX DUPABI CASES: ordinary=1 kind=2 calls=372 failures=279
+LINUX DUPABI CASES: ordinary=1 kind=3 calls=84 failures=30
+LINUX DUPABI CASES: ordinary=1 kind=4 calls=138 failures=96
+LINUX DUPABI CASES: ordinary=1 kind=5 calls=35 failures=3
+LINUX DUPABI DETAIL: ordinary=0 kind=0 op=0 old=1234567800000003 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=0 op=0 old=ffffffff00000003 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=1 op=1 old=3 new=123456780000003f flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=1 op=1 old=3 new=123456780000003f flags=80000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=1 op=1 old=3 new=123456780000003f flags=1234567800000000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=1 op=1 old=3 new=123456780000003f flags=1234567800080000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=1 op=1 old=3 new=123456780000003f flags=ffffffff00000000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=1 op=1 old=3 new=123456780000003f flags=ffffffff00080000 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=4 op=2 old=3 new=1234567800000003 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=4 op=2 old=3 new=123456780000003f flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=4 op=2 old=3 new=ffffffff00000003 flags=0 ret=-1 errno=22 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=4 op=2 old=3 new=ffffffff0000003f flags=0 ret=-1 errno=22 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=4 op=2 old=1234567800000003 new=3 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=4 op=2 old=1234567800000003 new=3f flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=0 op=0 old=1234567800000004 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=0 op=0 old=ffffffff00000004 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=0 op=0 old=1234567800000005 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=0 op=0 old=ffffffff00000005 new=0 flags=0 ret=-1 errno=9 expected=0
+LINUX DUPABI DETAIL: ordinary=0 kind=3 op=1 old=3f new=123456780000003f flags=0 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=3 op=1 old=3f new=123456780000003f flags=80000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=3 op=1 old=3f new=123456780000003f flags=1234567800000000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=3 op=1 old=3f new=123456780000003f flags=1234567800080000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=3 op=1 old=3f new=123456780000003f flags=ffffffff00000000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=3 op=1 old=3f new=123456780000003f flags=ffffffff00080000 ret=-1 errno=9 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=2 op=1 old=3 new=3f flags=1 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=2 op=1 old=3 new=3f flags=2 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=2 op=1 old=3 new=3f flags=4 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=2 op=1 old=3 new=3f flags=8 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=2 op=1 old=3 new=3f flags=10 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=2 op=1 old=3 new=3f flags=20 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=5 op=4 old=3 new=3f flags=1 ret=63 errno=0 expected=22
+LINUX DUPABI DETAIL: ordinary=0 kind=5 op=4 old=3 new=ffffffff flags=0 ret=-1 errno=22 expected=9
+LINUX DUPABI DETAIL: ordinary=0 kind=5 op=5 old=3 new=ffffffff flags=0 ret=-1 errno=22 expected=9
+LINUX DUPABI CASES: ordinary=0 kind=0 calls=24 failures=12
+LINUX DUPABI CASES: ordinary=0 kind=1 calls=324 failures=288
+LINUX DUPABI CASES: ordinary=0 kind=2 calls=372 failures=279
+LINUX DUPABI CASES: ordinary=0 kind=3 calls=84 failures=30
+LINUX DUPABI CASES: ordinary=0 kind=4 calls=138 failures=96
+LINUX DUPABI CASES: ordinary=0 kind=5 calls=35 failures=3
+LINUX DUPABI FAIL: errors, aliases, target/source state or retained storage
+QEMU: Terminated
+Missing verdicts: ['LINUX DUPABI: PASS']; failures: ['FAIL:', 'LINUX DUPABI FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/dupabi-20261013/final-before-x86/receipt.json

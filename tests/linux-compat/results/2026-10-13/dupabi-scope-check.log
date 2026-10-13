@@ -1,0 +1,57 @@
+/Users/alex/.cache/vinix-linux-compat/dupabi-20261013/scope.v:2:8: warning: module 'sha256 (crypto.sha256)' is imported but never used. Use `import sha256 (crypto.sha256) as _`, to silence this warning, or just remove the unused import line
+    1 | // Compile without -prod: both deliberately failing controls must execute.
+    2 | import crypto.sha256
+      |        ~~~~~~~~~~~~~
+    3 | import json2
+    4 | import os
+/Users/alex/.cache/vinix-linux-compat/dupabi-20261013/scope.v:45:4: notice: unused function: `publish`
+   43 | }
+   44 | fn object(path string) !map[string]json2.Any { return json2.decode[json2.Any](os.read_file(path)!)!.as_map() }
+   45 | fn publish(input string, output string) ! {
+      |    ~~~~~~~
+   46 |     data := os.read_bytes(input)!
+   47 |     if os.exists(output) { assert os.read_bytes(output)! == data } else { os.write_file_array(output, data)! }
+/Users/alex/.cache/vinix-linux-compat/dupabi-20261013/scope.v:49:4: notice: unused function: `git`
+   47 |     if os.exists(output) { assert os.read_bytes(output)! == data } else { os.write_file_array(output, data)! }
+   48 | }
+   49 | fn git(tree string, args []string) !string {
+      |    ~~~
+   50 |     mut command := ['-C', tree]; command << args
+   51 |     mut p := os.new_process('git'); p.set_args(command); p.set_redirect_stdio_merged(); p.run()
+/Users/alex/.cache/vinix-linux-compat/dupabi-20261013/scope.v:59:4: notice: unused function: `control`
+   57 |     assert lines.len == 1; return source.all_after(lines[0]).all_before('\n}\n')
+   58 | }
+   59 | fn control(args []string, marker string) string {
+      |    ~~~~~~~
+   60 |     mut p := os.new_process(os.executable()); p.set_args(args); p.set_redirect_stdio_merged(); p.run()
+   61 |     output := p.stdout_slurp(); p.wait(); code := p.code; p.close()
+/Users/alex/.cache/vinix-linux-compat/dupabi-20261013/scope.v:96:4: notice: unused function: `failure`
+   94 |     else if passing { assert log.split_into_lines().filter(it.trim_space() == 'LINUX DUPABI: PASS').len == 1 && !log.contains('LINUX DUPABI REFERENCE: PASS') }
+   95 | }
+   96 | fn failure(log string, arch string) { assert log.contains('LINUX DUPABI DETAIL:'), 'dupabi baseline failure markers required'; semantics(log, false, false, arch) }
+      |    ~~~~~~~
+   97 | fn storage(log string, arch string) {
+   98 |     mut slabs := [2]int{}; mut pages := [2]int{}; mut seen := map[string]bool{}
+/Users/alex/.cache/vinix-linux-compat/dupabi-20261013/scope.v:97:4: notice: unused function: `storage`
+   95 | }
+   96 | fn failure(log string, arch string) { assert log.contains('LINUX DUPABI DETAIL:'), 'dupabi baseline failure markers required'; semantics(log, false, false, arch) }
+   97 | fn storage(log string, arch string) {
+      |    ~~~~~~~
+   98 |     mut slabs := [2]int{}; mut pages := [2]int{}; mut seen := map[string]bool{}
+   99 |     for row in log.split_into_lines() {
+/Users/alex/.cache/vinix-linux-compat/dupabi-20261013/scope.v:108:4: notice: unused function: `receipt`
+  106 |     for group in 0 .. 2 { assert slabs[group] == if arch == 'aarch64' { 18 } else { 14 }; assert pages[group] == 1 }
+  107 | }
+  108 | fn receipt(state string, arch string, kernel string, names []string, failing bool) !map[string]string {
+      |    ~~~~~~~
+  109 |     value := object(state + '/receipt.json')!; assert value['architecture']!.str() == arch && value['kernel_sha256']!.str() == kernel && digest(state + '/kernel/bin/vinix') == kernel
+  110 |     rows := value['results']!.as_array(); assert rows.len == names.len
+/Users/alex/.cache/vinix-linux-compat/dupabi-20261013/scope.v:146:4: notice: unused function: `reference_receipt`
+  144 |     for name in ['file__syscall_dup3', 'file__syscall_fcntl', 'file__fdnum_dup', 'file__fdnum_create_from_fd', 'file__fd_from_fdnum', 'table__syscall_linux_fstat', 'table__syscall_linux_fstatat'] { assert definition(after, name) == definition(before, name) }
+  145 | }
+  146 | fn reference_receipt(state string, arch string, init string) !map[string]string {
+      |    ~~~~~~~~~~~~~~~~~
+  147 |     value := object(state + '/receipt.json')!; assert value['architecture']!.str() == arch && value['passed']!.bool() && value['finished']!.bool() && value['forced']!.bool() && value['status']!.int() == 0
+  148 |     artifacts := value['artifacts']!.as_map_of_strings()
+arm: whole kernel C restores from native duplication adapter bodies/helper and one dup3 dispatch; file duplication/ownership/stat unchanged
+x86: whole kernel C restores from native duplication adapter bodies/helper and one dup3 dispatch; file duplication/ownership/stat unchanged

@@ -745,6 +745,9 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 - [x] Correct native fstat/newfstatat descriptor words, flag errors and NULL queries;
   qualify metadata, libc/legacy controls and flat retention against Linux
   on both architectures. See [the stat receipts](docs/linux-posix-qualification.md#native-stat-descriptor-words-and-flag-errors).
+- [x] Validate native dup/dup3 argument words and reject unknown flags;
+  preserve x86 dup2 self calls and qualify alias/target state, real errors
+  and flat retention against Linux. See [the duplicate receipts](docs/linux-posix-qualification.md#native-descriptor-duplication-errors-and-words).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

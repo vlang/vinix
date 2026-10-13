@@ -106,14 +106,16 @@ fn syscall_linux_mmap(gpr_state voidptr, addr voidptr, length u64, prot int, fla
 }
 
 fn syscall_linux_dup2(gpr_state voidptr, oldfd int, newfd int) (u64, u64) {
-	if oldfd == newfd {
-		mut fd := file.fd_from_fdnum(unsafe { nil }, oldfd) or {
+	old_word := int(u32(oldfd))
+	new_word := int(u32(newfd))
+	if old_word == new_word {
+		mut fd := file.fd_from_fdnum(unsafe { nil }, old_word) or {
 			return errno.err, errno.get()
 		}
 		fd.unref()
-		return u64(newfd), 0
+		return u64(new_word), 0
 	}
-	return file.syscall_dup3(gpr_state, oldfd, newfd, 0)
+	return file.syscall_dup3(gpr_state, old_word, new_word, 0)
 }
 
 fn syscall_linux_pipe(gpr_state voidptr, pipefds &i32) (u64, u64) {
@@ -436,7 +438,7 @@ pub fn init_syscall_table() {
 	syscall_table[287] = voidptr(file.syscall_timerfd_gettime) // timerfd_gettime
 	syscall_table[289] = voidptr(userland.syscall_signalfd4) // signalfd4
 	syscall_table[290] = voidptr(file.syscall_eventfd2) // eventfd2
-	syscall_table[292] = voidptr(file.syscall_dup3) // dup3
+	syscall_table[292] = voidptr(syscall_linux_dup3) // dup3
 	syscall_table[293] = voidptr(pipe.syscall_pipe_checked) // pipe2
 	syscall_table[294] = voidptr(fs.syscall_inotify_init) // inotify_init1
 	syscall_table[295] = voidptr(syscall_linux_preadv) // preadv

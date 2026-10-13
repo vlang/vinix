@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "16321959a748eced071372f1a58964c35b1e1899b9ef495ceb796e9c06cc65b0",
+    "results": [
+        {
+            "name": "dupabi",
+            "source_sha256": "1dde787ee13101903dee2c0ce31c985ca27de9f6ff1c8545587e7d5d39f6cd3d",
+            "init_sha256": "9717907cce9e0e7b59e65ba89468a50b3ad9fab51ec9c9c068d0d8e4ae5ac6f4",
+            "iso_sha256": "8f647e2a2673acf7dc5427d4464ef865bf34771a4f9e0a5078bf8420f0095ffe",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

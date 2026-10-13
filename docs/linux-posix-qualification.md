@@ -3818,3 +3818,91 @@ committed parent plus this fix, separately from the isolated semantic builds.
 Remote synchronization, automount triggers, concurrent close and disk metadata,
 GNU wrappers and translated/ELF32 paths remain separate. The three broad
 section 15 acceptance gates remain open.
+
+## Native descriptor duplication errors and words
+
+Native dup and dup3 now consume lower-32-bit descriptor words. The new dup3
+adapter validates the lower-32-bit flags before descriptor lookup or target
+replacement; only O_CLOEXEC is accepted. Unknown flags return EINVAL even with
+an invalid source, target or equal descriptors. X86 dup2 compares normalized
+words before deciding whether it is a self call: a valid self call returns
+the descriptor and preserves its existing descriptor flags, while an invalid
+self call returns EBADF. Dup3 equal words return EINVAL. Ordinary negative
+libc targets now return EBADF. Successful copies clear or set CLOEXEC as
+requested and share the existing open description.
+
+| Calls across root and UID/GID1000 | ARM calls | x86 calls | ARM baseline failures | x86 baseline failures | Candidate/Linux failures |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Raw dup words and invalid descriptors | 48 | 48 | 24 | 24 | 0 |
+| Successful raw dup3 queries | 648 | 648 | 576 | 576 | 0 |
+| Unknown flags and refusal precedence | 744 | 744 | 558 | 558 | 0 |
+| Valid-flag dup3 equality/descriptor errors | 168 | 168 | 60 | 60 | 0 |
+| Native x86 dup2 self/replacement/errors | 0 | 276 | 0 | 192 | 0 |
+| Musl dup/dup2/dup3 controls | 70 | 70 | 6 | 6 | 0 |
+
+Each Vinix candidate and actual Linux 6.12.51 reference passes all 1678 ARM
+or 1954 x86 calls. The baselines fail 1224 ARM and 1416 x86 calls. Independent
+three-pattern upper words cover old descriptor, new descriptor and flags;
+all 31 unknown single flag bits are refused. Sources include a regular file,
+O_PATH file/directory, an unlinked file and both nonblocking pipe endpoints.
+Metadata, status flags and requested descriptor flags agree with each source.
+Ordinary file aliases move the shared cursor through the new descriptor and
+restore it through the source. Every tested request starts with a distinct
+seeded target: errors must retain its metadata/CLOEXEC/cursor and the source's
+metadata/status/descriptor flags/cursor. File contents and queued AB data
+remain exact after both credential cohorts.
+
+Both native candidates pass dupabi, statabi, open and runtime guest suites.
+Two 200-cycle retention cohorts perform 15 ARM or 21 x86 raw duplication calls
+and three libc target seeds per cycle after warmup and grace. All 18 ARM and
+14 x86 live slab classes remain exact, as do 68/68 ARM and 177/177 x86 large
+pages, in both credential groups. Eight host test files and the inventory
+check pass. Allocation scans retain 659/655 source files and 400/292 sites
+with identical existing allowance refusals; no allowances change.
+
+The maintained [V reference controller](../tests/linux-compat/dupabi-reference.v)
+boots the exact same native musl ELF with caller-supplied Linux kernels. It
+freezes the probe/kernel, compiles a V exec wrapper, creates the initramfs in
+V and records wrapper/source/C/ELF/archive/QEMU/serial hashes. These dated
+boots use the fixed Alpine 3.22.2 kernels from the statx reference; both logs
+identify Linux 6.12.51. ARM uses macOS HVF; x86 uses TCG. `--reference` runs
+the same semantic matrix while skipping Vinix-specific allocator reporting.
+The native audit still requires all retention rows.
+
+Isolated worktrees start at
+`35f1a52fac949a772a5e331b6f3b8cd0b59376ee`, changing only the three native
+adapter sources. Restoring the dup/dup2 adapter bodies and one dup3 dispatch,
+then removing the new dup3 adapter declaration/body, restores the entire
+baseline kernel C after normalizing only unused-loop source offsets.
+Generic file duplication, descriptor lookup/refcounts and stat adapters
+remain exact. The independent
+[lifetime review](../tests/linux-compat/results/2026-10-13/dupabi-lifetime-review.md)
+checks unchanged retained owners, stack metadata borrows and cleanup against
+source, generated C and actual native/Linux captures.
+
+The [assertion-enabled auditor](../tests/linux-compat/results/2026-10-13/dupabi-audit.v)
+requires exact baseline failures, candidate/reference counts/errors, flat
+retention, source isolation, whole-C scope and artifact hashes. Its deliberate
+assertion and a passing candidate supplied as baseline evidence both fail.
+[ARM evidence](../tests/linux-compat/results/2026-10-13/dupabi-evidence-aarch64.json)
+and [x86 evidence](../tests/linux-compat/results/2026-10-13/dupabi-evidence-x86_64.json)
+bind all 63 isolated inventory inputs and compiler/controllers/source/C/kernel,
+ELF/ISO, Linux kernel/wrapper/archive/QEMU, serial/build/audit/review hashes.
+Captures:
+[ARM baseline](../tests/linux-compat/results/2026-10-13/dupabi-before-aarch64.log),
+[ARM candidate](../tests/linux-compat/results/2026-10-13/dupabi-after-aarch64.log),
+[ARM Linux](../tests/linux-compat/results/2026-10-13/dupabi-reference-aarch64.log),
+[x86 baseline](../tests/linux-compat/results/2026-10-13/dupabi-before-x86_64.log),
+[x86 candidate](../tests/linux-compat/results/2026-10-13/dupabi-after-x86_64.log),
+[x86 Linux](../tests/linux-compat/results/2026-10-13/dupabi-reference-x86_64.log).
+Initial 33-libc-control drafts remain in private artifacts with their real
+baseline failures and Linux results. The final frozen probe adds ordinary
+negative-target libc controls. Public inventory fingerprints use the committed
+parent plus this fix, separately from the isolated semantic inputs.
+
+Descriptor-limit pressure, actual exec inheritance, GNU wrappers and foreign
+ABIs remain separate. Concurrent dup/close/fork/exec is unqualified: the
+existing fdnum_dup publishes its new descriptor before finalizing its flags,
+leaving a separate lifetime/publication issue. These tests observe completed
+calls and do not certify that concurrent path. The three broad section 15
+acceptance gates remain open.

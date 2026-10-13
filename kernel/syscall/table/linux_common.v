@@ -790,7 +790,17 @@ fn syscall_linux_sched_yield(_ voidptr) (u64, u64) {
 
 // dup(oldfd) via fcntl(oldfd, F_DUPFD, 0)
 fn syscall_linux_dup(gpr_state voidptr, oldfd int) (u64, u64) {
-	return file.syscall_fcntl(gpr_state, oldfd, 0, 0)
+	return file.syscall_fcntl(gpr_state, int(u32(oldfd)), 0, 0)
+}
+
+// dup3 takes C-int descriptor/flag words. Reject unknown flags before the
+// existing descriptor duplication path can replace or retain either handle.
+fn syscall_linux_dup3(gpr_state voidptr, oldfd int, newfd int, flags int) (u64, u64) {
+	query_flags := u32(flags)
+	if query_flags & ~u32(resource.o_cloexec) != 0 {
+		return errno.err, errno.einval
+	}
+	return file.syscall_dup3(gpr_state, int(u32(oldfd)), int(u32(newfd)), int(query_flags))
 }
 
 // struct statx, the 256-byte form statx(2) fills. Its timestamps and its
