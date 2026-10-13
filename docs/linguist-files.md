@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `44fb696a51293846e0ad300a9784fdfaa0d7fbd2`,
+at source commit `b59d1939dddedf512ab2211dac393bbcc06a4de1`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 599 | 2,396,874 | 5.48% |
+| C | 599 | 2,396,874 | 5.47% |
 | Python | 10 | 89,440 | 0.20% |
-| Shell | 822 | 1,362,726 | 3.12% |
+| Shell | 823 | 1,358,869 | 3.10% |
 
-All `.v` files are classified as V. The resulting V share is 84.07%, with no
+All `.v` files are classified as V. The resulting V share is 84.12%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 44fb696a51293846e0ad300a9784fdfaa0d7fbd2 --breakdown --json
+github-linguist --rev b59d1939dddedf512ab2211dac393bbcc06a4de1 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -774,6 +774,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/security-audit/run-collector` | 396 |
 | `build-support/security-tools/compile-v-core` | 167 |
 | `build-support/security-tools/stage` | 165 |
+| `build-support/source-tools/run` | 143 |
 | `build-support/sparse-file` | 178 |
 | `build-support/stage-oh-my-zsh.sh` | 2,893 |
 | `build-support/stage-uname.sh` | 215 |
@@ -831,17 +832,17 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/tools/stage_app` | 143 |
 | `desktop/tools/stage_host_gpu` | 148 |
 | `desktop/tools/stage_ui2` | 143 |
-| `desktop/tools/test-activity.sh` | 2,440 |
+| `desktop/tools/test-activity.sh` | 1,631 |
 | `desktop/tools/test-battery.sh` | 673 |
 | `desktop/tools/test-cache-tools` | 194 |
 | `desktop/tools/test-clipboard.sh` | 1,356 |
 | `desktop/tools/test-execinfo.sh` | 812 |
 | `desktop/tools/test-gpu-present` | 138 |
 | `desktop/tools/test-new-utilities.sh` | 2,637 |
-| `desktop/tools/test-settings.sh` | 5,219 |
+| `desktop/tools/test-settings.sh` | 5,065 |
 | `desktop/tools/test-utilities.sh` | 10,608 |
-| `desktop/tools/test-utility-parity.sh` | 2,858 |
-| `desktop/tools/test-window-experience.sh` | 2,089 |
+| `desktop/tools/test-utility-parity.sh` | 1,823 |
+| `desktop/tools/test-window-experience.sh` | 1,960 |
 | `desktop/tools/tests/test_font_data` | 150 |
 | `gl-triangle/compile-v` | 564 |
 | `gl-triangle/run-gl-triangle` | 2,351 |
@@ -1102,7 +1103,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/clipboard/run-vm` | 156 |
 | `tests/clipboard/test-host` | 174 |
 | `tests/clock-control/run` | 184 |
-| `tests/clock-control/run-host.sh` | 731 |
+| `tests/clock-control/run-host.sh` | 526 |
 | `tests/codex/smoke` | 138 |
 | `tests/compiler-selection/test-find-v.sh` | 6,624 |
 | `tests/compiler-selection/test-kernel-ar` | 145 |
@@ -1231,7 +1232,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/run.sh` | 128 |
 | `tests/linuxkpi/run_vm` | 152 |
 | `tests/listen-backlog/run` | 187 |
-| `tests/m1-deploy/run.sh` | 2,686 |
+| `tests/m1-deploy/run.sh` | 2,392 |
 | `tests/m1-wifi/build.sh` | 2,603 |
 | `tests/m1-wifi/compile-fixture` | 177 |
 | `tests/m1-wifi/compile-provider` | 162 |
@@ -1246,7 +1247,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/m1-wifi/verify-build` | 158 |
 | `tests/m1-wifi/verify-test` | 157 |
 | `tests/mapped-writeback/run` | 213 |
-| `tests/mapped-writeback/run-host.sh` | 3,848 |
+| `tests/mapped-writeback/run-host.sh` | 3,641 |
 | `tests/memlock/run-vm` | 215 |
 | `tests/memlock/run.sh` | 2,067 |
 | `tests/memory-pressure/run.sh` | 3,124 |
@@ -1336,7 +1337,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/posix-timer/check-generated` | 146 |
 | `tests/posix-timer/run` | 182 |
 | `tests/power-supply/run` | 748 |
-| `tests/private-pages/run-host.sh` | 16,215 |
+| `tests/private-pages/run-host.sh` | 14,471 |
 | `tests/proc-map-lookup/run` | 188 |
 | `tests/proc-thread-lock/run` | 189 |
 | `tests/process-churn/check-generated` | 146 |
@@ -1398,7 +1399,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/security-audit/collector-run.sh` | 227 |
 | `tests/security-mac/host-run.sh` | 225 |
 | `tests/security-mac/run.sh` | 944 |
-| `tests/security-policy/run.sh` | 2,109 |
+| `tests/security-policy/run.sh` | 2,686 |
 | `tests/shared-streams/run` | 185 |
 | `tests/smt-policy/run` | 183 |
 | `tests/smt-policy/run-host.sh` | 1,181 |

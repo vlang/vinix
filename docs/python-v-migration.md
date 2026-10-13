@@ -2,9 +2,9 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `44fb696a51293846e0ad300a9784fdfaa0d7fbd2`,
+not been reached. At source `b59d1939dddedf512ab2211dac393bbcc06a4de1`,
 Linguist 7.27.0 reports **Python 0.20%** (10 files, 89,440 bytes) and
-**V 84.07%** (4,042 files, 36,774,544 bytes). The complete committed-blob inventory and reproduction
+**V 84.12%** (4,055 files, 36,890,169 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
@@ -3429,3 +3429,22 @@ the execinfo checks use six cold generator-wrapper builds. No Python or new
 Vinix guest verdict is claimed. This caller closure receives zero Python-file
 retirement credit. The four concurrently edited legacy adapters and their
 import dependencies remain preserved pending coordination.
+
+Supplement `b59d1939` replaces eleven embedded Python preparation blocks with
+native V, totaling 5,448 original body bytes and 122 lines across eight shell
+callers. Desktop suites reuse native link materialization and activity/parity
+merge profiles. Clock, EXT2 mapping, private/file/paging source selection and
+the 96-byte M1 deployment fixture preserve the original text and binary
+policies. Native stat headers select the correct Darwin inode ABI under Rosetta.
+A V driver invokes all staged test files directly, retains failures and rejects
+empty selections, avoiding the shared SDK vtest architecture/cache issues.
+The security-policy fixture records current audit hooks and verifies typed
+allowed/denied events; the EXT2 host fixture models only its existing
+non-journaled transaction path and rejects unsupported journals. Fifteen cold
+ARM/x86/ASanUBSan source/test/frozen-reference builds pass exact merge comparison,
+Unicode/newline/marker/ordering/link/ELF cases, actual failed-test continuation,
+clock/security policy, EXT2 mapping, every private/file/paging combination and
+disposable M1 deployment. The committed Luna suite addition remains intact.
+No Python, full desktop UI suite, GUI application, live ESP or Vinix guest
+executes; no kernel implementation or lifetime changes. These Shell blocks
+receive zero Python-file credit. See [native source tools](../build-support/source-tools/README.md).
