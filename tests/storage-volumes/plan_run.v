@@ -40,7 +40,7 @@ fn check_generated(path string) ! {
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test', 'data_scrub_test', 'crypt_test', 'recovery_test', 'sealed_test', 'sealed_rewrap_test', 'volume_seal_test', 'volume_rewrap_test', 'volume_discovery_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test', 'data_scrub_test', 'crypt_test', 'recovery_test', 'sealed_test', 'sealed_rewrap_test', 'volume_seal_test', 'volume_rewrap_test', 'volume_discovery_test', 'volume_growth_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -129,7 +129,7 @@ fn volume_seal_io_tests(root string, work string, v string) ! {
 	for file in os.ls(root + '/tools/volumes/volumecli')! {
 		if !file.ends_with('.v') || file.ends_with('_test.v') { continue }
 		mut source := os.read_file(root + '/tools/volumes/volumecli/' + file)!
-		if file in ['crypt.v', 'recovery_io.v', 'volume_seal_io.v', 'plan_io.v'] {
+		if file in ['crypt.v', 'recovery_io.v', 'volume_seal_io.v', 'volume_growth.v', 'plan_io.v'] {
 			for name in ['open', 'close', 'ioctl', 'pread', 'openat', 'write', 'fsync', 'linkat', 'unlinkat'] {
 				source = source.replace('C.' + name + '(', 'volume_seal_mock_' + name + '(').replace('fn volume_seal_mock_' + name + '(', 'fn C.' + name + '(')
 			}
@@ -137,9 +137,9 @@ fn volume_seal_io_tests(root string, work string, v string) ! {
 		if file == 'plan_lock.v' {
 			for name in ['open', 'close', 'flock'] { source = source.replace('C.' + name + '(', 'volume_seal_mock_' + name + '(').replace('fn volume_seal_mock_' + name + '(', 'fn C.' + name + '(') }
 		}
-		if file in ['volume_seal_io.v', 'volume_rewrap.v'] { source = source.replace('sealed_derive(', 'volume_seal_mock_derive(') }
+		if file in ['volume_seal_io.v', 'volume_rewrap.v', 'volume_growth.v'] { source = source.replace('sealed_derive(', 'volume_seal_mock_derive(') }
 		if file == 'plan_check.v' { source = source.replace('C.fflush(', 'volume_seal_mock_fflush(') }
-		if file in ['volume_seal_io.v', 'volume_seal_crypto.v', 'volume_rewrap.v', 'crypt.v', 'recovery_crypto.v', 'data_sha256.v', 'recovery_io.v'] {
+		if file in ['volume_seal_io.v', 'volume_seal_crypto.v', 'volume_rewrap.v', 'volume_growth.v', 'crypt.v', 'recovery_crypto.v', 'data_sha256.v', 'recovery_io.v'] {
 			source = source.replace('erase_key(', 'volume_seal_mock_erase(').replace('fn volume_seal_mock_erase(', 'fn erase_key(')
 		}
 		os.write_file(fixture + '/' + file, source)!
@@ -615,6 +615,8 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 		|| !first.contains('PLAN VOLUME SEAL LARGE ') || first.count('PLAN VOLUME SEAL RETAIN ') == 0 { return error('Missing authenticated volume configuration and full-cost lifetimes') }
 	if !first.contains('PLAN VOLUME REWRAP PASSED:') || first.count('PLAN VOLUME REWRAP CYCLES count=4') != 2
 		|| !first.contains('PLAN VOLUME REWRAP LARGE ') || first.count('PLAN VOLUME REWRAP RETAIN ') == 0 { return error('Missing authenticated volume credential changes and full-cost lifetimes') }
+	if !first.contains('PLAN VOLUME GROWTH PASSED:') || first.count('PLAN VOLUME GROWTH CYCLES count=4') != 2
+		|| !first.contains('PLAN VOLUME GROWTH LARGE ') || first.count('PLAN VOLUME GROWTH RETAIN ') == 0 { return error('Missing authenticated encrypted growth and full-cost lifetimes') }
 	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
 	if !first.contains('STORAGE MONITOR PASSED:') { return error('Missing periodic storage monitor qualification') }
 	if nvme && !first.contains('NVME HEALTH PASSED') { return error('Missing NVMe health ABI qualification') }
@@ -637,6 +639,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !second.contains('PLAN REWRAP REORDERED BOOT PRESERVED') { return error('Rewrapped passphrase unlock failed after raw key deletion and physical reorder') }
 	if !second.contains('PLAN VOLUME SEAL REORDERED BOOT PRESERVED') { return error('Authenticated configuration failed after device reorder and raw-key deletion') }
 	if !second.contains('PLAN VOLUME REWRAP REORDERED BOOT PRESERVED') { return error('Rewrapped configuration failed after device reorder and raw-key deletion') }
+	if !second.contains('PLAN VOLUME GROWTH REORDERED BOOT PRESERVED') { return error('Grown encrypted configuration failed after device reorder') }
 	// Enlarge the existing disposable backing file without changing its MBR or
 	// prior bytes. The saved bundle and all guest files remain guest-produced.
 	mut disk := os.open_file(work + '/volume.raw', 'r+')!
@@ -649,11 +652,13 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	}
 	if !third.contains('PLAN VOLUME SEAL CHANGED CAPACITY REFUSED') { return error('Sealed configuration did not reject changed physical capacity') }
 	if !third.contains('PLAN VOLUME REWRAP CHANGED CAPACITY REFUSED') { return error('Rewrapped configuration did not reject changed physical capacity') }
+	if !third.contains('PLAN VOLUME GROWTH CAPACITY ADOPTED') { return error('Encrypted configuration did not adopt physical capacity preserving ciphertext') }
 	fourth := boot(second_args, work + '/capacity-restored-boot.log')!
 	if !fourth.contains('PLAN CAPACITY BOOT RESTORED:') || fourth.contains('init: volume restore failed; continuing') {
 		return error('Production init did not restore the adopted physical capacity')
 	}
 	if !fourth.contains('PLAN POOL BOOT PRESERVED') { return error('Pool configuration did not survive capacity adoption and boot') }
+	if !fourth.contains('PLAN VOLUME GROWTH CAPACITY BOOT PRESERVED') { return error('Encrypted capacity configuration did not survive reboot') }
 	if !fourth.contains('PLAN POOL GROWTH BOOT PRESERVED') { return error('Expanded tail pool did not survive boot') }
 	if !fourth.contains('PLAN POOL BATCH BOOT PRESERVED') { return error('Mixed batch tail mapping did not survive boot') }
 	if !fourth.contains('PLAN POOL GROWTH BATCH BOOT PRESERVED') { return error('Growth batch tail mapping did not survive boot') }
@@ -678,6 +683,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !fifth.contains('init: volume restore failed; continuing') || !fifth.contains('PLAN CAPACITY CONTRACTION SAVED:') {
 		return error('Missing old-geometry rejection or verified physical contraction')
 	}
+	if !fifth.contains('PLAN VOLUME GROWTH PHYSICAL CONTRACTION REFUSED') { return error('Encrypted capacity configuration accepted physical contraction') }
 	sixth := boot(second_args, work + '/capacity-contract-restored-boot.log')!
 	if sixth.contains('init: volume restore failed; continuing') || !sixth.contains('PLAN CAPACITY CONTRACT BOOT RESTORED:')
 		|| !sixth.contains('PLAN CAPACITY CONTRACTION BOOT PRESERVED') {

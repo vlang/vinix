@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`plan-grow-volume DEVICE CONFIG PASSPHRASE_FILE LENGTH_BYTES NEW_CONFIG`
+authenticates saved encrypted metadata, checks the same identity/native sectors
+on a pinned read-only parent, and publishes a separate configuration adopting
+nondecreasing physical capacity and extent length. Key, start, slot and readonly
+mode remain exact; credentials/key erase before publication. Apply live growth
+or reopen separately. See [growth and limits](../../docs/storage-volumes.md#authenticated-encrypted-volume-growth).
+
 `open-volume-auto CONFIG PASSPHRASE_FILE [ro]` authenticates before discovering
 the unique matching physical disk, then imports through its retained descriptor.
 It survives device renumbering, accepts physical aliases, rejects matching

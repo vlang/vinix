@@ -494,6 +494,8 @@ fn first_boot(parent &char) {
 		volume_rewrap_retention(parent)
 		planned_volume_discovery(parent, wrong)
 		volume_discovery_retention(parent)
+		planned_volume_growth(parent, wrong)
+		volume_growth_retention(parent)
 		health_check(parent)
 		health_cycles(parent)
 		$if nvme_health_test ? { nvme_health_check(); nvme_health_cycles() }
@@ -585,6 +587,8 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 			C.printf(c'PLAN DONE\n'); for { C.pause() }
 		}
 		if status(actual).bytes == 20971520 {
+			volume_discovery_tool(c'/root/volume-capacity.sealed', c'/root/next.pass', true, 1); missing(c'/dev/mapper/vinix60')
+			C.printf(c'PLAN VOLUME GROWTH PHYSICAL CONTRACTION REFUSED\n')
 			physical_capacity_contract_phase(actual, other)
 			C.printf(c'PLAN DONE\n')
 			for { C.pause() }
@@ -596,6 +600,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 			C.printf(c'PLAN VOLUME REWRAP CHANGED CAPACITY REFUSED\n')
 			volume_discovery_tool(c'/root/volume-next.sealed', c'/root/next.pass', true, 1); missing(c'/dev/mapper/vinix60')
 			C.printf(c'PLAN VOLUME DISCOVERY CHANGED CAPACITY REFUSED\n')
+			volume_growth_capacity_boot(actual)
 			physical_capacity_phase(actual, other)
 			C.printf(c'PLAN DONE\n')
 			for { C.pause() }
@@ -616,6 +621,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		volume_seal_reordered_boot(actual, other)
 		volume_rewrap_reordered_boot(actual, other)
 		volume_discovery_reordered_boot(actual)
+		volume_growth_reordered_boot(actual)
 		$if nvme_health_test ? { nvme_health_check() }
 		before := status(c'/dev/mapper/vinix2').generation
 		second_before := status(c'/dev/mapper/vinix9').generation

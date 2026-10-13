@@ -1,5 +1,12 @@
 # Storage-volume qualification
 
+Authenticated encrypted growth adds full-width/native-sector metadata tests
+and extends the publication model with same-key capacity adoption, credential
+buffer reuse, pinned read-only probes and pre-/post-KDF disk rechecks. Both guests
+verify separate live growth with held descriptors, unchanged ciphertext,
+extension conflicts, RW/RO reopening, physical adoption, reboot and contraction
+refusal, with measured allocation retention. See [growth qualification](volume-growth.md).
+
 Authenticated encrypted-volume discovery adds native syntax checks and a
 sanitized syscall model covering authentication-before-scan, credential erasure,
 physical aliases/duplicate identities, RW/RO modes, native geometry, pinned

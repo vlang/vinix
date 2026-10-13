@@ -17,15 +17,20 @@ mut:
 
 @[direct_array_access]
 fn load_volume_seal(config &char, password &char, mut work VolumeSealFiles) bool {
+	return load_volume_seal_credentials(config, password, mut work) > 0
+}
+
+@[direct_array_access]
+fn load_volume_seal_credentials(config &char, password &char, mut work VolumeSealFiles) int {
 	if !read_recovery_file(config, &work.envelope[0], volume_seal_bytes) || !volume_seal_header(&work.envelope[0], volume_seal_bytes) {
-		plan_error(c'invalid sealed volume format, geometry or work profile'); return false
+		plan_error(c'invalid sealed volume format, geometry or work profile'); return 0
 	}
 	size := read_private_key_file(password, &work.password[0], 1, 1024)
-	if size == 0 || !sealed_derive(&work.password[0], size, &work.envelope[40], &work.wrapping[0]) { return false }
+	if size == 0 || !sealed_derive(&work.password[0], size, &work.envelope[40], &work.wrapping[0]) { return 0 }
 	if !decode_volume_seal(&work.envelope[0], volume_seal_bytes, &work.wrapping[0], mut work.disk, mut work.request) {
-		plan_error(c'invalid sealed volume or passphrase'); return false
+		plan_error(c'invalid sealed volume or passphrase'); return 0
 	}
-	return true
+	return size
 }
 
 fn volume_seal_recheck(fd i32, mut work VolumeSealFiles) bool {

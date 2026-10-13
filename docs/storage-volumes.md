@@ -395,8 +395,9 @@ cleanup or durability failure can leave a complete private output with status 1.
 Identifiers are partition-table identifiers: cloned or deliberately duplicated
 identities are not a proof of unique hardware. Verification samples a pinned
 device; it cannot prevent a privileged actor from changing disk metadata after
-the final check. Physical capacity or sector-size changes require a fresh
-configuration, as do desired slot/extent/mode changes. Existing configurations
+the final check. Physical capacity and extent growth can use `plan-grow-volume`
+below. Sector-size, slot, start or mode changes require a fresh configuration.
+Existing configurations
 remain usable with their saved credentials and matching geometry. The separate
 `rewrap-key` command accepts `VINIXKP1` key envelopes; use `rewrap-volume` below
 for this configuration format. Keep an independent key backup and retain the
@@ -449,6 +450,60 @@ observable candidates during this scan, and a privileged metadata rewrite
 after the final check remains outside its guarantee. The existing encryption,
 credential storage, process-termination and cache limits apply. See
 [automatic unlock qualification](../tests/storage-volumes/volume-discovery.md).
+
+## Authenticated encrypted-volume growth
+
+`plan-grow-volume DEVICE CONFIG PASSPHRASE_FILE LENGTH_BYTES NEW_CONFIG`
+authenticates an encrypted configuration and publishes a separate private
+configuration with a nondecreasing extent length and the observed physical
+capacity. It preserves the exact volume key, native sectors, disk identity,
+slot, starting offset and readonly mode. The disk may have its original capacity
+or a larger one; smaller capacity, changed identity/sectors, shrinking extents,
+unaligned lengths and out-of-bounds growth reject. Equal lengths are supported
+for capacity adoption or a fresh wrapping salt/nonce.
+
+```sh
+# Plan against the current whole physical disk, without a raw keyfile.
+vinix-volume plan-grow-volume /dev/vda /root/data.vcrypt /root/volume.pass 16777216 /root/data-grown.vcrypt
+# Apply separately to an already active view; held descriptors keep working.
+vinix-volume grow /dev/mapper/vinix0 16777216
+vinix-volume remove /dev/mapper/vinix0
+# Reopen with the new saved capacity/length after removal or reboot.
+vinix-volume open-volume-auto /root/data-grown.vcrypt /root/volume.pass
+```
+
+Planning authenticates before opening the physical parent or output directory.
+It retains one read-only parent descriptor, verifies the saved identity and
+native sectors, then validates the proposed extent against the observed
+capacity. It rechecks that disk before deriving the new wrapping key and again
+after taking the output-directory lock, before publication. Runtime disk
+identity, exact observed byte/sector geometry and physical readonly changes
+observed during those rechecks reject. The original credential bytes are read
+once, retained at their exact authenticated length and used with a fresh salt
+and nonce; the old derived key is erased before reuse. After encoding, both
+credential buffers and the plaintext volume key are erased before publication
+I/O. Normal returns erase the complete workspace and close retained descriptors.
+
+The unchanged 320-byte `VINIXVC1` format authenticates the new geometry and
+wrapped key. Publication uses the same directory lock, mode-0600 temporary,
+no-overwrite hardlink, cleanup and durability rules. Source, credential and
+existing destination entries remain intact. A post-publication cleanup,
+durability or reporting failure can leave a complete authentic configuration
+with status 1. Complete operation/reporting returns 0 and invalid syntax 2.
+
+Planning changes no live mapping, device data or filesystem, and reserves no
+extent. Applying growth or importing the new configuration separately still
+requires kernel privilege and mounted/swap/overlap admission. Existing live
+growth preserves its generation and held descriptors. The same key, native
+sectors and mapping start retain AES-XTS tweak positions, so prior ciphertext
+reopens unchanged. Newly exposed bytes need initialization before use; raw
+growth does not produce zero plaintext or resize a filesystem. Saved readonly
+mode cannot escalate. Old configurations retain their old geometry and still
+reject changed physical capacity; keep an independent recovery path and verify
+new access before retiring them. Further physical contraction or sector changes
+reject the new configuration too. Partition-table identity, sampled recheck,
+credential storage, termination and unverified-ciphertext limits remain as
+above. See [growth qualification](../tests/storage-volumes/volume-growth.md).
 
 ## Changing encrypted-volume configuration credentials
 
