@@ -6,7 +6,7 @@ import os
 
 pub struct CatalogImport {
 pub:
-	source string @[required] // aarch64, x86_64 or shared, beneath the captured roots
+	source string @[required] // optional profile directories, then aarch64/x86_64/shared
 	recipe RootRecipe @[required]
 }
 
@@ -80,6 +80,27 @@ fn catalog_import_order(a &CatalogImport, b &CatalogImport) int {
 	return package_order(&a.recipe.manifest, &b.recipe.manifest)
 }
 
+fn catalog_source(source string, architecture string) bool {
+	if !relative_path(source) { return false }
+	parts := source.split('/')
+	if parts.len > 8 || !parts[..parts.len - 1].all(identifier(it)) { return false }
+	return parts.last() == if architecture == 'all' { 'shared' } else { architecture }
+}
+
+// O_NOFOLLOW applies only to the final component of an openat path. Capture
+// every profile directory separately so no ancestor can redirect the importer.
+fn catalog_source_root(root int, source string) !int {
+	mut directory := C.dup(root)
+	if directory < 0 { return error('cannot retain catalog roots') }
+	for component in source.split('/') {
+		next := C.openat(directory, component.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
+		C.close(directory)
+		if next < 0 { return error('catalog source must be an ordinary directory at every component: ${source}') }
+		directory = next
+	}
+	return directory
+}
+
 fn catalog_recipe(text string) !CatalogRecipe {
 	input := json2.decode[CatalogRecipe](text)!
 	json2.decode[CatalogDeclarations](text)!
@@ -101,8 +122,8 @@ fn catalog_recipe(text string) !CatalogRecipe {
 	for item in input.packages {
 		validate_root_recipe(item.recipe)!
 		p := canonical_package(item.recipe.manifest)!
-		if (p.architecture == 'all' && item.source != 'shared')
-			|| (p.architecture != 'all' && (p.architecture !in architectures || item.source != p.architecture)) {
+		if !catalog_source(item.source, p.architecture)
+			|| (p.architecture != 'all' && p.architecture !in architectures) {
 			return error('catalog source must match the declared package architecture: ${p.id}')
 		}
 		identity := '${p.id}/${p.architecture}/${p.version}'
@@ -167,8 +188,7 @@ fn catalog_build(recipe_file string, source_roots string, destination string, op
 	defer { for _, fd in roots { C.close(fd) } }
 	for item in recipe.packages {
 		if item.source in roots { continue }
-		fd := C.openat(root, item.source.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
-		if fd < 0 { return error('catalog source must be an ordinary directory: ${item.source}') }
+		fd := catalog_source_root(root, item.source)!
 		roots[item.source] = fd
 	}
 	stage := export_stage(parent, '.vinix-catalog')!

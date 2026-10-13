@@ -65,3 +65,9 @@ private-data/installed-app working folders, batch diagnostics and PTY execution.
 The form defaults to private data for relative outputs; CLI clients select that
 folder with the additive `--data-cwd` flag. See the
 [launch-options qualification](../../tests/packages/launch-options-check.md).
+
+`compose-catalog` combines reviewed profile locks into one publisher catalog,
+with separate prepared-root directories for each profile. It retains pins,
+permissions and license declarations and rechecks targets and dependencies.
+See [catalog composition](SDK.md#compose-application-catalogs) and
+[qualification](../../tests/packages/composition-check.md).

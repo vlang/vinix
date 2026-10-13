@@ -48,7 +48,7 @@ fn package_template(id string, version string) pkgcore.Package {
 }
 
 fn qualify_catalog_cli(binary string, work string) ! {
-	for args in [['run-args', 'catalog-app'], ['run-args', 'catalog-app', '--data-cwd', '--data-cwd', '--'], ['run-args', 'catalog-app', '--file'], ['run-args', 'catalog-app', '--file', 'relative', '--'], ['ffmpeg-catalog', '1.0.0']] {
+	for args in [['run-args', 'catalog-app'], ['run-args', 'catalog-app', '--data-cwd', '--data-cwd', '--'], ['run-args', 'catalog-app', '--file'], ['run-args', 'catalog-app', '--file', 'relative', '--'], ['ffmpeg-catalog', '1.0.0'], ['compose-catalog'], ['compose-catalog', '/tmp/unused', 'profile']] {
 		assert command(binary, args)!.code != 0
 	}
 	assert command(binary, ['run-terminal-args', 'catalog-app', '--', '-version'])!.text.contains('terminal standard input and output')
@@ -77,6 +77,21 @@ fn qualify_catalog_cli(binary string, work string) ! {
 	assert !os.exists(workspace + '/index.json') && !os.exists(workspace + '/.publisher')
 	assert command(binary, ['pack-catalog', path, roots, workspace])!.code != 0
 	assert command(binary, ['pack-catalog', path, roots])!.code != 0
+	composed_directory := work + '/composed lock; $literal'
+	composed := json2.decode[pkgcore.CompositionInfo](success(binary, ['compose-catalog', composed_directory, 'fixture', path])!)!
+	assert composed.package_count == 1 && composed.sources.map(it.id) == ['fixture']
+	assert composed.catalog_sha256 == pkgcore.hash_file(composed.catalog)!
+	assert command(binary, ['compose-catalog', composed_directory, 'fixture', path])!.code != 0
+	assert command(binary, ['compose-catalog', work + '/duplicate-composition', 'one', path, 'two', path])!.code != 0
+	assert !os.exists(work + '/duplicate-composition')
+	namespaced := work + '/composed-roots'
+	os.mkdir_all(namespaced + '/fixture')!
+	os.rename(roots + '/aarch64', namespaced + '/fixture/aarch64')!
+	composed_workspace := work + '/composed workspace'
+	assert json2.decode[pkgcore.CatalogInfo](success(binary, ['pack-catalog', composed.catalog, namespaced, composed_workspace])!)!.package_count == 1
+	assert os.read_file(composed_workspace + '/manifests/catalog-app-aarch64-1.0.0.json')!
+		== os.read_file(workspace + '/manifests/catalog-app-aarch64-1.0.0.json')!
+	os.rename(namespaced + '/fixture/aarch64', roots + '/aarch64')!
 	os.write_file(roots + '/aarch64/bin/app', 'changed source')!
 	refused := command(binary, ['pack-catalog', path, roots, work + '/catalog-changed'])!
 	assert refused.code != 0 && refused.text.contains('payload inventory differs') && !os.exists(work + '/catalog-changed')

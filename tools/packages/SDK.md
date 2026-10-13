@@ -142,13 +142,16 @@ permissions, licenses or publisher trust from an upstream installation.
 | `format` | Required integer `1`. |
 | `architectures` | Required nonempty list of distinct `aarch64`/`x86_64` targets. |
 | `packages` | Required nonempty list of at most 4,096 imports. |
-| `packages[].source` | `aarch64`, `x86_64` or `shared`, naming an ordinary directory beneath the prepared-roots directory. |
+| `packages[].source` | `aarch64`, `x86_64` or `shared`, optionally preceded by profile directories such as `media/aarch64`, beneath the prepared-roots directory. |
 | `packages[].recipe` | A format-1 prepared-root recipe, with its complete manifest and explicit selectors. |
 | `recipe.manifest.files` | Required, nonempty pinned inventory: every file has explicit `path`, `sha256`, `bytes` and `executable`. |
 | `recipe.manifest.proprietary`, `firmware` | Required booleans, including explicit `false` declarations. |
 
-Each target-specific import's source must match its manifest architecture. Data
-declared `all` uses `shared`. Every ID/version must cover every declared target;
+Each target-specific import's final source component must match its manifest
+architecture. Data declared `all` uses a final `shared` component. Optional
+profile components are valid package identifiers; source paths have at most eight
+components and retain the normal relative-path byte limit. Every ID/version must
+cover every declared target;
 duplicate identities and mixed shared/target-specific versions fail. Explicit
 runtime runners and every dependency must resolve for each advertised version.
 As in release publication, `all` data must resolve on both supported hosts.
@@ -157,6 +160,8 @@ missing disclosures and missing file pins. The existing 8 MiB metadata limit
 applies, and normal package/selector bounds still apply.
 
 The builder captures every selected source directory before copying any package.
+Every profile/source component must be an ordinary directory; ancestor and final
+symlinks are refused. Replacing a captured profile path cannot redirect the import.
 Guest symlinks resolve beneath that captured architecture root using `pack-root`
 rules. Unexpected files, wrong sizes or changed executable status fail before
 copying those files; changed bytes and missing pins also fail. There is no
@@ -192,6 +197,59 @@ canonical workspace lock records that import; later manual `pack`/`pack-root`
 changes require a newly reviewed lock/build for reproducible catalog assembly.
 This publisher workflow does not authenticate upstream archives or qualify the
 applications' executable/runtime ABI or graphical sessions.
+
+### Compose application catalogs
+
+`compose-catalog NEW_LOCK_DIRECTORY PROFILE CATALOG.json [PROFILE CATALOG.json...]`
+combines between one and 64 complete reviewed catalog locks. Each profile ID must
+be distinct and valid. All inputs must cover exactly the same architecture set;
+duplicate package ID/architecture/version identities are refused, even if their
+metadata matches. Package count, source depth, file pins, disclosures, target
+coverage and complete runtime dependency closures are checked again on the
+combined catalog. Composition retains every manifest and selector unchanged.
+
+Sources acquire the profile prefix: `aarch64` from `sqlite` becomes
+`sqlite/aarch64`. This keeps unrelated loaders and libraries in separate prepared
+roots, even when they share filenames. Existing scoped sources can be composed
+again within the eight-component bound. Prepare ordinary directories matching
+these prefixes; links to profile/architecture directories are refused. Guest
+payload aliases inside each captured architecture root retain `pack-root` rules.
+
+For the qualified SQLite and FFmpeg profiles, prepare this layout (copy the
+prepared roots into these directories while preserving their file modes):
+
+```text
+/build/roots/sqlite/aarch64/...
+/build/roots/sqlite/x86_64/...
+/build/roots/media/aarch64/...
+/build/roots/media/x86_64/...
+```
+
+```sh
+vinix-package sqlite-catalog 3.53.4 1.0.0 /build/roots/sqlite /build/sqlite-lock
+vinix-package ffmpeg-catalog 1.0.0 /build/roots/media /build/media-lock
+vinix-package compose-catalog /build/combined-lock sqlite /build/sqlite-lock/catalog.json media /build/media-lock/catalog.json
+vinix-package pack-catalog /build/combined-lock/catalog.json /build/roots /build/combined-workspace
+vinix-package publish-release /build/combined-workspace company /secure/publisher.seed 1 EXPIRES_UNIX /build/combined-release
+```
+
+The composer checks destination space plus a 64 MiB reserve and atomically
+publishes a new private 0700 directory with `catalog.json` and `composition.json`.
+The latter records sorted profile IDs, canonical input-lock SHA-256 digests,
+combined catalog digest, architectures and package count, without host input
+filenames. Input order and JSON formatting do not change these bytes. The CLI
+returns format-1 JSON with `directory`, `catalog`, `catalog_sha256`,
+`architectures`, `package_count` and `sources` (`id`, `catalog_sha256`).
+Keep the provenance file with the reviewed lock; `pack-catalog` imports the
+combined lock through its existing pinned workflow.
+
+An existing destination is never replaced. Failures remove the private staging
+directory; an abrupt kill can leave an unpublished `.vinix-composition-*`
+directory. A parent-flush diagnostic after publication requires storage
+verification. No payload acquisition, consumer state/trust changes, signing or
+license acceptance occur. A composed release uses its publisher's one key;
+composition does not merge independently signed repositories or authenticate
+upstream inputs. See [qualification](../../tests/packages/composition-check.md).
 
 ### SQLite CLI publisher profile
 

@@ -44,6 +44,7 @@ fn main() {
 		'packages-linux' { scenario_packages_linux(mut t) }
 		'packages-sqlite' { scenario_packages_sqlite(mut t) }
 		'packages-ffmpeg' { scenario_packages_ffmpeg(mut t) }
+		'packages-composition' { scenario_packages_composition(mut t) }
 		'packages-crash-staged', 'packages-crash-published', 'packages-crash-activated' {
 			scenario_package_recovery(mut t)
 		}

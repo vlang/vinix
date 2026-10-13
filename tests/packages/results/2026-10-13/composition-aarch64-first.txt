@@ -1,0 +1,6 @@
+FAIL aarch64 packages-composition (0.4s)
+  mcopy -i /Users/alex/code/vinix/build/package-composition-work/guest-arm/packages-composition/boot.img /Users/alex/code/vinix/build/package-composition-work/guest-arm/packages-composition/initramfs.tar ::/boot/initramfs.tar
+mcopy: exit status 1
+Disk full
+  nothing was printed on the serial port
+  logs: /Users/alex/code/vinix/build/package-composition-work/guest-arm/packages-composition

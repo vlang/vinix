@@ -89,6 +89,22 @@ pub fn build_initramfs(guest string, scenario string, state string, extras strin
 	return archive
 }
 
+fn boot_fat_size(files []u64) !u64 {
+	mut payload := u64(0)
+	for size in files {
+		if size >= u64(4) << 30 || payload > (u64(16) << 30) - size {
+			return error('boot inputs exceed FAT file/volume size limits')
+		}
+		payload += size
+	}
+	// Budget FAT tables, directory/cluster rounding and free space. The old
+	// fixed 64 MiB image could not hold a larger catalog plus its kernel.
+	required := payload + payload / 8 + (u64(8) << 20)
+	mut image := u64(64) << 20
+	for image < required { image *= 2 }
+	return image
+}
+
 // An AArch64 machine boots from a FAT volume: the firmware runs Limine from
 // the removable-media path, and Limine reads its configuration, the kernel
 // and the initramfs from the same volume. Returns the QEMU arguments that
@@ -108,7 +124,7 @@ fn boot_media_aarch64(host Host, kernel string, initramfs string, cmdline string
 		'\n    cmdline: ${('vinix.qemu_platform=1 ' + cmdline).trim_space()}\n')!
 	image := os.join_path(state, 'boot.img')
 	os.write_file(image, '')!
-	os.truncate(image, u64(64) << 20)!
+	os.truncate(image, boot_fat_size([os.file_size(loader), os.file_size(config), os.file_size(kernel), os.file_size(initramfs)])!)!
 	log := os.join_path(state, 'image.log')
 	run_tool(['mformat', '-F', '-i', image, '::'], map[string]string{}, log, tool_seconds)!
 	run_tool(['mmd', '-i', image, '::/EFI', '::/EFI/BOOT', '::/boot'], map[string]string{}, log, tool_seconds)!

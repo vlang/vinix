@@ -24,6 +24,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
 	'  pack-catalog CATALOG.json PREPARED_ROOTS NEW_WORKSPACE\n' +
+	'  compose-catalog NEW_LOCK_DIRECTORY PROFILE CATALOG.json [PROFILE CATALOG.json...]\n' +
 	'  sqlite-catalog SQLITE_VERSION RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
 	'  ffmpeg-catalog RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
 	'  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX\n' +
@@ -90,6 +91,15 @@ fn checked(arguments []string) !int {
 		'pack-catalog' {
 			if names.len != 3 { return error('pack-catalog requires a catalog recipe, prepared roots and a new workspace directory') }
 			println(json2.encode(pkgcore.pack_catalog(names[0], names[1], names[2])!))
+			return 0
+		}
+		'compose-catalog' {
+			if names.len < 3 || names.len % 2 != 1 || names.len > 129 {
+				return error('compose-catalog requires a new lock directory and 1 to 64 PROFILE CATALOG.json pairs')
+			}
+			mut sources := []pkgcore.CatalogSource{}
+			for i := 1; i < names.len; i += 2 { sources << pkgcore.CatalogSource{ id: names[i], catalog: names[i + 1] } }
+			println(json2.encode(pkgcore.compose_catalog(sources, names[0])!))
 			return 0
 		}
 		'sqlite-catalog' {

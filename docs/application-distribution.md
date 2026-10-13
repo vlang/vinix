@@ -36,6 +36,15 @@ hardware acceleration and external codec libraries are disabled. The
 [qualification](../tests/packages/ffmpeg-profile-check.md) covers real media
 encoding, decoding and inspection through the package service on both targets.
 
+[Catalog composition](../tools/packages/SDK.md#compose-application-catalogs)
+combines independently prepared profiles into one publisher release while
+keeping their loaders and libraries in separate directories. It preserves every
+payload pin, permission and license disclosure, checks complete architecture and
+runtime coverage, and retains canonical source-lock provenance. The
+[combined-catalog qualification](../tests/packages/composition-check.md) exercises
+SQLite, FFmpeg and FFprobe in one signed release, including a SQLite-only runtime
+update, rollback, offline cache reinstall and data-preserving uninstall.
+
 ## Trust and configuration
 
 The image stage creates `/etc/vinix-packages/config.json` with an empty
