@@ -1321,17 +1321,21 @@ fn (mut d Desktop) draw_button(el &ui2.Element, x int, y int, w int, h int) {
 	// An icon on its own gets the whole control; an icon with a label gets a
 	// square at the leading edge and the label takes what is left. Without the
 	// second case a glyph drawn across a wide button swamps its text.
-	mut text_x := x + text_inset
-	mut text_w := w - 2 * text_inset
+	// A window's button on Windows XP's bar has a larger icon nearer its edge.
+	luna_task := d.walk.on_bar && d.walk.kind == .luna && el.image_path.len > 0 && el.text.len > 0
+	inset := if luna_task { luna_task_inset } else { text_inset }
+	icon_limit := if luna_task { luna_task_icon } else { button_icon_size }
+	mut text_x := x + inset
+	mut text_w := w - 2 * inset
 	if el.image_path.len > 0 {
 		if el.text.len == 0 {
 			if !d.draw_app_icon(el.image_path, x, y, w, h) {
 				d.draw_builtin_glyph(el.image_path, x, y, w, h, text_color)
 			}
 		} else {
-			icon := if h - 8 < button_icon_size { h - 8 } else { button_icon_size }
-			if !d.draw_app_icon(el.image_path, x + text_inset, y + (h - icon) / 2, icon, icon) {
-				d.draw_builtin_glyph(el.image_path, x + text_inset, y + (h - icon) / 2, icon, icon,
+			icon := if h - 8 < icon_limit { h - 8 } else { icon_limit }
+			if !d.draw_app_icon(el.image_path, x + inset, y + (h - icon) / 2, icon, icon) {
+				d.draw_builtin_glyph(el.image_path, x + inset, y + (h - icon) / 2, icon, icon,
 					text_color)
 			}
 			text_x += icon + 6
@@ -2042,6 +2046,9 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 		'luna_arrow', 'luna_power', 'luna_restart', 'luna_sleep' {
 			// The coloured marks of Windows XP's Start menu. See luna.v.
 			d.draw_luna_glyph(name, x, y, w, h)
+		}
+		'luna_chevron' {
+			d.draw_luna_chevron(x, y, w, h)
 		}
 		else {
 			if name.starts_with('battery_') {

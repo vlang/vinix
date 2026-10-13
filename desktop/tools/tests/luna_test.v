@@ -650,3 +650,278 @@ fn test_windows_xp_start_menu_partial_frames_match_full_ones() {
 		luna_test_same(&desktop, lit, luna_test_pixels(&desktop))
 	}
 }
+
+fn test_windows_xp_task_buttons_are_raised_with_an_icon_and_a_title() {
+	for scale in [1, 2] {
+		mut desktop := luna_menu_test_desktop(scale)
+		first := desktop.spawn('Welcome', .welcome, 100, 60, 300, 220)
+		second := desktop.spawn('Notes', .notes, 200, 150, 300, 200)
+		luna_test_full_frame(mut desktop)
+		top := 600 - taskbar_height
+		raised := desktop.hit_target_named('task.${first}') or { panic('no task button') }
+		pressed := desktop.hit_target_named('task.${second}') or { panic('no task button') }
+		// Nearly the height of the bar, in its middle, one after the other.
+		assert raised.height == luna_task_height && pressed.height == luna_task_height
+		assert raised.y == top + (taskbar_height - luna_task_height) / 2
+		assert pressed.x == raised.x + raised.width + taskbar_item_gap
+		// A button is the window's icon and then its title, in plain type. A
+		// window with no icon of its own has the mark its title bar has.
+		tree := desktop.build_tree()
+		button := luna_test_find(&tree, 'task.${first}') or { panic('no task button') }
+		assert button.text == 'Welcome' && button.image_path == 'builtin:window'
+		assert button.text_style.size == luna_task_text_size && !button.text_style.bold
+		assert button.text_style.color == 0xffffff
+		free_tree(tree)
+		mut marked := 0
+		for x in raised.x + luna_task_inset .. raised.x + luna_task_inset + luna_task_icon {
+			if luna_test_pixel(&desktop, x, raised.y + raised.height / 2) == 0xffffff {
+				marked++
+			}
+		}
+		assert marked > 0
+
+		// Raised: its own blue through the middle, lighter toward the top and
+		// darker toward the bottom, with round corners the bar shows in.
+		x := raised.x + raised.width - 8
+		middle := raised.y + raised.height / 2
+		assert luna_test_pixel(&desktop, x, middle) == luna_bar_button
+		assert luna_test_pixel(&desktop, x, raised.y + 3) == luna_bar_face_color(luna_bar_button, 3,
+			luna_task_height, false)
+		assert luna_test_green(luna_test_pixel(&desktop, x, raised.y + 3)) > luna_test_green(luna_bar_button)
+		assert luna_test_green(luna_test_pixel(&desktop, x, raised.y + raised.height - 4)) < luna_test_green(luna_bar_button)
+		assert luna_test_pixel(&desktop, raised.x, raised.y) == luna_gradient(luna_bar, raised.y - top,
+			taskbar_height)
+		// Pressed in, for the window in front: the other way about.
+		px := pressed.x + pressed.width - 8
+		assert luna_test_pixel(&desktop, px, middle) == luna_bar_button_pressed
+		assert luna_test_green(luna_test_pixel(&desktop, px, pressed.y + 3)) < luna_test_green(luna_bar_button_pressed)
+		assert luna_test_green(luna_test_pixel(&desktop, px, pressed.y + pressed.height - 4)) > luna_test_green(luna_bar_button_pressed)
+		// Lighter under the pointer.
+		desktop.set_hover('task.${first}')
+		luna_test_full_frame(mut desktop)
+		assert luna_test_pixel(&desktop, x, middle) == luna_bar_button_hover
+		desktop.set_hover('')
+	}
+	// A button too short to shade is one colour, and the middle of any is.
+	assert luna_bar_face_color(0x123456, 2, 6, false) == 0x123456
+	assert luna_bar_face_color(0x123456, 17, 34, false) == 0x123456
+	assert luna_bar_face_color(0x123456, 17, 34, true) == 0x123456
+}
+
+fn test_windows_xp_quick_launch_is_icons_alone() {
+	mut desktop := luna_menu_test_desktop(1)
+	desktop.pinned_apps = [0, 3]
+	window := desktop.spawn('Welcome', .welcome, 100, 60, 300, 220)
+	luna_test_full_frame(mut desktop)
+	top := 600 - taskbar_height
+	layout := desktop.taskbar_layout(3)
+	files := desktop.hit_target_named(taskbar_pin_actions[0]) or { panic('no pinned Files') }
+	terminal := desktop.hit_target_named(taskbar_pin_actions[3]) or { panic('no pinned Terminal') }
+	task := desktop.hit_target_named('task.${window}') or { panic('no task button') }
+	// Two narrow slots, then the window's button with the room that is left.
+	assert desktop.taskbar_quick_count() == 2
+	assert files.width == luna_quick_side && files.height == luna_quick_side
+	assert files.x == layout.entries_left + (luna_quick_width - luna_quick_side) / 2
+	assert terminal.x == files.x + luna_quick_width + taskbar_item_gap
+	assert task.x == layout.entries_left + 2 * (luna_quick_width + taskbar_item_gap)
+	assert task.width == layout.item_width && task.width == taskbar_item_width
+	assert task.height == luna_task_height
+	// What is in Quick Launch has no name on the bar and no box at rest.
+	tree := desktop.build_tree()
+	quick := luna_test_find(&tree, taskbar_pin_actions[0]) or { panic('no pinned Files') }
+	assert quick.text.len == 0 && quick.box.transparent
+	assert luna_test_pictured(&tree, available_apps[0].icon)
+	assert luna_test_pictured(&tree, available_apps[3].icon)
+	free_tree(tree)
+	corner := luna_gradient(luna_bar, files.y + 1 - top, taskbar_height)
+	assert luna_test_pixel(&desktop, files.x + 1, files.y + 1) == corner
+	// Under the pointer it is in a raised square.
+	desktop.set_hover(taskbar_pin_actions[0])
+	luna_test_full_frame(mut desktop)
+	assert luna_test_pixel(&desktop, files.x + 2, files.y + files.height / 2) == luna_bar_button_hover
+	desktop.set_hover('')
+	luna_test_full_frame(mut desktop)
+
+	// Dragging finds each slot where the bar draws it, narrow or wide.
+	for x in [0, files.x + 3, files.x + luna_quick_width - 1] {
+		under := desktop.taskbar_entry_under(x) or { panic('no entry under the pointer') }
+		assert under.key == taskbar_pin_actions[0]
+	}
+	second := desktop.taskbar_entry_under(terminal.x + 3) or { panic('no entry under the pointer') }
+	assert second.key == taskbar_pin_actions[3]
+	for x in [task.x, task.x + task.width / 2, task.x + task.width + 300] {
+		under := desktop.taskbar_entry_under(x) or { panic('no entry under the pointer') }
+		assert under.id == 'task.${window}'
+	}
+
+	// Once it has a window, a pinned program is a button like any other.
+	index := desktop.window_index(window) or { panic('missing window') }
+	desktop.windows[index].factory_index = 0
+	assert desktop.taskbar_quick_count() == 1
+	luna_test_full_frame(mut desktop)
+	running := desktop.hit_target_named(taskbar_pin_actions[0]) or { panic('no pinned Files') }
+	idle := desktop.hit_target_named(taskbar_pin_actions[3]) or { panic('no pinned Terminal') }
+	assert running.x == layout.entries_left && running.height == luna_task_height
+	assert running.width == desktop.taskbar_layout(2).item_width
+	assert idle.x == running.x + running.width + taskbar_item_gap + (luna_quick_width - luna_quick_side) / 2
+	assert idle.width == luna_quick_side
+
+	// The other themes give every entry one width.
+	assert desktop.taskbar_slot_width(true, 0, 168) == luna_quick_width
+	assert desktop.taskbar_slot_width(true, 1, 168) == 168
+	assert desktop.taskbar_slot_width(false, 0, 168) == 168
+	for kind in [ThemeKind.default_, ThemeKind.windows7, ThemeKind.macos] {
+		desktop.settings.theme = kind
+		assert desktop.taskbar_quick_count() == 0
+		assert desktop.taskbar_slot_width(true, 0, 168) == 168
+	}
+}
+
+fn test_windows_xp_clock_is_small_plain_and_in_the_middle() {
+	mut desktop := luna_menu_test_desktop(1)
+	luna_test_full_frame(mut desktop)
+	layout := desktop.taskbar_layout(0)
+	tree := desktop.build_tree()
+	time := luna_test_find(&tree, 'clock.time') or { panic('no clock') }
+	date := luna_test_find(&tree, 'clock.date') or { panic('no date') }
+	built := luna_test_find(&tree, 'build.time') or { panic('no build stamp') }
+	// White and plain, the time over the date about the middle of the bar.
+	assert time.text == desktop.taskbar_clock_time && date.text == desktop.taskbar_clock_date
+	assert date.text.len > 0
+	assert time.text_style.size == luna_clock_time_size && !time.text_style.bold
+	assert date.text_style.size == luna_clock_date_size && !date.text_style.bold
+	assert time.text_style.color == 0xffffff && date.text_style.color == 0xffffff
+	assert int(time.frame.y) == (taskbar_height - luna_clock_time_rows - luna_clock_date_rows) / 2
+	assert int(date.frame.y) == int(time.frame.y) + luna_clock_time_rows
+	assert !built.text_style.bold && built.text_style.size == luna_clock_time_size
+	// Its box is what its type needs, at the end of the notification area.
+	box := desktop.luna_clock_box()
+	assert box > 0 && box < taskbar_clock_width
+	assert desktop.taskbar_clock_box() == box && desktop.clock_text_width() == box
+	assert int(time.frame.width) == box
+	assert int(time.frame.x + time.frame.width) == layout.status_right
+	assert desktop.taskbar_build_box() < taskbar_build_width
+	assert int(built.frame.x + built.frame.width) + taskbar_item_gap == int(time.frame.x)
+	free_tree(tree)
+
+	// With no date on show the time is alone in the middle, as Windows XP
+	// shows it, and its box is no wider than the time.
+	desktop.settings.clock_show_date = false
+	desktop.settings.clock_show_weekday = false
+	desktop.settings.clock_show_seconds = false
+	desktop.settings.clock_24_hour = false
+	desktop.taskbar_clock_sampled = false
+	desktop.update_taskbar_clock_at(1_760_000_000)
+	alone_tree := desktop.build_tree()
+	alone := luna_test_find(&alone_tree, 'clock.time') or { panic('no clock') }
+	under := luna_test_find(&alone_tree, 'clock.date') or { panic('no date') }
+	assert under.text.len == 0
+	assert alone.text.ends_with('M')
+	assert int(alone.frame.y) == (taskbar_height - luna_clock_time_rows) / 2
+	assert int(alone.frame.width) == desktop.luna_clock_box() && desktop.luna_clock_box() <= box
+	free_tree(alone_tree)
+
+	// A second input source has its badge between the build stamp and the
+	// time, clear of both.
+	desktop.settings.keyboard_layouts = 3
+	luna_test_full_frame(mut desktop)
+	badge_tree := desktop.build_tree()
+	clock := luna_test_find(&badge_tree, 'clock.time') or { panic('no clock') }
+	stamp := luna_test_find(&badge_tree, 'build.time') or { panic('no build stamp') }
+	input := desktop.hit_target_named(action_tray_input) or { panic('no input badge') }
+	assert input.x + input.width <= int(clock.frame.x)
+	assert input.x >= int(stamp.frame.x + stamp.frame.width)
+	free_tree(badge_tree)
+
+	// The other themes keep the boxes the bar has always given them.
+	for kind in [ThemeKind.default_, ThemeKind.windows7, ThemeKind.macos] {
+		desktop.settings.theme = kind
+		assert desktop.taskbar_clock_box() == taskbar_clock_width
+		assert desktop.taskbar_build_box() == taskbar_build_width
+		assert !desktop.taskbar_luna()
+	}
+}
+
+fn test_windows_xp_bar_boxes_only_what_is_pressed_or_under_the_pointer() {
+	for scale in [1, 2] {
+		mut desktop := luna_menu_test_desktop(scale)
+		desktop.spawn('Welcome', .welcome, 100, 60, 300, 220)
+		luna_test_full_frame(mut desktop)
+		top := 600 - taskbar_height
+		tree := desktop.build_tree()
+		overview := luna_test_find(&tree, action_window_overview) or { panic('no overview button') }
+		current := luna_test_find(&tree, workspace_action_ids[0]) or { panic('no pager') }
+		other := luna_test_find(&tree, workspace_action_ids[1]) or { panic('no pager') }
+		// The overview and the workspaces not on show are an icon and numbers.
+		assert overview.box.transparent && other.box.transparent && !current.box.transparent
+		// The hidden icons come out of Windows XP's round button.
+		assert luna_test_pictured(&tree, 'builtin:luna_chevron')
+		assert !luna_test_pictured(&tree, 'builtin:chevron_up')
+		free_tree(tree)
+		beside := desktop.hit_target_named(workspace_action_ids[1]) or { panic('no pager') }
+		assert luna_test_pixel(&desktop, beside.x + 1, beside.y + 1) == luna_gradient(luna_bar, beside.y +
+			1 - top, taskbar_height)
+		shown := desktop.hit_target_named(workspace_action_ids[0]) or { panic('no pager') }
+		assert luna_test_pixel(&desktop, shown.x + shown.width - 3, shown.y + shown.height / 2) == luna_bar_button_pressed
+		grid := desktop.hit_target_named(action_window_overview) or { panic('no overview button') }
+		assert luna_test_pixel(&desktop, grid.x + 1, grid.y + 1) == luna_gradient(luna_bar, grid.y +
+			1 - top, taskbar_height)
+
+		// The round button: a blue disc, brighter under the pointer, with the
+		// notification area's own blue outside it.
+		chevron := desktop.hit_target_named(action_tray_overflow) or { panic('no hidden icons button') }
+		center_x := chevron.x + chevron.width / 2
+		center_y := chevron.y + chevron.height / 2
+		disc := luna_test_pixel(&desktop, center_x + 4, center_y + 3)
+		assert luna_test_blue(disc) > luna_test_red(disc) + 0x40
+		assert luna_test_pixel(&desktop, chevron.x, chevron.y) == luna_gradient(luna_tray, chevron.y - top,
+			taskbar_height)
+		desktop.set_hover(action_tray_overflow)
+		luna_test_full_frame(mut desktop)
+		lit := luna_test_pixel(&desktop, center_x + 4, center_y + 3)
+		assert luna_test_red(lit) > luna_test_red(disc) && luna_test_green(lit) > luna_test_green(disc)
+		desktop.set_hover(action_window_overview)
+		luna_test_full_frame(mut desktop)
+		assert luna_test_pixel(&desktop, grid.x + 2, grid.y + 4) == luna_bar_face_color(luna_bar_button_hover,
+			4, grid.height, false)
+		desktop.set_hover('')
+	}
+}
+
+fn test_windows_xp_taskbar_partial_frames_match_full_ones() {
+	for scale in [1, 2] {
+		mut desktop := luna_menu_test_desktop(scale)
+		desktop.pinned_apps = [0, 3]
+		first := desktop.spawn('Welcome', .welcome, 100, 60, 300, 220)
+		desktop.spawn('Notes', .notes, 200, 150, 300, 200)
+		luna_test_full_frame(mut desktop)
+		before := luna_test_pixels(&desktop)
+		top := 600 - taskbar_height
+		// The Start button with Quick Launch, part of two buttons, the pager
+		// with the notification area, and the whole bar.
+		for area in [[0, top - 6, 200, taskbar_height + 6], [230, top + 10, 220, 20],
+			[640, top, 384, taskbar_height], [0, top, 1024, taskbar_height]] {
+			luna_test_partial_frame(mut desktop, area[0], area[1], area[2], area[3])
+			luna_test_same(&desktop, luna_test_pixels(&desktop), before)
+		}
+		// The pointer over each kind of thing on the bar, and off it again.
+		for action in ['task.${first}', taskbar_pin_actions[0], action_tray_overflow,
+			action_window_overview, workspace_action_ids[1]] {
+			for lit in [action, ''] {
+				old := if lit.len > 0 { '' } else { action }
+				desktop.set_hover(lit)
+				assert desktop.damage_hover_change(old, lit)
+				hover := desktop.frame_damage
+				desktop.frame_damage = FrameDamage{}
+				assert hover.count > 0
+				for i in 0 .. hover.count {
+					luna_test_partial_frame(mut desktop, hover.rects[i].x, hover.rects[i].y,
+						hover.rects[i].w, hover.rects[i].h)
+				}
+				partial := luna_test_pixels(&desktop)
+				luna_test_full_frame(mut desktop)
+				luna_test_same(&desktop, partial, luna_test_pixels(&desktop))
+			}
+		}
+	}
+}

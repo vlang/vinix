@@ -1545,7 +1545,15 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		unsafe { entries.free() }
 	}
 	mut children := frame_elements(3 * entries.len + workspace_count + tray_item_count + 11)
-	item_height := if icon_only { taskbar_icon_item_height } else { taskbar_item_height }
+	// Windows XP's bar: taskbar_luna.v has its measurements and its type.
+	luna := d.taskbar_luna()
+	item_height := if luna {
+		luna_task_height
+	} else if icon_only {
+		taskbar_icon_item_height
+	} else {
+		taskbar_item_height
+	}
 	item_y := (taskbar_height - item_height) / 2
 
 	// The Start orb is the taskbar's anchor. Its standalone V is the first
@@ -1587,6 +1595,9 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 			theme.taskbar_item_bg
 		}
 		radius: 5
+		// Beside Windows XP's Start button it is an icon alone, as what is
+		// in Quick Launch is, until the pointer is over it.
+		transparent: luna && !d.overview.active && d.hover != action_window_overview
 	}, ui2.TextStyle{ color: theme.taskbar_text_active })
 
 	layout := d.taskbar_layout(entries.len)
@@ -1598,8 +1609,8 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	status_width := layout.status_width
 	tray_span := layout.tray_span
 	workspace_width := layout.workspace_width
-	clock_width := taskbar_clock_width
-	build_width := taskbar_build_width
+	clock_width := d.taskbar_clock_box()
+	build_width := d.taskbar_build_box()
 	show_desktop_width := if dock { 0 } else { taskbar_show_desktop_width }
 	mut x := entries_left
 
@@ -1607,26 +1618,29 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// other buttons only move when the drag actually crosses one of them.
 	mut dragged := -1
 	for index, entry in entries {
-		if x + item_width > entry_right {
+		slot_width := d.taskbar_slot_width(entry.pinned, entry.window_count, item_width)
+		if x + slot_width > entry_right {
 			break
 		}
 		if d.taskbar_press.dragging && entry.key == d.taskbar_press.key {
 			dragged = index
 		} else {
-			d.taskbar_entry_elements(mut children, entry, x, item_y, item_width, item_height,
+			d.taskbar_entry_elements(mut children, entry, x, item_y, slot_width, item_height,
 				icon_only, false)
 		}
-		x += item_width + taskbar_item_gap
+		x += slot_width + taskbar_item_gap
 	}
 	if dragged >= 0 {
+		slot_width := d.taskbar_slot_width(entries[dragged].pinned, entries[dragged].window_count,
+			item_width)
 		mut drag_x := d.pointer_x - d.taskbar_press.grab_offset
-		if drag_x > x - taskbar_item_gap - item_width {
-			drag_x = x - taskbar_item_gap - item_width
+		if drag_x > x - taskbar_item_gap - slot_width {
+			drag_x = x - taskbar_item_gap - slot_width
 		}
 		if drag_x < entries_left {
 			drag_x = entries_left
 		}
-		d.taskbar_entry_elements(mut children, entries[dragged], drag_x, item_y, item_width,
+		d.taskbar_entry_elements(mut children, entries[dragged], drag_x, item_y, slot_width,
 			item_height, icon_only, true)
 	}
 
@@ -1651,6 +1665,9 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 				theme.taskbar_item_bg
 			}
 			radius: 5
+			// On Windows XP's bar only the workspace on show is a button,
+			// pressed in; the others are their numbers.
+			transparent: luna && !active && d.hover != id
 		}, ui2.TextStyle{
 			color: if active || occupied { theme.taskbar_text_active } else { theme.taskbar_muted }
 			size:  12
@@ -1691,28 +1708,32 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		children << d.input_menu_button(clock_x + clock_width - d.clock_text_width() -
 			taskbar_item_gap - tray_input_width, item_y, item_height)
 	}
-	children << ui2.label('build.time', d.taskbar_build_time, ui2.rect(f64(build_x), 3, f64(build_width), 21), ui2.TextStyle{
-		color: theme.taskbar_text_active
-		size:  15
-		bold:  true
-		align: .right
-	})
-	children << ui2.label('build.date', d.taskbar_build_date, ui2.rect(f64(build_x), 25, f64(build_width), 17), ui2.TextStyle{
-		color: theme.taskbar_muted
-		size:  11
-		align: .right
-	})
-	children << ui2.label('clock.time', d.taskbar_clock_time, ui2.rect(f64(clock_x), 3, f64(clock_width), 21), ui2.TextStyle{
-		color: theme.taskbar_text_active
-		size:  taskbar_clock_time_size
-		bold:  true
-		align: .right
-	})
-	children << ui2.label('clock.date', d.taskbar_clock_date, ui2.rect(f64(clock_x), 25, f64(clock_width), 17), ui2.TextStyle{
-		color: theme.taskbar_muted
-		size:  taskbar_clock_date_size
-		align: .right
-	})
+	if luna {
+		d.luna_taskbar_texts(mut children, build_x, build_width, clock_x, clock_width)
+	} else {
+		children << ui2.label('build.time', d.taskbar_build_time, ui2.rect(f64(build_x), 3, f64(build_width), 21), ui2.TextStyle{
+			color: theme.taskbar_text_active
+			size:  15
+			bold:  true
+			align: .right
+		})
+		children << ui2.label('build.date', d.taskbar_build_date, ui2.rect(f64(build_x), 25, f64(build_width), 17), ui2.TextStyle{
+			color: theme.taskbar_muted
+			size:  11
+			align: .right
+		})
+		children << ui2.label('clock.time', d.taskbar_clock_time, ui2.rect(f64(clock_x), 3, f64(clock_width), 21), ui2.TextStyle{
+			color: theme.taskbar_text_active
+			size:  taskbar_clock_time_size
+			bold:  true
+			align: .right
+		})
+		children << ui2.label('clock.date', d.taskbar_clock_date, ui2.rect(f64(clock_x), 25, f64(clock_width), 17), ui2.TextStyle{
+			color: theme.taskbar_muted
+			size:  taskbar_clock_date_size
+			align: .right
+		})
+	}
 	if dock {
 		x = clock_x + clock_width + taskbar_item_gap
 	}
@@ -1755,8 +1776,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 // start_button_luna says whether the Start button is Windows XP's: in the
 // screen's corner, the bar's whole height, with the word beside its mark.
 fn (d &Desktop) start_button_luna() bool {
-	theme := d.theme()
-	return theme.chrome == .luna && !theme.dock
+	return d.taskbar_luna()
 }
 
 // start_button_span is where the Start button starts along the bar and how
@@ -1766,6 +1786,17 @@ fn (d &Desktop) start_button_span(edge_padding int) (int, int) {
 		return 0, d.luna_start_width()
 	}
 	return edge_padding, start_button_width
+}
+
+// taskbar_clock_box and taskbar_build_box are the widths set aside for the
+// clock and for the build stamp: fixed, so the bar holds still whatever they
+// say, or under Windows XP what its smaller type needs.
+fn (d &Desktop) taskbar_clock_box() int {
+	return if d.taskbar_luna() { d.luna_clock_box() } else { taskbar_clock_width }
+}
+
+fn (d &Desktop) taskbar_build_box() int {
+	return if d.taskbar_luna() { d.luna_build_box() } else { taskbar_build_width }
 }
 
 // TaskbarLayout is where the bar's parts go, in the taskbar's coordinates.
@@ -1793,8 +1824,8 @@ fn (d &Desktop) taskbar_layout(entry_count int) TaskbarLayout {
 	// presentation as well as on an unscaled framebuffer.
 	tray_width := d.tray_width()
 	tray_span := if tray_width > 0 { tray_width + taskbar_item_gap } else { 0 }
-	status_width := tray_span + 24 + taskbar_build_width + taskbar_item_gap + d.input_menu_span() +
-		taskbar_clock_width
+	status_width := tray_span + 24 + d.taskbar_build_box() + taskbar_item_gap + d.input_menu_span() +
+		d.taskbar_clock_box()
 	status_right := if dock {
 		0
 	} else {
@@ -1807,17 +1838,28 @@ fn (d &Desktop) taskbar_layout(entry_count int) TaskbarLayout {
 	entries_right := if dock { d.canvas.width } else { workspace_x - taskbar_item_gap }
 	// Entries share whatever room is left rather than each taking a fixed
 	// slot: with a fixed one the last window opened simply had no entry, which
-	// is the opposite of what a list of open windows is for.
+	// is the opposite of what a list of open windows is for. What Windows XP
+	// keeps in Quick Launch takes a narrow slot of its own first.
+	quick := d.taskbar_quick_count()
+	shared := if entry_count > quick { entry_count - quick } else { 0 }
 	return TaskbarLayout{
 		entries_left:    entries_left
 		entries_right:   entries_right
-		item_width:      d.taskbar_item_width(entry_count, entries_left, entries_right)
+		item_width:      d.taskbar_item_width(shared, entries_left + quick * (luna_quick_width +
+			taskbar_item_gap), entries_right)
 		workspace_x:     workspace_x
 		workspace_width: workspace_width
 		status_right:    status_right
 		status_width:    status_width
 		tray_span:       tray_span
 	}
+}
+
+// taskbar_slot_width is the width of one entry's slot on a bar whose buttons
+// are `item_width` wide. On Windows XP's bar a pinned program that is not
+// running is in Quick Launch, which is its icon alone.
+fn (d &Desktop) taskbar_slot_width(pinned bool, window_count int, item_width int) int {
+	return if pinned && window_count == 0 && d.taskbar_luna() { luna_quick_width } else { item_width }
 }
 
 fn (d &Desktop) taskbar_item_width(count int, left int, right int) int {
@@ -1869,7 +1911,18 @@ fn (d &Desktop) taskbar_entry_elements(mut children []ui2.Element, entry Taskbar
 	} else {
 		theme.taskbar_text
 	}
-	radius := if icon_only { 4 } else { 6 }
+	luna := d.taskbar_luna()
+	if luna && entry.pinned && entry.window_count == 0 {
+		d.luna_quick_elements(mut children, entry, x, y, width, height, dragging)
+		return
+	}
+	radius := if luna {
+		luna_bar_button_radius
+	} else if icon_only {
+		4
+	} else {
+		6
+	}
 	button_frame := ui2.rect(f64(x), f64(y), f64(width), f64(height))
 	button_style := ui2.BoxStyle{
 		bg:     bg
@@ -1888,6 +1941,14 @@ fn (d &Desktop) taskbar_entry_elements(mut children []ui2.Element, entry Taskbar
 		}
 		children << ui2.button_with_image(entry.id, '', icon, button_frame, button_style, ui2.TextStyle{
 			color: text_color
+		})
+	} else if luna {
+		// Windows XP's button: the window's icon, then its title.
+		children << ui2.button_with_image(entry.id, entry.label, luna_task_image(entry.icon),
+			button_frame, button_style, ui2.TextStyle{
+			color: text_color
+			size:  luna_task_text_size
+			align: .left
 		})
 	} else {
 		children << ui2.button(entry.id, entry.label, button_frame, button_style, ui2.TextStyle{

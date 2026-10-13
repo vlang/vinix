@@ -41,9 +41,10 @@ What it does:
   sixteen glass colours
 - a **Windows XP theme**: Luna's blue title bars with round upper corners and
   white bold titles, three square caption buttons with a red close, a blue
-  frame, the blue taskbar with the green Start button in its corner, and
-  Windows XP's Start menu: the user in a blue header, programs in a white
-  column, places in a pale blue one, and the session buttons in a blue foot
+  frame, the blue taskbar with the green Start button in its corner, Quick
+  Launch icons, raised window buttons and a small plain clock, and Windows
+  XP's Start menu: the user in a blue header, programs in a white column,
+  places in a pale blue one, and the session buttons in a blue foot
 - dragging a window by its title bar, with top-edge maximize, side halves,
   corner quarters and a translucent placement preview; shake the title bar to
   hide other windows on its workspace, and shake again to restore them
@@ -244,6 +245,7 @@ typing any word with a q in it drop the user back to the console.
     glass.v        Aero glass for the Windows 7 theme: blur, tint, caption buttons
     luna.v         Luna for the Windows XP theme: blue title bars, frame, taskbar
     start_menu_luna.v  the Start menu as Windows XP lays it out
+    taskbar_luna.v     the taskbar's buttons, Quick Launch and clock as Windows XP has them
 
 The interesting part is the split between `wm.v` and `render.v`. The window
 manager never draws: it describes the whole screen as a `ui2.Element` tree —
@@ -847,12 +849,22 @@ pixels apart, six in from the edge and five down, lit from the upper left
 inside a white line: blue for minimise and maximise, red for close. The frame
 is four pixels of blue, brighter on the left than on the right and the
 bottom, and a window casts no shadow. An unfocused window keeps every shape
-and loses the colour. The taskbar is the blue bar with labelled window
-buttons that are pressed in for the window in front, and the notification
-area and the clock in a lighter panel. The Start button is green and the
-whole height of the bar, square in the screen's corner and round at its other
-end, with the V and the word *start* in white; it is brighter under the
-pointer and darker while its menu is open. `luna.v` paints all of it from
+and loses the colour. The taskbar is the blue bar (`taskbar_luna.v`). A
+window's button is its icon and then its title in plain white type: a raised
+blue button nearly the height of the bar, lighter toward its top and darker
+toward its bottom, lighter still under the pointer, pressed in and dark for
+the window in front, and orange when it asks for attention. What is beside
+the Start button and is not a window is an icon or a number alone until the
+pointer is over it, as Quick Launch is: the overview, the workspaces that are
+not on show, and every pinned program that is not running, which takes a
+narrow slot rather than a button's. The notification area and the clock are
+in a lighter panel. The hidden icons come out of a round blue button at its
+head, and the clock is small, plain and white: the time alone in the middle
+of the bar, or over the date when Date & Time has the date on show. The
+build stamp beside it is set the same way, paler. The Start button is green
+and the whole height of the bar, square in the screen's corner and round at
+its other end, with the V and the word *start* in white; it is brighter under
+the pointer and darker while its menu is open. `luna.v` paints all of it from
 gradients given as stops.
 
 The Start menu under this theme is Windows XP's (`start_menu_luna.v`). It

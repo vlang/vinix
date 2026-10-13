@@ -313,6 +313,51 @@ fn test_luna_start_menu_redraws_release_all_temporary_allocations() {
 	assert live == 0, 'the Windows XP Start menu retained ${live} bytes'
 }
 
+fn test_luna_taskbar_redraws_release_all_temporary_allocations() {
+	mut desktop := memory_fixture_desktop()
+	desktop.settings.theme = .windows_xp
+	desktop.settings.keyboard_layouts = 3
+	desktop.pinned_apps = [0, 3]
+	task := desktop.windows[0].id_task
+	// Warm the frame pool for the bar's layouts before measuring.
+	render_and_release(mut desktop)
+	luna_memory_hover(mut desktop, task)
+	luna_memory_hover(mut desktop, taskbar_pin_actions[0])
+	desktop.set_hover('')
+	render_and_release(mut desktop)
+
+	C.vinix_heap_begin()
+	for iteration in 0 .. 12 {
+		// Windows XP's bar measures its clock, gives what is pinned a slot
+		// and an icon of its own and draws its buttons a row at a time: none
+		// of it may outlive the frame, nor may finding a slot for a drag.
+		luna_memory_hover(mut desktop, task)
+		luna_memory_hover(mut desktop, taskbar_pin_actions[0])
+		luna_memory_hover(mut desktop, action_tray_overflow)
+		luna_memory_hover(mut desktop, action_window_overview)
+		desktop.set_hover('')
+		desktop.focus = desktop.windows[iteration % desktop.windows.len].id
+		layout := desktop.taskbar_layout(desktop.windows.len + 2)
+		assert layout.item_width > 0 && desktop.taskbar_quick_count() == 2
+		under := desktop.taskbar_entry_under(layout.entries_left + iteration * 40) or {
+			panic('no entry under the pointer')
+		}
+		assert under.id.len > 0
+		tree := desktop.build_tree()
+		desktop.render_clipped(tree, desktop.damage_clip(DamageRect{
+			x:     0
+			y:     768 - taskbar_height - 4
+			w:     1024
+			h:     taskbar_height + 4
+			valid: true
+		}), false)
+		free_tree(tree)
+	}
+	live := C.vinix_heap_end()
+	if live != 0 { print_heap_sizes('Windows XP taskbar allocations by size') }
+	assert live == 0, 'the Windows XP taskbar retained ${live} bytes'
+}
+
 fn glass_memory_backdrops(desktop &Desktop) int {
 	mut count := 0
 	for slot in desktop.glass.slots {

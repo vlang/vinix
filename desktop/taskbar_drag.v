@@ -87,13 +87,6 @@ fn (d &Desktop) taskbar_entry_under(x int) ?TaskbarEntry {
 	if stride <= 0 {
 		return none
 	}
-	mut fits := (layout.entries_right - layout.entries_left + taskbar_item_gap) / stride
-	if fits > entries.len {
-		fits = entries.len
-	}
-	if fits <= 0 {
-		return none
-	}
 	mut left := layout.entries_left
 	if d.theme().dock {
 		// A dock is centred, so its buttons start wherever the panel does.
@@ -107,12 +100,25 @@ fn (d &Desktop) taskbar_entry_under(x int) ?TaskbarEntry {
 			break
 		}
 	}
-	mut slot := (x - left) / stride
-	if x < left {
-		slot = 0
+	// Slots are not all one width: Windows XP's bar keeps a pinned program
+	// that is not running in a narrow one. Walk them as the bar lays them out,
+	// stopping at the last that fits.
+	room := layout.entries_right - layout.entries_left
+	mut slot := -1
+	mut at := 0
+	for index, entry in entries {
+		width := d.taskbar_slot_width(entry.pinned, entry.window_count, layout.item_width)
+		if at + width > room {
+			break
+		}
+		slot = index
+		if x < left + at + width + taskbar_item_gap {
+			break
+		}
+		at += width + taskbar_item_gap
 	}
-	if slot >= fits {
-		slot = fits - 1
+	if slot < 0 {
+		return none
 	}
 	return entries[slot]
 }

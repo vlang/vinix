@@ -563,8 +563,18 @@ fn (d &Desktop) tray_overflow_icon_element(id string, glyph string, x int, y int
 fn (d &Desktop) tray_elements(mut children []ui2.Element, x int, y int, height int) {
 	mut at := x
 	if d.tray.overflow_count() > 0 {
-		children << d.tray_icon_element(action_tray_overflow, 'builtin:chevron_up', at, y,
-			tray_chevron_width, height, d.tray.flyout == .overflow)
+		if d.taskbar_luna() {
+			// Windows XP's is a round button of its own, which luna.v lights.
+			children << ui2.button_with_image(action_tray_overflow, '', 'builtin:luna_chevron',
+				ui2.rect(f64(at), f64(y), f64(tray_chevron_width), f64(height)), ui2.BoxStyle{
+				transparent: true
+			}, ui2.TextStyle{
+				color: d.theme().taskbar_text_active
+			})
+		} else {
+			children << d.tray_icon_element(action_tray_overflow, 'builtin:chevron_up', at, y,
+				tray_chevron_width, height, d.tray.flyout == .overflow)
+		}
 		at += tray_chevron_width + 2
 	}
 	for index in 0 .. tray_item_count {

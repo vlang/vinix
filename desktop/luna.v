@@ -95,6 +95,10 @@ const luna_bar_button = u32(0x3c81f3)
 const luna_bar_button_hover = u32(0x53a3ff)
 const luna_bar_button_pressed = u32(0x1e52b7)
 const luna_bar_button_radius = 3
+// The round button that brings out the notification area's hidden icons.
+const luna_chevron_size = 16
+const luna_chevron_light = u32(0xa9d6ff)
+const luna_chevron_dark = u32(0x1668d6)
 
 // The Start menu's shell: the header its user tile sits in, the foot the
 // session buttons sit in, and the blue between them.
@@ -381,20 +385,131 @@ fn (mut d Desktop) draw_luna_bar_box(el &ui2.Element, x int, y int, w int, h int
 	} else {
 		0
 	}
-	d.canvas.fill_round_rect(x, y, w, h, radius, fill)
+	d.luna_bar_face(x, y, w, h, radius, fill, pressed)
 	if w < 6 || h < 6 {
 		return
 	}
 	if pressed {
 		// Pressed in: shaded along the top and the left.
-		d.canvas.blend_rect(x + 1, y + 1, w - 2, 1, 0x000000, 90)
-		d.canvas.blend_rect(x + 1, y + 2, 1, h - 3, 0x000000, 60)
+		d.canvas.blend_rect(x + 2, y + 1, w - 4, 1, 0x000000, 72)
+		d.canvas.blend_rect(x + 1, y + 2, 1, h - 4, 0x000000, 52)
 	} else {
 		// Raised: lit along the top and the left, shaded opposite.
-		d.canvas.blend_rect(x + 2, y + 1, w - 4, 1, 0xffffff, 80)
-		d.canvas.blend_rect(x + 1, y + 2, 1, h - 4, 0xffffff, 44)
-		d.canvas.blend_rect(x + w - 2, y + 2, 1, h - 4, 0x000000, 56)
-		d.canvas.blend_rect(x + 2, y + h - 2, w - 4, 1, 0x000000, 56)
+		d.canvas.blend_rect(x + 2, y + 1, w - 4, 1, 0xffffff, 72)
+		d.canvas.blend_rect(x + 1, y + 2, 1, h - 4, 0xffffff, 40)
+		d.canvas.blend_rect(x + w - 2, y + 2, 1, h - 4, 0x000000, 50)
+		d.canvas.blend_rect(x + 2, y + h - 2, w - 4, 1, 0x000000, 50)
+	}
+}
+
+// luna_bar_face_color is a button of the bar's colour on one of its rows.
+// Through the middle it is the colour itself. A raised button is lighter
+// toward its top and darker toward its bottom, as Windows XP's are; one that
+// is pressed in is the other way about.
+fn luna_bar_face_color(base u32, row int, h int, pressed bool) u32 {
+	if h < 8 {
+		return base
+	}
+	at := row * 1000 / (h - 1)
+	if pressed {
+		if at < 300 {
+			return blend(base, 0x000000, u32((300 - at) * 64 / 300))
+		}
+		if at > 700 {
+			return blend(base, 0xffffff, u32((at - 700) * 28 / 300))
+		}
+		return base
+	}
+	if at < 300 {
+		return blend(base, 0xffffff, u32((300 - at) * 72 / 300))
+	}
+	if at > 700 {
+		return blend(base, 0x000000, u32((at - 700) * 56 / 300))
+	}
+	return base
+}
+
+// luna_bar_face fills a button of the bar, its corners round.
+fn (mut d Desktop) luna_bar_face(x int, y int, w int, h int, radius int, base u32, pressed bool) {
+	for row in 0 .. h {
+		color := luna_bar_face_color(base, row, h, pressed)
+		if radius == 0 || (row >= radius && row < h - radius) {
+			d.canvas.fill_rect(x, y + row, w, 1, color)
+			continue
+		}
+		d.canvas.fill_rect(x + radius, y + row, w - 2 * radius, 1, color)
+		for column in 0 .. radius {
+			left := round_rect_coverage(x + column, y + row, x, y, w, h, radius)
+			if left > 0 {
+				d.canvas.blend_pixel(x + column, y + row, color, left)
+			}
+			right := round_rect_coverage(x + w - 1 - column, y + row, x, y, w, h, radius)
+			if right > 0 {
+				d.canvas.blend_pixel(x + w - 1 - column, y + row, color, right)
+			}
+		}
+	}
+}
+
+// draw_luna_chevron is the round button at the head of the notification area
+// that brings out the icons kept off the bar: a blue disc lit from its upper
+// left inside a pale ring, with a white chevron. It is brighter under the
+// pointer and while those icons are out. It is measured against the backing
+// pixels, so it is as round at either scale.
+fn (mut d Desktop) draw_luna_chevron(x int, y int, w int, h int) {
+	mut size := if w < h { w } else { h }
+	if size > luna_chevron_size {
+		size = luna_chevron_size
+	}
+	if size < 6 {
+		return
+	}
+	lit := d.hover == action_tray_overflow || d.tray.flyout == .overflow
+	scale := f64(d.canvas.scale)
+	center_x := (f64(x) + f64(w) / 2) * scale
+	center_y := (f64(y) + f64(h) / 2) * scale
+	radius := f64(size) * scale / 2
+	stroke := radius * 0.17
+	reach := radius * 0.30
+	first_x := int(center_x - radius) - 1
+	first_y := int(center_y - radius) - 1
+	last := int(2 * radius) + 3
+	for py in first_y .. first_y + last {
+		for px in first_x .. first_x + last {
+			sample_x := f64(px) + 0.5 - center_x
+			sample_y := f64(py) + 0.5 - center_y
+			inside := radius - math.sqrt(sample_x * sample_x + sample_y * sample_y)
+			if inside <= -0.5 {
+				continue
+			}
+			coverage := if inside >= 0.5 { u32(255) } else { u32((inside + 0.5) * 255) }
+			// Lit from the upper left: light there, dark opposite.
+			mut shade := (sample_x + sample_y) / (2.8 * radius) + 0.5
+			if shade < 0 {
+				shade = 0
+			} else if shade > 1 {
+				shade = 1
+			}
+			mut color := mix(luna_chevron_light, luna_chevron_dark, u32(shade * 255))
+			if inside < scale {
+				color = blend(color, 0xffffff, 120)
+			}
+			// The chevron points left: two strokes meeting at its tip.
+			mut nearest := distance_to_segment(sample_x, sample_y, reach * 0.6, -reach, -reach * 0.6,
+				0)
+			nearest = math.min(nearest, distance_to_segment(sample_x, sample_y, -reach * 0.6,
+				0, reach * 0.6, reach))
+			mark := stroke - nearest
+			if mark >= 0.5 {
+				color = 0xffffff
+			} else if mark > -0.5 {
+				color = blend(color, 0xffffff, u32((mark + 0.5) * 255))
+			}
+			if lit {
+				color = blend(color, 0xffffff, 56)
+			}
+			d.canvas.blend_physical_pixel(px, py, color, coverage)
+		}
 	}
 }
 

@@ -615,6 +615,10 @@ fn (d &Desktop) clock_text_width() int {
 	if d.fonts.len == 0 {
 		return taskbar_clock_width
 	}
+	if d.taskbar_luna() {
+		// Windows XP's clock is set smaller, in a box that fits it.
+		return d.luna_clock_box()
+	}
 	time := d.face_for(ui2.TextStyle{
 		size: taskbar_clock_time_size
 		bold: true
@@ -633,7 +637,7 @@ fn (d &Desktop) input_menu_span() int {
 	if !d.input_menu_shown() {
 		return 0
 	}
-	need := tray_input_width + taskbar_item_gap - (taskbar_clock_width - d.clock_text_width())
+	need := tray_input_width + taskbar_item_gap - (d.taskbar_clock_box() - d.clock_text_width())
 	return if need > 0 { need } else { 0 }
 }
 
