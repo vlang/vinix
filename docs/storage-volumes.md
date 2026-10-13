@@ -406,6 +406,50 @@ data retains AES-XTS's unverified confidentiality semantics; encrypted-root boot
 and volume-key rotation remain separate work. See
 [configuration qualification](../tests/storage-volumes/volume-config.md).
 
+## Automatic encrypted-volume discovery
+
+`open-volume-auto CONFIG PASSPHRASE_FILE [ro]` authenticates an encrypted-volume
+configuration and finds its physical disk in `/dev`, using the saved whole-disk
+identity, exact capacity and native sector size. Device names may change across
+reboots. The stored slot, extent, key and mode remain authoritative; optional
+`ro` restricts a writable configuration and never elevates a saved readonly one.
+
+```sh
+vinix-volume open-volume-auto /root/data.vcrypt /root/volume.pass
+vinix-volume remove /dev/mapper/vinix0
+vinix-volume open-volume-auto /root/data.vcrypt /root/volume.pass ro
+```
+
+Canonical input validation and full authentication finish before the device
+directory is opened. Credential and derived wrapping-key buffers are erased
+before scanning. Discovery uses the existing bounded, directory-relative
+scanner: symlinks and non-block entries are skipped, partitions and mapper
+parents are excluded, and physical aliases sharing one runtime disk identity
+are accepted. Distinct physical disks with matching saved identities and
+geometry are ambiguous and reject before import. Enumeration or unreadable
+matching-geometry candidate failures also reject, since uniqueness could not be
+established. The scan is limited to 4096 entries.
+
+A writable mapping requires a separately reopened writable descriptor whose
+physical identity is checked against the scanned candidate. After the complete
+scan, the retained descriptor is checked twice against the authenticated disk
+identity and geometry, selected runtime disk identity and readonly status,
+then passed directly to encrypted import. No pathname is reopened for import,
+no raw keyfile is created and no configuration or credential file is changed.
+Normal returns close every retained descriptor and erase the whole secret
+workspace. Status 0 means import and reporting succeeded, 1 means a controlled
+failure and 2 means invalid syntax. Reporting failure after successful import
+can leave a live mapping, as with `open-volume`.
+
+This is explicit unlock after the system has booted. It does not add unattended
+credential storage, automatic init replay, encrypted-root boot or volume-key
+rotation. Saved configurations still reject changed capacity or sector size.
+Partition-table identities are cloneable; uniqueness is established among the
+observable candidates during this scan, and a privileged metadata rewrite
+after the final check remains outside its guarantee. The existing encryption,
+credential storage, process-termination and cache limits apply. See
+[automatic unlock qualification](../tests/storage-volumes/volume-discovery.md).
+
 ## Changing encrypted-volume configuration credentials
 
 `rewrap-volume CONFIG OLD_PASSPHRASE_FILE NEW_PASSPHRASE_FILE NEW_CONFIG`

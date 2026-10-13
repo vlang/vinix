@@ -4,6 +4,12 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`open-volume-auto CONFIG PASSPHRASE_FILE [ro]` authenticates before discovering
+the unique matching physical disk, then imports through its retained descriptor.
+It survives device renumbering, accepts physical aliases, rejects matching
+clones, enforces saved readonly mode and creates no raw keyfile. See
+[automatic discovery and limits](../../docs/storage-volumes.md#automatic-encrypted-volume-discovery).
+
 `rewrap-volume CONFIG OLD_PASSPHRASE_FILE NEW_PASSPHRASE_FILE NEW_CONFIG`
 changes credentials without exporting the raw key or opening a disk. It preserves
 all authenticated disk/mapping metadata and readonly mode, refreshes salt/nonce,

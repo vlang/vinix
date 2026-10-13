@@ -40,7 +40,7 @@ fn check_generated(path string) ! {
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test', 'data_scrub_test', 'crypt_test', 'recovery_test', 'sealed_test', 'sealed_rewrap_test', 'volume_seal_test', 'volume_rewrap_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test', 'data_scrub_test', 'crypt_test', 'recovery_test', 'sealed_test', 'sealed_rewrap_test', 'volume_seal_test', 'volume_rewrap_test', 'volume_discovery_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -57,6 +57,7 @@ fn host(root string, work string) ! {
 	recovery_io_tests(root, work, v)!
 	sealed_io_tests(root, work, v)!
 	volume_seal_io_tests(root, work, v)!
+	volume_discovery_io_tests(root, work, v)!
 	for arch in ['aarch64', 'x86_64'] {
 		path := work + '/volume-' + arch + '.c'
 		generate(root, root + '/tools/volumes/volumecli', path, arch)!
@@ -96,6 +97,31 @@ fn sealed_io_tests(root string, work string, v string) ! {
 		'-fsanitize=address,undefined', '-o', binary, fixture + '/sealed_io_test.v'])!
 	print(command([binary])!)
 	println('PASS sealed keys: source/entropy and publication faults, bounded memory allocation, complete vector erasure, release failure/EINTR, pre-KDF metadata validation, authentication before parent import and credential rewrap stage faults under ASan/UBSan')
+}
+
+fn volume_discovery_io_tests(root string, work string, v string) ! {
+	fixture := work + '/volumediscoveryio'; os.mkdir(fixture)!
+	for file in os.ls(root + '/tools/volumes/volumecli')! {
+		if !file.ends_with('.v') || file.ends_with('_test.v') { continue }
+		mut source := os.read_file(root + '/tools/volumes/volumecli/' + file)!
+		if file in ['discovery.v', 'volume_discovery.v', 'volume_seal_io.v', 'recovery_io.v', 'crypt.v', 'plan_io.v'] {
+			for name in ['open', 'close', 'openat', 'fstat', 'fstatat', 'fdopendir', 'closedir', 'readdir', 'ioctl', 'pread'] {
+				if name == 'openat' && file != 'discovery.v' { continue }
+				source = source.replace('C.' + name + '(', 'volume_discovery_mock_' + name + '(').replace('fn volume_discovery_mock_' + name + '(', 'fn C.' + name + '(')
+			}
+		}
+		if file == 'volume_seal_io.v' { source = source.replace('sealed_derive(', 'volume_discovery_mock_derive(') }
+		if file == 'plan_check.v' { source = source.replace('C.fflush(', 'volume_discovery_mock_fflush(') }
+		if file in ['volume_discovery.v', 'volume_seal_io.v'] { source = source.replace('erase_key(', 'volume_discovery_mock_erase(') }
+		os.write_file(fixture + '/' + file, source)!
+	}
+	os.cp(root + '/tests/storage-volumes/volume_discovery_io_test.v', fixture + '/volume_discovery_io_test.v')!
+	binary := work + '/volume-discovery-io-test'
+	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
+		'-I' + root + '/tools/volumes/volumecli -O2 -fsanitize=address,undefined', '-ldflags',
+		'-fsanitize=address,undefined', '-o', binary, fixture + '/volume_discovery_io_test.v'])!
+	print(command([binary])!)
+	println('PASS encrypted discovery: authentication before scan, erased credentials, aliases/duplicate disks, native geometry, pinned rechecks, enumeration/import faults and descriptor cleanup under ASan/UBSan')
 }
 
 fn volume_seal_io_tests(root string, work string, v string) ! {

@@ -39,6 +39,13 @@ fn candidate_disk(fd i32, expected &DiskKey, mut key DiskKey, mut status Status)
 @[direct_array_access]
 fn discover_disk(plan &Plan, directory &char, writable bool, name &char) i32 {
 	if !plan_valid(plan) { plan_error(c'invalid discovery plan'); return -1 }
+	mut selected_status := Status{}
+	return discover_disk_key(&plan.key, directory, writable, name, mut selected_status)
+}
+
+@[direct_array_access]
+fn discover_disk_key(expected &DiskKey, directory &char, writable bool, name &char, mut selected_status Status) i32 {
+	if !key_valid(expected) { plan_error(c'invalid discovery identity'); return -1 }
 	dir_fd := C.open(directory, C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC)
 	if dir_fd < 0 { C.perror(c'vinix-volume: open device directory'); return -1 }
 	stream := C.fdopendir(dir_fd)
@@ -74,7 +81,7 @@ fn discover_disk(plan &Plan, directory &char, writable bool, name &char) i32 {
 			C.close(fd); plan_error(c'discovery entry changed type'); return -1
 		}
 		mut status := Status{}
-		result := candidate_disk(fd, unsafe { &plan.key }, mut key, mut status)
+		result := candidate_disk(fd, expected, mut key, mut status)
 		if result != 1 { C.close(fd); if result < 0 { return -1 }; continue }
 		if selected >= 0 {
 			C.close(fd)
@@ -88,13 +95,15 @@ fn discover_disk(plan &Plan, directory &char, writable bool, name &char) i32 {
 			if write_fd < 0 { C.close(fd); C.perror(c'vinix-volume: open discovered disk for restore'); return -1 }
 			mut again := Status{}
 			valid := C.fstat(write_fd, &opened) == 0 && C.S_ISBLK(opened.st_mode) != 0
-				&& candidate_disk(write_fd, unsafe { &plan.key }, mut key, mut again) == 1 && again.disk_id == status.disk_id
+				&& candidate_disk(write_fd, expected, mut key, mut again) == 1 && again.disk_id == status.disk_id
 			C.close(fd)
 			if !valid { C.close(write_fd); plan_error(c'discovered disk changed before writable open'); return -1 }
 			fd = write_fd
+			status = again
 		}
 		selected = fd
 		selected_id = status.disk_id
+		selected_status = status
 		C.snprintf(name, 256, c'%s', child)
 	}
 	if selected < 0 { plan_error(c'no physical disk matches the plan'); return -1 }

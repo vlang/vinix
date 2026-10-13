@@ -1,5 +1,12 @@
 # Storage-volume qualification
 
+Authenticated encrypted-volume discovery adds native syntax checks and a
+sanitized syscall model covering authentication-before-scan, credential erasure,
+physical aliases/duplicate identities, RW/RO modes, native geometry, pinned
+rechecks and complete fault cleanup. Both guests test keyless automatic unlock,
+duplicate refusal, device reordering, capacity changes and retained allocations.
+See [automatic unlock qualification](volume-discovery.md).
+
 Saved volume plans have a native V controller with no Python dependency:
 
 ```sh
