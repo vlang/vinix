@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "f13b02f27a3003a3105b73ad5f35c59c47143e45462b0bf9de9ea4df8a1357c8",
+    "results": [
+        {
+            "name": "fcntlabi",
+            "source_sha256": "6f70bc290dff8671cbde66025806b7b5d99d82468dc6e7098ec86a27cc43c3ac",
+            "init_sha256": "d627872a0a61cbe541ae88541b21efe49f0ae214e13801f1828a0cd19cb8dc16",
+            "iso_sha256": "257eca9cbc3ef3ccbb42a5af23e82c0cf3085b27862e5816e3750838732baaef",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

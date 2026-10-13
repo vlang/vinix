@@ -788,6 +788,37 @@ fn syscall_linux_sched_yield(_ voidptr) (u64, u64) {
 	return 0, 0
 }
 
+// Native fcntl takes unsigned-int descriptor/command words. Its third word
+// names either an int value or a full-width user pointer, depending on cmd.
+fn syscall_linux_fcntl(gpr_state voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
+	command := int(u32(cmd))
+	mut value := arg
+	match command {
+		file.f_dupfd, file.f_dupfd_cloexec {
+			value = u64(i64(i32(u32(arg))))
+		}
+		file.f_setfd, file.f_setfl, file.f_setown, file.f_setsig,
+		file.f_setpipe_sz, file.f_add_seals {
+			value = u64(u32(arg))
+		}
+		else {}
+	}
+	if command == file.f_dupfd || command == file.f_dupfd_cloexec {
+		process := proc.current_thread().process
+		if i64(value) < 0 || value >= process.rlimits[proc.rlimit_nofile].cur
+			|| value >= u64(proc.max_fds) {
+			// Validate the source before refusing the minimum. Keep this
+			// fcntl-only: dup still needs EMFILE when no descriptor fits.
+			mut descriptor := file.fd_from_fdnum(unsafe { nil }, int(u32(fdnum))) or {
+				return errno.err, errno.ebadf
+			}
+			descriptor.unref()
+			return errno.err, errno.einval
+		}
+	}
+	return file.syscall_fcntl(gpr_state, int(u32(fdnum)), command, value)
+}
+
 // dup(oldfd) via fcntl(oldfd, F_DUPFD, 0)
 fn syscall_linux_dup(gpr_state voidptr, oldfd int) (u64, u64) {
 	return file.syscall_fcntl(gpr_state, int(u32(oldfd)), 0, 0)

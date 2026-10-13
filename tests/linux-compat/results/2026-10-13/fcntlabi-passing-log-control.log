@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-13/fcntlabi-audit.v:96: FAIL: fn main.failure: assert log.contains('LINUX FCNTLABI DETAIL:'), 'fcntlabi baseline failure markers required';
+      message: fcntlabi baseline failure markers required
+V panic: Assertion failed...

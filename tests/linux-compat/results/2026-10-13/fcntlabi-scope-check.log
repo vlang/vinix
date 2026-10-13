@@ -1,0 +1,2 @@
+aarch64: native fcntl adapter/body and one dispatch only; generic fcntl/lookup/dup/native dup/dup3/lock C unchanged; full pointer arg and paired bad-min lookup release; exact probe C with16 explicit stack allocations: PASS
+x86_64: native fcntl adapter/body and one dispatch only; generic fcntl/lookup/dup/native dup/dup3/lock C unchanged; full pointer arg and paired bad-min lookup release; exact probe C with16 explicit stack allocations: PASS

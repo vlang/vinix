@@ -1048,3 +1048,23 @@ deliberate close/reuse exercise on a freed descriptor. The audit requires
 complete baseline failures, candidate and Linux passes, unchanged probe ELFs,
 and an observed unfinished producer before close in each instrumented cohort.
 See [the publication receipts and limits](../../docs/linux-posix-qualification.md#descriptor-flags-before-publication).
+
+The `fcntlabi` case runs 8,928 raw/musl calls per architecture across root and
+UID/GID1000. It varies descriptor, command and scalar upper words independently,
+checks getters and descriptor/status/signal setters, duplicates six source
+classes, and distinguishes invalid minima from actual descriptor exhaustion.
+Zero-soft-limit controls preserve native dup's EMFILE behavior. Real high
+stack flock pointers and surrounding canaries check transport; NULL remains
+EFAULT. Pipe identity-size queries use each kernel's actual capacity. Shared
+offsets, source/seed metadata and flags, file bytes and queued AB remain exact.
+Two native 200-cycle cohorts measure valid and refused duplication retention.
+
+```sh
+tests/linux-compat/run --arch aarch64 --kernel-dir ARM-KERNEL --state-dir FRESH-NATIVE --cases fcntlabi,dupabi,duppublish,open,runtime --timeout 1300
+v -enable-globals -nocache -gc none -cc cc run tests/linux-compat/fcntlabi-reference.v --arch aarch64 --kernel LINUX-KERNEL --init FRESH-NATIVE/fcntlabi/init --state-dir FRESH-LINUX
+```
+
+Use matching x86 inputs and `--arch x86_64` for x86. Set `V` to the selected
+compiler for both controllers and their generated guest modules when collecting
+reproducible receipts. Reference boots run the identical frozen native ELF and
+omit only Vinix allocator reporting. See [the fcntl receipts and limits](../../docs/linux-posix-qualification.md#native-fcntl-words-and-duplicate-minima).

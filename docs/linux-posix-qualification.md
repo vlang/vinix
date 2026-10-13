@@ -3995,3 +3995,96 @@ separately from the isolated semantic inputs.
 Actual exec inheritance, concurrent F_SETFD or source close, descriptor-limit
 pressure, GNU wrappers and translated/ELF32 paths remain separate. The three
 broad section 15 acceptance gates remain open.
+
+## Native fcntl words and duplicate minima
+
+Both native tables now route fcntl through an adapter that consumes lower-32-bit
+descriptor and command words. The third argument depends on the command:
+duplicate minima use signed int32 values; supported scalar setters consume
+their lower int word; pointer and unknown-command arguments retain all 64 bits.
+This follows the native entry and command conversions in
+[Linux fcntl](https://raw.githubusercontent.com/torvalds/linux/v6.12/fs/fcntl.c).
+
+F_DUPFD and F_DUPFD_CLOEXEC minima must fit the current soft descriptor limit.
+An invalid minimum returns EINVAL after validating the source descriptor, so
+an invalid source retains EBADF. This precheck takes and releases a paired
+temporary descriptor/handle hold before returning the scalar error. A valid
+request with an exhausted table still returns EMFILE. The generic fcntl and
+duplication helpers remain unchanged: native dup must continue returning
+EMFILE when the soft limit is zero, whereas fcntl's minimum zero is invalid
+at that limit. The adapter adds no allocation or stored pointer and uses the
+existing lookup lock without nesting another lock.
+
+| Calls across root and UID/GID1000 | Calls per architecture | Baseline failures | Candidate/Linux failures |
+| --- | ---: | ---: | ---: |
+| Descriptor/status getters | 648 | 576 | 0 |
+| Duplicate minima, alias and refusal state | 5184 | 4272 | 0 |
+| Descriptor/status/signal setters and pipe identity size | 2700 | 2360 | 0 |
+| Full-width flock pointer transport and NULL errors | 72 | 64 | 0 |
+| Invalid sources/commands, libc and limit exhaustion | 324 | 76 | 0 |
+| Total | 8928 | 7348 | 0 |
+
+Every Vinix candidate and actual Linux 6.12.51 reference passes all 8,928 calls
+using the same native musl ELF. Three independent patterns vary each upper
+word. Under soft limit 128, minima 0/63/127 succeed, while 128/129, INT_MAX,
+INT_MIN and -1 return EINVAL. Six held source classes cover a regular file,
+O_PATH file/directory, an unlinked file and both nonblocking pipe endpoints.
+Successful aliases have the requested CLOEXEC flag and real source metadata
+and status. Regular aliases move the shared offset and restore it through
+the source. Errors preserve the source and a distinct seeded descriptor 64,
+including metadata, flags and offsets. Libc invalid-minimum controls agree.
+
+Setter checks require exact resulting descriptor flags and selected
+APPEND/NONBLOCK status changes. Signals 0/1/64 succeed; 65 and negative int
+words return EINVAL without changing the previous signal. Pipe size requests
+use each kernel's actual current capacity and retain that capacity and queued
+data. Real stack pointers above 32 bits reach F_GETLK, preserve surrounding
+canaries and return unlocked type; NULL returns EFAULT. Those controls qualify
+pointer transport, rather than full advisory-lock semantics. Full-table and
+zero-soft-limit controls distinguish EINVAL, EBADF and EMFILE while retaining
+the descriptors that were open before the lower limit. Final source/seed
+bytes, parent descriptor flags, restored signals/offsets and queued AB remain
+exact.
+
+Both production kernels also pass dupabi, duppublish, open and runtime suites.
+Eight host test files pass. After 32 warmup cycles and settling, each native
+200-cycle retention cohort issues two high-word aliases and four invalid-minimum
+requests per cycle. All 18 ARM/14 x86 live slab classes and 68/177 large pages
+stay flat for each credential. Allocation scanning retains the existing
+allowance failures: 659/655 source files and 400/292 sites remain unchanged.
+
+The entire candidate kernel C restores by replacing one native fcntl dispatch
+assignment, removing the new adapter body/declaration and ignoring only
+compiler-generated unused-return source offsets. Generic fcntl, descriptor
+lookup/creation/duplication, native dup/dup3 and the lock helper are unchanged.
+The new bad-minimum lookup releases its paired hold before EINVAL and never
+uses the descriptor afterward. Independent source/C/native/reference lifetime
+review checks that release and the probe's explicit stack storage, temporary
+aliases, cursor restoration and pressure cleanup. Source, generated C and ELF
+remain identical across baseline, candidate and reference probe runs.
+
+The [V audit](../tests/linux-compat/results/2026-10-13/fcntlabi-audit.v)
+requires complete counts, precise baseline failures, candidate/reference
+verdicts, state controls, flat retention, scope and all artifact hashes. Its
+deliberate assertion and passing evidence supplied as a baseline both fail.
+[ARM evidence](../tests/linux-compat/results/2026-10-13/fcntlabi-evidence-aarch64.json)
+and [x86 evidence](../tests/linux-compat/results/2026-10-13/fcntlabi-evidence-x86_64.json)
+bind all 63 isolated inputs and compiler/controller/source/C/kernel, native
+ELF/ISO, Linux kernel/wrapper/archive/QEMU, serial/build/audit/review hashes.
+Captures:
+[ARM baseline](../tests/linux-compat/results/2026-10-13/fcntlabi-before-aarch64.log),
+[ARM candidate](../tests/linux-compat/results/2026-10-13/fcntlabi-after-aarch64.log),
+[ARM Linux](../tests/linux-compat/results/2026-10-13/fcntlabi-reference-aarch64.log),
+[x86 baseline](../tests/linux-compat/results/2026-10-13/fcntlabi-before-x86_64.log),
+[x86 candidate](../tests/linux-compat/results/2026-10-13/fcntlabi-after-x86_64.log),
+[x86 Linux](../tests/linux-compat/results/2026-10-13/fcntlabi-reference-x86_64.log).
+Initial disk-space failures remain private and do not qualify the change.
+Completed older ISO/firmware artifacts were losslessly archived with SHA
+manifests; restoring gzip copies reproduces their original bytes. Public
+inventory fingerprints use the committed parent plus this fix, separately
+from the isolated semantic inputs.
+
+O_PATH disallowed commands, full status-flag/ownership/sealing behavior,
+dynamic pipe resizing, full lock semantics/concurrency, concurrent RLIMIT
+changes, GNU wrappers and translated/ELF32 paths remain separate. The three
+broad section 15 acceptance gates remain open.

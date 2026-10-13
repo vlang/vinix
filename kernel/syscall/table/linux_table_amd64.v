@@ -361,7 +361,7 @@ pub fn init_syscall_table() {
 	syscall_table[32] = voidptr(syscall_linux_dup) // dup
 	syscall_table[33] = voidptr(syscall_linux_dup2) // dup2
 	syscall_table[40] = voidptr(syscall_linux_sendfile) // sendfile
-	syscall_table[72] = voidptr(file.syscall_fcntl) // fcntl
+	syscall_table[72] = voidptr(syscall_linux_fcntl) // fcntl
 	syscall_table[73] = voidptr(file.syscall_flock) // flock
 	syscall_table[74] = voidptr(file.syscall_fsync) // fsync
 	syscall_table[75] = voidptr(file.syscall_fsync) // fdatasync

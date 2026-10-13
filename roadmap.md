@@ -756,6 +756,9 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 - [x] Finalize duplicate descriptor flags before publication; qualify concurrent
   flag observers, fork snapshots and close/reuse with isolated scheduling controls
   on both architectures. See [the publication receipts](docs/linux-posix-qualification.md#descriptor-flags-before-publication).
+- [x] Decode native fcntl words and scalar arguments without narrowing pointers;
+  preserve EINVAL for invalid duplicate minima, EBADF for invalid sources and
+  EMFILE for valid exhausted requests. See [the fcntl receipts](docs/linux-posix-qualification.md#native-fcntl-words-and-duplicate-minima).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
