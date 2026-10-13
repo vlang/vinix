@@ -144,19 +144,35 @@ fn cached_payload_progress(config Config, installed Installed, payload Payload, 
 	if verified_file(path, payload) { return path }
 	if os.exists(path) { os.rm(path)! }
 	part := path + '.part'
-	if os.exists(part) && (os.is_link(part) || os.file_size(part) > payload.bytes) { os.rm(part)! }
+	if os.is_link(part) { os.rm(part)! }
+	if os.exists(part) && !ordinary_file(part) {
+		return error('${installed.package.id}: partial download must be an ordinary regular file: ${part}')
+	}
+	// A complete invalid partial cannot use a range request at EOF. Retire it
+	// before transport, including oversized data left by an interrupted child.
+	if os.is_file(part) && (os.file_size(part) > payload.bytes
+		|| (os.file_size(part) == payload.bytes && !verified_file(part, payload))) { os.rm(part)! }
 	repositories := config.repositories.filter(it.id == installed.repository && it.public_key == installed.public_key)
 	if repositories.len != 1 {
 		return error('${installed.package.id}: repository was revoked or its key changed')
 	}
 	url := repositories[0].url.trim_right('/') + '/objects/' + payload.sha256
+	resumed := os.is_file(part) && os.file_size(part) > 0 && os.file_size(part) < payload.bytes
+	event := pkgprotocol.Progress{ phase: 'download', package: installed.package.id,
+		repository: installed.repository, path: payload.path, total: payload.bytes }
 	if !verified_file(part, payload) {
 		println('Downloading ${installed.package.id}/${payload.path} (${payload.bytes} bytes)')
-		fetch_progress(url, part, payload.bytes, true, config.policy.offline,
-			pkgprotocol.Progress{ phase: 'download', package: installed.package.id,
-				repository: installed.repository, path: payload.path, total: payload.bytes }, report)!
+		fetch_progress(url, part, payload.bytes, true, config.policy.offline, event, report)!
 	}
 	report(pkgprotocol.Progress{ phase: 'verify', package: installed.package.id, repository: installed.repository, path: payload.path })
+	if !verified_file(part, payload) && resumed {
+		os.rm(part)!
+		// Restart once with the same authenticated source/size. A failed fresh
+		// transfer retains its new partial; a second integrity failure stops.
+		println('Restarting ${installed.package.id}/${payload.path}: resumed payload failed verification')
+		fetch_progress(url, part, payload.bytes, false, config.policy.offline, event, report)!
+		report(pkgprotocol.Progress{ phase: 'verify', package: installed.package.id, repository: installed.repository, path: payload.path })
+	}
 	if !verified_file(part, payload) {
 		os.rm(part)!
 		return error('${installed.package.id}: payload checksum or size mismatch; partial data discarded, retry from the trusted repository')

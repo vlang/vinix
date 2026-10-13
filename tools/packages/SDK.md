@@ -799,6 +799,16 @@ have zero counters; `complete` has `current:1,total:1` and is emitted only after
 the relevant durable publication/activation succeeded, including unchanged
 transactions. Failures may leave a partial phase and emit no completion event.
 
+Downloads preserve bounded partial files for transport retries and promote only
+verified bytes. If a completed resumed transfer fails its signed size/hash check,
+the service discards that partial and retries once from byte zero at the same
+source. Invalid complete/oversized partials start fresh directly. Fresh-transfer
+integrity failures stop; transport failures retain their new partial. Progress
+may reset to zero during recovery, and completion still requires activation.
+Metadata, payload verification and offline sources require ordinary regular
+files; directories/FIFOs in partial cache paths refuse before transfer. See
+[download recovery qualification](../../tests/packages/download-recovery-check.md).
+
 Frames are bounded to 8192 bytes. Identifiers/paths, phase-specific counter
 limits, JSON field types and formats are validated by
 [`pkgprotocol.decode_progress`](pkgprotocol/progress.v). Decoded events own their

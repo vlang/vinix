@@ -80,8 +80,15 @@ pub fn atomic_write(path string, text string) ! {
 	sync_directory(os.dir(path))!
 }
 
+fn ordinary_file(path string) bool {
+	// This compiler's os.is_file only excludes directories, so it accepts
+	// FIFOs/devices. Inspect the file type before any potentially blocking read.
+	info := os.lstat(path) or { return false }
+	return info.mode & 0o170000 == 0o100000
+}
+
 pub fn read_metadata(path string) !string {
-	if os.is_link(path) || !os.is_file(path) || os.file_size(path) > max_metadata {
+	if !ordinary_file(path) || os.file_size(path) > max_metadata {
 		return error('metadata must be a bounded regular file: ${path}')
 	}
 	text := os.read_file(path)!
@@ -90,7 +97,7 @@ pub fn read_metadata(path string) !string {
 }
 
 pub fn hash_file(path string) !string {
-	if os.is_link(path) || !os.is_file(path) {
+	if !ordinary_file(path) {
 		return error('payload must be a regular file: ${path}')
 	}
 	mut file := os.open(path)!
@@ -120,7 +127,7 @@ pub fn hash_file(path string) !string {
 }
 
 pub fn verified_file(path string, payload Payload) bool {
-	if os.is_link(path) || !os.is_file(path) || os.file_size(path) != payload.bytes { return false }
+	if !ordinary_file(path) || os.file_size(path) != payload.bytes { return false }
 	digest := hash_file(path) or { return false }
 	valid := digest == payload.sha256
 	unsafe { digest.free() }
@@ -174,7 +181,7 @@ pub fn fetch(url string, destination string, maximum u64, resume bool, offline b
 fn fetch_progress(url string, destination string, maximum u64, resume bool, offline bool, event pkgprotocol.Progress, report fn (pkgprotocol.Progress)) ! {
 	if url.starts_with('file:///') {
 		source := url[7..]
-		if os.is_link(source) || !os.is_file(source) {
+		if !ordinary_file(source) {
 			return error('offline repository file unavailable: ${source}')
 		}
 		if os.file_size(source) > maximum {

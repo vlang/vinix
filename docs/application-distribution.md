@@ -208,17 +208,27 @@ Changes take an exclusive process-released filesystem lock. Before downloading,
 space is checked for the complete staged generation, missing cached payloads,
 filesystem overhead and the configured reserve. Files stream in 64 KiB blocks.
 Partial downloads persist as `objects/HASH.part`; retries resume and verify the
-complete hash. Complete partial files are promoted without network access. Hash
-failures discard the partial file. Network/storage failure leaves activation
-unchanged.
+complete hash. A damaged resumed prefix triggers one fresh download from the
+same authenticated source with the same size/hash requirement. A second integrity
+failure discards the partial and stops; a fresh download's integrity failure does
+not trigger another transfer. Invalid complete or oversized partials start fresh
+directly. Verified complete partials are promoted without network access. Ordinary
+transport failures retain partial data for a later retry. Network/storage failure
+leaves activation unchanged. Partial directories/FIFOs refuse before opening;
+metadata, object verification and offline sources also require ordinary regular
+files, so special files cannot hang these reads. The
+[download recovery checks](../tests/packages/download-recovery-check.md) cover
+reviewed deployment recovery and refusal without changing activation/rollback.
 
 `--progress` adds bounded, versioned progress frames to maintenance output for
 refresh, install/remove/upgrade, reviewed apply, deployment and rollback. Software
 uses them automatically: downloads and staged copies show byte counts, staging
 shows package counts, and verification/activation remain distinct phases.
 Counters describe the current phase; a finished download does not imply a
-completed installation. Completion is reported only after successful publication
-and activation flushes. Copied installation payloads are hashed again before the
+completed installation. Restarting a damaged partial resets its download counter
+to zero; the restart reason appears in maintenance output. Completion is reported
+only after successful publication and activation flushes. Copied installation
+payloads are hashed again before the
 generation can be published. HTTPS transfer monitoring reaps failed/oversized
 children, retains bounded partial downloads for retry, and enforces authenticated
 size bounds while the child runs.

@@ -112,3 +112,9 @@ descriptor per obsolete generation. Removal rechecks directory/lease identities
 and the live lock under the package writer lock. See
 [collection qualification](../../tests/packages/collection-limit-check.md) for
 the reproduced 128-generation / 32-descriptor failure and corrected workflow.
+
+A damaged resumed download now retries once from byte zero with the same signed
+payload requirements. Invalid complete/oversized partials start fresh; a bad
+source stops without changing activation or rollback. Metadata, verification and
+offline sources reject special files before opening. See
+[download recovery qualification](../../tests/packages/download-recovery-check.md).
