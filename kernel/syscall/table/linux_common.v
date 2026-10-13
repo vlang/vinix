@@ -250,7 +250,9 @@ fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (
 }
 
 fn linux_writev_flags(_ voidptr, fdnum int, iov_ptr u64, iovcnt int, flags u32) (u64, u64) {
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	// fdget takes unsigned int even when the native vector ABI uses a word.
+	// The vector count retains its full native width.
+	mut fd := file.fd_from_fdnum(unsafe { nil }, int(u32(fdnum))) or { return errno.err, errno.get() }
 	defer { fd.unref() }
 	access_error := linux_iov_access_error(fd, true)
 	if access_error != 0 { return errno.err, access_error }
@@ -822,7 +824,7 @@ fn syscall_linux_readv(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u
 }
 
 fn linux_readv_flags(_ voidptr, fdnum int, iov_ptr u64, iovcnt int, flags u32) (u64, u64) {
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	mut fd := file.fd_from_fdnum(unsafe { nil }, int(u32(fdnum))) or { return errno.err, errno.get() }
 	defer { fd.unref() }
 	access_error := linux_iov_access_error(fd, false)
 	if access_error != 0 { return errno.err, access_error }

@@ -2091,3 +2091,57 @@ positioned I/O, GNU wrappers and ELF32/translated paths, disk-backed vectors,
 deterministic positioned descriptor/header races, shared-offset atomicity and
 allocation exhaustion remain separate work. The three broad section-15 gates
 stay open.
+
+## Native vector descriptor words
+
+All six native vector syscalls now resolve descriptors through an unsigned
+32-bit value, including preadv2/pwritev2's current-position -1 path. The old
+lookup kept the complete syscall register and returned EBADF for valid
+descriptors with nonzero upper bits. Linux's native vector entry points accept
+a word, then call [the unsigned-int fdget/fdget_pos interfaces](https://github.com/torvalds/linux/blob/v6.12/include/linux/file.h#L65).
+The change is three casts at the consuming helpers' existing lookups. Vector
+counts retain their full native width, and positioned negative-offset checks
+continue to precede descriptor lookup.
+
+The V `iovfd` fixture runs 3,080 checks in each root and UID/GID 1000 child.
+It combines seven descriptor/resource kinds, read/write, unpositioned/v1/v2
+explicit/v2 current-position calls, five upper-word patterns and eleven
+vector/offset variants. Raw descriptors have zero, 1, 0x12345678, 0x80000000
+or 0xffffffff in the upper word. Valid aliases must preserve actual file and
+nonblocking pipe/UNIX stream data and cursor behavior. Invalid/O_PATH and
+wrong-access descriptors retain EBADF; positioned streams retain ESPIPE;
+header/range/count errors and negative positions retain their earlier errors.
+Counts of 2^32+1 must remain invalid, with no transfer from their valid first
+entry. Refusals preserve file bytes/cursors, destinations and queued data.
+
+Both unchanged kernels fail 1,144 checks per credential group: the complete
+descriptor register displaces valid I/O and import/seek errors with EBADF.
+Ordinary descriptors, invalid low descriptors and negative positioned offsets
+already pass. Both candidates pass all 6,160 checks per architecture, with
+identical before/after fixture C. Each credential group warms 32 cycles and
+measures 200 cycles through 0/8/9/1024-entry empty imports, malformed vectors,
+negative positions, wide counts and actual I/O. All slab classes stay flat,
+with big pages 77/77 on ARM and 210/210 on x86.
+
+Independent review and the auditor compare entire emitted consuming bodies:
+only the three descriptor casts differ. All six wrappers, FD/vector reference
+and cleanup code remain byte-identical; fixture borrows and alias-safe closes
+retain their reviewed lifetimes. Both architectures pass five guest cases:
+descriptor words, unknown flags, positioned imports, descriptor-reuse races
+and native runtime. Eight host test files and mapping-storage geometry checks
+pass. Allocation audits retain the same existing 406 ARM/295 x86 sites and
+allowance failures; no allowance is increased. The inventory keeps 62 inputs.
+
+The [dated receipts](../tests/linux-compat/results/2026-10-13/) publish
+`iovfd-before-*`, `iovfd-after-*`, host/geometry/allocation logs and the
+[assertion-enabled auditor](../tests/linux-compat/results/2026-10-13/iovfd-audit.v).
+Both failing controls execute. Private source trees pin `ad4c6f638`; only the
+two vector syscall files differ. Baseline binaries, C and allocation logs are
+reused from the preceding committed flag qualification and bound to its exact
+artifact hashes; the descriptor fixture runs freshly on those binaries.
+The clean compiler remains pinned at `f6358ecff9`.
+
+This qualification covers these native vector descriptor words. Scalar and
+other FD APIs, GNU wrappers, ELF32/translated variants, deterministic
+positioned races, shared-offset atomicity and allocation exhaustion remain
+separate work. The three broad section-15 gates stay open.

@@ -740,8 +740,8 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/sched/sched_amd64.v` | `b7d35c2f8895a7db92734731cd80d03048524afdc4b3cca43eb9116e98c85b54` |
 | `kernel/sched/sched_arm64.v` | `7fbd982e9ea4567b1a60e684bb55bc800ed240be3f8cf9439d8c0807740c768f` |
 | `kernel/syscall/table/container.v` | `3bd7f741353d73549d61affa8e6a9ee822fef466f997e10498dfd94cbd11c04f` |
-| `kernel/syscall/table/linux_common.v` | `55ff18040179d00bae4b37be7a6bd3406e942378d3e9b5bea5959a32bcf79e6b` |
-| `kernel/syscall/table/linux_compat.v` | `71de3679110baf44789223eec6f7dbb74854c80d70049cb51092e1e76de2ffef` |
+| `kernel/syscall/table/linux_common.v` | `5a102d96c07e03ad30af852723b76413fd3874f929fb8cf2322a85f579a874f7` |
+| `kernel/syscall/table/linux_compat.v` | `3cff2259bc5463ef6d5b0cad84231e9c93139566dbf8ef31b29d73364b3642d6` |
 | `kernel/syscall/table/linux_table_amd64.v` | `864d82fe466cf4e1fba08785d4638655c18cb34ae547478b2853c1d583c3dbd9` |
 | `kernel/syscall/table/syscall_table_arm64.v` | `1519f6e3ec40f2bc702248ae63e3e9efb79766b81f4890b9d9a3090fbec4b01c` |
 | `kernel/syscall/table/trace_amd64.v` | `886f920865046fc589e5e923fd2ae9c1bf1ed0a6731b5344026b480470b3cd18` |

@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "540374ca3468c98e754439a71bf3435968e5bc91d81b4da5d5454effcb861bb8",
+    "results": [
+        {
+            "name": "iovfd",
+            "source_sha256": "03355eb1560fd5502f6cd347aade5c8b5d7c010efc98115f41e2aeca8ab10724",
+            "init_sha256": "78b46d1af1286f373c94111fbb100999d89e3c7c1d581f48e46a1db5032dc1a7",
+            "iso_sha256": "cb9f70b89ceda9049fac4c34dd15f60665608f541cd2debac74cb9a750a3b335",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

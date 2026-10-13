@@ -61,7 +61,7 @@ fn syscall_linux_pwritev2(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int,
 // segment. Descriptor/access and pipe/socket seek errors precede header import,
 // including for empty vectors. Validate the aggregate position before I/O.
 fn linux_positioned_iov(fdnum int, iov_ptr u64, iovcnt int, offset i64, write bool, flags u32) (u64, u64) {
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
+	mut fd := file.fd_from_fdnum(unsafe { nil }, int(u32(fdnum))) or {
 		return errno.err, errno.get()
 	}
 	defer { fd.unref() }

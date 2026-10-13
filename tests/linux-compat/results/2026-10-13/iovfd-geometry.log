@@ -1,0 +1,5 @@
+---- Testing... ----------------------------------------------------------------
+OK    3990.677 ms /private/var/folders/5s/gdmd5zq90y52hchygpfzp2m00000gn/T/vinix-mmap-budget-39600/modules/vmstorage/storage_test.v
+--------------------------------------------------------------------------------
+Summary for all V _test.v files: 1 passed, 1 total. Elapsed time: 7860 ms, on 1 job. Comptime: 3867 ms. Runtime: 3990 ms.
+Mapping metadata storage admission: PASS

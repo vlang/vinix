@@ -657,6 +657,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   low-32-bit flag decoding without changing data, cursors or pipe/socket queues.
   Qualify both credential groups and flat storage on both architectures. See
   [the vector-flag receipts](docs/linux-posix-qualification.md#native-vector-flags-and-error-precedence).
+- [x] Decode lower-32-bit descriptors in all six native vector syscalls while
+  preserving full-width counts and the existing single descriptor owner.
+  Qualify real data/cursors/pipe queues, import/seek/access errors and negative
+  positions as root/UID1000, with flat retention on both architectures. See
+  [the descriptor-width receipts](docs/linux-posix-qualification.md#native-vector-descriptor-words).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
