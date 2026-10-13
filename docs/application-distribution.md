@@ -236,7 +236,7 @@ operations; an unrestricted administrator can bypass the service's guarantees.
 
 Each generation contains package state, the full payload closure, launcher
 records and a running-application lease. Files/directories are flushed before
-publication; POSIX rename switches `current` atomically. The next transaction
+publication; POSIX rename switches `current` atomically. The next state-changing transaction
 retires abandoned stages. A crash before activation exposes the old complete set;
 a crash after it exposes the new complete set. Actual durability depends on the
 filesystem/device honoring flush and rename. No maintainer scripts or implicit
@@ -250,6 +250,28 @@ valid/reachable catalog, including after publisher revocation. Previous payloads
 remain for rollback. `gc` retains active/previous and leased generations, removes
 older unused generations and unused complete objects, and clears abandoned
 partial downloads.
+
+Stored generations are decoded strictly with all state envelope fields required.
+Unknown and duplicate fields, including escaped duplicate spelling in nested
+package/provenance/dependency/file records, are refused. State checks include
+unique requested roots, the complete reachable dependency closure, target
+architectures, provenance, runtime kind and executable runner, and an earlier
+rollback generation. Activation pointers and numeric generation directories use
+canonical positive u64 names; leading-zero aliases, zero and overflow are refused.
+Generation directories and state files must be ordinary filesystem entries.
+
+Before collection deletes anything, it validates both retained states, parses all
+numeric generation names and obtains every eligible obsolete-generation lease.
+Busy leases remain protected. Missing, symbolic, directory or FIFO
+obsolete-generation leases refuse collection without retiring another generation
+or cache object; FIFO checks are
+nonblocking. Corrupt rollback metadata therefore cannot discard cache objects
+needed for recovery. Normal filesystem failures during subsequent removal can
+still leave a partially completed collection. Restore damaged metadata from a
+known-good administrator backup. Use `verify` for the active generation and
+`review rollback` for the restored previous generation before cleanup or rollback;
+the service does not guess manifests or rewrite corrupt history. See
+[persistent state qualification](../tests/packages/state-validation-check.md).
 
 Personal data under `~/.local/share/vinix-apps/ID` survives uninstall/rollback.
 After uninstall an ordinary user can explicitly erase it with

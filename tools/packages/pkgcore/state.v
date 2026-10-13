@@ -1,0 +1,169 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module pkgcore
+
+import json2
+import os
+
+// Generations are written by the service, rather than supplied as manifest
+// templates. Every state envelope field must survive storage and decoding.
+struct PersistentStateInput {
+	format int @[required]
+	generation u64 @[required]
+	previous u64 @[required]
+	architecture string @[required]
+	requested []string @[required]
+	packages []Installed @[required]
+}
+
+fn state_document_field(parent string, key string) bool {
+	return match parent {
+		'' { key in ['format', 'generation', 'previous', 'architecture', 'requested', 'packages']! }
+		'packages' { key in ['package', 'repository', 'public_key', 'sequence']! }
+		'package' { key in ['id', 'version', 'architecture', 'name', 'description', 'homepage', 'license',
+			'proprietary', 'firmware', 'kind', 'runtime', 'entrypoint', 'arguments', 'permissions',
+			'associations', 'dependencies', 'files', 'sdk']! }
+		'dependencies' { key in ['id', 'minimum', 'before']! }
+		'files' { key in ['path', 'sha256', 'bytes', 'executable']! }
+		else { false }
+	}
+}
+
+fn decode_persistent_state(text string, architecture string) !State {
+	if text.len > max_metadata { return error('persistent package state exceeds metadata limit') }
+	input := json2.decode[PersistentStateInput](text, strict: true)!
+	state := State{ format: input.format, generation: input.generation, previous: input.previous,
+		architecture: input.architecture, requested: input.requested, packages: input.packages }
+	document_keys(text, state_document_field) or { close_decoded_state(state); return err }
+	validate_state(state, architecture) or { close_decoded_state(state); return err }
+	return state
+}
+
+// Only for independently owned JSON-decoded states. Plans and in-memory fixture
+// states can share manifests; this is deliberately not a general State.close().
+fn close_decoded_state(state State) {
+	unsafe {
+		state.architecture.free()
+		for id in state.requested { id.free() }
+		(&array(&state.requested)).free()
+		for installed in state.packages {
+			installed.repository.free(); installed.public_key.free()
+			p := installed.package
+			p.id.free(); p.version.free(); p.architecture.free(); p.name.free()
+			p.description.free(); p.homepage.free(); p.license.free(); p.kind.free()
+			p.runtime.free(); p.entrypoint.free()
+			for value in p.arguments { value.free() }
+			(&array(&p.arguments)).free()
+			for value in p.permissions { value.free() }
+			(&array(&p.permissions)).free()
+			for value in p.associations { value.free() }
+			(&array(&p.associations)).free()
+			for dependency in p.dependencies {
+				dependency.id.free(); dependency.minimum.free(); dependency.before.free()
+			}
+			(&array(&p.dependencies)).free()
+			for file in p.files { file.path.free(); file.sha256.free() }
+			(&array(&p.files)).free()
+		}
+		(&array(&state.packages)).free()
+	}
+}
+
+fn numeric_generation_name(name string) bool {
+	if name.len == 0 { return false }
+	for byte in name { if byte < `0` || byte > `9` { return false } }
+	return true
+}
+
+fn generation_number(name string) !u64 {
+	if name.len == 0 || name.len > 20 || name[0] < `1` || name[0] > `9` {
+		return error('invalid package generation identity: expected a canonical positive u64')
+	}
+	mut value := u64(0)
+	for byte in name {
+		if byte < `0` || byte > `9` { return error('invalid package generation identity: nondecimal name') }
+		digit := u64(byte - `0`)
+		if value > (~u64(0) - digit) / 10 { return error('package generation identity exceeds u64') }
+		value = value * 10 + digit
+	}
+	return value
+}
+
+fn read_generation_state(directory string, architecture string, generation u64) !State {
+	if generation == 0 { return error('invalid package generation identity: zero') }
+	name := generation.str()
+	path := directory + '/generations/' + name
+	defer { unsafe { name.free(); path.free() } }
+	if os.is_link(path) || !os.is_dir(path) {
+		return error('package generation must be an ordinary directory')
+	}
+	metadata := path + '/state.json'
+	defer { unsafe { metadata.free() } }
+	text := read_metadata(metadata)!
+	defer { unsafe { text.free() } }
+	state := decode_persistent_state(text, architecture)!
+	if state.generation != generation {
+		close_decoded_state(state)
+		return error('package generation identity mismatch')
+	}
+	return state
+}
+
+struct CollectionTarget {
+	path string
+	lease int
+}
+
+fn close_collection_targets(targets []CollectionTarget) {
+	for target in targets { C.close(target.lease); unsafe { target.path.free() } }
+	unsafe { (&array(&targets)).free() }
+}
+
+fn open_collection_lease(path string) !int {
+	// Nonblocking open prevents a malformed FIFO from hanging collection.
+	lease := C.open(path.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
+	if lease < 0 { return error('cannot check generation lease before collection') }
+	mut info := C.stat{}
+	if C.fstat(lease, &info) != 0 || u32(info.st_mode) & 0o170000 != 0o100000 {
+		C.close(lease)
+		return error('collection lease must be an ordinary regular file')
+	}
+	return lease
+}
+
+// Admit every numeric name and obtain obsolete-generation leases before any
+// removal. A bad later entry must not cause an earlier generation to disappear.
+fn collection_targets(directory string, current State) ![]CollectionTarget {
+	parent := directory + '/generations'
+	defer { unsafe { parent.free() } }
+	names := os.ls(parent)!
+	defer { unsafe { for name in names { name.free() }; (&array(&names)).free() } }
+	mut targets := []CollectionTarget{cap: names.len}
+	mut admitted := false
+	defer { if !admitted { close_collection_targets(targets) } }
+	for name in names {
+		if !numeric_generation_name(name) { continue }
+		generation := generation_number(name)!
+		if generation in [current.generation, current.previous]! { continue }
+		path := parent + '/' + name
+		if os.is_link(path) || !os.is_dir(path) {
+			unsafe { path.free() }
+			return error('collection generation must be an ordinary directory')
+		}
+		lease_path := path + '/lease'
+		lease := open_collection_lease(lease_path) or {
+			unsafe { lease_path.free(); path.free() }
+			return err
+		}
+		unsafe { lease_path.free() }
+		if C.flock(lease, C.LOCK_EX | C.LOCK_NB) != 0 {
+			code := C.errno
+			C.close(lease)
+			unsafe { path.free() }
+			if code == C.EWOULDBLOCK || code == C.EAGAIN { continue }
+			return error('cannot lock generation lease before collection')
+		}
+		targets << CollectionTarget{ path: path, lease: lease }
+	}
+	admitted = true
+	return targets
+}

@@ -40,24 +40,23 @@ pub fn read_state(directory string, architecture string) !State {
 		return State{ architecture: architecture }
 	}
 	target := os.readlink(current)!
-	if !target.starts_with('generations/') || target.len <= 12 || !target[12..].bytes().all(it >= `0` && it <= `9`) {
+	defer { unsafe { target.free() } }
+	if !target.starts_with('generations/') || target.len <= 12 {
 		return error('invalid package activation pointer')
 	}
-	state := json2.decode[State](read_metadata(directory + '/' + target + '/state.json')!)!
-	validate_state(state, architecture)!
-	if state.generation != target[12..].u64() {
-		return error('package generation identity mismatch')
-	}
-	return state
+	generation := generation_number(unsafe { tos(target.str + 12, target.len - 12) })!
+	return read_generation_state(directory, architecture, generation)
 }
 
 fn validate_state(state State, architecture string) ! {
 	if state.format != 1 || state.architecture != architecture || state.generation == 0
-		|| state.packages.len > 4096 || state.requested.any(!identifier(it)) {
+		|| state.previous >= state.generation || state.packages.len > 4096 || state.requested.len > 4096
+		|| state.requested.any(!identifier(it)) {
 		return error('invalid persistent package state')
 	}
-	mut ids := map[string]bool{}
-	for installed in state.packages {
+	mut ids := map[string]int{}
+	defer { unsafe { ids.free() } }
+	for index, installed in state.packages {
 		installed.package.validate()!
 		if installed.package.id in ids || installed.package.architecture !in [
 			architecture,
@@ -66,25 +65,51 @@ fn validate_state(state State, architecture string) ! {
 			|| !identifier(installed.repository) || !digest_valid(installed.public_key) || installed.sequence == 0 {
 			return error('invalid installed package provenance')
 		}
-		ids[installed.package.id] = true
+		ids[installed.package.id] = index
 	}
+	mut reached := map[string]bool{}
+	mut pending := []string{cap: state.packages.len}
+	unsafe { pending.flags |= .noslices }
+	defer { unsafe { reached.free(); (&array(&pending)).free() } }
 	for id in state.requested {
 		if id !in ids { return error('persistent requested package is missing: ${id}') }
+		if id in reached { return error('duplicate persistent requested package: ${id}') }
+		reached[id] = true
+		pending << id
 	}
 	for installed in state.packages {
 		for dependency in installed.package.dependencies {
-			if !state.packages.any(dependency.accepts(it.package)) {
+			if dependency.id !in ids || !dependency.accepts(state.packages[ids[dependency.id]].package) {
 				return error('persistent dependency closure is inconsistent: ${dependency.id}')
 			}
 		}
+		p := installed.package
+		if p.runtime != '' {
+			runtime := state.packages[ids[p.runtime]].package
+			if runtime.kind != 'runtime' || !runtime.files.any(it.path == p.entrypoint && it.executable) {
+				return error('${p.id}: persistent isolated runtime ${p.runtime} does not provide ${p.entrypoint}')
+			}
+		}
 	}
+	mut next := 0
+	for next < pending.len {
+		id := pending[next]
+		next++
+		for dependency in state.packages[ids[id]].package.dependencies {
+			if dependency.id in reached { continue }
+			reached[dependency.id] = true
+			pending << dependency.id
+		}
+	}
+	if reached.len != state.packages.len { return error('persistent package state contains packages outside the requested dependency closure') }
 }
 
 fn next_generation(directory string) !u64 {
 	mut maximum := u64(0)
 	for name in os.ls(directory + '/generations')! {
-		if name.len > 0 && name.bytes().all(it >= `0` && it <= `9`) {
-			if name.u64() > maximum { maximum = name.u64() }
+		if numeric_generation_name(name) {
+			generation := generation_number(name)!
+			if generation > maximum { maximum = generation }
 		}
 	}
 	if maximum == ~u64(0) { return error('package generation counter exhausted') }
@@ -201,16 +226,17 @@ fn transact_locked(config Config, directory string, operation string, names []st
 // Callers validate the complete plan and any review identity under the writer
 // lock before reaching this shared transactional activation boundary.
 fn activate_plan_locked(config Config, directory string, current State, plan Plan, operation string, options TransactionOptions) !State {
-	// Retire abandoned work only after a supplied review has been accepted.
-	for name in os.ls(directory + '/generations')! {
-		if name.starts_with('.stage-') { os.rmdir_all(directory + '/generations/' + name)! }
-	}
 	if current.requested == plan.requested && current.packages == plan.packages {
 		options.progress(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 })
 		return current
 	}
-	disk_check(free_bytes(directory)!, estimate_space(plan, directory)!, config.policy.reserve_bytes)!
+	// Parse all generation identities before retiring any abandoned work.
 	generation := next_generation(directory)!
+	// Retire abandoned work only after a supplied review has been accepted.
+	for name in os.ls(directory + '/generations')! {
+		if name.starts_with('.stage-') { os.rmdir_all(directory + '/generations/' + name)! }
+	}
+	disk_check(free_bytes(directory)!, estimate_space(plan, directory)!, config.policy.reserve_bytes)!
 	stage := directory + '/generations/.stage-' + generation.str()
 	owned_directory(stage, 0o700)!
 	os.mkdir_all(stage + '/apps')!
@@ -289,9 +315,7 @@ pub fn rollback(config Config, directory string) !State {
 
 fn rollback_target(config Config, directory string, current State) !State {
 	if current.previous == 0 { return error('no previous package generation is available') }
-	old := json2.decode[State](read_metadata(directory + '/generations/' + current.previous.str() + '/state.json')!)!
-	validate_state(old, config.architecture)!
-	if old.generation != current.previous { return error('rollback generation identity mismatch') }
+	old := read_generation_state(directory, config.architecture, current.previous)!
 	for installed in old.packages {
 		check_policy(installed.package, config.policy)!
 		if !config.repositories.any(it.id == installed.repository && it.public_key == installed.public_key) {
@@ -339,32 +363,21 @@ pub fn collect(config Config, directory string) ! {
 
 fn collect_locked(config Config, directory string) ! {
 	current := read_state(directory, config.architecture)!
-	for name in os.ls(directory + '/generations')! {
-		if name.bytes().all(it >= `0` && it <= `9`) && name.u64() !in [
-			current.generation,
-			current.previous,
-		] {
-			path := directory + '/generations/' + name
-			lease := C.open((path + '/lease').str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
-			if lease < 0 { return error('cannot check generation lease: ${name}') }
-			if C.flock(lease, C.LOCK_EX | C.LOCK_NB) == 0 {
-				os.rmdir_all(path) or {
-					C.close(lease)
-					return err
-				}
-			}
-			C.close(lease)
-		}
-	}
+	defer { if current.generation != 0 { close_decoded_state(current) } }
+	previous := if current.previous == 0 { State{} }
+		else { read_generation_state(directory, config.architecture, current.previous)! }
+	defer { if previous.generation != 0 { close_decoded_state(previous) } }
 	// Retain content needed by both the active and rollback generation.
 	mut keep := map[string]bool{}
-	for generation in [current.generation, current.previous] {
-		if generation == 0 { continue }
-		state := json2.decode[State](read_metadata(directory + '/generations/' + generation.str() + '/state.json')!)!
+	defer { unsafe { keep.free() } }
+	for state in [current, previous]! {
 		for installed in state.packages {
 			for file in installed.package.files { keep[file.sha256] = true }
 		}
 	}
+	targets := collection_targets(directory, current)!
+	defer { close_collection_targets(targets) }
+	for target in targets { os.rmdir_all(target.path)! }
 	for name in os.ls(directory + '/objects')! {
 		if digest_valid(name) && name !in keep { os.rm(directory + '/objects/' + name)! }
 		if name.ends_with('.part') && digest_valid(name.all_before_last('.part')) {

@@ -46,6 +46,54 @@ fn qualify_package_configuration_lock() ! {
 	}
 }
 
+fn qualify_package_stored_state(root string, architecture string, application_id string, runtime_id string) ! {
+	directory := pkgcore.state_directory(root)
+	path := directory + '/generations/1/state.json'
+	text := os.read_file(path)!
+	original := pkgcore.read_state(directory, architecture)!
+	assert original.generation == 1 && original.previous == 0
+	package_success(['--root', root, 'remove', application_id])!
+	assert pkgcore.read_state(directory, architecture)!.generation == 2
+	os.mkdir(directory + '/generations/3')!
+	os.write_file(directory + '/generations/3/lease', '')!
+	orphan := directory + '/objects/' + 'f'.repeat(64)
+	assert !os.exists(orphan)
+	os.write_file(orphan, 'unused cache sentinel')!
+	// This data package satisfies the dependency's version and validates on
+	// its own, but cannot provide the application's executable runtime.
+	bad := pkgcore.State{ ...original, packages: original.packages.map(if it.package.id == runtime_id {
+		pkgcore.Installed{ ...it, package: pkgcore.Package{ ...it.package, kind: 'data', architecture: 'all' } }
+	} else { it }) }
+	os.write_file(path, json2.encode(bad))!
+	for command in ['rollback', 'gc'] {
+		refused := run(['/usr/bin/vinix-package', '--root', root, command], '', none, none)
+		assert refused.status != 0 && refused.output.contains('persistent isolated runtime'), refused.output
+		assert os.is_dir(directory + '/generations/3') && os.exists(orphan)
+		assert os.readlink(directory + '/current')! == 'generations/2'
+	}
+	os.write_file(path, text)!
+	package_success(['--root', root, 'gc'])!
+	assert !os.exists(directory + '/generations/3') && !os.exists(orphan)
+	package_success(['--root', root, 'rollback'])!
+	package_success(['--root', root, 'verify'])!
+	os.write_file(path, text.replace('"generation":1', '"generation":1,"generat\\u0069on":1'))!
+	for command in ['status', 'verify', 'view', 'gc'] {
+		refused := run(['/usr/bin/vinix-package', '--root', root, command], '', none, none)
+		assert refused.status != 0 && refused.output.contains('duplicate administration document field'), refused.output
+	}
+	os.write_file(path, text)!
+	os.mkdir(directory + '/generations/01')!
+	os.write_file(directory + '/generations/01/state.json', text)!
+	os.rm(directory + '/current')!
+	os.symlink('generations/01', directory + '/current')!
+	alias := run(['/usr/bin/vinix-package', '--root', root, 'status'], '', none, none)
+	assert alias.status != 0 && alias.output.contains('canonical positive u64'), alias.output
+	os.rm(directory + '/current')!
+	os.symlink('generations/1', directory + '/current')!
+	os.rmdir_all(directory + '/generations/01')!
+	package_success(['--root', root, 'verify'])!
+}
+
 fn qualify_package_linux(mut t Test) ! {
 	// Crypto's gc-none allocations belong to the probe process, not PID 1's
 	// later package workflow. Reap it before starting installation scenarios.
@@ -399,6 +447,8 @@ fn qualify_package_linux(mut t Test) ! {
 	assert pkgcore.read_state(pkgcore.state_directory(locked_client), architecture)!.packages.all(it.package.version == '1.0.0')
 	package_success(['--root', locked_client, 'verify'])!
 	t.say('PACKAGE LOCKED MIRROR exact-old-runtime bundled-lock offline-reproduction PASS')
+	qualify_package_stored_state(locked_client, architecture, application.id, runtime.id)!
+	t.say('PACKAGE STATE runtime-closure duplicate-fields canonical-generations collection-preflight restore PASS')
 	updates := json2.decode[pkgcore.SoftwareView](package_success(['view'])!)!
 	assert updates.update_error == '' && updates.rows.filter(it.updatable).map(it.id) == [runtime.id]
 	assert updates.rows.any(it.id == runtime.id && it.kind == 'runtime' && it.version == '1.1.0'

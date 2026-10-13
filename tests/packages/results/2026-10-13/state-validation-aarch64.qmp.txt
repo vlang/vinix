@@ -1,0 +1,4 @@
+[   0.099] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[   0.099] -> {"execute":"qmp_capabilities"}
+[   0.130] <- {"return": {}}
+[  91.836] <- {"timestamp": {"seconds": 1791882562, "microseconds": 185384}, "event": "SHUTDOWN", "data": {"guest": true, "reason": "guest-shutdown"}}

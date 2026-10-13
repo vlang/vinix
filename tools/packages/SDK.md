@@ -6,6 +6,15 @@ link desktop internals or write the database. Breaking changes require a new
 `format`/`sdk` value; unknown versions are rejected. This does not freeze kernel,
 Apple or internal compositor interfaces.
 
+Installed `state.json` files are service-generated records, rather than publisher
+templates. Every state envelope field is required; duplicate/unknown nested
+fields, invalid provenance, orphaned packages and inconsistent runtime/root
+closures are rejected. Generation names are canonical positive u64 values and
+rollback links name earlier generations. Collection validates retained metadata
+and admits regular-file leases before removal. Applications and publishers must
+use the service instead of writing this state. See
+[state validation qualification](../../tests/packages/state-validation-check.md).
+
 ## Build and publish
 
 ```sh

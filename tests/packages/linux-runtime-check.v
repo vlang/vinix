@@ -86,7 +86,7 @@ fn linux_suite(work string, repository string) !hwhost.Suite {
 			arches:   ['aarch64', 'x86_64']
 			about:    'prepared-root import and signed musl loader/library execution under real sandbox enforcement'
 			required: ['HWTEST START packages-linux', 'PACKAGE SIGNING', 'PACKAGE CATALOG', 'PACKAGE RELEASE', 'PACKAGE REVIEW', 'PACKAGE TRUST REVIEW', 'PACKAGE CONFIGURATION', 'PACKAGE ORGANIZATION', 'PACKAGE DOCUMENTS', 'PACKAGE DEPLOYMENT', 'PACKAGE PROGRESS', 'PACKAGE OFFLINE', 'PACKAGE MIRROR REVIEW', 'PACKAGE REPOSITORY', 'PACKAGE UPDATES', 'PACKAGE LINUX IMPORT',
-				'PACKAGE LOCKED MIRROR', 'HWTEST PASS packages-linux']
+				'PACKAGE LOCKED MIRROR', 'PACKAGE STATE', 'HWTEST PASS packages-linux']
 			ending:   .poweroff
 			timeout:  180
 		}]
@@ -173,6 +173,16 @@ fn check() !int {
 	kernel := work + '/kernel'
 	os.cp(options.kernel, kernel)!
 	stage_linux(repository, work, options.arch)!
+	// Capture staged boot inputs while they exist. Temporary work can disappear
+	// after a completed guest; receipts must describe the admitted input bytes.
+	inputs := [
+		artifact('kernel', kernel)!,
+		artifact('sandbox', work + '/usr/bin/vinix-sandbox')!,
+		artifact('dynamic-linux-payload', work + '/linux-probe')!,
+		artifact('shared-linux-library', work + '/linux-library')!,
+		artifact('musl-loader', work + '/musl')!,
+		artifact('static-linux-runner', work + '/linux-runner')!,
+	]
 	status := hwhost.run_suite(linux_suite(work, repository)!, [...args, '--kernel', kernel], @FILE)
 	if status == 0 && options.state_dir != '' {
 		root := os.join_path(options.state_dir, 'guest', 'root')
@@ -180,12 +190,7 @@ fn check() !int {
 			architecture: options.arch
 			completed_at: time.now().unix()
 			artifacts:    [
-				artifact('kernel', kernel)!,
-				artifact('sandbox', work + '/usr/bin/vinix-sandbox')!,
-				artifact('dynamic-linux-payload', work + '/linux-probe')!,
-				artifact('shared-linux-library', work + '/linux-library')!,
-				artifact('musl-loader', work + '/musl')!,
-				artifact('static-linux-runner', work + '/linux-runner')!,
+				...inputs,
 				artifact('package-service', root + '/usr/bin/vinix-package')!,
 				artifact('guest-init', options.state_dir + '/guest/init')!,
 				artifact('account-manager', root + '/usr/sbin/vinix-account')!,

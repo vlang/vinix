@@ -99,3 +99,10 @@ destination arguments stay frozen; changes to the document require a new review.
 See [locked mirror qualification](../../tests/packages/locked-mirror-check.md).
 See [Software locked export qualification](../../tests/packages/software-locked-mirror-check.md)
 for graphical presentation, argument and memory checks.
+
+Stored generations now use strict state/schema and complete runtime/root closure
+validation. Canonical bounded generation identities prevent aliases and overflow;
+garbage collection admits retained states and obsolete-generation leases before
+deleting anything. Corrupt rollback metadata or malformed leases preserve cache
+and generation contents for administrator recovery. See
+[state validation qualification](../../tests/packages/state-validation-check.md).

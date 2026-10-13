@@ -1,0 +1,50 @@
+29 assertion runners, SDK heap, CLI/PTY/Software and both staging targets: PASS
+Package signing: RFC8032 keys/signatures and tamper/canonical-scalar refusal passed
+Passed /Users/alex/code/vinix/tools/packages/signing/signing_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/administration_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/catalog_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/command_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/composition_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/context_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/deployment_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/distribution_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/document_keys_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/ffmpeg_profile_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/import_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/mirror_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/policy_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/progress_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/release_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/review_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/service_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/session_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/sqlite_profile_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/state_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/view_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgprotocol/command_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgprotocol/deployment_mirror_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgprotocol/mirror_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgprotocol/progress_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgprotocol/repositories_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgprotocol/review_test.v
+Passed /Users/alex/code/vinix/tools/packages/appsdk/context_test.v
+Application SDK context: repeated decode/load/encode/refusal/close retain zero tracked bytes
+Passed /Users/alex/code/vinix/desktop/packagecore/registry_test.v
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed
+Package terminal: literal argv, PTY geometry/input, inherited-fd closure and clean child exit passed
+Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed
+Software deployment: full closure, frozen literal path, empty removal, cancellation, bounds, stale/error diagnostics and close guard passed
+Software offline export: destination paging, dependency provenance, literal confirmation, installed scope, progress, stale diagnostics and close guard passed
+Software locked offline export: exact older runtime, source/digest paging, literal frozen confirmation, invalid responses, stale diagnostics, progress and cancellation passed
+Software launch options: quoted literal arguments, separate file grants, frozen worker input, diagnostics and terminal transfer passed
+Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed
+Staged signed package service and Software launcher (aarch64)
+Package signing license staged (aarch64)
+Staged signed package service and Software launcher (x86_64)
+Package signing license staged (x86_64)
+Package distribution checks passed
+Final state assertions (including trusted successful launch and explicit runtime/data roots): ASan/UBSan PASS
+Sanitizers: ASAN_OPTIONS=detect_leaks=0; UBSAN_OPTIONS=halt_on_error=1
+Final AArch64/x86_64 QEMU TCG: PACKAGE STATE and complete Linux workflow PASS; 22 artifact hashes verified, clean guest shutdown
+Earlier final ARM guest passed functionally but its receipt failed after temporary kernel disappearance; receipt-safe rerun supplies final evidence.
+No desktop, power-cut, physical-media, graphical broker or broader foreign API claim.
