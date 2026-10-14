@@ -68,6 +68,7 @@ fn main() {
 		'sockets_fixture':     digest(state + '/sources/overlayfixture/sockets.v')!
 		'path_access_fixture': digest(state + '/sources/overlayfixture/path_access.v')!
 		'path_permission_fixture': digest(state + '/sources/overlayfixture/path_permissions.v')!
+		'path_acl_fixture': digest(state + '/sources/overlayfixture/path_acl.v')!
 		'abi_header':          digest(state + '/sources/overlayfixture/native-abi.h')!
 	}
 	disk := state + '/store.ext2'

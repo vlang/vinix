@@ -14,6 +14,8 @@ struct C.stat {
 	st_mode  u32
 	st_nlink u64
 	st_rdev  u64
+	st_atim C.timespec
+	st_mtim C.timespec
 }
 
 struct C.dirent {
@@ -532,6 +534,10 @@ pub fn run() int {
 		if sockets { check(C.mkdir(c'/tmp/overlay-volume/protected', 0o700) == 0, 427) }
 		if access { owned_directory(c'/tmp/overlay-state/reference', 474) }
 		root_listener := if sockets || access { root_socket_listener() } else { -1 }
+		acl_base := if access { &char(c'/tmp/overlay-state/reference') } else { &char(c'/tmp/overlay-state') }
+		acl_tmpfs := if sockets || access { root_socket_acls(acl_base) } else { [6]i32{} }
+		acl_ext2 := if sockets { root_socket_acls(c'/tmp/overlay-volume') } else { [6]i32{} }
+		acl_overlay := if sockets { root_socket_acls(c'/tmp/overlay-state/diskmerged') } else { [6]i32{} }
 		worker := C.fork()
 		check(worker >= 0, 87)
 		if worker == 0 {
@@ -545,6 +551,11 @@ pub fn run() int {
 			check(C.mknod(c'/tmp/overlay-state/denied-device', u32(C.S_IFCHR | 0o600), denied_device) == -1
 				&& *C.__errno_location() == C.EPERM, 119)
 			if root_listener >= 0 { inherited_socket_owner(root_listener) }
+			if sockets || access { socket_acl_connections(acl_base, acl_tmpfs) }
+			if sockets {
+				socket_acl_connections(c'/tmp/overlay-volume', acl_ext2)
+				socket_acl_connections(c'/tmp/overlay-state/diskmerged', acl_overlay)
+			}
 			if concurrent {
 				sample(0)
 				exercise(false)
@@ -569,6 +580,14 @@ pub fn run() int {
 			&& C.WEXITSTATUS(status) == 0, 88)
 		if root_listener >= 0 {
 			check(C.unlink(c'/tmp/overlay-state/root-listener') == 0 && C.close(root_listener) == 0, 535)
+		}
+		if sockets || access { close_socket_acls(acl_base, acl_tmpfs) }
+		if sockets {
+			close_socket_acls(c'/tmp/overlay-volume', acl_ext2)
+			close_socket_acls(c'/tmp/overlay-state/diskmerged', acl_overlay)
+			// Final root-owned endpoints retire after the worker's slab samples.
+			// Drain their chained namespace/endpoint/backing grace periods too.
+			check(C.usleep(25000000) == 0, 558)
 		}
 		if opaque { opaque_persistence() }
 		if full { opaque_full() }

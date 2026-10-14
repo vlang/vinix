@@ -896,11 +896,12 @@ pub fn (mut this UnixSocket) send_datagram_to(_handle voidptr, buf voidptr, coun
 		return none
 	}
 	mut target := lookup_bound(addr, addrlen)?
+	defer { target.unref(unsafe { nil }) or {} }
 	return this.send_datagram(mut target, _handle, buf, count, []&file.FD{})
 }
 
 // The socket bound at a sockaddr_un: a name in the abstract namespace, or a
-// path.
+// path. Returns one owned resource reference, released by the transport caller.
 fn lookup_bound(_addr voidptr, addrlen u32) ?&UnixSocket {
 	addr := unix_address(_addr, addrlen)?
 
@@ -914,7 +915,9 @@ fn lookup_bound(_addr voidptr, addrlen u32) ?&UnixSocket {
 		for i in 0 .. 64 {
 			if abstract_sockets[i].in_use && abstract_sockets[i].name_len == name_len {
 				if unsafe { C.memcmp(&abstract_sockets[i].name[0], &addr.sun_path[0], name_len) } == 0 {
-					return abstract_sockets[i].socket
+					mut target := abstract_sockets[i].socket
+					katomic.inc(mut &target.refcount)
+					return target
 				}
 			}
 		}
@@ -927,20 +930,13 @@ fn lookup_bound(_addr voidptr, addrlen u32) ?&UnixSocket {
 	defer {
 		unsafe { path.free() }
 	}
-	target := fs.get_node(proc.current_directory_of(t.process), path, true) or { return none }
-	// Connecting to a socket by name asks "unix" of pledge(2) and "w" of
-	// unveil(2), as on OpenBSD.
-	if !fs.policy_check(target, proc.policy_socket | proc.policy_write) {
-		return none
-	}
-	// Pathname transports require write permission on the resolved inode,
-	// using effective credentials and the common DAC/MAC checks. Refuse before
-	// connect can change peers/backlogs or sendto can publish a datagram.
-	fs.check_access(target, fs.access_write, true)?
-	mut target_res := target.resource
+	// The VFS excludes namespace retirement during policy/DAC/MAC checks and
+	// hands back a pin that covers the complete transport operation.
+	mut target_res := fs.resolve_socket_target(proc.current_directory_of(t.process), path)?
 	if mut target_res is UnixSocket {
 		return target_res
 	}
+	resource.release_resource(mut target_res)
 	errno.set(errno.econnrefused)
 	return none
 }
@@ -1307,6 +1303,7 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 
 fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? {
 	mut socket := lookup_bound(_addr, addrlen)?
+	defer { socket.unref(unsafe { nil }) or {} }
 
 	// A datagram socket joins no listener: connect(2) only names where its
 	// sends go, as syslog(3) does with /dev/log.

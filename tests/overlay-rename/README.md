@@ -121,6 +121,13 @@ an inherited root listener after dropping to UID/GID 1000; the new descriptor
 belongs to the worker while captured peer credentials retain the root listener
 identity. Pair/accepted traffic and descriptor passing continue after mode
 changes. See [descriptor ownership evidence](socket-ownership.md).
+Root also creates sockets with inherited ACLs before the account drop. Named
+UID 1000 denials must override writable other bits; explicit grants, masked
+grants and a changed inode owner must produce the expected connection result.
+The fixture checks empty refused queues, ownership-update rollback on ext2 and
+persisted mode, owner, ACL and timestamps after remount. Repeated socket cycles
+inherit ACLs and exercise chmod and lookup before retirement. See
+[backing ACL and metadata evidence](socket-acl.md).
 Two batches each run 32 cycles on each backend; every live slab class and the
 large-allocation count must match. A protected-directory bind must fail with
 `EACCES`. Root remounts the volume read-only, verifies that removed names stay

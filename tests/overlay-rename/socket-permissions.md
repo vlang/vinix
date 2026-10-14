@@ -64,9 +64,11 @@ VFS. Review is retained in `socketperm-lifetime-review.md`. Repeat these cases
 using [the controller instructions](README.md); Linux reference kernels and boot
 policy match [the preceding pathname-open qualification](socket-open.md).
 
-This qualifies the tested inode-mode permission paths. UnixSocket does not yet
-forward permission snapshots to its physical backing resource, so inherited or
-named socket ACL support remains open. Broader credential/capability/MAC policy
+This qualified the tested inode-mode permission paths. At this stage UnixSocket
+did not forward permission snapshots to its physical backing resource. The
+subsequent [backing ACL correction](socket-acl.md) covers inherited ACL permission
+snapshots and metadata updates. Direct socket xattr mutation remains open.
+Broader credential/capability/MAC policy
 matrices, network namespace isolation, full OCI/rootless-runtime acceptance and
 complete server qualification also remain open.
 

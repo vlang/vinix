@@ -41,8 +41,10 @@ fn persistent_socket_cycle(base &char, backing &char, hold bool) {
 			&& C.snprintf(&target[0], 108, c'%s/socket-target', base) > 0
 			&& C.snprintf(&disk_source[0], 108, c'%s/socket-source', backing) > 0
 			&& C.snprintf(&disk_target[0], 108, c'%s/socket-target', backing) > 0, 402)
+		socket_default_acl(base, 0, 2)
 		listener := persistent_bind(&source[0])
 		replaced := persistent_bind(&target[0])
+		check(C.removexattr(base, c'system.posix_acl_default') == 0, 552)
 		old_path := C.open(&target[0], C.O_PATH)
 		check(old_path >= 0 && C.listen(listener, 2) == 0, 403)
 		check(C.rename(&source[0], &target[0]) == 0, 404)
@@ -182,6 +184,7 @@ fn persistent_sockets_remount() {
 		check(C.umount(c'/tmp/overlay-state/diskmerged') == 0
 			&& C.umount(c'/tmp/overlay-volume') == 0, 416)
 		check(C.mount(volume_device(), c'/tmp/overlay-volume', c'ext2', usize(C.MS_RDONLY), nil) == 0, 417)
+		socket_acl_persistence()
 		for base in [&char(c'/tmp/overlay-volume/direct'), &char(c'/tmp/overlay-volume/upper')]! {
 			mut path := [108]char{}
 			for name in [&char(c'socket-source'), &char(c'socket-target')]! {
