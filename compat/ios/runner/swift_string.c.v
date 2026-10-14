@@ -263,6 +263,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		// calls, rather than Swift's strong-word or bridge-object encoding.
 		'_swift_errorRetain' { u64(unsafe { voidptr(objc_retain) }) }
 		'_swift_errorRelease' { u64(unsafe { voidptr(objc_release) }) }
+		'_swift_initStackObject' { u64(unsafe { voidptr(swift_stack_initialize) }) }
 		'_swift_allocObject' { u64(unsafe { voidptr(swift_heap_allocate) }) }
 		'_swift_deallocObject', '_swift_deallocClassInstance' { u64(unsafe { voidptr(swift_heap_deallocate) }) }
 		'_swift_deallocUninitializedObject' { u64(unsafe { voidptr(swift_heap_deallocate_uninitialized) }) }

@@ -5347,22 +5347,55 @@ SDK/LLVM references, actual IPA callers/type bytes, generated-C checks, retained
 compiler/native expectation trials and IPA probe/audits are under
 `build/ios/fortnite/mangled-state-checks`; full iOS regression remains unpassed.
 
-The supplied IPA gets past the metadata-state lookup import and exits with
-status 1 at MarketplaceKitWrapper's required `_swift_initStackObject`. Its
-required import and native initialization instructions are retained. Fortnite
-has not entered application code and remains unplayable.
+Swift Core exports `_swift_initStackObject` for caller-owned object header
+initialization. It takes opaque metadata and writable storage in `x0`/`x1`,
+writes metadata and refcount word `5` into the 16-byte header, and returns the
+storage pointer. The caller initializes and destroys its properties and owns
+the storage lifetime. Metadata may be nil or inaccessible: this entry never
+reads it. Native ARM64e signs nonzero metadata; Vinix stores its raw pointer,
+as in the existing heap implementation. The SDK's stack-promoted refcount uses
+two unowned references to prevent freeing the caller's memory.
+
+Initialization requires naturally aligned, writable header storage and has no
+runtime, allocator, lock, registry, destructor or ARC dependency. It changes no
+bytes outside the header and retains no caller pointers. Stack ARC, unowned/
+weak references, dynamic type queries, deallocation and full stack lifetime
+tracking remain unsupported. Existing registry checks reject this storage before
+reading it or freeing it; initialization does not create heap provenance.
+MarketplaceKitWrapper's inspected StringGuts helper places the header at
+`sp + 40` in a 112-byte frame. Supporting this initializer does not implement
+that helper's full StringGuts behavior.
+
+Ten fresh ASan/UBSan runs and five ARM64 Vinix suites pass across initialization,
+owned heap, Array, object type and metadata-state lookup. Native/V comparisons
+cover exact pointer-return ABI, native metadata signatures and refcount word,
+nil/arbitrary/protected metadata, four header offsets, untouched property/guard
+bytes, a header ending at a protected page, repeated real frame storage and
+preserved `x20`/`x21`. V additionally checks runtime-independent initialization,
+eight private frame workers, invalid storage, Core-only export spelling,
+rejection of stack ARC/type/deallocation before and after caller unmapping, and
+two empty runtime lifetimes. The public `build-swift-stack` target and full
+build, regression and Swift guest modes include its fixture. Thirteen generated
+C streams/executables, native SDK/LLVM references, actual IPA caller instructions,
+generated-C allocation/ownership checks and IPA probe/audits are retained under
+`build/ios/fortnite/stack-checks`; full iOS regression remains unpassed.
+
+The supplied IPA gets past the stack initializer import and exits with status 1
+at MarketplaceKitWrapper's required DispatchWorkItemFlags metadata accessor,
+`_$s8Dispatch0A13WorkItemFlagsVMa`, in `/usr/lib/swift/libswiftDispatch.dylib`.
+Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,464 | 696 | 79 |
+| Fortnite executable | 1,465 | 695 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 158 | 18 | 23 |
-| All images | 2,281 | 717 | 120 |
+| MarketplaceKitWrapper | 159 | 17 | 23 |
+| All images | 2,283 | 715 | 120 |
 
-The C++/GLES/Text variant reports 2,294 resolved imports, 704 unresolved strong
+The C++/GLES/Text variant reports 2,296 resolved imports, 702 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
