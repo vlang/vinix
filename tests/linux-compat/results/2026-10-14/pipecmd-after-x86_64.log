@@ -1,0 +1,499 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   381k      0 --:--:-- --:--:-- --:--:--  380k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 87 2880k   87 2511k    0     0  1476k      0  0:00:01  0:00:01 --:--:-- 1475k100 2880k  100 2880k    0     0  1634k      0  0:00:01  0:00:01 --:--:-- 1633k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  33768      0 --:--:-- --:--:-- --:--:-- 33775
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   261k      0 --:--:-- --:--:-- --:--:--  261k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 38 49092   38 18900    0     0  52360      0 --:--:-- --:--:-- --:--:-- 52354100 49092  100 49092    0     0   118k      0 --:--:-- --:--:-- --:--:--  118k
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   196k      0 --:--:-- --:--:-- --:--:--  196k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/pipecmd/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/pipecmd/.vinix-amd64.iso.g0ZjAT'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 47.1g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/pipecmd/iso-build/.iso-staging.yeva6w/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13639 sectors
+Written to medium : 13639 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/pipecmd/.vinix-amd64.iso.g0ZjAT' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd51b.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/pipecmd/test.iso (27932672 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/pipecmd
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=80360
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX PIPECMD SLAB: ordinary=1 namespace=0 size=16 live=1631/1631 cycles=200
+LINUX PIPECMD SLAB: ordinary=1 namespace=0 size=32 live=2876/2876 cycles=200
+LINUX PIPECMD SLAB: ordinary=1 namespace=0 size=48 live=326/326 cycles=200
+LINUX PIPECMD SLAB: ordinary=1 namespace=0 size=64 live=218/218 cycles=200
+LINUX PIPECMD SLAB: ordinary=1 namespace=0 size=96 live=20/20 cycles=200
+LINUX PIPECMD SLAB: ordinary=1 namespace=0 size=128 live=19/19 cycles=200
+LINUX PIPECMD SLAB: ordinary=1 namespace=0 size=192 live=378/378 cycles=200
+LINUX PIPECMD SLAB: ordinary=1 namespace=0 size=256 live=792/792 cycles=200
+LINUX PIPECMD SLAB: ordinary=1 namespace=0 size=384 live=553/553 cycles=200
+LINUX PIPECMD SLAB: ordinary=1 namespace=0 size=512 live=500/500 cycles=200
+LINUX PIPECMD SLAB: ordinary=1 namespace=0 size=768 live=12/12 cycles=200
+LINUX PIPECMD SLAB: ordinary=1 namespace=0 size=1024 live=13/13 cycles=200
+LINUX PIPECMD SLAB: ordinary=1 namespace=0 size=1536 live=28/28 cycles=200
+LINUX PIPECMD SLAB: ordinary=1 namespace=0 size=2048 live=0/0 cycles=200
+LINUX PIPECMD STORAGE: ordinary=1 namespace=0 cycles=200 big_pages=198/198 PASS
+LINUX PIPECMD CASES: ordinary=1 namespace=0 kind=0 calls=950 failures=0
+LINUX PIPECMD CASES: ordinary=1 namespace=0 kind=1 calls=250 failures=0
+LINUX PIPECMD CASES: ordinary=1 namespace=0 kind=2 calls=338 failures=0
+LINUX PIPECMD CASES: ordinary=1 namespace=0 kind=3 calls=48 failures=0
+LINUX PIPECMD FINAL: ordinary=1 namespace=0 kind=0 calls=950 failures=0
+LINUX PIPECMD FINAL: ordinary=1 namespace=0 kind=1 calls=250 failures=0
+LINUX PIPECMD FINAL: ordinary=1 namespace=0 kind=2 calls=338 failures=0
+LINUX PIPECMD FINAL: ordinary=1 namespace=0 kind=3 calls=48 failures=0
+LINUX PIPECMD SLAB: ordinary=0 namespace=0 size=16 live=1631/1631 cycles=200
+LINUX PIPECMD SLAB: ordinary=0 namespace=0 size=32 live=2876/2876 cycles=200
+LINUX PIPECMD SLAB: ordinary=0 namespace=0 size=48 live=326/326 cycles=200
+LINUX PIPECMD SLAB: ordinary=0 namespace=0 size=64 live=218/218 cycles=200
+LINUX PIPECMD SLAB: ordinary=0 namespace=0 size=96 live=20/20 cycles=200
+LINUX PIPECMD SLAB: ordinary=0 namespace=0 size=128 live=19/19 cycles=200
+LINUX PIPECMD SLAB: ordinary=0 namespace=0 size=192 live=378/378 cycles=200
+LINUX PIPECMD SLAB: ordinary=0 namespace=0 size=256 live=792/792 cycles=200
+LINUX PIPECMD SLAB: ordinary=0 namespace=0 size=384 live=553/553 cycles=200
+LINUX PIPECMD SLAB: ordinary=0 namespace=0 size=512 live=500/500 cycles=200
+LINUX PIPECMD SLAB: ordinary=0 namespace=0 size=768 live=12/12 cycles=200
+LINUX PIPECMD SLAB: ordinary=0 namespace=0 size=1024 live=13/13 cycles=200
+LINUX PIPECMD SLAB: ordinary=0 namespace=0 size=1536 live=28/28 cycles=200
+LINUX PIPECMD SLAB: ordinary=0 namespace=0 size=2048 live=0/0 cycles=200
+LINUX PIPECMD STORAGE: ordinary=0 namespace=0 cycles=200 big_pages=198/198 PASS
+LINUX PIPECMD CASES: ordinary=0 namespace=0 kind=0 calls=950 failures=0
+LINUX PIPECMD CASES: ordinary=0 namespace=0 kind=1 calls=250 failures=0
+LINUX PIPECMD CASES: ordinary=0 namespace=0 kind=2 calls=338 failures=0
+LINUX PIPECMD CASES: ordinary=0 namespace=0 kind=3 calls=48 failures=0
+LINUX PIPECMD FINAL: ordinary=0 namespace=0 kind=0 calls=950 failures=0
+LINUX PIPECMD FINAL: ordinary=0 namespace=0 kind=1 calls=250 failures=0
+LINUX PIPECMD FINAL: ordinary=0 namespace=0 kind=2 calls=338 failures=0
+LINUX PIPECMD FINAL: ordinary=0 namespace=0 kind=3 calls=48 failures=0
+LINUX PIPECMD: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+/Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/tmp/vinix-v-module-eVr0gq/fcntlabifixture/core.v:220:28: notice: variable `duplicate` shadows a function declaration
+  218 |         mut position := 0; mut large := false
+  219 |         for position < int(length) {
+  220 |             mut size := u64(0); mut duplicate := u64(0); mut live := u64(0); mut pages := u64(0)
+      |                                     ~~~~~~~~~
+  221 |             if C.sscanf(&data[position], c'size-%lu %lu %lu %lu', &size, &duplicate, &live, &pages) == 4 {
+  222 |                 if counts.rows >= 32 || size != duplicate { return false }; counts.sizes[counts.rows] = size; counts.live[counts.rows] = live; counts.rows++
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   480k      0 --:--:-- --:--:-- --:--:--  480k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  1 2880k    1 42153    0     0  63890      0  0:00:46 --:--:--  0:00:46 63868100 2880k  100 2880k    0     0  2177k      0  0:00:01  0:00:01 --:--:-- 2178k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  30201      0 --:--:-- --:--:-- --:--:-- 30198
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   266k      0 --:--:-- --:--:-- --:--:--  266k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  60682      0 --:--:-- --:--:-- --:--:-- 60682
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   119k      0 --:--:-- --:--:-- --:--:--  119k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/fcntlabi/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/fcntlabi/.vinix-amd64.iso.6CYJvY'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 46.0g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/fcntlabi/iso-build/.iso-staging.dw6D9Z/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13639 sectors
+Written to medium : 13639 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/fcntlabi/.vinix-amd64.iso.6CYJvY' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd51b.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/fcntlabi/test.iso (27932672 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/fcntlabi
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=80192
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX FCNTLABI CASES: ordinary=1 kind=0 calls=324 failures=0
+LINUX FCNTLABI CASES: ordinary=1 kind=1 calls=2592 failures=0
+LINUX FCNTLABI CASES: ordinary=1 kind=2 calls=1350 failures=0
+LINUX FCNTLABI CASES: ordinary=1 kind=3 calls=36 failures=0
+LINUX FCNTLABI CASES: ordinary=1 kind=4 calls=162 failures=0
+LINUX FCNTLABI SLAB: ordinary=1 size=16 live=1626/1626 cycles=200
+LINUX FCNTLABI SLAB: ordinary=1 size=32 live=2881/2881 cycles=200
+LINUX FCNTLABI SLAB: ordinary=1 size=48 live=326/326 cycles=200
+LINUX FCNTLABI SLAB: ordinary=1 size=64 live=172/172 cycles=200
+LINUX FCNTLABI SLAB: ordinary=1 size=96 live=20/20 cycles=200
+LINUX FCNTLABI SLAB: ordinary=1 size=128 live=19/19 cycles=200
+LINUX FCNTLABI SLAB: ordinary=1 size=192 live=377/377 cycles=200
+LINUX FCNTLABI SLAB: ordinary=1 size=256 live=792/792 cycles=200
+LINUX FCNTLABI SLAB: ordinary=1 size=384 live=550/550 cycles=200
+LINUX FCNTLABI SLAB: ordinary=1 size=512 live=499/499 cycles=200
+LINUX FCNTLABI SLAB: ordinary=1 size=768 live=12/12 cycles=200
+LINUX FCNTLABI SLAB: ordinary=1 size=1024 live=13/13 cycles=200
+LINUX FCNTLABI SLAB: ordinary=1 size=1536 live=20/20 cycles=200
+LINUX FCNTLABI SLAB: ordinary=1 size=2048 live=0/0 cycles=200
+LINUX FCNTLABI STORAGE: ordinary=1 cycles=200 big_pages=177/177 PASS
+LINUX FCNTLABI CASES: ordinary=0 kind=0 calls=324 failures=0
+LINUX FCNTLABI CASES: ordinary=0 kind=1 calls=2592 failures=0
+LINUX FCNTLABI CASES: ordinary=0 kind=2 calls=1350 failures=0
+LINUX FCNTLABI CASES: ordinary=0 kind=3 calls=36 failures=0
+LINUX FCNTLABI CASES: ordinary=0 kind=4 calls=162 failures=0
+LINUX FCNTLABI SLAB: ordinary=0 size=16 live=1626/1626 cycles=200
+LINUX FCNTLABI SLAB: ordinary=0 size=32 live=2881/2881 cycles=200
+LINUX FCNTLABI SLAB: ordinary=0 size=48 live=326/326 cycles=200
+LINUX FCNTLABI SLAB: ordinary=0 size=64 live=172/172 cycles=200
+LINUX FCNTLABI SLAB: ordinary=0 size=96 live=20/20 cycles=200
+LINUX FCNTLABI SLAB: ordinary=0 size=128 live=19/19 cycles=200
+LINUX FCNTLABI SLAB: ordinary=0 size=192 live=377/377 cycles=200
+LINUX FCNTLABI SLAB: ordinary=0 size=256 live=792/792 cycles=200
+LINUX FCNTLABI SLAB: ordinary=0 size=384 live=550/550 cycles=200
+LINUX FCNTLABI SLAB: ordinary=0 size=512 live=499/499 cycles=200
+LINUX FCNTLABI SLAB: ordinary=0 size=768 live=12/12 cycles=200
+LINUX FCNTLABI SLAB: ordinary=0 size=1024 live=13/13 cycles=200
+LINUX FCNTLABI SLAB: ordinary=0 size=1536 live=20/20 cycles=200
+LINUX FCNTLABI SLAB: ordinary=0 size=2048 live=0/0 cycles=200
+LINUX FCNTLABI STORAGE: ordinary=0 cycles=200 big_pages=177/177 PASS
+LINUX FCNTLABI: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   246k      0  0:00:01  0:00:01 --:--:--  246k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0 2880k    0 14051    0     0  25196      0  0:01:57 --:--:--  0:01:57 25181 87 2880k   87 2511k    0     0  1674k      0  0:00:01  0:00:01 --:--:-- 1674k100 2880k  100 2880k    0     0  1720k      0  0:00:01  0:00:01 --:--:-- 1720k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  74635      0 --:--:-- --:--:-- --:--:-- 74843
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 61  207k   61  127k    0     0   236k      0 --:--:-- --:--:-- --:--:--  236k100  207k  100  207k    0     0   385k      0 --:--:-- --:--:-- --:--:--  384k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0    99k      0 --:--:-- --:--:-- --:--:--   99k
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   141k      0 --:--:-- --:--:-- --:--:--  141k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/fcntlpath/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/fcntlpath/.vinix-amd64.iso.rchYWi'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 45.1g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/fcntlpath/iso-build/.iso-staging.55R5Ln/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13636 sectors
+Written to medium : 13636 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/fcntlpath/.vinix-amd64.iso.rchYWi' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd50f.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/fcntlpath/test.iso (27926528 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/fcntlpath
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=75752
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91c00
+initramfs: Done (9 entries)
+LINUX FCNTLPATH CASES: ordinary=1 kind=0 calls=3888 failures=0
+LINUX FCNTLPATH CASES: ordinary=1 kind=1 calls=648 failures=0
+LINUX FCNTLPATH CASES: ordinary=1 kind=2 calls=870 failures=0
+LINUX FCNTLPATH SLAB: ordinary=1 size=16 live=1624/1624 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=1 size=32 live=2888/2888 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=1 size=48 live=326/326 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=1 size=64 live=194/194 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=1 size=96 live=20/20 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=1 size=128 live=19/19 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=1 size=192 live=377/377 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=1 size=256 live=794/794 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=1 size=384 live=551/551 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=1 size=512 live=500/500 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=1 size=768 live=12/12 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=1 size=1024 live=13/13 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=1 size=1536 live=20/20 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=1 size=2048 live=0/0 cycles=200
+LINUX FCNTLPATH STORAGE: ordinary=1 cycles=200 big_pages=160/160 PASS
+LINUX FCNTLPATH CASES: ordinary=0 kind=0 calls=3888 failures=0
+LINUX FCNTLPATH CASES: ordinary=0 kind=1 calls=648 failures=0
+LINUX FCNTLPATH CASES: ordinary=0 kind=2 calls=870 failures=0
+LINUX FCNTLPATH SLAB: ordinary=0 size=16 live=1624/1624 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=0 size=32 live=2888/2888 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=0 size=48 live=326/326 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=0 size=64 live=194/194 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=0 size=96 live=20/20 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=0 size=128 live=19/19 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=0 size=192 live=377/377 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=0 size=256 live=794/794 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=0 size=384 live=551/551 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=0 size=512 live=500/500 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=0 size=768 live=12/12 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=0 size=1024 live=13/13 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=0 size=1536 live=20/20 cycles=200
+LINUX FCNTLPATH SLAB: ordinary=0 size=2048 live=0/0 cycles=200
+LINUX FCNTLPATH STORAGE: ordinary=0 cycles=200 big_pages=160/160 PASS
+LINUX FCNTLPATH: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:05 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:06 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:07 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:08 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:09 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:10 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:11 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:11 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:12 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:13 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:14 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:16 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:17 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:18 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:19 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:20 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:21 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:22 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:23 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:24 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:25 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:26 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:27 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:28 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:29 --:--:--     0 44  248k   44  111k    0     0   3752      0  0:01:07  0:00:30  0:00:37 22813100  248k  100  248k    0     0   8379      0  0:00:30  0:00:30 --:--:-- 63758
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:05 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:06 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:07 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:08 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:09 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:10 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:11 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:12 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:13 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:14 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:15 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:16 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:17 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:18 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:19 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:20 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:21 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:22 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:23 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:24 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:25 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:26 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:27 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:28 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:29 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:30 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:31 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:31 --:--:--     0 11 2880k   11  317k    0     0   9974      0  0:04:55  0:00:32  0:04:23 72414 11 2880k   11  317k    0     0   9676      0  0:05:04  0:00:33  0:04:31 72382100 2880k  100 2880k    0     0  87144      0  0:00:33  0:00:33 --:--:--  765k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  38086      0 --:--:-- --:--:-- --:--:-- 38054
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   213k      0 --:--:-- --:--:-- --:--:--  213k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0100 49092  100 49092    0     0  19084      0  0:00:02  0:00:02 --:--:-- 19087
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   185k      0 --:--:-- --:--:-- --:--:--  184k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/open/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/open/.vinix-amd64.iso.K2wRFU'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 44.3g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/open/iso-build/.iso-staging.qBUKMz/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13620 sectors
+Written to medium : 13620 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/open/.vinix-amd64.iso.K2wRFU' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd4cf.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/open/test.iso (27893760 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/open
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=42904
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91c00
+initramfs: Done (9 entries)
+LINUX OPEN: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   263k      0 --:--:-- --:--:-- --:--:--  263k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 17 2880k   17  495k    0     0   316k      0  0:00:09  0:00:01  0:00:08  316k 49 2880k   49 1413k    0     0   544k      0  0:00:05  0:00:02  0:00:03  544k 98 2880k   98 2827k    0     0   790k      0  0:00:03  0:00:03 --:--:--  790k100 2880k  100 2880k    0     0   803k      0  0:00:03  0:00:03 --:--:--  803k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  29533      0 --:--:-- --:--:-- --:--:-- 29564
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   220k      0 --:--:-- --:--:-- --:--:--  220k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  62532      0 --:--:-- --:--:-- --:--:-- 62537
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   146k      0 --:--:-- --:--:-- --:--:--  146k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/runtime/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/runtime/.vinix-amd64.iso.L3jZ49'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 43.5g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/runtime/iso-build/.iso-staging.G3VK0c/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13622 sectors
+Written to medium : 13622 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/runtime/.vinix-amd64.iso.L3jZ49' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd4d7.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/runtime/test.iso (27897856 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/pipecmd-20261014/states/p3-after-x86/runtime
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=46592
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91a00
+initramfs: Done (9 entries)
+LINUX RUNTIME page_size=4096 pointer_bits=64
+LINUX RUNTIME PASS: atomics SIMD TLS
+LINUX RUNTIME PASS: JIT page sizes
+LINUX RUNTIME PASS: wide offsets time64
+LINUX RUNTIME: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+Linux compatibility guest suite: PASS

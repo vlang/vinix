@@ -860,6 +860,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   transfers and flat pressure-cohort storage on both architectures.
   See [the error receipts](docs/linux-posix-qualification.md#native-pipe2-null-output-error-precedence).
 
+- [x] Return native EBADF for pipe-only fcntl commands on nonpipe
+  descriptions; qualify real pipe/FIFO capacities, aliases, words, descriptor
+  limits/reuse, retained data and flat storage on both architectures.
+  See [the type-error receipts](docs/linux-posix-qualification.md#native-pipe-only-fcntl-type-errors).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

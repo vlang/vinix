@@ -1342,3 +1342,21 @@ faults; all slab/large-page storage remains flat. Run the suite with
 Growth/budget injection, concurrent limit/close and output-copy rollback
 races, legacy x86 pipe and GNU/foreign paths remain separate. See
 [receipts and limits](../../docs/linux-posix-qualification.md#native-pipe2-null-output-error-precedence).
+
+The `pipecmd` case qualifies F_GETPIPE_SZ/F_SETPIPE_SZ nonpipe EBADF and
+real anonymous pipe/FIFO capacities. Root/UID1000 cohorts check nine source
+classes, original/dup/CLOEXEC/fixed aliases, native words, ignored arguments,
+libc, invalid descriptors, reduced limits and reuse. All 3,172 controls pass
+per architecture on corrected Vinix and the identical ELF on Linux6.12.51;
+original baselines fail 1,724 wrong-error checks. Final metadata, flags,
+regular XYZ/cursor1, queued AB/CD/GH and 80 slots remain intact. Same-capacity
+setters preserve occupied buffers. Two 200-cycle alias/query/close cohorts
+keep every slab and large-page count flat after removing measured per-call
+interface boxes. The separate errno-only kernel's storage failures and
+allocation-tracked call chains remain visible in the report.
+Run `--cases pipecmd,fcntlabi,fcntlpath,open,runtime` and use
+`pipecmd-reference.v --arch ARCH --kernel LINUX --init NATIVE-PROBE-ELF
+--state-dir FRESH-DIR` for Linux. The reference CPIO supplies `/dev/null`.
+Actual resizing, occupancy/ceiling/budget behavior, concurrent close/reuse,
+GNU and foreign paths remain separate. See
+[receipts and limits](../../docs/linux-posix-qualification.md#native-pipe-only-fcntl-type-errors).

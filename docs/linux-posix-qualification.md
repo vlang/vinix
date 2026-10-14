@@ -5450,3 +5450,91 @@ constructor-budget injection, concurrent prlimit/close, copy-before-
 publication and user-copy rollback races, legacy x86 pipe, GNU/translated/
 ELF32 paths and the three broad section 15 gates remain open. This change
 adds pressure retention qualification, without new desktop performance claims.
+
+## Native pipe-only fcntl type errors
+
+Native `F_GETPIPE_SZ` and `F_SETPIPE_SZ` now return EBADF on nonpipe
+descriptions. The capacity getter also refuses a missing pipe capability with
+EBADF. Previously these guards returned EINVAL. Existing descriptor lookup,
+O_PATH restrictions, lower-32-bit scalar decoding and final unrefs stay intact.
+Linux checks for an actual pipe before dispatching these commands in its
+[pipe implementation](https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux-stable.git/+/refs/tags/v5.4.155/fs/pipe.c).
+
+The `pipecmd` musl probe inherits a bank of 29 descriptions in root and
+UID/GID1000 child cohorts: linked/unlinked regular files, a directory,
+`/dev/null`, a UNIX stream socket, O_PATH, anonymous read/write ends and a
+named FIFO. Original, dup and CLOEXEC aliases plus fixed descriptors 64/65
+exercise raw and libc commands, five upper-register patterns, ignored getter
+arguments, invalid descriptors, reduced soft limits 8/0 and closed/reused 66.
+Positive setters request the current capacity, preserving occupied buffers.
+
+| Controls per credential cohort | Calls | Original baseline failures |
+| --- | ---: | ---: |
+| Nonpipe raw command refusals | 950 | 800 |
+| Actual pipe/FIFO getters | 250 | 0 |
+| Setters, libc, invalid descriptors, limits and reuse | 338 | 62 |
+| Retained metadata/flags/cursors/capacities/data/queues/slots | 48 | 0 |
+
+Both original baselines fail exactly 1,724 of 3,172 checks per architecture.
+Corrected Vinix and actual Linux 6.12.51 pass every row with the same final
+native ELF. Child CASES and parent FINAL counters agree. Regular XYZ bytes
+and cursor 1, queued AB/CD/GH, every alias and the 80-slot vector survive.
+The errno correction is committed separately as `98c0df505`.
+
+That intermediate kernel passes all semantics but fails storage: each
+200-cycle cohort retains exactly 4,000 size-16 objects. The cycle makes
+twenty successful capacity calls, each of which V heap-boxed an optional
+`PipeCapacityResource` interface. An allocation-tracked AArch64 diagnostic
+records two live call chains of 2,000 × 16 bytes, with zero dropped records;
+generated C identifies the getter and setter boxes. Those failed receipts
+remain published as diagnostics, separate from the original wrong-errno
+baseline and final passing candidate.
+
+Both capacity helpers now borrow local interface wrappers synchronously.
+The fcntl lookup retains the underlying Pipe through delegation. Methods
+return scalar capacities/options and never receive or retain the wrapper
+address. No free, destructor, reference count, buffer allocation or resizing
+algorithm is changed. Independent review covers this borrow and the fixture
+bank, fork, count-transfer and stack lifetimes.
+
+Final two warmed 200-cycle cohorts repeat alias/query/close operations,
+nonpipe and invalid-descriptor errors, unchanged status and queued data.
+All 18 ARM/14 x86 slab classes and observed large pages remain exactly flat:
+75/75 ARM and 198/198 x86 for both credentials. Six ordinary production
+builds in detached worktrees at `f6d7c868c15bee486447baea44d0ea04aaa215cf`
+cover original, errno-only and final kernels; one additional tracked build
+supplies the diagnostic. Complete generated C changes only the fcntl
+body/prototype and two capacity helper bodies/prototypes. Comparing the
+errno-only and final kernels confines differences to those two helpers,
+which contain local wrappers and no hidden heap allocations.
+
+Both final five-case guest profiles (pipecmd/fcntlabi/fcntlpath/open/runtime),
+eight host test files and 64-input dispatch inventories pass. The capability
+source is separately pinned in the evidence. Allocation scans retain
+400 ARM/292 x86 reported sites and unchanged existing allowance refusals.
+The probe has twelve explicit allocas and no hidden heap/index helpers.
+Preview, baseline, candidate and preflight source/C/ELF identity passes;
+complete raw preflight C drift is empty. Active audit controls reject a
+passing capture presented as the failing baseline. The reused f6358ec
+compiler and all 15,146 input pins remain bound.
+
+Fresh AArch64 ops/churn/cache controls report zero retained bytes for every
+200-call operation and all four 300-run churn workloads. Idle/apps/drag
+controls complete with the actual staged corrected kernel, measurement
+program, configuration, desktop binary and image hashes recorded.
+
+- [AArch64 receipt](../tests/linux-compat/results/2026-10-14/pipecmd-after-aarch64.json), [Linux reference](../tests/linux-compat/results/2026-10-14/pipecmd-reference-aarch64.json), [evidence](../tests/linux-compat/results/2026-10-14/pipecmd-evidence-aarch64.json).
+- [x86-64 receipt](../tests/linux-compat/results/2026-10-14/pipecmd-after-x86_64.json), [Linux reference](../tests/linux-compat/results/2026-10-14/pipecmd-reference-x86_64.json), [evidence](../tests/linux-compat/results/2026-10-14/pipecmd-evidence-x86_64.json).
+- [Intermediate ARM storage failure](../tests/linux-compat/results/2026-10-14/pipecmd-errno-only-aarch64-native.log), [x86 storage failure](../tests/linux-compat/results/2026-10-14/pipecmd-errno-only-x86_64-native.log), [named allocation sites](../tests/linux-compat/results/2026-10-14/pipecmd-tracked-named_sites.log).
+- [Audit](../tests/linux-compat/results/2026-10-14/pipecmd-audit.v), [verdict](../tests/linux-compat/results/2026-10-14/pipecmd-audit.log), [independent review](../tests/linux-compat/results/2026-10-14/pipecmd-lifetime-review.md).
+- [Memory controls](../tests/linux-compat/results/2026-10-14/pipecmd-perf-after-ops-result.json), [desktop controls](../tests/linux-compat/results/2026-10-14/pipecmd-perf-after-desktop-result.json).
+
+The initial Linux reference image omitted `/dev/null`, causing setup failures
+before any CASES rows. Adding character device 1:3 fixes the environment;
+the native probe ELF is unchanged. Initial host compilation failures and
+reference setup failures are not semantic baselines.
+
+Requests that resize buffers, page-ring occupancy behavior, privileged
+ceilings and budget injection, FIFO-shaped resources lacking the capability,
+concurrent descriptor close/reuse/resize, legacy/GNU/translated/ELF32 paths
+and the three broad section 15 gates remain separate.

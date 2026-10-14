@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "6e8e36cf94396325ce502a7eba7d9c35251b847d33deae48b81eb9c275a7838d",
+    "results": [
+        {
+            "name": "pipecmd",
+            "source_sha256": "e2fc512dc614e13af04f2fee6fbe5b2d98e3c795ab111a9b1d878ed2b8fcd25d",
+            "init_sha256": "9ee4eb9c29faa09b82e43560391879fef8ed3ffe0da112ab9cf67040f06a62da",
+            "iso_sha256": "00eeacaa4edb0325896020b71e4b9292ed7c4c738b7007ab8588e53412662157",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

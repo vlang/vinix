@@ -243,14 +243,20 @@ pub fn advise_resource(mut res Resource, handle voidptr, offset u64, length u64,
 
 pub fn pipe_capacity(mut res Resource) ?u64 {
 	if mut res is PipeCapacityResource {
-		return res.pipe_capacity()
+		// Borrow the capability synchronously. Calling through the narrowed
+		// Resource directly makes V heap-box this interface on every query.
+		mut backend := PipeCapacityResource(res)
+		mut stack := unsafe { &backend }
+		return stack.pipe_capacity()
 	}
 	return none
 }
 
 pub fn set_pipe_capacity(mut res Resource, requested u64) ?u64 {
 	if mut res is PipeCapacityResource {
-		return res.set_pipe_capacity(requested)
+		mut backend := PipeCapacityResource(res)
+		mut stack := unsafe { &backend }
+		return stack.set_pipe_capacity(requested)
 	}
 	return none
 }
