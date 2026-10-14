@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "68d687a15529864ce93abde1ceadb0140e975f7a1ec38478baaed00b6e23095c",
+    "results": [
+        {
+            "name": "ownerquery",
+            "source_sha256": "2426a4eef0ae4a0ace2b0d83e6502fe74bba1637e046b195c9929c17ec417082",
+            "init_sha256": "c566e5462eb3bd2caf9c9dc575a44c912be14d1314320e2723801b15d104f1d0",
+            "iso_sha256": "97a7d3b5aa59a3b0f0cbb638e68193db6d2137f4c3ba1a7f3102815d852c9dfb",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

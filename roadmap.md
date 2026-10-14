@@ -817,6 +817,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   getters, descriptor limits/replacement and flat storage on both architectures.
   See [the owner-control receipts](docs/linux-posix-qualification.md#native-fcntl-owner-commands-and-target-errors).
 
+- [x] Map native fcntl owner getters to attached task kinds and caller PID
+  namespaces; qualify reaped/joined targets, surviving groups, aliases and flat
+  storage on both architectures. See
+  [the getter receipts](docs/linux-posix-qualification.md#native-fcntl-owner-task-kinds-and-namespaces).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -99,9 +99,9 @@ pub mut:
 	dirlist_valid bool
 	dirlist       []stat.Dirent
 	dirlist_index u64
-	// Who F_SETOWN made the file's owner, a F_OWNER_* kind and an id, and the
-	// signal F_SETSIG chose. They are recorded, so that a program reads back
-	// what it set; I/O readiness raises no SIGIO here.
+	// The F_OWNER_* kind and kernel PID number selected by F_SETOWN, under l.
+	// Getters map attached tasks into the caller's namespace. This stores a
+	// number, not a retained PID identity; I/O readiness raises no SIGIO here.
 	owner_type int
 	owner_id   int
 	signal     int
@@ -1554,19 +1554,27 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 				return errno.err, errno.einval
 			}
 			target := if id < 0 { -id } else { id }
-			if target != 0 && !proc.pid_number_exists(target) {
+			global := proc.pid_number_id(target)
+			if target != 0 && global == 0 {
 				fd.unref()
 				return errno.err, errno.esrch
 			}
+			handle.l.acquire()
 			handle.owner_type = if id < 0 { f_owner_pgrp } else { f_owner_pid }
-			handle.owner_id = target
+			handle.owner_id = global
+			handle.l.release()
 			fd.unref()
 		}
 		f_getown {
-			ret = if handle.owner_type == f_owner_pgrp {
-				u64(-i64(handle.owner_id))
+			handle.l.acquire()
+			kind := handle.owner_type
+			global := handle.owner_id
+			handle.l.release()
+			target := proc.pid_owner_number(global, kind)
+			ret = if kind == f_owner_pgrp {
+				u64(-i64(target))
 			} else {
-				u64(handle.owner_id)
+				u64(target)
 			}
 			fd.unref()
 		}
@@ -1582,15 +1590,22 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 					fd.unref()
 					return errno.err, errno.einval
 				}
-				if owner[1] != 0 && !proc.pid_number_exists(int(owner[1])) {
+				global := proc.pid_number_id(int(owner[1]))
+				if owner[1] != 0 && global == 0 {
 					fd.unref()
 					return errno.err, errno.esrch
 				}
+				handle.l.acquire()
 				handle.owner_type = int(owner[0])
-				handle.owner_id = int(owner[1])
+				handle.owner_id = global
+				handle.l.release()
 			} else {
-				owner[0] = i32(handle.owner_type)
-				owner[1] = i32(handle.owner_id)
+				handle.l.acquire()
+				kind := handle.owner_type
+				global := handle.owner_id
+				handle.l.release()
+				owner[0] = i32(kind)
+				owner[1] = i32(proc.pid_owner_number(global, kind))
 				if !usercopy.copy_to_user(arg, voidptr(&owner[0]), 8) {
 					fd.unref()
 					return errno.err, errno.efault

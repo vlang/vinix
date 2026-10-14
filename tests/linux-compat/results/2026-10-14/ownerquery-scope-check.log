@@ -1,0 +1,2 @@
+arm: complete C identical outside reviewed fcntl/PID units; scalar helpers allocation-free; SHA256=5f5e095f81ebb907ecf3a69399f0a81a2fb6e6740cd1d2d937b76c2dde47bb2c
+x86: complete C identical outside reviewed fcntl/PID units; scalar helpers allocation-free; SHA256=b048f2d78a69fb9e0645afa45ad495f61eb042172e33818c184538e136766c4c

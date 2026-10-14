@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "Completed superseded probe; diagnostic only. Qualification uses fresh task-directory snapshots and bounded observed settling after join. The qualified x86 Linux reference retains its single premature post-join expectation failure; final native profiles retain cached-path removal setup failures and passing related cases.",
+    "base_commit": "905c838513a0939fb8d269786487346fbd62d7a1",
+    "artifacts": {
+        "aggregate": "6a213ba2a5462e43e925d17065b040d0e4fa0a9da6b3190354c4f1adbd439dd3",
+        "ownerquery_c": "36f65d152a1fd8cd7119f86f2f6f3a9b2a20198bd764519f312f0b6bbc068c89",
+        "ownerquery_init": "bde7cbfdf7cb23a3016c330ffe771c04b79ba1dd26d1e6d38ac0805b752f6b2d",
+        "ownerquery_iso": "5f0be12acc0d4f2d86e27f66614a24bc99f81b073fcaf8cb8451be5557cbe86f",
+        "ownerquery_serial": "7497d9583c1785145a4a521d3a84ae02c38b240be79c93fd0eed63899cca30e8",
+        "ownerquery_source": "4ac5b170993b1c91fbc318dc7c78a03d7c748db04a570545fbca51a7593a38aa",
+        "receipt": "34ce10b27327f5d6eb1b9cbe1fa07361a9d4a7c73daf2d065e24b5e32991dd07"
+    },
+    "source_inputs": {}
+}

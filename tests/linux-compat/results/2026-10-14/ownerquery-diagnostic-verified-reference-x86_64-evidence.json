@@ -1,0 +1,18 @@
+{
+    "architecture": "x86_64",
+    "context": "Completed superseded probe; diagnostic only. Qualification uses fresh task-directory snapshots and bounded observed settling after join. The qualified x86 Linux reference retains its single premature post-join expectation failure; final native profiles retain cached-path removal setup failures and passing related cases.",
+    "base_commit": "905c838513a0939fb8d269786487346fbd62d7a1",
+    "artifacts": {
+        "aggregate": "99863a69280412bf428eafdabbc6f6aff6c2e247b0c3850e23a8d2dac95f27b2",
+        "initramfs": "23323a3c72139dfabdf1437432dce971d03670e2f67f44afaca4cfb78b93414f",
+        "kernel": "ec9073e710b26f5907024476c084188a01610a5a48a948bd1664ac42faaadbd4",
+        "probe": "0333dc52cb4cc558174b1c41663b1f149697fd52468860481d0d176879b077bd",
+        "receipt": "44266b66996145932a9f7312a5d011f5f3205b6e91938b52b426ad42b2cb043c",
+        "serial": "4d25acbea5901628f5ed9caaa5247fc83208809b13e4b6ee1eaa9f96348f2e4e",
+        "serial_adapter_c": "f32deebe2af4585e8ba8b413f3623c0e7627bf67412e081c533d8bdc18e2bd16",
+        "wrapper_c": "53fab3dd5ab9e8e674e843c6435b06232f3022489febb1e80f475c8b4d3f35a5",
+        "wrapper_elf": "35e77cc044d13d4ce0cd42bad2c9bfbd4380b710e59cfdf2665d82b928afd2a9",
+        "wrapper_source": "10dc51b14d860049e3fae86ce5c88b2dcefa1c2b2a8ad1edf9842f9b6c7e2ad5"
+    },
+    "source_inputs": {}
+}

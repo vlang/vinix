@@ -4868,8 +4868,84 @@ generated from the committed publication parent plus this change.
 
 This qualifies command mapping and the selected owner-update/refusal behavior.
 Actual SIGIO/queued notifications, retained PID identity after exit/recycling,
-PID-kind attachment getters, non-main-thread targets, leaderless groups,
-namespace owner getters and restrictive/concurrent policy remain unqualified.
-The helper accounts for caller namespaces and surviving group/session IDs,
-but those paths need their own regression receipts. GNU/translated/ELF32
+and restrictive/concurrent policy remain unqualified. Selected PID-kind
+getters, non-main-thread targets, leaderless groups and namespace owner
+getters have the separate qualification below. GNU/translated/ELF32
 paths and the three broad section 15 acceptance gates stay open.
+
+## Native fcntl owner task kinds and namespaces
+
+F_GETOWN/F_GETOWN_EX previously echoed the stored number even when no task
+was attached to that owner kind, the target had been reaped, or the caller
+could not see that PID namespace. Setters now resolve caller numbers into
+kernel numbers; getters map only the attached requested PID/TID/group kind
+back into the caller namespace, returning zero for an absent attachment or
+invisible number. A non-main TID may be accepted for PID/group configuration
+while its getter returns zero, matching the pinned
+[Linux implementation](https://github.com/gregkh/linux/blob/v6.12.51/fs/fcntl.c).
+A group remains visible after its leader is reaped while another member
+survives. Zero and the existing exact setter errors retain their behavior.
+
+Each native architecture runs 2,430 raw/musl controls as root and UID/GID1000.
+Per credential categories have 405 live PID/TID/child kind checks, 135 child
+reap/refusal checks, 135 worker removal/refusal checks, 225 group survival and
+last-member checks, and 315 inside/outside one-level namespace checks.
+Regular files, nonblocking pipe readers and UNIX stream endpoints each have
+original/dup/CLOEXEC aliases. Extended getter pointers stay full width; raw
+descriptor/command upper words and ignored scalar arguments are exercised.
+Small negative group numbers from the generic libc syscall wrapper receive
+the corresponding errno decoding. Metadata, descriptor/status/signal fields,
+shared offsets, all file bytes and queued AB remain intact. Namespace children
+exchange real owner settings over shared descriptions in both directions.
+
+The worker is observed in fresh task-directory snapshots while alive, joined,
+then polled for absence through bounded fresh getdents64 snapshots before
+zero/ESRCH checks. Every directory record and terminating byte is bounded;
+EOF and successful close are required. This establishes observed settling,
+not a universal simultaneous PID-detach barrier. Earlier Linux x86 checks
+incorrectly assumed join itself guaranteed detachment and failed one control.
+A subsequent pathname predicate exposed Vinix's cached task-path limit:
+existing task paths are refreshed on directory listing or missing lookup.
+Those earlier receipts/captures remain published as diagnostics. Cached-path
+invalidation and exact thread-exit races remain unqualified.
+
+Both unchanged baselines fail exactly 1,290 controls. Native baseline/candidate
+source, C and ELF match exactly; patched Vinix and actual Linux 6.12.51 pass
+the same native musl ELF. The separate preflight C differs only in stderr
+scaffolding, with an identical resulting ELF; its whole-C hashes and raw diff
+are published without normalization. Two 200-cycle cohorts
+measure alias/update/refusal cleanup while a separate non-main worker stays
+alive; all slab classes and large pages stay flat after warmups and settling.
+Owner kind/number writes and snapshots use Handle.l, released before table
+lookup; setters release pid_lock before acquiring Handle.l. The scalar helpers
+hold pid_lock for all target/namespace/group reads, return no borrowed pointer
+and allocate nothing. No object, field or retained namespace is added. Fixture
+failure paths terminate without returning while a worker borrows the frame;
+successful paths join workers, reap children, close descriptors and unlink.
+
+Four completed production builds, five candidate guest cases per architecture
+(ownerquery/fcntlowner/fcntlsig/open/runtime), eight host files and coverage
+checks pass. Allocation inventory remains 400 ARM/292 x86 sites with existing
+allowance refusals. Its copied-source counts grow from 659/655 to 1304/1315
+because the preserved obj-persistent/vsrc build snapshot is also traversed;
+allocation sites and refusal rows remain identical. Complete generated C is
+identical outside precisely fcntl
+and the replaced/new scalar PID helpers, their bodies and prototypes. The
+assertion-enabled audit executes negative assertion and passing-as-baseline
+controls and binds 63 frozen inputs, C/kernels/probe/ISO/captures/builds and
+the independent lifetime review. Twenty-six explicit fixture allocas have no
+hidden heap/index helpers. Runtime evidence freezes committed parent
+905c838513a0939fb8d269786487346fbd62d7a1; the public inventory is generated
+separately from the committed publication parent plus this change. The failed
+ARM build from host disk exhaustion remains visible; successful rebuild and
+completed profiles use a separately verified RAM scratch volume.
+
+- [AArch64 receipt](../tests/linux-compat/results/2026-10-14/ownerquery-after-aarch64.json), [capture](../tests/linux-compat/results/2026-10-14/ownerquery-after-aarch64-native.log), [Linux reference](../tests/linux-compat/results/2026-10-14/ownerquery-reference-aarch64.json), [evidence](../tests/linux-compat/results/2026-10-14/ownerquery-evidence-aarch64.json).
+- [x86-64 receipt](../tests/linux-compat/results/2026-10-14/ownerquery-after-x86_64.json), [capture](../tests/linux-compat/results/2026-10-14/ownerquery-after-x86_64-native.log), [Linux reference](../tests/linux-compat/results/2026-10-14/ownerquery-reference-x86_64.json), [evidence](../tests/linux-compat/results/2026-10-14/ownerquery-evidence-x86_64.json).
+- [Audit](../tests/linux-compat/results/2026-10-14/ownerquery-audit.v), [verdict](../tests/linux-compat/results/2026-10-14/ownerquery-audit.log), [independent review](../tests/linux-compat/results/2026-10-14/ownerquery-lifetime-review.md); superseded diagnostic/build/allocation/host and negative-control logs sit beside them.
+
+The handle still stores a number rather than a retained Linux struct-pid
+identity. PID recycling, exact exit/update races, SIGIO/queued notifications,
+restrictive ownership/security policy, deeper PID namespaces, cached task-path
+invalidation and GNU/translated/ELF32 paths remain unqualified. The three broad
+section 15 acceptance gates stay open.

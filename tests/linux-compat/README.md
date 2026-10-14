@@ -1214,3 +1214,18 @@ file/queue/cursor state are covered. Both baselines fail 2,736 controls; patched
 Vinix and the identical native ELF on actual Linux 6.12.51 pass. Two 200-cycle
 cohorts keep storage flat. Actual SIGIO and retained target identity are
 unqualified. See [receipts and limits](../../docs/linux-posix-qualification.md#native-fcntl-owner-commands-and-target-errors).
+
+The `ownerquery` case checks attached owner kinds and caller PID namespaces
+with 2,430 controls per architecture as root and UID/GID1000. Regular files,
+pipe readers and UNIX stream endpoints have original/dup/CLOEXEC aliases.
+Main PIDs, non-main TIDs, child reaping, joined workers, surviving leaderless
+groups and shared descriptions across a one-level PID namespace exercise
+zero, visible IDs and ESRCH without disturbing bytes, metadata, flags,
+signals, cursors or queued AB. Raw/libc scalar and extended getters cover
+native upper words and negative raw group-number decoding. Fresh bounded
+task-directory snapshots establish observed worker removal after join;
+cached task-path invalidation and exact exit races remain unqualified.
+Two 200-cycle cohorts measure alias/update/refusal cleanup with a live worker.
+Both baselines fail 1,290 controls; candidate Vinix and actual same-ELF Linux
+6.12.51 pass. Earlier join-timing and cached-path setup failures are preserved.
+See [receipts and limits](../../docs/linux-posix-qualification.md#native-fcntl-owner-task-kinds-and-namespaces).

@@ -1,0 +1,25 @@
+--- executed-native-x86_64
++++ preflight-x86_64
+@@ -1151,11 +1151,20 @@
+ 	bool arg1;
+ };
+ 
++static FILE* v3_eprint_begin(void) {
++	fflush(stdout);
++	fflush(stderr);
++	return stderr;
++}
++static void v3_eprint_end(void) {
++	fflush(stderr);
++}
++#define v3_eprintf(...) do { fprintf(v3_eprint_begin(), __VA_ARGS__); v3_eprint_end(); } while (0)
+ static void v3_eprint_lit(const char* s) {
+-	fprintf(stderr, "%s", s);
++	v3_eprintf("%s", s);
+ }
+ static void v3_eprintln_string(string s) {
+-	fprintf(stderr, "%.*s\n", s.len, (char*)s.str);
++	v3_eprintf("%.*s\n", s.len, (char*)s.str);
+ }
+ 
+ bool ownerqueryfixture__capture(i32 fd, ownerqueryfixture__State* target);

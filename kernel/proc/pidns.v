@@ -191,11 +191,11 @@ fn global_id_in(viewer &Namespace, local int) int {
 
 // Linux find_vpid() recognizes any allocated PID number, regardless of the
 // owner's requested PID/TID/group kind. Groups and sessions keep their number
-// after their leader is reaped. Return only a scalar while holding pid_lock:
-// callers must not retain a process or thread from this existence check.
-pub fn pid_number_exists(local int) bool {
+// after their leader is reaped. Return only the kernel number under pid_lock;
+// no borrowed process or thread escapes the lookup.
+pub fn pid_number_id(local int) int {
 	if local <= 0 || local >= max_pid {
-		return false
+		return 0
 	}
 	viewer := current_pid_namespace()
 	pid_lock.acquire()
@@ -206,20 +206,47 @@ pub fn pid_number_exists(local int) bool {
 	if global > 0 && global < max_pid {
 		p := processes[global]
 		if p != unsafe { nil } && pid_in(p, viewer) == local {
-			return true
+			return global
 		}
 		t := threads_by_tid[global]
 		if t != unsafe { nil } && tid_in(t, viewer) == local {
-			return true
+			return global
 		}
 	}
 	for i := 1; i < max_pid; i++ {
 		p := processes[i]
-		if p != unsafe { nil } && (pgid_in(p, viewer) == local || sid_in(p, viewer) == local) {
-			return true
+		if p != unsafe { nil } {
+			if pgid_in(p, viewer) == local { return p.pgid }
+			if sid_in(p, viewer) == local { return p.sid }
 		}
 	}
-	return false
+	return 0
+}
+
+// An fcntl owner number is visible only while a task is attached to the
+// requested PID/TID/group kind, and only in namespaces that see that number.
+// This maps a kernel number without borrowing or retaining a target pointer.
+pub fn pid_owner_number(global int, kind int) int {
+	if global <= 0 || global >= max_pid { return 0 }
+	viewer := current_pid_namespace()
+	pid_lock.acquire()
+	defer { pid_lock.release() }
+	if kind == 0 {
+		t := threads_by_tid[global]
+		if t != unsafe { nil } { return tid_in(t, viewer) }
+	} else if kind == 1 {
+		p := processes[global]
+		if p != unsafe { nil } { return pid_in(p, viewer) }
+	} else if kind == 2 {
+		for i := 1; i < max_pid; i++ {
+			p := processes[i]
+			if p != unsafe { nil } && p.pgid == global {
+				number := pgid_in(p, viewer)
+				if number != 0 { return number }
+			}
+		}
+	}
+	return 0
 }
 
 // The process `viewer` calls `local`, or nil. The caller holds the table lock,
