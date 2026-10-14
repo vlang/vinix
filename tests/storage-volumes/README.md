@@ -1,5 +1,11 @@
 # Storage-volume qualification
 
+`--host-data-monitor` and `--data-monitor` qualify repeated complete data scans,
+one discovery per disk, retained reference/pins across intervals, restored-data
+status, late operational failures, 512-sample sessions and bounded lifetimes
+across reordered reboot. The oracle reconstructs 14 persisted files, including
+every long-session sample. See [data monitoring](data-monitor.md).
+
 `--host-cipher-scrub-reference` and `--cipher-scrub-reference` qualify complete
 ciphertext scrub binding to a supplied reference, private pinned inputs,
 historical findings and bounded lifetimes across reordered reboot. The oracle

@@ -3154,6 +3154,64 @@ changing caller state; embedded identities, bounds, pools and global slots
 retain the ordinary bundle validation. See
 [qualification](../tests/storage-volumes/data-checksums.md).
 
+## Periodic pinned data checksum monitoring
+
+`monitor-data-auto MANIFEST INTERVAL_SECONDS COUNT` repeatedly checks every
+desired extent in a trusted plain-data `VINIXDH1` reference. The complete
+bounded reference is validated once before identity-based read-only discovery.
+The source file, parent directory and original selected physical descriptors
+remain open through all samples, sleeps and final stdout checks. Replacing the
+reference pathname does not change the session's reference or trigger discovery.
+
+```sh
+vinix-volume monitor-data-auto /root/data.vhash 60 10
+vinix-volume monitor-data-auto /root/data.vhash 60 0
+```
+
+The interval is a decimal integer from 0 through 86400 seconds, measured after
+each completed sample. Interrupted sleeps resume their remaining duration.
+`COUNT` is a decimal unsigned 64-bit integer. A positive count completes after
+that many samples; a zero interval permits consecutive finite scans. Count 0
+runs continuously and requires a positive interval. Sample numbers start at 1.
+Both sample and changed-sample counters saturate at the unsigned 64-bit maximum
+in a continuous session. Invalid CLI syntax returns usage status 2.
+
+Each sample reads every saved row, including rows after a digest mismatch.
+Every selected physical identity, read-only bit, native identity/capacity/sector
+is rechecked before and after streaming and again immediately before output.
+Distinct physical matches, missing participants and changed pins fail using the
+existing automatic-discovery rules. Mapping read-only flags remain exact and
+independent of physical read-only status. The monitor uses the ordinary plain
+reference-file policy and takes no directory writer lock.
+
+A complete privately constructed sample starts with this newline-terminated
+prefix, followed immediately by the canonical full `VINIXSR1` scrub header and
+every row in saved disk/row order:
+
+```text
+format=VINIXDM1 operation=monitored-data sample=N changed_samples=C session_changed=0|1
+```
+
+`changed_samples` counts completed scans containing any changed row;
+`session_changed` stays 1 once any scan has changed. Each scrub retains the
+full original reference fingerprint, geometry, mapping modes and both digests.
+The fixed 33024-byte sample buffer covers all 64 rows. The combined stream is
+a monitor transcript; extract one complete `VINIXSR1` sample for an offline
+scrub query. No successful sample is printed for an incomplete read or failed
+final pin check. A stdout failure can leave a partial write and returns 1.
+
+A finite session returns 0 if all scans were clean, or 2 if any completed scan
+changed, including when later samples show restored data. Any later input,
+device, encoding or stdout failure returns 1, taking precedence over findings.
+Earlier completed samples remain visible. Continuous sessions run until an
+operational failure or external termination; they do not return after findings.
+
+The command creates no file, imports no mapping and writes no physical data.
+Use a trusted reference and quiescent writes when consistent observations are
+required. Pinning and repeated SHA-256 scans provide neither authentication,
+a concurrent snapshot nor repair. See
+[monitor qualification](../tests/storage-volumes/data-monitor.md).
+
 ## Binding ciphertext scrubs to checksum references
 
 `verify-volume-scrub-reference REFERENCE REPORT` checks a saved `VINIXCS1`

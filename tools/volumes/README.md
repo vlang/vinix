@@ -4,6 +4,12 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`monitor-data-auto MANIFEST INTERVAL_SECONDS COUNT` repeatedly scans every
+plain-data mapping while retaining one validated reference and the original
+read-only disk pins. Complete samples preserve changed status after restoration;
+later operational failures take precedence. Count 0 runs continuously with a
+positive interval. See [monitoring](../../docs/storage-volumes.md#periodic-pinned-data-checksum-monitoring).
+
 `verify-volume-scrub-reference REFERENCE REPORT` checks a saved ciphertext scrub
 against the entire supplied checksum reference, using pinned private inputs.
 The historical view includes complete mapping geometry and both input hashes;

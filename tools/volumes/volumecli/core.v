@@ -56,6 +56,7 @@ fn decimal(text &char) ?u64 {
 }
 
 fn usage() i32 {
+	C.printf(c'       vinix-volume monitor-data-auto MANIFEST INTERVAL_SECONDS COUNT\n')
 	C.printf(c'       vinix-volume verify-volume-scrub-reference REFERENCE REPORT\n')
 	C.printf(c'       vinix-volume verify-data-scrub-reference MANIFEST REPORT\n')
 	C.printf(c'       vinix-volume compare-data-scrubs BEFORE_REPORT AFTER_REPORT\n')
@@ -115,6 +116,12 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && C.strcmp(argv[1], c'monitor-data-auto') == 0 {
+			if argc != 5 || argv[2][0] == 0 { return usage() }
+			interval := decimal(argv[3]) or { return usage() }; samples := decimal(argv[4]) or { return usage() }
+			if interval > 86400 || (interval == 0 && samples == 0) { return usage() }
+			return monitor_manifest_data(argv[2], u32(interval), samples)
+		}
 		if argc >= 2 && C.strcmp(argv[1], c'verify-volume-scrub-reference') == 0 {
 			if argc != 4 || argv[2][0] == 0 || argv[3][0] == 0 { return usage() }
 			return verify_volume_scrub_reference_files(argv[2], argv[3])
