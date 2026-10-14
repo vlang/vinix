@@ -40,6 +40,9 @@ import resource
 import security
 import stat
 
+// Bound lazy layer population and other callbacks through stacked overlays.
+const overlay_max_layer_depth = 8
+
 struct OverlayFS {
 mut:
 	dev_id u64
@@ -49,6 +52,7 @@ mut:
 	staging_serial u64
 	staging_owner u32
 	work_next &OverlayFS = unsafe { nil }
+	layer_depth int
 }
 
 // What an overlay node is made of.
@@ -502,6 +506,10 @@ fn overlay_populate_locked(mut dir VFSNode) {
 
 	mut merged := map[string]&OverlayMerge{}
 	for index, layer in layers {
+		// A lower overlay directory can still be lazy. Materialize its merged
+		// children before collecting this layer, using the already-held lock.
+		mut populated_layer := unsafe { layer }
+		overlay_populate_locked(mut populated_layer)
 		if layer.children == unsafe { nil } {
 			continue
 		}
@@ -1094,6 +1102,7 @@ fn overlay_mount(parent &VFSNode, mount_parent &VFSNode, name string, options st
 	vfs_lock.acquire()
 	defer { vfs_lock.release() }
 	mut lowers := []&VFSNode{}
+	mut layer_depth := 1
 	mut layers_assigned := false
  defer { if !layers_assigned { unsafe { lowers.free() } } }
 	lower_paths := lower_spec.split(':')
@@ -1105,13 +1114,22 @@ fn overlay_mount(parent &VFSNode, mount_parent &VFSNode, name string, options st
 			errno.set(errno.einval)
 			return none
 		}
-		lowers << overlay_directory(parent, path)?
+		layer := overlay_directory(parent, path)?
+		depth := overlay_layer_depth(layer)
+		if depth > overlay_max_layer_depth { errno.set(errno.eloop); return none }
+		if depth > layer_depth { layer_depth = depth }
+		lowers << layer
 	}
 	mut upper := &VFSNode(unsafe { nil })
 	mut work := &VFSNode(unsafe { nil })
 	if upper_path.len > 0 {
 		upper = overlay_directory(parent, upper_path)?
 		work = overlay_directory(parent, work_path)?
+		for layer in [upper, work]! {
+			depth := overlay_layer_depth(layer)
+			if depth > overlay_max_layer_depth { errno.set(errno.eloop); return none }
+			if depth > layer_depth { layer_depth = depth }
+		}
 		if !same_filesystem(upper, work) { errno.set(errno.exdev); return none }
   if upper.resource.stat.ino == work.resource.stat.ino
    || is_ancestor(upper, work) || is_ancestor(work, upper) { errno.set(errno.einval); return none }
@@ -1128,6 +1146,7 @@ fn overlay_mount(parent &VFSNode, mount_parent &VFSNode, name string, options st
 		upper:  upper
 		work:   work
 		lowers: lowers.clone()
+		layer_depth: layer_depth
   staging_owner: proc.current_thread().process.euid
 	}
 	mut root := create_node(ofs, mount_parent, name, true)
@@ -1147,6 +1166,12 @@ fn overlay_mount(parent &VFSNode, mount_parent &VFSNode, name string, options st
  }
  layers_assigned = true
 	return root
+}
+
+// Each alias carries its filesystem's maximum accepted backing depth. Layer
+// pointers stay fixed for that mount, so admission needs no recursive walk.
+fn overlay_layer_depth(node &VFSNode) int {
+	return if node.overlay == unsafe { nil } { 1 } else { node.overlay.fs.layer_depth + 1 }
 }
 
 // Generic VFS creation performs identity and ACL checks after filesystem.create.
