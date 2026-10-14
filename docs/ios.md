@@ -5282,10 +5282,43 @@ generated C streams and executables, pinned SDK/LLVM references, generated-C
 allocation/ownership checks, retained fixture trials and IPA probe/audits are
 under `build/ios/fortnite/objc-cast-checks`; full iOS regression remains unpassed.
 
-The supplied IPA gets past `_swift_dynamicCastObjCClass` and exits with status 1
-at MarketplaceKitWrapper's required `_swift_getForeignTypeMetadata`. Its required
-import and native foreign-metadata instructions are retained. Fortnite has not
-entered application code and remains unplayable.
+Swift Core exports `_swift_getForeignTypeMetadata` for complete imported scalar
+enum templates. MarketplaceKitWrapper's `UISceneActivationState` accessor passes
+the request in `x0` and its complete enum template in `x1`; the response returns
+metadata and state in `x0`/`x1`. Native comparisons confirm that separate templates
+with the same imported identity return the first template, including an `N`
+Clang-name override after the Swift name. Already complete templates return state
+zero for blocking, nonblocking and abstract requests.
+
+The entry accepts nongeneric imported enums with descriptor flags `0x60012`, no
+payload, field metadata or initialization/completion callbacks, and complete
+inline POD witnesses of size/stride 1, 2, 4 or 8. Names have a 1,023-byte bound;
+related-entity/namespace tags, duplicate overrides, foreign classes/structs,
+generic or payload enums, non-POD/incomplete witnesses and callbacks reject.
+The image or caller supplies readable, immutable template, descriptor, witness
+and name spans and keeps them mapped until quiescent runtime shutdown. A fixed
+64-entry cache inside the runtime borrows those pointers and publishes canonical
+identities under the existing lock, with no lookup allocation or ARC operation.
+Shutdown clears its slots after workers drain. Additional identities and
+incompatible widths reject without overwriting known entries.
+
+Ten fresh ASan/UBSan runs and five ARM64 Vinix suites pass across foreign
+metadata, metadata, ObjC casts, mangled lookup and Any. The public
+`build-swift-foreign-metadata` target and full build, regression and Swift guest
+modes include the fixture. Native/V comparisons cover imported identity aliases,
+four scalar widths, all request bits, read-only templates, guarded response
+storage and preserved `x20`/`x21`. V additionally checks concurrent publication,
+malformed layouts/tags, cache exhaustion, retirement and two cleared cache
+lifetimes before caller unmapping. Thirteen generated C streams/executables,
+pinned SDK/LLVM references, the actual IPA accessor/template, generated-C
+allocation checks and IPA probe/audits are retained under
+`build/ios/fortnite/foreign-metadata-checks`; full iOS regression remains unpassed.
+
+The supplied IPA gets past `_swift_getForeignTypeMetadata` and exits with status 1
+at MarketplaceKitWrapper's required
+`_swift_getTypeByMangledNameInContextInMetadataState`. Its required import and
+native instructions are retained. Fortnite has not entered application code and
+remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -5294,10 +5327,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,464 | 696 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 156 | 20 | 23 |
-| All images | 2,279 | 719 | 120 |
+| MarketplaceKitWrapper | 157 | 19 | 23 |
+| All images | 2,280 | 718 | 120 |
 
-The C++/GLES/Text variant reports 2,292 resolved imports, 706 unresolved strong
+The C++/GLES/Text variant reports 2,293 resolved imports, 705 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

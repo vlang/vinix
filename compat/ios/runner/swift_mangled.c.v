@@ -181,6 +181,7 @@ fn swift_mangled_lookup(name u64, length u64, context u64, generic_args u64) u64
 
 fn swift_mangled_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_swift_getForeignTypeMetadata' { u64(unsafe { voidptr(swift_foreign_metadata) }) }
 		'_swift_getTypeByMangledNameInContext' { u64(unsafe { voidptr(swift_mangled_lookup) }) }
 		else { none }
 	}
