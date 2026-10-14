@@ -144,7 +144,7 @@ fn test_swift_actor_executor() {
 	for _ in 0 .. 2 {
 		objc_start()
 		assert ios_runtime.swift_concurrency_code == 0 && !ios_runtime.swift_concurrency_retired
-		for name in ['_$sScPSgMa', '_$sScM6sharedScMvgZ', '_swift_task_cancel', '_swift_once']! {
+		for name in ['_$sScPSgMa', '_$sScMScAsMc', '_swift_task_cancel', '_swift_once']! {
 			if _ := runtime_symbol('/usr/lib/swift/libswift_Concurrency.dylib', name) { assert false }
 		}
 		assert ios_runtime.swift_concurrency_code == 0

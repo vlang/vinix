@@ -45,6 +45,14 @@ fn swift_array_layout(count i64, element u64) !SwiftArrayLayout {
 	// witnesses. Arbitrary Swift classes and class-constrained existentials
 	// still require separate storage/reflection/bridging implementations.
 	verbatim := kind == 0x305
+	// Our final MainActor class has known one-reference value witnesses.
+	// Compare its canonical metadata before admitting a native class kind;
+	// arbitrary application classes remain outside this storage profile.
+	C.ios_objc_initialize_lock()
+	main_actor := ios_runtime != unsafe { nil } && ios_runtime.swift_main_actor_arena != 0
+		&& !ios_runtime.swift_main_actor_retired
+		&& element == ios_runtime.swift_main_actor_arena + u64(C.getpagesize()) + 24
+	C.ios_objc_initialize_unlock()
 	if verbatim {
 		if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired {
 			return swift_objc_array_failure()
@@ -54,7 +62,7 @@ fn swift_array_layout(count i64, element u64) !SwiftArrayLayout {
 		C.ios_objc_initialize_unlock()
 		if !valid { return swift_objc_array_failure() }
 	}
-	if !verbatim && kind !in [u64(0x200), 0x201, 0x202, 0x300, 0x301, 0x302, 0x303, 0x304, 0x306]! {
+	if !verbatim && !main_actor && kind !in [u64(0x200), 0x201, 0x202, 0x300, 0x301, 0x302, 0x303, 0x304, 0x306]! {
 		return error('iOS: Swift reference-type Array storage is not implemented')
 	}
 	if kind == 0x303 && unsafe { *(&u32(element + 8)) } & 0x80000000 == 0 {

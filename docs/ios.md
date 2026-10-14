@@ -5681,22 +5681,69 @@ the corrected fixture, the native import-target assumption and joined startup
 probes/audits are retained under `build/ios/fortnite/nsobject-hashable-checks`.
 Full iOS regression remains unpassed and published runners remain unchanged.
 
-The IPA startup probe gets past NSObject conformances and exits with status 1
-at MarketplaceKitWrapper's required MainActor.shared getter,
+The IPA startup probe at this stage got past NSObject conformances and exited
+with status 1 at MarketplaceKitWrapper's required MainActor.shared getter,
 `_$sScM6sharedScMvgZ`, in `/usr/lib/swift/libswift_Concurrency.dylib`.
-Fortnite has not entered application code and remains unplayable.
+
+The next step implements MainActor.shared and its nongeneric final class
+metadata in `swift_main_actor.c.v`, exporting `_$sScM6sharedScMvgZ`,
+`_$sScMMa` and `_$sScMMn`. V/LLVM inspection of the installed Mac runtime
+shows the shared getter forwarding to `swift_initStaticObject`. Its instance
+is sixteen bytes with immortal reference bits `0x80000004ffffffff`; native
+and unknown-object ARC leave those bits unchanged. Its complete accessor
+returns the class metadata and zero state, and its class value witnesses
+operate on one eight-byte reference. IPA inspection retains the two actual
+shared getter calls and three accessor calls, including the caller moving
+the returned metatype into x20 before calling shared. No Fortnite code was
+executed by these inspectors.
+
+Vinix publishes one sealed RX/RO arena containing the accessor, independent
+class descriptor and immutable singleton. It preserves the borrowed metatype
+and error registers, returns the canonical immortal reference without heap
+allocation or per-call ARC, and routes native/unknown ARC and object-type
+lookup through its registered identity before reading owner storage. The
+existing reference witnesses support copy/take/assignment/destruction and
+exact bounded values. Typed Array storage additionally accepts this canonical
+class metadata; arbitrary application class storage remains unsupported.
+Separately allocated instances have a real Swift-context deallocating
+destructor for the measured instance layout. At quiescent shutdown, Array
+and heap owners drain before the actor arena retires, followed by ARC
+adapters and borrowed value witnesses. Descriptors, getter entries and
+singleton references expire with the runtime.
+
+Ten fresh ASan/UBSan runs and five ARM64 guest suites pass across MainActor,
+actor witness dispatch, heap allocation, unknown-object witnesses and
+TaskPriority metadata. The native/V MainActor comparison checks complete
+accessor requests, identity, unchanged immortal ARC, object type, exact
+protected copy/take/destroy spans, a borrowed protected metatype, guarded
+x20/x21 and eight getter/ARC workers. Vinix also checks eight concurrent
+first publishers, nominal lookup, actual allocated-instance destruction,
+typed-array ownership, explicit executor/conformance rejection and two
+drained lifetimes with code and metadata unmapped. Thirteen fresh C streams
+and executables, SDK/native/IPA observations, the original observer register
+output failure and corrected observer, and joined startup probes/audits are
+retained under `build/ios/fortnite/main-actor-checks`. Full iOS regression
+remains unpassed and published runners remain unchanged.
+
+The actual IPA startup probe now gets past MainActor.shared and its metadata
+accessor and exits with status 1 at the required MainActor Actor conformance,
+`_$sScMScAsMc`. The installed modern Mac runtime returns an executor object
+and witness pointer for its main executor; that native representation is
+retained for further implementation. MainActor Actor conformance and main
+executor scheduling remain explicitly unsupported. Fortnite has not entered
+application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,472 | 688 | 79 |
+| Fortnite executable | 1,474 | 686 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 168 | 8 | 23 |
-| All images | 2,299 | 699 | 120 |
+| MarketplaceKitWrapper | 170 | 6 | 23 |
+| All images | 2,303 | 695 | 120 |
 
-The C++/GLES/Text variant reports 2,312 resolved imports, 686 unresolved strong
+The C++/GLES/Text variant reports 2,316 resolved imports, 682 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
