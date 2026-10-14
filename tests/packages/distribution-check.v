@@ -45,6 +45,9 @@ fn check() ! {
 		run(v, [...helper_flags, '-gc', 'none', '-path', '@vlib|@vmodules|' + repository,
 			'-o', work + '/https-check', repository + '/tests/packages/https-check.v'])!
 		run(work + '/https-check', [work + '/https-fixture', work + '/https-run'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/https-destination-check', repository + '/tests/packages/https-destination-check.v'])!
+		run(work + '/https-destination-check', [work + '/https-fixture', work + '/https-destinations'])!
 		if '--https-only' in os.args { println('Package HTTPS checks passed'); return }
 	}
 	if '--software-only' !in os.args {

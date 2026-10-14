@@ -91,52 +91,7 @@ fn fetch_progress(url string, destination string, maximum u64, resume bool, offl
 	if url.starts_with('file:///') {
 		return fetch_file_progress(url[7..], destination, maximum, resume, event, report)
 	}
-	if offline { return error('offline mode: verified payload is missing from cache: ${url}') }
-	if !url.starts_with('https://') {
-		return error('repository transport requires HTTPS or a local file repository')
-	}
-	mut resumed := resume && ordinary_file(destination) && os.file_size(destination) > 0
-	mut code := https_transfer(url, destination, maximum, resumed, event, report)!
-	if code == 33 && resumed {
-		// curl's explicit range-support refusal is the only transport error that
-		// discards a prefix automatically. Other failures retain it for retry.
-		os.rm(destination)!
-		label := if event.package == '' { 'download' } else { event.package + '/' + event.path }
-		println('Restarting ${label}: repository does not support byte ranges')
-		resumed = false
-		code = https_transfer(url, destination, maximum, false, event, report)!
-	}
-	if code != 0 { return error('download failed (${code}); retained partial data for retry: ${url}') }
-	if os.file_size(destination) > maximum {
-		os.rm(destination)!
-		return error('download exceeded its size limit')
-	}
-	sync_file(destination)!
-	return resumed
-}
-
-fn https_transfer(url string, destination string, maximum u64, resume bool, event pkgprotocol.Progress, report fn (pkgprotocol.Progress)) !int {
-	mut args := ['--disable', '--fail', '--show-error', '--silent', '--location', '--proto', '=https',
-		'--proto-redir', '=https', '--tlsv1.2', '--connect-timeout', '20', '--max-time', '1800',
-		'--retry', '3', '--max-filesize', maximum.str(), '--output', destination]
-	if resume { args << ['--continue-at', '-'] }
-	args << ['--', url]
-	mut process := os.new_process('/usr/bin/curl')
-	defer { process.close() }
-	process.set_args(args)
-	if event.phase != '' {
-		// Keep the conditional outside the callback argument: the cross C
-		// backend can otherwise infer the callback snapshot's signature wrongly.
-		mut current := u64(0)
-		if resume { current = transfer_size(destination) }
-		report(pkgprotocol.Progress{ ...event, current: current })
-	}
-	if event.phase == '' {
-		process.wait()
-		return process.code
-	}
-	process.run()
-	return monitor_transfer_status(mut process, destination, maximum, event, report) or { return error('${err}: ${url}') }
+	return fetch_https_with(url, destination, maximum, resume, offline, event, report, HttpsOutputOptions{})
 }
 
 pub fn free_bytes(path string) !u64 {

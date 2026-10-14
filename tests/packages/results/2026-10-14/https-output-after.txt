@@ -1,0 +1,8 @@
+alias: wait status 256; refused with external files preserved
+hardlink: wait status 256; refused with external files preserved
+fifo: wait status 256; refused with external files preserved
+directory: wait status 256; refused with external files preserved
+nul-path: wait status 256; refused with external files preserved
+oversized-resume: wait status 256; refused with external files preserved
+delayed-alias: wait status 256; refused with external files preserved
+HTTPS destination qualification passed

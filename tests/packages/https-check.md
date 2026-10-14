@@ -4,12 +4,16 @@ The pre-change downloader repeatedly resumed the same partial when a server
 ignored its Range header. Real curl returned error 33 each time, leaving the
 retained prefix unusable until an administrator removed it manually.
 
-Acquisition now discards that prefix and makes one fresh HTTPS transfer on curl's
+Acquisition now makes one fresh HTTPS transfer on curl's
 explicit range-support refusal. Other transport failures keep partial data for
 later commands. Acquisition reports whether it actually resumed; if a fresh
 fallback fails its signed hash, the transaction stops rather than making a third
 integrity transfer. Both transfer attempts retain the same URL, TLS/redirect
-policy, authenticated size limit and normal transport retry/time bounds.
+policy, authenticated size limit and transport time bounds. The captured-output
+writer replaces the old prefix only when fresh bytes arrive (or empty success).
+Curl's internal retries are disabled: its output pipe cannot rewind delivered
+bytes. The service controls the fresh fallback and preserves interrupted bytes
+for a later transaction. See [captured output qualification](https-output-check.md).
 Progress starts with the retained offset and resets to zero for a fresh fallback.
 
 `https-fixture.v` serves a loopback TLS repository. `https-check.v` invokes the
@@ -44,8 +48,10 @@ V=/path/to/v V_MACOS_V3_NO_FALLBACK=1 \
 ```
 
 `--https` adds this transport fixture to the normal distribution suite.
-`--https-only` runs it independently of the desktop/UI fixtures. The native curl
-and OpenSSL versions are part of the retained qualification evidence. These are
+`--https-only` runs it independently of the desktop/UI fixtures. The destination
+regression also runs in these modes and refuses aliases, hard links,
+FIFOs, directories, NUL paths, oversized resume prefixes and delayed substitutions.
+Curl and OpenSSL versions are part of the retained qualification evidence. These are
 host HTTPS checks; they do not qualify a guest TLS stack, public repository,
 proxy fleet, physical-media interruption or broader application runtimes.
 

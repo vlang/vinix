@@ -565,6 +565,10 @@ fn qualify_package_linux(mut t Test) ! {
 	t.say('PACKAGE PAYLOAD HASH captured-files signed-length special-file-refusal preserved-state restored-retry PASS')
 	qualify_package_atomic_metadata(architecture)!
 	t.say('PACKAGE METADATA WRITE exclusive-temporary captured-parent stale-names preserved-state restored-verification PASS')
+	output_check := run(['/usr/share/package-fixtures/https-output-check', '--producer',
+		'/usr/share/package-fixtures/output-producer'], '', none, none)
+	assert output_check.status == 0, output_check.output
+	t.say('PACKAGE PIPE OUTPUT bounded-writes resume range-refusal closed-descriptors reaped-children PASS')
 	// Organization restrictions are reviewed and atomically persisted without
 	// editing trust, the account selection or the installed generation.
 	policy_path := '/tmp/organization-policy.json'

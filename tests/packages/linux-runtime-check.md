@@ -82,6 +82,15 @@ musl loader, static runner, service, session runner and serial log. Keep the log
 alongside the receipt; failure cannot produce a passing receipt. Retained images
 contain fixture keys only.
 
+The controller also builds a static stdout producer and the package core's HTTPS
+output runner for each target. The guest runs the actual bounded pipe consumer,
+including resume, range refusal, interrupted recovery, captured destination
+checks, close-on-exec and child/descriptor retirement under a 32-descriptor limit.
+`PACKAGE PIPE OUTPUT` is required; both binaries are pinned in the current receipt.
+This exercises the target process/pipe/file boundary. Actual certificate and HTTP
+behavior is qualified separately with host curl and the loopback TLS server in
+[HTTPS output qualification](https-output-check.md).
+
 The scenario passed on both targets on 2026-10-12 using an isolated build of
 committed kernel revision `7ac619bd`. Retained receipts and complete serial logs:
 [AArch64 receipt](results/2026-10-12/linux-aarch64.json),

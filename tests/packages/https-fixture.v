@@ -40,6 +40,7 @@ fn serve(mut connection openssl.SSLConn, root string, log string) ! {
 	mut record := os.open_file(log, 'a', 0o600)!
 	record.writeln(mode + ' ' + relative + ' ' + if range == '' { '-' } else { range })!
 	record.close()
+	if mode == 'delayed' { time.sleep(250 * time.millisecond) }
 	if mode == 'forbidden' && relative.starts_with('objects/') { reply(mut connection, '403 Forbidden', 'Content-Length: 0\r\n', '')!; return }
 	if mode == 'insecure-redirect' && relative.starts_with('objects/') {
 		reply(mut connection, '302 Found', 'Location: http://127.0.0.1:9/refused\r\nContent-Length: 0\r\n', '')!

@@ -1,0 +1,10 @@
+alias: wait status 0; previous behavior reproduced
+hardlink: wait status 0; previous behavior reproduced
+fifo: wait status 14; previous behavior reproduced
+curl: (23) Failure writing output to destination, passed 16384 returned 4294967295
+directory: wait status 256; previous behavior reproduced
+nul-path: wait status 0; previous behavior reproduced
+curl: (63) Maximum file size exceeded
+oversized-resume: wait status 256; previous behavior reproduced
+delayed-alias: wait status 0; previous behavior reproduced
+HTTPS destination qualification passed

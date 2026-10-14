@@ -266,10 +266,19 @@ A refused refresh or enrollment preserves the previous cached catalog, trust
 history, configuration and installed generation. See
 [signed metadata qualification](../tests/packages/index-schema-check.md).
 
-If an HTTPS repository refuses byte-range resume, acquisition discards that
-prefix and retries once from byte zero. A corrupt fresh fallback stops without
-another integrity retry. Other transport failures preserve partial data for a
-later transaction. [Real TLS transport checks](../tests/packages/https-check.md)
+HTTPS acquisition opens one nonblocking, no-follow regular destination before
+starting curl, refusing hard links and oversized resume prefixes. Curl writes to
+a pipe; the service bounds each write before sending it to the captured file.
+The file and named identity must still agree before successful completion, and
+the captured file is flushed without reopening the pathname. See
+[HTTPS output qualification](../tests/packages/https-output-check.md).
+
+If an HTTPS repository refuses byte-range resume, acquisition retries once from
+byte zero, replacing the old prefix when fresh bytes arrive. A corrupt fresh
+fallback stops without another integrity retry. Other transport failures preserve
+partial data for a later transaction. Curl's internal retries are disabled because a pipe cannot
+rewind bytes already delivered; each service attempt has its own captured offset.
+[Real TLS transport checks](../tests/packages/https-check.md)
 cover certificate/hostname trust, HTTPS-only redirects, authenticated size bounds,
 range recovery, progress and preserved activation/rollback.
 

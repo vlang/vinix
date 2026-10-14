@@ -98,6 +98,11 @@ admits the signed length before reading, bounds hashing to that size plus one
 sentinel byte, and refuses changed sizes or pathname identity. See
 [hash qualification](../../tests/packages/hash-file-check.md).
 
+HTTPS acquisition also captures its regular destination before starting curl.
+Curl supplies bytes through a pipe; the service enforces the size bound before
+writing, preserves retry prefixes and refuses changed destination identities.
+See [HTTPS output qualification](../../tests/packages/https-output-check.md).
+
 Metadata publication now shares one writer for catalogs, publisher documents,
 configuration and trust history. Exclusive private temporary files replace
 predictable `.new` names; publication, cleanup and durability checks use captured
