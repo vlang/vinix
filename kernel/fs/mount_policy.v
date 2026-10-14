@@ -71,6 +71,12 @@ pub fn mount_flags(identity &lib.MountContext) u64 {
 	return if entry == unsafe { nil } { u64(0) } else { entry.flags }
 }
 
+// An explicit route selects one attachment even when bind aliases share the
+// inode. Backend read-only state still applies to every route to that inode.
+fn read_only_on_mount(node &VFSNode, identity &lib.MountContext) bool {
+	return node.read_only || mount_flags(identity) & ms_rdonly != 0
+}
+
 // Only a filesystem's original mount can be inferred from an inode. Bind
 // identities must be preserved by the path walk instead: newest matching root
 // would apply one alias's permissions to every other alias of the inode.

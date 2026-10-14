@@ -59,8 +59,9 @@ final worker state uses explicit stack storage and remains alive until join.
 `before-c` predates the churn case. `before-d`, `all-after-a` and `linux-a` retain
 the intermediate writable copied-root fixture. Native writable opens there
 returned `EROFS` despite the copied source attachment being writable and its
-sibling bind being read-only. This existing alias-policy limitation is recorded
-separately: final preservation cases explicitly remount their copied roots
+sibling bind being read-only. The subsequent [bind policy checks](bind-policy.md)
+qualify the correction to creation and writable opens through such aliases.
+Final pivot preservation cases explicitly remount their copied roots
 read-only, and retain all identity and read-only assertions. Final `before-e`,
 `all-after-b` and `linux-b` qualify the complete current fixture.
 
@@ -94,8 +95,8 @@ Private worktree sparsification and derived object-cache removal are recorded
 separately; kernel sources, generated C, binaries, logs and receipts remain.
 
 Concurrent unshare/setns writes to a private view's namespace remain
-unsynchronized with its lock. Broader fork/chroot/namespace stress, copied-root
-writable-open alias behavior, bootstrap/self-root pivots, cursor-depth boundary
+unsynchronized with its lock. Broader fork/chroot/namespace stress,
+bootstrap/self-root pivots, cursor-depth boundary
 qualification, same-directory stacking, busy-reference accounting, reclamation,
 propagation and full OCI/rootless acceptance remain open, along with the rest
 of roadmap section 17.

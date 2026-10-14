@@ -428,8 +428,15 @@ process-table-locked pass preserves fork inheritance ordering; a busy thread
 list is waited for outside that lock using a pinned process, then the traversal
 restarts. Independent source/generated-C lifetime review and native ARM/x86
 plus same-ELF Linux checks cover the change and a thread-view creation/retirement
-loop. Concurrent unshare/setns remains unsynchronized; inode-based creation
-and copied-root writable-open checks outside this pivot path remain open.
+loop. Concurrent unshare/setns remains unsynchronized.
+The [bind attachment policy checks](../tests/mount-lifecycle/bind-policy.md)
+qualify writable opens, truncating opens, `O_CREAT` and `mkdirat` through separate
+read-only/writable aliases of the same inode. Explicit path routes select the
+attachment while backend read-only state and existing authorization still
+apply. Retained fds, copied namespaces, chroot/cwd aliases and private thread
+views pass on both architectures and the same-ELF Linux reference. Internal
+inode-only creators keep their conservative fallback; metadata, symlink/link,
+rename, unlink and descriptor truncation still need complete route-based policy.
 Mount reclamation, busy-reference accounting and full OCI acceptance remain open.
 The overlay-depth refusal measurements also exposed an event-record allocation per call.
 The separate [security event producer correction](../tests/overlay-rename/security-events.md)

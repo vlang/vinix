@@ -31,6 +31,13 @@ individual cases.
 `pa-0` through `pa-4` select its individual cases.
 `--case pivot-threads` selects private thread-view updates and preservation;
 `pt-0` through `pt-6` select its individual cases.
+`--case bind-policy` selects creation and writable-open attachment policy;
+`bp-0` through `bp-4` select its individual cases.
+
+The [bind policy checks](bind-policy.md) distinguish writable and read-only
+attachments of the same inode for opens, truncating opens, file creation and
+`mkdirat`. They cover directory/file binds, retained fds in copied namespaces,
+chroot/cwd aliases and another thread's private namespace.
 
 The [private thread pivot checks](pivot-threads.md) cover other threads' owned
 filesystem views, including a view in the caller's namespace whose process
@@ -71,7 +78,7 @@ iterations, verifies capability denial and finishes with valid local operations.
 
 Use `--probe-state /path/to/prior-native-result` to reuse its probe ELF and
 generated C with a different kernel or case. The controller requires a matching
-architecture and identical current/copied hashes of all eight fixture files,
+architecture and identical current/copied hashes of all nine fixture files,
 verifies both artifact hashes against the prior receipt and checks the ELF
 architecture before boot.
 The prior result may be a failed control; its receipt hash is pinned in the new

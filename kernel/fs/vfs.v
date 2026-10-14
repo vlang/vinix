@@ -777,18 +777,18 @@ fn internal_create_with_acl_locked(parent &VFSNode, name string, mode u32, acces
 	apply_umask bool) ?&VFSNode {
 	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	if !starting_mount(parent, identity) { return none }
-	return internal_create_resolved_locked(parent, name, mode, access, apply_umask, identity, 0, false, 0)
+	return internal_create_resolved_locked(parent, name, mode, access, apply_umask, identity, 0, false, false, 0)
 }
 
 fn internal_create_resolved(parent &VFSNode, name string, mode u32, access u32,
 	identity &lib.MountContext, resolve u64, follow_final bool) ?&VFSNode {
 	vfs_lock.acquire()
 	defer { vfs_lock.release() }
-	return internal_create_resolved_locked(parent, name, mode, access, true, identity, resolve, follow_final, 0)
+	return internal_create_resolved_locked(parent, name, mode, access, true, identity, resolve, follow_final, true, 0)
 }
 
 fn internal_create_resolved_locked(parent &VFSNode, name string, mode u32, access u32,
-	apply_umask bool, identity &lib.MountContext, resolve u64, follow_final bool, depth int) ?&VFSNode {
+	apply_umask bool, identity &lib.MountContext, resolve u64, follow_final bool, explicit_identity bool, depth int) ?&VFSNode {
 	if depth > 64 { errno.set(errno.eloop); return none }
 	mut parent_of_tgt_node, mut target_node, basename := walk_path_resolved(parent, name, depth, true, identity, resolve)
 	if parent_of_tgt_node == unsafe { nil } { return none }
@@ -811,7 +811,7 @@ fn internal_create_resolved_locked(parent &VFSNode, name string, mode u32, acces
 			// creation. Retain the walk's mount identity and resolution policy.
 			return internal_create_resolved_locked(target_node.parent,
 				target_node.symlink_target, mode, access, apply_umask, identity,
-				resolve, true, depth + 1)
+				resolve, true, explicit_identity, depth + 1)
 		}
 		errno.set(errno.eexist)
 		return none
@@ -821,7 +821,10 @@ fn internal_create_resolved_locked(parent &VFSNode, name string, mode u32, acces
 
 	// Retained directory descriptions keep their policy after lazy unmount or
 	// namespace retirement, when the inode has no active mount in this table.
-	if read_only(parent_of_tgt_node) || mount_flags(identity) & ms_rdonly != 0 {
+	// Internal inode-only callers retain their conservative fallback. Syscalls
+	// that preserve the starting route must use only the selected attachment.
+	if read_only_on_mount(parent_of_tgt_node, identity)
+		|| (!explicit_identity && read_only(parent_of_tgt_node)) {
 		errno.set(errno.erofs)
 		return none
 	}
@@ -980,9 +983,11 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64)
 		return errno.err, errno.enoent
 	}
 
-	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	parent := parent_and_mount_for(dirfd, path, identity) or { return errno.err, errno.get() }
 
-	internal_create_with_acl(parent, path, (mode & 0o7777) | stat.ifdir, proc.policy_create, true) or {
+	internal_create_resolved(parent, path, (mode & 0o7777) | stat.ifdir, proc.policy_create,
+		identity, 0, false) or {
 		return errno.err, errno.get()
 	}
 
@@ -1240,7 +1245,7 @@ pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, requested_fl
 		return errno.err, errno.eisdir
 	}
 
-	if (read_only(node) || mount_flags(open_mount) & ms_rdonly != 0)
+	if read_only_on_mount(node, open_mount)
 		&& ((flags & 3) != 0 || flags & resource.o_trunc != 0) {
 		return errno.err, errno.erofs
 	}
