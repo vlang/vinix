@@ -5203,6 +5203,10 @@ release or autorelease. It checks live registered storage and class ancestry
 before accepting an owner. Unknown, stale, releasing and private Swift heap
 owners reject; native Swift error boxes still need lazy Error witnesses and
 cache initialization and remain unsupported.
+The CFError result keeps Vinix's private class and existing CF APIs/Error
+witnesses; this export does not supply native NSError inheritance, class
+casts or Objective-C property behavior for that private class. Ordinary
+NSError instances retain their existing Objective-C behavior.
 
 Ten fresh ASan/UBSan runs and five ARM64 Vinix suites pass across the bridge,
 Error ARC, Error value extraction, localizedDescription and object type.
