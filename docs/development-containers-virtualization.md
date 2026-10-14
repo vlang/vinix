@@ -435,7 +435,7 @@ read-only/writable aliases of the same inode. Explicit path routes select the
 attachment while backend read-only state and existing authorization still
 apply. Retained fds, copied namespaces, chroot/cwd aliases and private thread
 views pass on both architectures and the same-ELF Linux reference. Internal
-inode-only creators keep their conservative fallback; metadata, symlink/link,
+inode-only creators keep their conservative fallback; metadata, hard links,
 rename, unlink and descriptor truncation still need complete route-based policy.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
@@ -477,6 +477,14 @@ namespace copies, chroot/cwd, detached and retired mounts, and unprivileged
 denial. Existing capability/MAC/securelevel and overlay checks keep their order.
 The flag payloads are native-only; filesystem-backed Linux flag comparisons and
 error-order parity remain open.
+The [symlink creation checks](../tests/mount-lifecycle/symlink-policy.md) extend
+destination attachment policy to `symlinkat`. The destination's directory and
+mount route are captured together and retained while resolving its parent;
+the stored link target remains literal. Native and same-ELF Linux probes cover
+both bind-policy directions, copied namespaces, root/cwd aliases, parent
+symlinks, detached and retired descriptions, and UID/GID 1000 denial. Internal
+kernel callers keep their conservative fallback. Persistent backend integration,
+concurrent mount changes and the remaining link/rename/unlink paths remain open.
 Mount reclamation, busy-reference accounting and full OCI acceptance remain open.
 The overlay-depth refusal measurements also exposed an event-record allocation per call.
 The separate [security event producer correction](../tests/overlay-rename/security-events.md)

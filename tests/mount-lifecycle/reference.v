@@ -98,6 +98,7 @@ fn run() ! {
 		&& result.text.contains('MOUNT METADATA: PASS')
 		&& result.text.contains('MOUNT TIMES: PASS')
 		&& result.text.contains('MOUNT XATTR: PASS')
+		&& result.text.contains('MOUNT SYMLINK: PASS')
 	mut cases_pass := true
 	for kind in 0 .. 7 { cases_pass = cases_pass && result.text.contains('MOUNT IDENTITY CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT ADMISSION CASE: ${kind} PASS') }
@@ -111,6 +112,7 @@ fn run() ! {
 	for kind in 0 .. 7 { cases_pass = cases_pass && result.text.contains('MOUNT METADATA CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT TIMES CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT XATTR CASE: ${kind} PASS') }
+	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT SYMLINK CASE: ${kind} PASS') }
 	artifacts := {
 		'kernel': digest(state + '/linux')!
 		'probe': digest(state + '/probe')!

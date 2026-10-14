@@ -529,9 +529,17 @@ fn join_path(nodes []&VFSNode) string {
 }
 
 pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	return symlink_on_mount(parent, dest, target, identity, false)
+}
+
+fn symlink_on_mount(parent &VFSNode, dest string, target string, identity &lib.MountContext, explicit_identity bool) ?&VFSNode {
 	vfs_lock.acquire()
 	defer { vfs_lock.release() }
-	mut parent_of_tgt_node, mut target_node, basename := walk_path(parent, target, 0, true)
+	// Kernel callers start from a node. Syscall callers already captured the
+	// directory and attachment together, so keep that route during the walk.
+	if !explicit_identity && !starting_mount(parent, identity) { return none }
+	mut parent_of_tgt_node, mut target_node, basename := walk_path_on_mount(parent, target, 0, true, identity)
 
 	if parent_of_tgt_node != unsafe { nil }
 		&& !policy_check_name(parent_of_tgt_node, basename, proc.policy_create) {
@@ -543,7 +551,8 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 		return none
 	}
 
-	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
+	if read_only_on_mount(parent_of_tgt_node, identity)
+		|| (!explicit_identity && read_only(parent_of_tgt_node)) { errno.set(errno.erofs); return none }
 	if !attr_allows_dir_add(parent_of_tgt_node) { return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	require_linked(parent_of_tgt_node)?
@@ -2155,9 +2164,10 @@ pub fn syscall_symlinkat(_ voidptr, _target charptr, newdirfd int, _linkpath cha
 		return errno.err, errno.enoent
 	}
 
-	parent := get_parent_dir(newdirfd, linkpath) or { return errno.err, errno.get() }
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	parent := parent_and_mount_for(newdirfd, linkpath, identity) or { return errno.err, errno.get() }
 
-	symlink(parent, target, linkpath) or { return errno.err, errno.get() }
+	symlink_on_mount(parent, target, linkpath, identity, true) or { return errno.err, errno.get() }
 
 	return 0, 0
 }
