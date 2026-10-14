@@ -132,6 +132,8 @@ fn catalog_build(recipe_file string, source_roots string, destination string, op
 	recipe := catalog_recipe(read_metadata(recipe_file)!)!
 	text := json2.encode(recipe) + '\n'
 	if text.len > max_metadata { return error('canonical catalog recipe exceeds metadata limit') }
+	root := capture_prepared_root(source_roots, 'catalog')!
+	defer { C.close(root) }
 	target := export_target(destination, 'catalog workspace')!
 	parent := os.dir(target)
 	mut objects := map[string]Payload{}
@@ -155,9 +157,6 @@ fn catalog_build(recipe_file string, source_roots string, destination string, op
 	// also check the actual temporary filesystem, which may be another volume.
 	disk_check(options.available_space(parent)!, mirror_cost(needed, scratch)!, 64 * 1024 * 1024)!
 	disk_check(options.available_space(os.temp_dir())!, scratch, 64 * 1024 * 1024)!
-	root := C.open(source_roots.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
-	if root < 0 { return error('catalog source roots must be an ordinary directory') }
-	defer { C.close(root) }
 	mut roots := map[string]int{}
 	defer { for _, fd in roots { C.close(fd) } }
 	for item in recipe.packages {

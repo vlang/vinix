@@ -1,0 +1,17 @@
+root/nul: wait status 0; previous root admission/output behavior reproduced
+root/alias-slashes: wait status 0; previous root admission/output behavior reproduced
+root/alias: wait status 256; previous root admission/output behavior reproduced
+root/empty: wait status 256; previous root admission/output behavior reproduced
+root/missing: wait status 256; previous root admission/output behavior reproduced
+root/file: wait status 256; previous root admission/output behavior reproduced
+root/fifo: wait status 256; previous root admission/output behavior reproduced
+root: ordinary directory and redundant separators preserve canonical metadata
+catalog/nul: wait status 0; previous root admission/output behavior reproduced
+catalog/alias-slashes: wait status 0; previous root admission/output behavior reproduced
+catalog/alias: wait status 256; previous root admission/output behavior reproduced
+catalog/empty: wait status 256; previous root admission/output behavior reproduced
+catalog/missing: wait status 256; previous root admission/output behavior reproduced
+catalog/file: wait status 256; previous root admission/output behavior reproduced
+catalog/fifo: wait status 256; previous root admission/output behavior reproduced
+catalog: ordinary directory and redundant separators preserve canonical metadata
+Prepared root qualification passed

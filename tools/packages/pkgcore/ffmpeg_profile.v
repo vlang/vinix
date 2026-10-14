@@ -75,10 +75,9 @@ fn ffmpeg_catalog_with(runtime_version string, source_roots string, destination 
 	if compare_versions(runtime_version, '1.0.0') < 0 || compare_versions(runtime_version, '2.0.0') >= 0 {
 		return error('FFmpeg profile runtime must be in the supported 1.x compatibility range')
 	}
-	target := export_target(destination, 'FFmpeg profile')!
-	root := C.open(source_roots.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
-	if root < 0 { return error('FFmpeg profile roots must be an ordinary directory') }
+	root := capture_prepared_root(source_roots, 'FFmpeg profile')!
 	defer { C.close(root) }
+	target := export_target(destination, 'FFmpeg profile')!
 	mut roots := map[string]int{}
 	defer { for _, fd in roots { C.close(fd) } }
 	mut needed := u64(4 * 1024 * 1024)

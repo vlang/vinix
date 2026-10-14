@@ -281,6 +281,17 @@ order or the upstream aliases. Do not select account databases, host settings,
 devices or unrelated applications. Proprietary and firmware flags stay explicit
 publisher declarations, subject to administrator policy.
 
+`pack-root`, `pack-catalog` and the Native, SQLite and FFmpeg profile builders
+share input-root admission. Empty and NUL-containing paths refuse. Redundant
+trailing separators are stripped while preserving `/`, so a symlink at the
+root's final component refuses even with trailing slashes. Each admitted root
+is captured with directory, no-follow, nonblocking and close-on-exec flags and
+checked as a directory before any destination parents are created. Parent
+aliases retain ordinary path semantics. Subsequent pathname replacement cannot
+redirect the captured namespace; source contents still need to stay stable.
+Ordinary paths with trailing separators preserve canonical package/catalog
+metadata. See [prepared-root qualification](../../tests/packages/prepared-root-check.md).
+
 Prepared-root recipes reject unknown or duplicate fields (including escaped
 spellings), null collections and mismatched JSON types before opening the input
 root or creating an import workspace. `manifest`, `entries`, and each selector's

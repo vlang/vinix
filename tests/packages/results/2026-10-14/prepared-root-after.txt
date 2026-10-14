@@ -1,0 +1,17 @@
+root/nul: wait status 256; refused before creating output parents
+root/alias-slashes: wait status 256; refused before creating output parents
+root/alias: wait status 256; refused before creating output parents
+root/empty: wait status 256; refused before creating output parents
+root/missing: wait status 256; refused before creating output parents
+root/file: wait status 256; refused before creating output parents
+root/fifo: wait status 256; refused before creating output parents
+root: ordinary directory and redundant separators preserve canonical metadata
+catalog/nul: wait status 256; refused before creating output parents
+catalog/alias-slashes: wait status 256; refused before creating output parents
+catalog/alias: wait status 256; refused before creating output parents
+catalog/empty: wait status 256; refused before creating output parents
+catalog/missing: wait status 256; refused before creating output parents
+catalog/file: wait status 256; refused before creating output parents
+catalog/fifo: wait status 256; refused before creating output parents
+catalog: ordinary directory and redundant separators preserve canonical metadata
+Prepared root qualification passed

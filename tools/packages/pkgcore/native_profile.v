@@ -47,10 +47,9 @@ pub fn native_catalog(version string, source_roots string, destination string) !
 
 fn native_catalog_with(version string, source_roots string, destination string, options CatalogOptions) !NativeProfileInfo {
 	version_parts(version)!
-	target := export_target(destination, 'native SDK profile')!
-	root := C.open(source_roots.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
-	if root < 0 { return error('native SDK profile roots must be an ordinary directory') }
+	root := capture_prepared_root(source_roots, 'native SDK profile')!
 	defer { C.close(root) }
+	target := export_target(destination, 'native SDK profile')!
 	mut roots := map[string]int{}
 	defer { for _, fd in roots { C.close(fd) } }
 	mut needed := u64(4 * 1024 * 1024)

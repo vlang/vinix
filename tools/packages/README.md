@@ -144,6 +144,12 @@ architecture/version/runtime coverage. It emits a canonical catalog lock and a
 private publisher workspace for `publish-release`. See the
 [catalog contract](SDK.md#build-a-pinned-application-catalog).
 
+Prepared-root imports, catalog builds and all three fixed profiles capture an
+ordinary source directory before creating output parents. Empty/NUL paths and
+leaf directory aliases refuse, including aliases with trailing separators.
+Ordinary directories with redundant separators retain the same canonical
+metadata. See [root admission qualification](../../tests/packages/prepared-root-check.md).
+
 `sqlite-catalog SQLITE_VERSION RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY`
 creates the concrete SQLite CLI/musl runtime lock for both supported hosts. It
 retains redistribution notices and separates compatible library updates from

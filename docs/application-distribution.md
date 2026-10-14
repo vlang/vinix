@@ -108,6 +108,13 @@ enroll a publisher or accept proprietary/firmware terms for consumers.
 The [catalog qualification](../tests/packages/catalog-build-check.md) covers
 canonical release reproduction, refusal/cleanup and real Linux guest execution.
 
+Prepared-root imports, catalog builds and the three fixed publisher profiles
+share source-root admission before creating destination parents. Empty/NUL
+paths and leaf directory aliases refuse even with trailing separators. Ordinary
+roots retain canonical metadata and a captured namespace that later pathname
+replacement cannot redirect. See
+[root admission qualification](../tests/packages/prepared-root-check.md).
+
 The [native SDK publisher profile](../tools/packages/SDK.md#native-sdk-publisher-profile)
 provides a single pinned catalog for Hello, Counter and Memo on both targets.
 Its [V builder](../examples/package-catalog/README.md) compiles six static apps

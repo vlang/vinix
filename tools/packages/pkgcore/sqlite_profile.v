@@ -58,10 +58,9 @@ fn sqlite_catalog_with(sqlite_version string, runtime_version string, source_roo
 	if compare_versions(runtime_version, '1.0.0') < 0 || compare_versions(runtime_version, '2.0.0') >= 0 {
 		return error('SQLite profile runtime must be in the supported 1.x compatibility range')
 	}
-	target := export_target(destination, 'SQLite profile')!
-	root := C.open(source_roots.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
-	if root < 0 { return error('SQLite profile roots must be an ordinary directory') }
+	root := capture_prepared_root(source_roots, 'SQLite profile')!
 	defer { C.close(root) }
+	target := export_target(destination, 'SQLite profile')!
 	mut roots := map[string]int{}
 	defer { for _, fd in roots { C.close(fd) } }
 	mut needed := u64(4 * 1024 * 1024)
