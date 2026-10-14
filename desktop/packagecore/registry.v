@@ -1,37 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module packagecore
 
-import json2
 import os
 import desktop.workflowcore
+import tools.packages.pkgprotocol
 
 pub const association_prefix = 'package.'
 pub const request_prefix = 'software.launch:'
-
-// The compositor reads only presentation fields from administrator-owned state.
-// Executable paths, arguments, trust and confinement stay in vinix-package.
-struct Manifest {
-	id           string
-	name         string
-	description  string
-	architecture string
-	kind         string
-	permissions  []string
-	associations []string
-}
-
-struct Installed {
-	package Manifest
-}
-
-struct State {
-	// Own raw number text explicitly; json2's numeric substring conversion is
-	// otherwise retained by the current compiler under -manualfree.
-	format       string @[raw]
-	generation   string @[raw]
-	architecture string
-	packages     []Installed
-}
 
 pub struct App {
 pub:
@@ -131,6 +106,20 @@ fn trusted(path string, owner u32, directory bool) !workflowcore.Identity {
 	return info
 }
 
+fn registration_generation(number string) !u64 {
+	if number.len == 0 || number.len > 20 || number[0] < `1` || number[0] > `9` {
+		return error('invalid package generation: expected a canonical positive u64')
+	}
+	mut value := u64(0)
+	for byte in number {
+		if byte < `0` || byte > `9` { return error('invalid package generation: nondecimal identity') }
+		digit := u64(byte - `0`)
+		if value > (~u64(0) - digit) / 10 { return error('package generation exceeds u64') }
+		value = value * 10 + digit
+	}
+	return value
+}
+
 // Resolving current once gives a coherent generation even during activation.
 // Readers do not need a catalog or network connection. Launch rechecks current
 // state and holds its lease; a stale menu cannot execute a removed generation.
@@ -158,10 +147,7 @@ pub fn (mut registry Registry) refresh(directory string, owner u32, architecture
 		return error('invalid package generation')
 	}
 	number := unsafe { tos(target.str + 12, target.len - 12) }
-	for byte in number {
-		if byte < `0` || byte > `9` { return error('invalid package generation') }
-	}
-	if number.u64() == 0 { return error('invalid package generation') }
+	identity_generation := registration_generation(number)!
 	parent := directory + '/generations'
 	generation := directory + '/' + target
 	path := generation + '/state.json'
@@ -175,56 +161,19 @@ pub fn (mut registry Registry) refresh(directory string, owner u32, architecture
 	trusted(parent, owner, true)!
 	trusted(generation, owner, true)!
 	identity := trusted(path, owner, false)!
-	if registry.seen_arch == target_arch && registry.seen.unchanged(identity) { return false }
+	if registry.generation == identity_generation && registry.seen_arch == target_arch
+		&& registry.seen.unchanged(identity) { return false }
 	bytes := workflowcore.read_regular(path, 8 * 1024 * 1024)!
 	defer { unsafe { bytes.free() } }
-	state := json2.decode[State](unsafe { tos(bytes.data, bytes.len) })!
-	defer {
-		unsafe {
-			state.format.free()
-			state.generation.free()
-			state.architecture.free()
-			for installed in state.packages {
-				p := installed.package
-				p.id.free()
-				p.name.free()
-				p.description.free()
-				p.architecture.free()
-				p.kind.free()
-				for permission in p.permissions { permission.free() }
-				(&array(&p.permissions)).free()
-				for mime in p.associations { mime.free() }
-				(&array(&p.associations)).free()
-			}
-			(&array(&state.packages)).free()
-		}
-	}
-	if state.format != '1' || state.generation != number || state.architecture != architecture || state.packages.len > 4096 {
+	mut state := pkgprotocol.decode_registration(unsafe { tos(bytes.data, bytes.len) })!
+	defer { state.close() }
+	if state.generation != identity_generation || state.architecture != architecture {
 		return error('incompatible package registration')
-	}
-	mut ids := map[string]bool{}
-	defer { unsafe { ids.free() } }
-	// Validate the entire snapshot before replacing the existing registry.
-	for installed in state.packages {
-		p := installed.package
-		if !identifier(p.id) || p.id in ids || p.architecture !in [architecture, 'all']
-			|| p.name == '' || !printable(p.name, 256) || !printable(p.description, 4096)
-			|| p.kind !in ['native', 'linux', 'windows', 'apple', 'runtime', 'data']
-			|| (p.architecture == 'all' && p.kind != 'data') || p.associations.len > 128 {
-			return error('invalid package registration')
-		}
-		ids[p.id] = true
-		for mime in p.associations {
-			if !printable(mime, 128) || !mime.contains('/') || mime.contains(';') || mime.contains('=') {
-				return error('invalid package MIME registration')
-			}
-		}
 	}
 	registry.close()
 	registry.apps = []App{cap: state.packages.len}
 	unsafe { registry.apps.flags |= .noslices }
-	for installed in state.packages {
-		p := installed.package
+	for p in state.packages {
 		if p.kind in ['runtime', 'data'] { continue }
 		mut mimes := []string{cap: p.associations.len}
 		// Advertising a MIME handler requires the same files grant as launch.
@@ -243,7 +192,7 @@ pub fn (mut registry Registry) refresh(directory string, owner u32, architecture
 		unsafe { registry.apps.push_many(&app, 1) }
 	}
 	registry.apps.sort(a.id < b.id)
-	registry.generation = number.u64()
+	registry.generation = identity_generation
 	registry.seen = identity
 	registry.seen_arch = target_arch
 	return true

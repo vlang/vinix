@@ -39,6 +39,11 @@ including long paths and exit status. It survives catalog reloads until another
 failure, explicit clearing or window close. The view is read-only and marks
 omitted output. See [qualification](../../tests/packages/software-failure-check.md).
 
+Start, Quick Launch and Open With use bounded installed-state presentation
+decoding with complete fields, explicit ownership and canonical generation
+identities. Damaged metadata is refused before menu replacement; restoring it
+permits refresh. See [registration qualification](../../tests/packages/registration-check.md).
+
 Use `publish-release REPOSITORY_DIR ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY`
 to emit a complete signed consumer repository with atomic publication, dependency
 closure validation on each declared architecture and retained publisher sequence

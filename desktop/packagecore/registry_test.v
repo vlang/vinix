@@ -4,6 +4,20 @@ module packagecore
 import json2
 import os
 
+struct Manifest {
+	id string
+	name string
+	description string
+	architecture string
+	kind string
+	permissions []string
+	associations []string
+}
+
+struct Installed {
+	package Manifest
+}
+
 struct FixtureState {
 	format       int
 	generation   u64
@@ -100,4 +114,62 @@ fn test_request_keeps_literal_documents_and_rejects_control_characters() {
 		bad.validate() or { rejected = true }
 		assert rejected
 	}
+}
+
+fn test_registration_rejects_damaged_metadata_without_publishing_partial_menus_and_recovers() {
+	root := os.real_path(os.temp_dir()) + '/vinix-registration-admission-' + os.getpid().str()
+	os.mkdir_all(root + '/generations/1')!
+	defer { os.rmdir_all(root) or {} }
+	owner := u32(os.geteuid())
+	path := root + '/generations/1/state.json'
+	valid := json2.encode(FixtureState{format: 1, generation: 1, architecture: 'x86_64', packages: [
+		Installed{package: Manifest{ ...fixture_manifest('editor', 'native', ['files']), architecture: 'x86_64' }},
+		Installed{package: Manifest{ ...fixture_manifest('runtime', 'runtime', []), architecture: 'x86_64' }},
+	]})
+	os.write_file(path, valid)!
+	os.mkdir_all(root + '/generations/2')!
+	os.link(path, root + '/generations/2/state.json')!
+	os.symlink('generations/1', root + '/current')!
+	mut registry := Registry{}
+	defer { registry.close() }
+	assert registry.refresh(root, owner, 'x86_64')!
+	assert registry.apps.len == 1 && registry.apps[0].id == 'editor' && registry.apps[0].accepts('text/plain')
+	// Equal file identities do not authorize a different activation generation.
+	os.rm(root + '/current')!; os.symlink('generations/2', root + '/current')!
+	assert rejected_refresh(mut registry, root, owner, 'x86_64') && registry.generation == 1
+	os.rm(root + '/current')!; os.symlink('generations/1', root + '/current')!
+	assert !registry.refresh(root, owner, 'x86_64')!
+	for invalid in [
+		'{"format":1,"generation":1,"architecture":"x86_64","packages":null}',
+		'{"format":1,"generation":1,"architecture":"x86_64"}',
+		valid.replace('"permissions":["files"]', '"permissions":null'),
+		valid.replace('"id":"runtime"', '"id":"runtime","i\\u0064":"other"'),
+		valid.replace('"associations":["text/plain"]', '"associations":null'),
+		valid + ' false', valid[..valid.len - 2],
+	] {
+		// Replace the inode so a rejected parse cannot be hidden by the identity cache.
+		os.write_file(path + '.new', invalid)!; os.rename(path + '.new', path)!
+		assert rejected_refresh(mut registry, root, owner, 'x86_64')
+		assert registry.generation == 1 && registry.apps.len == 1 && registry.apps[0].id == 'editor'
+		assert registry.apps[0].accepts('text/plain')
+	}
+	os.write_file(path + '.new', valid)!; os.rename(path + '.new', path)!
+	assert registry.refresh(root, owner, 'x86_64')! && !registry.refresh(root, owner, 'x86_64')!
+	// Service-generated canonical positive u64 identities and the maximum value
+	// are admitted; aliases and overflow cannot become another menu generation.
+	for number in ['0', '01', '+1', '-1', '1.0', '18446744073709551616', '18446744073709551617', '18446744073709551615'] {
+		os.mkdir_all(root + '/generations/' + number)!
+		os.write_file(root + '/generations/' + number + '/state.json', valid.replace('"generation":1', '"generation":' + number))!
+		os.rm(root + '/current')!; os.symlink('generations/' + number, root + '/current')!
+		if number == '18446744073709551615' {
+			assert registry.refresh(root, owner, 'x86_64')! && registry.generation == ~u64(0)
+		} else {
+			assert rejected_refresh(mut registry, root, owner, 'x86_64') && registry.generation == 1
+		}
+	}
+	os.rm(root + '/current')!; os.symlink('generations/1', root + '/current')!
+	assert registry.refresh(root, owner, 'x86_64')!
+	os.write_file(path + '.new', '{"format":1,"generation":1,"architecture":"x86_64","packages":[]}')!
+	os.rename(path + '.new', path)!
+	assert registry.refresh(root, owner, 'x86_64')! && registry.apps.len == 0 && registry.generation == 1
 }

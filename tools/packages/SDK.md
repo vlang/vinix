@@ -1122,6 +1122,25 @@ are freed on refusal under manual memory management. Software publishes only a
 complete valid view and frees refusal errors. See
 [catalog metadata qualification](../../tests/packages/view-metadata-check.md).
 
+`pkgprotocol.decode_registration(text)` reads the desktop presentation projection
+of a format-1 installed generation. Its owned `RegistrationSnapshot` contains
+`format`, positive `generation`, `architecture` and `packages`; each
+`RegisteredPackage` contains `id`, `name`, `description`, `architecture`, `kind`,
+`permissions` and `associations`. Input packages retain the stored state's
+`{"package":{...},...}` envelope. Call `.close()` on the returned snapshot.
+
+Every projected field is explicit, typed and unique, including escaped key
+spellings. Empty strings/arrays remain explicit; null, malformed Unicode,
+trailing input, duplicate package IDs and fractional/overflowing generation
+numbers are refused. Bounds are 8 MiB, 4096 packages, five permissions and 128
+MIME associations per package, with the existing ID/text limits. Other stored
+state fields are syntax-checked with at most 32 extension nesting levels and
+retired without building a payload/provenance tree. Partial input releases its
+owned fields and arrays on refusal. The compositor also requires a canonical
+positive u64 activation target and matching snapshot generation/architecture.
+The package service remains authoritative for complete state, trust, policy and
+launch admission. See [registration qualification](../../tests/packages/registration-check.md).
+
 For live operation progress, pass `--progress` to `update`, `install`, `remove`,
 `upgrade`, `apply`, `deploy`, `deployment-apply`, `rollback`, `mirror` or
 `mirror-apply`. It is refused with

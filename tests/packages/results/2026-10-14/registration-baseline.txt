@@ -1,0 +1,25 @@
+Before replacing the 8350e0b37 registration reader:
+null package list: accepted=true, menu generation=1
+missing package list: accepted=true, menu generation=1
+null permissions: accepted=true, menu generation=1
+duplicate escaped name: accepted=true, menu generation=1
+leading-zero generation: accepted=false, menu generation=0
+overflowed generation: accepted=true, menu generation=18446744073709551615
+
+After the bounded reader, before binding the cache to the activation generation:
+cached generation mismatch: accepted=true, menu generation=1
+
+Final same reproductions:
+null package list: accepted=false, menu generation=0
+missing package list: accepted=false, menu generation=0
+null permissions: accepted=false, menu generation=0
+duplicate escaped name: accepted=false, menu generation=0
+leading-zero generation: accepted=false, menu generation=0
+overflowed generation: accepted=false, menu generation=0
+cached generation mismatch: accepted=false, menu generation=1
+
+Initial qualification attempts:
+The first heap run exited 133 with no output at the tracker record limit. A fixed-array argument converted to a slice allocated per installed package; a shared constant key array removed that allocation. Final full native/sanitized fixtures retain zero bytes.
+The initial maintained --desktop run passed Software and all eight heap modes, then stopped because build/app-src was absent. The successful run explicitly selected retained generated assets with VINIX_PACKAGE_TEST_DESKTOP.
+The next launcher build exposed the native ui2 control-state branch under headless macOS. The maintained launcher entrypoint now applies the prior standalone headless guard and separately links the pinned Unix process/thread helper scopes. All assertions remain active.
+Recompiling the edited private driver harness through the compiler cache produced duplicate C literal declarations; -nocache rebuilt it successfully. Raw failed logs and final results are retained and hashed.

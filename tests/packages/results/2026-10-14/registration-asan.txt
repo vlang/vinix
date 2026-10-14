@@ -1,0 +1,31 @@
+Clang ASan/UBSan, ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1.
+PASS ASan/UBSan protocol
+PASS final ASan/UBSan registry
+PASS final ASan/UBSan lifecycle
+PASS final ASan/UBSan memory
+Package registration reader: 1000 wide/additive/partial-invalid decode/close cycles retain zero tracked bytes
+Package registry: 1000 reload/cache/partial-refusal/architecture-refusal/generation-refusal/retirement cycles retain zero tracked bytes
+Updating trusted repository fixture
+Installing Editor 1.0.0 1.0.0 (1/2) from fixture
+Downloading editor/bin/runner (32 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Editor 2.0.0 2.0.0 (1/2) from fixture
+Installing Runtime 2.0.0 (2/2) from fixture
+Activated package generation 2
+Activated package generation 3
+Rolled back to generation 2; application data was retained
+Real generation registration: aarch64 install/update/remove/rollback and MIME cache passed
+Updating trusted repository fixture
+Installing Editor 1.0.0 1.0.0 (1/2) from fixture
+Downloading editor/bin/runner (32 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Editor 2.0.0 2.0.0 (1/2) from fixture
+Installing Runtime 2.0.0 (2/2) from fixture
+Activated package generation 2
+Activated package generation 3
+Rolled back to generation 2; application data was retained
+Real generation registration: x86_64 install/update/remove/rollback and MIME cache passed

@@ -323,24 +323,15 @@ fn test_package_registry_reload_and_retirement_release_all_storage() {
 	mut registry := packagecore.Registry{}
 	assert registry.refresh(root, u32(os.geteuid()), 'aarch64')!
 	registry.close()
-	// json2 currently boxes a one-byte Error{} to signal successful end of
-	// input, and drops it internally even with -manualfree (measured with
-	// the allocator and debugger). Compare its independent decode baseline:
-	// every allocation owned by the registration must still be retired.
-	assert json2.decode[bool]('true')!
-	C.vinix_heap_begin()
-	for _ in 0 .. 100 {
-		assert json2.decode[bool]('true')!
-	}
-	decoder_baseline := C.vinix_heap_end()
-	assert decoder_baseline <= 100
+	// Registration uses the bounded owned reader, including partial failures;
+	// it no longer needs the generic decoder's EOF-marker allocation allowance.
 	C.vinix_heap_begin()
 	for _ in 0 .. 100 {
 		assert registry.refresh(root, u32(os.geteuid()), 'aarch64')!
 		assert !registry.refresh(root, u32(os.geteuid()), 'aarch64')!
 		registry.close()
 	}
-	assert C.vinix_heap_end() == decoder_baseline
+	package_assert_heap_flat('package registration reload and retirement')
 	assert registry.refresh(root, u32(os.geteuid()), 'aarch64')!
 	C.vinix_heap_begin()
 	for _ in 0 .. 100 {

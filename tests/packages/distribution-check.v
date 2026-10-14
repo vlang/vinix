@@ -62,6 +62,8 @@ fn check() ! {
 		run(work + '/review-memory', [])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap', '-o', work + '/view-memory', repository + '/tests/packages/view-memory.v'])!
 		run(work + '/view-memory', [])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap', '-o', work + '/registration-memory', repository + '/tests/packages/registration-memory.v'])!
+		run(work + '/registration-memory', [])!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/desktop/packagecore', work)!
 		run(v, [...helper_flags, '-gc', 'none', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts', '-o', work + '/vinix-package', repository + '/tools/packages/main.v'])!
 		run(work + '/vinix-package', ['--help'])!

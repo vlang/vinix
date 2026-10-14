@@ -4,14 +4,14 @@ module pkgprotocol
 const software_view_keys = ['format', 'generation', 'architecture', 'offline', 'catalog_error', 'update_error', 'rows', 'launch_user']
 const software_row_keys = ['id', 'name', 'description', 'version', 'installed_version', 'architecture', 'kind', 'runtime', 'repository', 'public_key', 'license', 'proprietary', 'firmware', 'permissions', 'requested', 'updatable', 'update_action', 'diagnostic', 'installed_name', 'installed_kind', 'installed_permissions', 'installed_window_protocol']
 
-// View format 1 promises to ignore additive fields. Known fields remain typed,
-// mandatory and unique, including escaped key spellings. Unknown values are
-// syntax-checked with bounded nesting and retired without building a JSON tree.
+// Both presentation projections ignore additive/service-owned fields. Known
+// fields remain typed, mandatory and unique, including escaped key spellings.
+// Unknown values are syntax-checked without building a retained JSON tree.
 fn (mut r MetadataReader) view_member(keys []string, seen u32) !int {
 	key := r.quoted(8 * 1024 * 1024)!
 	index := keys.index(key)
 	unsafe { key.free() }
-	if index >= 0 && seen & (u32(1) << index) != 0 { return error('duplicate Software view JSON field') }
+	if index >= 0 && seen & (u32(1) << index) != 0 { return error('duplicate package presentation JSON field') }
 	r.expect(`:`)!
 	return index
 }
@@ -20,25 +20,25 @@ fn (mut r MetadataReader) skip_view_number() ! {
 	if r.text[r.position] == `-` { r.position++ }
 	start := r.position
 	for r.position < r.text.len && r.text[r.position] >= `0` && r.text[r.position] <= `9` { r.position++ }
-	if r.position == start || (r.position > start + 1 && r.text[start] == `0`) { return error('invalid Software view extension number') }
+	if r.position == start || (r.position > start + 1 && r.text[start] == `0`) { return error('invalid package presentation extension number') }
 	if r.position < r.text.len && r.text[r.position] == `.` {
 		r.position++; fraction := r.position
 		for r.position < r.text.len && r.text[r.position] >= `0` && r.text[r.position] <= `9` { r.position++ }
-		if r.position == fraction { return error('invalid Software view extension fraction') }
+		if r.position == fraction { return error('invalid package presentation extension fraction') }
 	}
 	if r.position < r.text.len && r.text[r.position] in [u8(`e`), `E`]! {
 		r.position++
 		if r.position < r.text.len && r.text[r.position] in [u8(`+`), `-`]! { r.position++ }
 		exponent := r.position
 		for r.position < r.text.len && r.text[r.position] >= `0` && r.text[r.position] <= `9` { r.position++ }
-		if r.position == exponent { return error('invalid Software view extension exponent') }
+		if r.position == exponent { return error('invalid package presentation extension exponent') }
 	}
 }
 
 fn (mut r MetadataReader) skip_view_extension(depth int) ! {
-	if depth > 32 { return error('Software view extension exceeds nesting limit') }
+	if depth > 32 { return error('package presentation extension exceeds nesting limit') }
 	r.spaces()
-	if r.position >= r.text.len { return error('incomplete Software view extension') }
+	if r.position >= r.text.len { return error('incomplete package presentation extension') }
 	byte := r.text[r.position]
 	if byte == `"` { value := r.quoted(8 * 1024 * 1024)!; unsafe { value.free() }; return }
 	if byte == `{` || byte == `[` {
@@ -53,12 +53,12 @@ fn (mut r MetadataReader) skip_view_extension(depth int) ! {
 	}
 	if byte in [u8(`t`), `f`]! { r.boolean()!; return }
 	if byte == `n` {
-		if r.position + 4 > r.text.len || unsafe { tos(r.text.str + r.position, 4) } != 'null' { return error('invalid Software view extension null') }
+		if r.position + 4 > r.text.len || unsafe { tos(r.text.str + r.position, 4) } != 'null' { return error('invalid package presentation extension null') }
 		r.position += 4
 		return
 	}
 	if byte == `-` || (byte >= `0` && byte <= `9`) { r.skip_view_number()!; return }
-	return error('invalid Software view extension value')
+	return error('invalid package presentation extension value')
 }
 
 fn (mut r MetadataReader) parse_software_row() !SoftwareRow {

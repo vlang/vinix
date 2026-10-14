@@ -567,6 +567,16 @@ are not imported. Opening a launcher refreshes registration, so install/remove,
 upgrade and rollback become visible without restarting the desktop. Runtime/data
 packages are omitted. Package actions use stable IDs, independent of row order.
 
+Registration admits complete, typed presentation fields and canonical positive
+u64 generation identities. Missing/null collections, duplicate known fields
+(including escaped spellings), invalid Unicode, counter overflow and incomplete
+records are refused before replacing the menu snapshot. Other service-owned
+state fields receive bounded syntax checks without retaining payload trees.
+The desktop clears unavailable registration; fixing the generation permits a
+normal refresh. The package service still checks full state, publisher trust,
+policy and payloads when launching. See
+[registration qualification](../tests/packages/registration-check.md).
+
 Files' application chooser opens the shared, paged **Open With** dialog. Packages
 are offered only for their declared MIME types when they declare `files` access.
 Installation never takes over user defaults. An explicit choice is saved as
@@ -827,11 +837,10 @@ publishing, format and launch interfaces. The
 transactions, signatures, resolution, recovery, rollback, publisher tooling and
 Software controls, registry trust/retirement, shared launchers and document
 associations, plus both package target builds and desktop configurations.
-Allocator fixtures check menu redraws and cached reads for zero retained storage,
-and registration retirement against the standard JSON decoder's measured
-one-byte EOF-marker allocation per decode under `-manualfree`.
-The same allocator checks measure Software review redraws at zero retention,
-and review decode/cancellation/close against that independent decoder baseline.
+Allocator fixtures check menu redraws, registration decoding/refusal/retirement
+and cached reads for zero retained storage. Registration no longer uses the
+generic JSON decoder's historical EOF-marker allocation allowance. Software
+review ownership is covered by the review metadata checks below.
 Service and CLI fixtures check complete dependency disclosure and rejection of
 changed catalogs, policy, active state or operation/IDs before acquisition.
 Repository administration fixtures cover invalid enrollment, preserved policy,
