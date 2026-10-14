@@ -913,6 +913,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   references, real state/restoration, flat storage and independent lifetime review.
   See [the bounded nice contract](docs/linux-posix-qualification.md#native-scheduling-attribute-nice-normalization-and-admission).
 
+- [x] Enforce native target RLIMIT_RTPRIO admission, retain/lower existing RT
+  priority and require privilege for a zero-limit RT policy switch. Qualify
+  31,118 process-leader controls per architecture against identical-ELF Linux,
+  with real errors/state/restoration, flat storage and independent lifetime review.
+  See [the realtime admission contract](docs/linux-posix-qualification.md#native-realtime-scheduling-admission).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -704,7 +704,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/fs/mount_policy.v` | `b96b0be92533a606416e49c64e51f771fcb14ad3a57041490d04f873c3ee4ef0` |
 | `kernel/fs/procfs.v` | `b924f6eee11e596e4abdeaf1816421ed0c2964956f9a75b1c34a3d60fe6ccb86` |
 | `kernel/fs/tmpfs.v` | `99a10d885597ccb745530e639685f282703332667066a28dd79f18195ec3e010` |
-| `kernel/fs/vfs.v` | `1d357e96dccae2d102b68c3aafd7f11de6665136721ca57aa4df20a45ffcc52c` |
+| `kernel/fs/vfs.v` | `131bbe64844f925bbbac6acbf60aa59eaf23eb344a2209e9b526d0d2f297c089` |
 | `kernel/futex/futex.v` | `171c2e30ac47d2b0d682e00e7aca04a8a1ddd7d3c65e27fae4a2e7d7dd9e015d` |
 | `kernel/futex/pi.v` | `69a0a836bcaba1fc18b7e3298d31cb848f885798e37a8d6fdd095b910ba073ba` |
 | `kernel/kbudget/budget.v` | `980b9ae894bda6376f920e22bbca0aa953e02bd0349977bfe054a24580869b06` |

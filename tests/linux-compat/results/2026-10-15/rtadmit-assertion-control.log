@@ -1,0 +1,3 @@
+tests/linux-compat/rtadmit-check.v:357: FAIL: fn main.main: assert false, 'rtadmit assertions must execute'
+      message: rtadmit assertions must execute
+V panic: Assertion failed...

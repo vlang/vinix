@@ -1,0 +1,1 @@
+arm/x86: whole generated production C differs only in table__may_set_sched_params; no compiler identifier normalization, new allocation/free or pointer escape; one PID-table lock and exact existing unlock paths plus one new guarded return

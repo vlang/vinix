@@ -6317,3 +6317,122 @@ does not close the ARM CPU1 QoS blocker or the three broad section 15 gates.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-14/attrnice-evidence-aarch64.json), [primary native receipt](../tests/linux-compat/results/2026-10-14/attrnice-after-aarch64-receipt.json), [completion receipt](../tests/linux-compat/results/2026-10-14/attrnice-completion-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/attrnice-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-14/attrnice-evidence-x86_64.json), [primary native receipt](../tests/linux-compat/results/2026-10-14/attrnice-after-x86_64-receipt.json), [completion/build-failure receipt](../tests/linux-compat/results/2026-10-14/attrnice-completion-x86_64-receipt.json), [descriptor recovery](../tests/linux-compat/results/2026-10-14/attrnice-recovery-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/attrnice-reference-x86_64-receipt.json).
 - [Maintained V audit](../tests/linux-compat/attrnice-check.v), [verdict](../tests/linux-compat/results/2026-10-14/attrnice-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-14/attrnice-lifetime-review.md).
+
+## Native realtime scheduling admission
+
+The 2026-10-15 qualification covers target-limit admission through native
+`sched_setscheduler`, `sched_setparam` and `sched_setattr` for stable,
+single-thread process leaders. The existing permission helper incorrectly used
+the caller's `RLIMIT_RTPRIO` and rejected retaining/lowering an existing RT
+priority above that limit. It also admitted an RT policy switch at target limit
+zero when the caller had a nonzero limit. The corrected helper reads the target
+process's soft limit and current thread policy/priority under its existing
+PID-table lock. Without effective `CAP_SYS_NICE`, changing RT policy at limit
+zero returns EPERM; a requested priority above both the current priority and
+target limit returns EPERM. Same-policy retention/lowering remains allowed.
+Existing owner, MAC, capability, deadline and ordinary-class admission checks
+retain their code. UID0 alone supplies no capability bypass.
+
+The primary [Linux v6.12 scheduler implementation](https://raw.githubusercontent.com/torvalds/linux/v6.12/kernel/sched/syscalls.c)
+uses `task_rlimit(p, RLIMIT_RTPRIO)`, the policy-switch/zero-limit check and
+`p->rt_priority` for this admission. Its retained SHA-256 is
+`a9c89bc6e1eca2587f39518718aa0a53fd8ef646f16927a0252e5fa7f25b5804`.
+Actual Linux 6.12.51 references execute the unchanged native probe ELF on each
+architecture. Dedicated musl scheduling wrappers remain subject to their
+separately documented ENOSYS behavior; raw entry uses genuine musl `syscall`.
+
+Root and UID/GID1000 cohorts each use self soft limits 0/20/40 with hard 99,
+effective capability 23 off/on, a same-owner peer with soft20 and a UID/GID1001
+peer with soft40. Peer hard limits are 99. Targets include PID0, self, the two
+peers, an absent positive PID and a reaped child, plus signed-negative controls.
+Five genuine starting states are OTHER/0, FIFO/20, FIFO/99, RR/40 and RR/99;
+compact matrices use OTHER/0, FIFO/20 and RR/40. Five operations cover legacy
+FIFO/RR setters, setparam on the existing policy and attribute FIFO/RR setters.
+
+| Cohort group | Controls per cohort | Scope |
+| --- | --- | --- |
+| 0 | 5,400 | Three self limits, two capability states, six targets, five starting states, six priority boundaries and five operations |
+| 1 | 1,440 | Upper PID words on live/missing targets, two limits and capability states, compact starting states and priority boundaries |
+| 2 | 7,680 | Read-only aligned/unaligned, inaccessible and NULL inputs; valid/invalid priorities; upper policy/flag words and input/lookup/admission precedence |
+| 3 | 1,039 | Signed-negative PID/priority controls, reserved low flags, invalid priorities, initial/final limits, restored states and complete capability snapshot |
+
+| Architecture | Checks | Original failures | Corrected failures | Same-ELF Linux failures |
+| --- | --- | --- | --- | --- |
+| AArch64 | 31,118 | 1,312 | 0 | 0 |
+| x86-64 | 31,118 | 1,312 | 0 | 0 |
+
+Each original root and UID1000 cohort fails `434/74/148/0`, independently on both
+architectures. The reference and corrected cohorts record zero failures for
+all four groups. Native pages are 16 KiB ARM/4 KiB x86; references use 4 KiB. Every
+live call verifies raw getscheduler/getparam/getpriority, genuine musl
+getpriority, known sched_attr fields and output canaries. Errors preserve the
+real starting state; successes apply the requested policy/priority with nice 0.
+Nonself calls also leave self OTHER/0/nice 0. Accessible input bytes and both
+eight-byte guards stay unchanged; unaligned input is prepared with memcpy.
+Negative PID, NULL and reserved attribute flags give EINVAL before input import;
+inaccessible inputs give EFAULT before lookup; absent/reaped targets give ESRCH
+before priority validation; invalid priorities give EINVAL before permission.
+Upper PID/policy/flag words use their actual narrowed syscall ABI; pointers keep
+their full width. setparam's extra policy register is unused.
+
+A privileged broker establishes and verifies the real starting state before
+each live operation, then restores OTHER/0/nice 0 after either success or error.
+Its new action4 accepts only the registered cohort/peer PIDs and validates
+OTHER/0 or FIFO/RR priorities 1..99 before applying setup. Messages and scheduling
+parameters stay on the synchronous caller/broker stacks until ACK; target
+pointers do not escape their lock. Peers close inherited broker descriptors,
+are released and reaped; the three-page guarded mapping is unmapped before
+reporting. Counts transfer through the pipe before closing and reaping the
+cohort. PR_SET_KEEPCAPS occurs only in disposable children; complete process
+state restoration is not claimed. Probe C contains 25 explicit allocas and no
+heap, dynamic-array or fixed-index helpers.
+
+Each corrected cohort performs 32 warmups and 200 lowering/zero-limit-switch/
+different-target-limit/capability cycles with thirteen-second snapshot settling.
+All 18 ARM and 14 x86 slab classes stay exactly flat. Large-page counts remain
+85/85 ARM and 216/216 x86, including the broker IPC. This bounded observation
+does not qualify whole-kernel allocation or general process churn.
+
+Four fresh production builds use isolated worktrees at
+`37cfa0db2a2af906eb621733a3d4c0ead6ac48e9`. After removing only
+`table__may_set_sched_params`, every remaining generated C byte matches between
+original and corrected builds on both architectures. There is no compiler
+identifier normalization, new allocation/free, prototype or pointer escape.
+The helper retains one table lock and its existing unlock paths, adding exactly
+one guarded early-return unlock. Allocation scans retain 398 ARM/290 x86 sites
+with byte-identical reports and existing allowance refusals; whole-kernel
+allocation approval is not claimed. Eight host files and four frozen inventory
+checks pass. Public dispatch fingerprints use the committed parent plus this
+owned change, excluding other sessions' uncommitted source edits.
+
+Eight native cases per architecture pass: rtadmit, runtime, schedabi, rrabi,
+attrquery, attrimport, attrnice and fcntlabi. Original/corrected/reference probe
+source/C/ELF identities are bound; every native receipt binds its actual kernel,
+source, executable, ISO and serial result. The maintained V auditor requires
+the exact measured baseline vectors, both cohort topologies, storage outcomes,
+all 15,146 pinned compiler inputs, 64 frozen dispatch inputs and independent
+lifetime review. A deliberately false assertion and a passing Linux reference
+supplied as a failing baseline must actually exit 1 without `-prod`. A bounded
+watchdog hashes completed case files before retiring only unbound ISO staging
+and firmware variables, then rechecks every retained regular file.
+
+Initial baseline producers and the first allocation scanner failed to open
+their output logs during host disk pressure. Their actual producer output was
+not retained and cannot be reconstructed; no build/guest/semantic verdict is
+assigned to those attempts. Existing generated regular objects were copied
+before fresh successful builds/scans. Two first preflight compiler attempts
+refused an incorrect private guesthost import before creating state/C/ELF;
+the private module symlinks were corrected before successful compilation.
+The 310 retained preparation files are pinned separately. Subsequent producer
+drivers use bounded log-write retries so actual output is retained.
+
+Permission and mutation still use separate table-lock intervals; target
+exit/reuse and credential/limit/policy changes between them remain unqualified.
+Worker-thread admission, supplementary ownership, idle-exit/reset/deadline/
+KEEP/clamp/timing semantics, namespace/pledge/MAC-denial configurations, glibc,
+translated/ELF32 paths and physical priority/fairness remain separate. This
+work does not close the ARM CPU1 QoS blocker or the three broad section 15 gates.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/rtadmit-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/rtadmit-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/rtadmit-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/rtadmit-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/rtadmit-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/rtadmit-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/rtadmit-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/rtadmit-reference-x86_64-receipt.json).
+- [Maintained V audit](../tests/linux-compat/rtadmit-check.v), [verdict](../tests/linux-compat/results/2026-10-15/rtadmit-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-15/rtadmit-lifetime-review.md).

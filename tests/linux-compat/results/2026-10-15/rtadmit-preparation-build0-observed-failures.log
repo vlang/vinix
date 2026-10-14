@@ -1,0 +1,1 @@
+Both baseline producers and the allocation scanner failed to open their output logs during host disk pressure. No build log, baseline kernel or allocation verdict was retained; existing regular generated objects are copied separately before fresh attempts. Failed producer output cannot be reconstructed.

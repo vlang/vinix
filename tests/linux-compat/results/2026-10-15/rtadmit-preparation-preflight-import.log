@@ -1,0 +1,1 @@
+Both first preflight compiler attempts failed before main: cannot import module guesthost (not found). No preflight state, generated probe C or ELF was created. Private module symlinks were corrected to tests/native-guest-tools/guesthost and tests/linuxkpi/hosttest before fresh compiler attempts. This is preparation failure evidence; no guest or semantic verdict occurred.

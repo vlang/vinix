@@ -1,0 +1,71 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "623f52d8964d4c742965633cd460974364fa576f88804139493127ee10b2017b",
+    "results": [
+        {
+            "name": "rtadmit",
+            "source_sha256": "e35b0fe0a165cc8190f9a9637e10287888156c75d245d589db6cd14d5584a741",
+            "init_sha256": "9ee0054e1cef050db8da9414801ad38bf4a2999da5c6ed5f825c85673d10db75",
+            "iso_sha256": "ac733f78ca4bda77df94af53d53ecea15e7a1c79d49ba019fb07e467eda6045f",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "dbe7b7ee65bae675bb327acdef1ecc2e6e7cdfa9a7b081f36c60f90832df76aa",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "schedabi",
+            "source_sha256": "de18a603b819a8534ec998e1229c6b6b5103bfe515bff8e81b81ee78b9c21d7d",
+            "init_sha256": "aaf0c1175a0b32bee276fc84f5619c7c468643a97337fb4ee44b45900b81af18",
+            "iso_sha256": "bc7e9e0cbebb705feb5aacc12583b57ae94e1f376e0c58d716c72382753222f5",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "rrabi",
+            "source_sha256": "1dbb6631fbff3080966eaabecb56c4efa37b53bb3df2979ad68da9be7e8b874e",
+            "init_sha256": "c4fa4490cfc1f9997ab8018831a242c1c4fdc5099bb6c59bbccceb1b88890f5a",
+            "iso_sha256": "be5d8f424011b84b366ec4345c1e0770e20e937fbd262a88201e302a73f0219d",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "attrquery",
+            "source_sha256": "ece9c957e365646f3f37aefef75b5ff7540c58da876a1764eb67fff46b557c9b",
+            "init_sha256": "43da21bb9f97a38755442078b7396f5ff8924e01ea9fac6117fc5cf86ed6f770",
+            "iso_sha256": "1cebe4d7bed990b7eda51ec8db0d8b61ee8ba5f79730326b7a9f16d0899dda77",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "attrimport",
+            "source_sha256": "ea50d5decd874adb05f39d61b06e650f4163647c3fb7df84795333d55d1d62aa",
+            "init_sha256": "4805664d48a3609e91df4d388b3d2caed44459b9496d450b0f93e96c5d819d1a",
+            "iso_sha256": "cec637314c4a637def427fa1aa5405b289f75f1f27700b2f9ebd3d8e49e35a9c",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "attrnice",
+            "source_sha256": "42f45edd6322c95037aa848404275527503570ab70929f9678c60db82701fb59",
+            "init_sha256": "cc88302a486072416ef3c9b193a008ed10d1b074f23d0ed032e586200e20afeb",
+            "iso_sha256": "a06e6b7edafd8eba2e884dee2e618ded334d008487777d2d29d2b6ce98088341",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "fcntlabi",
+            "source_sha256": "6f70bc290dff8671cbde66025806b7b5d99d82468dc6e7098ec86a27cc43c3ac",
+            "init_sha256": "b92892f1860ff4aae349f27924922645aed79becbcff2dd00a0a18fc797fd3fd",
+            "iso_sha256": "19ec781eefb9f2c0295780668b74d83919f48e1e79e09b7fb98d3c08f6af552d",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

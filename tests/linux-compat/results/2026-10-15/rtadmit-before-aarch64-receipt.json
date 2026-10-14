@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "452c2dde8ab24762ffa13e92b029336e931b6abb492f6001a81116fb26a19bc8",
+    "results": [
+        {
+            "name": "rtadmit",
+            "source_sha256": "e35b0fe0a165cc8190f9a9637e10287888156c75d245d589db6cd14d5584a741",
+            "init_sha256": "9ee0054e1cef050db8da9414801ad38bf4a2999da5c6ed5f825c85673d10db75",
+            "iso_sha256": "37b9b850ffedeeec66697ab0e55ba3b8821a6baa05ddaef7f30d7851de64747f",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

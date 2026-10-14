@@ -1510,3 +1510,24 @@ cases pass across primary/completion/recovery receipts; missing initial aggregat
 and the failed x86 descriptor ISO build remain explicit. Nice remains process-wide in Vinix; pthread nice, races, complete realtime/deadline/
 reset/clamp behavior and GNU/foreign paths remain separate. The three broad
 compatibility gates remain open.
+
+The `rtadmit` case qualifies realtime admission through native
+`sched_setscheduler`, `sched_setparam` and `sched_setattr` for single-thread
+process leaders. The target's `RLIMIT_RTPRIO` controls admission; retaining or
+lowering its current priority remains allowed above the limit, and changing RT
+policy with a zero target limit needs effective `CAP_SYS_NICE`. Root and UID1000
+each execute `5400/1440/7680/1039` controls, or 31,118 per architecture. Same-owner
+and cross-owner peers have different limits, five real initial policy/priority
+states are set by a privileged broker, and every live call checks and restores
+actual state. Guarded inputs, negative/absent/reaped PIDs, upper syscall words,
+real errors, untouched buffers and genuine musl getpriority observations are
+included. Originals fail 1,312; corrected Vinix and identical ELFs on Linux
+6.12.51 pass, with two flat warmed 200-cycle storage cohorts. Run
+`--cases rtadmit,runtime,schedabi,rrabi,attrquery,attrimport,attrnice,fcntlabi`
+with a fresh state directory. `rtadmit-reference.v` accepts the preceding
+reference controller arguments; compile `rtadmit-check.v` without `-prod` and
+pass the retained evidence directory. [The report](../../docs/linux-posix-qualification.md#native-realtime-scheduling-admission)
+binds receipts, source/C/ELF/compiler pins, actual auditor negative controls and
+independent lifetime review. Thread/credential/limit races, idle-exit/reset/
+deadline/timing, security configurations and GNU/foreign paths remain separate.
+The three broad compatibility gates remain open.

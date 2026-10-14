@@ -53,8 +53,8 @@ fn sched_target_errno(pid int) u64 {
 }
 
 // May the caller give this thread that priority? CAP_SYS_NICE grants it;
-// everybody else is held to RLIMIT_RTPRIO, and may not touch a thread outside
-// their own user.
+// everybody else is held to the target's limit and current priority, and may
+// not touch a thread outside their own user.
 fn may_set_sched_params(target_tid int, policy int, priority int) bool {
 	caller := proc.current_thread().process
 	if target_tid <= 0 || target_tid >= proc.max_pid { return false }
@@ -74,15 +74,18 @@ fn may_set_sched_params(target_tid int, policy int, priority int) bool {
 		return false
 	}
 
-	// Asking for less never needs permission. Asking for a deadline does, and
-	// there is no limit that grants it.
+	// Deadline needs privilege; ordinary classes retain their prior admission.
 	if policy == proc.sched_deadline {
 		return false
 	}
 	if policy != proc.sched_fifo && policy != proc.sched_rr {
 		return true
 	}
-	return proc.limit_allows(caller, proc.rlimit_rtprio, u64(priority))
+	// A zero target limit prevents an RT policy switch, but the same policy
+	// may retain or lower its current priority even above the target's limit.
+	limit := proc.soft_limit(owner, proc.rlimit_rtprio)
+	if policy != target.sched.policy && limit == 0 { return false }
+	return priority <= target.sched.priority || u64(priority) <= limit
 }
 
 // The target's nice limit authorizes fair-class priority increases. Keep
