@@ -4864,3 +4864,12 @@ Editor de código sin telemetría de Microsoft
 app_selection.zed.detail
 Editor de código colaborativo
 -----
+wine.zed.starting
+Iniciando Zed…
+-----
+wine.zed.missing
+Zed no está instalado.
+-----
+wine.zed.exited
+Zed se ha cerrado.
+-----

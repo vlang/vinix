@@ -336,13 +336,15 @@ number shortcuts 1–9 keep their catalog identities. Downloads run separately i
 Terminal, so a failed package does not cancel the remaining choices.
 
 The Alpine choices include Blender, VLC's `vlc-qt` desktop frontend, Neovim,
-KeePassXC, Telegram's `telegram-desktop`, and `obs-studio`. VSCodium and Zed are
-offered for installation when the image already uses untagged Alpine edge
-main/community/testing repositories. Setup does not add repositories. Discord,
+KeePassXC, Telegram's `telegram-desktop`, and `obs-studio`. VSCodium requires
+untagged Alpine edge main/community/testing repositories. The tested Zed
+runtime uses the staged Alpine APK described below; setup recognizes its
+installed launcher. Setup does not add repositories. Discord,
 Slack and Spotify have no compatible package in the stable image; their rows
-show that requirement. Steam needs its separately built compatibility layer;
-an existing installation is recognized. These rows cannot queue nonexistent
-Alpine packages. Neovim runs in Terminal; installation alone does not register
+show that requirement. Steam already runs through the existing `steam-hosted`
+launcher and `scripts/build-steam-aarch64.sh` compatibility layer; first boot
+recognizes installations supplied by that layer. Unavailable rows cannot queue
+installation. Neovim runs in Terminal; installation alone does not register
 new third-party GUI apps with the native desktop.
 
 The **iOS runtime** option installs Vinix's own static ARM64 compatibility
@@ -414,6 +416,15 @@ The direct launcher writes Firefox's upstream graphics and GTK diagnostics to
 `/var/log/firefox.log`. On an M1 image with the Asahi runtime, direct Xorg can
 enable glamor/DRI3 and Firefox WebRender over X11 EGL. The embedded window uses
 Xvfb's software surface so the native compositor can copy it into the desktop.
+
+Zed is also a hosted X11 application, with its own Start-menu entry, official
+icon, input and clipboard forwarding. Its native AArch64 Alpine APK runs with a
+private musl/Vulkan dependency tree under `/usr/libexec/vinix-zed/root`; Mesa's
+lavapipe renders into Xvfb. `run-zed` supplies Compose data, fonts and a 60 Hz
+RandR mode without changing the Alpine executable. See
+[the Zed guest workflow](../tests/zed/README.md) for staging, building and capturing
+a real QEMU screenshot. The tested Alpine package is `0.138.4-r5`, retained by
+an Alpine mirror after its removal from the current edge/testing index.
 
 GIMP uses the same hosted X11 path. `pkg install gimp` installs Alpine's native
 AArch64/musl build and restores the executable modes for its plug-ins; the

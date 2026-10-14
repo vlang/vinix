@@ -4863,3 +4863,12 @@ app_selection.vscodium.detail
 app_selection.zed.detail
 Éditeur de code collaboratif
 -----
+wine.zed.starting
+Démarrage de Zed…
+-----
+wine.zed.missing
+Zed n'est pas installé.
+-----
+wine.zed.exited
+Zed s'est fermé.
+-----

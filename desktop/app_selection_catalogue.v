@@ -102,7 +102,7 @@ const first_run_app_catalogue = [
 		icon:            'asset:zed'
 		package_name:    'zed'
 		action:          'apps.toggle.zed'
-		installed_paths: ['/usr/bin/zed-editor', '/usr/bin/zed']
+		installed_paths: ['/usr/bin/zed-editor', '/usr/bin/zed', '/usr/bin/run-zed']
 		category:        .development
 		requirement:     .testing
 	},

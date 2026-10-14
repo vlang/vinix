@@ -324,6 +324,7 @@ pub fn gpu_exec_fiq_trace(phase u64, cntv_ctl u64) {
 }
 
 pub fn initialise() {
+	gic.set_sync_core_handler(answer_sync_core)
 	configure_cpu_capacities()
 	time.register_deadline_wakeup(timer_deadline_changed)
 	// The kernel acts with every capability: file permissions are lifted by

@@ -16,6 +16,8 @@ import resource
 import stat
 import time
 import usercopy
+import katomic
+import sched
 
 // Native arm64/x86-64 pass the complete loff_t in pos_l. Linux's pos_from_hilo
 // shifts pos_h by BITS_PER_LONG, so that argument contributes nothing here.
@@ -256,13 +258,22 @@ fn syscall_linux_bpf(_ voidptr, _cmd int, _attr u64, _size u32) (u64, u64) {
 	return errno.err, errno.enosys
 }
 
-// Runtimes discover barrier support through QUERY and select their fallback.
-// There is no cross-CPU rendezvous implementing any of Linux's commands yet.
+// Advertise only the instruction synchronization commands the platform can
+// execute. Wasmtime uses these before publishing newly compiled ARM64 code.
 fn syscall_linux_membarrier(_ voidptr, command int, flags u32, _cpu_id int) (u64, u64) {
-	if command == 0 { // MEMBARRIER_CMD_QUERY
-		if flags != 0 {
-			return errno.err, errno.einval
-		}
+	if flags != 0 { return errno.err, errno.einval }
+	if command == 0 {
+		return if sched.sync_core_supported() { u64(32 | 64) } else { u64(0) }, 0
+	}
+	if !sched.sync_core_supported() { return errno.err, errno.einval }
+	mut pagemap := proc.current_thread().process.pagemap
+	if command == 64 { // MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_SYNC_CORE
+		katomic.store(mut &pagemap.membarrier_sync_core_registered, true)
+		return 0, 0
+	}
+	if command == 32 { // MEMBARRIER_CMD_PRIVATE_EXPEDITED_SYNC_CORE
+		if !katomic.load(&pagemap.membarrier_sync_core_registered) { return errno.err, errno.eperm }
+		sched.synchronize_core()
 		return 0, 0
 	}
 	return errno.err, errno.einval

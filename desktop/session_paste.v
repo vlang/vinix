@@ -10,7 +10,7 @@ mut:
 
 fn hosted_session_client(name string) bool {
 	return name in ['vinix-firefox', 'vinix-chromium', 'vinix-libreoffice', 'vinix-gimp',
-		'vinix-wine-notepad', 'vinix-wine-word2013', 'vinix-wine-calculator', 'vinix-obs', 'vinix-steam']
+		'vinix-wine-notepad', 'vinix-wine-word2013', 'vinix-wine-calculator', 'vinix-obs', 'vinix-steam', 'vinix-zed']
 }
 
 fn native_rich_paste(mut app NativeApp, kind sessioncore.DataKind, data string) {

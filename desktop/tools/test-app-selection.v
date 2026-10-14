@@ -14,7 +14,7 @@ fn main() {
 	workflowbuild.run('git', ['archive', 'HEAD', 'desktop', '-o', '${work}/source.tar'])!
 	workflowbuild.run('tar', ['-xf', '${work}/source.tar', '-C', '${work}/source'])!
 	for name in ['main.v', 'app_selection.v', 'app_selection_catalogue.v', 'app_selection_runtime.v',
-		'app_icon.v', 'font_data.v'] {
+		'app_icon.v', 'font_data.v', 'app.v', 'wine_app.v', 'zed_app.v', 'session_paste.v'] {
 		os.cp('${root}/desktop/${name}', '${work}/source/desktop/${name}')!
 	}
 	for directory in ['assets', 'translations'] {

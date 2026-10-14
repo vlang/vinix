@@ -18,6 +18,7 @@ import memory
 // Interrupt IDs
 const intid_timer = u32(27) // EL1 Virtual Timer PPI (INTID 27)
 const intid_reschedule = u32(1) // Scheduler SGI, Group 1 Non-Secure
+const intid_sync_core = u32(2) // Synchronous instruction-pipeline rendezvous
 const intid_spurious = u32(1023)
 
 // QEMU virt GIC addresses (from DTB: intc@8000000)
@@ -46,6 +47,7 @@ const gicr_stride = u64(0x20000)
 
 __global (
 	gic_timer_callback fn (voidptr)
+	gic_sync_core_callback fn ()
 	gicd_base          u64
 	gicr_base          u64
 )
@@ -339,10 +341,22 @@ pub fn set_timer_handler(handler fn (voidptr)) {
 // ICC_SGI1R_EL1 names the complete MPIDR affinity path. RS=0 supports
 // Aff0 0..15 without depending on the optional Range Selector extension.
 pub fn send_reschedule(mpidr u64) bool {
+	return send_sgi(mpidr, intid_reschedule)
+}
+
+pub fn set_sync_core_handler(handler fn ()) {
+	gic_sync_core_callback = handler
+}
+
+pub fn send_sync_core(mpidr u64) bool {
+	return send_sgi(mpidr, intid_sync_core)
+}
+
+fn send_sgi(mpidr u64, intid u32) bool {
 	if !is_initialised() || mpidr & 0xff >= 16 { return false }
 	value := ((mpidr >> 32) & 0xff) << 48
 		| ((mpidr >> 16) & 0xff) << 32
-		| u64(intid_reschedule) << 24
+		| u64(intid) << 24
 		| ((mpidr >> 8) & 0xff) << 16
 		| u64(1) << (mpidr & 0xf)
 	// Publish the queue before the destination observes the interrupt.
@@ -364,6 +378,11 @@ pub fn poll_iar1() u32 {
 // Handle an interrupt in polled mode (bypass exception vector).
 // Used as HVF workaround since QEMU+HVF doesn't inject IRQs to guest.
 pub fn dispatch_polled(intid u32, gpr_state voidptr) {
+	if intid == intid_sync_core {
+		write_icc_eoir1(intid)
+		if gic_sync_core_callback != unsafe { nil } { gic_sync_core_callback() }
+		return
+	}
 	if intid == intid_timer || intid == intid_reschedule {
 		if intid == intid_timer { cpu.write_cntv_ctl_el0(0x2) }
 		write_icc_eoir1(intid)
@@ -381,6 +400,11 @@ fn gic_dispatch(gpr_state voidptr) {
 	intid := read_icc_iar1()
 
 	if intid >= intid_spurious {
+		return
+	}
+	if intid == intid_sync_core {
+		write_icc_eoir1(intid)
+		if gic_sync_core_callback != unsafe { nil } { gic_sync_core_callback() }
 		return
 	}
 

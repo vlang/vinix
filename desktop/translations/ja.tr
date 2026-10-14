@@ -4863,3 +4863,12 @@ Microsoftのテレメトリーを含まないコードエディター
 app_selection.zed.detail
 共同作業用コードエディター
 -----
+wine.zed.starting
+Zedを起動中…
+-----
+wine.zed.missing
+Zedが未インストールです。
+-----
+wine.zed.exited
+Zedが終了しました。
+-----

@@ -4864,3 +4864,12 @@ Code editor without Microsoft telemetry
 app_selection.zed.detail
 Collaborative code editor
 -----
+wine.zed.starting
+Starting Zed…
+-----
+wine.zed.missing
+Zed is not installed.
+-----
+wine.zed.exited
+Zed exited.
+-----

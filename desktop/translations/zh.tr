@@ -4863,3 +4863,12 @@ app_selection.vscodium.detail
 app_selection.zed.detail
 协作代码编辑器
 -----
+wine.zed.starting
+正在启动 Zed…
+-----
+wine.zed.missing
+未安装 Zed。
+-----
+wine.zed.exited
+Zed 已退出。
+-----

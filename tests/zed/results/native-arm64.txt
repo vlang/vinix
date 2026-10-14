@@ -1,0 +1,15 @@
+Zed on Vinix native ARM64 guest
+Recorded: 2026-10-14 11:25:31 UTC
+QEMU: aarch64 virt/GICv3, HVF, host CPU, 4 CPUs, 8192 MiB, ramfb
+Alpine Zed: 0.138.4-r5, unchanged native ARM64/musl executable
+APK SHA-256: a520ddd336bcabf39b029c0fce5547d8ae03761880dcd6f00d929776df57b797
+GUI ELF SHA-256: 83ca6ca8dc78057c084721eb6886ca148f1757a259e959bdb87ce171403dfe87
+Guest kernel SHA-256: 487c6fd5e830102e85c2f2e5fdb3322f2988d106594f8e00093728b519900158
+Desktop SHA-256: 235a85278ccc6474260ab63496f26e587248439f48eb4cf49dc5f256977afea5
+Screenshot SHA-256: d515a9b1799c65f26101f5c31d2cb1df4919448334f0a764208f73d4a12632a1
+Keyboard: selected the buffer, typed V source through QMP guest input, saved with Ctrl+S; saved tab confirmed visually.
+
+ZED CHECK: membarrier ABI, 400 concurrent rendezvous and native JIT execution PASS
+ZED GUEST: starting Vinix desktop with Zed
+2026-10-14T11:18:25+00:00 [INFO] Adapter "llvmpipe (LLVM 20.1.8, 128 bits)"
+2026-10-14T11:18:25+00:00 [INFO] Refreshing at 16666 micros

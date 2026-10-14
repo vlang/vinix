@@ -141,6 +141,9 @@ enum HostedText {
 	chromium_starting
 	chromium_missing
 	chromium_exited
+	zed_starting
+	zed_missing
+	zed_exited
 	gimp_starting
 	gimp_missing
 	gimp_exited
@@ -199,6 +202,9 @@ fn (t HostedText) text() string {
 		.chromium_starting { tr('wine.chromium.starting') }
 		.chromium_missing { tr('wine.chromium.missing') }
 		.chromium_exited { tr('wine.chromium.exited') }
+		.zed_starting { tr('wine.zed.starting') }
+		.zed_missing { tr('wine.zed.missing') }
+		.zed_exited { tr('wine.zed.exited') }
 		.gimp_starting { tr('wine.gimp.starting') }
 		.gimp_missing { tr('wine.gimp.missing') }
 		.gimp_exited { tr('wine.gimp.exited') }
@@ -465,7 +471,7 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 	// passing them to the launcher, so an old or ignored game-size option can
 	// never leave a smaller GLFW window floating in a white root surface.
 	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command,
-		name == 'minecraft', name == 'doom' || name == 'qemu' || name == 'opengothic'
+		name == 'minecraft' || name == 'zed', name == 'doom' || name == 'qemu' || name == 'opengothic'
 		|| name == 'roblox' || name == 'dota2', name == 'obs') or {
 		app.failed = true
 		app.failure = .host_failed

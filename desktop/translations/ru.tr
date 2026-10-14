@@ -4864,3 +4864,12 @@ app_selection.vscodium.detail
 app_selection.zed.detail
 Совместный редактор кода
 -----
+wine.zed.starting
+Запуск Zed…
+-----
+wine.zed.missing
+Zed не установлен.
+-----
+wine.zed.exited
+Zed завершил работу.
+-----

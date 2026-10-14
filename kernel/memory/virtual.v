@@ -130,6 +130,8 @@ pub fn locked_bytes(pagemap &Pagemap) u64 {
 
 pub struct Pagemap {
 pub mut:
+	// Linux membarrier registration belongs to the shared address space.
+	membarrier_sync_core_registered bool
 	kernel_owner kbudget.Owner
 	kernel_charge kbudget.Charge
 	l           klock.Lock
