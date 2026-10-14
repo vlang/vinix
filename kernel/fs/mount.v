@@ -50,7 +50,9 @@ pub const ms_wxallowed = u64(1) << 63
 const ms_propagation = ms_unbindable | ms_private | ms_slave | ms_shared
 const ms_per_mount = ms_rdonly | ms_nosuid | ms_nodev | ms_noexec | ms_noatime | ms_nodiratime | ms_relatime | ms_strictatime | ms_wxallowed
 
+const mnt_force = 1
 const mnt_detach = 2
+const mnt_expire = 4
 const umount_nofollow = 8
 
 @[heap]
@@ -882,6 +884,14 @@ pub fn syscall_umount(_ voidptr, tgt charptr, flags u64) (u64, u64) {
 	defer { unsafe { target.free() } }
 	if flags & ~u64(0xf) != 0 {
 		return errno.err, errno.einval
+	}
+	if flags & mnt_expire != 0 && flags & (mnt_force | mnt_detach) != 0 {
+		return errno.err, errno.einval
+	}
+	// Force needs backend cancellation; expiry needs access tracking and a
+	// two-call protocol. Neither may silently detach an ordinary mount.
+	if flags & (mnt_force | mnt_expire) != 0 {
+		return errno.err, errno.enotsup
 	}
 	unmount(calling_directory(), target, flags) or { return errno.err, errno.get() }
 	return 0, 0
