@@ -5072,11 +5072,44 @@ trials and actual IPA probe/audit evidence are under
 sealing order and the context comparison before argument reads. Full iOS
 regression remains unpassed.
 
+SwiftCore now exports `_$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF`, generic equality
+for RawRepresentable values whose RawValue conforms to Equatable. Native
+SwiftCore instructions and the installed SDK interface establish the call
+sequence: borrow both Self addresses, obtain two owned raw values through the
+getter's indirect result, call the caller's static equality witness with
+RawValue metadata in `x20`, destroy the right value then the left, and return
+only bit zero of the witness result. V preserves this sequence with two
+16-byte-rounded stack temporaries, the existing getter adapter and a new
+36-byte equality adapter in the existing sealed hashing page. It holds no
+registry lock across getter, equality or destruction callbacks.
+
+The checked subset requires caller-owned readable metadata, witness records,
+code and Self spans to remain alive. It accepts complete raw-value layouts
+through 64 KiB, power-of-two alignment through 16, compatible stride and
+non-null required entries. Associated metadata can be direct or the existing
+tagged String name. Unsupported layouts are rejected before getters execute;
+this does not provide general pointer-span validation. No new heap owner,
+registry or teardown path is added; callbacks must not retain temporary
+addresses after returning.
+
+Ten fresh ASan/UBSan runs and five Vinix ARM64 guest suites pass across
+RawRepresentable equality/hashing, generic Hashable forwarding, Hasher and
+integer hashing. The equality fixture compares native and V witness semantics,
+arbitrary result high bits, indirect results and hidden contexts, reverse
+destruction for POD/reference values and real Strings, tagged String metadata,
+protected zero/odd/large values, reentrant callbacks and eight workers. Two
+runtime lifetimes drain owners and retire the existing adapter page. The public
+`build-swift-raw-equality` target and full build/regression/Swift guest modes
+include it. Thirteen final generated-C streams and executables, native SDK/LLVM
+inputs, generated-C allocation/callback audit and actual IPA probe/audits are
+retained under `build/ios/fortnite/raw-equality-checks`. Full iOS regression
+remains unpassed.
+
 The supplied IPA now exits with status 1 at MarketplaceKitWrapper's required
-`_$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF`, the generic equality function for
-RawRepresentable values with Equatable raw values. Its required import and
-native instructions are retained for the next implementation. Fortnite has
-not entered application code and remains unplayable.
+`_$ss4Int8VMn`, Swift.Int8's nominal descriptor. Its required import and native
+descriptor/metadata/value-witness layout are retained for the next
+implementation. Fortnite has not entered application code and remains
+unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -5085,10 +5118,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,461 | 699 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 147 | 29 | 23 |
-| All images | 2,267 | 731 | 120 |
+| MarketplaceKitWrapper | 148 | 28 | 23 |
+| All images | 2,268 | 730 | 120 |
 
-The C++/GLES/Text variant reports 2,280 resolved imports, 718 unresolved strong
+The C++/GLES/Text variant reports 2,281 resolved imports, 717 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

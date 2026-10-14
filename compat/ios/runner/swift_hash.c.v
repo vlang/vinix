@@ -63,7 +63,8 @@ fn swift_hash_entry(offset u64) u64 {
 		swift_hash_emit(u64(code))
 		swift_hasher_emit(u64(code) + 192)
 		swift_raw_emit(u64(code) + 640)
-		C.__builtin___clear_cache(code, unsafe { voidptr(u64(code) + 772) })
+		swift_raw_equality_emit(u64(code) + 800)
+		C.__builtin___clear_cache(code, unsafe { voidptr(u64(code) + 836) })
 		if C.mprotect(code, page, C.PROT_READ | C.PROT_EXEC) != 0 {
 			C.munmap(code, page)
 			panic('iOS: cannot seal Swift hashing entries')

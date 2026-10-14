@@ -94,6 +94,7 @@ fn swift_raw_protocol_emit(data u64) {
 
 fn swift_raw_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF' { u64(unsafe { voidptr(swift_raw_equal) }) }
 		'_$sSYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF' { swift_hash_entry(640) }
 		'_$sSYMp' { swift_string_metadata() - 16 + 448 }
 		'_$sSYTL' { swift_string_metadata() - 16 + 464 }
