@@ -8,6 +8,7 @@ struct C.timespec {
 }
 
 struct C.stat {
+	st_dev   u64
 	st_ino   u64
 	st_uid   u32
 	st_gid   u32
@@ -274,6 +275,7 @@ fn persistence(stress bool) {
 		check(C.umount(c'/tmp/overlay-state/diskmerged') == 0 && C.umount(c'/tmp/overlay-volume') == 0, 79)
 		check(C.mount(volume_device(), c'/tmp/overlay-volume', c'ext2', 0, nil) == 0, 80)
 		persisted_inode_flags(false)
+		persisted_protected_copyup()
 		check(contents(c'/tmp/overlay-volume/upper/current', c'BBBBBBBB')
 			&& contents(c'/tmp/overlay-volume/upper/moved', c'AAAAAAAA'), 81)
 		fd := C.open(c'/tmp/overlay-volume/upper/current', C.O_RDONLY)
@@ -540,8 +542,10 @@ pub fn run() int {
 			for { C.pause() }
 		}
 		if disk || sockets { prepare_xattr_guards() }
+		if disk || sockets { prepare_protected_copyup() }
 		if disk || sockets { prepare_inode_flags() }
 		if disk || sockets { held_inode_flags() }
+		if disk || sockets { mount_protected_stack() }
 		if sockets { check(C.mkdir(c'/tmp/overlay-volume/protected', 0o700) == 0, 427) }
 		if access { owned_directory(c'/tmp/overlay-state/reference', 474) }
 		root_listener := if sockets || access { root_socket_listener() } else { -1 }
@@ -571,6 +575,7 @@ pub fn run() int {
 				socket_acl_connections(c'/tmp/overlay-state/diskmerged', acl_overlay)
 			}
 			if disk || sockets { xattr_copyup_preflight() }
+			if disk || sockets { exercise_protected_copyup() }
 			if disk || sockets { exercise_inode_flags() }
 			if concurrent {
 				sample(0)
@@ -605,6 +610,7 @@ pub fn run() int {
 			// Drain their chained namespace/endpoint/backing grace periods too.
 			check(C.usleep(25000000) == 0, 558)
 		}
+		if disk || sockets { close_protected_copyup() }
 		if opaque { opaque_persistence() }
 		if full { opaque_full() }
 		if sockets { persistent_sockets_remount() }

@@ -131,12 +131,16 @@ fn persistent_sockets() {
 		persistent_socket_cycle(c'/tmp/overlay-state/diskmerged', c'/tmp/overlay-volume/upper', true)
 		persistent_socket_links(c'/tmp/overlay-volume/direct')
 		persistent_socket_links(c'/tmp/overlay-state/diskmerged')
-		for phase in 40 .. 42 {
+		// Two initial batches warm the reusable ext2 metadata footprint.
+		// Keep their samples, then compare the unchanged phases 40/41 gate.
+		for phase in 38 .. 42 {
 			for _ in 0 .. 32 {
 				persistent_socket_cycle(c'/tmp/overlay-volume/direct', c'/tmp/overlay-volume/direct', false)
 				persistent_socket_cycle(c'/tmp/overlay-state/diskmerged', c'/tmp/overlay-volume/upper', false)
 			}
-			check(C.usleep(25000000) == 0, 415)
+			// Namespace, endpoint and backing retire through separate
+			// queues. Leave margin for their worker ticks on emulated CPUs.
+			check(C.usleep(40000000) == 0, 415)
 			sample(phase)
 		}
 		C.puts(c'OVERLAY PERSISTENT SOCKETS: PASS')
@@ -190,6 +194,7 @@ fn persistent_sockets_remount() {
 			&& C.umount(c'/tmp/overlay-volume') == 0, 416)
 		check(C.mount(volume_device(), c'/tmp/overlay-volume', c'ext2', usize(C.MS_RDONLY), nil) == 0, 417)
 		persisted_inode_flags(true)
+		persisted_protected_copyup()
 		socket_acl_persistence()
 		socket_creation_persistence()
 		for base in [&char(c'/tmp/overlay-volume/direct'), &char(c'/tmp/overlay-volume/upper')]! {

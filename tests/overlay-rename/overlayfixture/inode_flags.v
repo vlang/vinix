@@ -164,6 +164,7 @@ fn exercise_inode_flags() {
 					&& inode_flag_set(fd, 0) == -1 && *C.__errno_location() == C.EPERM && inode_flags(fd) == 0
 					&& C.close(fd) == 0, 659)
 				inode_flag_absent(c'/tmp/overlay-volume/upper/flags-5')
+				protected_copyup_cycle()
 			}
 			check(C.usleep(25000000) == 0, 660)
 			sample(phase)

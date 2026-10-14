@@ -42,7 +42,7 @@ fn main() {
 	arch := options.value('--arch', '')
 	case_name := options.value('--case', 'all')
 	state := os.abs_path(options.value('--state-dir', ''))
-	timeout := options.integer('--timeout', 360)!
+	timeout := options.integer('--timeout', 900)!
 	if os.exists(state) || timeout <= 0 {
 		eprintln('state must be fresh and timeout positive')
 		exit(2)
@@ -74,6 +74,9 @@ fn main() {
 		'xattr_copyup_fixture': digest(state + '/sources/overlayfixture/xattr_copyup.v')!
 		'inode_flags_fixture': digest(state + '/sources/overlayfixture/inode_flags.v')!
 		'disk_flags_fixture': digest(state + '/sources/overlayfixture/disk_flags.v')!
+		'protected_copyup_fixture': digest(state + '/sources/overlayfixture/protected_copyup.v')!
+		'stack_depth_fixture': digest(state + '/sources/overlayfixture/overlay_depth.v')!
+		'security_events_fixture': digest(state + '/sources/overlayfixture/security_events.v')!
 		'abi_header':          digest(state + '/sources/overlayfixture/native-abi.h')!
 	}
 	disk := state + '/store.ext2'
@@ -151,6 +154,7 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 	mut expected := ['OVERLAY GUEST: PASS']
 	if case_name == 'flags-persistence' { expected << 'EXT2 FLAGS REMOUNT: PASS' }
 	if case_name in ['disk', 'all', 'sockets'] {
+		expected << ['OVERLAY PROTECTED COPY-UP: PASS', 'OVERLAY PROTECTED PERSISTENCE: PASS', 'OVERLAY STACK DEPTH: PASS', 'SECURITY EVENT PRODUCERS: PASS']
 		expected << ['OVERLAY FLAGS COPY-UP: PASS', 'OVERLAY FLAGS HELD ALIASES: PASS', 'OVERLAY FLAGS AUTHORIZATION: PASS', 'OVERLAY FLAGS PERSISTENCE: PASS']
 	}
 	if case_name in ['atomic', 'all'] { expected << 'OVERLAY REPLACE: PASS' }
@@ -179,6 +183,10 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 	if case_name == 'socket-access' { expected << ['OVERLAY SOCKET REFERENCE: PASS', 'OVERLAY SOCKET UMASK: PASS'] }
 	positive, negative := guesthost.verdict_policy(expected, ['FAIL: overlay'], false)
 	code := guesthost.boot(command, configured.env, state, positive, negative, timeout, true)!
+	if code == 0 && case_name in ['disk', 'all', 'sockets'] && !samples_flat(os.read_file(state + '/serial.log')!, 70, 71) {
+		eprintln('refused overlay stacking retained live kernel allocations')
+		return 1
+	}
 	if code == 0 && case_name in ['disk', 'all', 'sockets'] && !samples_flat(os.read_file(state + '/serial.log')!, 60, 61) {
 		eprintln('refused inode flag operations retained live kernel allocations')
 		return 1

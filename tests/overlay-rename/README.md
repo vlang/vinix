@@ -27,7 +27,8 @@ ABI header and `mke2fs` (`VINIX_MKE2FS` can select it). It owns a QEMU process w
 networking disabled and records kernel, fixture, ABI, init, ISO and disk hashes
 in `receipt.json`. Guest serial output is retained in `serial.log`. A positive
 verdict is required for every selected case; assertion failures fail the run.
-The timeout defaults to 360 seconds to include the chained retirement waits.
+The timeout defaults to 900 seconds to cover the full matrix, cache warmup and
+chained retirement waits.
 
 The default `--case all` includes:
 
@@ -99,6 +100,28 @@ a direct ext2 regular file, directory and volume root. After a writable remount,
 all flags and their write/metadata/creation refusals must remain effective.
 See [ext2 inode-flag loading](ext2-flags.md).
 
+`disk`, `all` and `sockets` also preserve append-only protections through xattr,
+chmod/chown, timestamps, descriptor chmod, appended data and directory child
+creation. The ordinary-account probe checks tmpfs and ext2 uppers and an ext2
+upper stacked over another overlay, including held descriptors, unchanged lower
+content and flags, write/truncate/deletion refusals and upper flags after remount.
+Repeated metadata updates participate in the existing phases 60/61 memory gate.
+These cases add a 25-second retirement wait. See
+[protection-preserving copy-up](protected-copyup.md).
+Its stacked-directory case also checks [lazy inner-layer population](stacked-population.md)
+without a preparatory lookup of the existing lower child.
+Root additionally mounts eight lazy read-only overlay layers and has UID/GID
+1000 read the deepest nested file. A ninth backing layer returns `ELOOP` without
+replacing its target or creating staging storage. Two batches each repeat 200
+refusals for excessive lower, upper and work-layer depths; every live class and
+large count must match in phases 70/71. The additional mounts retire before
+the ext2 remount checks. The limit counts backing overlay depth, not the number
+of colon-separated directories from ordinary filesystems.
+Each batch also sends 200 authorized service reports and verifies ring counters
+and bounded copied labels. Before those batches, UID 1000 must be refused when
+writing through an inherited root-opened report descriptor.
+See [security event qualification](security-events.md).
+
 The `disk`, `all` and `sockets` cases also set and clear inode flags through
 lower-only paths, check unchanged lower flags/content and retained descriptors,
 and verify upper protections after remount. Removed or replaced lower-only
@@ -164,7 +187,9 @@ The creation probe checks umasks `0000`, `0022`, `0077`, `0222` and `0777` for
 stream, record and datagram sockets, with and without a default ACL. It verifies
 pathname/O_PATH metadata and actual access, then checks persisted masked ACLs
 after remount. See [socket creation-mask evidence](socket-umask.md).
-Two batches each run 32 cycles on each backend; every live slab class and the
+Two initial batches warm the ext2 metadata footprint. Two measured batches
+then each run 32 cycles on each backend. All four batches wait 40 seconds for
+chained retirement and print allocation samples; every live slab class and the
 large-allocation count must match. A protected-directory bind must fail with
 `EACCES`. Root remounts the volume read-only, verifies that removed names stay
 absent, and checks that an ordinary-account bind fails with `EROFS`.
