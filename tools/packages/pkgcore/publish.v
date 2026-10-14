@@ -2,7 +2,6 @@
 module pkgcore
 
 import tools.packages.signing as ed25519
-import encoding.hex
 import json2
 import os
 import time
@@ -72,12 +71,17 @@ pub fn keygen(path string) !string {
 }
 
 fn publication(repository string, id string, seed_path string, sequence u64, expires i64) !(Index, string, string, string) {
+	seed := read_signing_seed(seed_path, SigningSeedOptions{})!
+	defer { seed.close() }
+	return publication_with_seed(repository, id, seed, sequence, expires)
+}
+
+fn publication_with_seed(repository string, id string, seed SigningSeed, sequence u64, expires i64) !(Index, string, string, string) {
 	if !identifier(id) || sequence == 0 || expires <= time.now().unix() {
 		return error('publishing requires a repository ID, positive sequence and future expiry')
 	}
-	seed := hex.decode(read_metadata(seed_path)!.trim_space())!
-	if seed.len != 32 { return error('signing seed must contain exactly 32 bytes of hex') }
-	private_key := ed25519.new_key_from_seed(seed)
+	mut private_key := ed25519.new_key_from_seed(seed.bytes)
+	defer { retire_signing_bytes(mut private_key) }
 	mut packages := []Package{}
 	for name in os.ls(repository + '/manifests')! {
 		if !name.ends_with('.json') { continue }

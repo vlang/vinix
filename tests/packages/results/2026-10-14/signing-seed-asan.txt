@@ -1,0 +1,60 @@
+signing_seed ASan/UBSan (detect_leaks=0, halt_on_error=1):
+PASS
+release ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+PASS
+catalog ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Updating trusted repository fixture
+Installing app 1.0.0 (1/3) from fixture
+Downloading app/bin/application (19 bytes)
+Installing License 1.0.0 (2/3) from fixture
+Downloading license/COPYING (23 bytes)
+Installing runtime 1.0.0 (3/3) from fixture
+Downloading runtime/bin/runner (23 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing app 1.0.0 (1/3) from fixture
+Downloading app/bin/application (18 bytes)
+Installing License 1.0.0 (2/3) from fixture
+Downloading license/COPYING (23 bytes)
+Installing runtime 1.0.0 (3/3) from fixture
+Downloading runtime/bin/runner (22 bytes)
+Activated package generation 1
+Activated package generation 2
+PASS
+composition ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Updating trusted repository composed
+Installing alpha 1.0.0 (1/4) from composed
+Downloading alpha/bin/app (13 bytes)
+Installing Notice 1.0.0 (2/4) from composed
+Downloading alpha-notice/NOTICE (12 bytes)
+Installing beta 1.0.0 (3/4) from composed
+Downloading beta/bin/app (12 bytes)
+Installing Notice 1.0.0 (4/4) from composed
+Downloading beta-notice/NOTICE (11 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository composed
+Installing alpha 1.0.0 (1/4) from composed
+Downloading alpha/bin/app (12 bytes)
+Installing Notice 1.0.0 (2/4) from composed
+Downloading alpha-notice/NOTICE (12 bytes)
+Installing beta 1.0.0 (3/4) from composed
+Downloading beta/bin/app (11 bytes)
+Installing Notice 1.0.0 (4/4) from composed
+Downloading beta-notice/NOTICE (11 bytes)
+Activated package generation 1
+Activated package generation 2
+PASS

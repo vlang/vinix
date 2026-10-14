@@ -1,0 +1,11 @@
+legacy-public: refused without publication
+legacy-hardlink: refused without publication
+legacy-padded: refused without publication
+release-hardlink: refused without publication
+release-padded: refused without publication
+release-public: refused without publication
+legacy-alias: refused without publication
+release-alias: refused without publication
+legacy-fifo: refused without publication
+release-fifo: refused without publication
+Signing seed qualification: private retry and reproducible signatures PASS

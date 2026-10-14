@@ -54,7 +54,7 @@ fn compiler_output(command []string) !string {
 
 fn linux_suite(work string, repository string) !hwhost.Suite {
 	mut binaries := [hwhost.RootBinary{ source: work + '/usr/bin/vinix-sandbox', path: 'usr/bin/vinix-sandbox' }]
-	for name in ['linux-probe', 'linux-runner', 'musl', 'linux-library', 'https-output-check', 'output-producer'] {
+	for name in ['linux-probe', 'linux-runner', 'musl', 'linux-library', 'https-output-check', 'output-producer', 'signing-seed-check'] {
 		binaries << hwhost.RootBinary{ source: work + '/' + name, path: 'usr/share/package-fixtures/' + name }
 	}
 	copying := if work == '' { '' } else { os.read_file(repository + '/LICENSE')! }
@@ -86,7 +86,7 @@ fn linux_suite(work string, repository string) !hwhost.Suite {
 			arches:   ['aarch64', 'x86_64']
 			about:    'prepared-root import and signed musl loader/library execution under real sandbox enforcement'
 			required: ['HWTEST START packages-linux', 'PACKAGE SIGNING', 'PACKAGE CATALOG', 'PACKAGE RELEASE', 'PACKAGE REVIEW', 'PACKAGE TRUST REVIEW', 'PACKAGE CONFIGURATION', 'PACKAGE ORGANIZATION', 'PACKAGE DOCUMENTS', 'PACKAGE DEPLOYMENT', 'PACKAGE PROGRESS', 'PACKAGE OFFLINE', 'PACKAGE MIRROR REVIEW', 'PACKAGE REPOSITORY', 'PACKAGE UPDATES', 'PACKAGE LINUX IMPORT',
-				'PACKAGE LOCKED MIRROR', 'PACKAGE STATE', 'PACKAGE COLLECTION', 'PACKAGE DOWNLOAD RECOVERY', 'PACKAGE OFFLINE COPY', 'PACKAGE PAYLOAD HASH', 'PACKAGE METADATA WRITE', 'PACKAGE PIPE OUTPUT', 'HWTEST PASS packages-linux']
+				'PACKAGE LOCKED MIRROR', 'PACKAGE STATE', 'PACKAGE COLLECTION', 'PACKAGE DOWNLOAD RECOVERY', 'PACKAGE OFFLINE COPY', 'PACKAGE PAYLOAD HASH', 'PACKAGE METADATA WRITE', 'PACKAGE PIPE OUTPUT', 'PACKAGE SIGNING SEED', 'HWTEST PASS packages-linux']
 			ending:   .poweroff
 			timeout:  180
 		}]
@@ -132,11 +132,12 @@ fn stage_linux(repository string, work string, architecture string) ! {
 		'linux-library': 'tests/packages/linux-library.v'
 		'https-output-check': 'tools/packages/pkgcore/https_output_test.v'
 		'output-producer': 'tests/packages/output-fixture.v'
+		'signing-seed-check': 'tests/packages/signing-seed-check.v'
 	} {
 		mut flags := ['-os', 'linux', '-arch', arch, '-gc', 'none', '-d', 'no_backtrace', '-d',
 			'no_segfault_handler']
 		if output == 'linux-library' { flags << '-shared' }
-		if output in ['https-output-check', 'output-producer'] {
+		if output in ['https-output-check', 'output-producer', 'signing-seed-check'] {
 			flags << ['-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts']
 		}
 		invoke([v, ...flags, '-o', work + '/' + output + '.c', repository + '/' + input])!
@@ -149,7 +150,7 @@ fn stage_linux(repository string, work string, architecture string) ! {
 	require_dynamic_payload(work + '/linux-probe')!
 	invoke([cc, '-static', '-O2', '-std=gnu11', '-D_GNU_SOURCE', work + '/linux-runner.c', '-o',
 		work + '/linux-runner', '-lm', '-lpthread'])!
-	for output in ['https-output-check', 'output-producer'] {
+	for output in ['https-output-check', 'output-producer', 'signing-seed-check'] {
 		invoke([cc, '-static', '-O2', '-std=gnu11', '-D_GNU_SOURCE', '-fpermissive', work + '/' + output + '.c', '-o', work + '/' + output, '-lm', '-lpthread'])!
 	}
 	loader := compiler_output([cc, '-print-file-name=libc.so'])!
@@ -192,6 +193,7 @@ fn check() !int {
 		artifact('static-linux-runner', work + '/linux-runner')!,
 		artifact('https-output-check', work + '/https-output-check')!,
 		artifact('output-producer', work + '/output-producer')!,
+		artifact('signing-seed-check', work + '/signing-seed-check')!,
 	]
 	status := hwhost.run_suite(linux_suite(work, repository)!, [...args, '--kernel', kernel], @FILE)
 	if status == 0 && options.state_dir != '' {

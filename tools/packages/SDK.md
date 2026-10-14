@@ -138,6 +138,16 @@ Do not modify the workspace or seed while publishing.
 An object whose digest matches the signing seed file is refused, catching an
 accidentally packed seed; keep all credentials out of payload sources as well.
 
+Both `publish` and `publish-release` capture the seed through one nonblocking,
+no-follow descriptor. The captured file must belong to the invoking publisher,
+have no group/other permissions or additional hard links, and contain exactly
+64 hexadecimal digits with optional surrounding ASCII whitespace, within a
+128-byte file limit. Uppercase hex and CRLF are accepted. Restore a private
+ordinary file (normally mode 0600) before retrying a refusal; publication does
+not repair permissions or remove the input. The raw-file digest used by
+`publish-release` to exclude an accidentally packed seed comes from the same
+bytes that select its signing key. See [qualification](../../tests/packages/signing-seed-check.md).
+
 Every advertised version must have a complete dependency closure within this
 workspace for its declared host architecture. An `all` data package must resolve
 on both hosts. Runtime entrypoints and version bounds use the consumer solver;

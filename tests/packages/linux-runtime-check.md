@@ -91,6 +91,13 @@ This exercises the target process/pipe/file boundary. Actual certificate and HTT
 behavior is qualified separately with host curl and the loopback TLS server in
 [HTTPS output qualification](https-output-check.md).
 
+The current controller also stages the signing-seed CLI probe. Both target
+guests require `PACKAGE SIGNING SEED`, checking private ownership, bounded input,
+hard-link/special-file refusal and reproducible retry through both publishing
+commands. Its executable is included in the qualification receipt. Host tests
+add deterministic replacements and a coupled signing/exclusion capture; see
+[signing seed qualification](signing-seed-check.md).
+
 The scenario passed on both targets on 2026-10-12 using an isolated build of
 committed kernel revision `7ac619bd`. Retained receipts and complete serial logs:
 [AArch64 receipt](results/2026-10-12/linux-aarch64.json),

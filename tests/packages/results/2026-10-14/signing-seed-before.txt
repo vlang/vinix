@@ -1,0 +1,11 @@
+legacy-public: previous unsafe acceptance reproduced
+legacy-hardlink: previous unsafe acceptance reproduced
+legacy-padded: previous unsafe acceptance reproduced
+release-hardlink: previous unsafe acceptance reproduced
+release-padded: previous unsafe acceptance reproduced
+release-public: refused without publication
+legacy-alias: refused without publication
+release-alias: refused without publication
+legacy-fifo: refused without publication
+release-fifo: refused without publication
+Signing seed qualification: private retry and reproducible signatures PASS

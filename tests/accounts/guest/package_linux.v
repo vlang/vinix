@@ -569,6 +569,10 @@ fn qualify_package_linux(mut t Test) ! {
 		'/usr/share/package-fixtures/output-producer'], '', none, none)
 	assert output_check.status == 0, output_check.output
 	t.say('PACKAGE PIPE OUTPUT bounded-writes resume range-refusal closed-descriptors reaped-children PASS')
+	seed_check := run(['/usr/share/package-fixtures/signing-seed-check', '/usr/bin/vinix-package',
+		'/tmp/signing-seed-contract'], '', none, none)
+	assert seed_check.status == 0, seed_check.output
+	t.say('PACKAGE SIGNING SEED private-owner bounded-capture hardlink-refusal reproducible-retry PASS')
 	// Organization restrictions are reviewed and atomically persisted without
 	// editing trust, the account selection or the installed generation.
 	policy_path := '/tmp/organization-policy.json'

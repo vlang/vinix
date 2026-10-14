@@ -108,6 +108,11 @@ configuration and trust history. Exclusive private temporary files replace
 predictable `.new` names; publication, cleanup and durability checks use captured
 descriptors. See [atomic write qualification](../../tests/packages/atomic-write-check.md).
 
+Both publishing commands read one captured private signing seed, bounded to
+128 bytes of hex text. Owner, permissions, link count, size and named identity
+must agree before signing. Release secret exclusion uses that same capture.
+See [signing seed qualification](../../tests/packages/signing-seed-check.md).
+
 Consumer and publisher sequence histories also require complete, unambiguous
 records. Missing/null floor arrays cannot reset replay protection; damaged files
 are retained for administrator recovery. Revocation stays available. See

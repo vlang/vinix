@@ -104,15 +104,21 @@ pub fn publish_release(repository string, id string, seed_path string, sequence 
 
 fn release_locked(repository string, id string, seed_path string, sequence u64, expires i64, destination string, options ReleaseOptions) !ReleaseInfo {
 	target := export_target(destination, 'publisher release')!
+	if seed_path == '' || seed_path.contains('\x00') { return error('publisher signing seed requires a valid private-file path') }
 	if os.is_link(seed_path) { return error('publisher signing seed must be a private ordinary file owned by this administrator') }
-	signing_seed := os.real_path(seed_path)
-	seed_info := os.lstat(signing_seed)!
-	if !os.is_file(signing_seed) || seed_info.uid != u32(os.geteuid()) || seed_info.mode & 0o077 != 0 {
-		return error('publisher signing seed must be a private ordinary file owned by this administrator')
-	}
-	check_export_parent(os.dir(signing_seed), 'publisher signing seed')!
-	index, text, signature, public_key := publication(repository, id, signing_seed, sequence, expires)!
-	seed_digest := hash_file(signing_seed)!
+	// Resolve aliases in the parent, retaining the caller's leaf for the
+	// no-follow open. real_path(seed_path) could follow a substituted leaf.
+	seed_parent := os.real_path(os.dir(seed_path))
+	seed_name := os.file_name(seed_path)
+	defer { unsafe { seed_parent.free(); seed_name.free() } }
+	if seed_name in ['', '.', '..']! { return error('publisher signing seed requires a valid private-file path') }
+	check_export_parent(seed_parent, 'publisher signing seed')!
+	signing_seed := seed_parent.trim_right('/') + '/' + seed_name
+	defer { unsafe { signing_seed.free() } }
+	seed := read_signing_seed(signing_seed, SigningSeedOptions{})!
+	defer { seed.close() }
+	options.checkpoint('seed', signing_seed)!
+	index, text, signature, public_key := publication_with_seed(repository, id, seed, sequence, expires)!
 	identity := Repository{ id: id, public_key: public_key }
 	remembered := remember_index(release_history(repository)!, identity, index, text)!
 	release_closures(index, public_key)!
@@ -120,7 +126,7 @@ fn release_locked(repository string, id string, seed_path string, sequence u64, 
 	mut needed := mirror_cost(u64(4 * 1024 * 1024), u64(text.len + signature.len))!
 	for p in index.packages {
 		for payload in p.files {
-			if payload.sha256 == seed_digest { return error('publisher release would include the signing seed as a payload') }
+			if payload.sha256 == seed.file_sha256 { return error('publisher release would include the signing seed as a payload') }
 			if payload.sha256 in objects { continue }
 			objects[payload.sha256] = payload
 			needed = mirror_cost(needed, payload.bytes)!

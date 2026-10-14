@@ -36,6 +36,13 @@ parent descriptor. Failures before replacement preserve the old document; errors
 after replacement explicitly report that the document was saved. See
 [atomic write qualification](../tests/packages/atomic-write-check.md).
 
+Publisher seed admission uses one private regular-file descriptor for both
+publishing commands. Ownership, permissions, link count, the 128-byte size bound
+and named identity are checked on that capture. Release signing and accidental
+seed-payload exclusion use the same bytes. Unsafe inputs refuse without changing
+their contents or publishing an index; restoring a valid seed permits retry.
+See [signing seed qualification](../tests/packages/signing-seed-check.md).
+
 This application store is separate from the Alpine `pkg`/`apk` system layer.
 Existing Alpine ports and special downloads still use that frontend and its
 persistence rules. They do **not** acquire these rollback guarantees. Release
