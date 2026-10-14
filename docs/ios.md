@@ -5256,9 +5256,35 @@ generated-C allocation/ownership checks, retained trials and actual IPA
 probe/audits are under
 `build/ios/fortnite/dynamic-cast-checks`; full iOS regression remains unpassed.
 
-The supplied IPA gets past `_swift_dynamicCast` and exits with status 1 at
-MarketplaceKitWrapper's required `_swift_dynamicCastObjCClass`. Its required
-import and native Swift class-cast instructions are retained. Fortnite has not
+Swift Core also exports `_swift_dynamicCastObjCClass`. This conditional entry
+takes a raw registered Objective-C class rather than Swift wrapper metadata.
+It returns the same borrowed object on a matching class or superclass and nil
+on an incompatible class, with no retain, release or autorelease. A nil input
+returns nil before inspecting the target, including a protected target pointer.
+Non-nil inputs require live registered storage, a matching ISA, positive
+references and bounded registered physical class ancestry. Invalid targets,
+tearing-down objects, Swift prefixes, private CFError storage, formal-class
+overrides and `isKindOfClass:` overrides reject without calling a method or
+changing ownership. Native Swift's overridden `class` and `isKindOfClass:`
+behavior is measured separately and remains unsupported by this entry.
+
+The cast reuses the existing ancestry check and borrowed static errors. It
+creates no Swift metadata wrapper, arena, owner registry or teardown path.
+Ten fresh ASan/UBSan runs and five ARM64 Vinix suites pass across this entry,
+generic casts, object type, Any and the error bridge. The public
+`build-swift-objc-cast` target and full build, regression and Swift
+guest modes include its fixture. Native/V comparisons cover class/ancestor/
+incompatible casts, repeated borrowed calls, nil before target reads, guarded
+result buffers and `x20`/`x21`. V additionally checks concurrent readers,
+registered constants, `object_setClass`, invalid or expired storage, cycles,
+unlocked destructor reentry and two drained runtime lifetimes. Thirteen final
+generated C streams and executables, pinned SDK/LLVM references, generated-C
+allocation/ownership checks, retained fixture trials and IPA probe/audits are
+under `build/ios/fortnite/objc-cast-checks`; full iOS regression remains unpassed.
+
+The supplied IPA gets past `_swift_dynamicCastObjCClass` and exits with status 1
+at MarketplaceKitWrapper's required `_swift_getForeignTypeMetadata`. Its required
+import and native foreign-metadata instructions are retained. Fortnite has not
 entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -5268,10 +5294,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,464 | 696 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 155 | 21 | 23 |
-| All images | 2,278 | 720 | 120 |
+| MarketplaceKitWrapper | 156 | 20 | 23 |
+| All images | 2,279 | 719 | 120 |
 
-The C++/GLES/Text variant reports 2,291 resolved imports, 707 unresolved strong
+The C++/GLES/Text variant reports 2,292 resolved imports, 706 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

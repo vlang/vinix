@@ -73,7 +73,7 @@ fn swift_dynamic_cast_class_checked(owner u64, source u64, target u64) !bool {
 		cls = header.cls
 	} else if owner in ios_runtime.constants { cls = read64(owner) }
 	else { return swift_dynamic_cast_failure() }
-	mut source_found := false; mut target_found := target == 0
+	mut source_found := source == 0; mut target_found := target == 0
 	for _ in 0 .. 128 {
 		info := ios_runtime.classes[cls] or { return swift_dynamic_cast_failure() }
 		if info.meta || (info.dynamic && !info.registered) || read64(cls + 32) & 2 != 0 || cls == cf_error_type_id()
