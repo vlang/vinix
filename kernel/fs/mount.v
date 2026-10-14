@@ -804,6 +804,26 @@ fn is_beneath(node &VFSNode, ancestor &VFSNode) bool {
 	return false
 }
 
+// Physical inode ancestry is insufficient for bind aliases: the same inode
+// can be reached through an attachment outside the requested root. Follow
+// current namespace parents rather than a descriptor's saved cursor prefix.
+fn mount_path_beneath(mut table MountTable, node &VFSNode, entry &Mount,
+	root &VFSNode, root_entry &Mount) bool {
+	mut current_node := unsafe { node }
+	mut current_entry := unsafe { entry }
+	for _ in 0 .. 64 {
+		if current_entry == unsafe { nil } { return false }
+		if current_entry.id == root_entry.id { return is_beneath(current_node, root) }
+		current_entry.lock.acquire()
+		current_node = current_entry.covered
+		current_entry.lock.release()
+		next, valid := mount_parent_in_namespace(mut table, current_entry)
+		if !valid { return false }
+		current_entry = next
+	}
+	return false
+}
+
 // Whether the caller's namespace has made the mount `node` lies in read-only.
 // The nearest mount root above the node decides. A bind mount shares its
 // nodes with the tree it was made from, so the same directory can be
@@ -831,19 +851,6 @@ fn in_read_only_mount(node &VFSNode) bool {
 		current = current.parent
 	}
 	return false
-}
-
-fn find_mount(mut table MountTable, root &VFSNode) &Mount {
-	table.lock.acquire()
-	defer {
-		table.lock.release()
-	}
-	for i := table.mounts.len - 1; i >= 0; i-- {
-		if !table.mounts[i].detached && voidptr(table.mounts[i].root) == voidptr(root) {
-			return table.mounts[i]
-		}
-	}
-	return unsafe { nil }
 }
 
 // Mount objects remain permanent. Copy their parent identity under the entry
@@ -1093,34 +1100,44 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 	defer {
 		unsafe { old_path.free() }
 	}
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
 	directory := calling_directory()
 	new_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	mut new_root := get_node_and_mount(directory, new_path, true, new_mount) or { return errno.err, errno.get() }
-	mut put_old := get_node(directory, old_path, true) or { return errno.err, errno.get() }
+	put_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	mut put_old := get_node_and_mount(directory, old_path, true, put_mount) or { return errno.err, errno.get() }
 	if !stat.isdir(new_root.resource.stat.mode) || !stat.isdir(put_old.resource.stat.mode) {
 		return errno.err, errno.enotdir
 	}
 
 	mut process := calling_process()
-	old_root := process_root(process)
-	old_top := reduce_node(old_root, false)
-	if old_top == unsafe { nil } || voidptr(new_root) == voidptr(old_top) {
+	old_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	old_directory := proc.snapshot_root_directory(process, old_mount)
+	old_root := if old_directory == unsafe { nil } { vfs_root } else { unsafe { &VFSNode(old_directory) } }
+	if old_mount.depth == 0 && !native_context(old_root, old_mount) { return errno.err, errno.get() }
+	old_top := reduce_node_on_mount(old_root, false, 0, true, old_mount)
+	if old_top == unsafe { nil } { return errno.err, errno.get() }
+	mut table := table_of(process)
+	require_mount_destination(mut table, put_mount, false) or { return errno.err, errno.get() }
+	old_entry := attached_namespace_mount(mut table, lib.mount_context_top(old_mount))
+	new_entry := attached_namespace_mount(mut table, lib.mount_context_top(new_mount))
+	put_entry := attached_namespace_mount(mut table, lib.mount_context_top(put_mount))
+	if old_entry == unsafe { nil } || new_entry == unsafe { nil } || put_entry == unsafe { nil } {
+		return errno.err, errno.einval
+	}
+	if new_entry.id == old_entry.id || put_entry.id == old_entry.id {
 		return errno.err, errno.ebusy
 	}
-	// put_old has to be the new root or somewhere below it.
-	if !is_beneath(put_old, new_root) {
+	if voidptr(old_entry.root) != voidptr(old_top) || voidptr(new_entry.root) != voidptr(new_root)
+		|| !mount_path_beneath(mut table, put_old, put_entry, new_root, new_entry)
+		|| !mount_path_beneath(mut table, new_root, new_entry, old_top, old_entry) {
 		return errno.err, errno.einval
 	}
 
-	mut table := table_of(process)
-	old_entry := find_mount(mut table, old_top)
 	attach_mount(mut table, mut put_old, old_top)
-	record_mount(mut table, put_old, old_top, if old_entry != unsafe { nil } {
-		old_entry.source
-	} else {
-		'rootfs'
-	}, if old_entry != unsafe { nil } { old_entry.fstype } else { 'rootfs' },
-		if old_entry != unsafe { nil } { old_entry.flags } else { u64(0) }, '', new_mount)
+	record_mount(mut table, put_old, old_top, old_entry.source, old_entry.fstype,
+		old_entry.flags, '', put_mount)
 
 	table.lock.acquire()
 	table.root_hint = new_root

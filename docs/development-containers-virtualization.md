@@ -397,6 +397,15 @@ propagation dispatch on both native architectures and the same-ELF Linux
 reference. Valid mounted roots still accept propagation requests, including
 directory/file bind roots and privileged foreign roots; namespace propagation
 effects and their complete authorization model remain unimplemented.
+The [pivot-root admission checks](../tests/mount-lifecycle/pivot.md) require
+active caller-namespace identities for both roots and the old-root destination,
+and follow current mount parents when checking ancestry. A shared inode through
+another bind alias cannot authorize the destination. The VFS writer lock covers
+resolution, admission and existing publication; nested destinations record their
+own containing mount. Native ARM/x86 and same-ELF Linux checks cover repeated
+refusals, capability denial and valid tmpfs/bind/nested pivots. Complete pivot
+reparenting, old-root detachment and root/cwd updates across other aliases remain
+unqualified.
 Mount reclamation, busy-reference accounting and full OCI acceptance remain open.
 The overlay-depth refusal measurements also exposed an event-record allocation per call.
 The separate [security event producer correction](../tests/overlay-rename/security-events.md)
