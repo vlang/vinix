@@ -56,6 +56,9 @@ struct XAttrTarget {
 mut:
 	node &VFSNode           = unsafe { nil }
 	res  &resource.Resource = unsafe { nil }
+	// A pathname owns the origin and node until its complete syscall returns.
+	// FD targets use their existing descriptor pin and never project a transport.
+	owned_path PathTarget
 }
 
 // `access` is what the call asks of the file, for pledge(2) and unveil(2).
@@ -69,13 +72,25 @@ fn xattr_target_by_path(_path charptr, follow bool, access u32) ?XAttrTarget {
 		return none
 	}
 	parent := get_parent_dir(at_fdcwd, path)?
-	node := get_node(parent, path, follow)?
-	if !policy_check(node, access) {
+	held := retain_path_target(parent, path, follow)?
+	mut transferred := false
+	defer {
+		if !transferred {
+			failure := errno.get()
+			release_path_target(held)
+			errno.set(failure)
+		}
+	}
+	if !policy_check(held.node, access) {
 		return none
 	}
+	mut origin := held.res
+	backing := resource.path_xattr_resource(origin)
+	transferred = true
 	return XAttrTarget{
-		node: node
-		res:  node.resource
+		node: held.node
+		res: backing
+		owned_path: held
 	}
 }
 
@@ -149,10 +164,23 @@ fn xattr_target_to_change(target XAttrTarget, name string) ?XAttrTarget {
 		return none
 	}
 	overlay_copy_up(target.node)?
+	mut origin := target.node.resource
+	backing := if target.owned_path.node != unsafe { nil } {
+		resource.path_xattr_resource(origin)
+	} else { origin }
 	return XAttrTarget{
 		node: target.node
-		res:  target.node.resource
+		res: backing
+		owned_path: target.owned_path
 	}
+}
+
+fn xattr_changed(target XAttrTarget) {
+	if target.owned_path.node != unsafe { nil } {
+		mut origin := target.owned_path.res
+		resource.refresh_path_xattr_resource(mut origin)
+	}
+	if target.node != unsafe { nil } { inotify_emit(target.node, '', in_attrib, 0) }
 }
 
 // What setting or removing `name` on `target` needs, as on Linux.
@@ -166,6 +194,8 @@ fn xattr_may_change(target XAttrTarget, name string, removing bool) ? {
 	if target.node != unsafe { nil } && !attr_allows_metadata(target.node) {
 		return none
 	}
+	if resource.backend_is_read_only(mut mandatory_res) { errno.set(errno.erofs); return none }
+	if resource.is_immutable(mut mandatory_res) { errno.set(errno.eperm); return none }
 	if posix_acl.is_name(name) {
 		if stat.islnk(target.res.stat.mode) { errno.set(errno.enotsup); return none }
 		if name == posix_acl.default_name && !stat.isdir(target.res.stat.mode) {
@@ -251,7 +281,7 @@ fn xattr_set(given XAttrTarget, _name charptr, value voidptr, size u64, flags in
 		backend_flags |= resource.acl_clear_setgid
 	}
 	resource.set_xattr(mut res, name, data, backend_flags) or { return errno.err, errno.get() }
-	if target.node != unsafe { nil } { inotify_emit(target.node, '', in_attrib, 0) }
+	xattr_changed(target)
 	return 0, 0
 }
 
@@ -335,7 +365,7 @@ fn xattr_remove(given XAttrTarget, _name charptr) (u64, u64) {
 	xattr_may_change(target, name, true) or { return errno.err, errno.get() }
 	mut res := target.res
 	resource.remove_xattr(mut res, name) or { return errno.err, errno.get() }
-	if target.node != unsafe { nil } { inotify_emit(target.node, '', in_attrib, 0) }
+	xattr_changed(target)
 	return 0, 0
 }
 
@@ -572,11 +602,13 @@ fn (mut res TmpFSResource) sync_acl_mode_locked(mode u32) ? {
 
 pub fn syscall_setxattr(_ voidptr, _path charptr, _name charptr, value voidptr, size u64, flags int) (u64, u64) {
 	target := xattr_target_by_path(_path, true, proc.policy_fattr) or { return errno.err, errno.get() }
+	defer { release_path_target(target.owned_path) }
 	return xattr_set(target, _name, value, size, flags)
 }
 
 pub fn syscall_lsetxattr(_ voidptr, _path charptr, _name charptr, value voidptr, size u64, flags int) (u64, u64) {
 	target := xattr_target_by_path(_path, false, proc.policy_fattr) or { return errno.err, errno.get() }
+	defer { release_path_target(target.owned_path) }
 	return xattr_set(target, _name, value, size, flags)
 }
 
@@ -585,17 +617,20 @@ pub fn syscall_fsetxattr(_ voidptr, fdnum int, _name charptr, value voidptr, siz
 	defer {
 		fd.unref()
 	}
+	if fd.handle.flags & resource.o_path != 0 { return errno.err, errno.ebadf }
 	fd.handle.mac_check(proc.mac_metadata) or { return errno.err, errno.get() }
 	return xattr_set(xattr_target_of_fd(fd), _name, value, size, flags)
 }
 
 pub fn syscall_getxattr(_ voidptr, _path charptr, _name charptr, value voidptr, size u64) (u64, u64) {
 	target := xattr_target_by_path(_path, true, proc.policy_read) or { return errno.err, errno.get() }
+	defer { release_path_target(target.owned_path) }
 	return xattr_get(target, _name, value, size)
 }
 
 pub fn syscall_lgetxattr(_ voidptr, _path charptr, _name charptr, value voidptr, size u64) (u64, u64) {
 	target := xattr_target_by_path(_path, false, proc.policy_read) or { return errno.err, errno.get() }
+	defer { release_path_target(target.owned_path) }
 	return xattr_get(target, _name, value, size)
 }
 
@@ -604,17 +639,20 @@ pub fn syscall_fgetxattr(_ voidptr, fdnum int, _name charptr, value voidptr, siz
 	defer {
 		fd.unref()
 	}
+	if fd.handle.flags & resource.o_path != 0 { return errno.err, errno.ebadf }
 	fd.handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
 	return xattr_get(xattr_target_of_fd(fd), _name, value, size)
 }
 
 pub fn syscall_listxattr(_ voidptr, _path charptr, list voidptr, size u64) (u64, u64) {
 	target := xattr_target_by_path(_path, true, proc.policy_read) or { return errno.err, errno.get() }
+	defer { release_path_target(target.owned_path) }
 	return xattr_list(target, list, size)
 }
 
 pub fn syscall_llistxattr(_ voidptr, _path charptr, list voidptr, size u64) (u64, u64) {
 	target := xattr_target_by_path(_path, false, proc.policy_read) or { return errno.err, errno.get() }
+	defer { release_path_target(target.owned_path) }
 	return xattr_list(target, list, size)
 }
 
@@ -623,17 +661,20 @@ pub fn syscall_flistxattr(_ voidptr, fdnum int, list voidptr, size u64) (u64, u6
 	defer {
 		fd.unref()
 	}
+	if fd.handle.flags & resource.o_path != 0 { return errno.err, errno.ebadf }
 	fd.handle.mac_check(proc.mac_inspect) or { return errno.err, errno.get() }
 	return xattr_list(xattr_target_of_fd(fd), list, size)
 }
 
 pub fn syscall_removexattr(_ voidptr, _path charptr, _name charptr) (u64, u64) {
 	target := xattr_target_by_path(_path, true, proc.policy_fattr) or { return errno.err, errno.get() }
+	defer { release_path_target(target.owned_path) }
 	return xattr_remove(target, _name)
 }
 
 pub fn syscall_lremovexattr(_ voidptr, _path charptr, _name charptr) (u64, u64) {
 	target := xattr_target_by_path(_path, false, proc.policy_fattr) or { return errno.err, errno.get() }
+	defer { release_path_target(target.owned_path) }
 	return xattr_remove(target, _name)
 }
 
@@ -642,6 +683,7 @@ pub fn syscall_fremovexattr(_ voidptr, fdnum int, _name charptr) (u64, u64) {
 	defer {
 		fd.unref()
 	}
+	if fd.handle.flags & resource.o_path != 0 { return errno.err, errno.ebadf }
 	fd.handle.mac_check(proc.mac_metadata) or { return errno.err, errno.get() }
 	return xattr_remove(xattr_target_of_fd(fd), _name)
 }

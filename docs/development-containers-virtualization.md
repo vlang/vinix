@@ -328,8 +328,12 @@ The [backing ACL correction](../tests/overlay-rename/socket-acl.md) forwards
 permission snapshots and metadata updates to a named socket's retained inode.
 Native tmpfs/ext2/overlay checks cover inherited ACL denials/grants, chmod masks,
 ownership rollback and metadata persistence; pathname and transport operations
-retain their targets through backing callbacks. Direct xattr changes on a live
-socket and full socket/path metadata separation remain open.
+retain their targets through backing callbacks. The
+[pathname xattr correction](../tests/overlay-rename/socket-xattrs.md) exposes a
+live socket's backing ACL through pathname calls while preserving mount,
+owner/capability and descriptor restrictions. Native tmpfs/ext2/overlay checks
+and identical Linux probes pass; full socket/path metadata separation, creation
+umask parity and the broader authorization matrix remain open.
 The [UNIX descriptor ownership correction](../tests/overlay-rename/socket-ownership.md)
 initializes unnamed/pair metadata from creator credentials and accepted metadata
 from the accepting account. Ordinary-account metadata changes and acceptance of

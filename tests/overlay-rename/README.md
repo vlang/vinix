@@ -128,6 +128,13 @@ The fixture checks empty refused queues, ownership-update rollback on ext2 and
 persisted mode, owner, ACL and timestamps after remount. Repeated socket cycles
 inherit ACLs and exercise chmod and lookup before retirement. See
 [backing ACL and metadata evidence](socket-acl.md).
+Pathname xattr calls must read, list, update and remove that live inode's access
+ACL. Explicit ACL updates must immediately control new connections, preserve
+established traffic, reject invalid permissions and unauthorized namespaces,
+and survive transport retirement and disk remount. Socket descriptions remain
+unsupported for filesystem ACLs; all four descriptor xattr calls reject
+`O_PATH` with `EBADF` before inspecting user pointers or writing output buffers.
+See [pathname socket xattr evidence](socket-xattrs.md).
 Two batches each run 32 cycles on each backend; every live slab class and the
 large-allocation count must match. A protected-directory bind must fail with
 `EACCES`. Root remounts the volume read-only, verifies that removed names stay

@@ -47,6 +47,7 @@ fn root_socket_acls(base &char) [6]i32 {
 			check(descriptors[index] >= 0 && C.bind(descriptors[index], voidptr(address), u32(sizeof(C.sockaddr_un))) == 0, 538)
 			// chmod must update the inherited ACL mask on the backing inode.
 			check(C.chmod(&path[0], if index == 2 { u32(0o600) } else if index == 1 { u32(0o620) } else { u32(0o622) }) == 0, 539)
+			socket_xattr_root(&path[0], index)
 			if index == 0 && (C.strcmp(base, c'/tmp/overlay-volume') == 0
 				|| C.strcmp(base, c'/tmp/overlay-state/diskmerged') == 0) {
 				// Vinix's current ext2 owner encoding rejects IDs above 16 bits.
@@ -76,6 +77,7 @@ fn socket_acl_connections(base &char, descriptors [6]i32) {
 		for index in 0 .. 6 {
 			mut path := [108]char{}
 			socket_acl_path(base, index, &path[0])
+			socket_xattr_account(&path[0], index)
 			mut address := &C.sockaddr_un(C.alloca(sizeof(C.sockaddr_un)))
 			socket_address(&path[0], address)
 			kind := if index == 4 { C.SOCK_SEQPACKET } else if index == 5 { C.SOCK_DGRAM } else { C.SOCK_STREAM }

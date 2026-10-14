@@ -51,6 +51,7 @@ fn persistent_socket_cycle(base &char, backing &char, hold bool) {
 		socket_absent(&disk_source[0], 405)
 		mut st := C.stat{}
 		check(C.fstat(old_path, &st) == 0 && st.st_nlink == 0, 406)
+		socket_live_xattrs(&target[0], listener)
 		check(C.chmod(&target[0], 0) == 0, 472)
 		socket_private_opens(&target[0])
 		metadata := C.open(&target[0], C.O_PATH)
@@ -60,6 +61,7 @@ fn persistent_socket_cycle(base &char, backing &char, hold bool) {
 		mut address := &C.sockaddr_un(C.alloca(sizeof(C.sockaddr_un)))
 		socket_address(&target[0], address)
 		socket_metadata_operations(metadata, address)
+		path_xattr_descriptions(metadata)
 		socket_private_connections(client, listener, address)
 		delivered_metadata := pass_socket_metadata(metadata)
 		check(C.close(delivered_metadata) == 0, 464)
@@ -82,6 +84,7 @@ fn persistent_socket_cycle(base &char, backing &char, hold bool) {
 		socket_owned_description(accepted, 524)
 		socket_owned_peer(accepted)
 		if hold {
+			C.puts(c'OVERLAY SOCKET XATTR: PASS')
 			C.puts(c'OVERLAY SOCKET PATH CLOSE: PASS')
 			C.puts(c'OVERLAY SOCKET ACCESS: PASS')
 			C.puts(c'OVERLAY SOCKET OPEN: PASS')

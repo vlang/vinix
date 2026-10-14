@@ -4,6 +4,16 @@ module unix
 import resource
 import stat
 
+fn (mut this UnixSocket) path_xattr_backend() &resource.Resource {
+	return this.namespace_resource
+}
+
+fn (mut this UnixSocket) path_xattrs_changed() {
+	if this.namespace_resource == unsafe { nil } { return }
+	this.stat.mode = this.namespace_resource.stat.mode
+	this.stat.ctim = this.namespace_resource.stat.ctim
+}
+
 // bind retains the filesystem resource until the endpoint retires. Borrow it
 // synchronously: the backend snapshots its ACL and matching owner/mode under
 // its own locks, without taking the socket transport lock or creating a box.
