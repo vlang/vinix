@@ -1,0 +1,83 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=25
+!>+ [11] ./sbin/init sz=210912
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/cache-promotion-probe sz=1353912
+!>+ [15] ./usr/share/package-fixtures/cache-promotion-core sz=885016
+!>+ [16] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e89800
+initramfs: Done (16 entries)
+HWTEST START packages-cache-promotion
+CACHE PROMOTION captured partial/parent, link/replacement/FIFO/content refusal and atomic destination-link replacement PASS
+CACHE PROMOTION signed hash/length, captured flush EINTR/EIO, published-cache diagnostics and 128 cycles under 32 descriptors PASS
+CACHE PROCESS cache-promotion-core PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (28672 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Rolled back to generation 2; application data was retained
+Rolled back to generation 1; application data was retained
+CACHE PROMOTION prefix: refused alias with unrelated bytes/mode and state/history preserved; ordinary offline retry and rollback PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (28672 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Rolled back to generation 2; application data was retained
+Rolled back to generation 1; application data was retained
+CACHE PROMOTION valid-complete: refused alias with unrelated bytes/mode and state/history preserved; ordinary offline retry and rollback PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (28672 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Rolled back to generation 2; application data was retained
+Rolled back to generation 1; application data was retained
+CACHE PROMOTION invalid-complete: refused alias with unrelated bytes/mode and state/history preserved; ordinary offline retry and rollback PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (28672 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Rolled back to generation 2; application data was retained
+Rolled back to generation 1; application data was retained
+CACHE PROMOTION oversized: refused alias with unrelated bytes/mode and state/history preserved; ordinary offline retry and rollback PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (28672 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Rolled back to generation 2; application data was retained
+Rolled back to generation 1; application data was retained
+CACHE PROMOTION verify-hardlink: refused alias with unrelated bytes/mode and state/history preserved; ordinary offline retry and rollback PASS
+CACHE PROMOTION signed reviewed recovery, hard-link refusal, preserved outside metadata and ordinary cache/rollback PASS
+CACHE PROCESS cache-promotion-probe PASS
+HWTEST PASS packages-cache-promotion

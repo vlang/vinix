@@ -1,0 +1,56 @@
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (28672 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Rolled back to generation 2; application data was retained
+Rolled back to generation 1; application data was retained
+CACHE PROMOTION prefix: refused alias with unrelated bytes/mode and state/history preserved; ordinary offline retry and rollback PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (28672 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Rolled back to generation 2; application data was retained
+Rolled back to generation 1; application data was retained
+CACHE PROMOTION valid-complete: refused alias with unrelated bytes/mode and state/history preserved; ordinary offline retry and rollback PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (28672 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Rolled back to generation 2; application data was retained
+Rolled back to generation 1; application data was retained
+CACHE PROMOTION invalid-complete: refused alias with unrelated bytes/mode and state/history preserved; ordinary offline retry and rollback PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (28672 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Rolled back to generation 2; application data was retained
+Rolled back to generation 1; application data was retained
+CACHE PROMOTION oversized: refused alias with unrelated bytes/mode and state/history preserved; ordinary offline retry and rollback PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (28672 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Rolled back to generation 2; application data was retained
+Rolled back to generation 1; application data was retained
+CACHE PROMOTION verify-hardlink: refused alias with unrelated bytes/mode and state/history preserved; ordinary offline retry and rollback PASS
+CACHE PROMOTION signed reviewed recovery, hard-link refusal, preserved outside metadata and ordinary cache/rollback PASS

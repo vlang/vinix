@@ -1,0 +1,11 @@
+PASS baseline 64f73d399 reproduces successful recovery changing an unrelated hard-linked file from 0640 to 0444
+
+Previous implementation, isolated fixture data:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (28672 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+CACHE PROMOTION BEFORE: complete hard-linked partial installed and changed unrelated file permissions from 0640 to 0444

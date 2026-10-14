@@ -27,6 +27,14 @@ its contents. Captured destination identity, size and link count are rechecked
 around progress callbacks and flushing; interrupted flushes retry. Source hard
 links remain readable. See [output qualification](../tests/packages/copy-output-check.md).
 
+Retained download partials also require exactly one hard link, including complete
+files that need no transport. Cache promotion captures the partial and its object
+directory, verifies the signed length/hash on that descriptor, applies permissions
+and flushes without reopening its path, then publishes with directory-relative
+atomic rename. Replaced paths and shared partials refuse; an error after cache
+publication says the object was saved. See
+[cache-promotion qualification](../tests/packages/cache-promotion-check.md).
+
 Payload hashing and verification use one captured ordinary-file descriptor,
 opened without following leaf aliases or blocking on FIFOs. Verification checks
 the authenticated length on that descriptor before hashing. Reads stop at the

@@ -1,0 +1,2 @@
+CACHE PROMOTION captured partial/parent, link/replacement/FIFO/content refusal and atomic destination-link replacement PASS
+CACHE PROMOTION signed hash/length, captured flush EINTR/EIO, published-cache diagnostics and 128 cycles under 32 descriptors PASS

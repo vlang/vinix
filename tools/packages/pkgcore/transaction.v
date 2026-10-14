@@ -172,9 +172,7 @@ fn cached_payload_progress(config Config, installed Installed, payload Payload, 
 	if os.exists(path) { os.rm(path)! }
 	part := path + '.part'
 	if os.is_link(part) { os.rm(part)! }
-	if os.exists(part) && !ordinary_file(part) {
-		return error('${installed.package.id}: partial download must be an ordinary regular file: ${part}')
-	}
+	if os.exists(part) || os.is_link(part) { validate_download_partial(part)! }
 	// A complete invalid partial cannot use a range request at EOF. Retire it
 	// before transport, including oversized data left by an interrupted child.
 	if os.is_file(part) && (os.file_size(part) > payload.bytes
@@ -204,10 +202,7 @@ fn cached_payload_progress(config Config, installed Installed, payload Payload, 
 		os.rm(part)!
 		return error('${installed.package.id}: payload checksum or size mismatch; partial data discarded, retry from the trusted repository')
 	}
-	os.chmod(part, 0o444)!
-	sync_file(part)!
-	os.rename(part, path)!
-	sync_directory(directory + '/objects')!
+	promote_cached_payload(directory, payload)!
 	return path
 }
 

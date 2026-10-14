@@ -1460,6 +1460,17 @@ Metadata, payload verification and offline sources require ordinary regular
 files; directories/FIFOs in partial cache paths refuse before transfer. See
 [download recovery qualification](../../tests/packages/download-recovery-check.md).
 
+Existing partials must have exactly one hard link, even when already complete
+or invalid/oversized. Unsafe shared partials are retained for inspection without
+changing the other file's bytes or permissions. Retire only the partial alias
+under the writer lock or with workers stopped; an ordinary verified partial can
+then retry without its upstream object. Promotion captures the object directory
+and partial, verifies length/hash on that descriptor, checks named identity/link
+count before mutation/publication, and uses captured `fchmod`/`fsync` and
+directory-relative atomic rename. Interrupted flushes retry. A post-publication
+storage failure reports **cached payload saved**; it does not report transaction
+completion. See [cache-promotion checks](../../tests/packages/cache-promotion-check.md).
+
 An HTTPS server's explicit byte-range refusal (curl exit 33) also discards the
 prefix and permits one fresh transfer. A completed fresh fallback is classified
 as fresh, so an integrity failure cannot trigger another transfer. Certificate,

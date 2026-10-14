@@ -111,6 +111,9 @@ fn check() ! {
 			'-o', work + '/copy-output-check', repository + '/tests/packages/copy-output-check.v'])!
 		run(work + '/copy-output-check', [work + '/copy-output'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/cache-promotion-check', repository + '/tests/packages/cache-promotion-check.v'])!
+		run(work + '/cache-promotion-check', [work + '/cache-promotion'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/prepared-root-check', repository + '/tests/packages/prepared-root-check.v'])!
 		run(work + '/prepared-root-check', [work + '/prepared-root'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',

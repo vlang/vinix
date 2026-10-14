@@ -1,0 +1,2 @@
+PASS aarch64 packages-cache-promotion (18.6s)
+package-cache-promotion aarch64: 1 passed, 0 failed, 0 skipped
