@@ -5314,11 +5314,43 @@ pinned SDK/LLVM references, the actual IPA accessor/template, generated-C
 allocation checks and IPA probe/audits are retained under
 `build/ios/fortnite/foreign-metadata-checks`; full iOS regression remains unpassed.
 
-The supplied IPA gets past `_swift_getForeignTypeMetadata` and exits with status 1
-at MarketplaceKitWrapper's required
-`_swift_getTypeByMangledNameInContextInMetadataState`. Its required import and
-native instructions are retained. Fortnite has not entered application code and
-remains unplayable.
+Swift Core additionally exports
+`_swift_getTypeByMangledNameInContextInMetadataState`. Its five arguments are
+request, bounded name, length, context and generic arguments; it returns a
+metadata pointer. MarketplaceKitWrapper's abstract instantiation helper passes
+request `0xff` and caches that pointer with a tag bit. Native Swift clears the
+nonblocking bit before resolution, but nominal accessor traces show an abstract
+request `0xff` for every tested public state, including complete lookup.
+
+The entry supports requests `0`, `0x3f`, `0xff`, `0x100`, `0x13f` and `0x1ff`
+within an active runtime. It reuses the existing bounded grammar and canonical
+metadata caches, resolving through abstract accessor requests and requiring
+complete nominal responses. Complete metadata satisfies every supported request;
+incomplete responses, other state/flag combinations, generic nominal
+initialization and deferred completion reject. Caller name, descriptor, accessor
+and argument spans remain borrowed through the call. Accessors run outside the
+runtime lock, and this entry introduces no cache, arena, ARC operation, owner
+registry or teardown path. Existing four-argument lookup and direct nominal
+helpers retain their complete request zero.
+
+Ten fresh ASan/UBSan runs and five ARM64 Vinix suites pass across this entry,
+legacy mangled lookup, foreign enum metadata, metadata and Array. Native/V
+comparisons cover six public requests and abstract accessor traces, builtins,
+nested Arrays, generic substitution, direct/indirect symbolic references,
+embedded zeros, read-only descriptors/names, protected input boundaries,
+guarded results and preserved `x20`/`x21`. V adds unsupported state/syntax/lifetime
+rejection before callbacks, incomplete-response rejection, unlocked accessor
+reentry, eight readers and two drained lifetimes. The public
+`build-swift-mangled-state` target and full build, regression and Swift guest
+modes include its fixture. Thirteen generated C streams/executables, pinned
+SDK/LLVM references, actual IPA callers/type bytes, generated-C checks, retained
+compiler/native expectation trials and IPA probe/audits are under
+`build/ios/fortnite/mangled-state-checks`; full iOS regression remains unpassed.
+
+The supplied IPA gets past the metadata-state lookup import and exits with
+status 1 at MarketplaceKitWrapper's required `_swift_initStackObject`. Its
+required import and native initialization instructions are retained. Fortnite
+has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -5327,10 +5359,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,464 | 696 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 157 | 19 | 23 |
-| All images | 2,280 | 718 | 120 |
+| MarketplaceKitWrapper | 158 | 18 | 23 |
+| All images | 2,281 | 717 | 120 |
 
-The C++/GLES/Text variant reports 2,293 resolved imports, 705 unresolved strong
+The C++/GLES/Text variant reports 2,294 resolved imports, 704 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

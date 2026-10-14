@@ -104,7 +104,7 @@ fn swift_mangled_parse(name u64, length u64) !SwiftMangledType {
 	return SwiftMangledType{kind: kind, arrays: arrays, value: value, name_length: name_length}
 }
 
-fn swift_mangled_nominal(descriptor u64) !u64 {
+fn swift_mangled_nominal_request(descriptor u64, request u64) !u64 {
 	// Descriptors/accessors belong to the caller or its loaded Mach-O image.
 	// Generic nominals need argument/witness substitution and are not invoked
 	// through this nongeneric ABI. No lock crosses a borrowed accessor call.
@@ -117,14 +117,14 @@ fn swift_mangled_nominal(descriptor u64) !u64 {
 	address := u64(i64(descriptor + 12) + i64(delta))
 	if address % 4 != 0 { return error('iOS: unaligned Swift metadata accessor') }
 	access := unsafe { SwiftMangledAccessor(voidptr(address)) }
-	response := access(0) // MetadataState::Complete, response in x0/x1.
+	response := access(request) // MetadataResponse in x0/x1; this subset requires Complete.
 	if response.metadata == 0 || response.state != 0 {
 		return error('iOS: Swift nominal accessor did not return complete metadata')
 	}
 	return response.metadata
 }
 
-fn swift_mangled_lookup_checked(name u64, length u64, context u64, generic_args u64) !u64 {
+fn swift_mangled_lookup_request_checked(request u64, name u64, length u64, context u64, generic_args u64) !u64 {
 	parsed := swift_mangled_parse(name, length)!
 	mut metadata := u64(0)
 	match parsed.kind {
@@ -145,7 +145,7 @@ fn swift_mangled_lookup_checked(name u64, length u64, context u64, generic_args 
 			metadata = read64(generic_args)
 			if metadata == 0 { return 0 }
 		}
-		5 { metadata = swift_mangled_nominal(parsed.value)! }
+		5 { metadata = swift_mangled_nominal_request(parsed.value, request)! }
 		6 {
 			// A borrowed bounded key avoids allocating a temporary C string.
 			key := unsafe { (&u8(parsed.value)).vstring_with_len(int(parsed.name_length)) }
@@ -171,8 +171,16 @@ fn swift_mangled_lookup_checked(name u64, length u64, context u64, generic_args 
 		}
 		else { return error('iOS: invalid Swift type expression') }
 	}
-	for _ in u64(0) .. parsed.arrays { metadata = swift_array_access(0, metadata).metadata }
+	for _ in u64(0) .. parsed.arrays { metadata = swift_array_access(request, metadata).metadata }
 	return metadata
+}
+
+fn swift_mangled_nominal(descriptor u64) !u64 {
+	return swift_mangled_nominal_request(descriptor, 0)
+}
+
+fn swift_mangled_lookup_checked(name u64, length u64, context u64, generic_args u64) !u64 {
+	return swift_mangled_lookup_request_checked(0, name, length, context, generic_args)
 }
 
 fn swift_mangled_lookup(name u64, length u64, context u64, generic_args u64) u64 {
@@ -181,6 +189,7 @@ fn swift_mangled_lookup(name u64, length u64, context u64, generic_args u64) u64
 
 fn swift_mangled_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_swift_getTypeByMangledNameInContextInMetadataState' { u64(unsafe { voidptr(swift_mangled_state_lookup) }) }
 		'_swift_getForeignTypeMetadata' { u64(unsafe { voidptr(swift_foreign_metadata) }) }
 		'_swift_getTypeByMangledNameInContext' { u64(unsafe { voidptr(swift_mangled_lookup) }) }
 		else { none }
