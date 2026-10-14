@@ -5891,24 +5891,56 @@ final builds include the allocation-free symbol matcher and the additional
 initialization-order checks. Full iOS regression remains unpassed and
 published runners remain unchanged.
 
-Two more strong imports resolve, and both bundled frameworks have zero
-unresolved strong imports in the C++/GLES/Text audit. The actual IPA startup
-probe passes their binding and exits with status 1 in the main executable at
-Foundation's required
-`_$s10Foundation10CocoaErrorV19fileWriteFileExistsAC4CodeVvgZ`. Fortnite has
-not entered application code and remains unplayable.
+The queue bridge resolves two more strong imports, and both bundled
+frameworks have zero unresolved strong imports in the C++/GLES/Text audit.
+Before the CocoaError getter was implemented, the actual IPA startup probe
+passed their binding and stopped in the main executable at Foundation's
+required `_$s10Foundation10CocoaErrorV19fileWriteFileExistsAC4CodeVvgZ`.
+
+The Foundation bridge now exports that `fileWriteFileExists` getter through
+both the framework and Swift overlay install names. The installed native
+implementation writes the eight-byte `CocoaError.Code` raw value `516`
+through Swift's indirect result register x8. It reads no Self, metadata or
+witness argument. V emits this entry in the existing Foundation arena, which
+is published as RX code and RO data and retired by the existing drained
+shutdown. The getter adds no per-call allocation, ARC work or callback.
+Other CocoaError getters, Code metadata, constructors and conformances remain
+unsupported.
+
+Native differential checks verify the eight-byte layout, native `rawValue`
+consumption of V-produced values, protected unused arguments and Self,
+preserved x20/x21, result canaries, both guarded page boundaries, concurrent
+publication/use and two unmapped runtime teardowns. V/Mach-O/LLVM inspection
+of the pinned IPA finds the required getter cell at `10dc981e8`, its stub at
+`10c63a878` and a branch island at `107c28d54`. The actual caller at
+`100073af4` sets x8 to its result buffer before the call. The first inspector
+attempt missed the branch island; its source, executable and failed output
+are retained separately.
+
+Twelve ASan/UBSan runs and six ARM64 guest suites pass across the new getter,
+Foundation logging, NSString unbridging, Error descriptions, Swift metadata
+and unknown-object ownership. Fifteen final generated C streams/executables
+and the four joined, retired VM runs are retained under
+`build/ios/fortnite/cocoa-error-code-checks`, together with native SDK inputs,
+instruction/caller evidence and staging/inspector failures. Full iOS
+regression remains unpassed and published runners remain unchanged.
+
+The actual IPA launch now passes the getter binding and exits with status 1
+at `_$s10Foundation10CocoaErrorV4CodeVAA01_cD8ProtocolAAMc`, the required
+Code conformance to Foundation's `_ErrorCodeProtocol`. Fortnite has not
+entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,476 | 684 | 79 |
+| Fortnite executable | 1,477 | 683 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,311 | 687 | 120 |
+| All images | 2,312 | 686 | 120 |
 
-The C++/GLES/Text variant reports 2,324 resolved imports, 674 unresolved strong
+The C++/GLES/Text variant reports 2,325 resolved imports, 673 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
