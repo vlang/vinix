@@ -1,0 +1,4 @@
+PASS final-cli-lifecycle
+PASS final-cli-native
+PASS final-cli-pack
+PASS builder-failure-cleanup

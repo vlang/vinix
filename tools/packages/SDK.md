@@ -373,6 +373,60 @@ license acceptance occur. A composed release uses its publisher's one key;
 composition does not merge independently signed repositories or authenticate
 upstream inputs. See [qualification](../../tests/packages/composition-check.md).
 
+### Native SDK publisher profile
+
+`native-catalog VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY` emits a pinned catalog
+for the existing Hello, Counter and Memo applications. `VERSION` is a canonical
+three-component package version applied to all three apps in this fixed profile.
+
+Each of `PREPARED_ROOTS/aarch64` and `PREPARED_ROOTS/x86_64` must contain:
+
+```text
+bin/package-hello
+bin/counter
+bin/memo
+licenses/application-sdk-MIT.txt
+licenses/v-MIT.txt
+licenses/musl-MIT.txt
+```
+
+Executables must be ordinary, executable, static ELF64 images for the declared
+host, without an ELF interpreter. The checks admit target/format structure;
+they do not prove every syscall, library function or application behavior.
+Notices must be nonempty ordinary files of at most 1 MiB. Root directories
+cannot be aliases; the importer captures both target directories before copying.
+Imported executable bytes and notice sizes are checked again before publication.
+
+The six manifests retain the example contracts: Hello has `files` permission,
+`text/plain` association and no window protocol; Counter has only `display` and
+protocol 1; Memo has only `display` and protocol 2. All use SDK 1, license MIT,
+no shared runtime and explicit false proprietary/firmware flags. Each app carries
+its three redistribution notices. This profile grants no additional capability.
+Updating statically linked SDK, V or musl code requires a newly reviewed
+application build/version; these apps have no independently updated runtime.
+
+The service preflights destination and temporary-filesystem space, inventories
+payload hashes, canonicalizes complete target coverage and atomically publishes
+only `catalog.json` to a new private lock directory. Failures remove the private
+staging workspace; abrupt termination can leave an unpublished
+`.vinix-native-profile-*` directory. A directory-flush error after publication
+requires checking the named published destination before retrying.
+
+Use the [combined V builder](../../examples/package-catalog/README.md) to compile
+all six applications and produce prepared roots, the reviewed lock, a private
+publisher workspace and an artifact receipt. For separately prepared roots:
+
+```sh
+vinix-package native-catalog 1.0.0 PREPARED_ROOTS NEW_NATIVE_LOCK
+vinix-package pack-catalog NEW_NATIVE_LOCK/catalog.json PREPARED_ROOTS NEW_WORKSPACE
+```
+
+The lock also works with `compose-catalog` alongside SQLite and FFmpeg profiles;
+place roots under matching profile subdirectories when importing a composed
+lock. Publishing, authenticated key enrollment, installation review and account
+selection remain explicit. The examples' local builders and manifests remain
+supported. See [native catalog qualification](../../tests/packages/native-catalog-check.md).
+
 ### SQLite CLI publisher profile
 
 `sqlite-catalog SQLITE_VERSION RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY`

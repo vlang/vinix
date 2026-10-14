@@ -105,6 +105,13 @@ retains redistribution notices and separates compatible library updates from
 the CLI. See the [publisher profile](SDK.md#sqlite-cli-publisher-profile) and
 [real SQLite lifecycle qualification](../../tests/packages/sqlite-profile-check.md).
 
+`native-catalog VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY` pins Hello, Counter and
+Memo for both hosts, retaining their SDK permissions, native window protocols
+and redistribution notices. The [combined V builder](../../examples/package-catalog/README.md)
+compiles all six variants and assembles a publisher workspace. See the
+[profile](SDK.md#native-sdk-publisher-profile) and
+[qualification](../../tests/packages/native-catalog-check.md).
+
 `ffmpeg-catalog RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY` creates a
 pinned FFmpeg 8.0.1 local media profile: FFmpeg and FFprobe share a separately
 versioned musl/library runtime, with notices, upstream source and V build tools.

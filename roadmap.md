@@ -605,6 +605,13 @@ remain required before this acceptance gate is complete. Host lifecycle/UI
 fixtures and both target builds are available in
 [the V qualification driver](tests/packages/distribution-check.v).
 
+The [native SDK catalog](examples/package-catalog/README.md) now builds and pins
+Hello, Counter and Memo for both architectures in one publisher workspace,
+retaining their permissions, protocol versions and notices. Its
+[qualification](tests/packages/native-catalog-check.md) exercises signed native
+application maintenance; the broader catalog and graphical acceptance gate
+above remains open.
+
 - [ ] Harden the existing package frontend with trusted repositories, dependency
   resolution, reproducible metadata and consistent architecture support.
 - [ ] Add transactional install/remove/upgrade, rollback, disk-space checks,

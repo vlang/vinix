@@ -1,0 +1,22 @@
+PASS native_profile-compile
+PASS native_profile-run
+PASS catalog-compile
+PASS catalog-run
+PASS composition-compile
+PASS composition-run
+PASS import-compile
+PASS import-run
+PASS release-compile
+PASS release-run
+PASS distribution-compile
+PASS distribution-run
+PASS sanitize-final-compile
+PASS sanitize-final-run
+PASS cli-fixture-compile
+PASS cli-fixture-run
+PASS native-cli
+PASS native-cli-missing-arguments
+PASS native-cli-invalid-version
+PASS native-cli-pack
+PASS builder-existing-output
+Native catalog host qualification PASS e4597dd6419dc4b1519f38036296288b9f086cc14c3e4f9c33ac980c594e2ad6

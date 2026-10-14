@@ -51,6 +51,13 @@ enroll a publisher or accept proprietary/firmware terms for consumers.
 The [catalog qualification](../tests/packages/catalog-build-check.md) covers
 canonical release reproduction, refusal/cleanup and real Linux guest execution.
 
+The [native SDK publisher profile](../tools/packages/SDK.md#native-sdk-publisher-profile)
+provides a single pinned catalog for Hello, Counter and Memo on both targets.
+Its [V builder](../examples/package-catalog/README.md) compiles six static apps
+with redistribution notices, preserving file grants, MIME registration and
+native window protocols 1/2. The normal signed workflow handles their updates,
+rollback and retained private data. See [qualification](../tests/packages/native-catalog-check.md).
+
 The [SQLite publisher profile](../tools/packages/SDK.md#sqlite-cli-publisher-profile)
 provides a concrete dual-architecture CLI and separately versioned musl/SQLite
 runtime, with pinned payloads and redistribution notices. Its

@@ -34,6 +34,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
 	'  pack-catalog CATALOG.json PREPARED_ROOTS NEW_WORKSPACE\n' +
 	'  compose-catalog NEW_LOCK_DIRECTORY PROFILE CATALOG.json [PROFILE CATALOG.json...]\n' +
+	'  native-catalog VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
 	'  sqlite-catalog SQLITE_VERSION RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
 	'  ffmpeg-catalog RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
 	'  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX\n' +
@@ -123,6 +124,11 @@ fn checked(arguments []string) !int {
 			mut sources := []pkgcore.CatalogSource{}
 			for i := 1; i < names.len; i += 2 { sources << pkgcore.CatalogSource{ id: names[i], catalog: names[i + 1] } }
 			println(json2.encode(pkgcore.compose_catalog(sources, names[0])!))
+			return 0
+		}
+		'native-catalog' {
+			if names.len != 3 { return error('native-catalog requires version, prepared roots and a new lock directory') }
+			println(json2.encode(pkgcore.native_catalog(names[0], names[1], names[2])!))
 			return 0
 		}
 		'sqlite-catalog' {
