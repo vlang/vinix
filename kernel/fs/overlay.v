@@ -697,6 +697,22 @@ fn overlay_copy_up_locked(mut node VFSNode) ? {
 		errno.set(failure)
 		return none
 	}
+	// Finish data and metadata before installing protections; otherwise the
+	// internal copy could be refused. Publish the merged alias only afterwards.
+	bits := resource.attributes(mut from) & resource.attributes_kept
+	if bits != 0 {
+		if !resource.can_have_attributes(mut to) {
+			overlay_drop_real_locked(mut upper_dir, name)
+			errno.set(errno.enotsup)
+			return none
+		}
+		resource.set_attributes(mut to, bits) or {
+			failure := errno.get()
+			overlay_drop_real_locked(mut upper_dir, name)
+			errno.set(failure)
+			return none
+		}
+	}
 	entry.upper = real
 	if entry.retained { entry.upper_resource = overlay_retain_node(real) } else { mark_overlaid(entry) }
 	node.resource = real.resource
