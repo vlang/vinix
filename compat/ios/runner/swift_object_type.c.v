@@ -65,6 +65,7 @@ fn swift_object_type(owner u64) u64 {
 }
 
 fn swift_object_type_symbol(symbol string) ?u64 {
+	if symbol == '_swift_dynamicCast' { return u64(unsafe { voidptr(swift_dynamic_cast) }) }
 	if symbol == '_swift_getObjectType' { return u64(unsafe { voidptr(swift_object_type) }) }
 	return none
 }

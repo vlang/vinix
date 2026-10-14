@@ -5221,22 +5221,57 @@ allocation/lifetime checks, retained fixture trials and actual IPA probes
 are under `build/ios/fortnite/error-bridge-checks`. Full iOS regression remains
 unpassed.
 
-The supplied IPA gets past the error bridge and exits with status 1 at
-MarketplaceKitWrapper's required `_swift_dynamicCast`. Its required import
-and native Swift cast instructions are retained. Fortnite has not entered
-application code and remains unplayable.
+Swift Core now exports `_swift_dynamicCast` for same-type complete value
+metadata, canonical inline Any values and registered Objective-C class
+wrappers. It follows the native ownership flags: bit 1 takes on success,
+bit 2 destroys on conditional failure, and bit 0 requires success. A failed
+conditional cast leaves the destination untouched. Successful casts invoke
+the copy or take witness outside the runtime lock. Any construction publishes
+contained metadata first; taking Any into Any transfers all 32 bytes,
+including padding. Class-to-Any preserves the declared source class metadata.
+
+The supported class path checks live registered storage and physical ancestry.
+Swift classes, formal-class or `isKindOfClass:` overrides and Vinix's private
+CFError class are excluded. Protocol discovery, optional/metatype conversion,
+Foundation bridging, boxed Any conversions and unknown flag bits remain
+unsupported. Same-type struct/enum/optional/tuple/metatype values up to
+65,536 bytes require complete immutable caller-owned metadata, value witnesses
+and callback code; pointer alignment and shape checks do not establish
+arbitrary span safety.
+Uninitialized destination storage must be disjoint from the initialized
+source. Unsupported representations reject before writes or ownership changes
+through static borrowed errors; unconditional failure terminates through panic.
+Cast dispatch adds no allocator, registry, arena or teardown path.
+
+Ten fresh ASan/UBSan runs and five ARM64 Vinix suites pass across dynamic
+casts, Any, object type, String metadata and the error bridge. Native/V
+fixtures compare ownership for long String and ordinary Objective-C
+objects, Int/UInt8, inline Any wrap/unwrap/identity, class up/down/failing casts,
+padding, preserved `x20`/`x21`, and custom value-witness traces for sizes
+0/1/3/16/24/32. They also check unlocked reentry, guarded rejection and two
+drained runtime lifetimes. The public `build-swift-dynamic-cast` target and
+full build, regression and Swift guest modes include the fixture. Thirteen
+final generated C streams and executables, pinned native SDK/LLVM references,
+generated-C allocation/ownership checks, retained trials and actual IPA
+probe/audits are under
+`build/ios/fortnite/dynamic-cast-checks`; full iOS regression remains unpassed.
+
+The supplied IPA gets past `_swift_dynamicCast` and exits with status 1 at
+MarketplaceKitWrapper's required `_swift_dynamicCastObjCClass`. Its required
+import and native Swift class-cast instructions are retained. Fortnite has not
+entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,463 | 697 | 79 |
+| Fortnite executable | 1,464 | 696 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 154 | 22 | 23 |
-| All images | 2,276 | 722 | 120 |
+| MarketplaceKitWrapper | 155 | 21 | 23 |
+| All images | 2,278 | 720 | 120 |
 
-The C++/GLES/Text variant reports 2,289 resolved imports, 709 unresolved strong
+The C++/GLES/Text variant reports 2,291 resolved imports, 707 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
