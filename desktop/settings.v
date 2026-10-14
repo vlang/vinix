@@ -137,7 +137,7 @@ const theme_default = Theme{
 	window_edge: 0xb9c2d0
 	window_radius: 9
 	shadow_alpha: 150
-	title_height: 34
+	title_height: default_title_height
 	title_active_bg: 0xffffff
 	title_inactive_bg: 0xf1f3f6
 	title_highlight: 0
@@ -152,7 +152,7 @@ const theme_default = Theme{
 	title_bold: true
 	title_size: 13
 	button_look: .flat
-	button_size: 22
+	button_size: 16
 	button_gap: 4
 	button_inset: 8
 	button_hover: 0xe7eaf0

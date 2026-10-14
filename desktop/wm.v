@@ -785,6 +785,11 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 		grip := window_resize_grip_size
 		// All of a painted frame's width resizes, as it does in Windows.
 		edge := if border > window_resize_edge_size { border } else { window_resize_edge_size }
+		// Flat caption buttons leave less room above them in a compact bar.
+		// Keep the upper resize targets within that gap so every button pixel
+		// still responds to its caption action.
+		button_top := (theme.title_height - theme.button_size) / 2
+		top_edge := if theme.button_look == .flat && button_top < edge { button_top } else { edge }
 		right := window.width - grip
 		bottom := window.height - grip
 		// The caption group hangs from the top edge. Over it only the frame's
@@ -808,7 +813,7 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 			}
 		} else {
 			window_children << resize_grip(window.id_resize_n, grip, 0, window.width - 2 * grip,
-				edge, ui2.cursor_resize_ns)
+				top_edge, ui2.cursor_resize_ns)
 		}
 		window_children << resize_grip(window.id_resize_s, grip, window.height - edge,
 			window.width - 2 * grip, edge, ui2.cursor_resize_ns)
@@ -821,10 +826,10 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 		// The upper corners are the title bar's, whose buttons sit a few pixels
 		// in from them. There the grip is an L along the two outer edges, so
 		// the buttons and the bar's own drag keep the rest.
-		window_children << resize_grip(window.id_resize_nw, 0, 0, nw_reach, edge, ui2.cursor_resize_nwse)
+		window_children << resize_grip(window.id_resize_nw, 0, 0, nw_reach, top_edge, ui2.cursor_resize_nwse)
 		window_children << resize_grip(window.id_resize_nw, 0, 0, nw_side, grip, ui2.cursor_resize_nwse)
 		window_children << resize_grip(window.id_resize_ne, window.width - ne_reach, 0, ne_reach,
-			edge, ui2.cursor_resize_nesw)
+			top_edge, ui2.cursor_resize_nesw)
 		window_children << resize_grip(window.id_resize_ne, window.width - ne_side, 0, ne_side, grip,
 			ui2.cursor_resize_nesw)
 	}

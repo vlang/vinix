@@ -11,7 +11,7 @@ module main
 
 // The default theme's title bar height, for sizing a window before its
 // theme is known — an AppFactory declares a height in the abstract.
-const default_title_height = 34
+const default_title_height = 22
 
 // The invisible resize target at each corner remains large enough to grab at
 // either logical scale, while the frame cannot be collapsed past a useful
