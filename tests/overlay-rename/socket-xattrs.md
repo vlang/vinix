@@ -79,6 +79,25 @@ caller-stack interface dispatch without heap boxing or temporary promotion.
 The pinned allocation audit is `socketxattr-allocation-audit-a.log`. Repeat the
 cases with [the controller instructions](README.md).
 
+The subsequent ARM smoke run `socketxattr-desktop-perf-b` uses the same fixed
+kernel, independently extracted from its running boot disk. All 36 batches of
+200 syscall operations retain zero bytes per operation; all four 300-process
+churn batches retain zero bytes with no additional slab pages. The cache test
+writes 32 MiB and records 16 MiB cached. Desktop idle, application launch and
+dragging pass their five-second and process-count checks. The complete report,
+serial transcript and assertion-enabled verification are retained in
+`socketxattr-desktop-perf-b.json`, `socketxattr-desktop-serial.log` and
+`socketxattr-perf-evidence-final.log`.
+
+This kernel regression uses a frozen prebuilt ARM desktop (SHA-256
+`ff2ff6e838a04b4b9812f29aff1ab070e4e13a12f4a341a0b4a1ac9613446674`)
+and private cached initramfs (SHA-256
+`d491b349c45b1fb2b5052b4a41fbb90857cf68488c0e6b17caafbe1d879843a9`).
+It does not qualify concurrent desktop changes. The initial preparation
+`socketxattr-desktop-perf-a` started before that private image finished copying;
+ISO construction refused its changing size and no guest booted. The fresh
+passing run uses the completed, pinned inputs.
+
 Earlier reference failures remain separate: the initial probe assumed a
 creation ACL mask unaffected by umask, used an unsupported ACL wire version
 and used a malformed capability payload. Final tests set the mask explicitly,
