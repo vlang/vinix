@@ -1118,6 +1118,18 @@ by a failed refresh/enrollment/publication. Restore the retained history under
 the appropriate writer lock before retrying; revocation requires no history.
 See [history qualification](../../tests/packages/history-schema-check.md).
 
+The local `catalog.json` cache is an array of complete
+`{repository:{id,url,public_key},text,signature}` snapshots, with at most 4,096
+distinct repository IDs. Configuration has the same repository limit and shares
+identity/source validation. The signed text is nonempty and signatures are
+nonempty strings of at most 256 bytes, including permitted legacy whitespace;
+signature authentication, expiry and replay-floor checks still follow decoding.
+Exact signed bytes are preserved. Missing/unknown/duplicate fields, null or
+coerced values, invalid identities and a root null refuse admission. An absent
+cache or explicit empty array remains valid; a dangling cache link is an error.
+Restore damaged cache/history under the package writer lock instead of resetting
+them to empty records. See [cache qualification](../../tests/packages/snapshot-schema-check.md).
+
 `view` emits one `{format:1,generation,architecture,offline,catalog_error,update_error,rows,launch_user}`
 JSON object. Rows include ID/name/description, available/installed version, target,
 kind, repository/key, license/proprietary/firmware flags, permissions, explicit

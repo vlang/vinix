@@ -186,6 +186,16 @@ and recover from retained trusted records or a protected backup; deleting histor
 discards replay protection. Publisher revocation remains available with damaged
 history. See [history qualification](../tests/packages/history-schema-check.md).
 
+The cached `catalog.json` wrapper also requires complete typed snapshots with
+unique, valid repository identities. Missing/null/coerced declarations, ambiguous
+keys, over-limit records and dangling cache links are refused. A present null
+cache cannot silently become an empty input to legacy replay-floor migration.
+Signed index bytes and signature checks are preserved. Restore trusted cache and
+history under the writer lock before retrying; replacing damaged records with
+empty lists discards recovery information. Revocation and uninstall remain
+available without a readable catalog. See
+[cache qualification](../tests/packages/snapshot-schema-check.md).
+
 Refresh verifies all configured repositories before committing metadata. A fetch
 or validation failure keeps the previous catalog/history. History is flushed
 before the new catalog or enrollment configuration: an interrupted publication

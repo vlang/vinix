@@ -53,8 +53,10 @@ pub fn snapshots_catalog(config Config, snapshots []Snapshot, now i64) !Catalog 
 
 pub fn read_snapshots(directory string) ![]Snapshot {
 	path := directory + '/catalog.json'
-	if !os.exists(path) { return []Snapshot{} }
-	return json2.decode[[]Snapshot](read_metadata(path)!)!
+	if !os.exists(path) && !os.is_link(path) { return []Snapshot{} }
+	text := read_metadata(path)!
+	defer { unsafe { text.free() } }
+	return decode_snapshots(text) or { return error('invalid cached repository metadata: ${err}') }
 }
 
 pub fn load_catalog(config Config, directory string) !Catalog {

@@ -1,0 +1,33 @@
+Initial production read_snapshots probes against unchanged ba63bcc9a sources:
+Snapshot probe: null cache accepted=true
+Snapshot probe: unknown field accepted=true
+Snapshot probe: duplicate text accepted=true
+Snapshot probe: missing URL accepted=true
+Snapshot probe: dangling cache accepted=true
+tools/packages/pkgcore/snapshot_schema_test.v:41: fn test_cache_reader_refuses_null_ambiguous_incomplete_and_dangling_records
+   > assert accepted == 0
+     Left value (len: 1): `5`
+    Right value (len: 1): `0`
+
+
+Final same malformed-wrapper/link probes and signed lifecycle:
+Snapshot probe: null cache accepted=false
+Snapshot probe: unknown field accepted=false
+Snapshot probe: duplicate text accepted=false
+Snapshot probe: missing URL accepted=false
+Snapshot probe: dangling cache accepted=false
+Snapshot schema: complete typed records, ambiguity refusal, exact signed bytes, legacy whitespace and fresh/empty caches passed
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Downloading app/bin/app (14 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Activated package generation 3
+Rolled back to generation 2; application data was retained
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Activated package generation 4
+Activated package generation 5
+Snapshot schema: failed migration preserves state/cache/recovery; restored legacy floor rejects replay, authentic renewal and revoked-publisher uninstall passed

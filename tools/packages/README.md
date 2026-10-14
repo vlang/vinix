@@ -88,6 +88,11 @@ records. Missing/null floor arrays cannot reset replay protection; damaged files
 are retained for administrator recovery. Revocation stays available. See
 [history qualification](../../tests/packages/history-schema-check.md).
 
+Cached repository snapshots require complete typed, unique records and ordinary
+metadata files. A present null/ambiguous cache cannot become an empty legacy
+migration input. Restoring trusted cache/history permits retry; revocation and
+uninstall remain available. See [cache qualification](../../tests/packages/snapshot-schema-check.md).
+
 Use `pack-catalog CATALOG.json PREPARED_ROOTS NEW_WORKSPACE` to assemble reviewed
 prepared-root recipes and pinned inventories atomically, with complete declared
 architecture/version/runtime coverage. It emits a canonical catalog lock and a

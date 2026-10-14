@@ -263,6 +263,12 @@ pub fn (p Package) validate() ! {
 	}
 }
 
+fn valid_repository(repository Repository) bool {
+	return identifier(repository.id) && digest_valid(repository.public_key)
+		&& printable(repository.url, 4096) && !repository.url.contains('?') && !repository.url.contains('#')
+		&& (repository.url.starts_with('https://') || (repository.url.starts_with('file:///') && relative_path(repository.url[8..])))
+}
+
 pub fn (c Config) validate() ! {
 	if c.format != 1 || c.architecture !in ['aarch64', 'x86_64'] {
 		return error('unsupported package configuration')
@@ -270,11 +276,10 @@ pub fn (c Config) validate() ! {
 	if c.launch_user != '' && (!launch_account_name(c.launch_user) || c.launch_user in ['root', 'greeter', 'nobody']) {
 		return error('package launch_user must name an ordinary account')
 	}
+	if c.repositories.len > 4096 { return error('package configuration exceeds the repository identity limit') }
 	mut ids := map[string]bool{}
 	for repository in c.repositories {
-		if !identifier(repository.id) || repository.id in ids || !digest_valid(repository.public_key)
-			|| !printable(repository.url, 4096) || repository.url.contains('?') || repository.url.contains('#')
-			|| !(repository.url.starts_with('https://') || (repository.url.starts_with('file:///') && relative_path(repository.url[8..]))) {
+		if !valid_repository(repository) || repository.id in ids {
 			return error('invalid or duplicate repository: ${repository.id}')
 		}
 		ids[repository.id] = true

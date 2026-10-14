@@ -281,6 +281,44 @@ fn qualify_history_schema(binary string, root string, repository string, key str
 	println('Package CLI: malformed retained history refuses replay after revocation and empty refresh')
 }
 
+fn qualify_snapshot_schema(binary string, root string, repository string, key string) ! {
+	store := pkgcore.state_directory(root)
+	path := store + '/catalog.json'
+	original := os.read_file(path)!
+	defer { os.write_file(path, original) or { panic(err) } }
+	current := os.readlink(store + '/current')!
+	retained := ['trust-history.json', current + '/state.json']
+	mut hashes := []string{}
+	for file in retained { hashes << pkgcore.hash_file(store + '/' + file)! }
+	configuration := os.read_file(root + '/etc/vinix-packages/config.json')!
+	objects := os.ls(store + '/objects')!.sorted()
+	sentinel := store + '/generations/.stage-snapshot-sentinel'
+	os.mkdir(sentinel)!
+	os.write_file(sentinel + '/keep', 'interrupted recovery work')!
+	defer { os.rmdir_all(sentinel) or {} }
+	for invalid in ['null', original.replace('"repository":', '"unknown":false,"repository":'),
+		original.replace('"text":', '"te\\u0078t":"discarded","text":'),
+		original.replace('"url":', '"url":null,"discard":')] {
+		assert invalid != original
+		os.write_file(path, invalid)!
+		for arguments in [['update'], ['plan', 'install', 'app'], ['review', 'install', 'app'], ['install', 'app'],
+			['repo-list'], ['repo-review', 'enroll', 'fixture', 'file://' + repository, key],
+			['repo-enroll', 'fixture', 'file://' + repository, key]] {
+			reply := command(binary, ['--root', root, ...arguments])!
+			assert reply.code == 1 && reply.text.contains('invalid cached repository metadata:') && !reply.text.contains('V panic:'), reply.text
+		}
+		assert os.read_file(path)! == invalid && os.readlink(store + '/current')! == current
+		assert os.read_file(root + '/etc/vinix-packages/config.json')! == configuration
+		for i, file in retained { assert pkgcore.hash_file(store + '/' + file)! == hashes[i] }
+		assert os.ls(store + '/objects')!.sorted() == objects && os.read_file(sentinel + '/keep')! == 'interrupted recovery work'
+		assert json2.decode[pkgcore.State](success(binary, ['--root', root, '--json', 'verify'])!)!.generation == 1
+		assert !os.exists(store + '/refresh') && !os.exists(store + '/enrollment')
+	}
+	os.write_file(path, original)!
+	success(binary, ['--root', root, 'update'])!
+	println('Package CLI: malformed cached snapshots preserve trust/state/recovery and permit verified refresh after restoration')
+}
+
 fn qualify(binary string) ! {
 	work := os.real_path(os.temp_dir()) + '/vinix-package-cli-' + os.getpid().str()
 	os.mkdir_all(work + '/root/etc/vinix-packages')!
@@ -397,6 +435,7 @@ fn qualify(binary string) ! {
 	assert installed.packages[0].package.id == 'app'
 	qualify_coordination_files(binary, work + '/root')!
 	qualify_configuration_schema(binary, work + '/root')!
+	qualify_snapshot_schema(binary, work + '/root', repository, key)!
 	mut launchers := packagecore.Registry{}
 	defer { launchers.close() }
 	store := pkgcore.state_directory(work + '/root')
