@@ -116,7 +116,7 @@ fn refresh_locked(config Config, directory string) !Catalog {
 
 fn refresh_progress(config Config, directory string, report fn (pkgprotocol.Progress)) !Catalog {
 	previous := read_snapshots(directory)!
-	mut history := history_with_snapshots(directory, previous)!
+	mut history := history_with_snapshots(config, directory, previous)!
 	mut snapshots := []Snapshot{}
 	work := directory + '/refresh'
 	if os.exists(work) { os.rmdir_all(work)! }

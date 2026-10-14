@@ -13,7 +13,7 @@ pub:
 }
 
 fn configured_repository_status(config Config, directory string) !RepositoryStatus {
-	history := history_with_snapshots(directory, read_snapshots(directory)!)!
+	history := history_with_snapshots(config, directory, read_snapshots(directory)!)!
 	return RepositoryStatus{
 		architecture: config.architecture
 		repositories: config.repositories
@@ -70,7 +70,9 @@ pub fn enroll_repository_reviewed(root string, repository Repository, offline bo
 	current := load_config(root)!
 	path := writable_configuration(root)!
 	next := enrollment_configuration(current, repository)!
-	mut history := history_with_snapshots(directory, read_snapshots(directory)!)!
+	// A reviewed replacement disables the old ID/key. Recovery uses that exact
+	// proposed configuration in both review and apply, before publishing trust.
+	mut history := history_with_snapshots(next, directory, read_snapshots(directory)!)!
 	work := directory + '/enrollment'
 	if os.exists(work) { os.rmdir_all(work)! }
 	owned_directory(work, 0o700)!

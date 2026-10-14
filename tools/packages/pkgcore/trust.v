@@ -71,11 +71,46 @@ fn remember_index(history TrustHistory, repository Repository, index Index, text
 	return TrustHistory{ repositories: records }
 }
 
+// An explicitly revoked/replaced key may fail newer curve admission rules.
+// Its cache can be superseded only when retained history already pins that
+// exact identity, sequence and text. Never infer a floor from ineligible trust,
+// and never apply this exception to a valid key with a bad signature.
+fn recorded_retired_snapshot(config Config, history TrustHistory, snapshot Snapshot) bool {
+	repository := snapshot.repository
+	if config.repositories.any(it.id == repository.id && it.public_key == repository.public_key) {
+		return false
+	}
+	for floor in history.repositories {
+		if floor.id != repository.id || floor.public_key != repository.public_key { continue }
+		digest := index_digest(snapshot.text)
+		defer { unsafe { digest.free() } }
+		if floor.index_sha256 != digest { return false }
+		if key := admitted_publisher_key(repository.public_key) {
+			unsafe { key.free() }
+			return false
+		} else {
+			unsafe { err.free() }
+		}
+		// History binds these bytes; decoding only checks their complete shape
+		// and sequence. It does not authenticate or admit this publisher again.
+		index := decode_signed_index(repository.id, snapshot.text, 0) or {
+			message := err.msg()
+			unsafe { message.free(); err.free() }
+			return false
+		}
+		defer { close_decoded_index(index) }
+		return index.sequence == floor.sequence
+	}
+	return false
+}
+
 // Migrate authenticated legacy snapshots, including expired/revoked ones. A
 // history written before a torn catalog publication may already be newer.
-fn history_with_snapshots(directory string, snapshots []Snapshot) !TrustHistory {
+// Recorded retired snapshots add no trust and leave every existing floor intact.
+fn history_with_snapshots(config Config, directory string, snapshots []Snapshot) !TrustHistory {
 	mut history := read_history(directory)!
 	for snapshot in snapshots {
+		if recorded_retired_snapshot(config, history, snapshot) { continue }
 		index := verify_index(snapshot.repository, snapshot.text, snapshot.signature, 0)!
 		if history.repositories.any(it.id == snapshot.repository.id && it.public_key == snapshot.repository.public_key
 			&& it.sequence > index.sequence) {

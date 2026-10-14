@@ -1,0 +1,38 @@
+trust_recovery ASan/UBSan (detect_leaks=0, halt_on_error=1):
+TRUST RECOVERY exact disabled identity/digest/sequence and complete index required PASS
+TRUST RECOVERY valid retired keys still require authenticated signatures PASS
+TRUST RECOVERY empty refresh preserves retired and independent replay floors PASS
+PASS
+administration ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository unreachable
+Updating trusted repository fixture
+Updating trusted repository fixture
+PASS
+flow ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading data/payload (26 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Activated package generation 2
+Activated package generation 3
+PUBLISHER RECOVERY reviewed key replacement: exact retired floor retained; stale review/live tamper/old rollback refused; upgrade/uninstall/data PASS
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading data/payload (26 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Activated package generation 2
+Activated package generation 3
+PUBLISHER RECOVERY revocation/re-enrollment: exact retired floor retained; stale review/live tamper/old rollback refused; upgrade/uninstall/data PASS
+Publisher cache recovery qualification passed
+PASS

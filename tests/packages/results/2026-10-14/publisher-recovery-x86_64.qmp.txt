@@ -1,0 +1,6 @@
+[   0.054] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[   0.054] -> {"execute":"qmp_capabilities"}
+[   0.058] <- {"return": {}}
+[   0.864] <- {"timestamp": {"seconds": 1791995791, "microseconds": 132785}, "event": "RTC_CHANGE", "data": {"offset": -1, "qom-path": "/machine/unattached/device[3]/rtc"}}
+[   1.874] <- {"timestamp": {"seconds": 1791995791, "microseconds": 396815}, "event": "RTC_CHANGE", "data": {"offset": 0, "qom-path": "/machine/unattached/device[3]/rtc"}}
+[   8.129] <- {"timestamp": {"seconds": 1791995798, "microseconds": 383099}, "event": "SHUTDOWN", "data": {"guest": true, "reason": "guest-shutdown"}}

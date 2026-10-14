@@ -121,6 +121,9 @@ fn check() ! {
 			'-o', work + '/publisher-key-check', repository + '/tests/packages/publisher-key-check.v'])!
 		run(work + '/publisher-key-check', [work + '/publisher-keys'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/publisher-recovery-check', repository + '/tests/packages/publisher-recovery-check.v'])!
+		run(work + '/publisher-recovery-check', [work + '/publisher-recovery'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/hash-file-check', repository + '/tests/packages/hash-file-check.v'])!
 		run(work + '/hash-file-check', [work + '/hash-files'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',

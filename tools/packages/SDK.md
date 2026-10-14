@@ -1281,6 +1281,20 @@ cache is refused until refreshed. The administrator owns this local history;
 it is not a hardware trust anchor. See the
 [administration and recovery contract](../../docs/application-distribution.md#trust-and-configuration).
 
+After explicit revocation/key replacement, migration can retire a cached
+snapshot whose key fails current curve admission only if existing history pins
+the exact ID/key, SHA-256 of index bytes and decoded sequence. The pinned text
+must still have a complete valid index shape. No floor is synthesized, lowered
+or removed. A valid key always requires signature verification, even when its
+cached bytes already match history. Missing/different history, altered text,
+ambiguous cache records and still-enabled invalid identities fail closed.
+Enrollment review/apply evaluate the proposed configuration consistently, so a
+verified replacement can recover before the old cache is refreshed. Read-only
+review/status and enrollment leave that cache unchanged; successful refresh
+publishes the replacement catalog. The original invalid key remains unusable
+for enrollment, launch and rollback. No wire/schema changes are required. See
+[recovery checks](../../tests/packages/publisher-recovery-check.md).
+
 Consumer `trust-history.json` and `publish-release`'s `.publisher/history.json` are complete
 durable records. Their format-1 envelopes require `format` and respectively
 `repositories` or `indexes`. Every floor requires `id`, `public_key`, positive

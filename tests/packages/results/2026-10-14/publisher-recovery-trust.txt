@@ -1,0 +1,3 @@
+TRUST RECOVERY exact disabled identity/digest/sequence and complete index required PASS
+TRUST RECOVERY valid retired keys still require authenticated signatures PASS
+TRUST RECOVERY empty refresh preserves retired and independent replay floors PASS

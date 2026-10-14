@@ -1,0 +1,5 @@
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading data/payload (26 bytes)
+Activated package generation 1
+Publisher recovery baseline: reviewed revocation leaves recorded invalid cache blocking valid re-enrollment PASS

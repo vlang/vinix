@@ -101,9 +101,9 @@ fn read_repository_review(root string, operation string, repository Repository, 
 		return repository_review(config, TrustHistory{}, operation, matches[0], '', Index{})
 	}
 	if operation != 'enroll' { return error('unknown repository operation') }
-	enrollment_configuration(config, repository)!
+	next := enrollment_configuration(config, repository)!
 	directory := state_directory(root)
-	history := history_with_snapshots(directory, read_snapshots(directory)!)!
+	history := history_with_snapshots(next, directory, read_snapshots(directory)!)!
 	mut template := (os.temp_dir().trim_right('/') + '/vinix-repository-review-XXXXXX').bytes()
 	template << u8(0)
 	defer { unsafe { template.free() } }

@@ -270,6 +270,15 @@ These read-only diagnostics remain available with an unusable catalog and
 explicitly preserve the uninstall path. See
 [diagnostic qualification](../tests/packages/diagnostics-check.md).
 
+An old unusable key's cached index no longer blocks maintenance after reviewed
+revocation or replacement when retained history already pins its exact ID/key,
+sequence and index bytes. Review and listing leave the cache untouched; the
+next successful refresh supersedes it while preserving every sequence floor.
+This exception cannot authenticate the old publisher, admit a new invalid key,
+ignore a valid key's bad signature or reconstruct missing history. Unrecorded or
+changed index bytes and malformed metadata still require trusted restoration.
+See [publisher recovery qualification](../tests/packages/publisher-recovery-check.md).
+
 Ed25519 authenticates the exact index bytes **before** decoding. The service
 uses a [pinned, licensed V signing dependency](../tools/packages/signing/README.md)
 for publisher and consumer. Its source ledger makes changes reproducible, and
