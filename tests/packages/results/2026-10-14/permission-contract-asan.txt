@@ -1,0 +1,9 @@
+Clang ASan/UBSan; ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1. All six final runners exited 0.
+PASS ASan/UBSan sdk-contract
+PASS ASan/UBSan signed-index
+PASS ASan/UBSan view
+PASS ASan/UBSan review
+PASS ASan/UBSan registration
+PASS ASan/UBSan memory
+SDK permission admission: 1000 empty/valid/full/repeated/unknown/oversized cycles retain zero tracked bytes
+Application SDK context: repeated decode/load/encode/refusal/close retain zero tracked bytes

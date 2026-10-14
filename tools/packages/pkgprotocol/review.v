@@ -110,8 +110,7 @@ pub fn (review &Review) validate() ! {
 			|| (row.runtime != '' && !identifier(row.runtime)) || !identifier(row.repository)
 			|| !digest(row.public_key) || row.action !in ['install', 'update', 'keep', 'remove', 'export']
 			|| ((row.action == 'export') != (review.operation == 'mirror'))
-			|| row.permissions.len > 5 || row.permissions.any(it !in ['files', 'network', 'process',
-			'display', 'audio'])
+			|| !view_permissions(row.permissions)
 			|| row.requested != (row.id in review.requested) || (row.action == 'remove' && row.requested) {
 			return error('invalid package in review response')
 		}

@@ -115,6 +115,7 @@ fn test_review_bounds_are_checked_during_collection_and_scalar_decoding() {
 	assert !accepts_metadata(0, json2.encode(Review{ ...base, names: names }))
 	assert !accepts_metadata(0, json2.encode(Review{ ...base, rows: [ReviewPackage{ ...base.rows[0], description: 'x'.repeat(4097) }] }))
 	assert !accepts_metadata(0, json2.encode(Review{ ...base, rows: [ReviewPackage{ ...base.rows[0], permissions: ['audio', 'display', 'files', 'network', 'process', 'files'] }] }))
+	assert !accepts_metadata(0, json2.encode(Review{ ...base, rows: [ReviewPackage{ ...base.rows[0], permissions: ['files', 'files'] }] }))
 	mut repositories := []Repository{cap: 4097}
 	for index in 0 .. 4097 { repositories << Repository{ ...complete_status_fixture().repositories[0], id: 'publisher-' + index.str() } }
 	assert !accepts_metadata(1, json2.encode(RepositoryStatus{ ...complete_status_fixture(), repositories: repositories }))

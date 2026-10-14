@@ -85,6 +85,7 @@ fn test_registration_refuses_bad_identities_permissions_mime_targets_and_integer
 		text.replace('"kind":"native"', '"kind":"unknown"'), text.replace('aarch64', 'arm64'),
 		text.replace('"kind":"native"', '"kind":"data"').replace('"architecture":"aarch64","kind":', '"architecture":"unknown","kind":'),
 		text.replace('"permissions":["files","display"]', '"permissions":["root"]'),
+		text.replace('"permissions":["files","display"]', '"permissions":["files","files"]'),
 		text.replace('"associations":["text/plain"]', '"associations":["text/plain;application/x-other"]'),
 		text.replace('"associations":["text/plain"]', '"associations":["text=plain/other"]'),
 		text.replace('"associations":["text/plain"]', '"associations":["plain"]')] {

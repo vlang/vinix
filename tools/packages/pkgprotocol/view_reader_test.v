@@ -108,6 +108,8 @@ fn test_view_reader_refuses_incoherent_updates_permissions_architectures_and_lau
 		text.replace('"installed_kind":"native"', '"installed_kind":"linux"'), text.replace('"installed_permissions":["display"]', '"installed_permissions":[]'),
 		text.replace('"installed_kind":"native"', '"installed_kind":""'), text.replace('"installed_window_protocol":2', '"installed_window_protocol":3'),
 		text.replace('"permissions":["files","network"]', '"permissions":["root"]'), text.replace('"installed_version":"1.0.0"', '"installed_version":""'),
+		text.replace('"permissions":["files","network"]', '"permissions":["files","files"]'),
+		text.replace('"installed_permissions":["display"]', '"installed_permissions":["display","display"]'),
 		text.replace('"launch_user":"alex"', '"launch_user":"root"'), text.replace('"launch_user":"alex"', '"launch_user":"$(shell)"'),
 		text.replace('"id":"editor"', '"id":"../editor"'), text.replace('"name":"Editor é🚀"', '"name":""'),
 		text.replace('"name":"Editor é🚀"', '"name":"Line\\nBreak"'), text.replace('"public_key":"' + 'a'.repeat(64) + '"', '"public_key":"bad"')] {

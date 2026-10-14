@@ -116,11 +116,7 @@ pub fn (context &Context) validate() ! {
 		defer { unsafe { expected.free() } }
 		if context.runtime_directory != expected { return error('runtime directory must belong to the admitted generation') }
 	}
-	if context.permissions.len > grants.len { return error('application context has too many permissions') }
-	for i, permission in context.permissions {
-		if permission !in grants { return error('unknown application context permission') }
-		for j in 0 .. i { if permission == context.permissions[j] { return error('duplicate application context permission') } }
-	}
+	if !valid_permissions(context.permissions) { return error('invalid or duplicate application context permission') }
 }
 
 pub fn (context &Context) declares(permission string) bool { return permission in context.permissions }

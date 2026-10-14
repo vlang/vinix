@@ -86,7 +86,11 @@ fn test_persistent_state_rechecks_roots_history_architecture_and_runtime_closure
 			State{ ...state, format: 2 }, State{ ...state, requested: ['app', 'app'] },
 			State{ ...state, requested: ['missing'] }, State{ ...state, requested: [] },
 			State{ ...state, packages: [app] }, State{ ...state, packages: [app, runtime, runtime] }]
+		for permissions in [['files', 'files'], ['audio', 'display', 'files', 'network', 'process', 'files']] {
+			invalid << State{ ...state, packages: [Installed{ ...app, package: Package{ ...app.package, permissions: permissions } }, runtime] }
+		}
 		for broken in [
+			Package{ ...runtime.package, permissions: ['files', 'files'] },
 			Package{ ...runtime.package, kind: 'data', architecture: 'all' },
 			Package{ ...runtime.package, files: [Payload{ ...runtime.package.files[0], executable: false }] },
 			Package{ ...runtime.package, files: [Payload{ ...runtime.package.files[0], path: 'bin/other' }] },
@@ -164,6 +168,8 @@ fn test_collection_admits_retained_states_and_all_names_leases_before_removing_a
 	config := Config{ architecture: 'aarch64' }
 	old_text := json2.encode(previous)
 	for text in ['{broken', json2.encode(State{ ...previous, generation: 2 }),
+		json2.encode(State{ ...previous, packages: [Installed{ ...previous.packages[0],
+			package: Package{ ...previous.packages[0].package, permissions: ['files', 'files'] } }, previous.packages[1]] }),
 		json2.encode(State{ ...previous, packages: [previous.packages[0], Installed{ ...previous.packages[1],
 			package: Package{ ...previous.packages[1].package, kind: 'data', architecture: 'all' } }] })] {
 		os.write_file(work + '/generations/1/state.json', text)!

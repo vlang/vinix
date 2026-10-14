@@ -2,6 +2,7 @@
 module pkgcore
 
 import json2
+import tools.packages.appsdk
 
 pub const format_version = 1
 pub const max_metadata = 8 * 1024 * 1024
@@ -188,6 +189,12 @@ pub fn (d Dependency) validate() ! {
 	}
 }
 
+fn check_package_permissions(p Package) ! {
+	if !appsdk.valid_permissions(p.permissions) {
+		return error('${p.id}: permissions must be distinct SDK 1 grants: audio, display, files, network, process')
+	}
+}
+
 pub fn (p Package) validate() ! {
 	if !identifier(p.id) { return error('invalid package ID: ${p.id}') }
 	version_parts(p.version)!
@@ -220,9 +227,7 @@ pub fn (p Package) validate() ! {
 	if p.arguments.len > 64 || p.arguments.any(!printable(it, 4096)) {
 		return error('${p.id}: invalid launch arguments')
 	}
-	if p.permissions.any(it !in ['network', 'files', 'process', 'display', 'audio']) {
-		return error('${p.id}: unknown permission')
-	}
+	check_package_permissions(p)!
 	if p.associations.len > 128 || p.associations.any(!printable(it, 128) || !it.contains('/') || it.contains(';') || it.contains('=')) {
 		return error('${p.id}: invalid MIME association')
 	}

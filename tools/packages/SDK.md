@@ -457,6 +457,21 @@ or package scripts. Limits: 16,384 files, 4 GiB/file, 64 GiB/package, 8 MiB per
 index/combined cached snapshot/state record. Relative paths have no dot/parent or
 empty components, backslashes or controls, and are at most 1,024 bytes.
 
+`permissions` is an explicit set of at most five distinct SDK-1 grants:
+`audio`, `display`, `files`, `network` and `process`. Empty sets are valid; order
+does not change access. Duplicate, unknown or excess entries are refused during
+manifest preflight, signed catalog admission and stored-state validation. They
+are also refused in package reviews, Software views and launcher registration.
+Readers preserve the authenticated declarations rather than dropping repeats.
+Correct source manifests and publish a newer signed sequence; damaged retained
+state follows the existing administrator recovery procedure.
+
+The MIT SDK's `appsdk.valid_permissions(values)` checks this borrowed list
+without allocating or changing it. Publication, package admission, presentation
+and `Context.validate()` share that predicate. Context environment output keeps
+its existing canonical grant order. See
+[permission-contract qualification](../../tests/packages/permission-contract-check.md).
+
 Dependencies are
 `{"id":"org.example.runtime","minimum":"2.0.0","before":"3.0.0"}`.
 Minimum is inclusive, before exclusive; either may be empty. Each ID appears once.

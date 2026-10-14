@@ -36,6 +36,8 @@ fn test_signed_index_rejects_ambiguous_or_coerced_metadata() {
 	for invalid in [
 		text.replace('"arguments":[]', '"arguments":[null]'),
 		text.replace('"permissions":[]', '"permissions":null'),
+		text.replace('"permissions":[]', '"permissions":["files","files"]'),
+		text.replace('"permissions":[]', '"permissions":["audio","display","files","network","process","files"]'),
 		text.replace('"associations":[]', '"associations":null'),
 		text.replace('"dependencies":[{"id":"runtime","minimum":"1.0.0","before":"2.0.0"}]', '"dependencies":null'),
 		text.replace('"sequence":1', '"sequence":1,"sequ\\u0065nce":1'),
@@ -241,7 +243,9 @@ fn test_invalid_signed_refresh_and_enrollment_preserve_catalog_history_and_state
 	private_key := ed25519.new_key_from_seed(seed)
 	for broken in [valid.replace('"sequence":1', '"sequence":2,"sequence":2'),
 		valid.replace('"sequence":1', '"sequence":2').replace('"firmware":false,', ''),
-		valid.replace('"sequence":1', '"sequence":2').replace('"permissions":[]', '"permissions":null')] {
+		valid.replace('"sequence":1', '"sequence":2').replace('"permissions":[]', '"permissions":null'),
+		valid.replace('"sequence":1', '"sequence":2').replace('"permissions":[]', '"permissions":["files","files"]'),
+		valid.replace('"sequence":1', '"sequence":2').replace('"permissions":[]', '"permissions":["audio","display","files","network","process","files"]')] {
 		os.write_file(workspace + '/index.json', broken)!
 		os.write_file(workspace + '/index.sig', schema_sign(broken, private_key)!)!
 		mut refresh_refused := false
@@ -262,6 +266,7 @@ fn test_invalid_signed_refresh_and_enrollment_preserve_catalog_history_and_state
 	current_source := os.read_file(workspace + '/index.json')!
 	for broken in [packed.replace('"firmware":false,', ''),
 		packed.replace('"permissions":[]', '"permissions":null'),
+		packed.replace('"permissions":[]', '"permissions":["files","files"]'),
 		packed.replace('"license":"MIT"', '"license":"MIT","license":"MIT"')] {
 		os.write_file(inventory, broken)!
 		mut refused := false

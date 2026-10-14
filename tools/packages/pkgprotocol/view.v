@@ -2,6 +2,8 @@
 // SDK 1 catalog presentation; no package state or privileged operations.
 module pkgprotocol
 
+import tools.packages.appsdk
+
 pub struct SoftwareRow {
 pub:
 	id string
@@ -49,11 +51,7 @@ fn view_account(value string) bool {
 }
 
 fn view_permissions(values []string) bool {
-	if values.len > 5 { return false }
-	for value in values {
-		if value !in ['audio', 'display', 'files', 'network', 'process']! { return false }
-	}
-	return true
+	return appsdk.valid_permissions(values)
 }
 
 pub fn (view &SoftwareView) validate() ! {

@@ -44,6 +44,11 @@ decoding with complete fields, explicit ownership and canonical generation
 identities. Damaged metadata is refused before menu replacement; restoring it
 permits refresh. See [registration qualification](../../tests/packages/registration-check.md).
 
+Package permission lists now use the SDK's bounded set contract throughout
+packing, publishing, installation, presentation and launch. Repeated or excess
+grants are refused before a new package can install and fail its launch context.
+See [permission qualification](../../tests/packages/permission-contract-check.md).
+
 Use `publish-release REPOSITORY_DIR ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY`
 to emit a complete signed consumer repository with atomic publication, dependency
 closure validation on each declared architecture and retained publisher sequence

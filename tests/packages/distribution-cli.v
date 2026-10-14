@@ -70,6 +70,8 @@ fn qualify_catalog_cli(binary string, work string) ! {
 	path := work + '/catalog recipe.json'
 	canonical_input := json2.encode(recipe)
 	for invalid in [canonical_input.replace('"permissions":["files"]', '"permissions":null'),
+		canonical_input.replace('"permissions":["files"]', '"permissions":["files","files"]'),
+		canonical_input.replace('"permissions":["files"]', '"permissions":["audio","display","files","network","process","files"]'),
 		canonical_input.replace('"firmware":false,', ''),
 		canonical_input.replace('"executable":true', '"executable":"true"')] {
 		assert invalid != canonical_input
@@ -82,6 +84,15 @@ fn qualify_catalog_cli(binary string, work string) ! {
 		assert !os.exists(work + '/schema-workspace') && !os.exists(work + '/schema-lock')
 	}
 	root_input := json2.encode(recipe.packages[0].recipe)
+	for permissions in ['["files","files"]', '["audio","display","files","network","process","files"]'] {
+		os.write_file(path, root_input.replace('"permissions":["files"]', '"permissions":' + permissions))!
+		refused := command(binary, ['pack-root', path, roots + '/aarch64', work + '/permission-root'])!
+		assert refused.code == 1 && refused.text.contains('distinct SDK 1 grants') && !refused.text.contains('V panic:'), refused.text
+		assert !os.exists(work + '/permission-root')
+		os.write_file(path, json2.encode(pkgcore.Package{ ...p, permissions: json2.decode[[]string](permissions)! }))!
+		packed := command(binary, ['pack', path, roots + '/aarch64', work + '/permission-pack'])!
+		assert packed.code == 1 && packed.text.contains('distinct SDK 1 grants') && !os.exists(work + '/permission-pack'), packed.text
+	}
 	os.write_file(path, root_input.replace('"firmware":false', '"firmware":true,"firm\\u0077are":false'))!
 	root_refused := command(binary, ['pack-root', path, roots + '/aarch64', work + '/schema-root'])!
 	assert root_refused.code == 1 && root_refused.text.contains('duplicate administration document field: firmware'), root_refused.text

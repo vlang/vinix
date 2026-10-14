@@ -88,6 +88,9 @@ fn test_metadata_validation_and_reproducibility() {
 	if _ := (Package{ ...p, permissions: ['everything'] }).validate() {
 		assert false
 	}
+	for permissions in [['files', 'files'], ['audio', 'display', 'files', 'network', 'process', 'files']] {
+		if _ := (Package{ ...p, permissions: permissions }).validate() { assert false }
+	}
 	if _ := (Package{ ...p, kind: 'windows' }).validate() {
 		assert false
 	}
@@ -111,6 +114,11 @@ fn test_metadata_validation_and_reproducibility() {
 		]
 	}) or { panic(err) }
 	assert first == second
+	forward := canonical_index(Index{ repository: 'fixture', sequence: 1, expires: 2000000000,
+		packages: [Package{ ...p, permissions: ['network', 'files'] }] })!
+	reverse := canonical_index(Index{ repository: 'fixture', sequence: 1, expires: 2000000000,
+		packages: [Package{ ...p, permissions: ['files', 'network'] }] })!
+	assert forward == reverse
 }
 
 fn test_repository_signature_expiry_and_identity() {

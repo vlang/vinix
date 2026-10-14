@@ -1,0 +1,76 @@
+Pinned V 0.5.2 826e96f56ca12fcb8fd02dfd6edf1551008e62a8; V_MACOS_V3_NO_FALLBACK=1; native assertions use -nocache -no-skip-unused -gc none -manualfree.
+PASS tools/packages/appsdk/context_test.v
+PASS tools/packages/appsdk/permissions_test.v
+PASS tools/packages/appsdk/window_input_test.v
+PASS tools/packages/appsdk/window_test.v
+PASS tools/packages/pkgprotocol/command_test.v
+PASS tools/packages/pkgprotocol/deployment_mirror_test.v
+PASS tools/packages/pkgprotocol/metadata_key_test.v
+PASS tools/packages/pkgprotocol/mirror_test.v
+PASS tools/packages/pkgprotocol/personal_data_test.v
+PASS tools/packages/pkgprotocol/policy_test.v
+PASS tools/packages/pkgprotocol/progress_test.v
+PASS tools/packages/pkgprotocol/registration_test.v
+PASS tools/packages/pkgprotocol/repositories_test.v
+PASS tools/packages/pkgprotocol/review_reader_test.v
+PASS tools/packages/pkgprotocol/review_test.v
+PASS tools/packages/pkgprotocol/view_reader_test.v
+PASS pkgcore/distribution_test.v
+PASS pkgcore/index_schema_test.v
+PASS pkgcore/publisher_schema_test.v
+PASS pkgcore/state_test.v
+PASS pkgcore/context_test.v
+PASS pkgcore/service_test.v
+PASS pkgcore/view_test.v
+PASS pkgcore/review_test.v
+PASS pkgcore/registration_test.v
+PASS pkgcore/release_test.v
+PASS pkgcore/catalog_test.v
+PASS SDK permission and context memory fixtures
+PASS complete signed CLI contracts including permission preflight
+PASS Software suite, eight heap modes, desktop arm64/amd64 typechecks and full launcher assertions
+
+Measured SDK ownership:
+SDK permission admission: 1000 empty/valid/full/repeated/unknown/oversized cycles retain zero tracked bytes
+Application SDK context: repeated decode/load/encode/refusal/close retain zero tracked bytes
+
+Complete CLI contract output:
+Package CLI: malformed publisher history refuses release without changing prior publication
+Package CLI: ambiguous configuration refused without activation, cache or trust changes
+Package CLI: malformed retained history refuses replay after revocation and empty refresh
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed
+
+Maintained frontend driver:
+Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed
+Software deployment: full closure, frozen literal path, empty removal, cancellation, bounds, stale/error diagnostics and close guard passed
+Software offline export: destination paging, dependency provenance, literal confirmation, installed scope, progress, stale diagnostics and close guard passed
+Software locked offline export: exact older runtime, source/digest paging, literal frozen confirmation, invalid responses, stale diagnostics, progress and cancellation passed
+Software launch options: quoted literal arguments, separate file grants, frozen worker input, diagnostics and terminal transfer passed
+Software native windows: bounded frames, namespaced controls, ordinary-service launch, clicks, close acknowledgement and EOF retirement passed
+Software native text: focus, UTF-8 bounds, literal replacement, stale controls, explicit commit/discard, close guard and protocol admission passed
+Software administrator approval: frozen literal request, masked bounded UTF-8 password, hidden-action refusal, credential wiping, cancellation and progress passed
+Software personal data: own-account inventory, installed/unsafe refusal, frozen explicit confirmation, cancellation, paging, live-lease diagnostics, reload and close guard passed
+Software organization policy: current restrictions, complete settings/impact paging, literal file review, frozen confirmation, administrator approval/cancel/wipe, stale/error refusal, reload and close guard passed
+Software metadata review: missing firmware and escaped duplicate flags refuse confirmation before administrator approval
+Software package details: complete Unicode descriptions/provenance/licenses/diagnostics, installed versus displayed permissions, paging, frozen review, hidden-action refusal, legacy fields and invalid-text refusal passed
+Software catalog reader: complete typed flags, installed-versus-planned launch fields, asynchronous malformed-response refusal, prior-valid-view preservation and explicit legacy details passed
+Software failure details: complete retained Unicode output, progress filtering, paging, read-only modal, compact back, reload retention and replacement/clear passed
+Software failure details: bounded tail, truncation disclosure, valid UTF-8/control escaping, empty diagnostics and response-limit failure passed
+Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed
+Native window broker: 1000 fragmented text frames, focus/edit/discard, UI builds and owned-tree retirements retain zero tracked bytes
+Software administrator approval: 1000 prompt/edit/render/wipe cycles retain zero tracked bytes
+Software personal data: 1000 wide/invalid/valid decode/select/render/confirm/cancel/retire cycles retain zero tracked bytes
+Software organization policy: 1000 wide-document/valid-review/invalid-review/page/redraw/cancel/retire cycles retain zero tracked bytes
+Software package/trust/offline metadata: 1000 valid/partial-invalid review, page/redraw/cancel/retire cycles retain zero tracked bytes
+Software package details: 1000 catalog/review/open/growing-UTF-8-page/redraw/navigate/back/retire cycles retain zero tracked bytes
+Software catalog reader: 1000 wide/partial-invalid/legacy reload, display/details and retirement cycles retain zero tracked bytes
+Software failure details: 1000 capture/page/render/back/replace/clear cycles retain zero tracked bytes
+Running package launchers
+Software offline export memory (deployment lock=false): redraw/paging=0; review retirement=0 bytes
+Software offline export memory (deployment lock=true): redraw/paging=0; review retirement=0 bytes
+Package launcher assertions passed
+Software distribution checks passed
+
+Static target staging (target ELF machines and SDK notices checked):
+PASS maintained static service/session/Linux SDK runner stage and target-machine checks aarch64
+PASS maintained static service/session/Linux SDK runner stage and target-machine checks x86_64

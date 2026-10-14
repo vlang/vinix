@@ -108,6 +108,7 @@ fn decode_manifest(text string, inventory bool) !Package {
 	defer { if !accepted { close_decoded_package(p) } }
 	document_keys_schema(text, manifest_document_field,
 		if inventory { manifest_required_fields } else { document_optional_fields }, manifest_value_type)!
+	check_package_permissions(p)!
 	accepted = true
 	return p
 }

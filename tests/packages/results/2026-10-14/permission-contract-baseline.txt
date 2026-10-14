@@ -1,0 +1,22 @@
+Before change, actual signed pack/publish/refresh/install and launch planning (synthetic payload never executed):
+permission count 2: pack accepted=true
+Updating trusted repository fixture
+Installing App 1.0.0 (1/1) from fixture
+Downloading app/bin/app (34 bytes)
+Activated package generation 1
+installed generation=1
+Software accepted=true, launch admitted=false
+permission count 6: pack accepted=true
+Updating trusted repository fixture
+Installing App 1.0.0 (1/1) from fixture
+Downloading app/bin/app (34 bytes)
+Activated package generation 1
+installed generation=1
+Software accepted=false, launch admitted=false
+
+Final same reproduction, rejected before output/activation:
+permission count 2: pack accepted=false
+permission count 6: pack accepted=false
+
+Initial qualification attempt:
+The first new SDK subset test deep-freed both an owned string array and its shallow sorted copy. ASan caught this fixture cleanup error; the sorted copy now frees only its array buffer. All final native and sanitizer assertions passed. The original sanitizer report is retained privately and hashed.

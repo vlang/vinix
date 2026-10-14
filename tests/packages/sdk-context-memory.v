@@ -9,6 +9,14 @@ fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
 
 fn main() {
+	sets := [ []string{}, ['files'], ['audio', 'display', 'files', 'network', 'process'], ['files', 'files'],
+		['root'], ['audio', 'display', 'files', 'network', 'process', 'files'] ]
+	C.vinix_heap_begin()
+	for _ in 0 .. 1000 {
+		for index, values in sets { assert appsdk.valid_permissions(values) == (index < 3) }
+	}
+	assert C.vinix_heap_end() == 0
+	println('SDK permission admission: 1000 empty/valid/full/repeated/unknown/oversized cycles retain zero tracked bytes')
 	key := '0123456789abcdef'.repeat(4)
 	defer { unsafe { key.free() } }
 	fields := appsdk.Fields{ sdk: '1', id: 'org.example.app', version: '1.2.3', architecture: 'aarch64', kind: 'linux',

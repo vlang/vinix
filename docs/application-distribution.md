@@ -577,6 +577,14 @@ normal refresh. The package service still checks full state, publisher trust,
 policy and payloads when launching. See
 [registration qualification](../tests/packages/registration-check.md).
 
+Manifest permissions use the same SDK-1 set contract at packing, signed catalog
+admission, retained-state validation, review, display and launch: each supported
+grant appears at most once, with at most five entries. Source templates fail
+before packing creates a workspace or copies payloads. Previously accepted
+repeated grants could install and then fail the launch context; they are now
+refused at admission. Valid manifests retain their canonical bytes and signatures.
+See [permission-contract qualification](../tests/packages/permission-contract-check.md).
+
 Files' application chooser opens the shared, paged **Open With** dialog. Packages
 are offered only for their declared MIME types when they declare `files` access.
 Installation never takes over user defaults. An explicit choice is saved as
