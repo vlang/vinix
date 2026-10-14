@@ -159,6 +159,12 @@ fn release_locked(repository string, id string, seed_path string, sequence u64, 
 	}
 	atomic_write(stage + '/index.json', text)!
 	atomic_write(stage + '/index.sig', signature + '\n')!
+	options.checkpoint('staged', stage)!
+	verify_release_stage(stage, text, signature, objects, false) or {
+		message := err.msg()
+		defer { unsafe { message.free(); err.free() } }
+		return error('publisher release verification failed before sequence reservation: ' + message)
+	}
 	// Keep the root private while flushing children. Even a discoverable hidden
 	// staging name must not expose a signed index before history is reserved.
 	flush_tree(stage + '/objects')!
@@ -174,6 +180,11 @@ fn release_locked(repository string, id string, seed_path string, sequence u64, 
 	os.chmod(stage, 0o755)!
 	sync_directory(stage)!
 	options.checkpoint('reserved', stage)!
+	verify_release_stage(stage, text, signature, objects, true) or {
+		message := err.msg()
+		defer { unsafe { message.free(); err.free() } }
+		return error('publisher release verification failed after sequence reservation; retry the same inputs or choose a newer sequence: ' + message)
+	}
 	publish_new_directory(stage, target, 'publisher release')!
 	published = true
 	sync_directory(parent) or {

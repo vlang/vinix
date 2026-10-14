@@ -1,0 +1,2 @@
+PASS x86_64 packages-release-admission (156.1s)
+package-release-admission x86_64: 1 passed, 0 failed, 0 skipped

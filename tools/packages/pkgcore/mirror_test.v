@@ -393,7 +393,7 @@ fn test_mirror_stage_admission_retires_descriptors_and_accepts_only_the_exported
 	for _ in 0 .. 128 {
 		mut refused := false
 		verify_mirror_stage(work + '/export', prepared, true) or {
-			message := err.msg(); refused = message.contains('unexpected mirror entry')
+			message := err.msg(); refused = message.contains('unexpected export entry')
 			unsafe { message.free(); err.free() }
 		}
 		assert refused

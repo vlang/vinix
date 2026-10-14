@@ -1,0 +1,67 @@
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+RELEASE ADMISSION late-index refused=true unpublished=true
+RELEASE ADMISSION changed staged metadata refuses after reservation; exact retry preserves publisher floor PASS
+RELEASE ADMISSION 34 staged/reserved refusals preserve workspace and outside data; history timing, no publication, cleanup and exact retry PASS
+
+Shared mirror admission:
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-58199-1792018263827692/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Data 1.0.0 (2/2) from fixture
+Downloading data/share/data (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-58199-1792018264391588/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-58199-1792018264795348/unsafe/nested/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-58199-1792018265415629/interrupted; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-58199-1792018265970272/missing/media/export; $literal; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-58199-1792018267923367/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+MIRROR ADMISSION late-index refused=true unpublished=true
+Offline mirror ready: /private/tmp/vinix-mirror-58199-1792018268550034/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION changed staged metadata refuses before publication; verified cache survives and offline retry succeeds PASS
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-58199-1792018269506368/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION 34 late metadata/payload/mode/link/namespace refusals preserve source state, outside data and cache; no completion, clean staging and offline retry PASS
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-58199-1792018271660984/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION 128 valid and refused complete-stage scans retire descriptors under a 32-descriptor limit and restored namespace retries PASS

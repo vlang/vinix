@@ -1,0 +1,203 @@
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FC86000 start failed: Unsupported
+Error: Image at 0007FC0B000 start failed: Not Found
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+BdsDxe: starting Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x77e74000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x77e74000 to 0xffffffff80000000, length: 0x2c4000
+vmm: Kernel: Mapping 0x78138000 to 0xffffffff802c4000, length: 0x2c000
+vmm: Kernel: Mapping 0x78164000 to 0xffffffff802f0000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x77e74000 +0x2f0000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 29
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 30
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 1000000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+initramfs: Module:  1
+initramfs: Address: 0xffff000077b34000
+initramfs: Size:    3406848
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=27
+!>+ [11] ./sbin/init sz=247432
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/release-admission-publisher sz=1503272
+!>+ [15] ./usr/share/package-fixtures/release-admission-core sz=1646072
+!>initramfs: no ustar sig at 0xffff000077e73800
+initramfs: Done (15 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 1000000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+pci: Found [0:2:0:-1]
+devcore: 3 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 3 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x2211f0
+HWTEST START packages-release-admission
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24f910
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /tmp/vinix-mirror-2496-1792018367397120/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Data 1.0.0 (2/2) from fixture
+Downloading data/share/data (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /tmp/vinix-mirror-2496-1792018368782094/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /tmp/vinix-mirror-2496-1792018369107075/unsafe/nested/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /tmp/vinix-mirror-2496-1792018369836580/interrupted; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /tmp/vinix-mirror-2496-1792018370604065/missing/media/export; $literal; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /tmp/vinix-mirror-2496-1792018372357194/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+MIRROR ADMISSION late-index refused=true unpublished=true
+Offline mirror ready: /tmp/vinix-mirror-2496-1792018372965261/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION changed staged metadata refuses before publication; verified cache survives and offline retry succeeds PASS
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /tmp/vinix-mirror-2496-1792018373803459/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION 34 late metadata/payload/mode/link/namespace refusals preserve source state, outside data and cache; no completion, clean staging and offline retry PASS
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /tmp/vinix-mirror-2496-1792018381312022/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION 128 valid and refused complete-stage scans retire descriptors under a 32-descriptor limit and restored namespace retries PASS
+RELEASE PROCESS release-admission-core PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24cd90
+random: reseeded from 3478 events, 4 hardware words
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+RELEASE ADMISSION late-index refused=true unpublished=true
+RELEASE ADMISSION changed staged metadata refuses after reservation; exact retry preserves publisher floor PASS
+RELEASE ADMISSION 34 staged/reserved refusals preserve workspace and outside data; history timing, no publication, cleanup and exact retry PASS
+RELEASE PROCESS release-admission-publisher PASS
+HWTEST PASS packages-release-admission
+syspower: power off: stopping devices

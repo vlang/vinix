@@ -8,6 +8,8 @@ import time
 fn C.fork() int
 fn C.waitpid(int, &int, int) int
 fn C._exit(int)
+fn C.link(&char, &char) int
+fn C.mkfifo(&char, u32) int
 
 fn release_fixture() !(string, string, i64) {
 	work := os.real_path(os.temp_dir()) + '/vinix-release-' + os.getpid().str() + '-' + time.now().unix_micro().str()
@@ -208,4 +210,117 @@ fn test_release_interruption_preserves_sequence_and_exact_retry_without_fork_or_
 	assert refused && !os.exists(work + '/busy')
 	publish_release(work + '/repository', 'fixture', work + '/seed', 3, expires, work + '/third')!
 	assert release_history(work + '/repository')!.repositories[0].sequence == 3
+}
+
+fn release_change_reserved_index(phase string, stage string) ! {
+	if phase == 'reserved' { os.write_file(stage + '/index.json', 'changed after sequence reservation')! }
+}
+
+fn test_release_late_metadata_change_refuses_publication_and_preserves_exact_retry() {
+	work, key, expires := release_fixture()!; defer { os.rmdir_all(work) or {} }
+	mut message := ''
+	release_locked(work + '/repository', 'fixture', work + '/seed', 1, expires, work + '/export',
+		ReleaseOptions{ checkpoint: release_change_reserved_index }) or { message = err.msg() }
+	println('RELEASE ADMISSION late-index refused=' + message.contains('publisher release verification').str() + ' unpublished=' + (!os.exists(work + '/export')).str())
+	assert message.contains('publisher release verification') && !os.exists(work + '/export')
+	assert os.ls(work)!.all(!it.starts_with('.vinix-release-'))
+	assert release_history(work + '/repository')!.repositories[0].sequence == 1
+	publish_release(work + '/repository', 'fixture', work + '/seed', 1, expires, work + '/export')!
+	index := verify_index(Repository{ id: 'fixture', public_key: key }, os.read_file(work + '/export/index.json')!,
+		os.read_file(work + '/export/index.sig')!.trim_space(), time.now().unix())!
+	assert index.sequence == 1 && index.packages.len == 3
+	println('RELEASE ADMISSION changed staged metadata refuses after reservation; exact retry preserves publisher floor PASS')
+}
+
+fn release_admission_mutate(phase string, stage string) ! {
+	if phase != os.getenv('VINIX_RELEASE_ADMISSION_PHASE') { return }
+	work := os.getenv('VINIX_RELEASE_ADMISSION_WORK')
+	if os.exists(work + '/mutated') { return }
+	subject := os.getenv('VINIX_RELEASE_ADMISSION_SUBJECT')
+	kind := os.getenv('VINIX_RELEASE_ADMISSION_KIND')
+	path := stage + '/' + subject
+	assert os.lstat(stage)!.mode & 0o777 == if phase == 'staged' { u32(0o700) } else { u32(0o755) }
+	os.write_file(work + '/mutated', 'once')!
+	match kind {
+		'extra' { os.write_file(path + '/unrequested', 'unreviewed')! }
+		'mode' { os.chmod(path, if subject == '' { if phase == 'staged' { 0o1700 } else { 0o700 } } else { 0o600 })! }
+		'link' { assert C.link(path.str, (work + '/linked').str) == 0 }
+		'rewrite' { os.write_file(path, 'changed staged bytes')! }
+		else {
+			os.rename(path, work + '/saved')!
+			match kind {
+				'alias' { os.symlink(work + '/outside', path)! }
+				'dir-alias' { os.symlink(work + '/outside-dir', path)! }
+				'fifo' { assert C.mkfifo(path.str, 0o600) == 0 }
+				'missing' {}
+				else { panic('unknown release admission mutation') }
+			}
+		}
+	}
+}
+
+fn test_release_complete_stage_refusal_obeys_reservation_and_preserves_workspace_for_retry() {
+	mut cases := 0
+	for phase in ['staged', 'reserved'] {
+		work, key, expires := release_fixture()!; defer { os.rmdir_all(work) or {} }
+		repository := work + '/repository'
+		publish_release(repository, 'fixture', work + '/seed', 1, expires, work + '/prior')!
+		prior_index := os.read_file(work + '/prior/index.json')!; prior_signature := os.read_file(work + '/prior/index.sig')!
+		prior_history := os.read_file(repository + '/.publisher/history.json')!; seed := os.read_file(work + '/seed')!
+		_, expected, signature, _ := publication(repository, 'fixture', work + '/seed', 2, expires)!
+		mut inputs := map[string]string{}
+		for directory in ['manifests', 'objects'] {
+			for name in os.ls(repository + '/' + directory)! {
+				path := repository + '/' + directory + '/' + name
+				inputs[path] = os.read_file(path)!
+			}
+		}
+		payload := 'objects/' + os.ls(repository + '/objects')![0]
+		os.write_file(work + '/outside', 'preserved')!; os.chmod(work + '/outside', 0o600)!
+		os.mkdir(work + '/outside-dir')!; os.chmod(work + '/outside-dir', 0o700)!
+		os.write_file(work + '/outside-dir/keep', 'preserved')!
+		os.setenv('VINIX_RELEASE_ADMISSION_WORK', work, true); os.setenv('VINIX_RELEASE_ADMISSION_PHASE', phase, true)
+		defer { for name in ['VINIX_RELEASE_ADMISSION_WORK', 'VINIX_RELEASE_ADMISSION_PHASE', 'VINIX_RELEASE_ADMISSION_SUBJECT', 'VINIX_RELEASE_ADMISSION_KIND'] { os.unsetenv(name) } }
+		for subject in ['index.json', 'index.sig', payload, '', 'objects'] {
+			kinds := if subject == '' { ['extra', 'mode'] }
+				else if subject == 'objects' { ['extra', 'dir-alias'] }
+				else if subject == payload { ['rewrite', 'missing', 'fifo'] }
+				else { ['rewrite', 'missing', 'alias', 'link', 'mode'] }
+			for kind in kinds {
+				os.setenv('VINIX_RELEASE_ADMISSION_SUBJECT', subject, true); os.setenv('VINIX_RELEASE_ADMISSION_KIND', kind, true)
+				mut message := ''
+				release_locked(repository, 'fixture', work + '/seed', 2, expires, work + '/export',
+					ReleaseOptions{ checkpoint: release_admission_mutate }) or { message = err.msg(); unsafe { err.free() } }
+				assert message.contains('publisher release verification') && !os.exists(work + '/export'), phase + '/' + subject + '/' + kind + ': ' + message
+				assert os.exists(work + '/mutated') && os.ls(work)!.all(!it.starts_with('.vinix-release-'))
+				history := release_history(repository)!
+				assert history.repositories.len == 1
+				assert history.repositories[0].sequence == if phase == 'staged' { u64(1) } else { u64(2) }
+				assert history.repositories[0].index_sha256 == index_digest(if phase == 'staged' { prior_index } else { expected })
+				close_decoded_history(history)
+				if phase == 'staged' { assert os.read_file(repository + '/.publisher/history.json')! == prior_history }
+				for path, bytes in inputs { assert os.read_file(path)! == bytes }
+				assert os.read_file(work + '/seed')! == seed && os.lstat(work + '/seed')!.mode & 0o777 == 0o600
+				assert os.read_file(work + '/prior/index.json')! == prior_index && os.read_file(work + '/prior/index.sig')! == prior_signature
+				assert os.read_file(work + '/outside')! == 'preserved' && os.lstat(work + '/outside')!.mode & 0o777 == 0o600
+				assert os.read_file(work + '/outside-dir/keep')! == 'preserved' && os.lstat(work + '/outside-dir')!.mode & 0o777 == 0o700
+				for name in ['mutated', 'linked', 'saved'] {
+					path := work + '/' + name
+					if os.is_dir(path) { os.rmdir_all(path)! } else if os.exists(path) { os.rm(path)! }
+				}
+				unsafe { message.free() }
+				cases++
+			}
+		}
+		info := publish_release(repository, 'fixture', work + '/seed', 2, expires, work + '/export')!
+		assert info.index_sha256 == index_digest(expected) && os.read_file(work + '/export/index.json')! == expected
+		assert os.read_file(work + '/export/index.sig')! == signature + '\n'
+		assert verify_index(Repository{ id: 'fixture', public_key: key }, expected, signature, time.now().unix())!.sequence == 2
+		history := os.read_file(repository + '/.publisher/history.json')!
+		mut refused := false
+		publish_release(repository, 'fixture', work + '/seed', 2, expires + 1, work + '/fork') or { refused = err.msg().contains('rollback or sequence equivocation') }
+		assert refused && !os.exists(work + '/fork') && os.read_file(repository + '/.publisher/history.json')! == history
+	}
+	assert cases == 34
+	println('RELEASE ADMISSION 34 staged/reserved refusals preserve workspace and outside data; history timing, no publication, cleanup and exact retry PASS')
 }

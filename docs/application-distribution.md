@@ -139,6 +139,13 @@ other users. Packing output inside its captured source tree also refuses before
 creating output parents. See
 [workspace qualification](../tests/packages/publisher-workspace-check.md).
 
+The complete release is checked before reserving its sequence and again before
+publication. Changed signed metadata, payloads, permissions, links or unexpected
+entries refuse and remove the unpublished stage. Refusal before reservation keeps
+the prior floor; refusal after reservation retains the intended sequence/digest,
+so retry the same inputs or publish a newer sequence. See
+[release admission qualification](../tests/packages/release-admission-check.md).
+
 The [native SDK publisher profile](../tools/packages/SDK.md#native-sdk-publisher-profile)
 provides a single pinned catalog for Hello, Counter and Memo on both targets.
 Its [V builder](../examples/package-catalog/README.md) compiles six static apps

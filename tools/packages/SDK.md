@@ -253,6 +253,15 @@ failure reports that the complete directory exists but its durability is uncerta
 Upload this complete release to a new remote directory, then switch the server's
 release route. Serving a mutable workspace can expose a torn metadata pair.
 
+Complete-stage verification runs before directory flushing/sequence reservation
+and again after reservation immediately before publication. It requires the exact
+captured signed metadata, root/object namespace, authenticated payload lengths
+and hashes, ordinary single-link files and final modes. An early refusal preserves
+the prior publisher floor. A late refusal keeps the intended reserved floor and
+requires an exact retry or a newer sequence; it never publishes the changed stage.
+These additional scans share offline mirror admission and add object reads.
+See [release admission qualification](../../tests/packages/release-admission-check.md).
+
 Keep `.publisher/history.json` with the workspace and back it up. `pack`, legacy
 `publish` and `publish-release` share the private `.publisher/lock`; prepared-root
 and catalog imports take it when packing their materialized payloads. Busy

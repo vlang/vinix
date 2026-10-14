@@ -1,0 +1,17 @@
+Baseline 98de2f946 with the new reserved-index assertion. The old publisher publishes changed staged signed metadata; the regression exits 1. This is a deterministic staging component check.
+
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+RELEASE ADMISSION late-index refused=false unpublished=false
+tools/packages/pkgcore/release_test.v:223: fn test_release_late_metadata_change_refuses_publication_and_preserves_exact_retry
+    assert message.contains('publisher release verification') && !os.exists(work + '/export')
