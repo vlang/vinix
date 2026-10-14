@@ -113,7 +113,8 @@ fn swift_error_metadata_arena() u64 {
 		*(&u64(data + 400)) = 0x181000001
 		*(&u64(data + 408)) = protocol
 	}
-	C.__builtin___clear_cache(allocation, unsafe { voidptr(code + 128) })
+	swift_any_emit(code,data)
+	C.__builtin___clear_cache(allocation, unsafe { voidptr(code + 152) })
 	if C.mprotect(allocation, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(allocation, usize(page * 2))
@@ -172,6 +173,7 @@ fn swift_error_value(owner u64, scratch &u64, output &SwiftErrorValue) {
 
 fn swift_error_value_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_$sypN' { swift_any_full_metadata() }
 		'_swift_getErrorValue' { u64(unsafe { voidptr(swift_error_value) }) }
 		'_swift_getObjCClassMetadata' { u64(unsafe { voidptr(swift_objc_metadata) }) }
 		'_$ss5ErrorMp' { swift_error_metadata_arena() + u64(C.getpagesize()) + 240 }

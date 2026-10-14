@@ -5134,22 +5134,64 @@ native SDK/LLVM inputs, generated-C allocation/sealing audit, retained compiler
 and native measurement trials, and actual IPA probe/audits are under
 `build/ios/fortnite/byte-metadata-checks`. Full iOS regression remains unpassed.
 
+SwiftCore now exports `_$sypN`, the full Any existential metadata record. The
+export includes its value-witness prefix; the metadata address point is eight
+bytes later, with kind `0x303`, no protocols and unconstrained existential
+flags. Its eight value witnesses describe a 32-byte container: a three-word
+value buffer followed by the contained type's metadata. Native SwiftCore data,
+instructions and differential calls establish inline witness dispatch, boxed
+ownership, exact take/copy behavior and enum encodings.
+
+Same-type inline assignments call the contained assignment witness. A type
+change moves the old inline payload into a 24-byte stack temporary, publishes
+and constructs the new value, then destroys the old temporary or box. Boxed
+copies share an existing owner; takes transfer it. Self assignment reads
+nothing. Required callbacks are checked before mutation, with no registry lock
+held across callbacks. The checked subset accepts complete inline layouts
+through 24 bytes with alignment through eight, and canonical registered Any,
+ArraySlice and Collection iterator boxes. Callers must keep readable initialized
+containers, immutable metadata/witness records and code alive. Foreign boxes,
+general `swift_allocBox`, protocol discovery and reflection remain unsupported;
+this does not provide general pointer-span validation.
+
+Full metadata, witnesses and private box records occupy unused space in the
+existing error arena, emitted before cache flushing and RX/RO publication.
+Private 48-byte Any boxes use the existing heap registry and ARC: their
+destructor destroys the initialized inner value before exact deallocation.
+They add no owner registry or arena teardown. Quiescent shutdown drains owners
+and callbacks before retiring the existing metadata and code pages.
+
+Ten fresh ASan/UBSan runs and five Vinix ARM64 suites pass across Any, String,
+heap ownership, Collection and error-value metadata. Fixtures compare native
+and V String/nested-box reference counts, same/different-type callback order,
+publication, preserved `x20`/`x21`, protected 32-byte containers and 24-byte
+buffers, unaligned enum buffers through UINT32_MAX, self assignment without
+reads, reentrant lookup and eight readers. V additionally verifies registered
+ArraySlice/iterator boxes, invalid layouts before writes and two drained heap
+and arena lifetimes. The public `build-swift-any` target and full build,
+regression and Swift guest modes include the fixture. Thirteen final generated
+C streams and executables, native SDK/LLVM inputs, generated-C allocation and
+lifetime audit, retained fixture trials and actual IPA probe/audits are under
+`build/ios/fortnite/any-checks`. Final input pins include the newly added runtime
+and test sources. Full iOS regression remains unpassed.
+
 The supplied IPA now exits with status 1 at MarketplaceKitWrapper's required
-`_$sypN`, Swift's full Any existential metadata record. Its required import and
-native metadata/value-witness layout are retained for the next implementation.
-Fortnite has not entered application code and remains unplayable.
+`__swiftEmptyArrayStorage`, the native immortal empty-array singleton. Its
+required import and native singleton/class header data are retained for the
+next implementation. Fortnite has not entered application code and remains
+unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,461 | 699 | 79 |
+| Fortnite executable | 1,462 | 698 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 151 | 25 | 23 |
-| All images | 2,271 | 727 | 120 |
+| MarketplaceKitWrapper | 152 | 24 | 23 |
+| All images | 2,273 | 725 | 120 |
 
-The C++/GLES/Text variant reports 2,284 resolved imports, 714 unresolved strong
+The C++/GLES/Text variant reports 2,286 resolved imports, 712 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
