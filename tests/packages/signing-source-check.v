@@ -35,6 +35,14 @@ fn main() {
 	changed, changed_text := run(work + '/validator', arguments)!
 	assert changed != 0 && changed_text.contains('differs'), changed_text
 	os.write_file(copy + '/signing.v', original)!
+	field_path := copy + '/internal/edwards25519/element.v'
+	field := os.read_file(field_path)!
+	assert field.count('\tv.carry_propagate_generic()\n\treturn v') == 2
+	os.write_file(field_path, field.replace('\tv.carry_propagate_generic()\n\treturn v',
+		'\tv = v.carry_propagate_generic()\n\treturn v'))!
+	carry, carry_text := run(work + '/validator', arguments)!
+	assert carry != 0 && carry_text.contains('differs'), carry_text
+	os.write_file(field_path, field)!
 	os.write_file(copy + '/unexpected.v', 'module signing\n')!
 	extra, extra_text := run(work + '/validator', arguments)!
 	assert extra != 0 && extra_text.contains('unrecorded'), extra_text
@@ -52,5 +60,5 @@ fn main() {
 	assert root_linked != 0 && root_text.contains('ordinary directory'), root_text
 	os.rm(copy)!
 	os.rename(work + '/actual', copy)!
-	println('Signing source checks: pinned bytes, mutation, extra implementation and file/root symlink refusal passed')
+	println('Signing source checks: pinned bytes, mutation, redundant-carry regression, extra implementation and file/root symlink refusal passed')
 }

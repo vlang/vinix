@@ -216,7 +216,7 @@ fn fe_mul_generic(a Element, b Element) Element {
 	}
 	// v.carryPropagate()
 	// using `carry_propagate_generic()` instead
-	v = v.carry_propagate_generic()
+	v.carry_propagate_generic()
 	return v
 }
 
@@ -323,7 +323,7 @@ fn fe_square_generic(a Element) Element {
 		l3: rr3
 		l4: rr4
 	}
-	v = v.carry_propagate_generic()
+	v.carry_propagate_generic()
 	return v
 }
 

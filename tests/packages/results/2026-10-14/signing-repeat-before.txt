@@ -1,0 +1,3 @@
+key: 74013 allocations, 3053898 requested bytes, 73480 40-byte requests
+sign: 74349 allocations, 3069765 requested bytes, 73747 40-byte requests
+Signing allocation qualification passed; RFC8032 bytes retained

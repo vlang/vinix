@@ -263,6 +263,10 @@ uses a [pinned, licensed V signing dependency](../tools/packages/signing/README.
 for publisher and consumer. Its source ledger makes changes reproducible, and
 [reference/sanitizer/guest checks](../tests/packages/signing-check.md) cover the
 compiler-sensitive point-initialization adaptation.
+The [field-temporary checks](../tests/packages/signing-repeat-check.md) also
+measure reduced allocation after discarding redundant carry-result assignments,
+and exercise repeated publication in one process. Table/digest ownership and an
+unbounded signing-process lifetime remain separate qualification work.
 The service checks repository identity, format, expiry, increasing sequence and same-sequence
 equivocation. `/var/lib/vinix-packages/trust-history.json` retains the highest
 authenticated sequence and exact index digest for each repository ID/key,

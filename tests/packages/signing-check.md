@@ -9,6 +9,12 @@ receiver pointer as a point value; [the baseline traces](results/2026-10-13/docu
 record a stack-buffer-overflow before policy parsing. No global compiler checkout
 or standard library is modified by the package implementation.
 
+A subsequent [field-temporary qualification](signing-repeat-check.md) removes
+redundant carry-result assignments in multiplication/squaring. It preserves the
+carry operation and returned limbs, measures the allocation reduction, and runs
+the reference vectors and repeated publication on both target architectures.
+The original results below describe the earlier signing tuple.
+
 The signing runner checks published empty, one-byte and two-byte message vectors
 from [RFC 8032 section 7.1](https://www.rfc-editor.org/rfc/rfc8032#section-7.1).
 Derived public keys and deterministic signatures must equal the reference bytes;

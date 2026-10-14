@@ -1,0 +1,104 @@
+signing ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Package signing: RFC8032 keys/signatures and tamper/canonical-scalar refusal passed
+PASS
+policy ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+PASS
+deployment ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-pins-78082-1791989086700522/locked export; $literal; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-capture-78082-1791989090957362/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Updating trusted repository deployment.json
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-namespace-78082-1791989092351605/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/2) from fixture
+Installing Runtime 2.0.0 (2/2) from fixture
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Offline mirror ready: /private/tmp/vinix-deployment-reproducible-78082-1791989094179013/mirror; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Rolled back to generation 1; application data was retained
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading unused/bin/runner (14 bytes)
+Activated package generation 1
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+PASS
+publisher_workspace ASan/UBSan (detect_leaks=0, halt_on_error=1):
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PASS

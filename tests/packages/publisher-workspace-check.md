@@ -111,6 +111,11 @@ ledger. Fresh case processes qualify the CLI-style lifetime; repeated signing
 in a long-lived target process remains unqualified. No kernel, allocator or
 signing implementation was changed to conceal that limitation.
 
+The subsequent [signing field-temporary qualification](signing-repeat-check.md)
+tests a revised signing tuple, including the batched assertions and repeated
+publication in one process. The failed experiments above retain their original
+sources and results.
+
 These checks do not close production publisher enrollment, advertised catalog
 migration, graphical login/broker integration or broader application/runtime
 qualification gates.

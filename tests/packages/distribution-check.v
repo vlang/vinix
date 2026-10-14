@@ -52,6 +52,10 @@ fn check() ! {
 	}
 	if '--software-only' !in os.args {
 		check_tests(v, ['-gc', 'none'], repository + '/tools/packages/signing', work)!
+		run(v, [...helper_flags, '-enable-globals', '-d', 'track_heap', '-gc', 'none', '-manualfree',
+			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/signing-allocation-check',
+			repository + '/tests/packages/signing-allocation-check.v'])!
+		run(work + '/signing-allocation-check', [])!
 		check_tests(v, ['-gc', 'none'], repository + '/tools/packages/pkgcore', work)!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgprotocol', work)!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/appsdk', work)!
@@ -94,6 +98,9 @@ fn check() ! {
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/publisher-workspace-check', repository + '/tests/packages/publisher-workspace-check.v'])!
 		run(work + '/publisher-workspace-check', [work + '/vinix-package', work + '/publisher-workspace'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/signing-repeat-check', repository + '/tests/packages/signing-repeat-check.v'])!
+		run(work + '/signing-repeat-check', [work + '/signing-repeat'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/hash-file-check', repository + '/tests/packages/hash-file-check.v'])!
 		run(work + '/hash-file-check', [work + '/hash-files'])!

@@ -62,6 +62,14 @@ fn signing_adapt(path string, source string) !string {
 		if result.count('check_initialized(...points)') != 2 { return error('unexpected multiscalar source layout') }
 		result = result.replace('check_initialized(...points)', 'for point in points { check_initialized(point) }')
 	}
+	if path == 'internal/edwards25519/element.v' {
+		original := '\tv = v.carry_propagate_generic()\n\treturn v'
+		if result.count(original) != 2 { return error('unexpected field carry source layout') }
+		// The method already updates v. Assigning its result back to v makes
+		// the qualified compiler heap-promote this temporary on every field
+		// multiply/square. Keep the same carry and return the updated value.
+		result = result.replace(original, '\tv.carry_propagate_generic()\n\treturn v')
+	}
 	return result
 }
 
@@ -109,7 +117,8 @@ fn synchronize_signing() ! {
 			upstream_sha256: sha256.sum(original.bytes()).hex(), result_sha256: sha256.sum(adapted.bytes()).hex() }
 	}
 	provenance := json2.encode(SigningProvenance{ revision: signing_source_revision,
-		adaptations: ['package-local module namespace', 'non-variadic point-initialization checks; arithmetic and encoding retained'],
+		adaptations: ['package-local module namespace', 'non-variadic point-initialization checks; arithmetic and encoding retained',
+			'field multiplication/squaring discard redundant carry-result assignment; receiver mutation and returned limbs retained'],
 		files: records }) + '\n'
 	if os.args[1] == '--write' {
 		os.write_file(destination + '/provenance.json', provenance)!

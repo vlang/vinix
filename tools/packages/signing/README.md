@@ -7,7 +7,7 @@ SHA-256 hashes; [LICENSE](LICENSE) retains the upstream copyright and license.
 Package staging retains this notice at
 `/usr/share/licenses/vinix-packages/ed25519-MIT.txt` in binary releases.
 
-The only operational adaptation replaces the private variadic point-initialization
+One operational adaptation replaces the private variadic point-initialization
 check with one value check per point, preserving its order and predicate. The
 qualified compiler's variadic lowering copied a mutable receiver pointer as a
 160-byte point value and caused an ASan stack-buffer-overflow during key generation.
@@ -15,6 +15,15 @@ The adapted helper passes values through the ordinary argument conversion; calls
 with two points become two checks, and slice expansion becomes iteration.
 Field/scalar arithmetic, point encoding, nonce derivation and signature layout
 are retained from the pinned source.
+
+Field multiplication and squaring also discard a redundant assignment of the
+carry method's return value back into its receiver. The method already updates
+the receiver; its operations, order and returned limbs remain the same. The
+qualified compiler otherwise heap-promotes a 40-byte temporary on every field
+operation. The [allocation and repeated-publication qualification](../../../tests/packages/signing-repeat-check.md)
+records the measured reduction, reference checks, source regeneration and target
+results. Table, digest and encoding allocations still need separate ownership
+work; these checks do not establish zero retained heap for the signing API.
 
 The package publisher and consumer import this dependency rather than whichever
 Ed25519 implementation happens to accompany the build compiler. No demonstration
