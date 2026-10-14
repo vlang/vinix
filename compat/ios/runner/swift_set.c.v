@@ -222,6 +222,17 @@ fn swift_set_bridge(address u64, ops []u32, target u64) {
 	write32(address + u64(count * 4), 0x58000050); write32(address + u64(count * 4 + 4), 0xd61f0200)
 	unsafe { *(&u64(address + u64(count * 4 + 8))) = target }
 }
+
+// Generic SetAlgebra.init(Sequence) dispatches through caller witness slot 20.
+// Native arm64e authenticates this entry; Vinix uses ordinary ARM64 pointers.
+// Preserve x0-x4, x7, indirect result x8, Swift context/error x20/x21 and the
+// original stack/LR. Forward the selected slot address in x5, target in x6,
+// then tail-branch: the witness consumes the source and initializes Self.
+fn swift_set_algebra_emit(entry u64) {
+	for i, op in [u32(0xaa0403e5), 0xf84a0ca6, 0xd61f00c0]! {
+		write32(entry + u64(i * 4), op)
+	}
+}
 fn swift_set_arena() u64 {
 	swift_array_sequence_arena(); swift_integer_metadata()
 	C.ios_objc_initialize_lock(); defer {C.ios_objc_initialize_unlock()}
@@ -243,6 +254,7 @@ fn swift_set_arena() u64 {
 	swift_set_bridge(base + 768, [u32(0xaa1403e0)], u64(unsafe {voidptr(swift_set_storage_destroy)})); swift_set_bridge(base + 832, [u32(0xaa1403e0)], u64(unsafe {voidptr(swift_set_box_destroy)}))
 	// C -> borrowed Swift Hashable witness; preserve x20 and all callee saves.
 	for i, op in [u32(0xa9be7bfd),0xa90153f3,0xaa0003f0,0xaa0103e0,0xaa0203e1,0xaa0303e2,0xaa0403f4,0xd63f0200,0xa94153f3,0xa8c27bfd,0xd65f03c0]! {write32(base + 896 + u64(i * 4),op)}
+	swift_set_algebra_emit(base + 960)
 	module_descriptor := ios_runtime.swift_array_arena + u64(page) + 224
 	for i, offset in [u64(128),192]! {
 		d := data + offset; write32(d,0xd1); swift_protocol_relative(d + 4,module_descriptor); swift_protocol_relative(d + 8,data + u64(400 + i * 16)); swift_protocol_relative(d + 12,base + if i == 0 {u64(0)} else {u64(512)})
@@ -262,12 +274,13 @@ fn swift_set_arena() u64 {
 	// Native singleton header/bitmap. The one sentinel bucket is unoccupied;
 	// all padding bits are occupied, matching the installed library.
 	unsafe { *(&u64(data + 1024)) = data + 1152; *(&u64(data + 1032)) = 0x80000004ffffffff; *(&u64(data + 1072)) = 1; *(&u64(data + 1080)) = ~u64(1); *(&u64(data + 1152)) = 0x500 }
-	C.__builtin___clear_cache(allocation,voidptr(base + 944))
+	C.__builtin___clear_cache(allocation,voidptr(base + 972))
 	if C.mprotect(allocation,page,C.PROT_READ | C.PROT_EXEC)!=0 || C.mprotect(voidptr(data),page,C.PROT_READ)!=0 {C.munmap(allocation,page * 3);panic('iOS: cannot seal Set records')}
 	ios_runtime.swift_set_arena = base;ios_runtime.swift_empty_set = data + 1024;return base
 }
 fn swift_set_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_$ss10SetAlgebraPyxqd__ncSTRd__7ElementQyd__ACRtzlufCTj' {swift_set_arena() + 960}
 		'_$sShyxGSTsMc' {swift_set_arena() + u64(C.getpagesize()) + 32}
 		'_$sSh8IteratorVyx_GStsMc' {swift_set_arena() + u64(C.getpagesize()) + 64}
 		'_$sShMa' {swift_set_arena()}

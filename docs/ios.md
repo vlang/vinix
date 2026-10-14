@@ -4874,23 +4874,60 @@ from copying to count and endIndex; every final stream was regenerated after
 completing those accessors. Full iOS regression remains unpassed.
 
 Both audits resolve three more required imports. MarketplaceKitWrapper's
-three required raw-buffer imports now resolve. The actual IPA exits with
-status 1 before entry at its required generic `SetAlgebra` sequence initializer
-thunk, `_$ss10SetAlgebraPyxqd__ncSTRd__7ElementQyd__ACRtzlufCTj`. The native
-thunk's witness-table dispatch is recorded for the next implementation.
-Fortnite has not entered application code and remains unplayable.
+three required raw-buffer imports now resolve. That cohort reached the
+required generic `SetAlgebra` sequence initializer thunk,
+`_$ss10SetAlgebraPyxqd__ncSTRd__7ElementQyd__ACRtzlufCTj`.
+
+The generic `SetAlgebra.init(Sequence)` thunk now forwards through the caller's
+witness table. Native Swift loads slot 20 (byte offset 160) from x4, passes
+the selected slot address in x5 and its target in x6, then tail-branches.
+The V entry emits the three ordinary ARM64 instructions for that dispatch;
+native arm64e additionally authenticates the pointer with the storage address
+and discriminator 62039. Integer arguments x0-x4/x7, indirect result x8,
+Swift context/error x20/x21 and the original stack/LR reach the witness
+unchanged. The caller supplies a valid table and callable initializer. The
+witness consumes the source and initializes Self, including custom conformances;
+the thunk reads no source, metadata or table header and performs no ARC,
+allocation or registry locking. This implements dispatch, while concrete
+SetAlgebra conformances and default initializer bodies remain separate work.
+Swift's [protocol declaration and default implementation](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/SetAlgebra.swift)
+specify an owned Sequence and allow conforming types to provide the initializer.
+
+The entry occupies 12 bytes at offset 960 in the existing Set code arena.
+Instruction-cache flushing covers its end before the page is sealed RX;
+the existing arena teardown releases it. Native comparisons exercise twelve
+calls with protected table prefixes and opaque metadata, preserving register
+and stack markers, 32-byte-aligned 48-byte indirect results, destination
+canaries and witness-only source transfer or release. V checks also exercise
+cross-thread lookup from inside the witness, repeated cached dispatch and
+two drained runtime lifetimes. Generated C confirms fixed stack emission.
+
+Ten fresh ASan/UBSan runs pass across SetAlgebra, Set, Sequence, witness and
+Array storage in both hash modes. These five suites pass in a fresh ARM64
+Vinix guest. The public `build-swift-set-algebra` target, full build, regression
+and Swift guest modes include the fixture. Thirteen generated-C streams and
+executables, native SDK/LLVM measurements and actual IPA probe/audit evidence
+are retained under `build/ios/fortnite/set-algebra-checks`. Full iOS regression
+remains unpassed.
+
+Both audits resolve two more required imports, including MarketplaceKitWrapper's
+SetAlgebra initializer dispatch. The actual IPA now exits with status 1 at
+`_$ss11_StringGutsV16_foreignCopyUTF84intoSiSgSrys5UInt8VG_tF`, the required
+`_StringGuts._foreignCopyUTF8` import in MarketplaceKitWrapper. Its native
+implementation is recorded for the next change. Fortnite has not entered
+application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,459 | 701 | 79 |
+| Fortnite executable | 1,460 | 700 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 142 | 34 | 23 |
-| All images | 2,260 | 738 | 120 |
+| MarketplaceKitWrapper | 143 | 33 | 23 |
+| All images | 2,262 | 736 | 120 |
 
-The C++/GLES/Text variant reports 2,273 resolved imports, 725 unresolved strong
+The C++/GLES/Text variant reports 2,275 resolved imports, 723 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
