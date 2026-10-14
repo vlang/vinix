@@ -5526,23 +5526,60 @@ C streams/executables, SDK/LLVM references, eight actual MarketplaceKitWrapper
 QoS call sites, the retained header-generation trial and IPA probes/audits are
 under `build/ios/fortnite/dispatch-qos-checks`; full iOS regression remains unpassed.
 
-The supplied IPA now gets past the QoS getter and metadata accessor and exits
+The QoS-only IPA probe got past the getter and metadata accessor and exited
 with status 1 at MarketplaceKitWrapper's required DispatchQueue.main getter,
 `_$sSo17OS_dispatch_queueC8DispatchE4mainABvgZ`, in
 `/usr/lib/swift/libswiftDispatch.dylib`. Fortnite has not entered application
 code and remains unplayable.
+
+Swift Dispatch now exports that main queue getter. It returns the existing
+registered Vinix main queue as an owned object in `x0`, preserving `x20`/`x21`
+and ignoring `x8` and the incoming Swift context. The installed native getter
+returns `_dispatch_main_q` through an autoreleased-return shim and then claims
+the owned reference. Vinix uses its shared Objective-C retain path; the main
+queue is immortal, so calls reuse its identity without reference-count churn.
+Seven MarketplaceKitWrapper call sites use this direct object return.
+
+Swift unknown-object ARC now recognizes registered dispatch queues before
+checking Objective-C or Swift heap storage. Classification reads only the
+scheduler registry, releases its mutex before taking the Objective-C lock,
+and sends queue ownership to the existing dispatch retain/release functions.
+Ordinary queues retain their scheduler reference counts. Queue identities
+remain valid during worker/callback quiescence and expire at system-data
+teardown. The getter requires an active scheduler and rejects after stopping.
+Its bridge shares the existing sealed Dispatch mapping and expires when that
+mapping is retired. Swift queue metadata, type queries, weak references,
+async adapters and other methods remain unsupported.
+
+Ten fresh ASan/UBSan runs and five ARM64 Vinix suites pass across the main
+queue, QoS, SetAlgebra, unknown-object witnesses and the existing scheduler.
+Checks cover native/V identity and ownership, protected unused arguments,
+preserved Swift registers, value witnesses, ordinary queue reference counts,
+eight concurrent resolvers, main-thread/reentrant callbacks, shutdown
+cancellation and two retired/unmapped lifetimes. Generated C verifies no new
+per-call allocation, registry-only classification and sealed publication.
+Thirteen C streams/executables, native/IPA references, recovered archive and
+VM trial evidence, and completed probes/audits are retained under
+`build/ios/fortnite/dispatch-main-checks`; full iOS regression remains unpassed.
+
+The IPA startup probe now gets past the main queue getter and exits with
+status 1 at MarketplaceKitWrapper's required
+`DispatchQueue.async(group:qos:flags:execute:)` adapter in
+`/usr/lib/swift/libswiftDispatch.dylib`:
+`_$sSo17OS_dispatch_queueC8DispatchE5async5group3qos5flags7executeySo0a1_b1_F0CSg_AC0D3QoSVAC0D13WorkItemFlagsVyyXBtF`.
+Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,470 | 690 | 79 |
+| Fortnite executable | 1,471 | 689 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 164 | 12 | 23 |
-| All images | 2,293 | 705 | 120 |
+| MarketplaceKitWrapper | 165 | 11 | 23 |
+| All images | 2,295 | 703 | 120 |
 
-The C++/GLES/Text variant reports 2,306 resolved imports, 692 unresolved strong
+The C++/GLES/Text variant reports 2,308 resolved imports, 690 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

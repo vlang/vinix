@@ -157,6 +157,13 @@ fn darwin_dispatch_retain(identity u64) {
 // Apple blocks may capture a dispatch queue as an Objective-C object. These
 // queues have private V storage, so retain/release must not inspect ObjHeader.
 // This does not advertise OS_dispatch_queue classes or other ObjC methods.
+fn dispatch_objc_is_queue(identity u64) bool {
+	if dispatch_runtime == unsafe { nil } { return false }
+	C.pthread_mutex_lock(dispatch_runtime.mutex)
+	defer { C.pthread_mutex_unlock(dispatch_runtime.mutex) }
+	return identity in dispatch_runtime.queues
+}
+
 fn dispatch_objc_retain(identity u64) bool {
 	if dispatch_runtime == unsafe { nil } { return false }
 	C.pthread_mutex_lock(dispatch_runtime.mutex)
