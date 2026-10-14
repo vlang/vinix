@@ -21,6 +21,13 @@ available for a retry after restoring trusted media. Signed size/hash checks
 still gate cache promotion and generation activation. See
 [copy qualification](../tests/packages/copy-file-check.md).
 
+Payload hashing and verification use one captured ordinary-file descriptor,
+opened without following leaf aliases or blocking on FIFOs. Verification checks
+the authenticated length on that descriptor before hashing. Reads stop at the
+captured size plus one sentinel; size or pathname-identity changes refuse before
+reporting success. These checks apply to cache, generation, launch and publisher
+verification. See [hash qualification](../tests/packages/hash-file-check.md).
+
 This application store is separate from the Alpine `pkg`/`apk` system layer.
 Existing Alpine ports and special downloads still use that frontend and its
 persistence rules. They do **not** acquire these rollback guarantees. Release

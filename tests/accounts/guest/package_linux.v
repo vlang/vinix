@@ -138,6 +138,51 @@ fn qualify_package_configuration_lock() ! {
 	}
 }
 
+fn qualify_package_payload_hash(architecture string, application pkgcore.Package) ! {
+	root := '/tmp/oversized-source-client'
+	directory := pkgcore.state_directory(root)
+	before := pkgcore.read_state(directory, architecture)!
+	assert before.generation == 3
+	payload := application.files.filter(it.path == 'bin/probe')[0]
+	path := directory + '/generations/3/apps/' + application.id + '/' + payload.path
+	original := os.read_bytes(path)!
+	assert pkgcore.hash_file(path)! == payload.sha256 && pkgcore.verified_file(path, payload)
+	outside := '/tmp/hash-outside'
+	os.write_file_array(outside, original)!
+	os.chmod(outside, 0o600)!
+	for kind in ['alias', 'fifo', 'directory', 'wrong-length', 'wrong-bytes'] {
+		os.rename(path, path + '.saved')!
+		match kind {
+			'alias' { os.symlink(outside, path)! }
+			'fifo' { assert C.mkfifo(path.str, 0o600) == 0 }
+			'directory' { os.mkdir(path)! }
+			'wrong-length' { mut bytes := original.clone(); bytes << u8(0); os.write_file_array(path, bytes)! }
+			'wrong-bytes' { mut bytes := original.clone(); bytes[0] ^= 1; os.write_file_array(path, bytes)! }
+			else { return error('unknown payload hash fixture') }
+		}
+		assert !pkgcore.verified_file(path, payload), kind
+		if kind in ['alias', 'fifo', 'directory'] {
+			mut refused := false
+			pkgcore.hash_file(path) or { refused = true }
+			assert refused, kind
+		}
+		refused := run(['/usr/bin/vinix-package', '--root', root, 'verify'], '', none, none)
+		assert refused.status != 0 && refused.output.contains('installed payload verification failed'), refused.output
+		assert pkgcore.read_state(directory, architecture)! == before
+		assert os.ls(directory + '/generations')!.sorted() == ['1', '2', '3']
+		assert os.read_bytes(outside)! == original && mode_of(outside) == 0o600
+		assert os.read_bytes(path + '.saved')! == original
+		if kind == 'directory' { os.rmdir(path)! } else { os.rm(path)! }
+		os.rename(path + '.saved', path)!
+		assert pkgcore.verified_file(path, payload)
+		package_success(['--root', root, 'verify'])!
+	}
+	assert !pkgcore.verified_file(path + '\x00ignored', payload)
+	mut refused := false
+	pkgcore.hash_file(path + '\x00ignored') or { refused = true }
+	assert refused
+}
+
 fn qualify_package_stored_state(root string, architecture string, application_id string, runtime_id string) ! {
 	directory := pkgcore.state_directory(root)
 	path := directory + '/generations/1/state.json'
@@ -472,6 +517,8 @@ fn qualify_package_linux(mut t Test) ! {
 	t.say('PACKAGE DOWNLOAD RECOVERY damaged-prefix complete-partial bounded-retry bad-source-refusal preserved-rollback PASS')
 	qualify_package_oversized_offline_source(architecture, mirror_path + '/fixture', key, probe_package)!
 	t.say('PACKAGE OFFLINE COPY captured-files oversized-source retained-prefix restored-resume PASS')
+	qualify_package_payload_hash(architecture, probe_package)!
+	t.say('PACKAGE PAYLOAD HASH captured-files signed-length special-file-refusal preserved-state restored-retry PASS')
 	// Organization restrictions are reviewed and atomically persisted without
 	// editing trust, the account selection or the installed generation.
 	policy_path := '/tmp/organization-policy.json'

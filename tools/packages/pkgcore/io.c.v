@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import crypto.sha256
 import os
 import tools.packages.pkgprotocol
 
@@ -85,44 +84,6 @@ fn ordinary_file(path string) bool {
 	// FIFOs/devices. Inspect the file type before any potentially blocking read.
 	info := os.lstat(path) or { return false }
 	return info.mode & 0o170000 == 0o100000
-}
-
-pub fn hash_file(path string) !string {
-	if !ordinary_file(path) {
-		return error('payload must be a regular file: ${path}')
-	}
-	mut file := os.open(path)!
-	defer { file.close() }
-	mut hash := sha256.new()
-	mut buffer := []u8{len: 64 * 1024}
-	defer {
-		unsafe {
-			buffer.free()
-			hash.free()
-			free(hash)
-		}
-	}
-	for {
-		count := file.read(mut buffer) or {
-			if err is os.Eof { break }
-			return err
-		}
-		if count == 0 { break }
-		hash.write(buffer[..count])!
-	}
-	mut digest := []u8{len: sha256.size}
-	hash.checksum_into(mut digest)
-	result := digest.hex()
-	unsafe { digest.free() }
-	return result
-}
-
-pub fn verified_file(path string, payload Payload) bool {
-	if !ordinary_file(path) || os.file_size(path) != payload.bytes { return false }
-	digest := hash_file(path) or { return false }
-	valid := digest == payload.sha256
-	unsafe { digest.free() }
-	return valid
 }
 
 pub fn copy_file(source string, target string, offset u64, maximum u64) ! {

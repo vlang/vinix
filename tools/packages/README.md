@@ -93,6 +93,11 @@ descriptors before truncating or writing. Aliases, special files, the same inode
 and inconsistent resume offsets refuse; an oversized offline source preserves
 the existing partial for recovery. See [copy qualification](../../tests/packages/copy-file-check.md).
 
+Payload hashing also captures one nonblocking, no-follow descriptor. Verification
+admits the signed length before reading, bounds hashing to that size plus one
+sentinel byte, and refuses changed sizes or pathname identity. See
+[hash qualification](../../tests/packages/hash-file-check.md).
+
 Consumer and publisher sequence histories also require complete, unambiguous
 records. Missing/null floor arrays cannot reset replay protection; damaged files
 are retained for administrator recovery. Revocation stays available. See

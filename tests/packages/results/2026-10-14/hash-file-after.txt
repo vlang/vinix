@@ -1,0 +1,5 @@
+hash-fifo: reader wait status 0 (0=safe bounded reads, 14=alarm, 10752=unverified bytes accepted)
+hash-alias: reader wait status 0 (0=safe bounded reads, 14=alarm, 10752=unverified bytes accepted)
+verify-alias: reader wait status 0 (0=safe bounded reads, 14=alarm, 10752=unverified bytes accepted)
+verify-wrong-length: reader wait status 0 (0=safe bounded reads, 14=alarm, 10752=unverified bytes accepted)
+Hash file qualification passed
