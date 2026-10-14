@@ -1,0 +1,27 @@
+
+Checkpoint staged
+[   0.173] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[   0.173] -> {"execute":"qmp_capabilities"}
+[   0.212] <- {"return": {}}
+[  13.447] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[  13.447] -> {"execute":"qmp_capabilities"}
+[  13.472] <- {"return": {}}
+[  24.915] <- {"timestamp": {"seconds": 1791975094, "microseconds": 861231}, "event": "SHUTDOWN", "data": {"guest": true, "reason": "guest-shutdown"}}
+
+Checkpoint published
+[   0.044] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[   0.044] -> {"execute":"qmp_capabilities"}
+[   0.058] <- {"return": {}}
+[  13.976] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[  13.976] -> {"execute":"qmp_capabilities"}
+[  13.999] <- {"return": {}}
+[  25.593] <- {"timestamp": {"seconds": 1791975121, "microseconds": 620304}, "event": "SHUTDOWN", "data": {"guest": true, "reason": "guest-shutdown"}}
+
+Checkpoint activated
+[   0.053] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[   0.053] -> {"execute":"qmp_capabilities"}
+[   0.080] <- {"return": {}}
+[  14.815] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[  14.815] -> {"execute":"qmp_capabilities"}
+[  14.853] <- {"return": {}}
+[  28.700] <- {"timestamp": {"seconds": 1791975151, "microseconds": 294418}, "event": "SHUTDOWN", "data": {"guest": true, "reason": "guest-shutdown"}}

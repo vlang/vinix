@@ -113,6 +113,11 @@ Both publishing commands read one captured private signing seed, bounded to
 must agree before signing. Release secret exclusion uses that same capture.
 See [signing seed qualification](../../tests/packages/signing-seed-check.md).
 
+File and directory durability helpers capture nonblocking, no-follow descriptors,
+check their types and named identities, and retry interrupted flushes. A changed
+target refuses with storage/state diagnostics. See
+[durability qualification](../../tests/packages/durability-check.md).
+
 Consumer and publisher sequence histories also require complete, unambiguous
 records. Missing/null floor arrays cannot reset replay protection; damaged files
 are retained for administrator recovery. Revocation stays available. See

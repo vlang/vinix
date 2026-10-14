@@ -79,6 +79,8 @@ fn persistence_check() !int {
 	suite := persistence_suite(image)
 	status := hwhost.run_suite(suite, [...args, '--kernel', kernel], @FILE)
 	if status == 0 && options.state_dir != '' {
+		// Retain the exact formatted input whose digest the receipt records.
+		os.cp(image, options.state_dir + '/initial.ext2')!
 		selected := hwhost.select_scenarios(suite.scenarios, options.arch, options.scenarios)!.run
 		mut artifacts := [persistence_artifact('kernel', kernel)!,
 			persistence_artifact('initial-ext2', image)!,

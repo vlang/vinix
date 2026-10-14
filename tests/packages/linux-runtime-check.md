@@ -98,6 +98,13 @@ commands. Its executable is included in the qualification receipt. Host tests
 add deterministic replacements and a coupled signing/exclusion capture; see
 [signing seed qualification](signing-seed-check.md).
 
+`PACKAGE DURABILITY` requires the staged durability probe to reject file and
+directory aliases, special/wrong-type files and NUL paths, then flush ordinary
+inputs successfully. The current receipt also pins that probe. Host tests add
+deterministic name/size changes, interrupted/error flushes and descriptor checks;
+the ext2 controller separately exercises all three completed crash checkpoints.
+See [durability qualification](durability-check.md).
+
 The scenario passed on both targets on 2026-10-12 using an isolated build of
 committed kernel revision `7ac619bd`. Retained receipts and complete serial logs:
 [AArch64 receipt](results/2026-10-12/linux-aarch64.json),

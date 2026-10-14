@@ -1,0 +1,9 @@
+file-alias: wait status 256; refused with outside inputs preserved
+file-directory: wait status 256; refused with outside inputs preserved
+file-fifo: wait status 256; refused with outside inputs preserved
+directory-alias: wait status 256; refused with outside inputs preserved
+directory-alias-slash: wait status 256; refused with outside inputs preserved
+file-nul: wait status 256; refused with outside inputs preserved
+directory-nul: wait status 256; refused with outside inputs preserved
+directory-file: wait status 256; refused with outside inputs preserved
+Package durability: ordinary file/directory retry PASS

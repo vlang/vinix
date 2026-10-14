@@ -573,6 +573,9 @@ fn qualify_package_linux(mut t Test) ! {
 		'/tmp/signing-seed-contract'], '', none, none)
 	assert seed_check.status == 0, seed_check.output
 	t.say('PACKAGE SIGNING SEED private-owner bounded-capture hardlink-refusal reproducible-retry PASS')
+	durability_check := run(['/usr/share/package-fixtures/durability-check', '/tmp/package-durability-contract'], '', none, none)
+	assert durability_check.status == 0, durability_check.output
+	t.say('PACKAGE DURABILITY captured-files captured-directories alias-special-nul-refusal ordinary-retry PASS')
 	// Organization restrictions are reviewed and atomically persisted without
 	// editing trust, the account selection or the installed generation.
 	policy_path := '/tmp/organization-policy.json'

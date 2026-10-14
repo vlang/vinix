@@ -1,0 +1,39 @@
+
+Checkpoint staged
+[   0.075] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[   0.075] -> {"execute":"qmp_capabilities"}
+[   0.075] <- {"return": {}}
+[   1.004] <- {"timestamp": {"seconds": 1791975072, "microseconds": 139310}, "event": "RTC_CHANGE", "data": {"offset": -1, "qom-path": "/machine/unattached/device[3]/rtc"}}
+[   2.027] <- {"timestamp": {"seconds": 1791975072, "microseconds": 500811}, "event": "RTC_CHANGE", "data": {"offset": 0, "qom-path": "/machine/unattached/device[3]/rtc"}}
+[  12.474] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[  12.474] -> {"execute":"qmp_capabilities"}
+[  12.475] <- {"return": {}}
+[  13.358] <- {"timestamp": {"seconds": 1791975084, "microseconds": 494709}, "event": "RTC_CHANGE", "data": {"offset": -1, "qom-path": "/machine/unattached/device[3]/rtc"}}
+[  14.382] <- {"timestamp": {"seconds": 1791975084, "microseconds": 871064}, "event": "RTC_CHANGE", "data": {"offset": 0, "qom-path": "/machine/unattached/device[3]/rtc"}}
+[  23.966] <- {"timestamp": {"seconds": 1791975095, "microseconds": 110592}, "event": "SHUTDOWN", "data": {"guest": true, "reason": "guest-shutdown"}}
+
+Checkpoint published
+[   0.027] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[   0.027] -> {"execute":"qmp_capabilities"}
+[   0.039] <- {"return": {}}
+[   1.231] <- {"timestamp": {"seconds": 1791975097, "microseconds": 351216}, "event": "RTC_CHANGE", "data": {"offset": 0, "qom-path": "/machine/unattached/device[3]/rtc"}}
+[   2.220] <- {"timestamp": {"seconds": 1791975097, "microseconds": 827123}, "event": "RTC_CHANGE", "data": {"offset": 0, "qom-path": "/machine/unattached/device[3]/rtc"}}
+[  20.400] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[  20.401] -> {"execute":"qmp_capabilities"}
+[  20.401] <- {"return": {}}
+[  21.597] <- {"timestamp": {"seconds": 1791975117, "microseconds": 766072}, "event": "RTC_CHANGE", "data": {"offset": 0, "qom-path": "/machine/unattached/device[3]/rtc"}}
+[  22.627] <- {"timestamp": {"seconds": 1791975118, "microseconds": 247800}, "event": "RTC_CHANGE", "data": {"offset": -1, "qom-path": "/machine/unattached/device[3]/rtc"}}
+[  33.677] <- {"timestamp": {"seconds": 1791975129, "microseconds": 799066}, "event": "SHUTDOWN", "data": {"guest": true, "reason": "guest-shutdown"}}
+
+Checkpoint activated
+[   0.051] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[   0.051] -> {"execute":"qmp_capabilities"}
+[   0.052] <- {"return": {}}
+[   1.156] <- {"timestamp": {"seconds": 1791975131, "microseconds": 818446}, "event": "RTC_CHANGE", "data": {"offset": 0, "qom-path": "/machine/unattached/device[3]/rtc"}}
+[   2.205] <- {"timestamp": {"seconds": 1791975132, "microseconds": 351759}, "event": "RTC_CHANGE", "data": {"offset": -1, "qom-path": "/machine/unattached/device[3]/rtc"}}
+[  23.338] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[  23.338] -> {"execute":"qmp_capabilities"}
+[  23.353] <- {"return": {}}
+[  25.204] <- {"timestamp": {"seconds": 1791975155, "microseconds": 844719}, "event": "RTC_CHANGE", "data": {"offset": 0, "qom-path": "/machine/unattached/device[3]/rtc"}}
+[  26.235] <- {"timestamp": {"seconds": 1791975156, "microseconds": 735741}, "event": "RTC_CHANGE", "data": {"offset": 0, "qom-path": "/machine/unattached/device[3]/rtc"}}
+[  40.674] <- {"timestamp": {"seconds": 1791975171, "microseconds": 311532}, "event": "SHUTDOWN", "data": {"guest": true, "reason": "guest-shutdown"}}

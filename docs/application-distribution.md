@@ -43,6 +43,13 @@ seed-payload exclusion use the same bytes. Unsafe inputs refuse without changing
 their contents or publishing an index; restoring a valid seed permits retry.
 See [signing seed qualification](../tests/packages/signing-seed-check.md).
 
+File and directory flushes also use captured nonblocking, no-follow descriptors.
+They require the correct type, check the named device/inode before and after
+`fsync`, and require unchanged file sizes. Interrupted flushes retry; changed
+targets and storage failures return diagnostics before a caller reports success.
+See [durability qualification](../tests/packages/durability-check.md), including
+ext2 interruption/recovery at the staged, published and activated checkpoints.
+
 This application store is separate from the Alpine `pkg`/`apk` system layer.
 Existing Alpine ports and special downloads still use that frontend and its
 persistence rules. They do **not** acquire these rollback guarantees. Release

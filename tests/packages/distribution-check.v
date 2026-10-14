@@ -90,6 +90,9 @@ fn check() ! {
 		run(work + '/atomic-write-check', [work + '/atomic-writes'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-o', work + '/signing-seed-check', repository + '/tests/packages/signing-seed-check.v'])!
 		run(work + '/signing-seed-check', [work + '/vinix-package', work + '/signing-seeds'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/durability-check', repository + '/tests/packages/durability-check.v'])!
+		run(work + '/durability-check', [work + '/durability'])!
 		run(v, [...helper_flags, '-o', work + '/terminal-check', repository + '/tests/packages/terminal-check.v'])!
 		run(work + '/terminal-check', [])!
 	}

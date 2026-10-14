@@ -1,0 +1,9 @@
+file-alias: wait status 0; previous behavior reproduced
+file-directory: wait status 0; previous behavior reproduced
+file-fifo: wait status 14; previous behavior reproduced
+directory-alias: wait status 0; previous behavior reproduced
+directory-alias-slash: wait status 0; previous behavior reproduced
+file-nul: wait status 0; previous behavior reproduced
+directory-nul: wait status 0; previous behavior reproduced
+directory-file: wait status 256; previous behavior reproduced
+Package durability: ordinary file/directory retry PASS

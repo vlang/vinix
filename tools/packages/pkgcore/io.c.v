@@ -57,19 +57,6 @@ pub fn replace_path(source string, destination string) ! {
 	}
 }
 
-pub fn sync_directory(path string) ! {
-	fd := C.open(path.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC)
-	if fd < 0 { return error('cannot open directory for durability: ${path}') }
-	defer { C.close(fd) }
-	if C.fsync(fd) != 0 { return error('cannot flush directory: ${path}') }
-}
-
-pub fn sync_file(path string) ! {
-	mut file := os.open(path)!
-	defer { file.close() }
-	if C.fsync(file.fd) != 0 { return error('cannot flush file: ${path}') }
-}
-
 fn ordinary_file(path string) bool {
 	// This compiler's os.is_file only excludes directories, so it accepts
 	// FIFOs/devices. Inspect the file type before any potentially blocking read.

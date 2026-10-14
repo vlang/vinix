@@ -50,6 +50,12 @@ both serial logs of every case. `--failures-only` removes passing boot/disk imag
 while preserving those logs and the receipt. Keep images by omitting that option.
 The disk contains only throwaway fixture signing credentials.
 
+The controller now also keeps `initial.ext2` in the state directory, even with
+`--failures-only`, so the receipt's formatted-input digest can be checked against
+the exact initial filesystem. This blank formatted image contains no signing
+credentials. See [captured durability qualification](durability-check.md) for
+renewed runs of all three checkpoints on both targets.
+
 All three cases passed on 2026-10-12 on each architecture. Hash receipts:
 [AArch64](results/2026-10-12/persistence-aarch64.json) and
 [x86_64](results/2026-10-12/persistence-x86_64.json).
