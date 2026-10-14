@@ -4789,3 +4789,78 @@ settings.power.profile_refused
 settings.power.write_failed
 Ядро отклонило изменение.
 -----
+app_selection.blender.detail
+3D-моделирование, анимация и рендеринг
+-----
+app_selection.category.browsers
+Браузеры
+-----
+app_selection.category.communication
+Общение
+-----
+app_selection.category.development
+Разработка
+-----
+app_selection.category.games
+Игры
+-----
+app_selection.category.media
+Медиа и творчество
+-----
+app_selection.category.productivity
+Работа
+-----
+app_selection.category.runtimes
+Среды выполнения
+-----
+app_selection.discord.detail
+Чаты сообществ и голосовые звонки
+-----
+app_selection.install_many
+Установить выбранные приложения
+-----
+app_selection.ios.detail
+Нативный ARM64; совместимые iOS-приложения
+-----
+app_selection.keepassxc.detail
+Менеджер паролей с локальной базой
+-----
+app_selection.neovim.detail
+Текстовый редактор в Терминале
+-----
+app_selection.obs.detail
+Запись и прямые трансляции
+-----
+app_selection.requires.external
+В образе нет совместимого пакета Alpine
+-----
+app_selection.requires.ios
+Требуется нативная среда iOS ARM64 в образе
+-----
+app_selection.requires.steam
+Требуется отдельная среда Steam
+-----
+app_selection.requires.testing
+Требуется Alpine edge с testing
+-----
+app_selection.slack.detail
+Общение и совместная работа
+-----
+app_selection.spotify.detail
+Музыка и подкасты
+-----
+app_selection.steam.detail
+Библиотека игр и магазин
+-----
+app_selection.telegram.detail
+Сообщения и групповые чаты
+-----
+app_selection.vlc.detail
+Видео- и аудиоплеер
+-----
+app_selection.vscodium.detail
+Редактор кода без телеметрии Microsoft
+-----
+app_selection.zed.detail
+Совместный редактор кода
+-----

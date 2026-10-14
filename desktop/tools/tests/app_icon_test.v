@@ -59,6 +59,17 @@ fn test_app_icons_keep_original_artwork_without_an_installed_directory() {
 	}
 	assert !os.exists(missing)
 	expected := {
+		'vlc': u32(0x84b67ad4),
+		'vscodium': u32(0x21b3e302),
+		'zed': u32(0x27484920),
+		'neovim': u32(0xfc398914),
+		'keepassxc': u32(0x19a89b23),
+		'discord': u32(0xaae70f27),
+		'telegram': u32(0xba12f64f),
+		'slack': u32(0xace85f4a),
+		'spotify': u32(0x29cd33b9),
+		'obs': u32(0x4136086b),
+		'ios': u32(0xb8f5e17),
 		'activity':   u32(0xc09cf065)
 		'blender':    u32(0x84f0ad7f)
 		'calculator': u32(0x2957b9bb)

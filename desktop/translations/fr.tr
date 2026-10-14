@@ -4788,3 +4788,78 @@ Cette machine ne règle pas la fréquence du processeur ; profil non modifiable.
 settings.power.write_failed
 Le noyau a refusé la modification.
 -----
+app_selection.blender.detail
+Modélisation 3D, animation et rendu
+-----
+app_selection.category.browsers
+Navigateurs
+-----
+app_selection.category.communication
+Communication
+-----
+app_selection.category.development
+Développement
+-----
+app_selection.category.games
+Jeux
+-----
+app_selection.category.media
+Médias et création
+-----
+app_selection.category.productivity
+Bureautique
+-----
+app_selection.category.runtimes
+Environnements
+-----
+app_selection.discord.detail
+Discussion et appels vocaux
+-----
+app_selection.install_many
+Installer les apps choisies
+-----
+app_selection.ios.detail
+ARM64 natif ; apps iOS compatibles, sans émulation
+-----
+app_selection.keepassxc.detail
+Gestionnaire de mots de passe local
+-----
+app_selection.neovim.detail
+Éditeur de texte en Terminal
+-----
+app_selection.obs.detail
+Enregistrement et diffusion en direct
+-----
+app_selection.requires.external
+Aucun paquet Alpine compatible dans cette image
+-----
+app_selection.requires.ios
+Nécessite un environnement iOS ARM64 dans cette image
+-----
+app_selection.requires.steam
+Nécessite un environnement Steam distinct
+-----
+app_selection.requires.testing
+Nécessite Alpine edge avec testing
+-----
+app_selection.slack.detail
+Messagerie et collaboration en équipe
+-----
+app_selection.spotify.detail
+Musique et podcasts
+-----
+app_selection.steam.detail
+Bibliothèque et boutique de jeux
+-----
+app_selection.telegram.detail
+Messagerie et discussions de groupe
+-----
+app_selection.vlc.detail
+Lecteur vidéo et audio
+-----
+app_selection.vscodium.detail
+Éditeur de code sans télémétrie Microsoft
+-----
+app_selection.zed.detail
+Éditeur de code collaboratif
+-----

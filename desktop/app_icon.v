@@ -311,7 +311,9 @@ fn embedded_app_icon(name string) AppIcon {
 const bundled_icon_paths = ['asset:firefox', 'asset:chromium', 'asset:blender', 'asset:minecraft',
 	'asset:doom', 'asset:steam', 'asset:terminal', 'asset:settings', 'asset:activity',
 	'asset:calculator', 'asset:disk_usage', 'asset:editor', 'asset:files', 'asset:clock',
-	'asset:calendar', 'asset:capture']
+	'asset:calendar', 'asset:capture', 'asset:vlc', 'asset:vscodium', 'asset:zed', 'asset:neovim',
+	'asset:keepassxc', 'asset:discord', 'asset:telegram', 'asset:slack', 'asset:spotify', 'asset:obs',
+	'asset:ios']
 
 // How many scaled icons are kept. The desktop draws each icon at a handful of
 // sizes; the limit only matters if something keeps asking for new ones.

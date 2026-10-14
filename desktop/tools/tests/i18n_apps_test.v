@@ -192,14 +192,18 @@ fn test_app_selection_in_spanish() {
 	set_desktop_language(.es)
 	begin_frame_elements()
 	root := state.element(&desktop)
-	defer { free_tree(root) }
 	assert i18n_apps_has_text(root, 'Elige tus aplicaciones')
 	assert i18n_apps_has_text(root, 'Navegador web de Mozilla')
-	assert i18n_apps_has_text(root, 'Instalada')
 	// Product names are not translated.
 	assert i18n_apps_has_text(root, 'Firefox')
 	button := i18n_apps_element(root, action_apps_install) or { panic('missing install button') }
 	assert button.text == 'Instalar 2 aplicaciones'
+	free_tree(root)
+	state.select_category(first_run_apps[3].category)
+	begin_frame_elements()
+	installed := state.element(&desktop)
+	assert i18n_apps_has_text(installed, 'Instalada')
+	free_tree(installed)
 
 	set_desktop_language(.ru)
 	for label in app_selection_install_labels {

@@ -6,6 +6,7 @@ module main
 
 import os
 import ui2
+import encoding.binary
 
 fn app_selection_test_element(root ui2.Element, name string) ?ui2.Element {
 	if root.id == name || root.action_id == name {
@@ -61,6 +62,7 @@ fn app_selection_test_state() AppSelectionState {
 	mut state := new_app_selection_state()
 	for i in 0 .. state.installed.len {
 		state.installed[i] = false
+		state.available[i] = first_run_apps[i].requirement !in [.external, .steam]
 	}
 	state.focus = 0
 	return state
@@ -78,35 +80,49 @@ fn app_selection_test_button_label(state AppSelectionState) string {
 }
 
 fn test_app_selection_offers_the_optional_apps_this_machine_can_install() {
-	assert first_run_app_catalogue.map(it.title) == ['Firefox', 'Chromium', 'VOffice', 'Minecraft']
+	assert first_run_app_catalogue.map(it.title) == ['Firefox', 'Chromium', 'VOffice', 'Minecraft',
+		'Blender', 'VLC', 'VSCodium', 'Zed', 'Neovim', 'KeePassXC', 'Discord', 'Telegram', 'Slack',
+		'Spotify', 'OBS Studio', 'Steam', 'iOS runtime']
 	assert first_run_app_catalogue.map(it.package_name) == ['firefox', 'chromium', 'voffice',
-		'minecraft']
+		'minecraft', 'blender', 'vlc-qt', 'vscodium', 'zed', 'neovim', 'keepassxc', 'discord',
+		'telegram-desktop', 'slack', 'spotify', 'obs-studio', 'steam', 'ios-runtime']
 	$if arm64 {
-		assert first_run_apps.map(it.title) == ['Firefox', 'Chromium', 'VOffice', 'Minecraft']
+		assert first_run_apps.len == first_run_app_catalogue.len
 	} $else {
 		// VOffice and Minecraft are only packaged for AArch64.
-		assert first_run_apps.map(it.title) == ['Firefox', 'Chromium']
+		assert first_run_apps.len == first_run_app_catalogue.len - 2
+		assert !first_run_apps.any(it.package_name in ['voffice', 'minecraft'])
 	}
-	assert app_selection_install_labels.len >= first_run_apps.len + 1
 
 	desktop := app_selection_test_desktop()
-	state := app_selection_test_state()
+	mut state := app_selection_test_state()
 	begin_frame_elements()
 	root := state.element(&desktop)
 	defer { free_tree(root) }
 
 	assert root.kind == .screen
 	assert app_selection_test_element(root, 'apps.window') != none
-	for app in first_run_apps {
-		row := app_selection_test_element(root, app.action) or { panic('missing ${app.title}') }
-		assert row.clickable && row.enabled
-		assert !app_selection_test_has_image(row, 'builtin:check')
-	}
 	assert app_selection_test_element(root, action_apps_install) != none
 	assert app_selection_test_element(root, 'taskbar') == none
 	assert !app_selection_test_has_action_prefix(root, 'task.')
 	assert !app_selection_test_has_action_prefix(root, 'shortcut.')
 	assert !app_selection_test_has_action_prefix(root, 'win.')
+	for category in first_run_categories {
+		state.select_category(category)
+		begin_frame_elements()
+		tree := state.element(&desktop)
+		for app in first_run_apps {
+			if app.category != category {
+				assert app_selection_test_element(tree, app.action) == none
+				continue
+			}
+			row := app_selection_test_element(tree, app.action) or { panic('missing ${app.title}') }
+			assert row.clickable == (app.requirement !in [.external, .steam])
+			assert app_selection_test_has_image(row, app.icon)
+			assert !app_selection_test_has_image(row, 'builtin:check')
+		}
+		free_tree(tree)
+	}
 }
 
 fn test_app_selection_clicks_toggle_apps_and_confirm() {
@@ -179,47 +195,29 @@ fn test_app_selection_skips_apps_the_image_already_has() {
 
 fn test_app_selection_is_keyboard_driven() {
 	mut state := app_selection_test_state()
-	$if arm64 {
-		state.installed[1] = true
-
-		state.key_input(' ')
-		assert state.selected[0]
-		// Tab and Down skip the installed Chromium row; Up wraps back around.
-		state.key_input('\t')
-		assert state.focus == 2
-		state.key_input('\x1b[B')
-		assert state.focus == 3
-		state.key_input('\x1b[B')
-		assert state.focus == 0
-		state.key_input('\x1b[A')
-		assert state.focus == 3
-		state.key_input('3')
-		assert state.selected[2] && state.focus == 2
-		state.key_input('2')
-		assert !state.selected[1]
-		// Control chords and stray escapes never reach desktop shortcuts or the
-		// selection.
-		state.key_input('\x10\x11\x1b')
-		assert state.packages() == ['firefox', 'voffice']
-	} $else {
-		state.key_input(' ')
-		assert state.selected[0]
-		// Tab moves to Chromium; Down wraps back to Firefox and Up to Chromium.
-		state.key_input('\t')
-		assert state.focus == 1
-		state.key_input('\x1b[B')
-		assert state.focus == 0
-		state.key_input('\x1b[A')
-		assert state.focus == 1
-		state.key_input('2')
-		assert state.selected[1] && state.focus == 1
-		// A number past the offered apps is ignored.
-		state.key_input('3')
-		// Control chords and stray escapes never reach desktop shortcuts or the
-		// selection.
-		state.key_input('\x10\x11\x1b')
-		assert state.packages() == ['firefox', 'chromium']
-	}
+	state.installed[1] = true
+	state.key_input(' ')
+	assert state.selected[0]
+	expected := state.next_available(0, 1)
+	state.key_input('\t')
+	assert state.focus == expected
+	assert state.category == first_run_apps[expected].category
+	state.key_input('\x1b[A')
+	assert state.focus == 0
+	last := state.next_available(0, -1)
+	state.key_input('\x1b[A')
+	assert state.focus == last
+	state.key_input('\x1b[B')
+	assert state.focus == 0
+	state.key_input('2')
+	assert state.packages() == ['firefox']
+	// Larger catalogues must not interpret punctuation or letters as numbers.
+	state.key_input(':;@ABCDEFG\x10\x11\x1b')
+	assert state.packages() == ['firefox']
+	state.key_input('\x1b[C')
+	assert state.category == .productivity
+	state.key_input('\x1b[D')
+	assert state.category == .browsers
 	assert !state.complete
 
 	state.key_input('\r')
@@ -242,12 +240,139 @@ fn test_first_run_install_command_accepts_only_offered_packages() {
 	assert first_run_install_command('') == ''
 	assert first_run_install_command('gimp ; rm -rf /') == ''
 	command := first_run_install_command('chromium firefox\nchromium firefox;reboot\n')
-	assert command.contains('for app in chromium firefox; do pkg install "\$app"')
+	assert command.contains('for app in chromium firefox; do ')
+	assert command.contains('*) pkg install "\$app"')
 	assert !command.contains('reboot')
 	assert command.ends_with('exec /bin/zsh -i')
 	$if !arm64 {
 		// Not offered here, so not installed either.
 		assert first_run_install_command('voffice minecraft') == ''
+	}
+}
+
+fn test_app_selection_retains_choices_across_categories_and_counts_many_apps() {
+	mut state := app_selection_test_state()
+	for action in ['apps.toggle.firefox', 'apps.toggle.chromium', 'apps.toggle.blender',
+		'apps.toggle.vlc', 'apps.toggle.neovim', 'apps.toggle.keepassxc'] {
+		state.handle_action(action)
+	}
+	assert state.selected_count() == 6
+	assert app_selection_test_button_label(state) == 'Install selected apps'
+	state.handle_action('apps.category.communication')
+	assert state.category == .communication
+	state.handle_action('apps.toggle.discord')
+	state.handle_action('apps.toggle.slack')
+	state.handle_action('apps.toggle.spotify')
+	state.handle_action('apps.toggle.steam')
+	assert state.selected_count() == 6
+	state.handle_action('apps.category.media')
+	assert state.selected_count() == 6
+	assert state.packages() == ['firefox', 'chromium', 'blender', 'vlc-qt', 'neovim', 'keepassxc']
+}
+
+fn test_app_selection_categories_fit_a_standard_and_small_screen() {
+	mut state := app_selection_test_state()
+	for size in [[1024, 720]!, [640, 480]!] {
+		desktop := Desktop{ canvas: Canvas{ width: size[0], height: size[1], scale: 1 } }
+		for category in first_run_categories {
+			state.select_category(category)
+			begin_frame_elements()
+			tree := state.element(&desktop)
+			card := app_selection_test_element(tree, 'apps.window') or { panic('missing card') }
+			note := app_selection_test_element(tree, 'apps.note') or { panic('missing note') }
+			for app in first_run_apps {
+				if app.category != category { continue }
+				row := app_selection_test_element(tree, app.action) or { panic('missing row') }
+				assert row.frame.x >= 0 && row.frame.x + row.frame.width <= card.frame.width
+				assert row.frame.y + row.frame.height < note.frame.y
+			}
+			for action in first_run_category_actions {
+				button := app_selection_test_element(tree, action) or { panic('missing category') }
+				assert button.frame.y + button.frame.height < note.frame.y
+			}
+			free_tree(tree)
+		}
+	}
+}
+
+fn test_first_run_install_command_uses_alpine_names_and_never_installs_external_clients() {
+	command := first_run_install_command('vlc-qt telegram-desktop neovim keepassxc obs-studio ios-runtime discord slack spotify steam')
+	assert command.contains('for app in vlc-qt telegram-desktop neovim keepassxc obs-studio ios-runtime;')
+	assert command.contains('qt5-qtbase-x11')
+	assert command.contains('qt6-qtbase-x11')
+	assert command.contains('/usr/bin/vinix-desktop --install-ios-runtime')
+	assert first_run_install_command('discord slack spotify steam') == ''
+}
+
+fn test_first_run_testing_packages_require_an_existing_complete_edge_configuration() {
+	assert first_run_testing_repositories('https://mirror/alpine/edge/main\nhttps://mirror/alpine/edge/community\nhttps://mirror/alpine/edge/testing\n')
+	assert !first_run_testing_repositories('https://mirror/alpine/v3.21/main\nhttps://mirror/alpine/v3.21/community\n')
+	assert !first_run_testing_repositories('https://mirror/alpine/edge/main\nhttps://mirror/alpine/edge/community\n# https://mirror/alpine/edge/testing\n')
+	assert !first_run_testing_repositories('https://mirror/alpine/edge/main\nhttps://mirror/alpine/edge/community\n@testing https://mirror/alpine/edge/testing\n')
+}
+
+fn app_selection_test_ios_payload() []u8 {
+	// ELF64 header, one executable PT_LOAD and an ARM64 RET instruction.
+	mut data := []u8{len: 124}
+	data[0] = 0x7f
+	data[1] = `E`
+	data[2] = `L`
+	data[3] = `F`
+	data[4] = 2
+	data[5] = 1
+	data[6] = 1
+	binary.little_endian_put_u16_at(mut data, 2, 16)
+	binary.little_endian_put_u16_at(mut data, 183, 18)
+	binary.little_endian_put_u32_at(mut data, 1, 20)
+	binary.little_endian_put_u64_at(mut data, 0x1078, 24)
+	binary.little_endian_put_u64_at(mut data, 64, 32)
+	binary.little_endian_put_u16_at(mut data, 64, 52)
+	binary.little_endian_put_u16_at(mut data, 56, 54)
+	binary.little_endian_put_u16_at(mut data, 1, 56)
+	binary.little_endian_put_u32_at(mut data, 1, 64)
+	binary.little_endian_put_u32_at(mut data, 5, 68)
+	binary.little_endian_put_u64_at(mut data, 0x1000, 80)
+	binary.little_endian_put_u64_at(mut data, 124, 96)
+	binary.little_endian_put_u64_at(mut data, 124, 104)
+	binary.little_endian_put_u32_at(mut data, 0xd65f03c0, 120)
+	return data
+}
+
+fn test_first_run_ios_runtime_requires_a_static_arm64_elf() {
+	valid := app_selection_test_ios_payload()
+	assert first_run_ios_elf(valid)
+	assert !first_run_ios_elf([]u8{})
+	mut wrong_arch := valid.clone()
+	wrong_arch[18] = 62
+	assert !first_run_ios_elf(wrong_arch)
+	mut dynamic := valid.clone()
+	dynamic[64] = 3
+	assert !first_run_ios_elf(dynamic)
+	mut overflow := valid.clone()
+	binary.little_endian_put_u64_at(mut overflow, ~u64(0), 32)
+	assert !first_run_ios_elf(overflow)
+	mut outside := valid.clone()
+	binary.little_endian_put_u64_at(mut outside, 0x2000, 24)
+	assert !first_run_ios_elf(outside)
+}
+
+fn test_first_run_ios_runtime_installs_only_a_valid_payload() {
+	root := os.join_path(os.temp_dir(), 'vinix-setup-runtime-${os.getpid()}')
+	os.mkdir_all(os.dir(root + first_run_ios_payload))!
+	defer { os.rmdir_all(root) or {} }
+	os.write_file(root + first_run_ios_payload, 'invalid runtime')!
+	if _ := first_run_install_ios_runtime(root) {
+		assert false, 'invalid runner was accepted'
+	}
+	assert !os.exists('${root}/usr/bin/run-ios')
+	$if arm64 {
+		valid := app_selection_test_ios_payload()
+		os.write_file_array(root + first_run_ios_payload, valid)!
+		first_run_install_ios_runtime(root)!
+		assert os.read_bytes('${root}/usr/bin/run-ios')! == valid
+		assert os.stat('${root}/usr/bin/run-ios')!.mode & 0o777 == 0o755
+		assert os.read_file('${root}/var/lib/vinix-pkg/ios-runtime.files')! == 'usr/bin/run-ios\n'
+		assert !os.exists('${root}/usr/bin/.run-ios-setup')
 	}
 }
 

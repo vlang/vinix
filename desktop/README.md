@@ -328,6 +328,42 @@ both. It is a standalone display client using the same pipe protocol as
 VOffice. See [iOS compatibility](../docs/ios.md) for the supported subset and
 QEMU tests.
 
+First boot offers optional software in Browsers, Productivity, Development,
+Communication, Media & creation, Games, and Runtimes. Choices remain selected
+when changing categories. Up/Down or Tab moves between installable apps, Space
+toggles a choice, Left/Right changes category, and Enter confirms. Existing
+number shortcuts 1–9 keep their catalog identities. Downloads run separately in
+Terminal, so a failed package does not cancel the remaining choices.
+
+The Alpine choices include Blender, VLC's `vlc-qt` desktop frontend, Neovim,
+KeePassXC, Telegram's `telegram-desktop`, and `obs-studio`. VSCodium and Zed are
+offered for installation when the image already uses untagged Alpine edge
+main/community/testing repositories. Setup does not add repositories. Discord,
+Slack and Spotify have no compatible package in the stable image; their rows
+show that requirement. Steam needs its separately built compatibility layer;
+an existing installation is recognized. These rows cannot queue nonexistent
+Alpine packages. Neovim runs in Terminal; installation alone does not register
+new third-party GUI apps with the native desktop.
+
+The **iOS runtime** option installs Vinix's own static ARM64 compatibility
+runner from an optional image payload. To supply that choice, include the
+already built runner before packing the image root:
+
+```sh
+v run build-support/ios/stage-setup-runtime.v build/ios/staging/usr/bin/run-ios /path/to/image/root
+```
+
+Images that already include `/usr/bin/run-ios` show it as installed. Images
+without the optional payload explain the requirement. The runtime executes
+compatible, unencrypted ARM64 iOS Mach-O apps directly, without CPU emulation;
+its supported API subset and limitations are documented in [iOS compatibility](../docs/ios.md).
+It is not a general App Store runtime. The optional payload is a Vinix binary,
+and does not contain Apple's frameworks or applications.
+
+Run the isolated V checks with `v run desktop/tools/test-app-selection.v`.
+The runner freezes unrelated desktop files at HEAD and overlays only setup,
+icons and translations, so concurrent application edits stay out of the checks.
+
 `./scripts/build-ios-aarch64.sh --with-ppsspp` also stages the official PPSSPP
 1.20.4 iOS app and its private Mesa/FreeType runtime. After rebuilding the
 desktop, launch **iOS PPSSPP** from Start. Its native main menu and Graphics

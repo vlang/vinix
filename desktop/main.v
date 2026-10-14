@@ -120,6 +120,10 @@ fn main() {
 	gpu_present_startup_stage(c'entered main')
 	gpu_present_startup_stage(c'collecting process arguments')
 	all_args := arguments()
+	if '--install-ios-runtime' in all_args {
+		first_run_install_ios_runtime('') or { eprintln(err); exit(1) }
+		return
+	}
 	for i,arg in all_args { if arg=='--session-dialog' && i+2<all_args.len { kind:=all_args[i+1].int(); session_dialog_cli(kind,all_args[i+2],if i+3<all_args.len { all_args[i+3] } else { '' }); return } }
 	if '--time-service' in all_args {
 		mut server := 'pool.ntp.org'

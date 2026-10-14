@@ -4788,3 +4788,78 @@ settings.power.profile_refused
 settings.power.write_failed
 内核拒绝了此更改。
 -----
+app_selection.blender.detail
+3D 建模、动画和渲染
+-----
+app_selection.category.browsers
+浏览器
+-----
+app_selection.category.communication
+通信
+-----
+app_selection.category.development
+开发
+-----
+app_selection.category.games
+游戏
+-----
+app_selection.category.media
+媒体与创作
+-----
+app_selection.category.productivity
+办公
+-----
+app_selection.category.runtimes
+运行环境
+-----
+app_selection.discord.detail
+社区聊天和语音通话
+-----
+app_selection.install_many
+安装所选应用
+-----
+app_selection.ios.detail
+原生 ARM64；兼容的 iOS 应用，无需模拟
+-----
+app_selection.keepassxc.detail
+本地密码管理器
+-----
+app_selection.neovim.detail
+终端文本编辑器
+-----
+app_selection.obs.detail
+录制和直播
+-----
+app_selection.requires.external
+此镜像没有兼容的 Alpine 软件包
+-----
+app_selection.requires.ios
+需要镜像中的原生 ARM64 iOS 运行环境
+-----
+app_selection.requires.steam
+需要独立的 Steam 兼容运行环境
+-----
+app_selection.requires.testing
+需要启用 testing 的 Alpine edge
+-----
+app_selection.slack.detail
+团队消息与协作
+-----
+app_selection.spotify.detail
+音乐和播客
+-----
+app_selection.steam.detail
+游戏库与商店
+-----
+app_selection.telegram.detail
+消息和群聊
+-----
+app_selection.vlc.detail
+视频和音频播放器
+-----
+app_selection.vscodium.detail
+无 Microsoft 遥测的代码编辑器
+-----
+app_selection.zed.detail
+协作代码编辑器
+-----

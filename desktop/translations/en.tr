@@ -4789,3 +4789,78 @@ This machine has no CPU frequency control, so the profile cannot be changed.
 settings.power.write_failed
 The kernel refused the change.
 -----
+app_selection.blender.detail
+3D modeling, animation and rendering
+-----
+app_selection.category.browsers
+Browsers
+-----
+app_selection.category.communication
+Communication
+-----
+app_selection.category.development
+Development
+-----
+app_selection.category.games
+Games
+-----
+app_selection.category.media
+Media & creation
+-----
+app_selection.category.productivity
+Productivity
+-----
+app_selection.category.runtimes
+Runtimes
+-----
+app_selection.discord.detail
+Community chat and voice calls
+-----
+app_selection.install_many
+Install selected apps
+-----
+app_selection.ios.detail
+Native ARM64; compatible iOS apps, no emulation
+-----
+app_selection.keepassxc.detail
+Password manager with a local vault
+-----
+app_selection.neovim.detail
+Terminal text editor
+-----
+app_selection.obs.detail
+Recording and live streaming
+-----
+app_selection.requires.external
+No compatible Alpine package in this image
+-----
+app_selection.requires.ios
+Requires a native ARM64 iOS runtime in the image
+-----
+app_selection.requires.steam
+Requires the separate Steam compatibility runtime
+-----
+app_selection.requires.testing
+Requires Alpine edge with testing enabled
+-----
+app_selection.slack.detail
+Team messaging and collaboration
+-----
+app_selection.spotify.detail
+Music and podcasts
+-----
+app_selection.steam.detail
+Game library and store
+-----
+app_selection.telegram.detail
+Messaging and group chats
+-----
+app_selection.vlc.detail
+Video and audio player
+-----
+app_selection.vscodium.detail
+Code editor without Microsoft telemetry
+-----
+app_selection.zed.detail
+Collaborative code editor
+-----
