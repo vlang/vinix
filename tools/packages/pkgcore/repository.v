@@ -64,27 +64,76 @@ pub fn verify_index(repository Repository, text string, signature string, now i6
 }
 
 pub fn snapshots_catalog(config Config, snapshots []Snapshot, now i64) !Catalog {
+	return catalog_from_snapshots(config, snapshots, TrustHistory{}, now)
+}
+
+// Returned manifests own their decoded fields; publisher identities continue
+// to borrow configuration. No returned field borrows snapshot/history scratch.
+fn catalog_from_snapshots(config Config, snapshots []Snapshot, history TrustHistory, now i64) !Catalog {
 	mut packages := []Installed{}
+	unsafe { packages.flags |= .noslices }
 	mut owners := map[string]string{}
+	mut accepted := false
+	defer {
+		unsafe { owners.free() }
+		if !accepted { close_authenticated_catalog(Catalog{ packages: packages }) }
+	}
 	for repository in config.repositories {
-		matches := snapshots.filter(it.repository == repository)
-		if matches.len != 1 {
+		mut position := -1
+		mut count := 0
+		for index, snapshot in snapshots {
+			if snapshot.repository == repository { position = index; count++ }
+		}
+		if count != 1 {
 			return error('${repository.id}: no authenticated cached index; run update')
 		}
-		index := verify_index(repository, matches[0].text, matches[0].signature, now)!
-		for p in index.packages {
-			if p.id in owners && owners[p.id] != repository.id {
-				return error('ambiguous package ${p.id} published by multiple repositories')
-			}
-			owners[p.id] = repository.id
-			packages << Installed{ package: p, repository: repository.id, public_key: repository.public_key, sequence: index.sequence }
+		append_authenticated_index(repository, snapshots[position], history, now, mut packages, mut owners)!
+	}
+	accepted = true
+	return Catalog{ packages: packages }
+}
+
+fn append_authenticated_index(repository Repository, snapshot Snapshot, history TrustHistory, now i64,
+	mut packages []Installed, mut owners map[string]string) ! {
+	index := verify_index(repository, snapshot.text, snapshot.signature, now)!
+	mut transferred := false
+	defer {
+		if transferred {
+			// Only the envelope retires: manifests now belong to the catalog.
+			unsafe { index.repository.free(); (&array(&index.packages)).free() }
+		} else { close_decoded_index(index) }
+	}
+	if history.repositories.len > 0 {
+		digest := index_digest(snapshot.text)
+		defer { unsafe { digest.free() } }
+		check_floor(history, repository, index, digest)!
+	}
+	// Admit the complete index before transferring any of its manifests. A
+	// later repository failure retires every earlier transfer in the caller.
+	for p in index.packages {
+		if p.id in owners && owners[p.id] != repository.id {
+			return error('ambiguous package ${p.id} published by multiple repositories')
 		}
 	}
-	return Catalog{ packages: packages }
+	for p in index.packages {
+		owners[p.id] = repository.id
+		record := Installed{ package: p, repository: repository.id, public_key: repository.public_key, sequence: index.sequence }
+		pointer := unsafe { &record }
+		unsafe { packages.push_many(pointer, 1) }
+	}
+	transferred = true
+}
+
+// Independently decoded catalog manifests only; plans and synthetic catalogs
+// can borrow package fields. Configured publisher strings are always borrowed.
+fn close_authenticated_catalog(catalog Catalog) {
+	for installed in catalog.packages { close_decoded_package(installed.package) }
+	unsafe { (&array(&catalog.packages)).free() }
 }
 
 pub fn read_snapshots(directory string) ![]Snapshot {
 	path := directory + '/catalog.json'
+	defer { unsafe { path.free() } }
 	if !os.exists(path) && !os.is_link(path) { return []Snapshot{} }
 	text := read_metadata(path)!
 	defer { unsafe { text.free() } }
@@ -94,13 +143,10 @@ pub fn read_snapshots(directory string) ![]Snapshot {
 pub fn load_catalog(config Config, directory string) !Catalog {
 	config.validate()!
 	snapshots := read_snapshots(directory)!
+	defer { close_decoded_snapshots(snapshots) }
 	history := read_history(directory)!
-	for snapshot in snapshots {
-		if !config.repositories.any(it == snapshot.repository) { continue }
-		index := verify_index(snapshot.repository, snapshot.text, snapshot.signature, time.now().unix())!
-		check_floor(history, snapshot.repository, index, index_digest(snapshot.text))!
-	}
-	return snapshots_catalog(config, snapshots, time.now().unix())
+	defer { close_decoded_history(history) }
+	return catalog_from_snapshots(config, snapshots, history, time.now().unix())
 }
 
 pub fn refresh(config Config, directory string) !Catalog {

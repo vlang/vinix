@@ -1,0 +1,2 @@
+PASS x86_64 packages-catalog-ownership (30.8s)
+package-catalog-ownership x86_64: 1 passed, 0 failed, 0 skipped

@@ -1533,6 +1533,16 @@ work survive. A successful apply writes the same bytes it preflighted. No-op
 reviews and rollback retain their existing behavior. See
 [generation metadata checks](../../tests/packages/state-preflight-check.md).
 
+Catalog reads authenticate each selected signed index once and check retained
+sequence/digest floors before exposing its manifests. Temporary decoded cache
+wrappers, histories and index envelopes retire after the read; returned package
+fields remain valid. Configured publisher identity strings retain their existing
+borrowed lifetime. A later repository's signature, schema, expiry, identity or
+replay failure returns no partial catalog. Revoked snapshots remain ignored by
+catalog admission, without weakening enrolled publisher checks. The
+[catalog ownership qualification](../../tests/packages/catalog-ownership-check.md)
+records the measured reduction and the remaining validation allocations.
+
 Configuration JSON preserves legacy omitted-field defaults, including partial
 policy objects. Present fields must have the declared JSON types; null values,
 unknown keys and duplicate keys (including escaped equivalent spellings) are

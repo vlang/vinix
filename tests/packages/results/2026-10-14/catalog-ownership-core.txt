@@ -1,0 +1,9 @@
+CATALOG OWNERSHIP returned manifests and configured publisher identities survive scratch retirement PASS
+CATALOG OWNERSHIP growing catalog survives source wrapper/index retirement with intact nested manifests PASS
+CATALOG OWNERSHIP later signature/syntax/schema/expiry/floor/equivocation/ambiguity/missing/identity refusal and revoked snapshots preserve metadata and configured identities PASS
+
+Tracked heap run:
+CATALOG OWNERSHIP returned manifests and configured publisher identities survive scratch retirement PASS
+CATALOG OWNERSHIP 64 loads/retirements stay within scratch budget: maximum 10104 bytes / 93 allocations PASS
+CATALOG OWNERSHIP growing catalog survives source wrapper/index retirement with intact nested manifests PASS
+CATALOG OWNERSHIP later signature/syntax/schema/expiry/floor/equivocation/ambiguity/missing/identity refusal and revoked snapshots preserve metadata and configured identities PASS

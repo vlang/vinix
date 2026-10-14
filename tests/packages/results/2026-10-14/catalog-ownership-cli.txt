@@ -1,0 +1,42 @@
+Package CLI: durable private key creation, existing-seed refusal and read-only public-key recovery passed
+Package CLI: malformed publisher history refuses release without changing prior publication
+Package CLI: scoped repository configuration survives damaged cache/history; strict listing/enrollment/update still refuse; reviewed revocation preserves active state and recovery data
+Package CLI: malformed locks refuse within two seconds, preserve state/cache/history and permit verified recovery
+Package CLI: special and oversized configuration, catalog, history and state refuse promptly, preserve recovery data and permit restored verification
+Package CLI: ambiguous configuration refused without activation, cache or trust changes
+Package CLI: malformed cached snapshots preserve trust/state/recovery and permit verified refresh after restoration
+Package CLI: malformed retained history refuses replay after revocation and empty refresh
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed
+
+Signed real CLI maintenance probe:
+Updating trusted repository trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+Installing Seed 1.0.0 (1/1) from trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+Downloading seed/asset (4 bytes)
+Activated package generation 1
+Updating trusted repository trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+STATE PREFLIGHT valid signed cache 8388328 bytes; resolved installed state 8389904 bytes
+STATE PREFLIGHT all four oversized review/apply refusals preserve state, cache and recovery work PASS
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"resolve","package":"","repository":"","path":"","current":0,"total":0}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"stage","package":"","repository":"","path":"","current":0,"total":2}
+Installing item-0 1.0.0 (1/2) from trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+Downloading item-0/asset (7 bytes)
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"download","package":"item-0","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":0,"total":7}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"download","package":"item-0","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":7,"total":7}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"verify","package":"item-0","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":0,"total":0}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"copy","package":"item-0","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":0,"total":7}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"copy","package":"item-0","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":7,"total":7}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"verify","package":"item-0","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":0,"total":0}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"stage","package":"item-0","repository":"","path":"","current":1,"total":2}
+Installing Seed 1.0.0 (2/2) from trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"copy","package":"seed","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":0,"total":4}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"copy","package":"seed","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":4,"total":4}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"verify","package":"seed","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":0,"total":0}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"stage","package":"seed","repository":"","path":"","current":2,"total":2}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"activate","package":"","repository":"","path":"","current":0,"total":0}
+Activated package generation 2
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"complete","package":"","repository":"","path":"","current":1,"total":1}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"verify","package":"","repository":"","path":"","current":0,"total":0}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"verify","package":"item-0","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":0,"total":0}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"verify","package":"seed","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":0,"total":0}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"complete","package":"","repository":"","path":"","current":1,"total":1}
+STATE PREFLIGHT signed service/CLI reviews and transactions reject oversized metadata before cleanup/download/staging; active state, trust and recovery data survive; bounded retry PASS

@@ -1,0 +1,2 @@
+PASS aarch64 packages-catalog-ownership (19.7s)
+package-catalog-ownership aarch64: 1 passed, 0 failed, 0 skipped

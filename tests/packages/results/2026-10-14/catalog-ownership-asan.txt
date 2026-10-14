@@ -1,0 +1,41 @@
+clang ASan/UBSan; detect_leaks=0; halt_on_error=1
+
+core-sanitize:
+CATALOG OWNERSHIP returned manifests and configured publisher identities survive scratch retirement PASS
+CATALOG OWNERSHIP growing catalog survives source wrapper/index retirement with intact nested manifests PASS
+CATALOG OWNERSHIP later signature/syntax/schema/expiry/floor/equivocation/ambiguity/missing/identity refusal and revoked snapshots preserve metadata and configured identities PASS
+PASS
+
+probe-sanitize:
+Updating trusted repository trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+Installing Seed 1.0.0 (1/1) from trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+Downloading seed/asset (4 bytes)
+Activated package generation 1
+Updating trusted repository trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+STATE PREFLIGHT valid signed cache 8388328 bytes; resolved installed state 8389904 bytes
+STATE PREFLIGHT all four oversized review/apply refusals preserve state, cache and recovery work PASS
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"resolve","package":"","repository":"","path":"","current":0,"total":0}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"stage","package":"","repository":"","path":"","current":0,"total":2}
+Installing item-0 1.0.0 (1/2) from trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+Downloading item-0/asset (7 bytes)
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"download","package":"item-0","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":0,"total":7}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"download","package":"item-0","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":7,"total":7}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"verify","package":"item-0","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":0,"total":0}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"copy","package":"item-0","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":0,"total":7}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"copy","package":"item-0","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":7,"total":7}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"verify","package":"item-0","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":0,"total":0}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"stage","package":"item-0","repository":"","path":"","current":1,"total":2}
+Installing Seed 1.0.0 (2/2) from trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"copy","package":"seed","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":0,"total":4}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"copy","package":"seed","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":4,"total":4}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"verify","package":"seed","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":0,"total":0}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"stage","package":"seed","repository":"","path":"","current":2,"total":2}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"activate","package":"","repository":"","path":"","current":0,"total":0}
+Activated package generation 2
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"complete","package":"","repository":"","path":"","current":1,"total":1}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"verify","package":"","repository":"","path":"","current":0,"total":0}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"verify","package":"item-0","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":0,"total":0}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"verify","package":"seed","repository":"trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","path":"asset","current":0,"total":0}
+VINIX-PACKAGE-PROGRESS {"format":1,"phase":"complete","package":"","repository":"","path":"","current":1,"total":1}
+STATE PREFLIGHT signed service/CLI reviews and transactions reject oversized metadata before cleanup/download/staging; active state, trust and recovery data survive; bounded retry PASS
+PASS

@@ -1,0 +1,16 @@
+Paired tracked-heap fixture, baseline 65ae4bf42 and final repository implementation.
+Both retire the returned catalog; validation allocations remain.
+
+Before:
+CATALOG OWNERSHIP returned manifests and configured publisher identities survive scratch retirement PASS
+CATALOG MEMORY kept=29029 allocations=168
+CATALOG MEMORY kept=29029 allocations=168
+CATALOG MEMORY kept=29029 allocations=168
+CATALOG MEMORY kept=29029 allocations=168
+
+After:
+CATALOG OWNERSHIP returned manifests and configured publisher identities survive scratch retirement PASS
+CATALOG MEMORY kept=10104 allocations=93
+CATALOG MEMORY kept=10104 allocations=93
+CATALOG MEMORY kept=10104 allocations=93
+CATALOG MEMORY kept=10104 allocations=93

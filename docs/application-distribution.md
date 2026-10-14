@@ -534,6 +534,9 @@ the exact future state against the persistent metadata limit before downloading,
 staging or deleting interrupted work. Oversized plans fail with guidance to
 reduce the requested set or package metadata; a smaller set can retry normally.
 See [metadata preflight qualification](../tests/packages/state-preflight-check.md).
+Catalog reads also release redundant authenticated metadata while preserving
+publisher, expiry and replay checks; see
+[catalog ownership qualification](../tests/packages/catalog-ownership-check.md).
 Files/directories are flushed before
 publication; POSIX rename switches `current` atomically. The next state-changing transaction
 retires abandoned stages. A crash before activation exposes the old complete set;
