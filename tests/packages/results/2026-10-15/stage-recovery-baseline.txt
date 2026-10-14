@@ -1,0 +1,5 @@
+Baseline 1f257f4d4 with the new root-alias assertion. The old recovery deletes outside data through the stage alias before returning an error; the regression exits 1.
+
+STAGE RECOVERY root-alias refused=true preserved=false
+tools/packages/pkgcore/stage_recovery_test.v:41: fn test_stage_recovery_refuses_root_alias_without_deleting_outside_data
+    assert message != '' && preserved

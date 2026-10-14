@@ -588,11 +588,22 @@ must contain exactly its declared payloads, generated launchers, captured state
 bytes and an empty mode-0444 lease. Entries must be ordinary, owned by the service
 and have canonical final modes; files must have one link. Unexpected directories
 are refused without traversal. Publication cannot replace an existing generation.
-A refused unpublished stage is removed. A published generation that fails the
-final check is retained at the path printed in the diagnostic, with `current`
+Cleanup removes a refused unpublished stage only while its captured directory
+identity remains valid; replacements are retained with a diagnostic. A published
+generation that fails the final check is retained at the path printed in the diagnostic, with `current`
 unchanged; retry builds a new generation from verified sources/cache. Rollback
 also checks the complete tree and captured state bytes after progress. See
 [generation admission checks](../tests/packages/generation-admission-check.md).
+
+Transactions and garbage collection validate every abandoned stage root before
+removing any stage. Invalid roots preserve the other stages, published generations
+and cache. Cleanup captures directory identities, refuses foreign directories or
+filesystems and walks components without following aliases. Leaf aliases, hard
+links and FIFOs are unlinked without changing outside contents or modes. Incomplete
+state files and missing leases are expected in interrupted stages. Unreadable or
+changed directories refuse cleanup and remain for inspection. Recovery keeps a
+fixed number of descriptors even for deep trees. See
+[stage recovery checks](../tests/packages/stage-recovery-check.md).
 
 Rollback checks payloads and current organization/key policy before restoring
 the previous generation. Uninstall removes the app and unused dependencies from

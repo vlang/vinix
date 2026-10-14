@@ -42,11 +42,22 @@ Transactions admit the complete generation before recursive flushing, before
 exclusive publication and after the final activation progress callback. Only
 declared payloads, generated launchers, exact state bytes and an empty read-only
 lease are allowed. Ordinary entries, ownership, single-link files and canonical
-final modes are required. Failed unpublished stages are removed. Published
-failures preserve the active pointer and report the retained generation path;
+final modes are required. Cleanup removes an unpublished stage only while its
+captured directory identity is still valid. Replacements are retained with a
+diagnostic. Published failures preserve the active pointer and report the retained generation path;
 retry builds a fresh generation. Rollback checks the same complete tree and
 captured state bytes after progress, preserving format-1 whitespace compatibility.
 See [generation admission qualification](../../tests/packages/generation-admission-check.md).
+
+Transactions and `gc` capture all abandoned stage roots before retiring any of
+them. Aliases, special roots, foreign ownership/filesystems and roots writable
+by other accounts refuse recovery. Cleanup checks captured directory identities,
+walks components without following links and unlinks leaf entries relative to
+captured directories. Incomplete metadata and missing leases are permitted in
+unpublished stages. Nested aliases and FIFOs are unlinked without traversal or
+opening. Unreadable or changed directories remain for inspection; restore trusted
+entries while holding the writer lock or stopping package workers before retrying.
+See [stage recovery qualification](../../tests/packages/stage-recovery-check.md).
 
 Disk preflight converts `statvfs.f_bavail` using its fundamental allocation size
 `f_frsize`, independently of the preferred I/O size. Zero allocation units and

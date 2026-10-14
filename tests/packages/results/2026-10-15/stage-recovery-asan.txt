@@ -1,0 +1,210 @@
+Checker heap probe:
+STAGE RECOVERY root-alias refused=true preserved=true
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+STAGE RECOVERY 12 malformed-root transaction/collection refusals preserve all stages, generations, cache and outside data; restored roots retry PASS
+STAGE RECOVERY five changed captured roots preserve original and replacement identities; restored inode retires PASS
+STAGE RECOVERY ten replaced nested/ancestor directories refuse without traversing aliases or deleting saved/replacement data; restored trees retire PASS
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-84280-1792021113293980/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-84280-1792021113301726/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-84280-1792021113309009/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-84280-1792021113315921/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-84280-1792021113323128/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-84280-1792021113330878/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-84280-1792021113416025/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-84280-1792021113424715/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-84280-1792021113435287/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-84280-1792021113447755/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+STAGE RECOVERY ten in-flight prepared/staged replacements preserve saved stages and outside data; restored originals retry PASS
+STAGE RECOVERY incomplete 64-level tree and 128 mixed-tree retirements/refusals keep descriptors below 32 without traversing aliases or opening FIFOs PASS
+STAGE RECOVERY 1024 long-name files spanning directory buffers retire completely in one recovery pass PASS
+STAGE RECOVERY 128 successful tree retirements and 128 refusals retain zero checker allocations PASS
+
+clang ASan/UBSan; detect_leaks=0; halt_on_error=1
+
+stage_recovery:
+STAGE RECOVERY root-alias refused=true preserved=true
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+STAGE RECOVERY 12 malformed-root transaction/collection refusals preserve all stages, generations, cache and outside data; restored roots retry PASS
+STAGE RECOVERY five changed captured roots preserve original and replacement identities; restored inode retires PASS
+STAGE RECOVERY ten replaced nested/ancestor directories refuse without traversing aliases or deleting saved/replacement data; restored trees retire PASS
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-87769-1792021209929299/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-87769-1792021209940007/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-87769-1792021210156710/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-87769-1792021210168312/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-87769-1792021210178418/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-87769-1792021210191321/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-87769-1792021210205092/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-87769-1792021210216705/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-87769-1792021210409123/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-87769-1792021210490774/store/generations/.stage-2: unpublished package stage directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+STAGE RECOVERY ten in-flight prepared/staged replacements preserve saved stages and outside data; restored originals retry PASS
+STAGE RECOVERY incomplete 64-level tree and 128 mixed-tree retirements/refusals keep descriptors below 32 without traversing aliases or opening FIFOs PASS
+STAGE RECOVERY 1024 long-name files spanning directory buffers retire completely in one recovery pass PASS
+PASS
+
+generation_admission:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+GENERATION ADMISSION late-state refused=true current_changed=false
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Activated package generation 33
+Rolled back to generation 1; application data was retained
+GENERATION ADMISSION 90 prepared/staged/published/activate refusals preserve current state, history and outside data; no completion, clean unpublished stages, retained published failures and offline retry PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Installing Application 2.0.0 (1/1) from fixture
+Activated package generation 3
+GENERATION ADMISSION exclusive publication preserves raced destination and retries at a fresh identity PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 2
+Rolled back to generation 1; application data was retained
+GENERATION ADMISSION rollback refuses four late changes without switching current; captured whitespace-compatible metadata retries PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+GENERATION ADMISSION 128 valid and refused scans of 64-level trees retire descriptors under a 32-descriptor limit PASS
+PASS

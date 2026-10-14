@@ -301,21 +301,33 @@ fn activate_repair_plan_locked(config Config, directory string, current State, p
 	encoded := encode_generation_state(state)!
 	defer { unsafe { encoded.free() } }
 	// Retire abandoned work only after a supplied review has been accepted.
-	for name in os.ls(directory + '/generations')! {
-		if name.starts_with('.stage-') { os.rmdir_all(directory + '/generations/' + name)! }
-	}
+	recover_generation_stages(directory)!
 	disk_check(free_bytes(directory)!, estimate_transaction_space(plan, directory, current, operation)!, config.policy.reserve_bytes)!
-	stage := directory + '/generations/.stage-' + generation.str()
+	number := generation.str()
+	stage_name := '.stage-' + number
+	stage := directory + '/generations/' + stage_name
+	defer { unsafe { number.free(); stage_name.free(); stage.free() } }
 	owned_directory(stage, 0o700)!
+	parent := recovery_parent(directory)!
+	defer { C.close(parent) }
+	stage_target := capture_stage(parent, stage_name)!
+	defer { unsafe { stage_target.name.free() } }
+	mut completed := false
+	defer {
+		if !completed {
+			retire_stage(parent, stage_target) or {
+				message := err.msg()
+				diagnostic := 'Unpublished package stage retained for inspection at ${stage}: ${message}'
+				eprintln(diagnostic)
+				unsafe { diagnostic.free(); message.free(); err.free() }
+			}
+		}
+	}
 	os.mkdir_all(stage + '/apps')!
 	os.mkdir_all(stage + '/share/applications')!
 	os.write_file(stage + '/lease', '')!
 	os.chmod(stage + '/lease', 0o444)!
 	sync_file(stage + '/lease')!
-	mut completed := false
-	defer {
-		if !completed { os.rmdir_all(stage) or {} }
-	}
 	mut done := 0
 	options.progress(pkgprotocol.Progress{ phase: 'stage', total: u64(plan.packages.len) })
 	for installed in plan.packages {
@@ -362,9 +374,8 @@ fn activate_repair_plan_locked(config Config, directory string, current State, p
 		completed = true
 		return error('fixture interrupted before activation')
 	}
-	number := generation.str()
 	published := directory + '/generations/' + number
-	defer { unsafe { number.free(); published.free() } }
+	defer { unsafe { published.free() } }
 	publish_new_directory(stage, published, 'package generation')!
 	completed = true
 	sync_directory(directory + '/generations')!
@@ -465,6 +476,7 @@ fn collect_locked(config Config, directory string) ! {
 	}
 	targets := collection_targets(directory, current)!
 	defer { close_collection_targets(targets) }
+	recover_generation_stages(directory)!
 	for target in targets { remove_collection_target(target)! }
 	for name in os.ls(directory + '/objects')! {
 		if digest_valid(name) && name !in keep { os.rm(directory + '/objects/' + name)! }
