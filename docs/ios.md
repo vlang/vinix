@@ -5105,11 +5105,39 @@ inputs, generated-C allocation/callback audit and actual IPA probe/audits are
 retained under `build/ios/fortnite/raw-equality-checks`. Full iOS regression
 remains unpassed.
 
+SwiftCore now supplies the `VN`, `VMn` and `VMa` records for Int8 and UInt8,
+plus `_$sBi8_WV`. Native SwiftCore data, accessors and value-witness instructions
+establish distinct canonical nominal identities with a shared one-byte POD
+witness table. Each descriptor names its type in the Swift module, describes
+one field at offset zero and points to an accessor returning complete metadata
+for every request. Copy/take witnesses copy exactly one byte; destruction
+reads nothing. Single-payload enum witnesses preserve native unaligned tag
+bytes, tag-width transitions and UInt32 wrapping arithmetic. Reflection and
+byte-type arithmetic/protocol conformances remain separate work.
+
+The records and two complete accessors occupy unused space in the existing
+integer arena, emitted before cache flushing and RX/RO sealing. They add no
+mapping, owner, registry, ARC operation or teardown path. Callers must keep
+borrowed value spans and metadata alive during witness calls. Existing
+quiescent teardown retires both integer pages after owners and workers drain.
+
+Ten fresh ASan/UBSan runs and five Vinix ARM64 suites pass across byte metadata,
+integer hashing, Array values, mangled lookup and pointer destruction. Native
+and V fixtures exercise all 256 byte patterns through every copy/take slot,
+read-only sources and protected suffixes, self-copy, no-read destruction,
+exact enum buffers through UInt32 wrapping, preserved `x20`/`x21`, complete
+accessors, typed byte Arrays, symbolic nominal lookup and eight readers. Two
+runtime lifetimes drain owners and unmap both arena pages. The public
+`build-swift-byte-metadata` target and full build/regression/Swift guest modes
+include the fixture. Thirteen final generated-C streams and executables,
+native SDK/LLVM inputs, generated-C allocation/sealing audit, retained compiler
+and native measurement trials, and actual IPA probe/audits are under
+`build/ios/fortnite/byte-metadata-checks`. Full iOS regression remains unpassed.
+
 The supplied IPA now exits with status 1 at MarketplaceKitWrapper's required
-`_$ss4Int8VMn`, Swift.Int8's nominal descriptor. Its required import and native
-descriptor/metadata/value-witness layout are retained for the next
-implementation. Fortnite has not entered application code and remains
-unplayable.
+`_$sypN`, Swift's full Any existential metadata record. Its required import and
+native metadata/value-witness layout are retained for the next implementation.
+Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -5118,10 +5146,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,461 | 699 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 148 | 28 | 23 |
-| All images | 2,268 | 730 | 120 |
+| MarketplaceKitWrapper | 151 | 25 | 23 |
+| All images | 2,271 | 727 | 120 |
 
-The C++/GLES/Text variant reports 2,281 resolved imports, 717 unresolved strong
+The C++/GLES/Text variant reports 2,284 resolved imports, 714 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

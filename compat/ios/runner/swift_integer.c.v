@@ -127,7 +127,8 @@ fn swift_integer_metadata() u64 {
 	write32(base + 132, 0xd61f0200)
 	swift_hasher_default_emit(base + 160)
 	swift_vararg_emit(base, data)
-	C.__builtin___clear_cache(arena, unsafe { voidptr(base + 328) })
+	swift_byte_metadata_emit(base, data)
+	C.__builtin___clear_cache(arena, unsafe { voidptr(base + 408) })
 	if C.mprotect(arena, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(arena, usize(page * 2))
@@ -145,6 +146,7 @@ fn swift_integer_stop() {
 }
 
 fn swift_integer_symbol(symbol string) ?u64 {
+	if address := swift_byte_symbol(symbol) { return address }
 	function := match symbol {
 		'_$sSi10bitPatternSis13OpaquePointerVSg_tcfC' { u64(unsafe { voidptr(swift_integer_pointer_bits) }) }
 		'_$sSi2eeoiySbSi_SitFZ' { u64(unsafe { voidptr(swift_integer_equal) }) }
