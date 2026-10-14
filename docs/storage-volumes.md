@@ -3154,6 +3154,74 @@ changing caller state; embedded identities, bounds, pools and global slots
 retain the ordinary bundle validation. See
 [qualification](../tests/storage-volumes/data-checksums.md).
 
+## Periodic authenticated ciphertext monitoring
+
+`monitor-volume-auto CONFIG PASSPHRASE_FILE REFERENCE INTERVAL_SECONDS COUNT`
+and `monitor-recovery-volume-auto BACKUP RECOVERY_KEYFILE REFERENCE
+INTERVAL_SECONDS COUNT` repeatedly hash one encrypted extent's physical
+ciphertext against a trusted `VINIXCH1` reference. They use the existing
+authenticated configuration/recovery formats and automatic read-only discovery.
+
+```sh
+vinix-volume monitor-volume-auto /root/volume.sealed /root/volume.pass /root/volume.vchash 60 10
+vinix-volume monitor-recovery-volume-auto /root/volume.vrecover /root/recovery.key /root/volume.vchash 60 0
+```
+
+A session authenticates exactly once. Passphrase configuration uses one bounded
+scrypt derivation; recovery-key authentication uses no KDF. The passphrase,
+wrapping/recovery key and decrypted volume key are erased before opening the
+reference or discovering a device. Configuration and credential input files
+close after their initial private reads. The reference must match every
+authenticated native identity/capacity/sector and slot/offset/length/read-only
+field before discovery. Malformed, unrelated or nonprivate inputs fail without
+opening a disk. The existing owned private regular-file rules apply to all
+inputs, including post-EOF ownership, permission and size checks.
+
+The original reference file and parent directory stay open with the original
+selected physical disk descriptor through all samples, sleeps and final stdout
+checks. Replacing any input pathname does not reload credentials, change the
+session reference or trigger rediscovery. Same-physical aliases retain the
+existing discovery rules; missing or ambiguous physical matches fail. The
+selected physical ID and physical read-only bit remain exact and independent
+of the authenticated mapping's mode. Every sample rechecks the pin before and
+after its complete native-sector scan and again immediately before output.
+
+Intervals are decimal seconds from 0 through 86400, measured after each complete
+sample. Interrupted sleeps resume the remainder. A positive unsigned 64-bit
+count completes after that many samples, including consecutive scans with
+interval 0. Count 0 runs continuously and requires a positive interval. Sample
+numbers start at 1; sample and changed-sample counters saturate at the unsigned
+64-bit maximum. Invalid CLI syntax returns usage status 2.
+
+Each privately encoded sample contains this newline-terminated prefix, then
+the ordinary complete two-line ASCII `VINIXCS1 operation=scrubbed-ciphertext`
+view with native geometry, mapping mode, original reference fingerprint and
+full expected/observed ciphertext digests:
+
+```text
+format=VINIXCM1 operation=monitored-ciphertext source=volume|recovery sample=N changed_samples=C session_changed=0|1
+```
+
+`source` records the initial authentication domain. `changed_samples` counts
+complete changed scans and `session_changed` stays 1 after the first finding,
+even when later data is restored. A fixed 2048-byte buffer holds each complete
+three-line sample. The transcript is a public ASCII view, not a binary CS1
+input for offline scrub commands. No successful sample is printed for an
+incomplete scan or failed final pin check. A stdout failure can leave a partial
+write and returns 1; earlier completed samples remain visible.
+
+Finite sessions return 0 if every sample is clean, or 2 if any complete sample
+changed. Later input, device, encoding or output failures return 1 and take
+precedence over findings. Continuous sessions continue after findings until an
+operational failure or external termination. Workspaces and owners are created
+once outside the loop; no per-sample authentication or secret lifetime remains.
+
+Monitoring takes no directory writer lock, publishes no file, imports no live
+mapping and writes no physical data. Keep encrypted writes quiescent when
+consistent observations are required and retain a trusted reference. Comparing
+ciphertext hashes supplies neither plaintext authentication, repair nor a
+concurrent snapshot. See [qualification](../tests/storage-volumes/cipher-monitor.md).
+
 ## Periodic pinned data checksum monitoring
 
 `monitor-data-auto MANIFEST INTERVAL_SECONDS COUNT` repeatedly checks every

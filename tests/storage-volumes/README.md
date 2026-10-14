@@ -1,5 +1,12 @@
 # Storage-volume qualification
 
+`--host-cipher-monitor` and `--cipher-monitor` qualify authenticated ciphertext
+sessions in both credential domains and mapping modes, one authentication and
+discovery, erased secrets, held reference/device owners across sleeps and
+output, restored-data status, later failures, 512-sample sessions and bounded
+real-KDF lifetimes across reordered reboot. An independent oracle reconstructs
+34 persisted files. See [ciphertext monitoring](cipher-monitor.md).
+
 `--host-data-monitor` and `--data-monitor` qualify repeated complete data scans,
 one discovery per disk, retained reference/pins across intervals, restored-data
 status, late operational failures, 512-sample sessions and bounded lifetimes

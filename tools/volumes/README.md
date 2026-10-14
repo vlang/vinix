@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`monitor-volume-auto CONFIG PASSPHRASE_FILE REFERENCE INTERVAL_SECONDS COUNT`
+and `monitor-recovery-volume-auto BACKUP RECOVERY_KEYFILE REFERENCE
+INTERVAL_SECONDS COUNT` repeatedly scan physical ciphertext. They authenticate
+once, erase secrets before discovery and retain the original private reference
+and read-only disk pin. Changed status persists after restoration; later errors
+take precedence. See [ciphertext monitoring](../../docs/storage-volumes.md#periodic-authenticated-ciphertext-monitoring).
+
 `monitor-data-auto MANIFEST INTERVAL_SECONDS COUNT` repeatedly scans every
 plain-data mapping while retaining one validated reference and the original
 read-only disk pins. Complete samples preserve changed status after restoration;
