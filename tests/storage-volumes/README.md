@@ -1,5 +1,12 @@
 # Storage-volume qualification
 
+`--host-data-monitor-verify` and `--data-monitor-verify` qualify whole saved
+plain-data monitor sessions: complete reference binding, canonical sequence
+and counter checks, all four transitions, buffered full-file hashes, pinned
+ordinary inputs, no partial findings and bounded lifetimes across reordered
+reboot. An independent oracle reconstructs 19 files, including all 512 long
+session frames and their summary. See [transcript verification](data-monitor-verify.md).
+
 `--host-cipher-monitor` and `--cipher-monitor` qualify authenticated ciphertext
 sessions in both credential domains and mapping modes, one authentication and
 discovery, erased secrets, held reference/device owners across sleeps and

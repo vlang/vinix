@@ -41,7 +41,7 @@ fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
 	volume_recovery_native_tests(root, work, v)!
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test', 'data_scrub_test', 'crypt_test', 'recovery_test', 'sealed_test', 'sealed_rewrap_test', 'volume_seal_test', 'volume_rewrap_test', 'volume_discovery_test', 'volume_growth_test', 'volume_boot_test', 'volume_boot_set_test', 'volume_recovery_inspect_test', 'volume_inspect_test', 'volume_growth_preview_test', 'volume_ciphertext_test', 'volume_ciphertext_scrub_test', 'volume_scrub_compare_test', 'volume_scrub_auto_test', 'volume_ciphertext_auto_test', 'volume_reference_test', 'data_auto_test', 'data_reference_test', 'data_scrub_view_test', 'data_scrub_compare_test', 'data_scrub_reference_test', 'volume_scrub_reference_test', 'data_monitor_test', 'volume_monitor_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test', 'data_scrub_test', 'crypt_test', 'recovery_test', 'sealed_test', 'sealed_rewrap_test', 'volume_seal_test', 'volume_rewrap_test', 'volume_discovery_test', 'volume_growth_test', 'volume_boot_test', 'volume_boot_set_test', 'volume_recovery_inspect_test', 'volume_inspect_test', 'volume_growth_preview_test', 'volume_ciphertext_test', 'volume_ciphertext_scrub_test', 'volume_scrub_compare_test', 'volume_scrub_auto_test', 'volume_ciphertext_auto_test', 'volume_reference_test', 'data_auto_test', 'data_reference_test', 'data_scrub_view_test', 'data_scrub_compare_test', 'data_scrub_reference_test', 'volume_scrub_reference_test', 'data_monitor_test', 'volume_monitor_test', 'data_monitor_verify_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -60,6 +60,7 @@ fn host(root string, work string) ! {
 	cipher_scrub_reference_io_tests(root, work, v)!
 	data_monitor_io_tests(root, work, v)!
 	cipher_monitor_io_tests(root, work, v)!
+	data_monitor_verify_io_tests(root, work, v)!
 	crypt_io_tests(root, work, v)!
 	recovery_io_tests(root, work, v)!
 	sealed_io_tests(root, work, v)!
@@ -582,7 +583,9 @@ fn plan_filesystem(work string) ! {
 
 fn compile_guest(root string, work string, arch string, nvme bool, recovery_mode string) ! {
 	source := work + '/guest.c'
-	if recovery_mode == 'cipher-monitor' {
+	if recovery_mode == 'data-monitor-verify' {
+		command(['sh', root + '/build-support/run-v-tool.sh', root + '/tests/linuxkpi/generate_module.v', root + '/tests/storage-volumes/planguest', source, '--arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-d', 'data_monitor_verify_test'])!
+	} else if recovery_mode == 'cipher-monitor' {
 		command(['sh', root + '/build-support/run-v-tool.sh', root + '/tests/linuxkpi/generate_module.v', root + '/tests/storage-volumes/planguest', source, '--arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-d', 'cipher_monitor_test'])!
 	} else if recovery_mode == 'data-monitor' {
 		command(['sh', root + '/build-support/run-v-tool.sh', root + '/tests/linuxkpi/generate_module.v', root + '/tests/storage-volumes/planguest', source, '--arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-d', 'data_monitor_test'])!
@@ -1002,6 +1005,8 @@ fn main() {
 	mut data_monitor := false
 	mut cipher_monitor_host_only := false
 	mut cipher_monitor := false
+	mut data_monitor_verify_host_only := false
+	mut data_monitor_verify := false
 	mut index := 1
 	for index < os.args.len {
 		name := os.args[index]
@@ -1042,6 +1047,8 @@ fn main() {
 		if name == '--data-monitor' { data_monitor = true; index++; continue }
 		if name == '--host-cipher-monitor' { is_host = true; cipher_monitor_host_only = true; index++; continue }
 		if name == '--cipher-monitor' { cipher_monitor = true; index++; continue }
+		if name == '--host-data-monitor-verify' { is_host = true; data_monitor_verify_host_only = true; index++; continue }
+		if name == '--data-monitor-verify' { data_monitor_verify = true; index++; continue }
 		if name == '--nvme' { nvme = true; index++; continue }
 		if name == '--volume-recovery' { recovery = true; index++; continue }
 		if name == '--recovery-unlock' { recovery_unlock = true; index++; continue }
@@ -1049,7 +1056,7 @@ fn main() {
 		if name == '--recovery-growth' { recovery_growth = true; index++; continue }
 		if name == '--recovery-inspect' { recovery_inspect = true; index++; continue }
 		if name !in ['--arch', '--work', '--kernel'] || index + 1 >= os.args.len || name in options {
-			eprintln('Usage: plan_run.v --work NEW_DIRECTORY [--host | --host-recovery-unlock | --host-recovery-rewrap | --host-recovery-growth | --host-recovery-inspect | --host-volume-inspect | --host-growth-preview | --host-ciphertext | --host-ciphertext-scrub | --host-scrub-compare | --host-auto-scrub | --host-ciphertext-auto | --host-reference | --host-data-auto | --host-data-reference | --host-data-scrub-view | --host-data-scrub-history | --host-scrub-reference | --host-cipher-scrub-reference | --host-data-monitor | --host-cipher-monitor | --arch amd64|aarch64 --kernel KERNEL [--nvme | --volume-recovery | --recovery-unlock | --recovery-rewrap | --recovery-growth | --recovery-inspect | --volume-inspect | --growth-preview | --ciphertext | --ciphertext-scrub | --scrub-compare | --auto-scrub | --ciphertext-auto | --reference | --data-auto | --data-reference | --data-scrub-view | --data-scrub-history | --scrub-reference | --cipher-scrub-reference | --data-monitor | --cipher-monitor]]'); exit(2)
+			eprintln('Usage: plan_run.v --work NEW_DIRECTORY [--host | --host-recovery-unlock | --host-recovery-rewrap | --host-recovery-growth | --host-recovery-inspect | --host-volume-inspect | --host-growth-preview | --host-ciphertext | --host-ciphertext-scrub | --host-scrub-compare | --host-auto-scrub | --host-ciphertext-auto | --host-reference | --host-data-auto | --host-data-reference | --host-data-scrub-view | --host-data-scrub-history | --host-scrub-reference | --host-cipher-scrub-reference | --host-data-monitor | --host-cipher-monitor | --host-data-monitor-verify | --arch amd64|aarch64 --kernel KERNEL [--nvme | --volume-recovery | --recovery-unlock | --recovery-rewrap | --recovery-growth | --recovery-inspect | --volume-inspect | --growth-preview | --ciphertext | --ciphertext-scrub | --scrub-compare | --auto-scrub | --ciphertext-auto | --reference | --data-auto | --data-reference | --data-scrub-view | --data-scrub-history | --scrub-reference | --cipher-scrub-reference | --data-monitor | --cipher-monitor | --data-monitor-verify]]'); exit(2)
 		}
 		options[name] = os.args[index + 1]; index += 2
 	}
@@ -1092,12 +1099,15 @@ fn main() {
 		|| (data_monitor && (is_host || nvme || recovery || recovery_unlock || recovery_rewrap || recovery_growth || recovery_inspect || volume_inspect || growth_preview || ciphertext || ciphertext_scrub || scrub_compare || auto_scrub || ciphertext_auto || reference || data_auto || data_reference || data_scrub_view || data_scrub_history || scrub_reference || cipher_scrub_reference))
 		|| (data_monitor_host_only && (focused_host || rewrap_host || growth_host || inspect_host || volume_inspect_host_only || preview_host || ciphertext_host_only || ciphertext_scrub_host_only || scrub_compare_host_only || auto_scrub_host_only || ciphertext_auto_host_only || reference_host_only || data_auto_host_only || data_reference_host_only || data_scrub_view_host_only || data_scrub_history_host_only || scrub_reference_host_only || cipher_scrub_reference_host_only))
 		|| (cipher_monitor && (is_host || nvme || recovery || recovery_unlock || recovery_rewrap || recovery_growth || recovery_inspect || volume_inspect || growth_preview || ciphertext || ciphertext_scrub || scrub_compare || auto_scrub || ciphertext_auto || reference || data_auto || data_reference || data_scrub_view || data_scrub_history || scrub_reference || cipher_scrub_reference || data_monitor))
-		|| (cipher_monitor_host_only && (focused_host || rewrap_host || growth_host || inspect_host || volume_inspect_host_only || preview_host || ciphertext_host_only || ciphertext_scrub_host_only || scrub_compare_host_only || auto_scrub_host_only || ciphertext_auto_host_only || reference_host_only || data_auto_host_only || data_reference_host_only || data_scrub_view_host_only || data_scrub_history_host_only || scrub_reference_host_only || cipher_scrub_reference_host_only || data_monitor_host_only)) {
+		|| (cipher_monitor_host_only && (focused_host || rewrap_host || growth_host || inspect_host || volume_inspect_host_only || preview_host || ciphertext_host_only || ciphertext_scrub_host_only || scrub_compare_host_only || auto_scrub_host_only || ciphertext_auto_host_only || reference_host_only || data_auto_host_only || data_reference_host_only || data_scrub_view_host_only || data_scrub_history_host_only || scrub_reference_host_only || cipher_scrub_reference_host_only || data_monitor_host_only))
+		|| (data_monitor_verify && (is_host || nvme || recovery || recovery_unlock || recovery_rewrap || recovery_growth || recovery_inspect || volume_inspect || growth_preview || ciphertext || ciphertext_scrub || scrub_compare || auto_scrub || ciphertext_auto || reference || data_auto || data_reference || data_scrub_view || data_scrub_history || scrub_reference || cipher_scrub_reference || data_monitor || cipher_monitor))
+		|| (data_monitor_verify_host_only && (focused_host || rewrap_host || growth_host || inspect_host || volume_inspect_host_only || preview_host || ciphertext_host_only || ciphertext_scrub_host_only || scrub_compare_host_only || auto_scrub_host_only || ciphertext_auto_host_only || reference_host_only || data_auto_host_only || data_reference_host_only || data_scrub_view_host_only || data_scrub_history_host_only || scrub_reference_host_only || cipher_scrub_reference_host_only || data_monitor_host_only || cipher_monitor_host_only)) {
 		eprintln('Select a new private work directory and supported architecture'); exit(2)
 	}
 	os.mkdir(work) or { eprintln(err); exit(1) }
 	root := os.dir(os.dir(os.dir(@FILE)))
-	if cipher_monitor_host_only { cipher_monitor_host(root, work) or { eprintln(err); exit(1) } }
+	if data_monitor_verify_host_only { data_monitor_verify_host(root, work) or { eprintln(err); exit(1) } }
+	else if cipher_monitor_host_only { cipher_monitor_host(root, work) or { eprintln(err); exit(1) } }
 	else if data_monitor_host_only { data_monitor_host(root, work) or { eprintln(err); exit(1) } }
 	else if cipher_scrub_reference_host_only { cipher_scrub_reference_host(root, work) or { eprintln(err); exit(1) } }
 	else if scrub_reference_host_only { scrub_reference_host(root, work) or { eprintln(err); exit(1) } }
@@ -1118,6 +1128,7 @@ fn main() {
 	else if rewrap_host { recovery_rewrap_host(root, work) or { eprintln(err); exit(1) } }
 	else if focused_host { recovery_unlock_host(root, work) or { eprintln(err); exit(1) } }
 	else if is_host { host(root, work) or { eprintln(err); exit(1) } }
+	else if data_monitor_verify { data_monitor_verify_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
 	else if cipher_monitor { cipher_monitor_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
 	else if data_monitor { data_monitor_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
 	else if cipher_scrub_reference { cipher_scrub_reference_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
@@ -1682,4 +1693,44 @@ fn cipher_monitor_io_tests(root string, work string, v string) ! {
 	os.cp(root + '/tests/storage-volumes/cipher_monitor_io_test.v', fixture + '/cipher_monitor_io_test.v')!
 	binary := work + '/cipher-monitor-io-test'; command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags', '-I' + root + '/tools/volumes/volumecli -O2 -fsanitize=address,undefined', '-ldflags', '-fsanitize=address,undefined', '-o', binary, fixture + '/cipher_monitor_io_test.v'])!
 	print(command([binary])!); println('PASS cipher monitor: actual authentication/private reference/physical streaming, one KDF/discovery, erased secrets and retained owners across samples/output/sleeps, restored latch, late errors and 512 samples under ASan/UBSan')
+}
+
+fn data_monitor_verify_host(root string, work string) ! {
+	v := os.getenv_opt('V') or { @VEXE }; os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
+	scrub_reference_io_tests(root, work, v)!; data_monitor_verify_io_tests(root, work, v)!
+	for entry in ['data_monitor_test', 'data_monitor_verify_test'] {
+		binary := work + '/' + entry
+		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags', '-I' + root + '/tools/volumes/volumecli -O2 -fsanitize=address,undefined', '-ldflags', '-fsanitize=address,undefined', '-o', binary, root + '/tools/volumes/volumecli/' + entry + '.v'])!
+		print(command([binary])!); println('PASS ' + entry + ': ASan/UBSan')
+	}
+	for arch in ['aarch64', 'x86_64'] { path := work + '/volume-' + arch + '.c'; generate(root, root + '/tools/volumes/volumecli', path, arch)!; check_generated(path)! }
+	println('PASS data monitor verification native/models/syntax and both target allocation audits')
+}
+
+fn data_monitor_verify_guest(root string, work string, arch string, kernel string) ! {
+	if kernel == '' || !os.is_file(kernel) || work.contains(',') { return error('Select an existing kernel and safe work directory') }
+	compile_guest(root, work, arch, false, 'data-monitor-verify')!
+	write_disk(work + '/volume.raw', false)!; write_disk(work + '/wrong.raw', true)!
+	plan_filesystem(work)!; pack(work)!
+	first := boot(if arch == 'aarch64' { arm_boot(root, work, kernel, false)! } else { amd64_boot(root, work, kernel, false, false)! }, work + '/first-boot.log')!
+	if !first.contains('PLAN DATA MONITOR VERIFY PASSED:') || first.count('PLAN DATA MONITOR VERIFY CYCLES count=100') != 2
+		|| !first.contains('PLAN DATA MONITOR VERIFY LARGE ') || first.count('PLAN DATA MONITOR VERIFY RETAIN ') == 0 { return error('Missing complete data monitor verification and retention qualification') }
+	second := boot(if arch == 'aarch64' { arm_boot(root, work, kernel, true)! } else { amd64_boot(root, work, kernel, true, false)! }, work + '/second-boot.log')!
+	if !second.contains('PLAN DATA MONITOR VERIFY REORDERED BOOT PRESERVED') || second.contains('init: volume restore failed; continuing') { return error('Automatic data operations failed after reordered boot') }
+	println('PASS ' + arch + ': offline complete transcript verification, exact artifacts, bounded lifetimes and reordered reboot')
+}
+
+fn data_monitor_verify_io_tests(root string, work string, v string) ! {
+	fixture := work + '/datamonitorverifyio'; os.mkdir(fixture)!
+	for file in os.ls(root + '/tools/volumes/volumecli')! {
+		if !file.ends_with('.v') || file.ends_with('_test.v') { continue }; mut source := os.read_file(root + '/tools/volumes/volumecli/' + file)!
+		if file == 'data_manifest.v' { source = source.replace('C.read(', 'scrub_ref_read(').replace('C.fstat(', 'scrub_ref_stat(') }
+		if file == 'plan_lock.v' { for name in ['open', 'openat', 'close', 'flock'] { source = source.replace('C.' + name + '(', 'scrub_ref_' + name + '(').replace('fn scrub_ref_' + name + '(', 'fn C.' + name + '(') } }
+		if file == 'data_monitor_verify.v' { source = source.replace('C.read(', 'monitor_verify_read(').replace('C.fstat(', 'monitor_verify_stat(').replace('accept_data_monitor_sample(', 'monitor_verify_accept(').replace('fn monitor_verify_accept(', 'fn accept_data_monitor_sample(').replace('encode_data_monitor_history(', 'monitor_verify_encode(').replace('fn monitor_verify_encode(', 'fn encode_data_monitor_history(').replace("C.printf(c'%s', &text[0])", 'scrub_ref_print(&text[0])') }
+		if file == 'plan_check.v' { source = source.replace('C.fflush(', 'scrub_ref_flush(').replace('C.ferror(', 'scrub_ref_ferror(').replace('fn scrub_ref_ferror(', 'fn C.ferror(') }
+		os.write_file(fixture + '/' + file, source)!
+	}
+	os.cp(root + '/tests/storage-volumes/data_monitor_verify_io_test.v', fixture + '/data_monitor_verify_io_test.v')!
+	binary := work + '/data-monitor-verify-io-test'; command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags', '-I' + root + '/tools/volumes/volumecli -O2 -fsanitize=address,undefined', '-ldflags', '-fsanitize=address,undefined', '-o', binary, fixture + '/data_monitor_verify_io_test.v'])!
+	print(command([binary])!); println('PASS data monitor verification: actual buffered whole-file parser, canonical sample/counter/latch validation, complete reference binding, pinned inputs through output, error precedence and 512 frames under ASan/UBSan')
 }

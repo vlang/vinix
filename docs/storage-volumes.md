@@ -3154,6 +3154,67 @@ changing caller state; embedded identities, bounds, pools and global slots
 retain the ordinary bundle validation. See
 [qualification](../tests/storage-volumes/data-checksums.md).
 
+## Offline data monitor transcript verification
+
+`verify-data-monitor MANIFEST TRANSCRIPT` validates a saved plain-data monitor
+session against its complete trusted `VINIXDH1` checksum reference. It reads
+ordinary files and summarizes every canonical `VINIXDM1`/`VINIXSR1` frame.
+
+```sh
+vinix-volume verify-data-monitor /root/data.vhash /root/monitor.txt
+```
+
+The transcript must be a nonempty regular file of at most 64 MiB. Samples start
+at 1 and advance consecutively using canonical decimal numbers. Every complete
+scrub must bind to the entire supplied reference, its native geometry, ordered
+rows and expected digests. Each prefix's changed-sample counter must equal the
+number of preceding and current scans with any changed mapping; its session
+flag must stay set after the first changed scan, including after restoration.
+An unrelated reference, inconsistent later counter, diagnostic line, malformed
+frame or partial tail invalidates the whole input. The buffered reader hashes
+every original transcript byte, requires true EOF and rechecks the transcript
+descriptor's regular type and exact initial length after EOF.
+
+Both inputs and their parent directories stay pinned through complete private
+validation, formatting, printing and final stdout checks. Ordinary reference
+rules allow readable 0644 files and separate hard-linked aliases, and reject
+symlinks, directories and FIFOs. No writer lock, authentication, device access
+or publication occurs. No successful summary is printed until the entire
+transcript validates; output failures can leave a partial write and return 1.
+
+The bounded complete summary begins with:
+
+```text
+format=VINIXDM1 operation=verified-data-monitor disks=D mappings=M samples=N changed_samples=C session_changed=0|1 final_changed=F algorithm=sha256 reference_sha256=HEX transcript_sha256=HEX
+```
+
+Native disk geometry lines precede each disk's mapping rows. Every row includes
+its full geometry and mode, count of changed observations, final match/changed
+finding, expected/final digests and counts for four adjacent-sample transitions:
+
+| Field | Adjacent observations |
+| --- | --- |
+| `stable` | Identical actual digests, including unchanged corruption |
+| `new_changes` | Expected digest followed by a different digest |
+| `restored` | Different digest followed by the expected digest |
+| `changed_again` | Two different digests, both differing from expected |
+
+The first observation has no transition. Row changed counts refer to individual
+mappings; the header count refers to scans containing any changed row. A fixed
+49152-byte summary workspace covers all 64 disks and mappings with full-width
+counters. Parsed history becomes visible only after complete input validation.
+
+A valid all-clean history returns 0. Any recorded changed scan returns 2, even
+if the final sample is fully restored. Operational input, binding, encoding or
+stdout failures return 1 and take precedence over findings; syntax errors
+return 2. An exact complete-frame prefix is a valid shorter transcript: the
+format records neither the requested count nor completion of the originating
+command. Compare the returned sample count with an independently known count
+when needed. This checks historical evidence against a trusted reference; it
+does not authenticate the transcript, establish current disk integrity or
+supply a concurrent snapshot or repair. See
+[qualification](../tests/storage-volumes/data-monitor-verify.md).
+
 ## Periodic authenticated ciphertext monitoring
 
 `monitor-volume-auto CONFIG PASSPHRASE_FILE REFERENCE INTERVAL_SECONDS COUNT`

@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`verify-data-monitor MANIFEST TRANSCRIPT` checks every saved plain-data monitor
+sample against its complete reference, including sequence, counters and latched
+changed status. It prints native geometry, full input hashes and per-mapping
+transition counts after whole-file validation. Historical changes return 2;
+later malformed data returns 1. See
+[transcript verification](../../docs/storage-volumes.md#offline-data-monitor-transcript-verification).
+
 `monitor-volume-auto CONFIG PASSPHRASE_FILE REFERENCE INTERVAL_SECONDS COUNT`
 and `monitor-recovery-volume-auto BACKUP RECOVERY_KEYFILE REFERENCE
 INTERVAL_SECONDS COUNT` repeatedly scan physical ciphertext. They authenticate
