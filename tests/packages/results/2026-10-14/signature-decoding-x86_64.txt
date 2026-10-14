@@ -1,0 +1,2 @@
+PASS x86_64 packages-signature-decoding (16.4s)
+package-signature-decoding x86_64: 1 passed, 0 failed, 0 skipped

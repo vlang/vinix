@@ -1,0 +1,35 @@
+Paired warmed public verify_index control, baseline f8238c463 versus borrowed bounded signature decoding. Same signed empty index, canonical/prefixed signatures and 1 MiB wrong-length hex. Four measured calls per case. Both versions retire returned indexes or errors; fixture setup and allocation peaks are excluded.
+
+Before:
+SIGNATURE MEMORY case=canonical kept=160 allocations=2
+SIGNATURE MEMORY case=canonical kept=160 allocations=2
+SIGNATURE MEMORY case=canonical kept=160 allocations=2
+SIGNATURE MEMORY case=canonical kept=160 allocations=2
+SIGNATURE MEMORY case=prefixed kept=289 allocations=3
+SIGNATURE MEMORY case=prefixed kept=289 allocations=3
+SIGNATURE MEMORY case=prefixed kept=289 allocations=3
+SIGNATURE MEMORY case=prefixed kept=289 allocations=3
+SIGNATURE MEMORY case=oversized kept=1048607 allocations=1
+SIGNATURE MEMORY case=oversized kept=1048607 allocations=1
+SIGNATURE MEMORY case=oversized kept=1048607 allocations=1
+SIGNATURE MEMORY case=oversized kept=1048607 allocations=1
+
+After:
+SIGNATURE MEMORY case=canonical kept=1 allocations=1
+SIGNATURE MEMORY case=canonical kept=1 allocations=1
+SIGNATURE MEMORY case=canonical kept=1 allocations=1
+SIGNATURE MEMORY case=canonical kept=1 allocations=1
+SIGNATURE MEMORY case=prefixed kept=1 allocations=1
+SIGNATURE MEMORY case=prefixed kept=1 allocations=1
+SIGNATURE MEMORY case=prefixed kept=1 allocations=1
+SIGNATURE MEMORY case=prefixed kept=1 allocations=1
+SIGNATURE MEMORY case=oversized kept=0 allocations=0
+SIGNATURE MEMORY case=oversized kept=0 allocations=0
+SIGNATURE MEMORY case=oversized kept=0 allocations=0
+SIGNATURE MEMORY case=oversized kept=0 allocations=0
+
+Reader-only control (no signature verification):
+SIGNATURE MEMORY case=canonical kept=1 allocations=1
+SIGNATURE MEMORY case=canonical kept=1 allocations=1
+SIGNATURE MEMORY case=canonical kept=1 allocations=1
+SIGNATURE MEMORY case=canonical kept=1 allocations=1

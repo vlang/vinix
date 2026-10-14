@@ -2,7 +2,6 @@
 module pkgcore
 
 import tools.packages.signing as ed25519
-import encoding.hex
 import os
 import time
 import tools.packages.pkgprotocol
@@ -50,9 +49,7 @@ pub fn verify_index(repository Repository, text string, signature string, now i6
 	if text.len > max_metadata { return error('${repository.id}: repository index too large') }
 	key := admitted_publisher_key(repository.public_key)!
 	defer { unsafe { key.free() } }
-	trimmed := signature.trim_space()
-	defer { unsafe { trimmed.free() } }
-	sig := hex.decode(trimmed)!
+	sig := decode_repository_signature(repository.id, signature)!
 	defer { unsafe { sig.free() } }
 	bytes := text.bytes()
 	defer { unsafe { bytes.free() } }

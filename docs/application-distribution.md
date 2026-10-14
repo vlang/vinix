@@ -555,6 +555,11 @@ on success, size refusal and write failure. Repository review fingerprints also
 release serialization/hash scratch while preserving their exact digest inputs.
 Persisted JSON, the newline-inclusive size limit and publication ordering stay
 compatible; see [administration metadata qualification](../tests/packages/administration-metadata-check.md).
+Repository signature decoding scans borrowed input and allocates an output only
+for a valid 64-byte hex representation. Oversized or malformed signatures cannot
+cause input-sized decoder allocations. Legacy whitespace, prefixes, hex case,
+odd leading-zero spelling and diagnostic precedence remain compatible; see
+[signature decoding qualification](../tests/packages/signature-decoding-check.md).
 Files/directories are flushed before
 publication; POSIX rename switches `current` atomically. The next state-changing transaction
 retires abandoned stages. A crash before activation exposes the old complete set;

@@ -1583,6 +1583,15 @@ newline. Enrollment/revocation retire temporary comparison digests after use.
 See [administration metadata qualification](../../tests/packages/administration-metadata-check.md)
 for byte compatibility, boundaries and measured serializer/hash ownership.
 
+Signature decoding scans the caller's string with fixed scratch and returns an
+owned 64-byte result only for a valid hex representation. It preserves the six
+ASCII outer whitespace bytes, optional `0x`/`0X`, mixed hex case and a 127-digit
+form with an implicit leading zero. Invalid hex retains its first-byte/index
+diagnostic before wrong-length refusal. Scanning remains linear in input size;
+the verifier still checks index size, publisher key, cryptographic signature,
+metadata identity and expiry in the same order. See
+[signature decoding qualification](../../tests/packages/signature-decoding-check.md).
+
 Configuration JSON preserves legacy omitted-field defaults, including partial
 policy objects. Present fields must have the declared JSON types; null values,
 unknown keys and duplicate keys (including escaped equivalent spellings) are

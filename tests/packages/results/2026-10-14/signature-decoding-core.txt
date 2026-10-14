@@ -1,0 +1,4 @@
+SIGNATURE DECODING legacy case, prefixes, odd leading-zero form, six ASCII whitespace bytes and all 256 interior bytes preserve results and diagnostics PASS
+SIGNATURE DECODING accepted forms authenticate exact bytes; tampering, expiry, identity and size/key/signature precedence remain enforced PASS
+SIGNATURE DECODING megabyte wrong-length/late-invalid inputs and long outer whitespace preserve compatibility and source bytes PASS
+SIGNATURE DECODING 16 repetitions of accepted, malformed and megabyte oversized inputs retain zero decoder scratch after caller cleanup PASS

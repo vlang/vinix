@@ -1,0 +1,2 @@
+PASS aarch64 packages-signature-decoding (13.4s)
+package-signature-decoding aarch64: 1 passed, 0 failed, 0 skipped
