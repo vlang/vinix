@@ -356,6 +356,15 @@ older unused generations and unused complete objects, and clears abandoned
 partial downloads.
 
 Stored generations are decoded strictly with all state envelope fields required.
+Each installed provenance, manifest, dependency and payload record must retain
+every declaration, including false flags and empty lists/bounds. Null and coerced
+values refuse admission. Only the documented zero-valued `window_protocol`
+extension remains optional. Damaged current state blocks dependent maintenance
+and launch admission; damaged previous state blocks rollback and collection.
+Failures preserve retained metadata, payloads and recovery work. Restore trusted
+records under the package writer lock or after stopping workers before retrying;
+missing declarations must not be guessed. See
+[stored-state qualification](../tests/packages/state-schema-check.md).
 Unknown and duplicate fields, including escaped duplicate spelling in nested
 package/provenance/dependency/file records, are refused. State checks include
 unique requested roots, the complete reachable dependency closure, target

@@ -1,0 +1,70 @@
+Pinned V 0.5.2 826e96f56ca12fcb8fd02dfd6edf1551008e62a8; V_MACOS_V3_NO_FALLBACK=1. Native assertions use -nocache -no-skip-unused -gc none -manualfree.
+PASS native core assertions state_schema
+PASS native core assertions state
+PASS native core assertions service
+PASS native core assertions distribution
+PASS native core assertions index_schema
+PASS native core assertions publisher_schema
+PASS native core assertions coordination
+PASS native core assertions review
+PASS native core assertions deployment
+PASS native core assertions collection_limit
+PASS stored schema scanner 1000-cycle tracked lifetimes
+PASS ASan/UBSan state_schema
+PASS ASan/UBSan state
+PASS ASan/UBSan service
+PASS complete signed CLI lifecycle
+
+Stored declaration and service recovery assertions:
+Stored state probe: aarch64 missing firmware accepted=false
+Stored state probe: aarch64 missing proprietary accepted=false
+Stored state probe: aarch64 null permissions accepted=false
+Stored state probe: aarch64 missing sdk accepted=false
+Stored state probe: x86_64 missing firmware accepted=false
+Stored state probe: x86_64 missing proprietary accepted=false
+Stored state probe: x86_64 null permissions accepted=false
+Stored state probe: x86_64 missing sdk accepted=false
+Stored state: complete nested declarations, explicit types, ambiguity refusal and legacy window compatibility passed on both architectures
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Downloading app/bin/app (14 bytes)
+Activated package generation 1
+Updating trusted repository publisher
+Installing Application 2.0.0 (1/1) from publisher
+Activated package generation 2
+Activated package generation 4
+Rolled back to generation 2; application data was retained
+Stored state: malformed active/previous metadata preserves activation, trust, payloads, cache and recovery; restoration permits reviewed removal, rollback and collection
+
+Scanner-only tracked lifetimes:
+Stored state probe: aarch64 missing firmware accepted=false
+Stored state probe: aarch64 missing proprietary accepted=false
+Stored state probe: aarch64 null permissions accepted=false
+Stored state probe: aarch64 missing sdk accepted=false
+Stored state probe: x86_64 missing firmware accepted=false
+Stored state probe: x86_64 missing proprietary accepted=false
+Stored state probe: x86_64 null permissions accepted=false
+Stored state probe: x86_64 missing sdk accepted=false
+Stored state: complete nested declarations, explicit types, ambiguity refusal and legacy window compatibility passed on both architectures
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Downloading app/bin/app (14 bytes)
+Activated package generation 1
+Updating trusted repository publisher
+Installing Application 2.0.0 (1/1) from publisher
+Activated package generation 2
+Activated package generation 4
+Rolled back to generation 2; application data was retained
+Stored state: malformed active/previous metadata preserves activation, trust, payloads, cache and recovery; restoration permits reviewed removal, rollback and collection
+Stored state scanner: retained 0 tracked bytes in 1000 cycles
+
+Full signed CLI lifecycle:
+Package CLI: malformed publisher history refuses release without changing prior publication
+Package CLI: malformed locks refuse within two seconds, preserve state/cache/history and permit verified recovery
+Package CLI: ambiguous configuration refused without activation, cache or trust changes
+Package CLI: malformed retained history refuses replay after revocation and empty refresh
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed
+
+x86_64 repeat with independently checked matching kernel/init/service input hashes:
+PASS x86_64 packages-state-schema (31.5s)
+PASS repeat input kernel/init/service hashes match the first passing x86_64 receipt

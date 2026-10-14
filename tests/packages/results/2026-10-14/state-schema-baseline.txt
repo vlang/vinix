@@ -1,0 +1,37 @@
+Initial stored-state decode probe against unchanged 832b7f2e5 production sources:
+Stored state probe: aarch64 missing firmware accepted=true
+Stored state probe: aarch64 missing proprietary accepted=true
+Stored state probe: aarch64 null permissions accepted=true
+Stored state probe: aarch64 missing sdk accepted=true
+Stored state probe: x86_64 missing firmware accepted=true
+Stored state probe: x86_64 missing proprietary accepted=true
+Stored state probe: x86_64 null permissions accepted=true
+Stored state probe: x86_64 missing sdk accepted=true
+tools/packages/pkgcore/state_schema_test.v:29: fn test_stored_state_refuses_missing_disclosures_and_coerced_manifest_values
+   > assert accepted == 0
+     Left value (len: 1): `8`
+    Right value (len: 1): `0`
+
+
+Final same missing/coerced declaration probes:
+Stored state probe: aarch64 missing firmware accepted=false
+Stored state probe: aarch64 missing proprietary accepted=false
+Stored state probe: aarch64 null permissions accepted=false
+Stored state probe: aarch64 missing sdk accepted=false
+Stored state probe: x86_64 missing firmware accepted=false
+Stored state probe: x86_64 missing proprietary accepted=false
+Stored state probe: x86_64 null permissions accepted=false
+Stored state probe: x86_64 missing sdk accepted=false
+Stored state: complete nested declarations, explicit types, ambiguity refusal and legacy window compatibility passed on both architectures
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Downloading app/bin/app (14 bytes)
+Activated package generation 1
+Updating trusted repository publisher
+Installing Application 2.0.0 (1/1) from publisher
+Activated package generation 2
+Activated package generation 4
+Rolled back to generation 2; application data was retained
+Stored state: malformed active/previous metadata preserves activation, trust, payloads, cache and recovery; restoration permits reviewed removal, rollback and collection
+
+Initial fixture calibration: V increment expressions needed statement assignments in or blocks; zero window_protocol is omitted by the writer, so the null mutation now explicitly inserts it. Initial guest assertions expected a narrower schema message than the correct typed SDK decoder diagnostic. The fixture now accepts that precise number/string error as well. Overlong retry directories hit the host Unix socket path limit before boot and were replaced with short state names. The initial x86_64 guest timed out after startup; its cause was not established. Fresh final x86_64 and an additional run with the exact same kernel/init/service tuple passed. Production admission was unchanged during these fixture corrections. Initial build logs, assertion output and guest attempts remain private and hashed; disposable failed-attempt VM media was removed to recover shared disk space.

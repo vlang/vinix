@@ -15,6 +15,15 @@ and admits regular-file leases before removal. Applications and publishers must
 use the service instead of writing this state. See
 [state validation qualification](../../tests/packages/state-validation-check.md).
 
+Stored provenance and every nested manifest, dependency and payload declaration
+must also be complete. False proprietary/firmware/executable flags, empty lists
+and dependency bounds, and SDK values are explicit; null or coerced values do
+not supply defaults. `window_protocol` remains optional at zero for format-1
+compatibility. Canonical writer bytes are unchanged. Restore damaged records
+from trusted retained state while holding the writer lock or stopping package
+workers; do not reconstruct omitted declarations by guessing defaults. See
+[stored-state schema qualification](../../tests/packages/state-schema-check.md).
+
 Collection checks obsolete-generation leases with a bounded descriptor pair,
 then reopens the same directory/lease identities and relocks before removal.
 The writer lock excludes new launch admission throughout both phases; an already

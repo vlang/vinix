@@ -1,0 +1,51 @@
+Three native runners exited 0 under clang ASan/UBSan; ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1. No whole-decoder/service heap retention claim.
+PASS ASan/UBSan state_schema
+Stored state probe: aarch64 missing firmware accepted=false
+Stored state probe: aarch64 missing proprietary accepted=false
+Stored state probe: aarch64 null permissions accepted=false
+Stored state probe: aarch64 missing sdk accepted=false
+Stored state probe: x86_64 missing firmware accepted=false
+Stored state probe: x86_64 missing proprietary accepted=false
+Stored state probe: x86_64 null permissions accepted=false
+Stored state probe: x86_64 missing sdk accepted=false
+Stored state: complete nested declarations, explicit types, ambiguity refusal and legacy window compatibility passed on both architectures
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Downloading app/bin/app (14 bytes)
+Activated package generation 1
+Updating trusted repository publisher
+Installing Application 2.0.0 (1/1) from publisher
+Activated package generation 2
+Activated package generation 4
+Rolled back to generation 2; application data was retained
+Stored state: malformed active/previous metadata preserves activation, trust, payloads, cache and recovery; restoration permits reviewed removal, rollback and collection
+PASS ASan/UBSan state
+PASS ASan/UBSan service
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Rolled back to generation 2; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Rolled back to generation 2; application data was retained

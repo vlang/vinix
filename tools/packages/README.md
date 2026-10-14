@@ -54,6 +54,11 @@ holders with diagnostics. FIFO replacements cannot hang status, transactions or
 launch admission; restoring a sound lock/lease permits retry. See
 [coordination qualification](../../tests/packages/coordination-check.md).
 
+Stored generations require complete manifests and provenance, including explicit
+false flags, empty lists and dependency bounds. Damaged current or rollback
+metadata refuses dependent operations before cleanup; restoring trusted records
+permits retry. See [stored-state qualification](../../tests/packages/state-schema-check.md).
+
 Launch, inventory and purge share account-home directory checks. Launch creates
 private app data and temporary directories without following aliases or changing
 an alias target's permissions. Unsafe entries fail with diagnostics and remain

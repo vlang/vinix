@@ -77,6 +77,7 @@ fn main() {
 		'packages-admin' { scenario_packages_admin(mut t) }
 		'packages-isolated-launch' { scenario_packages_isolated_launch(mut t) }
 		'packages-launch-data' { scenario_packages_launch_data(mut t) }
+		'packages-state-schema' { scenario_packages_state_schema(mut t) }
 		'packages-crash-staged', 'packages-crash-published', 'packages-crash-activated' {
 			scenario_package_recovery(mut t)
 		}

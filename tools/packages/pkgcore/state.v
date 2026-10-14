@@ -28,12 +28,46 @@ fn state_document_field(parent string, key string) bool {
 	}
 }
 
+fn state_required_fields(parent string, keys []string) ! {
+	if parent == '' {
+		for key in ['format', 'generation', 'previous', 'architecture', 'requested', 'packages']! {
+			if key !in keys { return error('missing required persistent state field: ' + key) }
+		}
+	} else if parent == 'packages' {
+		for key in ['package', 'repository', 'public_key', 'sequence']! {
+			if key !in keys { return error('missing required installed provenance field: ' + key) }
+		}
+	} else {
+		// Retained manifests must preserve the complete signed declarations,
+		// including explicit false/empty values. SDK 1's optional window_protocol
+		// remains compatible with generations written before that extension.
+		index_required_fields(if parent == 'package' { 'packages' } else { parent }, keys)!
+	}
+}
+
+fn state_value_type(parent string, key string, token u8) bool {
+	if parent == '' {
+		if key in ['requested', 'packages']! { return token == `[` }
+		if key == 'architecture' { return token == `"` }
+		return token >= `0` && token <= `9`
+	}
+	if parent == 'packages' {
+		if key == 'package' { return token == `{` }
+		if key == 'sequence' { return token >= `0` && token <= `9` }
+		return token == `"`
+	}
+	return index_value_type(if parent == 'package' { 'packages' } else { parent }, key, token)
+}
+
 fn decode_persistent_state(text string, architecture string) !State {
 	if text.len > max_metadata { return error('persistent package state exceeds metadata limit') }
 	input := json2.decode[PersistentStateInput](text, strict: true)!
 	state := State{ format: input.format, generation: input.generation, previous: input.previous,
 		architecture: input.architecture, requested: input.requested, packages: input.packages }
-	document_keys(text, state_document_field) or { close_decoded_state(state); return err }
+	document_keys_schema(text, state_document_field, state_required_fields, state_value_type) or {
+		close_decoded_state(state)
+		return err
+	}
 	validate_state(state, architecture) or { close_decoded_state(state); return err }
 	return state
 }
