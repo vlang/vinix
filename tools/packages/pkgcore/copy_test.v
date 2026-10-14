@@ -131,7 +131,7 @@ fn test_copy_uses_captured_descriptors_and_refuses_size_or_destination_identity_
 		}
 		assert refused == (mode !in ['source-fifo', 'source-alias']), mode
 		if !refused { assert os.read_file(work + '/target')! == 'payload' }
-		if mode.starts_with('target-') && mode != 'target-grow' { assert os.read_file(work + '/target.saved')! == 'payload' }
+		if mode.starts_with('target-') && mode != 'target-grow' { assert os.read_file(work + '/target.saved')! == '' }
 		assert os.read_file(work + '/outside')! == 'preserved' && os.lstat(work + '/outside')!.mode & 0o777 == 0o600
 		mut events := []pkgprotocol.Progress{}
 		for line in os.read_file(work + '/events')!.split_into_lines() { events << pkgprotocol.decode_progress(line)! }

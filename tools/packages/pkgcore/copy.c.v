@@ -15,6 +15,29 @@ struct CopySource {
 	inode u64
 }
 
+struct CopyOptions {
+	checkpoint fn (string, string) ! = mirror_no_checkpoint
+	flush fn (int) int = atomic_flush
+}
+
+struct CopyOutput {
+	fd int
+	device u64
+	inode u64
+}
+
+fn check_copy_output(output CopyOutput, path string, bytes u64) ! {
+	mut opened := C.stat{}
+	mut named := C.stat{}
+	if C.fstat(output.fd, &opened) != 0 || opened.st_mode & 0o170000 != 0o100000
+		|| opened.st_size < 0 || u64(opened.st_size) != bytes || opened.st_nlink != 1
+		|| C.fstatat(C.AT_FDCWD, path.str, &named, C.AT_SYMLINK_NOFOLLOW) != 0
+		|| named.st_mode & 0o170000 != 0o100000
+		|| u64(named.st_dev) != output.device || u64(named.st_ino) != output.inode {
+		return error('copy destination changed while writing; require a stable ordinary file without hard links: ${path}')
+	}
+}
+
 fn copy_source(source string, maximum u64) !CopySource {
 	if source.contains('\x00') { return error('copy source must be an ordinary regular file: ${source}') }
 	fd := C.open(source.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
@@ -50,6 +73,10 @@ fn fetch_file_progress(source string, target string, maximum u64, resume bool, e
 }
 
 fn copy_opened(input CopySource, source string, target string, offset u64, event pkgprotocol.Progress, report fn (pkgprotocol.Progress)) ! {
+	copy_opened_with(input, source, target, offset, event, report, CopyOptions{})!
+}
+
+fn copy_opened_with(input CopySource, source string, target string, offset u64, event pkgprotocol.Progress, report fn (pkgprotocol.Progress), options CopyOptions) ! {
 	if offset > input.bytes { return error('copy resume offset exceeds source size: ${source}') }
 	if target.contains('\x00') { return error('copy destination must be an ordinary regular file: ${target}') }
 	if C.lseek(input.fd, i64(offset), C.SEEK_SET) != i64(offset) { return error('cannot seek copy source: ${source}') }
@@ -64,11 +91,15 @@ fn copy_opened(input CopySource, source string, target string, offset u64, event
 	if u64(info.st_dev) == input.device && u64(info.st_ino) == input.inode {
 		return error('copy source and destination must be different files: ${target}')
 	}
+	if info.st_nlink != 1 {
+		return error('copy destination must be an ordinary regular file without hard links; retained data is unchanged: ${target}')
+	}
 	if offset > 0 && u64(info.st_size) != offset {
 		return error('copy destination changed or has a different resume offset: ${target}')
 	}
-	device := u64(info.st_dev)
-	inode := u64(info.st_ino)
+	captured := CopyOutput{ fd: output, device: u64(info.st_dev), inode: u64(info.st_ino) }
+	options.checkpoint('opened', target)!
+	check_copy_output(captured, target, u64(info.st_size))!
 	// Never use O_TRUNC: validate type, identity and offset before modifying it.
 	if offset == 0 && C.ftruncate(output, 0) != 0 { return error('cannot truncate copy destination: ${target}') }
 	if C.lseek(output, i64(offset), C.SEEK_SET) != i64(offset) { return error('cannot seek copy destination: ${target}') }
@@ -77,6 +108,7 @@ fn copy_opened(input CopySource, source string, target string, offset u64, event
 	mut bytes := offset
 	mut last := time.sys_mono_now()
 	if event.phase != '' { report(pkgprotocol.Progress{ ...event, current: bytes }) }
+	check_copy_output(captured, target, bytes)!
 	for bytes < input.bytes {
 		remaining := input.bytes - bytes
 		amount := if remaining < u64(buffer.len) { int(remaining) } else { buffer.len }
@@ -94,6 +126,7 @@ fn copy_opened(input CopySource, source string, target string, offset u64, event
 		bytes += u64(count)
 		if event.phase != '' && bytes < input.bytes && time.sys_mono_now() - last >= 200_000_000 {
 			report(pkgprotocol.Progress{ ...event, current: bytes })
+			check_copy_output(captured, target, bytes)!
 			last = time.sys_mono_now()
 		}
 	}
@@ -107,13 +140,14 @@ fn copy_opened(input CopySource, source string, target string, offset u64, event
 		}
 		break
 	}
-	if C.fstat(output, &info) != 0 || info.st_size < 0 || u64(info.st_size) != input.bytes {
-		return error('copy destination changed size while writing: ${target}')
+	check_copy_output(captured, target, input.bytes)!
+	for {
+		if options.flush(output) == 0 { break }
+		if C.errno == C.EINTR { continue }
+		return error('cannot flush captured payload; retained partial data may need retry after checking storage: ${target}')
 	}
-	named := os.lstat(target) or { return error('copy destination changed while writing: ${target}') }
-	if named.mode & 0o170000 != 0o100000 || named.dev != device || named.inode != inode {
-		return error('copy destination changed while writing: ${target}')
-	}
-	if C.fsync(output) != 0 { return error('cannot flush payload: ${target}') }
+	options.checkpoint('flushed', target)!
+	check_copy_output(captured, target, input.bytes)!
 	if event.phase != '' { report(pkgprotocol.Progress{ ...event, current: bytes }) }
+	check_copy_output(captured, target, input.bytes)!
 }

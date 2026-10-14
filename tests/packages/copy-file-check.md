@@ -14,6 +14,12 @@ sentinel read to detect growth. Shrinkage, final size mismatches and changed
 destination path identity fail before the final progress report. Writes and
 reads handle interruptions and short writes; successful output is flushed.
 
+The later [output qualification](copy-output-check.md) also requires exactly one
+destination hard link, checks identity/size/link count around callbacks and the
+flush, and retries interrupted flushes. Source hard links remain supported. Its
+separate baseline reproduces writes through an output linked to an unrelated
+file; the original nine-case probe below retains its original baseline contract.
+
 Offline `file://` acquisition shares this copier. It admits the source before
 changing any retained partial and resumes an ordinary partial only when its
 offset fits the captured source. An oversized partial restarts from zero after
@@ -38,7 +44,8 @@ empty and resumed contents, existing modes, private new files, invalid/overflowi
 offsets, missing resumes, malformed paths and source-size limits. A progress
 observer replaces captured source/destination names with FIFOs or aliases and
 changes sizes during copying. Old source descriptors remain readable; replaced
-destination names fail identity checks without following the replacement. Under
+destination names fail identity checks before writing through the captured
+output, without following the replacement. Under
 a 32-descriptor limit, 128 successful/refused cycles exercise descriptor cleanup.
 These tests do not claim whole-process heap retention or atomic file-copy rollback.
 

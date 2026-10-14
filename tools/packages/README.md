@@ -89,9 +89,12 @@ or stall it on a FIFO; in-place size changes fail with retry diagnostics. See
 [metadata read qualification](../../tests/packages/metadata-read-check.md).
 
 Local payload copies and offline transfers validate captured source/destination
-descriptors before truncating or writing. Aliases, special files, the same inode
-and inconsistent resume offsets refuse; an oversized offline source preserves
-the existing partial for recovery. See [copy qualification](../../tests/packages/copy-file-check.md).
+descriptors before truncating or writing. Aliases, special files, the same inode,
+hard-linked destinations and inconsistent resume offsets refuse; an oversized
+offline source preserves the existing partial for recovery. Destination identity,
+size and link count are rechecked around progress callbacks and flushing;
+interrupted flushes retry. See [copy qualification](../../tests/packages/copy-file-check.md)
+and [output qualification](../../tests/packages/copy-output-check.md).
 
 Payload hashing also captures one nonblocking, no-follow descriptor. Verification
 admits the signed length before reading, bounds hashing to that size plus one

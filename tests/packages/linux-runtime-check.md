@@ -107,9 +107,15 @@ See [durability qualification](durability-check.md).
 
 `PACKAGE KEYGEN` adds the target key-creation probe and CLI public-key recovery.
 It refuses aliased/shared-writable parents, NUL paths and all existing leaves,
-then creates an ordinary private seed successfully. The current receipt pins
-sixteen artifacts/logs, including this probe. See
+then creates an ordinary private seed successfully. The receipt pins this probe. See
 [key creation qualification](keygen-check.md).
+
+`PACKAGE COPY OUTPUT` requires the target [output probe](copy-output-check.v):
+fresh/resumed local copies and offline transfers, plus a publisher object
+temporary, refuse hard-linked destinations without changing unrelated contents
+or retained prefixes. Shared sources and ordinary output still succeed. Current
+receipts pin seventeen artifacts/logs, including this probe. See
+[output qualification](copy-output-check.md).
 
 The scenario passed on both targets on 2026-10-12 using an isolated build of
 committed kernel revision `7ac619bd`. Retained receipts and complete serial logs:

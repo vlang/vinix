@@ -581,6 +581,9 @@ fn qualify_package_linux(mut t Test) ! {
 	assert keygen_check.status == 0, keygen_check.output
 	assert run(['/usr/bin/vinix-package', 'key-public', '/tmp/package-keygen-contract/ordinary'], '', none, none).status == 0
 	t.say('PACKAGE KEYGEN captured-parent private-exclusive-publication unsafe-path-refusal public-key-recovery PASS')
+	copy_output_check := run(['/usr/share/package-fixtures/copy-output-check', '/tmp/package-copy-output-contract'], '', none, none)
+	assert copy_output_check.status == 0, copy_output_check.output
+	t.say('PACKAGE COPY OUTPUT hardlink-refusal preserved-prefix publisher-temporary ordinary-retry PASS')
 	// Organization restrictions are reviewed and atomically persisted without
 	// editing trust, the account selection or the installed generation.
 	policy_path := '/tmp/organization-policy.json'

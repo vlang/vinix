@@ -1,0 +1,7 @@
+copy-fresh: wait status 256; refused with unrelated file and retained prefix preserved
+copy-resume: wait status 256; refused with unrelated file and retained prefix preserved
+offline-fresh: wait status 256; refused with unrelated file and retained prefix preserved
+offline-resume: wait status 256; refused with unrelated file and retained prefix preserved
+pack-temporary: wait status 256; refused with unrelated file and retained prefix preserved
+Shared source and ordinary output accepted
+Copy output qualification passed

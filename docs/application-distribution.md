@@ -21,6 +21,12 @@ available for a retry after restoring trusted media. Signed size/hash checks
 still gate cache promotion and generation activation. See
 [copy qualification](../tests/packages/copy-file-check.md).
 
+Local destinations must also have exactly one hard link. Fresh/resumed offline
+transfers and publisher object temporaries refuse shared output before changing
+its contents. Captured destination identity, size and link count are rechecked
+around progress callbacks and flushing; interrupted flushes retry. Source hard
+links remain readable. See [output qualification](../tests/packages/copy-output-check.md).
+
 Payload hashing and verification use one captured ordinary-file descriptor,
 opened without following leaf aliases or blocking on FIFOs. Verification checks
 the authenticated length on that descriptor before hashing. Reads stop at the

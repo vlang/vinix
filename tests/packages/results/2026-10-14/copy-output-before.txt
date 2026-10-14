@@ -1,0 +1,7 @@
+copy-fresh: wait status 0; unrelated hard-linked file overwritten
+copy-resume: wait status 0; unrelated hard-linked file overwritten
+offline-fresh: wait status 0; unrelated hard-linked file overwritten
+offline-resume: wait status 0; unrelated hard-linked file overwritten
+pack-temporary: wait status 0; unrelated hard-linked file overwritten
+Shared source and ordinary output accepted
+Copy output qualification passed

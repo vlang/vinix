@@ -110,6 +110,17 @@ v -path '@vlib|@vmodules|.|tools/accounts' -o /tmp/vinix-package tools/packages/
 /tmp/vinix-package publish-release /build/new-repository company /secure/publisher.seed 1 2000000000 /srv/releases/company-1
 ```
 
+Local payload output must be an ordinary file with exactly one hard link. This
+applies to fresh/resumed `file://` transfers, cache-to-generation copies and
+`pack` object temporaries. A shared output refuses before truncation or writing;
+remove the unintended extra name or select a new destination after inspecting
+the retained data. Shared read-only sources remain supported. Destination
+identity, size and link count are checked around progress callbacks and the
+captured descriptor's flush, with interrupted flushes retried. Controlled parents
+and serialization of other writers remain required; these checks do not freeze
+arbitrary same-user in-place edits or make a failed copy transactional. See
+[output qualification](../../tests/packages/copy-output-check.md).
+
 `keygen` prints the lowercase-hex public key and creates a mode-0600, 32-byte
 signing seed encoded as 64 lowercase hex digits and a newline. Its parent must
 already be an ordinary directory owned by the publisher, without group/other

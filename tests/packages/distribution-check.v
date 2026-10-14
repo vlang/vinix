@@ -83,6 +83,9 @@ fn check() ! {
 			'-o', work + '/copy-file-check', repository + '/tests/packages/copy-file-check.v'])!
 		run(work + '/copy-file-check', [work + '/copy-files'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/copy-output-check', repository + '/tests/packages/copy-output-check.v'])!
+		run(work + '/copy-output-check', [work + '/copy-output'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/hash-file-check', repository + '/tests/packages/hash-file-check.v'])!
 		run(work + '/hash-file-check', [work + '/hash-files'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
