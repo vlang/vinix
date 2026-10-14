@@ -93,3 +93,49 @@ fn test_ffmpeg_profile_refuses_wrong_targets_links_notices_versions_and_unpinned
 	ffmpeg_catalog('1.0.0', work + '/roots', work + '/occupied') or { occupied = err.msg().contains('must be new') }
 	assert occupied && os.ls(work + '/occupied')!.len == 0
 }
+
+fn ffmpeg_directory_imported_source(phase string, stage string) ! {
+	if phase != 'created' { return }
+	path := os.dir(stage) + '/roots/aarch64/sources/ffmpeg.tar.xz'
+	os.rm(path)!; os.mkdir(path)!; os.write_file(path + '/nested', 'unexpected source directory')!
+}
+
+fn ffmpeg_empty_imported_notice(phase string, stage string) ! {
+	if phase == 'created' { os.write_file(os.dir(stage) + '/roots/aarch64/licenses/ffmpeg-COPYING.LGPLv2.1', '')! }
+}
+
+fn ffmpeg_empty_imported_build_record(phase string, stage string) ! {
+	if phase == 'created' { os.write_file(os.dir(stage) + '/roots/aarch64/sources/build.json', '')! }
+}
+
+fn ffmpeg_oversized_imported_notice(phase string, stage string) ! {
+	if phase != 'created' { return }
+	mut file := os.open_file(os.dir(stage) + '/roots/aarch64/licenses/ffmpeg-COPYING.LGPLv2.1', 'w', 0o644)!
+	defer { file.close() }
+	file.seek(1024 * 1024, .start)!; file.write_string('\x00')!
+}
+
+fn ffmpeg_profile_zero_space(_ string) !u64 { return 0 }
+
+fn test_ffmpeg_profile_requires_the_imported_source_filename_and_complete_bounded_notices() {
+	for checkpoint in [ffmpeg_directory_imported_source, ffmpeg_empty_imported_notice,
+		ffmpeg_empty_imported_build_record, ffmpeg_oversized_imported_notice] {
+		work := ffmpeg_test_roots()!
+		defer { os.rmdir_all(work) or {} }
+		mut denied := false
+		ffmpeg_catalog_with('1.0.0', work + '/roots', work + '/refused', CatalogOptions{ checkpoint: checkpoint }) or {
+			// Synthetic source bytes are intentionally unpinned. These checks
+			// must fail on the mutated inventory before reaching its hash check.
+			denied = err.msg().contains('unexpected payload path') || err.msg().contains('invalid redistribution/build notice')
+		}
+		assert denied && !os.exists(work + '/refused')
+		assert os.ls(work)!.all(!it.starts_with('.vinix-ffmpeg-profile-'))
+	}
+	work := ffmpeg_test_roots()!
+	defer { os.rmdir_all(work) or {} }
+	mut full := false
+	ffmpeg_catalog_with('1.0.0', work + '/roots', work + '/refused', CatalogOptions{ available_space: ffmpeg_profile_zero_space }) or {
+		full = err.msg().contains('insufficient disk space')
+	}
+	assert full && !os.exists(work + '/refused') && os.ls(work)!.all(!it.starts_with('.vinix-ffmpeg-profile-'))
+}

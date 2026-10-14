@@ -1,0 +1,8 @@
+sqlite-empty-notice changed-after-preflight=true exit=1 published=false
+vinix-package: catalog profile imported an invalid redistribution/build notice: org.sqlite.cli/aarch64/licenses/sqlite-COPYRIGHT
+sqlite-notice-directory changed-after-preflight=true exit=1 published=false
+vinix-package: catalog profile imported an unexpected payload path: org.sqlite.cli/aarch64/licenses/sqlite-COPYRIGHT
+ffmpeg-empty-notice changed-after-preflight=true exit=1 published=false
+vinix-package: catalog profile imported an invalid redistribution/build notice: org.ffmpeg.cli/aarch64/licenses/ffmpeg-COPYING.LGPLv2.1
+ffmpeg-source-directory changed-after-preflight=true exit=1 published=false
+vinix-package: catalog profile imported an unexpected payload path: org.vinix.ffmpeg-runtime/aarch64/sources/ffmpeg.tar.xz

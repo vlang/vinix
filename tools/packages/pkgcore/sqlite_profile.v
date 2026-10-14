@@ -7,6 +7,8 @@ import os
 pub const sqlite_application_id = 'org.sqlite.cli'
 pub const sqlite_runtime_id = 'org.vinix.sqlite-runtime'
 
+const sqlite_notices = ['licenses/sqlite-COPYRIGHT', 'licenses/musl-COPYRIGHT', 'licenses/vinix-COPYING']
+
 pub struct SqliteProfileInfo {
 pub:
 	format int = 1
@@ -47,6 +49,10 @@ fn sqlite_profile_templates(architecture string, sqlite_version string, runtime_
 }
 
 pub fn sqlite_catalog(sqlite_version string, runtime_version string, source_roots string, destination string) !SqliteProfileInfo {
+	return sqlite_catalog_with(sqlite_version, runtime_version, source_roots, destination, CatalogOptions{})
+}
+
+fn sqlite_catalog_with(sqlite_version string, runtime_version string, source_roots string, destination string, options CatalogOptions) !SqliteProfileInfo {
 	version_parts(sqlite_version)!
 	version_parts(runtime_version)!
 	if compare_versions(runtime_version, '1.0.0') < 0 || compare_versions(runtime_version, '2.0.0') >= 0 {
@@ -72,7 +78,7 @@ pub fn sqlite_catalog(sqlite_version string, runtime_version string, source_root
 			C.close(node.fd)
 			root_bytes = mirror_cost(root_bytes, node.bytes)!
 		}
-		for path in ['licenses/sqlite-COPYRIGHT', 'licenses/musl-COPYRIGHT', 'licenses/vinix-COPYING'] {
+		for path in sqlite_notices {
 			node := import_node(fd, path)!
 			C.close(node.fd)
 			if node.mode & 0o170000 != 0o100000 || node.bytes == 0 || node.bytes > u64(1024 * 1024) {
@@ -85,14 +91,16 @@ pub fn sqlite_catalog(sqlite_version string, runtime_version string, source_root
 	}
 	parent := os.dir(target)
 	scratch = mirror_cost(scratch, scratch)!
-	disk_check(free_bytes(parent)!, mirror_cost(needed, scratch)!, 64 * 1024 * 1024)!
-	disk_check(free_bytes(os.temp_dir())!, scratch, 64 * 1024 * 1024)!
+	disk_check(options.available_space(parent)!, mirror_cost(needed, scratch)!, 64 * 1024 * 1024)!
+	disk_check(options.available_space(os.temp_dir())!, scratch, 64 * 1024 * 1024)!
 	stage := export_stage(parent, '.vinix-sqlite-profile')!
 	defer { os.rmdir_all(stage) or {} }
+	options.checkpoint('created', stage)!
 	mut packages := []CatalogImport{}
 	for architecture in ['aarch64', 'x86_64'] {
 		for recipe in sqlite_profile_templates(architecture, sqlite_version, runtime_version) {
 			p := pack_root_descriptor(recipe, roots[architecture], stage + '/inventory', false)!
+			profile_file_inventory(recipe, p, sqlite_notices)!
 			// Validate the materialized bytes too: a source may have changed after
 			// preflight. Object modes are storage modes; the manifest carries exec.
 			objects := C.open((stage + '/inventory/objects').str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)

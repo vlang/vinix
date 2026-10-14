@@ -4,6 +4,8 @@ module pkgcore
 import json2
 import os
 
+const native_notices = ['licenses/application-sdk-MIT.txt', 'licenses/v-MIT.txt', 'licenses/musl-MIT.txt']
+
 pub struct NativeProfileInfo {
 pub:
 	format int = 1
@@ -86,17 +88,11 @@ fn native_catalog_with(version string, source_roots string, destination string, 
 	for architecture in ['aarch64', 'x86_64'] {
 		for recipe in native_profile_templates(architecture, version) {
 			p := pack_root_descriptor(recipe, roots[architecture], stage + '/inventory', false)!
-			if p.files.len != recipe.entries.len { return error('native SDK profile imported an unexpected payload inventory: ${p.id}') }
-			for entry in recipe.entries {
-				if !p.files.any(it.path == entry.path) { return error('native SDK profile imported an unexpected payload path: ${p.id}/${entry.path}') }
-			}
+			profile_file_inventory(recipe, p, native_notices)!
 			objects := C.open((stage + '/inventory/objects').str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
 			if objects < 0 { return error('cannot inspect native SDK profile inventory') }
 			for file in p.files {
-				if file.path != p.entrypoint {
-					if file.bytes == 0 || file.bytes > u64(1024 * 1024) { C.close(objects); return error('native SDK profile imported an invalid redistribution notice: ${file.path}') }
-					continue
-				}
+				if file.path != p.entrypoint { continue }
 				if !file.executable { C.close(objects); return error('native SDK profile payload is not executable: ${file.path}') }
 				profile_elf(objects, file.sha256, architecture, 'static', false) or {
 					C.close(objects)

@@ -74,6 +74,12 @@ hardware acceleration and external codec libraries are disabled. The
 [qualification](../tests/packages/ffmpeg-profile-check.md) covers real media
 encoding, decoding and inspection through the package service on both targets.
 
+All three fixed profiles validate the imported inventory before publication,
+requiring their exact file paths and nonempty, bounded license/build notices.
+Changes after preflight cannot substitute a directory for the required FFmpeg
+source archive or publish empty notices. Failed imports remove staging data and
+permit retry after restoring inputs. See [inventory qualification](../tests/packages/profile-inventory-check.md).
+
 [Catalog composition](../tools/packages/SDK.md#compose-application-catalogs)
 combines independently prepared profiles into one publisher release while
 keeping their loaders and libraries in separate directories. It preserves every

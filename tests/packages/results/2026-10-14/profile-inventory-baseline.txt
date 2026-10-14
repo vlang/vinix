@@ -1,0 +1,20 @@
+sqlite-empty-notice changed-after-preflight=true exit=0 published=true
+accepted org.sqlite.cli/aarch64/licenses/sqlite-COPYRIGHT bytes=0
+accepted org.sqlite.cli/x86_64/licenses/sqlite-COPYRIGHT bytes=0
+accepted org.vinix.sqlite-runtime/aarch64/licenses/sqlite-COPYRIGHT bytes=0
+accepted org.vinix.sqlite-runtime/x86_64/licenses/sqlite-COPYRIGHT bytes=0
+sqlite-notice-directory changed-after-preflight=true exit=0 published=true
+accepted org.sqlite.cli/aarch64/licenses/sqlite-COPYRIGHT/unexpected bytes=29
+accepted org.sqlite.cli/x86_64/licenses/sqlite-COPYRIGHT/unexpected bytes=29
+accepted org.vinix.sqlite-runtime/aarch64/licenses/sqlite-COPYRIGHT/unexpected bytes=29
+accepted org.vinix.sqlite-runtime/x86_64/licenses/sqlite-COPYRIGHT/unexpected bytes=29
+ffmpeg-empty-notice changed-after-preflight=true exit=0 published=true
+accepted org.ffmpeg.cli/aarch64/licenses/ffmpeg-COPYING.LGPLv2.1 bytes=0
+accepted org.ffmpeg.cli/x86_64/licenses/ffmpeg-COPYING.LGPLv2.1 bytes=0
+accepted org.ffmpeg.probe/aarch64/licenses/ffmpeg-COPYING.LGPLv2.1 bytes=0
+accepted org.ffmpeg.probe/x86_64/licenses/ffmpeg-COPYING.LGPLv2.1 bytes=0
+accepted org.vinix.ffmpeg-runtime/aarch64/licenses/ffmpeg-COPYING.LGPLv2.1 bytes=0
+accepted org.vinix.ffmpeg-runtime/x86_64/licenses/ffmpeg-COPYING.LGPLv2.1 bytes=0
+ffmpeg-source-directory changed-after-preflight=true exit=0 published=true
+accepted org.vinix.ffmpeg-runtime/aarch64/sources/ffmpeg.tar.xz/unexpected bytes=29
+accepted org.vinix.ffmpeg-runtime/x86_64/sources/ffmpeg.tar.xz/unexpected bytes=29

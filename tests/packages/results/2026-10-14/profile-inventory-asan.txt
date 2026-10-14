@@ -1,0 +1,27 @@
+sqlite_profile ASan/UBSan (detect_leaks=0, halt_on_error=1):
+
+ffmpeg_profile ASan/UBSan (detect_leaks=0, halt_on_error=1):
+
+native_profile ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Updating trusted repository native
+Installing Native counter 1.0.0 (1/3) from native
+Downloading org.vinix.counter/bin/counter (128 bytes)
+Downloading org.vinix.counter/licenses/application-sdk-MIT.txt (23 bytes)
+Downloading org.vinix.counter/licenses/musl-MIT.txt (12 bytes)
+Downloading org.vinix.counter/licenses/v-MIT.txt (9 bytes)
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 1
+Activated package generation 2
+Rolled back to generation 1; application data was retained
+Updating trusted repository native
+Installing Native counter 1.0.0 (1/3) from native
+Downloading org.vinix.counter/bin/counter (128 bytes)
+Downloading org.vinix.counter/licenses/application-sdk-MIT.txt (23 bytes)
+Downloading org.vinix.counter/licenses/musl-MIT.txt (12 bytes)
+Downloading org.vinix.counter/licenses/v-MIT.txt (9 bytes)
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 1
+Activated package generation 2
+Rolled back to generation 1; application data was retained

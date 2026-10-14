@@ -396,6 +396,8 @@ they do not prove every syscall, library function or application behavior.
 Notices must be nonempty ordinary files of at most 1 MiB. Root directories
 cannot be aliases; the importer captures both target directories before copying.
 Imported executable bytes and notice sizes are checked again before publication.
+All fixed profiles require their exact declared file inventory after import;
+see [inventory qualification](../../tests/packages/profile-inventory-check.md).
 
 The six manifests retain the example contracts: Hello has `files` permission,
 `text/plain` association and no window protocol; Counter has only `display` and
@@ -448,6 +450,9 @@ The profile checks ELF64 little-endian target/type and bounded program headers,
 requires an interpreter on the CLI and no interpreter on the static runner or
 shared libraries, and checks the imported object headers again. Executable
 payloads are limited to 512 MiB each; notices must be nonempty and at most 1 MiB.
+The imported inventory must contain every declared file at its exact path, with
+notice sizes checked again. A directory substituted after preflight cannot
+replace a required notice, executable or library in the catalog lock.
 This structural check does not identify an arbitrary file as genuine SQLite,
 authenticate its source or certify its library ABI. The publisher declares the
 numeric SQLite version and a runtime version in `>=1.0.0,<2.0.0`, and must build
@@ -584,7 +589,10 @@ The source archive's length and SHA-256 must match
 [ffmpeg-source.json](../../tests/packages/ffmpeg-source.json). ELF format,
 architecture, interpreter presence and ordinary executable metadata are checked
 before import and again on captured payload objects. All notices/build sources
-are required, nonempty and bounded. Symlinks are materialized within captured
+are required, nonempty and bounded, including in the imported inventory. Every
+declared file must retain its exact path: substituting a directory for the
+source archive cannot skip the archive's length, hash and mode checks.
+Symlinks are materialized within captured
 guest roots. The output is a canonical `catalog.json` only; temporary payload
 copies are removed. Both architectures, closure, source pin, disk reserve and
 new destination requirements are enforced before publication. `pack-catalog`

@@ -118,6 +118,12 @@ versioned musl/library runtime, with notices, upstream source and V build tools.
 See the [profile](SDK.md#ffmpeg-local-media-publisher-profile) and
 [qualification](../../tests/packages/ffmpeg-profile-check.md).
 
+Fixed native, SQLite and FFmpeg profiles recheck the complete imported file list
+and bounded, nonempty notices before publishing a lock. Replacing a required
+file with a directory cannot omit a notice or bypass the FFmpeg source pin.
+Failed imports leave no output lock and permit retry with restored inputs. See
+[profile inventory qualification](../../tests/packages/profile-inventory-check.md).
+
 Software's **Launch in Terminal** action runs an installed CLI application in a
 PTY within its window. `run-terminal ID [ABSOLUTE_FILE...]` provides the same
 ordinary-account launch from an existing terminal; it refuses redirected input

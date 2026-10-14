@@ -104,3 +104,48 @@ fn test_sqlite_profile_requires_both_targets_compatible_versions_and_new_destina
 	sqlite_catalog('3.53.4', '1.0.0', work + '/roots', work + '/link') or { linked = err.msg().contains('ordinary architecture roots') }
 	assert linked && !os.exists(work + '/link')
 }
+
+fn sqlite_empty_imported_notice(phase string, stage string) ! {
+	if phase == 'created' { os.write_file(os.dir(stage) + '/roots/x86_64/licenses/sqlite-COPYRIGHT', '')! }
+}
+
+fn sqlite_directory_imported_notice(phase string, stage string) ! {
+	if phase != 'created' { return }
+	path := os.dir(stage) + '/roots/x86_64/licenses/sqlite-COPYRIGHT'
+	os.rm(path)!; os.mkdir(path)!; os.write_file(path + '/nested', 'unexpected notice directory')!
+}
+
+fn sqlite_oversized_imported_notice(phase string, stage string) ! {
+	if phase != 'created' { return }
+	mut file := os.open_file(os.dir(stage) + '/roots/x86_64/licenses/sqlite-COPYRIGHT', 'w', 0o644)!
+	defer { file.close() }
+	file.seek(1024 * 1024, .start)!; file.write_string('\x00')!
+}
+
+fn sqlite_profile_zero_space(_ string) !u64 { return 0 }
+
+fn test_sqlite_profile_rechecks_imported_notices_cleans_failure_and_allows_exact_retry() {
+	for checkpoint in [sqlite_empty_imported_notice, sqlite_directory_imported_notice, sqlite_oversized_imported_notice] {
+		work := sqlite_profile_fixture()!
+		defer { os.rmdir_all(work) or {} }
+		path := work + '/roots/x86_64/licenses/sqlite-COPYRIGHT'
+		original := os.read_file(path)!
+		baseline := sqlite_catalog('3.53.4', '1.0.0', work + '/roots', work + '/baseline')!
+		mut denied := false
+		sqlite_catalog_with('3.53.4', '1.0.0', work + '/roots', work + '/refused', CatalogOptions{ checkpoint: checkpoint }) or {
+			denied = err.msg().contains('unexpected payload path') || err.msg().contains('invalid redistribution/build notice')
+		}
+		assert denied && !os.exists(work + '/refused')
+		assert os.ls(work)!.all(!it.starts_with('.vinix-sqlite-profile-'))
+		if os.is_dir(path) { os.rmdir_all(path)! } else { os.rm(path)! }
+		os.write_file(path, original)!
+		assert sqlite_catalog('3.53.4', '1.0.0', work + '/roots', work + '/refused')!.catalog_sha256 == baseline.catalog_sha256
+	}
+	work := sqlite_profile_fixture()!
+	defer { os.rmdir_all(work) or {} }
+	mut full := false
+	sqlite_catalog_with('3.53.4', '1.0.0', work + '/roots', work + '/refused', CatalogOptions{ available_space: sqlite_profile_zero_space }) or {
+		full = err.msg().contains('insufficient disk space')
+	}
+	assert full && !os.exists(work + '/refused') && os.ls(work)!.all(!it.starts_with('.vinix-sqlite-profile-'))
+}

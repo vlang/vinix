@@ -67,6 +67,10 @@ fn ffmpeg_templates(architecture string, runtime_version string) []RootRecipe {
 }
 
 pub fn ffmpeg_catalog(runtime_version string, source_roots string, destination string) !FfmpegProfileInfo {
+	return ffmpeg_catalog_with(runtime_version, source_roots, destination, CatalogOptions{})
+}
+
+fn ffmpeg_catalog_with(runtime_version string, source_roots string, destination string, options CatalogOptions) !FfmpegProfileInfo {
 	version_parts(runtime_version)!
 	if compare_versions(runtime_version, '1.0.0') < 0 || compare_versions(runtime_version, '2.0.0') >= 0 {
 		return error('FFmpeg profile runtime must be in the supported 1.x compatibility range')
@@ -109,14 +113,16 @@ pub fn ffmpeg_catalog(runtime_version string, source_roots string, destination s
 	}
 	parent := os.dir(target)
 	scratch = mirror_cost(scratch, scratch)!
-	disk_check(free_bytes(parent)!, mirror_cost(needed, scratch)!, 64 * 1024 * 1024)!
-	disk_check(free_bytes(os.temp_dir())!, scratch, 64 * 1024 * 1024)!
+	disk_check(options.available_space(parent)!, mirror_cost(needed, scratch)!, 64 * 1024 * 1024)!
+	disk_check(options.available_space(os.temp_dir())!, scratch, 64 * 1024 * 1024)!
 	stage := export_stage(parent, '.vinix-ffmpeg-profile')!
 	defer { os.rmdir_all(stage) or {} }
+	options.checkpoint('created', stage)!
 	mut packages := []CatalogImport{}
 	for architecture in ['aarch64', 'x86_64'] {
 		for recipe in ffmpeg_templates(architecture, runtime_version) {
 			p := pack_root_descriptor(recipe, roots[architecture], stage + '/inventory', false)!
+			profile_file_inventory(recipe, p, ffmpeg_notices)!
 			objects := C.open((stage + '/inventory/objects').str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
 			if objects < 0 { return error('cannot inspect FFmpeg profile inventory') }
 			for file in p.files {

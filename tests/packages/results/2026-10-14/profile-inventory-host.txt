@@ -1,0 +1,30 @@
+PASS profile_inventory-compile
+PASS profile_inventory-run
+PASS sqlite_profile-compile
+PASS sqlite_profile-run
+PASS ffmpeg_profile-compile
+PASS ffmpeg_profile-run
+PASS native_profile-compile
+PASS native_profile-run
+PASS catalog-compile
+PASS catalog-run
+PASS composition-compile
+PASS composition-run
+PASS import-compile
+PASS import-run
+PASS release-compile
+PASS release-run
+PASS sqlite_profile-sanitize-compile
+PASS sqlite_profile-sanitize-run
+PASS ffmpeg_profile-sanitize-compile
+PASS ffmpeg_profile-sanitize-run
+PASS native_profile-sanitize-compile
+PASS native_profile-sanitize-run
+PASS cli-fixture-compile
+PASS cli-fixture-run
+PASS sqlite-real-catalog
+PASS sqlite unchanged real catalog bytes
+PASS ffmpeg-real-catalog
+PASS ffmpeg unchanged real catalog bytes
+PASS native-real-catalog
+PASS native unchanged real catalog bytes
