@@ -1,0 +1,3 @@
+tests/linux-compat/schedabi-check.v:106: FAIL: fn main.failure: assert log.contains('LINUX SCHEDABI DETAIL:'), 'schedabi baseline failure markers required';
+      message: schedabi baseline failure markers required
+V panic: Assertion failed...

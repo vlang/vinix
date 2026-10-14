@@ -108,7 +108,8 @@ fn validate_sched_priority(policy int, priority int) ?int {
 	}
 }
 
-fn syscall_linux_sched_getscheduler(_ voidptr, pid int) (u64, u64) {
+fn syscall_linux_sched_getscheduler(_ voidptr, raw_pid int) (u64, u64) {
+	pid := int(i32(u32(raw_pid)))
 	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
 	params := proc.thread_sched_params(tid) or { return errno.err, errno.get() }
 	if params.reset_on_fork {
@@ -117,7 +118,10 @@ fn syscall_linux_sched_getscheduler(_ voidptr, pid int) (u64, u64) {
 	return u64(params.policy), 0
 }
 
-fn syscall_linux_sched_setscheduler(_ voidptr, pid int, policy int, param u64) (u64, u64) {
+fn syscall_linux_sched_setscheduler(_ voidptr, raw_pid int, raw_policy int, param u64) (u64, u64) {
+	// pid_t and policy are signed Linux 32-bit arguments on both native ABIs.
+	pid := int(i32(u32(raw_pid)))
+	policy := int(i32(u32(raw_policy)))
 	// Linux validates scalar/null arguments and imports sched_param before
 	// looking up the thread. An invalid input must not be masked by ESRCH.
 	if policy < 0 || pid < 0 || param == 0 {
@@ -155,7 +159,8 @@ fn syscall_linux_sched_setscheduler(_ voidptr, pid int, policy int, param u64) (
 
 // sched_getparam/sched_setparam: the priority on its own, leaving the policy
 // where it is.
-fn syscall_linux_sched_getparam(_ voidptr, pid int, param u64) (u64, u64) {
+fn syscall_linux_sched_getparam(_ voidptr, raw_pid int, param u64) (u64, u64) {
+	pid := int(i32(u32(raw_pid)))
 	if pid < 0 || param == 0 {
 		return errno.err, errno.einval
 	}
@@ -169,7 +174,8 @@ fn syscall_linux_sched_getparam(_ voidptr, pid int, param u64) (u64, u64) {
 	return 0, 0
 }
 
-fn syscall_linux_sched_setparam(_ voidptr, pid int, param u64) (u64, u64) {
+fn syscall_linux_sched_setparam(_ voidptr, raw_pid int, param u64) (u64, u64) {
+	pid := int(i32(u32(raw_pid)))
 	if pid < 0 || param == 0 {
 		return errno.err, errno.einval
 	}
@@ -201,7 +207,8 @@ fn syscall_linux_sched_setparam(_ voidptr, pid int, param u64) (u64, u64) {
 	return 0, 0
 }
 
-fn syscall_linux_sched_get_priority_max(_ voidptr, policy int) (u64, u64) {
+fn syscall_linux_sched_get_priority_max(_ voidptr, raw_policy int) (u64, u64) {
+	policy := int(i32(u32(raw_policy)))
 	match policy {
 		proc.sched_fifo, proc.sched_rr {
 			return u64(proc.rt_priority_max), 0
@@ -215,7 +222,8 @@ fn syscall_linux_sched_get_priority_max(_ voidptr, policy int) (u64, u64) {
 	}
 }
 
-fn syscall_linux_sched_get_priority_min(_ voidptr, policy int) (u64, u64) {
+fn syscall_linux_sched_get_priority_min(_ voidptr, raw_policy int) (u64, u64) {
+	policy := int(i32(u32(raw_policy)))
 	match policy {
 		proc.sched_fifo, proc.sched_rr {
 			return u64(proc.rt_priority_min), 0

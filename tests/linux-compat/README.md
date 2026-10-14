@@ -1377,3 +1377,24 @@ the V audit, preparation diagnostics, six builds, source/C/ELF identities,
 independent lifetime review and fresh memory/desktop controls. Fragmented
 page-slot occupancy, page quotas/sysctls, concurrent resizing, budget
 injection, larger privileged allocations and GNU/foreign paths remain open.
+
+The `schedabi` case checks signed32 native PID/policy words and legacy
+scheduler parameter errors on both architectures. Two root/UID1000
+cohorts run 5,476 checks, including 4,600 kernel-facing/state controls and
+876 deliberate ENOSYS refusals from the bundled musl's legacy process
+wrappers. The raw setup uses actual syscalls. Six PID classes, five word
+patterns, nine parameter destinations, invalid policy 8, BATCH/OTHER
+transitions, real priority bounds and guards check exact errors and retained
+policy/priority. Original kernels fail 2,460 checks, the separately committed
+error fix leaves 1,308 word failures, and decoded kernels plus identical
+Linux 6.12.51 ELFs pass. Both 200-cycle credential cohorts retain flat storage.
+Run `--cases schedabi,runtime,capabi,open,fcntlabi` with a fresh state directory.
+`schedabi-reference.v --arch ARCH --kernel LINUX --init NATIVE-PROBE-ELF
+--state-dir FRESH-DIR` runs the Linux oracle. Compile `schedabi-check.v`
+without `-prod` and pass the retained evidence directory to audit the
+captured original/error-only/decoded/reference artifacts and negative
+controls. [The report](../../docs/linux-posix-qualification.md#native-scheduler-scalar-words-and-error-precedence)
+publishes setup/oracle diagnostics, independent lifetime review and the
+existing AArch64 small-QoS CPU-affinity blocker. Realtime/deadline, capability/
+limit/reset rules, SCHED_EXT, target races, namespaces/pledge, RR/attribute/
+affinity argument ABIs and GNU/foreign paths remain separate.

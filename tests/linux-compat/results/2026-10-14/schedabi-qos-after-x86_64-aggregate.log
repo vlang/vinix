@@ -1,0 +1,109 @@
+build-support/native-compat-tools/compathost/demo.v:46:2: notice: variable `command` shadows a function declaration
+   44 |     } else { cc = compiler_prefix('CC_AMD64', 'x86_64-linux-musl-gcc')! }
+   45 |     guesthost.compile_module(root() + '/tests/kernel-gaps/serialcore', work + '/serial.o', arch, [...cc, ...common])!
+   46 |     command := [...cc, ...common, '-static', work + '/native.c', work + '/serial.o', '-o', work + '/init']
+      |     ~~~~~~~
+   47 |     run(command)!
+   48 |     elf_arch(work + '/init', arch)!
+build-support/native-compat-tools/compathost/regression.v:52:6: notice: variable `command` shadows a function declaration
+   50 |     source := root() + '/tests/' + family + '/check.c'
+   51 |     binary := work + '/' + tag + '-check'
+   52 |     mut command := [llvm + '/clang', '--target=aarch64-linux-musl', '-static', '-nostdinc', '-nostdlib',
+      |         ~~~~~~~
+   53 |         '-isystem', gcc + '/include', '-isystem', sdk + '/usr/include', '-O2', '-Wall', '-Wextra', '-Werror']
+   54 |     if family == 'kernel-job-control' {
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   439k      0 --:--:-- --:--:-- --:--:--  438k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 76 2880k   76 2192k    0     0  1363k      0  0:00:02  0:00:01  0:00:01 1362k100 2880k  100 2880k    0     0  1680k      0  0:00:01  0:00:01 --:--:-- 1680k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  32021      0 --:--:-- --:--:-- --:--:-- 32045
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   244k      0 --:--:-- --:--:-- --:--:--  244k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  50297      0 --:--:-- --:--:-- --:--:-- 50299
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   193k      0 --:--:-- --:--:-- --:--:--  193k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/schedabi-20261014/states/qos-after-x86/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/schedabi-20261014/states/qos-after-x86/.vinix-amd64.iso.WDgEEy'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 8712m free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/schedabi-20261014/states/qos-after-x86/iso-build/.iso-staging.Ohl4a0/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13631 sectors
+Written to medium : 13631 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/schedabi-20261014/states/qos-after-x86/.vinix-amd64.iso.WDgEEy' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd4fb.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/schedabi-20261014/states/qos-after-x86/test.iso (27916288 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/schedabi-20261014/states/qos-after-x86
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=52104
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000027ffff000
+initramfs: Done (9 entries)
+SCHED-QOS START
+SCHED-QOS hints-legacy-ABI-timer-slack PASS
+SCHED-QOS PI timeout-owner-death-errors PASS
+SCHED-QOS PI interrupt-withdrawal PASS
+SCHED-QOS PI retirement forced=0 PASS
+SCHED-QOS PI retirement forced=1 PASS
+SCHED-QOS PI nested=0 handoff_ns=10476000
+SCHED-QOS PI nested=1 handoff_ns=16892000
+SCHED-QOS PI nested=0 handoff_ns=20069000
+SCHED-QOS PI nested=1 handoff_ns=58949000
+SCHED-QOS PI nested=0 handoff_ns=5540000
+SCHED-QOS PI nested=1 handoff_ns=29680000
+SCHED-QOS PI nested=0 handoff_ns=9956000
+SCHED-QOS PI nested=1 handoff_ns=35474000
+SCHED-QOS PI nested=0 handoff_ns=36321000
+SCHED-QOS PI nested=1 handoff_ns=33763000
+SCHED-QOS PI nested=0 handoff_ns=17793000
+SCHED-QOS PI nested=1 handoff_ns=36793000
+SCHED-QOS PI nested=0 handoff_ns=15064000
+SCHED-QOS PI nested=1 handoff_ns=18223000
+SCHED-QOS PI nested=0 handoff_ns=21713000
+SCHED-QOS PI nested=1 handoff_ns=33475000
+SCHED-QOS PASS
+QEMU: Terminated
+All requested guest verdicts passed.

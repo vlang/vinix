@@ -871,6 +871,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   and flat resize storage on both architectures and same-ELF Linux.
   See [the rounding and capability receipts](docs/linux-posix-qualification.md#native-pipe-capacity-rounding-and-capability-ceilings).
 
+- [x] Decode signed32 native legacy scheduler PID/policy words and match
+  parameter error precedence; qualify guarded buffers, retained policy/priority,
+  real transitions and flat storage on both architectures and same-ELF Linux.
+  Publish musl wrapper refusals and the AArch64 multi-CPU QoS blocker.
+  See [the scheduler receipts](docs/linux-posix-qualification.md#native-scheduler-scalar-words-and-error-precedence).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "06fba5d67f4656311c91c5720337369796a9c80d202905645f74d193fc327727",
+    "results": [
+        {
+            "name": "schedabi",
+            "source_sha256": "d9e9fedd989253637b5c9b767511353bfcac3d25fa90154a7db01e2561070f88",
+            "init_sha256": "8bd8baddac2a410d540d4f0325d4693be218949d6f9c186295a8c0fa89014760",
+            "iso_sha256": "2bb250ec35b8fb32f1079a9fa04b3641c53b6658e252994a238bf3f3b172d454",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

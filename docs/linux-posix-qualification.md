@@ -5632,3 +5632,91 @@ semantics, installation/sandbox or architecture acceptance gates.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-14/pipesize-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-14/pipesize-after-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/pipesize-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-14/pipesize-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-14/pipesize-after-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/pipesize-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/results/2026-10-14/pipesize-audit.v), [verdict](../tests/linux-compat/results/2026-10-14/pipesize-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-14/pipesize-lifetime-review.md).
+
+## Native scheduler scalar words and error precedence
+
+The six legacy scheduling syscalls decode native PID/policy arguments as
+signed 32-bit values. `sched_getparam`, `sched_setparam` and
+`sched_setscheduler` reject negative PIDs and NULL parameter pointers with
+`EINVAL`; the policy setter also rejects a negative policy first. Setters
+import the four-byte priority before target lookup, returning `EFAULT`
+for unreadable input even when a nonnegative PID does not exist. Getters
+look up the target before copying output. These rules follow
+[Linux's scheduler syscall implementation](https://github.com/torvalds/linux/blob/v6.12/kernel/sched/syscalls.c).
+The existing target locks, copied scheduling parameters, permission checks,
+user-copy implementation and queue mutations are unchanged.
+
+Two native musl children, root and UID/GID1000, each run 2,738 checks.
+The full matrix has 4,600 kernel-facing/state checks and 876 explicit
+`ENOSYS` checks for the bundled musl's four legacy process wrappers.
+Those wrappers are deliberate libc stubs; they do not exercise the kernel.
+The probe uses real raw syscalls for setup and policy/priority observations,
+and the actual musl priority-min/max wrappers for their supported calls.
+
+| Architecture | Checks | Original failures | Error-only failures | Decoded failures | Same-ELF Linux failures |
+| --- | --- | --- | --- | --- | --- |
+| AArch64 | 5,476 | 2,460 | 1,308 | 0 | 0 |
+| x86-64 | 5,476 | 2,460 | 1,308 | 0 | 0 |
+
+Each original credential cohort fails 124 low-word error checks and 1,106
+upper-word checks. The separately committed error fix removes all low-word
+failures and leaves 654 upper-word failures per cohort. Signed argument
+decoding removes the remaining failures. Linux 6.12.51 on both architectures
+executes the identical final native probe ELF and passes every row.
+
+Six PID classes cover zero, self, negative, minimum signed32, maximum
+signed32 and an actually reaped child. Raw arguments use the ordinary
+sign extension and four independent PID/policy upper-word patterns.
+Nine parameter forms include aligned/unaligned guarded stack storage,
+nonzero priority, NULL, address 1, inaccessible and readonly native pages,
+cross-page input and a full-width invalid pointer. Other/BATCH transitions
+and priority bounds are real calls. Invalid policies use value 8, negative
+values and the signed32 minimum. Rejected calls retain observed policy,
+priority and buffer guards; successful getters return exactly four bytes.
+No arbitrary failed-copy prefix or complete scheduling-state assertion is
+made.
+
+After 32 warmups, both error-only and decoded kernels repeat 200 cycles per
+credential cohort, including BATCH/OTHER transitions, getters, priority
+updates and actual NULL/missing-target/input faults. All 18 AArch64 and 14
+x86-64 slab classes and large pages remain exactly flat: 63/63 ARM and
+160/160 x86. Six ordinary production builds use detached worktrees frozen
+at `108082c1e0513e87559e47fde420471ccc2f15f7`. Complete generated C is
+identical outside the three error-handling bodies/prototypes in the first
+fix and six legacy scheduling bodies/prototypes in the completed change.
+The new locals and existing copy buffers are genuine stack values.
+
+Both decoded five-case native profiles
+(schedabi/runtime/capabi/open/fcntlabi), eight host test files and the
+64-input frozen inventories pass. Allocation scans report 398 ARM/290 x86
+sites before and after with identical existing allowance refusals; they
+do not approve the whole kernel's allocation policy. Independent lifetime
+review checks synchronous pointer borrows, copied target parameters,
+scratch mappings, stack arguments, pipe transfer and child cleanup.
+The V auditor is compiled without `-prod`; false assertions and a passing
+capture presented as the failing baseline both execute and exit 1.
+
+The existing small scheduler-QoS workload passes on corrected x86-64.
+Both original and corrected AArch64 kernels pass its legacy hints/timer
+slack stage, then fail CPU 1 affinity with `EINVAL`. Both boot logs report
+`skipping SMP (no device tree)` despite QEMU requesting four CPUs.
+Their identical QoS probe ELF and separate kernel/input/serial hashes are
+published. AArch64 multi-CPU QoS remains unqualified.
+
+Preparation failures are retained separately. The first probe used musl's
+stub wrappers for setup and failed before any case rows. A later probe
+incorrectly treated policy 7 as invalid: actual Linux recognizes
+`SCHED_EXT` for priority bounds and exposed 24 oracle errors per architecture.
+The final probe uses invalid policy 8 and fresh original/error-only/decoded/
+Linux captures. Earlier preflight C/ELF fingerprints remain visible.
+
+Realtime/deadline mutations, reset-on-fork, capability/RLIMIT permission
+rules, SCHED_EXT behavior, namespace/pledge decoding, concurrent target
+reuse and general scheduler state remain separate. RR-interval,
+attribute and affinity argument/error ABIs, glibc, translation, ELF32 and
+the three broad section 15 acceptance gates remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-14/schedabi-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-14/schedabi-after-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/schedabi-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-14/schedabi-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-14/schedabi-after-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/schedabi-reference-x86_64-receipt.json).
+- [Maintained V audit](../tests/linux-compat/schedabi-check.v), [verdict](../tests/linux-compat/results/2026-10-14/schedabi-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-14/schedabi-lifetime-review.md).
+- [x86 QoS receipt](../tests/linux-compat/results/2026-10-14/schedabi-qos-after-x86_64-inputs.json), [AArch64 original failure](../tests/linux-compat/results/2026-10-14/schedabi-qos-before-aarch64-serial.log), [AArch64 decoded failure](../tests/linux-compat/results/2026-10-14/schedabi-qos-after-aarch64-serial.log).
