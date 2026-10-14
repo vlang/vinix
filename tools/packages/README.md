@@ -101,6 +101,13 @@ admits the signed length before reading, bounds hashing to that size plus one
 sentinel byte, and refuses changed sizes or pathname identity. See
 [hash qualification](../../tests/packages/hash-file-check.md).
 
+`pack` now walks a captured source tree through parent-relative descriptors and
+hashes/copies each regular file through the same open file. Changed identities,
+lengths or executable modes refuse; aliases, special files and excessive
+directory work cannot enter a new manifest. Sorted ordinary inputs retain
+canonical metadata. See [source qualification](../../tests/packages/pack-source-check.md)
+for limits, mutation/retry checks and target results.
+
 HTTPS acquisition also captures its regular destination before starting curl.
 Curl supplies bytes through a pipe; the service enforces the size bound before
 writing, preserves retry prefixes and refuses changed destination identities.

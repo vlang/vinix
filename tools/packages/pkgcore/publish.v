@@ -6,50 +6,21 @@ import json2
 import os
 import time
 
-fn source_files(directory string, prefix string, mut files []Payload, repository string) ! {
-	mut names := os.ls(directory)!
-	names.sort()
-	for name in names {
-		path := directory + '/' + name
-		relative := if prefix == '' { name } else { prefix + '/' + name }
-		if !relative_path(relative) || os.is_link(path) {
-			return error('package source contains an unsafe path or symlink: ${path}')
-		}
-		if os.is_dir(path) {
-			source_files(path, relative, mut files, repository)!
-			continue
-		}
-		if !os.is_file(path) { return error('package source contains a special file: ${path}') }
-		if files.len >= max_files { return error('package source exceeds file limit') }
-		size := os.file_size(path)
-		if size > u64(4) * 1024 * 1024 * 1024 {
-			return error('package source file is too large: ${path}')
-		}
-		digest := hash_file(path)!
-		payload := Payload{ path: relative, bytes: size, sha256: digest, executable: os.is_executable(path) }
-		target := repository + '/objects/' + digest
-		if !verified_file(target, payload) {
-			copy_file(path, target + '.new', 0, size)!
-			if !verified_file(target + '.new', payload) {
-				return error('package source changed while packing: ${path}')
-			}
-			os.rename(target + '.new', target)!
-		}
-		files << payload
-	}
+pub fn pack(manifest string, source string, repository string) !Package {
+	return pack_with(manifest, source, repository, PackSourceOptions{})
 }
 
-pub fn pack(manifest string, source string, repository string) !Package {
-	if os.is_link(source) || !os.is_dir(source) {
-		return error('package source must be a directory')
-	}
+fn pack_with(manifest string, source string, repository string, options PackSourceOptions) !Package {
+	root := capture_prepared_root(source, 'package source')!
+	defer { C.close(root) }
+	options.checkpoint('root', source)!
 	text := read_metadata(manifest)!
 	defer { unsafe { text.free() } }
 	template := decode_manifest(text, false)!
 	os.mkdir_all(repository + '/objects')!
-	mut files := []Payload{}
-	source_files(source, '', mut files, repository)!
-	p := Package{ ...template, files: files }
+	mut input := PackSource{ repository: repository, options: options }
+	input.walk(root, '', 0)!
+	p := Package{ ...template, files: input.files }
 	p.validate()!
 	os.mkdir_all(repository + '/manifests')!
 	atomic_write(repository + '/manifests/${p.id}-${p.architecture}-${p.version}.json', json2.encode(p) + '\n')!

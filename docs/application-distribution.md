@@ -115,6 +115,14 @@ roots retain canonical metadata and a captured namespace that later pathname
 replacement cannot redirect. See
 [root admission qualification](../tests/packages/prepared-root-check.md).
 
+The lower-level `pack` command also captures its source root and walks children
+through descriptors relative to their captured parents. Hashing and copying
+share each regular file's descriptor, with identity, length and executable-mode
+checks before metadata publication. Aliases, special files and excessive
+directory work refuse; ordinary inputs retain canonical manifests. Keep source
+contents stable and publisher output outside the source tree. See
+[source traversal qualification](../tests/packages/pack-source-check.md).
+
 The [native SDK publisher profile](../tools/packages/SDK.md#native-sdk-publisher-profile)
 provides a single pinned catalog for Hello, Counter and Memo on both targets.
 Its [V builder](../examples/package-catalog/README.md) compiles six static apps

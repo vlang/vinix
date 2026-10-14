@@ -110,6 +110,28 @@ v -path '@vlib|@vmodules|.|tools/accounts' -o /tmp/vinix-package tools/packages/
 /tmp/vinix-package publish-release /build/new-repository company /secure/publisher.seed 1 2000000000 /srv/releases/company-1
 ```
 
+`pack` captures an ordinary source directory before creating repository output.
+Empty/NUL paths and leaf directory symlinks, including aliases with trailing
+separators, refuse. Its sorted traversal opens every child relative to the
+captured parent without following symlinks; special files refuse without waiting
+on FIFOs. Each regular file supplies its length, executable mode, hash and copied
+bytes through one descriptor. Identity, length and executable mode are rechecked
+against that parent around hashing, cache reuse and copying; copied objects must
+also match the hash before publication.
+
+Source traversal allows at most 128 descendant directory levels, 32,768 entries
+(directories and files, including empty directories), 16,384 entries within any
+one directory, 16,384 regular files, 4 GiB per file and 64 GiB total payload.
+Oversized file/total lengths refuse before reading that file. Ordinary/slashed
+roots, sorted paths, empty files and shared read-only source files retain
+canonical metadata. Root parent aliases keep ordinary path semantics.
+Keep contents stable and repository parents controlled, serialize publishers,
+and keep output outside the source
+tree. Capture does not freeze same-user writes or authenticate upstream inputs.
+A failed walk can retain verified objects/partial object temporaries but does
+not replace the package manifest; inspect its diagnostic and correct the input
+before retrying. See [source qualification](../../tests/packages/pack-source-check.md).
+
 Local payload output must be an ordinary file with exactly one hard link. This
 applies to fresh/resumed `file://` transfers, cache-to-generation copies and
 `pack` object temporaries. A shared output refuses before truncation or writing;

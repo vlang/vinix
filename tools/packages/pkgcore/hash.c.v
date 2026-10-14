@@ -48,6 +48,21 @@ fn hash_file_with(path string, options HashReadOptions) !string {
 	device := u64(info.st_dev)
 	inode := u64(info.st_ino)
 	options.checkpoint('sized', path)!
+	digest := hash_opened(fd, expected, path, options)!
+	named := os.lstat(path) or {
+		unsafe { digest.free() }
+		return error('payload path changed while hashing: ${path}')
+	}
+	if named.mode & 0o170000 != 0o100000 || named.dev != device || named.inode != inode || named.size != expected {
+		unsafe { digest.free() }
+		return error('payload path changed while hashing: ${path}')
+	}
+	return digest
+}
+
+// The caller owns a captured regular descriptor positioned at byte zero and
+// checks its named identity. Packing uses its captured parent for that check.
+fn hash_opened(fd int, expected u64, path string, options HashReadOptions) !string {
 	mut hash := sha256.new()
 	mut buffer := []u8{len: 64 * 1024}
 	defer {
@@ -75,12 +90,10 @@ fn hash_file_with(path string, options HashReadOptions) !string {
 		break
 	}
 	options.checkpoint('read', path)!
-	if C.fstat(fd, &info) != 0 || info.st_size < 0 || u64(info.st_size) != expected {
+	mut info := C.stat{}
+	if C.fstat(fd, &info) != 0 || info.st_mode & 0o170000 != 0o100000
+		|| info.st_size < 0 || u64(info.st_size) != expected {
 		return error('payload changed size while hashing: ${path}')
-	}
-	named := os.lstat(path) or { return error('payload path changed while hashing: ${path}') }
-	if named.mode & 0o170000 != 0o100000 || named.dev != device || named.inode != inode || named.size != expected {
-		return error('payload path changed while hashing: ${path}')
 	}
 	mut digest := []u8{len: sha256.size}
 	hash.checksum_into(mut digest)

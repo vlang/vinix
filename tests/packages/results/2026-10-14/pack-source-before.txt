@@ -1,0 +1,12 @@
+nul: wait status 256; previous pack source/output behavior reproduced
+alias-slashes: wait status 0; previous pack source/output behavior reproduced
+alias: wait status 256; previous pack source/output behavior reproduced
+empty: wait status 256; previous pack source/output behavior reproduced
+missing: wait status 256; previous pack source/output behavior reproduced
+file: wait status 256; previous pack source/output behavior reproduced
+fifo: wait status 256; previous pack source/output behavior reproduced
+link: wait status 256; previous tree admission reproduced
+fifo: wait status 256; previous tree admission reproduced
+depth: wait status 0; previous tree admission reproduced
+Ordinary/slashed roots, sorted paths, empty files, executable mode and shared read-only sources preserve canonical metadata
+Pack source qualification passed

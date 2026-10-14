@@ -89,6 +89,9 @@ fn check() ! {
 			'-o', work + '/prepared-root-check', repository + '/tests/packages/prepared-root-check.v'])!
 		run(work + '/prepared-root-check', [work + '/prepared-root'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/pack-source-check', repository + '/tests/packages/pack-source-check.v'])!
+		run(work + '/pack-source-check', [work + '/pack-source'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/hash-file-check', repository + '/tests/packages/hash-file-check.v'])!
 		run(work + '/hash-file-check', [work + '/hash-files'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',

@@ -1,0 +1,12 @@
+nul: wait status 256; refused before creating output parents
+alias-slashes: wait status 256; refused before creating output parents
+alias: wait status 256; refused before creating output parents
+empty: wait status 256; refused before creating output parents
+missing: wait status 256; refused before creating output parents
+file: wait status 256; refused before creating output parents
+fifo: wait status 256; refused before creating output parents
+link: wait status 256; unsafe tree refused without a manifest
+fifo: wait status 256; unsafe tree refused without a manifest
+depth: wait status 256; unsafe tree refused without a manifest
+Ordinary/slashed roots, sorted paths, empty files, executable mode and shared read-only sources preserve canonical metadata
+Pack source qualification passed
