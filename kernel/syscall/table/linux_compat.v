@@ -127,10 +127,12 @@ fn syscall_linux_openat(gpr_state voidptr, dirfd i32, path charptr, flags i32, m
 
 fn syscall_linux_faccessat2(gpr_state voidptr, dirfd int, path charptr, mode u32, flags int) (u64, u64) {
 	// R_OK | W_OK | X_OK; AT_EACCESS, AT_SYMLINK_NOFOLLOW, AT_EMPTY_PATH.
-	if mode & ~u32(0x7) != 0 || flags & ~0x1300 != 0 {
+	// Linux declares flags as int: high register bits do not request a flag.
+	query_flags := int(u32(flags))
+	if mode & ~u32(0x7) != 0 || query_flags & ~0x1300 != 0 {
 		return errno.err, errno.einval
 	}
-	return fs.syscall_faccessat(gpr_state, dirfd, path, mode, flags)
+	return fs.syscall_faccessat(gpr_state, dirfd, path, mode, query_flags)
 }
 
 struct LinuxOpenHow {

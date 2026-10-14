@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "be2b4cd606a891740375c46fc119e98b912d53cd96cf718caab587aee05d34d4",
+    "results": [
+        {
+            "name": "accessflags",
+            "source_sha256": "c16a1b3749b3470ad52a357c792ad07d537b0033be753cdff9f42ddc5d42d842",
+            "init_sha256": "3d91e4320621f8824315d618a7cb583ff0ba8cc3c2f5b8fc60bcb9fb4efb0c4b",
+            "iso_sha256": "0e395aa5e1a676da4414959b8deb267bb4ebf6f3d9951dc6654a4a9e4c08cee6",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

@@ -840,6 +840,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   views, exact errors and flat repeated lookup storage on both architectures.
   See [the process-root receipts](docs/linux-posix-qualification.md#cached-procfs-process-root-invalidation).
 
+- [x] Decode native faccessat2 flag words and assign anonymous pipe creator
+  ownership before publication; qualify real permission/errors, aliases and
+  retained state as root/UID1000 with flat storage on both architectures.
+  See [the access receipts](docs/linux-posix-qualification.md#native-faccessat2-flag-words-and-pipe-owners).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

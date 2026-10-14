@@ -1268,3 +1268,19 @@ and a fresh `--state-dir` for the identical Linux probe. Superseded host build
 failures have empty probe/ISO hashes and are published separately from the
 actual semantic baselines. See
 [receipts and limits](../../docs/linux-posix-qualification.md#cached-procfs-process-root-invalidation).
+
+The `accessflags` case checks native faccessat2 flag words and pipe inode
+owners with 6,430 controls per architecture. Root/UID1000 cohorts exercise
+known/unknown lower flags, five upper-word patterns, real permissions and
+path/pointer/descriptor errors, original/dup/CLOEXEC aliases, unlinked O_PATH
+handles and retained metadata/owners/flags/data/cursors/queued AB. Baselines
+fail 3,623 controls; final Vinix and actual same-ELF Linux 6.12.51 pass. Two
+200-cycle stable-resource/alias cohorts retain flat storage. The existing
+`access` case also checks low-word pipe owners and real/effective permission
+differences. Run `tests/linux-compat/run` with `--arch ARCH --kernel-dir DIR`
+and compact fresh `--state-dir` paths and `--cases accessflags,access,procpid,open,runtime`.
+Use `tests/linux-compat/accessflags-reference.v` with `--arch`, `--kernel`,
+`--init` and a fresh `--state-dir` for the identical Linux probe. Early QMP
+launch failures and word-only pipe permission failures are preserved as
+diagnostics. See
+[receipts and limits](../../docs/linux-posix-qualification.md#native-faccessat2-flag-words-and-pipe-owners).

@@ -1,0 +1,9 @@
+Compiler output from the default V compiler:
+/Volumes/VinixOwnerQueryScratch/tmp/vinix-v-module-LUxvdC/accessflagsfixture/core.v:150:30: error: cannot use `int` as `u32` in argument 4 to `accessflagsfixture.query`
+  148 | fn cycle(bank &Bank, ordinary bool) bool {
+  149 |     unsafe { for upper in [u64(0), 0x100000000, 0x8000000000000000, 0xffffffff00000000, 0x1234567800000000]! {
+  150 |         if !query(bank, 8, C.R_OK, C.AT_EMPTY_PATH | C.AT_EACCESS, upper, ordinary) || !query(bank, 8, C.W_OK, C.AT_EMPTY_PATH, upper, ordinary) || !query(bank, 4, 0, 0, upper, ordinary) || !query(bank, 7, 0, C.AT_EMPTY_PATH, upper, ordinary) || !query(bank, 8, 0, 1, upper, ordinary) { return false }
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  151 |         alias := C.dup(bank.fds[3]); if alias < 0 { return false }; data := &C.stat(C.alloca(usize(sizeof(C.stat)))); valid := C.fstat(alias, data) == 0 && same(data, &bank.meta[1]); closed := C.close(alias) == 0; if !valid || !closed { return false }
+  152 |     }; return true }
+

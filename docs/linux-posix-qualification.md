@@ -5120,3 +5120,83 @@ PID reuse and generation identity, exact concurrent reap after a positive
 check, inherited retired-directory lookup or file contents, deeper namespace
 and mount teardown, retained-tree reclamation/churn, GNU/translated/ELF32
 paths and the three broad section 15 acceptance gates remain unqualified.
+
+## Native faccessat2 flag words and pipe owners
+
+Native faccessat2 now imports the lower 32 flag bits before checking known
+flags or dispatching permission checks. Upper register bits no longer cause
+EINVAL for otherwise valid requests. Unknown lower flag bits still return
+EINVAL before pathname lookup. The path pointer remains full width, and the
+existing descriptor retention, path copies and permission checks are unchanged.
+Linux declares this argument as `int` in its
+[syscall definition](https://code.googlesource.com/linux/torvalds/linux/+/2656821f1f202d58224551b71eff41aafd1edf8b/fs/open.c).
+
+Anonymous pipes also initialize inode UID/GID from their creator's effective
+IDs before the existing resource-interface copy. Previously an ordinary
+user's pipe remained root-owned, so valid empty-path permission queries failed.
+The fix adds only two scalar metadata assignments and a synchronous process
+borrow; pipe allocation, boxing, references and descriptor publication are
+unchanged. Named FIFOs and explicit fsuid/fsgid behavior are separate.
+
+The `accessflags` native musl probe runs root and UID/GID1000 cohorts. Eight
+known flag combinations and five upper-word patterns cover F_OK/R_OK/W_OK/
+R_OK|W_OK and invalid mode 8. Absolute and relative files, directories, links,
+missing paths, bad/non-directory descriptors and a full-width fault pointer
+exercise real success, EACCES, ENOENT, EBADF, ENOTDIR and EFAULT. Empty paths
+check original/dup/CLOEXEC aliases of regular files, directories, unlinked
+O_PATH files and pipes. Four unknown lower flag words require EINVAL without
+state changes. Every cohort transfers its counts to the supervisor; CASES
+and FINAL rows must agree exactly.
+
+| Controls per cohort | Calls | Root baseline failures | UID1000 baseline failures |
+| --- | ---: | ---: | ---: |
+| Known flags, argument words and real permission/path errors | 2,800 | 1,792 | 1,828 |
+| Unknown lower flags, including fault and descriptor controls | 400 | 0 | 0 |
+| Retained aliases, inode owners, flags, bytes, cursor and queued AB | 15 | 0 | 3 |
+
+The unchanged kernels fail 3,623 of 6,430 controls per architecture. Final
+Vinix kernels and actual Linux 6.12.51 pass with the identical native probe
+C/ELF. The original word-only intermediate fixes all root controls and leaves
+180 ordinary-user pipe permission failures; its captures use the earlier
+probe without explicit UID/GID metadata assertions. The fresh final probe adds
+those assertions and is used for both final baselines and Linux references.
+The existing `access` case independently checks low-word pipe ownership and
+real/effective permissions for equal UID/GID1000 and real1000/effective0,
+across six aliases per child. It closes every alias before _exit and the
+parent waits before returning.
+
+Two warmed and settled 200-cycle cohorts per architecture repeatedly check
+real permission refusals, missing/fault paths, flags and temporary directory
+aliases. All 18 ARM/14 x86 slab classes and large pages stay exactly flat,
+at 68/68 ARM and 177/177 x86 for both credentials. These measurements cover
+stable resources and alias cleanup; pipe/process creation churn remains separate.
+Six completed production builds include the two intermediate kernels. All
+five final guest cases (accessflags/access/procpid/open/runtime), eight host
+test files and coverage checks pass. The allocation inventory has 662 ARM/658
+x86 source files and 400/292 sites, retaining its existing allowance refusals;
+before/after site and refusal rows are identical.
+
+Erasing only faccessat2's body/prototype makes baseline and intermediate C
+identical; erasing only Pipe.create's body/prototype makes intermediate and
+final C identical. The combined change has no other generated-C difference.
+Independent review verifies scalar publication before boxing, unchanged
+allocation/free paths and synchronous fixture borrows. The native probe has
+nine explicit allocas without hidden heap/index helpers. The assertion-enabled
+audit rejects a passing log presented as a failing baseline, binds 63 frozen
+kernel inputs and all artifact hashes, and reuses the previously pinned
+self-contained f6358ec compiler. Final preflight/native/Linux bytes match
+without normalization. Runtime evidence freezes committed parent
+d00fe874ad9db66c958e35692fbb18c0a18c15bf; the public inventory separately uses
+the committed publication parent plus the flags fix.
+
+Initial QMP socket-path failures occurred before guest execution; compact v2
+paths are used for final runs. The earlier probe type-check error, original
+baselines and word-only failures remain separately published diagnostics.
+
+- [AArch64 receipt](../tests/linux-compat/results/2026-10-14/accessflags-after-aarch64.json), [Linux reference](../tests/linux-compat/results/2026-10-14/accessflags-reference-aarch64.json), [evidence](../tests/linux-compat/results/2026-10-14/accessflags-evidence-aarch64.json).
+- [x86-64 receipt](../tests/linux-compat/results/2026-10-14/accessflags-after-x86_64.json), [Linux reference](../tests/linux-compat/results/2026-10-14/accessflags-reference-x86_64.json), [evidence](../tests/linux-compat/results/2026-10-14/accessflags-evidence-x86_64.json).
+- [Audit](../tests/linux-compat/results/2026-10-14/accessflags-audit.v), [verdict](../tests/linux-compat/results/2026-10-14/accessflags-audit.log), [independent review](../tests/linux-compat/results/2026-10-14/accessflags-lifetime-review.md).
+
+Concurrent credential changes, filesystem UID/GID extensions, named FIFOs,
+restrictive policy, GNU/translated/ELF32 paths and the three broad section 15
+acceptance gates remain unqualified.

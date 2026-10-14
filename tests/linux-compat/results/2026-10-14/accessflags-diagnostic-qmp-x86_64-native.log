@@ -1,0 +1,2 @@
+qemu-system-x86_64: -qmp unix:/Users/alex/.cache/vinix-linux-compat/accessflags-20261014/states/final-accessflags-before-x86/accessflags/qmp.sock,server=on,wait=off: UNIX socket path '/Users/alex/.cache/vinix-linux-compat/accessflags-20261014/states/final-accessflags-before-x86/accessflags/qmp.sock' is too long
+Path must be less than 104 bytes
