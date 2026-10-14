@@ -36,8 +36,8 @@ fn (app &CalculatorApp) copy_controls(mut children []ui2.Element, button ui2.Rec
 	label := tr(if button_feedback { key } else { 'calculator.copy' })
 	children << ui2.Element{
 		...ui2.button('calculator.copy', label, button,
-			ui2.BoxStyle{ bg: settings_choice_bg, radius: 5 },
-			ui2.TextStyle{ color: body_text, size: if button.width < 116 { 9 } else { 11 }, align: .center })
+			ui2.BoxStyle{ bg: calculator_digit, radius: 13 },
+			ui2.TextStyle{ color: calculator_text, size: if button.width < 116 { 9 } else { 11 }, align: .center })
 		id: if button_feedback { 'calculator.copy.status' } else { 'calculator.copy' }
 		action_id: 'calculator.copy'
 		tooltip: tr(if key.len > 0 { key } else { 'calculator.copy' })
@@ -45,8 +45,8 @@ fn (app &CalculatorApp) copy_controls(mut children []ui2.Element, button ui2.Rec
 	if key.len > 0 && status.width > 0 {
 		children << ui2.Element{
 			...ui2.label('calculator.copy.status', tr(key), status,
-				ui2.TextStyle{ size: 11, color: if key == 'clipboard.copy.copied' { app_accent }
-					else { body_muted } })
+				ui2.TextStyle{ size: 11, color: if key == 'clipboard.copy.copied' { calculator_operator }
+					else { calculator_muted } })
 			tooltip: tr(key)
 		}
 	}

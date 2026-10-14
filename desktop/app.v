@@ -118,8 +118,8 @@ const available_apps = [
 	AppFactory{
 		title: 'Calculator'
 		icon: 'asset:calculator'
-		width: 620
-		height: 600
+		width: 340
+		height: 520
 		process_name: 'vinix-calculator'
 		keyboard: true
 		clipboard_copy: true

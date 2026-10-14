@@ -106,8 +106,8 @@ fn calculator_nth_root(radicand f64, degree f64) (f64, string) {
 fn calculator_scientific_button(action string, index int, left f64) ui2.Element {
 	return ui2.Element{
 		...ui2.button(action, tr(action), ui2.rect(left + f64(index % 5) * 48,
-			154 + f64(index / 5) * 44, 40, 36), ui2.BoxStyle{ bg: settings_choice_bg, radius: 6 },
-			ui2.TextStyle{ size: 12, color: body_text, align: .center })
+			154 + f64(index / 5) * 44, 40, 36), ui2.BoxStyle{ bg: calculator_digit, radius: 18 },
+			ui2.TextStyle{ size: 12, color: calculator_text, align: .center })
 		tooltip: tr(if action == 'calculator.scientific.ee' { 'calculator.scientific.ee.help' }
 			else if action == 'calculator.scientific.root' { 'calculator.scientific.root.help' }
 			else if action == 'calculator.scientific.random' { 'calculator.scientific.random.help' }

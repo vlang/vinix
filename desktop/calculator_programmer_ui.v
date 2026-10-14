@@ -37,14 +37,14 @@ fn (app &CalculatorApp) programmer_base_controls(mut children []ui2.Element, wid
 		top_y := if readouts { top + f64(index) * 28 } else { top }
 		children << ui2.Element{
 			...ui2.button(action, tr(action), ui2.rect(left, top_y, button_width, 24),
-				ui2.BoxStyle{ bg: if selected { app_accent } else { settings_choice_bg }, radius: 4 },
-				ui2.TextStyle{ color: if selected { app_on_accent } else { body_text }, size: 11, align: .center })
+				ui2.BoxStyle{ bg: if selected { calculator_operator } else { calculator_digit }, radius: 4 },
+				ui2.TextStyle{ color: calculator_text, size: 11, align: .center })
 			tooltip: tr('calculator.programmer.shortcuts')
 		}
 		if readouts {
 			children << ui2.label(calculator_programmer_readout_ids[index], app.integer.text(calculator_programmer_bases[index]),
 				ui2.rect(78, top_y, width - 90, 24),
-				ui2.TextStyle{ size: if index == 3 { 10 } else { 15 }, color: body_heading, align: .right })
+				ui2.TextStyle{ size: if index == 3 { 10 } else { 15 }, color: calculator_text, align: .right })
 		}
 	}
 }
@@ -57,9 +57,9 @@ fn (app &CalculatorApp) programmer_width_controls(mut children []ui2.Element, wi
 		children << ui2.Element{
 			...ui2.button(action, tr(action), ui2.rect(12 + f64(index) * (button_width + 6),
 				top, button_width, 24), ui2.BoxStyle{
-				bg: if selected { app_accent } else { settings_choice_bg }, radius: 4
+				bg: if selected { calculator_operator } else { calculator_digit }, radius: 4
 			}, ui2.TextStyle{
-				color: if selected { app_on_accent } else { body_text }, size: 11, align: .center
+				color: calculator_text, size: 11, align: .center
 			})
 			checked: selected
 			tooltip: tr('calculator.programmer.width.help')
@@ -85,7 +85,7 @@ fn (mut app CalculatorApp) build_programmer(size ui2.Rect) ui2.Element {
 		children << ui2.Element{
 			...ui2.label('', app.integer.text(app.integer.base), ui2.rect(display_left, 116, size.width - display_left - 12, 42),
 				ui2.TextStyle{ size: if app.integer.base == 2 { 9 } else { 20 },
-					color: if app.integer.has_error { files_error } else { body_heading }, align: .right })
+					color: if app.integer.has_error { files_error } else { calculator_text }, align: .right })
 			tooltip: tr(if app.integer.status.len > 0 { app.integer.status } else { 'calculator.programmer.bits.help' })
 		}
 		if app.integer.bits_view {
@@ -95,47 +95,47 @@ fn (mut app CalculatorApp) build_programmer(size ui2.Rect) ui2.Element {
 			app.programmer_bit_pages(mut children, size.width, 166)
 			app.programmer_bit_grid(mut children, size.width, 202, true)
 			children << calculator_utility_button('calculator.programmer.equals', '=', size.width - 56, copy_y, 44)
-			return ui2.screen(app_surface, children)
+			return ui2.screen(calculator_surface, children)
 		}
 		app.programmer_view_control(mut children, ui2.rect(size.width - 108, 166, 96, 24))
 		children << ui2.label('', tr(if app.integer.status.len > 0 {
 			app.integer.status
 		} else { 'calculator.programmer.resize' }), ui2.rect(12, 174, available - 106, 34),
-			ui2.TextStyle{ size: 11, color: if app.integer.status.len > 0 { files_error } else { body_muted } })
+			ui2.TextStyle{ size: 11, color: if app.integer.status.len > 0 { files_error } else { calculator_muted } })
 		if copy_y >= 248 {
 			children << ui2.Element{
 				...ui2.label('', tr('calculator.programmer.rules'), ui2.rect(12, 218, available, 24),
-					ui2.TextStyle{ size: 10, color: body_muted })
+					ui2.TextStyle{ size: 10, color: calculator_muted })
 				tooltip: tr('calculator.programmer.rules')
 			}
 		}
 		if copy_y >= 286 {
 			children << ui2.Element{
 				...ui2.label('', tr('calculator.programmer.shortcuts'), ui2.rect(12, 248, available, 32),
-					ui2.TextStyle{ size: 10, color: body_muted })
+					ui2.TextStyle{ size: 10, color: calculator_muted })
 				tooltip: tr('calculator.programmer.shortcuts')
 			}
 		}
-		return ui2.screen(app_surface, children)
+		return ui2.screen(calculator_surface, children)
 	}
 	app.copy_controls(mut children, ui2.rect(334, 10, 116, 26),
 		ui2.rect(462, 10, size.width - 474, 26))
 	app.programmer_width_controls(mut children, size.width, 74)
 	children << ui2.Element{
 		...ui2.label('', tr('calculator.programmer.rules'), ui2.rect(12, 44, available, 14),
-			ui2.TextStyle{ size: 11, color: body_muted })
+			ui2.TextStyle{ size: 11, color: calculator_muted })
 		tooltip: tr('calculator.programmer.rules')
 	}
 	children << ui2.Element{
 		...ui2.label('', tr('calculator.programmer.shifts'), ui2.rect(12, 58, available, 14),
-			ui2.TextStyle{ size: 11, color: body_muted })
+			ui2.TextStyle{ size: 11, color: calculator_muted })
 		tooltip: tr('calculator.programmer.shifts')
 	}
 	children << ui2.Element{
 		...ui2.label('', tr(if app.integer.status.len > 0 {
 			app.integer.status
 	} else { 'calculator.programmer.input_hint' }), ui2.rect(12, 102, available - 106, 18),
-			ui2.TextStyle{ size: 11, color: if app.integer.status.len > 0 { files_error } else { body_muted } })
+			ui2.TextStyle{ size: 11, color: if app.integer.status.len > 0 { files_error } else { calculator_muted } })
 		tooltip: tr(if app.integer.status.len > 0 {
 			app.integer.status
 		} else { 'calculator.programmer.shortcuts' })
@@ -144,7 +144,7 @@ fn (mut app CalculatorApp) build_programmer(size ui2.Rect) ui2.Element {
 	app.programmer_base_controls(mut children, size.width, 126, true)
 	if app.integer.bits_view {
 		children << ui2.label('', tr('calculator.programmer.bits.help'), ui2.rect(12, 234, available, 14),
-			ui2.TextStyle{ size: 10, color: body_muted })
+			ui2.TextStyle{ size: 10, color: calculator_muted })
 		app.programmer_bit_grid(mut children, size.width, 250, false)
 		children << calculator_utility_button('calculator.programmer.clear', 'AC', size.width - 188, 450, 52)
 		children << calculator_utility_button('calculator.programmer.backspace', '<-', size.width - 126, 450, 52)
@@ -162,12 +162,12 @@ fn (mut app CalculatorApp) build_programmer(size ui2.Rect) ui2.Element {
 			children << ui2.Element{
 				...ui2.button(action, label, ui2.rect(12 + f64(index % 6) * (button_width + 8),
 					250 + f64(index / 6) * 46, button_width, 38), ui2.BoxStyle{
-					bg: if action == 'calculator.programmer.equals' { app_accent }
-						else if unavailable { app_surface } else { settings_choice_bg }
+					bg: if action == 'calculator.programmer.equals' { calculator_operator }
+						else if unavailable { calculator_surface } else { calculator_digit }
 					radius: 5
 				}, ui2.TextStyle{
-					color: if action == 'calculator.programmer.equals' { app_on_accent }
-						else if unavailable { body_muted } else { body_text }
+					color: if action == 'calculator.programmer.equals' { calculator_text }
+						else if unavailable { calculator_muted } else { calculator_text }
 					size: 13
 					align: .center
 				})
@@ -177,7 +177,7 @@ fn (mut app CalculatorApp) build_programmer(size ui2.Rect) ui2.Element {
 		}
 	}
 	children << ui2.label('', tr('calculator.history.title'), ui2.rect(12, 488, available - 116, 20),
-		ui2.TextStyle{ size: 12, bold: true, color: body_heading })
+		ui2.TextStyle{ size: 12, bold: true, color: calculator_text })
 	children << calculator_utility_button('calculator.programmer.history.previous', '<', size.width - 122, 486, 22)
 	children << calculator_utility_button('calculator.programmer.history.next', '>', size.width - 96, 486, 22)
 	children << calculator_utility_button('calculator.programmer.history.clear', tr('calculator.history.clear'), size.width - 68, 486, 56)
@@ -193,10 +193,10 @@ fn (mut app CalculatorApp) build_programmer(size ui2.Rect) ui2.Element {
 		children << ui2.Element{
 			...ui2.button(calculator_programmer_history_actions[row], text,
 				ui2.rect(12, 520 + f64(row) * 22, available, 20), ui2.BoxStyle{ transparent: true },
-				ui2.TextStyle{ size: 11, color: body_text, align: .right })
+				ui2.TextStyle{ size: 11, color: calculator_text, align: .right })
 			id: frame_owned_text_id
 			action_id: calculator_programmer_history_actions[row]
 		}
 	}
-	return ui2.screen(app_surface, children)
+	return ui2.screen(calculator_surface, children)
 }

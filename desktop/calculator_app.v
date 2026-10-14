@@ -23,8 +23,16 @@ fn C.atanh(value f64) f64
 
 const calculator_history_limit = 20
 const calculator_input_limit = 48
-const calculator_button_texts = ['C', '%', '^', '÷', '7', '8', '9', '*', '4', '5', '6', '-', '1',
-	'2', '3', '+', '0', '.', '±', '=']!
+const calculator_surface = u32(0x333333)
+const calculator_digit = u32(0x5c5c5c)
+const calculator_function = u32(0x707070)
+const calculator_operator = u32(0xff9f0a)
+const calculator_text = u32(0xffffff)
+const calculator_muted = u32(0xbdbdbd)
+const calculator_button_texts = ['C', '±', '%', '÷', '7', '8', '9', '*', '4', '5', '6', '-', '1',
+	'2', '3', '+', '^', '0', '.', '=']!
+const calculator_button_labels = ['AC', '±', '%', '÷', '7', '8', '9', '×', '4', '5', '6', '−', '1',
+	'2', '3', '+', '^', '0', '.', '=']!
 const calculator_history_actions = ['calculator.history.0', 'calculator.history.1',
 	'calculator.history.2', 'calculator.history.3', 'calculator.history.4']
 const calculator_scientific_actions = ['calculator.scientific.sqrt', 'calculator.scientific.reciprocal',
@@ -107,42 +115,40 @@ fn build_native_calculator_layout(app &CalculatorApp) ui2.Element {
 		children.flags |= .noslices
 	}
 	content_width := app.panel_width - 24
-	display_children << ui2.label('display', '0', ui2.rect(10, 0, content_width - 20, 56),
-		ui2.TextStyle{ color: 0x111827, size: 28, align: .right })
+	display_children << ui2.label('display', '0', ui2.rect(0, 0, content_width, 52),
+		ui2.TextStyle{ color: calculator_text, size: 40, align: .right })
 	keys << ui2.Element{
 		kind: .view
-		frame: ui2.rect(12, 12, content_width, 56)
-		box: ui2.BoxStyle{ bg: 0xffffff, radius: 8 }
+		frame: ui2.rect(12, 4, content_width, 52)
+		box: ui2.BoxStyle{ transparent: true }
 		children: display_children
 	}
 	button_width := (content_width - 24) / 4
 	for index, text in calculator_button_texts {
 		operator := text in ['÷', '*', '-', '+', '=']!
 		keys << ui2.Element{
-			...ui2.button(text, text, ui2.rect(12 + f64(index % 4) * (button_width + 8),
-				76 + f64(index / 4) * 52, button_width, 44), ui2.BoxStyle{
-				bg: if text == 'C' { u32(0xef4444) } else if operator { u32(0x3478d4) }
-					else if text == '%' || text == '^' { u32(0xcbd5e1) } else { u32(0xf8fafc) }
-				radius: 8
+			...ui2.button(text, calculator_button_labels[index], ui2.rect(12 + f64(index % 4) * (button_width + 8),
+				64 + f64(index / 4) * (button_width + 8), button_width, button_width), ui2.BoxStyle{
+				bg: if operator { calculator_operator }
+					else if text in ['C', '±', '%', '^']! { calculator_function } else { calculator_digit }
+				radius: button_width / 2
 			}, ui2.TextStyle{
-				color: if text == 'C' || operator { u32(0xffffff) } else { u32(0x111827) }
-				size: 18
-				bold: text == '='
+				color: calculator_text
+				size: if text == 'C' { 16 } else { 22 }
 				align: .center
 			})
 			action_id: text
-			native_style: true
 		}
 	}
 	children << ui2.Element{
 		kind: .view
 		id: 'calculator'
 		frame: ui2.rect(app.panel_x, app.panel_y, app.panel_width, 340)
-		box: ui2.BoxStyle{ bg: 0x1f2937, radius: 12 }
+		box: ui2.BoxStyle{ bg: calculator_surface }
 		children: keys
 	}
 	return ui2.Element{
-		...ui2.screen(0xf1f5f9, children)
+		...ui2.screen(calculator_surface, children)
 		id: 'root'
 		frame: ui2.rect(0, 0, app.width, app.height)
 	}
@@ -156,7 +162,7 @@ fn calculator_layout_with_display(element ui2.Element, display string) ui2.Eleme
 			text:       display
 			text_style: ui2.TextStyle{
 				...element.text_style
-				size: if display.len > 14 { 18 } else { 28 }
+				size: if display.len > 14 { 18 } else if display.len > 9 { 28 } else { 40 }
 			}
 		}
 	}
@@ -194,10 +200,10 @@ fn (mut app CalculatorApp) build(size ui2.Rect) !ui2.Element {
 		app.copy_controls(mut children, ui2.rect(12, 206, 140, 26),
 			ui2.rect(164, 206, size.width - 176, 26))
 		children << ui2.label('', app.calculator.display, ui2.rect(12, 72, size.width - 24, 46),
-			ui2.TextStyle{ size: 22, color: body_heading, align: .right })
+			ui2.TextStyle{ size: 22, color: calculator_text, align: .right })
 		children << ui2.label('', tr('calculator.scientific.resize'), ui2.rect(12, 132, size.width - 24, 56),
-			ui2.TextStyle{ size: 12, color: body_muted })
-		return ui2.screen(app_surface, children)
+			ui2.TextStyle{ size: 12, color: calculator_muted })
+		return ui2.screen(calculator_surface, children)
 	}
 	rebuild := !app.layout_ready || app.width != size.width || app.height != size.height
 		|| app.layout_scientific != app.scientific
@@ -209,9 +215,9 @@ fn (mut app CalculatorApp) build(size ui2.Rect) !ui2.Element {
 		app.height = size.height
 		app.layout_scientific = app.scientific
 		available_width := size.width - 24
-		app.panel_width = if available_width < 260 { available_width } else { 260 }
+		app.panel_width = if available_width < 232 { available_width } else { 232 }
 		app.panel_x = if app.scientific && size.width >= 540 {
-			(size.width - 508) / 2 + 248
+			(size.width - app.panel_width - 248) / 2 + 248
 		} else if size.width > app.panel_width {
 			(size.width - app.panel_width) / 2
 		} else {
@@ -784,17 +790,17 @@ fn calculator_valid_number(text string) bool {
 
 fn calculator_utility_button(action string, text string, x f64, y f64, width f64) ui2.Element {
 	return ui2.button(action, text, ui2.rect(x, y, width, 26), ui2.BoxStyle{
-		bg:     settings_choice_bg
-		radius: 5
-	}, ui2.TextStyle{ color: body_text, size: 11, align: .center })
+		bg:     calculator_digit
+		radius: 13
+	}, ui2.TextStyle{ color: calculator_text, size: 11, align: .center })
 }
 
 fn calculator_mode_button(action string, selected bool, x f64, width f64, font_size int) ui2.Element {
 	return ui2.Element{
 		...ui2.button(action, tr(action), ui2.rect(x, 10, width, 26), ui2.BoxStyle{
-			bg:     if selected { app_accent } else { settings_choice_bg }
-			radius: 5
-		}, ui2.TextStyle{ color: if selected { app_on_accent } else { body_text }, size: font_size, align: .center })
+			bg:     if selected { calculator_operator } else { calculator_digit }
+			radius: 13
+		}, ui2.TextStyle{ color: calculator_text, size: font_size, align: .center })
 		tooltip: tr(if action == 'calculator.mode.programmer' {
 			'calculator.programmer.shortcuts'
 		} else {
@@ -847,7 +853,7 @@ fn (mut app CalculatorApp) with_utility_controls(tree ui2.Element, size ui2.Rect
 	if app.scientific {
 		left := x - 248
 		children << ui2.label('', tr('calculator.mode.scientific'), ui2.rect(left, 86, 100, 24),
-			ui2.TextStyle{ size: 13, bold: true, color: body_heading })
+			ui2.TextStyle{ size: 13, bold: true, color: calculator_text })
 		key := if app.scientific_status.len > 0 {
 			app.scientific_status
 		} else {
@@ -860,7 +866,7 @@ fn (mut app CalculatorApp) with_utility_controls(tree ui2.Element, size ui2.Rect
 					color: if app.calculator.has_error || key == 'calculator.random.unavailable' {
 						files_error
 					} else {
-						body_muted
+						calculator_muted
 					}
 				})
 			tooltip: tr(key)
@@ -875,7 +881,7 @@ fn (mut app CalculatorApp) with_utility_controls(tree ui2.Element, size ui2.Rect
 	history_x := if app.scientific { x - 248 } else { x }
 	history_width := if app.scientific { width + 248 } else { width }
 	children << ui2.label('', tr('calculator.history.title'), ui2.rect(history_x, 425, history_width - 116, 20),
-		ui2.TextStyle{ color: body_heading, size: 12, bold: true })
+		ui2.TextStyle{ color: calculator_text, size: 12, bold: true })
 	children << calculator_utility_button('calculator.history.clear', tr('calculator.history.clear'), history_x + history_width - 56, 422, 56)
 	children << calculator_utility_button('calculator.history.previous', '<', history_x + history_width - 110, 422, 22)
 	children << calculator_utility_button('calculator.history.next', '>', history_x + history_width - 84, 422, 22)
@@ -895,13 +901,13 @@ fn (mut app CalculatorApp) with_utility_controls(tree ui2.Element, size ui2.Rect
 		entry := app.history[app.history.len - 1 - app.history_offset - row]
 		text := entry.expression + ' = ' + entry.result
 		children << ui2.button(calculator_history_actions[row], text, ui2.rect(history_x, f64(455 + row * 22), history_width, 20),
-			ui2.BoxStyle{ transparent: true }, ui2.TextStyle{ color: body_text, size: 11, align: .right })
+			ui2.BoxStyle{ transparent: true }, ui2.TextStyle{ color: calculator_text, size: 11, align: .right })
 		// The string belongs to this frame, not to the bounded history.
 		children[children.len - 1] = ui2.Element{ ...children.last(), id: frame_owned_text_id, action_id: calculator_history_actions[row] }
 	}
 	if app.has_memory {
 		children << ui2.label('', tr('calculator.memory.indicator'), ui2.rect(x - 12, 42, 10, 26),
-			ui2.TextStyle{ color: app_accent, size: 11, bold: true })
+			ui2.TextStyle{ color: calculator_operator, size: 11, bold: true })
 	}
 	return ui2.Element{ ...tree, children: children }
 }

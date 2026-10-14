@@ -88,8 +88,8 @@ fn (app &CalculatorApp) programmer_view_control(mut children []ui2.Element, fram
 		...ui2.button('calculator.programmer.bits', tr(if app.integer.bits_view {
 			'calculator.programmer.keypad'
 		} else { 'calculator.programmer.bits' }), frame,
-			ui2.BoxStyle{ bg: if app.integer.bits_view { app_accent } else { settings_choice_bg }, radius: 4 },
-			ui2.TextStyle{ color: if app.integer.bits_view { app_on_accent } else { body_text }, size: 11, align: .center })
+			ui2.BoxStyle{ bg: if app.integer.bits_view { calculator_operator } else { calculator_digit }, radius: 4 },
+			ui2.TextStyle{ color: calculator_text, size: 11, align: .center })
 		checked: app.integer.bits_view
 		tooltip: tr('calculator.programmer.bits.help')
 	}
@@ -111,12 +111,12 @@ fn (app &CalculatorApp) programmer_bit_grid(mut children []ui2.Element, width f6
 		y := top + f64(index / columns) * row_height
 		children << ui2.label('', calculator_programmer_bit_labels[bit],
 			ui2.rect(x, y, cell_width, label_height),
-			ui2.TextStyle{ size: 9, color: body_muted, align: .center })
+			ui2.TextStyle{ size: 9, color: calculator_muted, align: .center })
 		children << ui2.Element{
 			...ui2.button(calculator_programmer_bit_actions[bit], if set { '1' } else { '0' },
 				ui2.rect(x, y + label_height, cell_width, button_height),
-				ui2.BoxStyle{ bg: if set { app_accent } else { settings_choice_bg }, radius: 3 },
-				ui2.TextStyle{ color: if set { app_on_accent } else { body_text }, size: 12, align: .center })
+				ui2.BoxStyle{ bg: if set { calculator_operator } else { calculator_digit }, radius: 3 },
+				ui2.TextStyle{ color: calculator_text, size: 12, align: .center })
 			checked: set
 			tooltip: tr('calculator.programmer.bits.help')
 		}
@@ -136,12 +136,12 @@ fn (app &CalculatorApp) programmer_bit_pages(mut children []ui2.Element, width f
 	}
 	children << ui2.label('calculator.programmer.bits.range', calculator_programmer_bit_ranges[app.integer.bit_page],
 		ui2.rect(range_left, top, width - 84 - range_left, 22),
-		ui2.TextStyle{ size: 10, color: body_text, align: .center })
+		ui2.TextStyle{ size: 10, color: calculator_text, align: .center })
 }
 
 fn (app &CalculatorApp) build_programmer_tiny(size ui2.Rect) ui2.Element {
 	mut children := frame_elements(8)
-	if size.width <= 4 || size.height <= 4 { return ui2.screen(app_surface, children) }
+	if size.width <= 4 || size.height <= 4 { return ui2.screen(calculator_surface, children) }
 	margin := if size.width < 60 || size.height < 60 { f64(2) } else { f64(10) }
 	inner := size.width - margin * 2
 	mut top := margin
@@ -151,7 +151,7 @@ fn (app &CalculatorApp) build_programmer_tiny(size ui2.Rect) ui2.Element {
 	}
 	if size.height >= 160 {
 		children << ui2.label('', app.integer.text(app.integer.base), ui2.rect(margin, top, inner, 24),
-			ui2.TextStyle{ size: 10, color: body_heading, align: .right })
+			ui2.TextStyle{ size: 10, color: calculator_text, align: .right })
 		top += 28
 	}
 	if size.height >= 88 {
@@ -161,8 +161,8 @@ fn (app &CalculatorApp) build_programmer_tiny(size ui2.Rect) ui2.Element {
 	children << ui2.Element{
 		...ui2.label('', tr('calculator.programmer.resize'),
 			ui2.rect(margin, top, inner, size.height - top - margin),
-			ui2.TextStyle{ size: 10, color: body_muted })
+			ui2.TextStyle{ size: 10, color: calculator_muted })
 		tooltip: tr('calculator.programmer.resize')
 	}
-	return ui2.screen(app_surface, children)
+	return ui2.screen(calculator_surface, children)
 }
