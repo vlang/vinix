@@ -1,5 +1,10 @@
 # Storage-volume qualification
 
+`--host-cipher-scrub-reference` and `--cipher-scrub-reference` qualify complete
+ciphertext scrub binding to a supplied reference, private pinned inputs,
+historical findings and bounded lifetimes across reordered reboot. The oracle
+independently reconstructs 18 persisted files. See [ciphertext binding](cipher-scrub-reference.md).
+
 `--host-scrub-reference` and `--scrub-reference` qualify complete historical
 scrub/reference binding, native geometry, failure precedence and repeated
 lifetimes across reordered reboot. The independent oracle reconstructs 24

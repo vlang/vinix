@@ -3154,6 +3154,52 @@ changing caller state; embedded identities, bounds, pools and global slots
 retain the ordinary bundle validation. See
 [qualification](../tests/storage-volumes/data-checksums.md).
 
+## Binding ciphertext scrubs to checksum references
+
+`verify-volume-scrub-reference REFERENCE REPORT` checks a saved `VINIXCS1`
+ciphertext scrub against a supplied `VINIXCH1` checksum reference. It requires
+no passphrase, recovery key, device discovery or disk access.
+
+```sh
+vinix-volume verify-volume-scrub-reference /root/volume.vchash /root/changed-volume.vcscrub
+```
+
+Both complete binary records are strictly validated before any finding is
+printed. The entire 128-byte supplied reference must match the reference
+embedded in the scrub, including native identity/capacity/sector, slot,
+offset/length/readonly mode, expected digest, reserved fields and checksum.
+The scrub's reference fingerprint, observed digest/result consistency and
+complete record checksum must also be valid. A structurally valid unrelated
+reference takes precedence over a recorded changed finding.
+
+The bounded complete output starts with
+`format=VINIXCS1 operation=verified-ciphertext-scrub-reference`, matched/changed
+counts and SHA-256 fingerprints of both original binary inputs. Its second
+line includes every saved disk/mapping field, `match` or `changed`, and full
+expected/actual digests. The output is a historical view, not a binary CS1
+input. No report is published or overwritten.
+
+Each input must be a private regular file owned by the effective user, with
+no group/other access and its exact format length. Reads retry interruptions
+and short transfers, reject trailing data and recheck descriptor ownership,
+permissions and length after EOF. Symlinks, directories, FIFOs and ordinary
+0644 files are refused. Both files and their parent directory descriptors
+remain pinned through formatting, printing and final stdout checks. Separate
+hard-linked aliases work; a same-file reference/report pair has incompatible
+lengths. The command takes no writer lock and works under directory writer
+contention. It opens no live mapping and performs no KDF or device I/O.
+
+Exit status is 0 for a valid bound clean finding, 2 for a valid bound changed
+finding, and 1 on operational refusal. Syntax errors return 2. Input, binding,
+encoding and stdout failures take precedence over changed findings. Refusals
+emit no binding header or row; established diagnostics may use stdout.
+
+This checks historical evidence against a trusted reference. CRC and SHA-256
+do not authenticate the inputs or establish present ciphertext integrity, and
+the operation supplies no repair or concurrent snapshot. Current authenticated
+checks remain available through `verify-volume-auto` and
+`scrub-volume-auto`. See [qualification](../tests/storage-volumes/cipher-scrub-reference.md).
+
 ## Binding data scrub reports to checksum references
 
 `verify-data-scrub-reference MANIFEST REPORT` checks a saved `VINIXSR1`

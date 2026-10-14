@@ -4,6 +4,12 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`verify-volume-scrub-reference REFERENCE REPORT` checks a saved ciphertext scrub
+against the entire supplied checksum reference, using pinned private inputs.
+The historical view includes complete mapping geometry and both input hashes;
+clean/changed findings return 0/2 and operational failures return 1.
+See [ciphertext binding](../../docs/storage-volumes.md#binding-ciphertext-scrubs-to-checksum-references).
+
 `verify-data-scrub-reference MANIFEST REPORT` binds a saved plain-data scrub to
 its complete checksum reference, then prints native disk geometry and every
 historical finding. The reference fingerprint and exact rows/expected digests
