@@ -865,6 +865,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   limits/reuse, retained data and flat storage on both architectures.
   See [the type-error receipts](docs/linux-posix-qualification.md#native-pipe-only-fcntl-type-errors).
 
+- [x] Normalize native pipe capacities to the architecture page size, reject
+  overflowing unsigned requests with EINVAL, and apply the growth ceiling
+  using effective CAP_SYS_RESOURCE; qualify aliases, retained bytes, errors
+  and flat resize storage on both architectures and same-ELF Linux.
+  See [the rounding and capability receipts](docs/linux-posix-qualification.md#native-pipe-capacity-rounding-and-capability-ceilings).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

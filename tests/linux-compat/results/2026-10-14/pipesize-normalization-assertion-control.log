@@ -1,0 +1,3 @@
+/Users/alex/.cache/vinix-linux-compat/pipesize-20261014/normalization-check.v:152: FAIL: fn main.main: assert false, 'normalization assertions must execute';
+      message: normalization assertions must execute
+V panic: Assertion failed...

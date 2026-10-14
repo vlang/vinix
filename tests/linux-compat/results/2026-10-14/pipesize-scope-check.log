@@ -1,0 +1,2 @@
+arm: full generated C unchanged outside normalization and capacity setter bodies/prototypes
+x86: full generated C unchanged outside normalization and capacity setter bodies/prototypes

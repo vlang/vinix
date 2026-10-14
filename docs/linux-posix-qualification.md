@@ -5538,3 +5538,97 @@ Requests that resize buffers, page-ring occupancy behavior, privileged
 ceilings and budget injection, FIFO-shaped resources lacking the capability,
 concurrent descriptor close/reuse/resize, legacy/GNU/translated/ELF32 paths
 and the three broad section 15 gates remain separate.
+
+## Native pipe capacity rounding and capability ceilings
+
+`F_SETPIPE_SZ` now rounds up from the native page size, independently of the
+4 KiB `PIPE_BUF` atomic-write limit. It rejects unsigned requests strictly
+above 2 GiB with `EINVAL`; exactly 2 GiB reaches the permission check.
+The 1 MiB ceiling applies when the normalized capacity grows beyond the
+existing capacity and the caller lacks effective `CAP_SYS_RESOURCE`.
+Existing oversized capacities can be retained or reduced after that bit is
+cleared. These rules follow [Linux's pipe implementation](https://github.com/torvalds/linux/blob/v6.12/fs/pipe.c).
+The existing byte-ring allocator, lock, charge rollback, data copy and free
+paths are unchanged.
+
+The `pipesize` musl probe runs four independent children: root with and
+without the effective resource bit, and UID/GID1000 with and without it.
+The ordinary privileged child retains permitted capabilities with
+`PR_SET_KEEPCAPS`, then enables only the resource bit. The root child with
+the bit cleared keeps its other capabilities, testing the specific authority
+instead of treating UID0 or another capability as sufficient.
+
+Each child inherits 29 descriptors: linked and unlinked regular files,
+directory, `/dev/null`, UNIX socket, O_PATH, anonymous read/write ends and
+named FIFO, each with original/dup/CLOEXEC aliases, plus fixed 64/65.
+The five case groups contain 1,000 rounding controls, 722 overflow/type/error
+controls, 194 privileged or 240 unprivileged ceiling controls, 28 actual data
+controls and 48 final-state controls. Across the four children there are
+8,060 checks per architecture.
+
+| Kernel | Native page | Checks | Original failures | Normalization-only failures | Final failures | Same-ELF Linux failures |
+| --- | --- | --- | --- | --- | --- | --- |
+| AArch64 | 16 KiB | 8,060 | 3,144 | 376 | 0 | 0 |
+| x86-64 | 4 KiB | 8,060 | 1,404 | 376 | 0 | 0 |
+
+Original AArch64 failures are 435 rounding and 257 overflow failures per
+child, plus 188 ceiling failures in each privileged child. Original x86-64
+has the same overflow and ceiling failures. The separately committed
+normalization fix removes rounding/overflow failures on both architectures;
+the capability fix removes the remaining 376 failures. Linux 6.12.51 references
+execute the exact final native ELF, with 4 KiB pages on both reference guests.
+
+Controls include raw upper-register patterns and libc calls, bad descriptors,
+reduced descriptor limits 8/0 and closed/pipe/regular reuse of descriptor 66.
+Nonpipe descriptions retain their `EBADF` precedence. Successful resizing
+updates every alias without changing metadata, flags, cursors or queued
+AB/CD/GH bytes. Refusals retain the previous capacity and data. A fresh
+anonymous pipe and the inherited named FIFO exercise wrapped QRST data
+across growth, a full two-page ring's `EBUSY` refusal, and successful shrinking
+after only one occupied page remains. Privileged controls grow actual
+two-byte queues to 2 MiB; capability removal permits same-capacity requests,
+refuses subsequent growth, and permits shrinking below the ceiling.
+Exactly 2 GiB is tested without the capability (`EPERM`), avoiding a
+privileged multi-gigabyte allocation.
+
+After 32 warmups, each final credential cohort runs 200 resize/alias/close
+cycles. All 18 AArch64 and 14 x86-64 slab classes and large-page counts stay
+exactly flat. The normalization-only unprivileged cohorts also stay flat;
+privileged storage qualification waits for the completed capability fix.
+Six production builds, seven native guest cases per architecture
+(pipesize/pipecmd/fcntlabi/keepcaps/capset/open/runtime), eight host test files,
+64 frozen dispatch inputs and complete generated-C comparisons are bound.
+Only normalization and capacity setter bodies/prototypes differ. Allocation
+scanning reports 398 AArch64 and 290 x86-64 sites before and after, with the
+same existing allowance refusals; the allowance check remains a reported
+failure rather than a whole-kernel allocation approval.
+
+The V audit is compiled without `-prod`. Deliberately failing assertions and
+a passing-capture-as-failing-baseline control both exit 1, and the real audit
+passes. Source, generated C, probe ELF, kernels, Linux wrappers, serial logs,
+tool inputs and receipts are SHA256-bound. Independent lifetime review checks
+the inherited descriptor/Handle pin, synchronous capability access, locked
+ring borrowers, replacement copy before free, charge rollback and stack/mmap
+fixture borrowers. Fresh corrected AArch64 ops/churn/cache and idle/apps/drag
+controls are bound separately.
+
+Preparation diagnostics are retained separately: the first pointer-type
+compile failure, an unavailable generated bounds helper, an unstaged ARM
+intermediate build and the earlier probe's uninitialized Bank field.
+Their earlier guest captures are diagnostic records; the final semantic
+baselines and references use the zero-initialized probe.
+An earlier preflight differs only in unused stderr helpers, with identical
+probe ELFs. Its raw C drift is retained. Repeating the preflight with the
+explicit pinned compiler yields byte-identical raw C and ELFs on both
+architectures; the audit binds both records separately.
+
+Linux page-slot occupancy for fragmented small writes, per-user pipe-page
+soft/hard accounting, a mutable `/proc/sys/fs/pipe-max-size`, watch queues,
+concurrent resize/close, budget-failure injection and privileged requests
+above the tested 2 MiB range remain unqualified. The native musl receipts do
+not qualify glibc, translated or 32-bit pipe paths or close the broad section 15
+semantics, installation/sandbox or architecture acceptance gates.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-14/pipesize-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-14/pipesize-after-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/pipesize-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-14/pipesize-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-14/pipesize-after-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/pipesize-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/results/2026-10-14/pipesize-audit.v), [verdict](../tests/linux-compat/results/2026-10-14/pipesize-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-14/pipesize-lifetime-review.md).

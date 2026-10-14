@@ -1,0 +1,3 @@
+/Users/alex/.cache/vinix-linux-compat/pipesize-20261014/normalization-check.v:119: FAIL: fn main.failure: assert log.contains('LINUX PIPESIZE DETAIL:'), 'pipesize baseline failure markers required';
+      message: pipesize baseline failure markers required
+V panic: Assertion failed...

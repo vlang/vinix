@@ -582,17 +582,13 @@ fn (mut this Pipe) pipe_capacity() u64 {
 }
 
 // Linux rounds requested pipe sizes up to a convenient power-of-two multiple
-// of the page size. Vinix has no capabilities yet, so apply the ordinary
-// unprivileged 1 MiB ceiling to every caller.
+// of the native page size, independently of the 4 KiB atomic-write limit.
+// Permission checks apply to the normalized capacity under the pipe lock.
 fn normalized_capacity(requested u64) ?u64 {
 	// Linux rejects sizes above 2 GiB before power-of-two rounding;
 	// exactly 2 GiB remains a valid request for the permission check.
 	if requested > u64(1) << 31 {
 		errno.set(errno.einval)
-		return none
-	}
-	if requested > pipe_max_capacity {
-		errno.set(errno.eperm)
 		return none
 	}
 	mut capacity := u64(memory.page_size)
@@ -606,6 +602,14 @@ fn (mut this Pipe) set_pipe_capacity(requested u64) ?u64 {
 	new_capacity := normalized_capacity(requested)?
 
 	this.l.acquire()
+	// The ceiling restricts growth, and effective CAP_SYS_RESOURCE bypasses
+	// it. An already larger pipe remains resizable after the capability drops.
+	if new_capacity > this.capacity && new_capacity > pipe_max_capacity
+		&& !proc.current_has_capability(proc.cap_sys_resource) {
+		this.l.release()
+		errno.set(errno.eperm)
+		return none
+	}
 	if new_capacity == this.capacity {
 		this.l.release()
 		return new_capacity

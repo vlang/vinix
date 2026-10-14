@@ -1,0 +1,27 @@
+diff --git a/Users/alex/.cache/vinix-linux-compat/pipesize-20261014/states/preflight3-pipesize-arm/fixture.c b/Users/alex/.cache/vinix-linux-compat/pipesize-20261014/states/p3-after-arm/pipesize/fixture.c
+index 8d37b19cd..9157d374f 100644
+--- a/Users/alex/.cache/vinix-linux-compat/pipesize-20261014/states/preflight3-pipesize-arm/fixture.c
++++ b/Users/alex/.cache/vinix-linux-compat/pipesize-20261014/states/p3-after-arm/pipesize/fixture.c
+@@ -1169,20 +1169,11 @@ struct pipesizefixture__Slabs {
+ 
+ typedef struct stat Array_fixed_struct_stat_29[29];
+ 
+-static FILE* v3_eprint_begin(void) {
+-	fflush(stdout);
+-	fflush(stderr);
+-	return stderr;
+-}
+-static void v3_eprint_end(void) {
+-	fflush(stderr);
+-}
+-#define v3_eprintf(...) do { fprintf(v3_eprint_begin(), __VA_ARGS__); v3_eprint_end(); } while (0)
+ static void v3_eprint_lit(const char* s) {
+-	v3_eprintf("%s", s);
++	fprintf(stderr, "%s", s);
+ }
+ static void v3_eprintln_string(string s) {
+-	v3_eprintf("%.*s\n", s.len, (char*)s.str);
++	fprintf(stderr, "%.*s\n", s.len, (char*)s.str);
+ }
+ 
+ bool pipesizefixture__available(i32 fd, i32 amount);

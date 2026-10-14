@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "8f1c1988f091fca90043de17e5f3f33bd5642c608ed07108374396d49352d715",
+    "results": [
+        {
+            "name": "pipesize",
+            "source_sha256": "fa3d6f719992719626ebb7947466b09d7b5bb9baa5422ec4a715e2892f2f2120",
+            "init_sha256": "ec02a5ee54c273907ad938bc1a37997d995a8127d87ca1ec1d1e53fc272b7d3d",
+            "iso_sha256": "b083a97da5f5a1109a95daa61ce1b3cb42ad7f4ef6bbafa8a53990f33096698a",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

@@ -1,0 +1,9 @@
+Compiler output from the default V compiler:
+/Users/alex/.cache/vinix-linux-compat/pipesize-20261014/tmp/vinix-v-module-CKHnIn/pipesizefixture/core.v:203:112: error: infix expr: cannot use `int` (right expression) as `voidptr`
+  201 | fn positive(counts &Counts, bank &Bank, ordinary bool, page u64) {
+  202 |     unsafe {
+  203 |         data := C.mmap(nil, usize(8 * page), C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0); if data == C.MAP_FAILED { fatal() }
+      |                                                                                                                      ~~~~~~~~~~~~~~~~~~~~
+  204 |         ends := &i32(C.alloca(usize(2 * sizeof(i32)))); if C.pipe2(ends, C.O_NONBLOCK | C.O_CLOEXEC) != 0 { fatal() }
+  205 |         alias := C.dup(ends[0]); if alias < 0 { fatal() }
+

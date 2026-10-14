@@ -700,7 +700,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/c/pthread.h` | `349a5a9d0b696749923c0632cd28a42e52d41bdc067d31d53fb686ce48f353d2` |
 | `kernel/event/event.v` | `a92daf2add03c5304742ad1b112ca04635b94f49e4279e8316f2bee57da6b708` |
 | `kernel/file/file.v` | `bb05660fb6b07f7ae2e63d96fc4682f2581ebf350e2baa09cab5c3fbed204672` |
-| `kernel/fs/mount.v` | `e3af25d33e1fdfc40bde8c1a397b58de1df607e66629b813757f7834035d70a3` |
+| `kernel/fs/mount.v` | `ac86923e939e505c8fb80ec8017c34a4115eb4502623e516794c8b544e9f2cea` |
 | `kernel/fs/mount_policy.v` | `6755ca918d30d05263520d1f3d25a2e4c31d7f1b7e619aabcf7e276218f9bc4a` |
 | `kernel/fs/procfs.v` | `b924f6eee11e596e4abdeaf1816421ed0c2964956f9a75b1c34a3d60fe6ccb86` |
 | `kernel/fs/tmpfs.v` | `99a10d885597ccb745530e639685f282703332667066a28dd79f18195ec3e010` |
@@ -723,7 +723,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/memory/table_budget.v` | `72becfcd2e1dff2c510efd3af47d2cb99effca487e8e9643e0c247e261729ed6` |
 | `kernel/memory/virtual_amd64.v` | `483bb2e7ac7a1248c6f09e182a8f27b8a250f4b3e4aeba2642b4be300b00bb9d` |
 | `kernel/memory/virtual_arm64.v` | `71602c4c637ebfaad8b85d1af34ca9a3d4e1afd4ebf85fdb433fa992871693c0` |
-| `kernel/pipe/pipe.v` | `db8f9e83758af3fc974c15329c74f0bccaf8d3030e49eb8175faec420a4888e4` |
+| `kernel/pipe/pipe.v` | `2ad825ae805ce9a9c8dfbc18d176424746cc32bdfa71491c3c427463dfd0a1c7` |
 | `kernel/pipe/usercopy.v` | `7af5925a4de313f7d8847269f2e07a293cbfb9c585eeaf2ab926d712983cad9b` |
 | `kernel/proc/container.v` | `db3558d2cea2aeb8c5a483cd9cbade7ba37e2d9d13f5d3047874a9ce2319449a` |
 | `kernel/proc/kernel_budget.v` | `763ca9bea7d11825b8abc293e350a3afabe911bab8e718853626d52fd2201553` |

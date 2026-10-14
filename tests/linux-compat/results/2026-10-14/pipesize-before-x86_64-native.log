@@ -1,0 +1,79 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=85104
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003801f200
+initramfs: Done (9 entries)
+LINUX PIPESIZE PAGE: ordinary=0 capability=1 bytes=4096 reference=0
+LINUX PIPESIZE DETAIL: ordinary=0 capability=1 kind=1 call=361 ret=-1 errno=1
+LINUX PIPESIZE DETAIL: ordinary=0 capability=1 kind=1 call=362 ret=-1 errno=1
+LINUX PIPESIZE DETAIL: ordinary=0 capability=1 kind=1 call=363 ret=-1 errno=1
+LINUX PIPESIZE DETAIL: ordinary=0 capability=1 kind=2 call=1 ret=-1 errno=1
+LINUX PIPESIZE DETAIL: ordinary=0 capability=1 kind=2 call=2 ret=-1 errno=1
+LINUX PIPESIZE DETAIL: ordinary=0 capability=1 kind=2 call=3 ret=-1 errno=1
+LINUX PIPESIZE CASES: ordinary=0 capability=1 kind=0 calls=1000 failures=0
+LINUX PIPESIZE CASES: ordinary=0 capability=1 kind=1 calls=722 failures=257
+LINUX PIPESIZE CASES: ordinary=0 capability=1 kind=2 calls=194 failures=188
+LINUX PIPESIZE CASES: ordinary=0 capability=1 kind=3 calls=28 failures=0
+LINUX PIPESIZE CASES: ordinary=0 capability=1 kind=4 calls=48 failures=0
+LINUX PIPESIZE FINAL: ordinary=0 capability=1 kind=0 calls=1000 failures=0
+LINUX PIPESIZE FINAL: ordinary=0 capability=1 kind=1 calls=722 failures=257
+LINUX PIPESIZE FINAL: ordinary=0 capability=1 kind=2 calls=194 failures=188
+LINUX PIPESIZE FINAL: ordinary=0 capability=1 kind=3 calls=28 failures=0
+LINUX PIPESIZE FINAL: ordinary=0 capability=1 kind=4 calls=48 failures=0
+LINUX PIPESIZE PAGE: ordinary=0 capability=0 bytes=4096 reference=0
+LINUX PIPESIZE DETAIL: ordinary=0 capability=0 kind=1 call=361 ret=-1 errno=1
+LINUX PIPESIZE DETAIL: ordinary=0 capability=0 kind=1 call=362 ret=-1 errno=1
+LINUX PIPESIZE DETAIL: ordinary=0 capability=0 kind=1 call=363 ret=-1 errno=1
+LINUX PIPESIZE CASES: ordinary=0 capability=0 kind=0 calls=1000 failures=0
+LINUX PIPESIZE CASES: ordinary=0 capability=0 kind=1 calls=722 failures=257
+LINUX PIPESIZE CASES: ordinary=0 capability=0 kind=2 calls=240 failures=0
+LINUX PIPESIZE CASES: ordinary=0 capability=0 kind=3 calls=28 failures=0
+LINUX PIPESIZE CASES: ordinary=0 capability=0 kind=4 calls=48 failures=0
+LINUX PIPESIZE FINAL: ordinary=0 capability=0 kind=0 calls=1000 failures=0
+LINUX PIPESIZE FINAL: ordinary=0 capability=0 kind=1 calls=722 failures=257
+LINUX PIPESIZE FINAL: ordinary=0 capability=0 kind=2 calls=240 failures=0
+LINUX PIPESIZE FINAL: ordinary=0 capability=0 kind=3 calls=28 failures=0
+LINUX PIPESIZE FINAL: ordinary=0 capability=0 kind=4 calls=48 failures=0
+LINUX PIPESIZE PAGE: ordinary=1 capability=1 bytes=4096 reference=0
+LINUX PIPESIZE DETAIL: ordinary=1 capability=1 kind=1 call=361 ret=-1 errno=1
+LINUX PIPESIZE DETAIL: ordinary=1 capability=1 kind=1 call=362 ret=-1 errno=1
+LINUX PIPESIZE DETAIL: ordinary=1 capability=1 kind=1 call=363 ret=-1 errno=1
+LINUX PIPESIZE DETAIL: ordinary=1 capability=1 kind=2 call=1 ret=-1 errno=1
+LINUX PIPESIZE DETAIL: ordinary=1 capability=1 kind=2 call=2 ret=-1 errno=1
+LINUX PIPESIZE DETAIL: ordinary=1 capability=1 kind=2 call=3 ret=-1 errno=1
+LINUX PIPESIZE CASES: ordinary=1 capability=1 kind=0 calls=1000 failures=0
+LINUX PIPESIZE CASES: ordinary=1 capability=1 kind=1 calls=722 failures=257
+LINUX PIPESIZE CASES: ordinary=1 capability=1 kind=2 calls=194 failures=188
+LINUX PIPESIZE CASES: ordinary=1 capability=1 kind=3 calls=28 failures=0
+LINUX PIPESIZE CASES: ordinary=1 capability=1 kind=4 calls=48 failures=0
+LINUX PIPESIZE FINAL: ordinary=1 capability=1 kind=0 calls=1000 failures=0
+LINUX PIPESIZE FINAL: ordinary=1 capability=1 kind=1 calls=722 failures=257
+LINUX PIPESIZE FINAL: ordinary=1 capability=1 kind=2 calls=194 failures=188
+LINUX PIPESIZE FINAL: ordinary=1 capability=1 kind=3 calls=28 failures=0
+LINUX PIPESIZE FINAL: ordinary=1 capability=1 kind=4 calls=48 failures=0
+LINUX PIPESIZE PAGE: ordinary=1 capability=0 bytes=4096 reference=0
+LINUX PIPESIZE DETAIL: ordinary=1 capability=0 kind=1 call=361 ret=-1 errno=1
+LINUX PIPESIZE DETAIL: ordinary=1 capability=0 kind=1 call=362 ret=-1 errno=1
+LINUX PIPESIZE DETAIL: ordinary=1 capability=0 kind=1 call=363 ret=-1 errno=1
+LINUX PIPESIZE CASES: ordinary=1 capability=0 kind=0 calls=1000 failures=0
+LINUX PIPESIZE CASES: ordinary=1 capability=0 kind=1 calls=722 failures=257
+LINUX PIPESIZE CASES: ordinary=1 capability=0 kind=2 calls=240 failures=0
+LINUX PIPESIZE CASES: ordinary=1 capability=0 kind=3 calls=28 failures=0
+LINUX PIPESIZE CASES: ordinary=1 capability=0 kind=4 calls=48 failures=0
+LINUX PIPESIZE FINAL: ordinary=1 capability=0 kind=0 calls=1000 failures=0
+LINUX PIPESIZE FINAL: ordinary=1 capability=0 kind=1 calls=722 failures=257
+LINUX PIPESIZE FINAL: ordinary=1 capability=0 kind=2 calls=240 failures=0
+LINUX PIPESIZE FINAL: ordinary=1 capability=0 kind=3 calls=28 failures=0
+LINUX PIPESIZE FINAL: ordinary=1 capability=0 kind=4 calls=48 failures=0
+LINUX PIPESIZE FAIL: resizing or retained state
+QEMU: Terminated
+

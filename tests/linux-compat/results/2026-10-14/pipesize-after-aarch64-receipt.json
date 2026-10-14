@@ -1,0 +1,63 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "faf19c208a2d71cf9b041f4c044726a889fe02efe0a9879c3305bd64b06fc5d8",
+    "results": [
+        {
+            "name": "pipesize",
+            "source_sha256": "fa3d6f719992719626ebb7947466b09d7b5bb9baa5422ec4a715e2892f2f2120",
+            "init_sha256": "ec02a5ee54c273907ad938bc1a37997d995a8127d87ca1ec1d1e53fc272b7d3d",
+            "iso_sha256": "89a30d207e95a06c9e7b3946e35300a857a3163c5994efdd680509154337e0bd",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "pipecmd",
+            "source_sha256": "e2fc512dc614e13af04f2fee6fbe5b2d98e3c795ab111a9b1d878ed2b8fcd25d",
+            "init_sha256": "9ee4eb9c29faa09b82e43560391879fef8ed3ffe0da112ab9cf67040f06a62da",
+            "iso_sha256": "bec3610d69aa5386b3793d4a565d8bad4f8e76eac1f9068459831d8db9ce2502",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "fcntlabi",
+            "source_sha256": "6f70bc290dff8671cbde66025806b7b5d99d82468dc6e7098ec86a27cc43c3ac",
+            "init_sha256": "b92892f1860ff4aae349f27924922645aed79becbcff2dd00a0a18fc797fd3fd",
+            "iso_sha256": "cf8e4038448087526a314c506510bad615d647d700a59d84da159fd802ea7c0e",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "keepcaps",
+            "source_sha256": "e1e0906a97dae640da4269408f3c2f04ca321fe0e113edda83075b81337aa04c",
+            "init_sha256": "6b4fd0b753044e97563f526502e664f180557ff8b0e98cfa45d204bc9152aa4e",
+            "iso_sha256": "8575c6af2054ade8a7091f53e142477ae21585287e55b50df74a04d0b8ef954d",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "capset",
+            "source_sha256": "ef93cfe6bdf2e25051da390b736ad9c0458e610f59bb4a593e6e815e4a81d8e4",
+            "init_sha256": "39514199121b876d551967b9b9cac5f479431a082632d1b847987a3799f5af7f",
+            "iso_sha256": "811aa1b988f18c4ef30308bb2f278bb18fccd1e889e8cdca38ca4389a410f6ce",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "open",
+            "source_sha256": "923b9cfdaa49bf37b0c82d235294b2785f61366c39d9af8f1d5dfe45cbe65262",
+            "init_sha256": "b41456ec1e04ca2e2e83e39ac5f01da498edfc8011f4eb71541bbc9ec9ec7c6a",
+            "iso_sha256": "e471e3546b007f061d50cd058c2e8657183fd4959f4679bb5cdb6d935353689b",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "752767bcba47df2b5bc14b294869dec2c7701069ef5a11129cb5995222ba7a8c",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

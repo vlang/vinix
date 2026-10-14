@@ -1360,3 +1360,20 @@ Run `--cases pipecmd,fcntlabi,fcntlpath,open,runtime` and use
 Actual resizing, occupancy/ceiling/budget behavior, concurrent close/reuse,
 GNU and foreign paths remain separate. See
 [receipts and limits](../../docs/linux-posix-qualification.md#native-pipe-only-fcntl-type-errors).
+
+The `pipesize` case qualifies native-page rounding and the effective
+CAP_SYS_RESOURCE pipe-growth ceiling on both architectures. Four independent
+root/UID1000 capability cohorts run8,060 total checks per architecture,
+covering real anonymous/FIFO resizing, aliases, overflow/type errors,
+upper-register arguments, low limits/reuse, metadata/flags/cursors, queued
+bytes and wrapped/full-ring data. The original kernels fail 3,144 ARM/1,404 x86
+checks, the separately committed rounding fix leaves 376 capability failures
+on each, and corrected Vinix plus the exact same ELF on Linux 6.12.51 pass.
+Each final 200-cycle resizing cohort keeps every slab class and large-page
+count flat. Run `--cases pipesize,pipecmd,fcntlabi,keepcaps,capset,open,runtime`;
+`pipesize-reference.v --arch ARCH --kernel LINUX --init NATIVE-PROBE-ELF
+--state-dir FRESH-DIR` runs the Linux oracle. The qualification report binds
+the V audit, preparation diagnostics, six builds, source/C/ELF identities,
+independent lifetime review and fresh memory/desktop controls. Fragmented
+page-slot occupancy, page quotas/sysctls, concurrent resizing, budget
+injection, larger privileged allocations and GNU/foreign paths remain open.
