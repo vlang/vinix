@@ -1574,6 +1574,15 @@ identity limits, rollback/equivocation checks, retired-key recovery and persiste
 JSON stay compatible. The [history ownership qualification](../../tests/packages/history-ownership-check.md)
 separates history/hash scratch from remaining reader and whole-service memory.
 
+Configuration and consumer/publisher replay-history serialization use owned
+buffers that retire after writing or refusal. The 8 MiB persisted-document limit
+includes the trailing newline, and overflow preserves the previous document.
+Repository review identities keep their exact existing JSON and SHA256 digest;
+their combined hash input does not acquire a persisted-document size limit or
+newline. Enrollment/revocation retire temporary comparison digests after use.
+See [administration metadata qualification](../../tests/packages/administration-metadata-check.md)
+for byte compatibility, boundaries and measured serializer/hash ownership.
+
 Configuration JSON preserves legacy omitted-field defaults, including partial
 policy objects. Present fields must have the declared JSON types; null values,
 unknown keys and duplicate keys (including escaped equivalent spellings) are

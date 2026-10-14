@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import json2
 import os
 
 pub struct ReleaseInfo {
@@ -166,8 +165,10 @@ fn release_locked(repository string, id string, seed_path string, sequence u64, 
 	sync_directory(stage)!
 	// Reserve this sequence/digest durably before exposing signed bytes. A failed
 	// export may retry exactly these inputs, but must not fork the same sequence.
-	write_administration_metadata(repository + '/.publisher/history.json',
-		json2.encode(ReleaseHistory{ indexes: remembered.repositories }) + '\n') or {
+	history_path := repository + '/.publisher/history.json'
+	defer { unsafe { history_path.free() } }
+	write_administration_document(history_path, ReleaseHistory{ indexes: remembered.repositories },
+		'package administration metadata exceeds its size limit') or {
 		return error('cannot durably reserve publisher sequence; check storage and retry the same inputs or choose a newer sequence: ${err}')
 	}
 	os.chmod(stage, 0o755)!

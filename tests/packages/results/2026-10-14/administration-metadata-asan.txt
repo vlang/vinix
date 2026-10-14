@@ -1,0 +1,36 @@
+clang ASan/UBSan; detect_leaks=0; halt_on_error=1
+
+administration_metadata:
+ADMINISTRATION METADATA configuration and both history formats preserve exact JSON, escaping, defaults, u64 widths and reader round-trips PASS
+ADMINISTRATION METADATA limit-minus-one and exact 8 MiB accepted; newline and escape expansion overflow refused PASS
+ADMINISTRATION METADATA review fingerprints preserve legacy digests and bind configuration, history, intent, publisher and index bytes PASS
+ADMINISTRATION METADATA repeated writes remain readable; oversized and publication failures preserve prior documents and source models PASS
+PASS
+
+administration:
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository unreachable
+Updating trusted repository fixture
+Updating trusted repository fixture
+PASS
+
+release:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+PASS

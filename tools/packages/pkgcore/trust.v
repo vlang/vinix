@@ -2,7 +2,6 @@
 module pkgcore
 
 import crypto.sha256
-import json2
 import os
 
 pub struct RepositoryFloor {
@@ -146,7 +145,7 @@ fn history_with_snapshots(config Config, directory string, snapshots []Snapshot)
 }
 
 fn save_history(directory string, history TrustHistory) ! {
-	text := json2.encode(history) + '\n'
-	if text.len > max_metadata { return error('repository trust history exceeds metadata limit') }
-	write_administration_metadata(directory + '/trust-history.json', text)!
+	path := directory + '/trust-history.json'
+	defer { unsafe { path.free() } }
+	write_administration_document(path, history, 'repository trust history exceeds metadata limit')!
 }

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import json2
 import os
 
 pub struct RepositoryStatus {
@@ -56,7 +55,7 @@ fn write_administration_metadata(path string, text string) ! {
 }
 
 fn save_configuration(path string, config Config) ! {
-	write_administration_metadata(path, json2.encode(config) + '\n')!
+	write_administration_document(path, config, 'package administration metadata exceeds its size limit')!
 }
 
 // The administrator supplies the key through an authenticated external channel.
@@ -84,7 +83,10 @@ pub fn enroll_repository_reviewed(root string, repository Repository, offline bo
 	defer { os.rmdir_all(work) or {} }
 	snapshot, index := enrollment_snapshot(current, repository, offline, work)!
 	defer { close_decoded_index(index); unsafe { snapshot.text.free(); snapshot.signature.free() } }
-	check_repository_review(expected, repository_fingerprint(current, history, 'enroll', repository, index_digest(snapshot.text)))!
+	digest := index_digest(snapshot.text)
+	actual := repository_fingerprint(current, history, 'enroll', repository, digest)
+	defer { unsafe { digest.free(); actual.free() } }
+	check_repository_review(expected, actual)!
 	remembered := remember_index(history, repository, index, snapshot.text)!
 	close_decoded_history(history)
 	history = remembered
@@ -110,7 +112,9 @@ pub fn revoke_repository_reviewed(root string, id string, expected string) !Conf
 	path := writable_configuration(root)!
 	matches := current.repositories.filter(it.id == id)
 	if matches.len != 1 { return error('repository is not enrolled: ${id}') }
-	check_repository_review(expected, repository_fingerprint(current, TrustHistory{}, 'revoke', matches[0], ''))!
+	actual := repository_fingerprint(current, TrustHistory{}, 'revoke', matches[0], '')
+	defer { unsafe { actual.free() } }
+	check_repository_review(expected, actual)!
 	next := Config{ ...current, repositories: current.repositories.filter(it.id != id) }
 	next.validate()!
 	save_configuration(path, next)!

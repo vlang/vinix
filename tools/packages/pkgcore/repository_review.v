@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import crypto.sha256
 import json2
 import os
 import time
@@ -19,20 +18,21 @@ struct RepositoryReviewIdentity {
 }
 
 fn repository_fingerprint(config Config, history TrustHistory, operation string, repository Repository, digest string) string {
-	text := json2.encode(RepositoryReviewIdentity{
+	mut bytes := []u8{cap: 2048}
+	unsafe { bytes.flags |= .noslices }
+	defer { unsafe { bytes.free() } }
+	json2.encode_append(RepositoryReviewIdentity{
 		config:       config
 		history:      history
 		operation:    operation
 		repository:   repository
 		index_sha256: digest
-	})
-	bytes := text.bytes()
-	fingerprint := sha256.sum(bytes).hex()
-	unsafe {
-		bytes.free()
-		text.free()
-	}
-	return fingerprint
+	}, mut bytes)
+	// Review identities combine independently bounded documents. Hash the exact
+	// existing JSON without adding the persisted-document newline or size limit.
+	text := bytes.bytestr()
+	defer { unsafe { text.free() } }
+	return index_digest(text)
 }
 
 fn check_repository_review(expected string, actual string) ! {

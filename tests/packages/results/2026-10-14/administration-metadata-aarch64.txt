@@ -1,0 +1,2 @@
+PASS aarch64 packages-administration-metadata (28.9s)
+package-administration-metadata aarch64: 1 passed, 0 failed, 0 skipped

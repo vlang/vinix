@@ -105,6 +105,10 @@ fn check() ! {
 			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/history-ownership-memory', repository + '/tools/packages/pkgcore/history_ownership_test.v'])!
 		run(work + '/history-ownership-memory', [])!
+		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/administration-metadata-memory', repository + '/tools/packages/pkgcore/administration_metadata_test.v'])!
+		run(work + '/administration-metadata-memory', [])!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgprotocol', work)!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
 			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/repository-configuration-memory',

@@ -550,6 +550,11 @@ Replay-history migration and updates now own their identity/digest fields and
 retire superseded records and decoded indexes. Refresh, repository review and
 enrollment, status and publishing retain the same replay rules; see
 [history ownership qualification](../tests/packages/history-ownership-check.md).
+Configuration and consumer/publisher history writes retire their JSON buffers
+on success, size refusal and write failure. Repository review fingerprints also
+release serialization/hash scratch while preserving their exact digest inputs.
+Persisted JSON, the newline-inclusive size limit and publication ordering stay
+compatible; see [administration metadata qualification](../tests/packages/administration-metadata-check.md).
 Files/directories are flushed before
 publication; POSIX rename switches `current` atomically. The next state-changing transaction
 retires abandoned stages. A crash before activation exposes the old complete set;

@@ -1,0 +1,2 @@
+PASS x86_64 packages-administration-metadata (46.1s)
+package-administration-metadata x86_64: 1 passed, 0 failed, 0 skipped

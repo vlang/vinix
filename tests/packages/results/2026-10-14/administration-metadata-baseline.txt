@@ -1,0 +1,14 @@
+Paired warmed tracked-heap control: baseline package implementation 807faf8f0 versus owned administration serialization/hash scratch.
+128 replay records; same configuration, publisher and index digest. Four measured calls in each executable. Both versions retire all three encoded results and the review fingerprint; fixture setup and filesystem operations are excluded.
+
+Before:
+ADMINISTRATION MEMORY kept=244550 allocations=23
+ADMINISTRATION MEMORY kept=244550 allocations=23
+ADMINISTRATION MEMORY kept=244550 allocations=23
+ADMINISTRATION MEMORY kept=244550 allocations=23
+
+After:
+ADMINISTRATION MEMORY kept=0 allocations=0
+ADMINISTRATION MEMORY kept=0 allocations=0
+ADMINISTRATION MEMORY kept=0 allocations=0
+ADMINISTRATION MEMORY kept=0 allocations=0
