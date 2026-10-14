@@ -99,6 +99,13 @@ a direct ext2 regular file, directory and volume root. After a writable remount,
 all flags and their write/metadata/creation refusals must remain effective.
 See [ext2 inode-flag loading](ext2-flags.md).
 
+The `disk`, `all` and `sockets` cases also set and clear inode flags through
+lower-only paths, check unchanged lower flags/content and retained descriptors,
+and verify upper protections after remount. Removed or replaced lower-only
+aliases must refuse copy-up; held upper aliases remain usable. Two batches of
+ordinary-account flag-update refusals must retain no live kernel allocations.
+See [overlay inode-flag qualification](inode-flags.md).
+
 The default `all` case additionally removes the shared work directory beneath
 two mounted overlays, waits past the grace period and verifies that both refuse
 further staging with `ENOENT` while preserving the destination. `disk` leaves

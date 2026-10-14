@@ -354,6 +354,11 @@ The [ext2 inode-flag loading correction](../tests/overlay-rename/ext2-flags.md)
 restores persisted immutable and append-only protections for files, directories
 and the volume root after remount. A separate direct-ext2 native probe checks
 both architectures without invoking overlay flag updates.
+The [overlay inode-flag correction](../tests/overlay-rename/inode-flags.md)
+routes authorized flag updates to upper copies, leaving the lower layer intact.
+Copy-up refuses removed or replaced lower-only aliases under its lock, preserving
+whiteouts and replacement names while held upper aliases remain supported.
+Native authorization, retention and remount checks cover both architectures.
 Crash consistency, full OCI/rootless-runtime acceptance and broader server-load
 qualification remain open. Full pins and native CI
 instructions are recorded in [the guest evidence](../tests/development/README.md).

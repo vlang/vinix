@@ -189,6 +189,7 @@ fn persistent_sockets_remount() {
 		check(C.umount(c'/tmp/overlay-state/diskmerged') == 0
 			&& C.umount(c'/tmp/overlay-volume') == 0, 416)
 		check(C.mount(volume_device(), c'/tmp/overlay-volume', c'ext2', usize(C.MS_RDONLY), nil) == 0, 417)
+		persisted_inode_flags(true)
 		socket_acl_persistence()
 		socket_creation_persistence()
 		for base in [&char(c'/tmp/overlay-volume/direct'), &char(c'/tmp/overlay-volume/upper')]! {

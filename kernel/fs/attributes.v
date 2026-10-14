@@ -79,6 +79,18 @@ fn file_flags_ioctl(mut node VFSNode, request u64, argp voidptr) ?int {
 	if new_bits == old_bits {
 		return 0
 	}
+	// An overlay change belongs to its upper inode. Keep origin validation
+	// before copy-up so refused requests leave the lower and upper untouched.
+	res = resource_to_change(node)?
+	if !resource.can_have_attributes(mut res) {
+		errno.set(errno.enotty)
+		return none
+	}
+	security.mac_require(mut res, proc.mac_metadata)?
+	if security.securelevel() > 0 && resource.attributes(mut res) & ~new_bits != 0 {
+		errno.set(errno.eperm)
+		return none
+	}
 	resource.set_attributes(mut res, new_bits) or {
 		return none
 	}

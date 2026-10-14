@@ -632,6 +632,9 @@ fn overlay_copy_up_locked(mut node VFSNode) ? {
 	if entry == unsafe { nil } || entry.upper != unsafe { nil } {
 		return
 	}
+	// A held lower alias can outlive unlink or replacement. Its old name
+	// must never publish another inode or replace a whiteout/new destination.
+	if node.orphan || node.removed { errno.set(errno.enoent); return none }
 	if entry.fs.upper == unsafe { nil } {
 		errno.set(errno.erofs)
 		return none
