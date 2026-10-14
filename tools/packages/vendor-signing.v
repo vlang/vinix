@@ -75,6 +75,7 @@ fn signing_adapt(path string, source string) !string {
 		result = signing_replace(result, 'mut seed := rand.bytes(seed_size)!', 'mut seed := rand.bytes(seed_size)!\n\tdefer { unsafe { seed.free() } }', 1)!
 		result = signing_replace(result, 'sign_generic(mut signature, privatekey, message)!',
 			'sign_generic(mut signature, privatekey, message) or { unsafe { signature.free() }; return err }', 1)!
+		result += '\n// publisher_key_valid requires canonical non-identity prime-order publisher keys.\n// This admission policy leaves the upstream signature verification rules intact.\npub fn publisher_key_valid(key PublicKey) bool {\n\tif key.len != public_key_size { return false }\n\tmut point := edwards25519.Point{}\n\tpoint.set_bytes(key) or { unsafe { err.free() }; return false }\n\tcanonical := point.bytes()\n\tdefer { unsafe { canonical.free() } }\n\tmut identity := []u8{len: 32}\n\tidentity[0] = 1\n\tdefer { unsafe { identity.free() } }\n\tif subtle.constant_time_compare(canonical, key) != 1 || subtle.constant_time_compare(canonical, identity) == 1 { return false }\n\t// [L]A = [(L - 1)]A + A must be the identity. L - 1 is a canonical scalar.\n\torder_minus_one := [u8(0xec), 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58,\n\t\t0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14,\n\t\t0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x10]\n\tdefer { unsafe { order_minus_one.free() } }\n\tmut scalar := edwards25519.new_scalar_owned()\n\tdefer { unsafe { free(scalar) } }\n\tscalar.set_canonical_bytes(order_minus_one) or { panic(err) }\n\tmut multiple := edwards25519.Point{}\n\tmultiple.scalar_mult(mut scalar, point)\n\tmultiple.add(multiple, point)\n\tencoded := multiple.bytes()\n\tdefer { unsafe { encoded.free() } }\n\treturn subtle.constant_time_compare(encoded, identity) == 1\n}\n'
 	}
 	if path == 'internal/edwards25519/point.v' {
 		original := 'fn check_initialized(points ...Point) {\n\tfor _, p in points {\n\t\tif p.x == fe_zero && p.y == fe_zero {\n\t\t\tpanic(\'edwards25519: use of uninitialized Point\')\n\t\t}\n\t}\n}'
@@ -177,6 +178,8 @@ fn signing_adapt(path string, source string) !string {
 			'bnaf := b.non_adjacent_form(8)\n\tdefer { unsafe { anaf.free(); bnaf.free() } }', 1)!
 		result = signing_replace(result, 'mut a := xa\n\tmut b := xb',
 			'mut a := new_scalar_owned()\n\tmut b := new_scalar_owned()\n\tdefer { unsafe { free(a); free(b) } }\n\ta.set(xa)\n\tb.set(xb)', 1)!
+		result = signing_replace(result, 'mut table := ProjLookupTable{}',
+			'mut table := &ProjLookupTable{}\n\tdefer { unsafe { free(table) } }', 1)!
 	}
 	return result
 }
@@ -228,7 +231,8 @@ fn synchronize_signing() ! {
 		adaptations: ['package-local module namespace', 'non-variadic point-initialization checks; arithmetic and encoding retained',
 			'field multiplication/squaring discard redundant carry-result assignment; receiver mutation and returned limbs retained',
 			'per-operation lookup table and digit ownership; point addition/subtraction use updated stack receivers',
-			'owned SHA-512 state/output, scalar boxes/conversions and point encodings; hash inputs, arithmetic and signature bytes retained'],
+			'owned SHA-512 state/output, scalar boxes/conversions and point encodings; hash inputs, arithmetic and signature bytes retained',
+			'publisher key admission requires canonical non-identity prime-order points; existing scalar multiplication owns its variable-base lookup table'],
 		files: records }) + '\n'
 	if os.args[1] == '--write' {
 		os.write_file(destination + '/provenance.json', provenance)!

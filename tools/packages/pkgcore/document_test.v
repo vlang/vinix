@@ -21,7 +21,7 @@ fn test_document_grants_require_regular_targets_in_every_launch_mode() {
 	for name in ['fifo', 'socket', 'directory'] { os.symlink(name, work + '/' + name + '-alias')! }
 	os.symlink('/dev/null', work + '/device-alias')!
 	for architecture in ['aarch64', 'x86_64'] {
-		key := '01'.repeat(32)
+		key := 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a'
 		config := Config{ architecture: architecture, repositories: [Repository{ id: 'fixture', url: 'https://example.invalid', public_key: key }] }
 		app := Package{ id: 'app', version: '1.0.0', architecture: architecture, name: 'App', license: 'MIT', kind: 'native', entrypoint: 'bin/app',
 			files: [Payload{ path: 'bin/app', bytes: 1, sha256: key, executable: true }], window_protocol: 1, permissions: ['display', 'files'] }

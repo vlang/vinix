@@ -333,6 +333,7 @@ pub fn rollback(config Config, directory string) !State {
 fn rollback_target(config Config, directory string, current State) !State {
 	if current.previous == 0 { return error('no previous package generation is available') }
 	old := read_generation_state(directory, config.architecture, current.previous)!
+	require_publisher_keys(old.packages)!
 	for installed in old.packages {
 		check_policy(installed.package, config.policy)!
 		if !config.repositories.any(it.id == installed.repository && it.public_key == installed.public_key) {

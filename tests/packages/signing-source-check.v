@@ -35,6 +35,12 @@ fn main() {
 	changed, changed_text := run(work + '/validator', arguments)!
 	assert changed != 0 && changed_text.contains('differs'), changed_text
 	os.write_file(copy + '/signing.v', original)!
+	key_check := '\tmultiple.add(multiple, point)\n'
+	assert original.count(key_check) == 1
+	os.write_file(copy + '/signing.v', original.replace(key_check, ''))!
+	key, key_text := run(work + '/validator', arguments)!
+	assert key != 0 && key_text.contains('differs'), key_text
+	os.write_file(copy + '/signing.v', original)!
 	digest_cleanup := '\tdefer { unsafe { digest.free(); free(digest) } }\n'
 	assert original.count(digest_cleanup) == 1
 	os.write_file(copy + '/signing.v', original.replace(digest_cleanup, ''))!
@@ -74,5 +80,5 @@ fn main() {
 	assert root_linked != 0 && root_text.contains('ordinary directory'), root_text
 	os.rm(copy)!
 	os.rename(work + '/actual', copy)!
-	println('Signing source checks: pinned bytes, mutation, digest ownership, redundant-carry regression, table ownership, extra implementation and file/root symlink refusal passed')
+	println('Signing source checks: pinned bytes, mutation, publisher key admission, digest ownership, redundant-carry regression, table ownership, extra implementation and file/root symlink refusal passed')
 }

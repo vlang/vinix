@@ -29,10 +29,11 @@ fn test_command_launch_grants_only_documents_and_does_not_append_or_expand_them(
 	path := os.real_path(os.temp_dir()) + '/vinix-command-' + time.now().unix_micro().str()
 	os.write_file(path, 'document')!
 	defer { os.rm(path) or {} }
-	config := Config{ architecture: 'x86_64', repositories: [Repository{ id: 'fixture', url: 'https://example.invalid', public_key: '01'.repeat(32) }] }
+	key := 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a'
+	config := Config{ architecture: 'x86_64', repositories: [Repository{ id: 'fixture', url: 'https://example.invalid', public_key: key }] }
 	app := Package{ id: 'app', version: '1.0.0', architecture: 'x86_64', name: 'App', license: 'MIT', kind: 'native', entrypoint: 'bin/app',
 		files: [Payload{ path: 'bin/app', bytes: 1, sha256: '01'.repeat(32), executable: true }], permissions: ['files'], arguments: ['@DATA@/fixed'] }
-	state := State{ generation: 1, architecture: 'x86_64', requested: ['app'], packages: [Installed{ package: app, repository: 'fixture', public_key: '01'.repeat(32), sequence: 1 }] }
+	state := State{ generation: 1, architecture: 'x86_64', requested: ['app'], packages: [Installed{ package: app, repository: 'fixture', public_key: key, sequence: 1 }] }
 	literal := ['-i', path, '-o', 'a space; $(literal)', '@DATA@/literal', '', '--uid', '0']
 	launch := command_launch_plan(config, '/var/lib/vinix-packages', state, 'app', '/home/user/data', 1000, 1000,
 		CommandLaunch{ arguments: literal, documents: [path] }, false)!

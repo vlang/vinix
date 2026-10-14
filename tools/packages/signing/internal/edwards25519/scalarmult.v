@@ -74,7 +74,8 @@ pub fn (mut v Point) scalar_base_mult(mut x Scalar) Point {
 pub fn (mut v Point) scalar_mult(mut x Scalar, q Point) Point {
 	check_initialized(q)
 
-	mut table := ProjLookupTable{}
+	mut table := &ProjLookupTable{}
+	defer { unsafe { free(table) } }
 	table.from_p3(q)
 
 	// Write x = sum(x_i * 16^i)

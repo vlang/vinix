@@ -1,0 +1,1 @@
+Publisher key memory: 15 independent key cases, 240 validations, zero retained bytes PASS

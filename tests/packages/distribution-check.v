@@ -64,6 +64,10 @@ fn check() ! {
 			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/signing-buffers-check',
 			repository + '/tests/packages/signing-buffers-check.v'])!
 		run(work + '/signing-buffers-check', [])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/publisher-key-memory',
+			repository + '/tests/packages/publisher-key-memory.v'])!
+		run(work + '/publisher-key-memory', [])!
 		check_tests(v, ['-gc', 'none'], repository + '/tools/packages/pkgcore', work)!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgprotocol', work)!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/appsdk', work)!
@@ -109,6 +113,9 @@ fn check() ! {
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/signing-repeat-check', repository + '/tests/packages/signing-repeat-check.v'])!
 		run(work + '/signing-repeat-check', [work + '/signing-repeat'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/publisher-key-check', repository + '/tests/packages/publisher-key-check.v'])!
+		run(work + '/publisher-key-check', [work + '/publisher-keys'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/hash-file-check', repository + '/tests/packages/hash-file-check.v'])!
 		run(work + '/hash-file-check', [work + '/hash-files'])!

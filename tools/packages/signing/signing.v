@@ -193,3 +193,31 @@ fn new_key_from_seed_generic(mut privatekey []u8, seed []u8) {
 	copy(mut privatekey, seed)
 	copy(mut privatekey[32..], publickey)
 }
+
+// publisher_key_valid requires canonical non-identity prime-order publisher keys.
+// This admission policy leaves the upstream signature verification rules intact.
+pub fn publisher_key_valid(key PublicKey) bool {
+	if key.len != public_key_size { return false }
+	mut point := edwards25519.Point{}
+	point.set_bytes(key) or { unsafe { err.free() }; return false }
+	canonical := point.bytes()
+	defer { unsafe { canonical.free() } }
+	mut identity := []u8{len: 32}
+	identity[0] = 1
+	defer { unsafe { identity.free() } }
+	if subtle.constant_time_compare(canonical, key) != 1 || subtle.constant_time_compare(canonical, identity) == 1 { return false }
+	// [L]A = [(L - 1)]A + A must be the identity. L - 1 is a canonical scalar.
+	order_minus_one := [u8(0xec), 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58,
+		0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x10]
+	defer { unsafe { order_minus_one.free() } }
+	mut scalar := edwards25519.new_scalar_owned()
+	defer { unsafe { free(scalar) } }
+	scalar.set_canonical_bytes(order_minus_one) or { panic(err) }
+	mut multiple := edwards25519.Point{}
+	multiple.scalar_mult(mut scalar, point)
+	multiple.add(multiple, point)
+	encoded := multiple.bytes()
+	defer { unsafe { encoded.free() } }
+	return subtle.constant_time_compare(encoded, identity) == 1
+}

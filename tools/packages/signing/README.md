@@ -36,6 +36,12 @@ key is enrolled by this module or its test fixtures. Standard-library SHA-512,
 entropy, integer and synchronization dependencies remain part of the toolchain
 qualification closure.
 
+The separate `publisher_key_valid` admission helper requires canonical,
+non-identity prime-order points. It uses the existing point/scalar operations
+and owns the variable-base lookup table. This leaves the signature API's
+verification semantics unchanged; the package service explicitly applies the
+stricter publisher policy. See [qualification](../../../tests/packages/publisher-key-check.md).
+
 Reproduce or check the generated sources from a V checkout containing the pinned
 commit, without reading dirty checkout files or fetching from the network:
 

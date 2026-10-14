@@ -15,9 +15,32 @@ pub:
 	signature  string
 }
 
+// Keep syntax-only configuration/history readers compatible with revocation of
+// old keys. New trust and every authenticated index must pass curve admission.
+fn admitted_publisher_key(encoded string) ![]u8 {
+	if !digest_valid(encoded) { return error('invalid repository publisher key: expected 32 lowercase hex bytes') }
+	key := hex.decode(encoded)!
+	if !ed25519.publisher_key_valid(ed25519.PublicKey(key)) {
+		unsafe { key.free() }
+		return error('invalid repository publisher key: expected a canonical non-identity Ed25519 point in the prime-order subgroup')
+	}
+	return key
+}
+
+fn require_publisher_keys(packages []Installed) ! {
+	mut checked := map[string]bool{}
+	defer { unsafe { checked.free() } }
+	for installed in packages {
+		if installed.public_key in checked { continue }
+		key := admitted_publisher_key(installed.public_key)!
+		unsafe { key.free() }
+		checked[installed.public_key] = true
+	}
+}
+
 pub fn verify_index(repository Repository, text string, signature string, now i64) !Index {
 	if text.len > max_metadata { return error('${repository.id}: repository index too large') }
-	key := hex.decode(repository.public_key)!
+	key := admitted_publisher_key(repository.public_key)!
 	defer { unsafe { key.free() } }
 	trimmed := signature.trim_space()
 	defer { unsafe { trimmed.free() } }

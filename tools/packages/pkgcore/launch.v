@@ -74,6 +74,8 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	if !config.repositories.any(it.id == installed.repository && it.public_key == installed.public_key) {
 		return error('${id}: publisher key has been revoked')
 	}
+	closure := application_closure(state, id)
+	require_publisher_keys(closure)!
 	generation := directory + '/generations/' + state.generation.str()
 	app := generation + '/apps/' + id
 	runtime := if p.runtime == '' { app } else { generation + '/apps/' + p.runtime }
@@ -88,7 +90,7 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	args << ['--promises', promises.join(' '), '--unveil', app, 'rx', '--unveil', data, 'rwc']
 	if runtime != app { args << ['--unveil', runtime, 'rx'] }
 	mut libraries := [app + '/lib', app + '/usr/lib', runtime + '/lib', runtime + '/usr/lib']
-	for dependency in application_closure(state, id) {
+	for dependency in closure {
 		check_policy(dependency.package, config.policy)!
 		if !config.repositories.any(it.id == dependency.repository && it.public_key == dependency.public_key) {
 			return error('${dependency.package.id}: dependency publisher key has been revoked')

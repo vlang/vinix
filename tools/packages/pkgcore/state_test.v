@@ -15,8 +15,8 @@ fn state_validation_fixture(architecture string) State {
 		permissions: ['files'], associations: ['text/plain'], dependencies: [Dependency{ id: 'runtime', minimum: '1.0.0', before: '2.0.0' }],
 		files: [Payload{ path: 'app', sha256: 'b'.repeat(64), bytes: 1 }] }
 	return State{ generation: 2, previous: 1, architecture: architecture, requested: ['app'], packages: [
-		Installed{ package: app, repository: 'publisher', public_key: 'c'.repeat(64), sequence: 1 },
-		Installed{ package: runtime, repository: 'publisher', public_key: 'c'.repeat(64), sequence: 1 }] }
+		Installed{ package: app, repository: 'publisher', public_key: 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a', sequence: 1 },
+		Installed{ package: runtime, repository: 'publisher', public_key: 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a', sequence: 1 }] }
 }
 
 fn state_validation_work(label string) !string {

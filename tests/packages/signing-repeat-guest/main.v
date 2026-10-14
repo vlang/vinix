@@ -16,6 +16,7 @@ fn check() ! {
 		'signing-reference': []string{}
 		'publisher-workspace-batch': []string{}
 		'signing-repeat': ['/tmp/signing-repeat']
+		'publisher-key': ['/tmp/publisher-key']
 	} {
 		mut child := os.new_process('/usr/share/package-fixtures/' + name)
 		child.set_args(arguments); child.set_redirect_stdio_merged(); child.run()

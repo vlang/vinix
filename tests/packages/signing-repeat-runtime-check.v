@@ -33,17 +33,19 @@ fn suite() hwhost.Suite {
 			hwhost.Program{ source: 'tools/packages/signing/signing_test.v', path: 'usr/share/package-fixtures/signing-reference' },
 			hwhost.Program{ source: 'tools/packages/pkgcore/publisher_workspace_test.v', path: 'usr/share/package-fixtures/publisher-workspace-batch' },
 			hwhost.Program{ source: 'tests/packages/signing-repeat-check.v', path: 'usr/share/package-fixtures/signing-repeat' },
+			hwhost.Program{ source: 'tests/packages/publisher-key-check.v', path: 'usr/share/package-fixtures/publisher-key' },
 		]
 		directories: ['tmp:1777']
 		scenarios: [hwhost.Scenario{
 			name: 'packages-signing-repeat'
 			arches: ['aarch64', 'x86_64']
-			about: 'reference signatures, batched publisher assertions and 32 publications in one process'
+			about: 'reference signatures, publisher key admission, batched publisher assertions and 32 publications in one process'
 			required: ['HWTEST START packages-signing-repeat',
 				'SIGNING PROCESS signing-reference PASS', 'SIGNING PROCESS publisher-workspace-batch PASS',
 				'SIGNING REPEAT 16/16 identical publication and verification PASS',
 				'PACKAGE SIGNING REPEAT 32 publications one-process canonical-bytes PASS',
-				'SIGNING PROCESS signing-repeat PASS', 'HWTEST PASS packages-signing-repeat']
+				'SIGNING PROCESS signing-repeat PASS', 'Publisher key admission qualification passed',
+				'SIGNING PROCESS publisher-key PASS', 'HWTEST PASS packages-signing-repeat']
 			ending: .poweroff
 			timeout: 300
 		}]
@@ -68,6 +70,7 @@ fn check() !int {
 			artifact('signing-reference', root + 'signing-reference')!,
 			artifact('publisher-workspace-batch', root + 'publisher-workspace-batch')!,
 			artifact('signing-repeat', root + 'signing-repeat')!,
+			artifact('publisher-key', root + 'publisher-key')!,
 			artifact('serial-log', base + '/packages-signing-repeat/serial.log')!,
 		] }
 		os.write_file(base + '/qualification.json', json2.encode(receipt) + '\n')!

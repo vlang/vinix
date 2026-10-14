@@ -4,7 +4,7 @@ module pkgcore
 import tools.packages.appsdk
 
 fn test_application_context_is_derived_from_installed_state_and_preserved_across_launch_modes() {
-	key := '0123456789abcdef'.repeat(4)
+	key := 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a'
 	runtime := Package{ id: 'runtime', version: '2.1.0', architecture: 'aarch64', name: 'Runtime', license: 'MIT', kind: 'runtime',
 		files: [Payload{ path: 'bin/runner', sha256: 'a'.repeat(64), bytes: 1, executable: true }] }
 	app := Package{ id: 'app', version: '1.2.3', architecture: 'aarch64', name: 'App', license: 'MIT', kind: 'linux',

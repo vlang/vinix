@@ -258,6 +258,13 @@ retaining payloads, personal data and history for inspection and uninstall.
 A root administrator can still alter installed code or local sequence records;
 this is not hardware protected antirollback.
 
+Publisher keys must encode canonical, non-identity points in the Ed25519
+prime-order subgroup. New enrollment, index verification, application/runtime
+launch and rollback enforce this check. Existing configuration/history stays
+readable for reviewed revocation and uninstall of an old unusable key, preserving
+replay floors and personal data. See
+[publisher key qualification](../tests/packages/publisher-key-check.md).
+
 Ed25519 authenticates the exact index bytes **before** decoding. The service
 uses a [pinned, licensed V signing dependency](../tools/packages/signing/README.md)
 for publisher and consumer. Its source ledger makes changes reproducible, and

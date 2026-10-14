@@ -31,13 +31,13 @@ fn fixture_package(id string, version string, architecture string) Package {
 }
 
 fn fixture_candidate(p Package) Installed {
-	return Installed{ package: p, repository: 'fixture', public_key: '01'.repeat(32), sequence: 1 }
+	return Installed{ package: p, repository: 'fixture', public_key: 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a', sequence: 1 }
 }
 
 fn fixture_config(architecture string) Config {
 	return Config{
 		architecture: architecture
-		repositories: [Repository{ id: 'fixture', url: 'https://example.invalid/packages', public_key: '01'.repeat(32) }]
+		repositories: [Repository{ id: 'fixture', url: 'https://example.invalid/packages', public_key: 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a' }]
 		policy:       Policy{ reserve_bytes: 0 }
 	}
 }

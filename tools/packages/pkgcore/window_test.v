@@ -5,7 +5,7 @@ import json2
 
 fn test_native_window_launch_keeps_only_standard_streams_and_declared_paths() {
 	for architecture in ['aarch64', 'x86_64'] {
-		key := 'a'.repeat(64)
+		key := 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a'
 		config := Config{ architecture: architecture, launch_user: 'alex', repositories: [Repository{ id: 'publisher', url: 'https://example.invalid', public_key: key }] }
 		p := Package{ id: 'counter', version: '1.0.0', architecture: architecture, name: 'Counter', license: 'MIT', kind: 'native', entrypoint: 'bin/counter',
 			window_protocol: 1, permissions: ['display'], files: [Payload{ path: 'bin/counter', sha256: key, bytes: 1, executable: true }] }

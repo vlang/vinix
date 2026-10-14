@@ -47,6 +47,8 @@ fn enrollment_configuration(current Config, repository Repository) !Config {
 	repositories.sort(a.id < b.id)
 	next := Config{ ...current, repositories: repositories }
 	next.validate()!
+	key := admitted_publisher_key(repository.public_key)!
+	unsafe { key.free() }
 	return next
 }
 

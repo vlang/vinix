@@ -176,6 +176,13 @@ content at an existing hash. Increase sequence for every index change, including
 expiry. Administrators explicitly enroll, replace or revoke publisher keys using
 the repository commands below; publishers cannot authorize their own keys.
 
+Publisher admission requires a canonical, non-identity Ed25519 point in the
+prime-order subgroup. The check applies to enrollment, index verification,
+application/runtime launch and rollback. An old key record stays readable for
+reviewed revocation and uninstall; no replay history is discarded. Normal
+`keygen`/`key-public` output and SDK-1 signature bytes are unchanged. See
+[publisher-key qualification](../../tests/packages/publisher-key-check.md).
+
 Publisher and consumer use the [pinned V signing dependency](signing/README.md),
 with its MIT license, source blob/digest ledger and reproducible V regeneration
 tool. It preserves SDK-1 Ed25519 bytes and removes a compiler-sensitive variadic
