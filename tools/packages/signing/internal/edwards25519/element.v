@@ -599,14 +599,17 @@ pub fn (mut v Element) selected(a Element, b Element, cond int) Element {
 
 // is_negative returns 1 if v is negative, and 0 otherwise.
 pub fn (mut v Element) is_negative() int {
-	return int(v.bytes()[0] & 1)
+	encoded := v.bytes()
+	defer { unsafe { encoded.free() } }
+	return int(encoded[0] & 1)
 }
 
 // absolute sets v to |u|, and returns v.
 pub fn (mut v Element) absolute(u Element) Element {
 	mut e := Element{}
 	mut uk := u
-	return v.selected(e.negate(uk), uk, uk.is_negative())
+	e.negate(uk)
+	return v.selected(e, uk, uk.is_negative())
 }
 
 // set sets v = a, and returns v.
@@ -657,11 +660,17 @@ pub fn (mut v Element) bytes() []u8 {
 
 fn (mut v Element) bytes_generic() []u8 {
 	mut out := []u8{len: 32}
+	v.encode_into(mut out)
+	return out
+}
 
+// out is owned by the caller and does not borrow the receiver.
+fn (mut v Element) encode_into(mut out []u8) {
 	v = v.reduce()
 
 	mut buf := []u8{len: 8}
-	idxs := [v.l0, v.l1, v.l2, v.l3, v.l4]
+	defer { unsafe { buf.free() } }
+	idxs := [v.l0, v.l1, v.l2, v.l3, v.l4]!
 	for i, l in idxs {
 		bits_offset := i * 51
 		binary.little_endian_put_u64(mut buf, l << u32(bits_offset % 8))
@@ -674,7 +683,6 @@ fn (mut v Element) bytes_generic() []u8 {
 		}
 	}
 
-	return out
 }
 
 // equal returns 1 if v and u are equal, and 0 otherwise.
@@ -683,6 +691,7 @@ pub fn (v Element) equal(ue Element) int {
 	mut u := ue
 	sa := u.bytes()
 	sv := left.bytes()
+	defer { unsafe { sa.free(); sv.free() } }
 	return subtle.constant_time_compare(sa, sv)
 }
 

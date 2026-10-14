@@ -267,8 +267,11 @@ The [field-temporary checks](../tests/packages/signing-repeat-check.md) also
 measure reduced allocation after discarding redundant carry-result assignments,
 and exercise repeated publication in one process. The later
 [table ownership checks](../tests/packages/signing-tables-check.md) qualify
-lookup-table/digit cleanup and point temporary lifetimes. Small scalar, digest
-and encoding allocations and an unbounded signing-process lifetime remain
+lookup-table/digit cleanup and point temporary lifetimes. Subsequent
+[buffer ownership checks](../tests/packages/signing-buffers-check.md) require
+zero retained tracked bytes after caller cleanup for measured key derivation,
+signing and verification operations, including hash padding boundaries.
+An unbounded publisher lifetime and all package-service allocations remain
 separate qualification work.
 The service checks repository identity, format, expiry, increasing sequence and same-sequence
 equivocation. `/var/lib/vinix-packages/trust-history.json` retains the highest

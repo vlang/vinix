@@ -25,8 +25,10 @@ records the measured reduction, reference checks, source regeneration and target
 results. Subsequent [table ownership qualification](../../../tests/packages/signing-tables-check.md)
 gives lookup tables/digits an operation lifetime and avoids heap-promoting point
 addition/subtraction temporaries. The generator records those adaptations too.
-Small digest, scalar and encoding allocations remain; these checks do not
-establish zero retained heap for the signing API.
+The later [buffer ownership qualification](../../../tests/packages/signing-buffers-check.md)
+retires digests, scalar boxes/conversions and encodings. Its measured signing
+operations retain zero tracked bytes after callers free returned buffers;
+the report records the tested operations, toolchain and limits of that claim.
 
 The package publisher and consumer import this dependency rather than whichever
 Ed25519 implementation happens to accompany the build compiler. No demonstration

@@ -1,0 +1,198 @@
+signing ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Package signing: RFC8032 keys/signatures and tamper/canonical-scalar refusal passed
+PASS
+policy ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+PASS
+deployment ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-pins-18092-1791991808354246/locked export; $literal; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-capture-18092-1791991809441100/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Updating trusted repository deployment.json
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-namespace-18092-1791991809809882/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/2) from fixture
+Installing Runtime 2.0.0 (2/2) from fixture
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Offline mirror ready: /private/tmp/vinix-deployment-reproducible-18092-1791991810274052/mirror; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Rolled back to generation 1; application data was retained
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading unused/bin/runner (14 bytes)
+Activated package generation 1
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+PASS
+publisher_workspace ASan/UBSan (detect_leaks=0, halt_on_error=1):
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PASS
+buffers ASan/UBSan (detect_leaks=0, halt_on_error=1):
+key: 0 retained bytes in 0 allocations after caller cleanup
+sign: 0 retained bytes in 0 allocations after caller cleanup
+verify: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+cycle: 0 retained bytes in 0 allocations after caller cleanup
+Signing buffer ownership qualification passed; RFC bytes and caller ownership retained
+PASS

@@ -51,6 +51,30 @@ fn signing_adapt(path string, source string) !string {
 	if path == 'ed25519.v' {
 		if !result.starts_with('module ed25519\n') { return error('unexpected signing module declaration') }
 		result = result.replace_once('module ed25519\n', 'module signing\n')
+		helper := 'fn signing_hash512(first []u8, second []u8, third []u8) []u8 {\n\tmut digest := sha512.new()\n\tdefer { unsafe { digest.free(); free(digest) } }\n\tdigest.write(first) or { panic(err) }\n\tdigest.write(second) or { panic(err) }\n\tdigest.write(third) or { panic(err) }\n\tmut out := []u8{len: sha512.size}\n\tdigest.checksum_into(mut out)\n\treturn out\n}\n\n'
+		result = signing_replace(result, '// public_key_size is the sizeof public keys in bytes', helper + '// public_key_size is the sizeof public keys in bytes', 1)!
+		result = signing_replace(result, 'mut h := sha512.sum512(seed)',
+			'mut h := signing_hash512(seed, [], [])\n\tdefer { unsafe { h.free() } }', 2)!
+		for name, count in {'s': 2, 'r': 1, 'k': 2, 'ss': 2} {
+			result = signing_replace(result, 'mut ${name} := edwards25519.new_scalar()',
+				'mut ${name} := edwards25519.new_scalar_owned()\n\tdefer { unsafe { free(${name}) } }', count)!
+		}
+		msg_start := '\tmut mh := sha512.new()'
+		msg_end := '\tmut r := edwards25519.new_scalar_owned()'
+		if result.count(msg_start) != 1 || result.count(msg_end) != 1 { return error('unexpected signing nonce hash layout') }
+		result = result.all_before(msg_start) + '\tmsg_digest := signing_hash512(prefix, message, [])\n\tdefer { unsafe { msg_digest.free() } }\n\n' + msg_end + result.all_after(msg_end)
+		original := '\tmut kh := sha512.new()\n\tkh.write(rr.bytes())!\n\tkh.write(publickey)!\n\tkh.write(message)!\n\n\tmut hram_digest := []u8{cap: sha512.size}\n\thram_digest = kh.sum(hram_digest)'
+		result = signing_replace(result, original, '\tencoded_r := rr.bytes()\n\tdefer { unsafe { encoded_r.free() } }\n\thram_digest := signing_hash512(encoded_r, publickey, message)\n\tdefer { unsafe { hram_digest.free() } }', 1)!
+		original_verify := '\tmut kh := sha512.new()\n\tkh.write(sig[..32])!\n\tkh.write(publickey)!\n\tkh.write(message)!\n\n\tmut hram_digest := []u8{cap: sha512.size}\n\thram_digest = kh.sum(hram_digest)'
+		result = signing_replace(result, original_verify, '\thram_digest := signing_hash512(sig[..32], publickey, message)\n\tdefer { unsafe { hram_digest.free() } }', 1)!
+		result = signing_replace(result, 'copy(mut signature[..32], rr.bytes())\n\tcopy(mut signature[32..], ss.bytes())',
+			'encoded_s := ss.bytes()\n\tdefer { unsafe { encoded_s.free() } }\n\tcopy(mut signature[..32], encoded_r)\n\tcopy(mut signature[32..], encoded_s)', 1)!
+		result = signing_replace(result, 'return subtle.constant_time_compare(sig[..32], rr.bytes()) == 1',
+			'encoded_r := rr.bytes()\n\tdefer { unsafe { encoded_r.free() } }\n\treturn subtle.constant_time_compare(sig[..32], encoded_r) == 1', 1)!
+		result = signing_replace(result, 'mut publickey := aa.bytes()', 'mut publickey := aa.bytes()\n\tdefer { unsafe { publickey.free() } }', 1)!
+		result = signing_replace(result, 'mut seed := rand.bytes(seed_size)!', 'mut seed := rand.bytes(seed_size)!\n\tdefer { unsafe { seed.free() } }', 1)!
+		result = signing_replace(result, 'sign_generic(mut signature, privatekey, message)!',
+			'sign_generic(mut signature, privatekey, message) or { unsafe { signature.free() }; return err }', 1)!
 	}
 	if path == 'internal/edwards25519/point.v' {
 		original := 'fn check_initialized(points ...Point) {\n\tfor _, p in points {\n\t\tif p.x == fe_zero && p.y == fe_zero {\n\t\t\tpanic(\'edwards25519: use of uninitialized Point\')\n\t\t}\n\t}\n}'
@@ -67,10 +91,21 @@ fn signing_adapt(path string, source string) !string {
 			'p1.add(p, pc)\n\treturn v.from_p1(p1)', 1)!
 		result = signing_replace(result, 'result := p1.sub(p, qcached)\n\treturn v.from_p1(result)',
 			'p1.sub(p, pc)\n\treturn v.from_p1(p1)', 1)!
+		result = signing_replace(result, 'mut p := Point{}\n\treturn p.set(id_point)', 'return id_point', 1)!
+		result = signing_replace(result, 'mut p := Point{}\n\treturn p.set(gen_point)', 'return gen_point', 1)!
+		start := 'pub fn (mut v Point) bytes() []u8 {'
+		end := '// Conversions.'
+		if result.count(start) != 1 || result.count(end) != 1 { return error('unexpected point encoding layout') }
+		encoding := 'pub fn (mut v Point) bytes() []u8 {\n\tcheck_initialized(v)\n\tmut zinv := Element{}\n\tmut x := Element{}\n\tmut y := Element{}\n\tzinv.invert(v.z)\n\tx.multiply(v.x, zinv)\n\ty.multiply(v.y, zinv)\n\tmut out := []u8{len: 32}\n\ty.encode_into(mut out)\n\tout[31] |= u8(x.is_negative() * 128)\n\treturn out\n}\n\n'
+		result = result.all_before(start) + encoding + end + result.all_after(end)
 	}
 	if path == 'internal/edwards25519/extra.v' {
 		if result.count('check_initialized(...points)') != 2 { return error('unexpected multiscalar source layout') }
 		result = result.replace('check_initialized(...points)', 'for point in points { check_initialized(point) }')
+		outlined := '\t// This function is outlined to make the allocations inline in the caller\n\t// rather than happen on the heap.\n\tmut buf := [32]u8{}\n\treturn v.bytes_montgomery_generic(mut buf)\n}\n\nfn (mut v Point) bytes_montgomery_generic(mut buf [32]u8) []u8 {\n'
+		result = signing_replace(result, outlined, '', 1)!
+		result = signing_replace(result, 'return copy_field_element(mut buf, mut u)',
+			'mut out := []u8{len: 32}\n\tu.encode_into(mut out)\n\treturn out', 1)!
 	}
 	if path == 'internal/edwards25519/element.v' {
 		original := '\tv = v.carry_propagate_generic()\n\treturn v'
@@ -79,6 +114,43 @@ fn signing_adapt(path string, source string) !string {
 		// the qualified compiler heap-promote this temporary on every field
 		// multiply/square. Keep the same carry and return the updated value.
 		result = result.replace(original, '\tv.carry_propagate_generic()\n\treturn v')
+		result = signing_replace(result, 'return int(v.bytes()[0] & 1)',
+			'encoded := v.bytes()\n\tdefer { unsafe { encoded.free() } }\n\treturn int(encoded[0] & 1)', 1)!
+		result = signing_replace(result, 'return v.selected(e.negate(uk), uk, uk.is_negative())',
+			'e.negate(uk)\n\treturn v.selected(e, uk, uk.is_negative())', 1)!
+		result = signing_replace(result, 'mut buf := []u8{len: 8}', 'mut buf := []u8{len: 8}\n\tdefer { unsafe { buf.free() } }', 1)!
+		result = signing_replace(result, 'idxs := [v.l0, v.l1, v.l2, v.l3, v.l4]',
+			'idxs := [v.l0, v.l1, v.l2, v.l3, v.l4]!', 1)!
+		result = signing_replace(result, 'sv := left.bytes()\n\treturn subtle.constant_time_compare(sa, sv)',
+			'sv := left.bytes()\n\tdefer { unsafe { sa.free(); sv.free() } }\n\treturn subtle.constant_time_compare(sa, sv)', 1)!
+		start := 'fn (mut v Element) bytes_generic() []u8 {'
+		end := '// equal returns 1'
+		if result.count(start) != 1 || result.count(end) != 1 { return error('unexpected field encoding layout') }
+		mut body := result.all_after(start).all_before(end)
+		body = signing_replace(body, '\n\tmut out := []u8{len: 32}\n', '', 1)!
+		body = signing_replace(body, '\treturn out\n', '', 1)!
+		wrapper := start + '\n\tmut out := []u8{len: 32}\n\tv.encode_into(mut out)\n\treturn out\n}\n\n// out is owned by the caller and does not borrow the receiver.\nfn (mut v Element) encode_into(mut out []u8) {'
+		result = result.all_before(start) + wrapper + body + end + result.all_after(end)
+	}
+	if path == 'internal/edwards25519/scalar.v' {
+		result = signing_replace(result, 'pub fn new_scalar() Scalar {\n\treturn Scalar{}\n}',
+			'pub fn new_scalar() Scalar {\n\treturn Scalar{}\n}\n\n// The package signing entry points own and retire this box.\npub fn new_scalar_owned() &Scalar {\n\treturn &Scalar{}\n}', 1)!
+		for declaration in ['mut wide_bytes := []u8{len: 64}', 'mut wide_bytes := []u8{len: 64, cap: 64}'] {
+			result = signing_replace(result, declaration, declaration + '\n\tdefer { unsafe { wide_bytes.free() } }', 1)!
+		}
+		result = signing_replace(result, 'copy(mut ss.s, x)', 'for i in 0 .. 32 { ss.s[i] = x[i] }', 1)!
+		result = signing_replace(result, 'copy(mut buf, s.s[..])', 'for i in 0 .. 32 { buf[i] = s.s[i] }', 1)!
+		result = signing_replace(result, 'return subtle.constant_time_compare(s.s[..], t.s[..])',
+			'mut left := []u8{len: 32}\n\tmut right := []u8{len: 32}\n\tfor i in 0 .. 32 { left[i] = s.s[i]; right[i] = t.s[i] }\n\tdefer { unsafe { left.free(); right.free() } }\n\treturn subtle.constant_time_compare(left, right)', 1)!
+		start := 'fn sc_mul_add(mut s [32]u8, a [32]u8, b [32]u8, c [32]u8) {'
+		end := '// Input:\n//   s[0]+256*s[1]'
+		if result.count(start) != 1 || result.count(end) != 1 { return error('unexpected scalar multiplication layout') }
+		mut body := result.all_after(start).all_before(end)
+		for name in ['a', 'b', 'c'] { body = body.replace('load3(${name}[', 'load3(${name}_bytes[').replace('load4(${name}[', 'load4(${name}_bytes[') }
+		owned := '\n\tmut a_bytes := []u8{len: 32}\n\tmut b_bytes := []u8{len: 32}\n\tmut c_bytes := []u8{len: 32}\n\tfor i in 0 .. 32 { a_bytes[i] = a[i]; b_bytes[i] = b[i]; c_bytes[i] = c[i] }\n\tdefer { unsafe { a_bytes.free(); b_bytes.free(); c_bytes.free() } }'
+		result = result.all_before(start) + start + owned + body + end + result.all_after(end)
+		result = signing_replace(result, 'mut digits := [5]u64{}', 'mut digits := [5]u64{}\n\tencoded := s.bytes()\n\tdefer { unsafe { encoded.free() } }', 1)!
+		result = signing_replace(result, 'binary.little_endian_u64(s.s[i * 8..])', 'binary.little_endian_u64(encoded[i * 8..])', 1)!
 	}
 	if path == 'internal/edwards25519/scalarmult.v' {
 		// Upstream's Once belongs to a new wrapper on every call, so it never
@@ -103,6 +175,8 @@ fn signing_adapt(path string, source string) !string {
 			'digits := x.signed_radix16()\n\tdefer { unsafe { digits.free() } }', 2)!
 		result = signing_replace(result, 'bnaf := b.non_adjacent_form(8)',
 			'bnaf := b.non_adjacent_form(8)\n\tdefer { unsafe { anaf.free(); bnaf.free() } }', 1)!
+		result = signing_replace(result, 'mut a := xa\n\tmut b := xb',
+			'mut a := new_scalar_owned()\n\tmut b := new_scalar_owned()\n\tdefer { unsafe { free(a); free(b) } }\n\ta.set(xa)\n\tb.set(xb)', 1)!
 	}
 	return result
 }
@@ -153,7 +227,8 @@ fn synchronize_signing() ! {
 	provenance := json2.encode(SigningProvenance{ revision: signing_source_revision,
 		adaptations: ['package-local module namespace', 'non-variadic point-initialization checks; arithmetic and encoding retained',
 			'field multiplication/squaring discard redundant carry-result assignment; receiver mutation and returned limbs retained',
-			'per-operation lookup table and digit ownership; point addition/subtraction use updated stack receivers'],
+			'per-operation lookup table and digit ownership; point addition/subtraction use updated stack receivers',
+			'owned SHA-512 state/output, scalar boxes/conversions and point encodings; hash inputs, arithmetic and signature bytes retained'],
 		files: records }) + '\n'
 	if os.args[1] == '--write' {
 		os.write_file(destination + '/provenance.json', provenance)!

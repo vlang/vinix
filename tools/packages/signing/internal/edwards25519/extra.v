@@ -87,13 +87,6 @@ fn is_on_curve(x Element, y Element, z Element, t Element) bool {
 // to the same value. If v is the identity point, bytes_montgomery returns 32
 // zero bytes, analogously to the X25519 function.
 pub fn (mut v Point) bytes_montgomery() []u8 {
-	// This function is outlined to make the allocations inline in the caller
-	// rather than happen on the heap.
-	mut buf := [32]u8{}
-	return v.bytes_montgomery_generic(mut buf)
-}
-
-fn (mut v Point) bytes_montgomery_generic(mut buf [32]u8) []u8 {
 	check_initialized(v)
 
 	// RFC 7748, Section 4.1 provides the bilinear map to calculate the
@@ -111,7 +104,9 @@ fn (mut v Point) bytes_montgomery_generic(mut buf [32]u8) []u8 {
 	recip.invert(recip.subtract(fe_one, y)) // r = 1/(1 - y)
 	u.multiply(u.add(fe_one, y), recip) // u = (1 + y)*r
 
-	return copy_field_element(mut buf, mut u)
+	mut out := []u8{len: 32}
+	u.encode_into(mut out)
+	return out
 }
 
 // mult_by_cofactor sets v = 8 * p, and returns v.

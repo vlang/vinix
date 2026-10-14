@@ -168,14 +168,12 @@ pub fn (mut v Point) set(u Point) Point {
 
 // new_identity_point returns a new Point set to the identity.
 pub fn new_identity_point() Point {
-	mut p := Point{}
-	return p.set(id_point)
+	return id_point
 }
 
 // new_generator_point returns a new Point set to the canonical generator.
 pub fn new_generator_point() Point {
-	mut p := Point{}
-	return p.set(gen_point)
+	return gen_point
 }
 
 fn (mut v ProjectiveCached) zero() ProjectiveCached {
@@ -198,33 +196,17 @@ fn (mut v AffineCached) zero() AffineCached {
 // bytes returns the canonical 32-byte encoding of v, according to RFC 8032,
 // Section 5.1.2.
 pub fn (mut v Point) bytes() []u8 {
-	// This function is outlined to make the allocations inline in the caller
-	// rather than happen on the heap.
-	mut buf := [32]u8{}
-	return v.bytes_generic(mut buf)
-}
-
-fn (mut v Point) bytes_generic(mut buf [32]u8) []u8 {
 	check_initialized(v)
-
 	mut zinv := Element{}
 	mut x := Element{}
 	mut y := Element{}
-	zinv.invert(v.z) // zinv = 1 / z
-	x.multiply(v.x, zinv) // x = x / z
-	y.multiply(v.y, zinv) // y = y / z
-
-	mut out := copy_field_element(mut buf, mut y)
-	unsafe {
-		// out[31] |= u8(x.is_negative() << 7) //original one
-		out[31] |= u8(x.is_negative() * 128) // x << 7 == x * 2^7
-	}
+	zinv.invert(v.z)
+	x.multiply(v.x, zinv)
+	y.multiply(v.y, zinv)
+	mut out := []u8{len: 32}
+	y.encode_into(mut out)
+	out[31] |= u8(x.is_negative() * 128)
 	return out
-}
-
-fn copy_field_element(mut buf [32]u8, mut v Element) []u8 {
-	copy(mut buf, v.bytes())
-	return buf[..]
 }
 
 // Conversions.

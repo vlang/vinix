@@ -41,6 +41,11 @@ pub fn new_scalar() Scalar {
 	return Scalar{}
 }
 
+// The package signing entry points own and retire this box.
+pub fn new_scalar_owned() &Scalar {
+	return &Scalar{}
+}
+
 // add sets s = x + y mod l, and returns s.
 pub fn (mut s Scalar) add(x Scalar, y Scalar) Scalar {
 	// s = 1 * x + y mod l
@@ -89,6 +94,7 @@ pub fn (mut s Scalar) set_uniform_bytes(x []u8) !Scalar {
 		return error('edwards25519: invalid set_uniform_bytes input length')
 	}
 	mut wide_bytes := []u8{len: 64}
+	defer { unsafe { wide_bytes.free() } }
 	copy(mut wide_bytes, x)
 	// for i, item in x {
 	//	wide_bytes[i] = item
@@ -105,7 +111,7 @@ pub fn (mut s Scalar) set_canonical_bytes(x []u8) !Scalar {
 		return error('invalid scalar length')
 	}
 	mut ss := Scalar{}
-	copy(mut ss.s, x)
+	for i in 0 .. 32 { ss.s[i] = x[i] }
 	if !is_reduced(ss) {
 		return error('invalid scalar encoding')
 	}
@@ -155,6 +161,7 @@ pub fn (mut s Scalar) set_bytes_with_clamping(x []u8) !Scalar {
 	}
 
 	mut wide_bytes := []u8{len: 64, cap: 64}
+	defer { unsafe { wide_bytes.free() } }
 	copy(mut wide_bytes, x)
 	// for i, item in x {
 	//	wide_bytes[i] = item
@@ -169,13 +176,17 @@ pub fn (mut s Scalar) set_bytes_with_clamping(x []u8) !Scalar {
 // bytes returns the canonical 32-byte little-endian encoding of s.
 pub fn (mut s Scalar) bytes() []u8 {
 	mut buf := []u8{len: 32}
-	copy(mut buf, s.s[..])
+	for i in 0 .. 32 { buf[i] = s.s[i] }
 	return buf
 }
 
 // equal returns 1 if s and t are equal, and 0 otherwise.
 pub fn (s Scalar) equal(t Scalar) int {
-	return subtle.constant_time_compare(s.s[..], t.s[..])
+	mut left := []u8{len: 32}
+	mut right := []u8{len: 32}
+	for i in 0 .. 32 { left[i] = s.s[i]; right[i] = t.s[i] }
+	defer { unsafe { left.free(); right.free() } }
+	return subtle.constant_time_compare(left, right)
 }
 
 // sc_mul_add and sc_reduce are ported from the public domain, “ref10”
@@ -204,42 +215,47 @@ fn load4(inp []u8) i64 {
 //   s[0]+256*s[1]+...+256^31*s[31] = (ab+c) mod l
 //   where l = 2^252 + 27742317777372353535851937790883648493.
 fn sc_mul_add(mut s [32]u8, a [32]u8, b [32]u8, c [32]u8) {
-	a0 := 2097151 & load3(a[..])
-	a1 := 2097151 & (load4(a[2..]) >> 5)
-	a2 := 2097151 & (load3(a[5..]) >> 2)
-	a3 := 2097151 & (load4(a[7..]) >> 7)
-	a4 := 2097151 & (load4(a[10..]) >> 4)
-	a5 := 2097151 & (load3(a[13..]) >> 1)
-	a6 := 2097151 & (load4(a[15..]) >> 6)
-	a7 := 2097151 & (load3(a[18..]) >> 3)
-	a8 := 2097151 & load3(a[21..])
-	a9 := 2097151 & (load4(a[23..]) >> 5)
-	a10 := 2097151 & (load3(a[26..]) >> 2)
-	a11 := (load4(a[28..]) >> 7)
-	b0 := 2097151 & load3(b[..])
-	b1 := 2097151 & (load4(b[2..]) >> 5)
-	b2 := 2097151 & (load3(b[5..]) >> 2)
-	b3 := 2097151 & (load4(b[7..]) >> 7)
-	b4 := 2097151 & (load4(b[10..]) >> 4)
-	b5 := 2097151 & (load3(b[13..]) >> 1)
-	b6 := 2097151 & (load4(b[15..]) >> 6)
-	b7 := 2097151 & (load3(b[18..]) >> 3)
-	b8 := 2097151 & load3(b[21..])
-	b9 := 2097151 & (load4(b[23..]) >> 5)
-	b10 := 2097151 & (load3(b[26..]) >> 2)
-	b11 := (load4(b[28..]) >> 7)
-	c0 := 2097151 & load3(c[..])
-	c1 := 2097151 & (load4(c[2..]) >> 5)
-	c2 := 2097151 & (load3(c[5..]) >> 2)
-	c3 := 2097151 & (load4(c[7..]) >> 7)
-	c4 := 2097151 & (load4(c[10..]) >> 4)
-	c5 := 2097151 & (load3(c[13..]) >> 1)
-	c6 := 2097151 & (load4(c[15..]) >> 6)
-	c7 := 2097151 & (load3(c[18..]) >> 3)
-	c8 := 2097151 & load3(c[21..])
-	c9 := 2097151 & (load4(c[23..]) >> 5)
-	c10 := 2097151 & (load3(c[26..]) >> 2)
-	c11 := (load4(c[28..]) >> 7)
+	mut a_bytes := []u8{len: 32}
+	mut b_bytes := []u8{len: 32}
+	mut c_bytes := []u8{len: 32}
+	for i in 0 .. 32 { a_bytes[i] = a[i]; b_bytes[i] = b[i]; c_bytes[i] = c[i] }
+	defer { unsafe { a_bytes.free(); b_bytes.free(); c_bytes.free() } }
+	a0 := 2097151 & load3(a_bytes[..])
+	a1 := 2097151 & (load4(a_bytes[2..]) >> 5)
+	a2 := 2097151 & (load3(a_bytes[5..]) >> 2)
+	a3 := 2097151 & (load4(a_bytes[7..]) >> 7)
+	a4 := 2097151 & (load4(a_bytes[10..]) >> 4)
+	a5 := 2097151 & (load3(a_bytes[13..]) >> 1)
+	a6 := 2097151 & (load4(a_bytes[15..]) >> 6)
+	a7 := 2097151 & (load3(a_bytes[18..]) >> 3)
+	a8 := 2097151 & load3(a_bytes[21..])
+	a9 := 2097151 & (load4(a_bytes[23..]) >> 5)
+	a10 := 2097151 & (load3(a_bytes[26..]) >> 2)
+	a11 := (load4(a_bytes[28..]) >> 7)
+	b0 := 2097151 & load3(b_bytes[..])
+	b1 := 2097151 & (load4(b_bytes[2..]) >> 5)
+	b2 := 2097151 & (load3(b_bytes[5..]) >> 2)
+	b3 := 2097151 & (load4(b_bytes[7..]) >> 7)
+	b4 := 2097151 & (load4(b_bytes[10..]) >> 4)
+	b5 := 2097151 & (load3(b_bytes[13..]) >> 1)
+	b6 := 2097151 & (load4(b_bytes[15..]) >> 6)
+	b7 := 2097151 & (load3(b_bytes[18..]) >> 3)
+	b8 := 2097151 & load3(b_bytes[21..])
+	b9 := 2097151 & (load4(b_bytes[23..]) >> 5)
+	b10 := 2097151 & (load3(b_bytes[26..]) >> 2)
+	b11 := (load4(b_bytes[28..]) >> 7)
+	c0 := 2097151 & load3(c_bytes[..])
+	c1 := 2097151 & (load4(c_bytes[2..]) >> 5)
+	c2 := 2097151 & (load3(c_bytes[5..]) >> 2)
+	c3 := 2097151 & (load4(c_bytes[7..]) >> 7)
+	c4 := 2097151 & (load4(c_bytes[10..]) >> 4)
+	c5 := 2097151 & (load3(c_bytes[13..]) >> 1)
+	c6 := 2097151 & (load4(c_bytes[15..]) >> 6)
+	c7 := 2097151 & (load3(c_bytes[18..]) >> 3)
+	c8 := 2097151 & load3(c_bytes[21..])
+	c9 := 2097151 & (load4(c_bytes[23..]) >> 5)
+	c10 := 2097151 & (load3(c_bytes[26..]) >> 2)
+	c11 := (load4(c_bytes[28..]) >> 7)
 
 	mut carry := [23]i64{} // original one
 	// mut carry := [23]u64{}
@@ -985,9 +1001,11 @@ pub fn (mut s Scalar) non_adjacent_form(w u32) []i8 {
 
 	mut naf := []i8{len: 256}
 	mut digits := [5]u64{}
+	encoded := s.bytes()
+	defer { unsafe { encoded.free() } }
 
 	for i := 0; i < 4; i++ {
-		digits[i] = binary.little_endian_u64(s.s[i * 8..])
+		digits[i] = binary.little_endian_u64(encoded[i * 8..])
 	}
 
 	width := u64(1 << w)

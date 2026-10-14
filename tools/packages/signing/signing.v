@@ -5,6 +5,17 @@ import crypto.sha512
 import crypto.subtle
 import tools.packages.signing.internal.edwards25519
 
+fn signing_hash512(first []u8, second []u8, third []u8) []u8 {
+	mut digest := sha512.new()
+	defer { unsafe { digest.free(); free(digest) } }
+	digest.write(first) or { panic(err) }
+	digest.write(second) or { panic(err) }
+	digest.write(third) or { panic(err) }
+	mut out := []u8{len: sha512.size}
+	digest.checksum_into(mut out)
+	return out
+}
+
 // public_key_size is the sizeof public keys in bytes
 pub const public_key_size = 32
 
@@ -62,7 +73,7 @@ pub fn (priv PrivateKey) sign(message []u8) ![]u8 {
 // sign`signs the message with privatekey and returns a signature
 pub fn sign(privatekey PrivateKey, message []u8) ![]u8 {
 	mut signature := []u8{len: signature_size}
-	sign_generic(mut signature, privatekey, message)!
+	sign_generic(mut signature, privatekey, message) or { unsafe { signature.free() }; return err }
 	return signature
 }
 
@@ -72,39 +83,39 @@ fn sign_generic(mut signature []u8, privatekey []u8, message []u8) ! {
 	}
 	seed, publickey := privatekey[..seed_size], privatekey[seed_size..]
 
-	mut h := sha512.sum512(seed)
-	mut s := edwards25519.new_scalar()
+	mut h := signing_hash512(seed, [], [])
+	defer { unsafe { h.free() } }
+	mut s := edwards25519.new_scalar_owned()
+	defer { unsafe { free(s) } }
 	s.set_bytes_with_clamping(h[..32])!
 	mut prefix := unsafe { h[32..] }
 
-	mut mh := sha512.new()
-	mh.write(prefix)!
-	mh.write(message)!
+	msg_digest := signing_hash512(prefix, message, [])
+	defer { unsafe { msg_digest.free() } }
 
-	mut msg_digest := []u8{cap: sha512.size}
-	msg_digest = mh.sum(msg_digest)
-
-	mut r := edwards25519.new_scalar()
+	mut r := edwards25519.new_scalar_owned()
+	defer { unsafe { free(r) } }
 	r.set_uniform_bytes(msg_digest)!
 
 	mut rr := edwards25519.Point{}
 	rr.scalar_base_mult(mut r)
 
-	mut kh := sha512.new()
-	kh.write(rr.bytes())!
-	kh.write(publickey)!
-	kh.write(message)!
-
-	mut hram_digest := []u8{cap: sha512.size}
-	hram_digest = kh.sum(hram_digest)
-	mut k := edwards25519.new_scalar()
+	encoded_r := rr.bytes()
+	defer { unsafe { encoded_r.free() } }
+	hram_digest := signing_hash512(encoded_r, publickey, message)
+	defer { unsafe { hram_digest.free() } }
+	mut k := edwards25519.new_scalar_owned()
+	defer { unsafe { free(k) } }
 	k.set_uniform_bytes(hram_digest)!
 
-	mut ss := edwards25519.new_scalar()
+	mut ss := edwards25519.new_scalar_owned()
+	defer { unsafe { free(ss) } }
 	ss.multiply_add(k, s, r)
 
-	copy(mut signature[..32], rr.bytes())
-	copy(mut signature[32..], ss.bytes())
+	encoded_s := ss.bytes()
+	defer { unsafe { encoded_s.free() } }
+	copy(mut signature[..32], encoded_r)
+	copy(mut signature[32..], encoded_s)
 }
 
 // verify reports whether sig is a valid signature of message by publickey.
@@ -120,18 +131,15 @@ pub fn verify(publickey PublicKey, message []u8, sig []u8) !bool {
 	mut aa := edwards25519.Point{}
 	aa.set_bytes(publickey)!
 
-	mut kh := sha512.new()
-	kh.write(sig[..32])!
-	kh.write(publickey)!
-	kh.write(message)!
+	hram_digest := signing_hash512(sig[..32], publickey, message)
+	defer { unsafe { hram_digest.free() } }
 
-	mut hram_digest := []u8{cap: sha512.size}
-	hram_digest = kh.sum(hram_digest)
-
-	mut k := edwards25519.new_scalar()
+	mut k := edwards25519.new_scalar_owned()
+	defer { unsafe { free(k) } }
 	k.set_uniform_bytes(hram_digest)!
 
-	mut ss := edwards25519.new_scalar()
+	mut ss := edwards25519.new_scalar_owned()
+	defer { unsafe { free(ss) } }
 	ss.set_canonical_bytes(sig[32..])!
 
 	// [S]B = R + [k]A --> [k](-A) + [S]B = R
@@ -140,12 +148,15 @@ pub fn verify(publickey PublicKey, message []u8, sig []u8) !bool {
 	mut rr := edwards25519.Point{}
 	rr.vartime_double_scalar_base_mult(k, minus_a, ss)
 
-	return subtle.constant_time_compare(sig[..32], rr.bytes()) == 1
+	encoded_r := rr.bytes()
+	defer { unsafe { encoded_r.free() } }
+	return subtle.constant_time_compare(sig[..32], encoded_r) == 1
 }
 
 // generate_key generates a public/private key pair entropy using `crypto.rand`.
 pub fn generate_key() !(PublicKey, PrivateKey) {
 	mut seed := rand.bytes(seed_size)!
+	defer { unsafe { seed.free() } }
 
 	privatekey := new_key_from_seed(seed)
 	mut publickey := []u8{len: public_key_size}
@@ -168,13 +179,16 @@ fn new_key_from_seed_generic(mut privatekey []u8, seed []u8) {
 		panic('ed25519: bad seed length: ${seed.len}')
 	}
 
-	mut h := sha512.sum512(seed)
-	mut s := edwards25519.new_scalar()
+	mut h := signing_hash512(seed, [], [])
+	defer { unsafe { h.free() } }
+	mut s := edwards25519.new_scalar_owned()
+	defer { unsafe { free(s) } }
 	s.set_bytes_with_clamping(h[..32]) or { panic(err) }
 	mut aa := edwards25519.Point{}
 	aa.scalar_base_mult(mut s)
 
 	mut publickey := aa.bytes()
+	defer { unsafe { publickey.free() } }
 
 	copy(mut privatekey, seed)
 	copy(mut privatekey[32..], publickey)

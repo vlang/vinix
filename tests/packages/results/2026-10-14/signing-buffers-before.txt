@@ -1,0 +1,4 @@
+key: 1357 retained bytes in 16 allocations after caller cleanup
+sign: 6544 retained bytes in 85 allocations after caller cleanup
+verify: 3644 retained bytes in 54 allocations after caller cleanup
+Signing buffer ownership qualification passed; RFC bytes and caller ownership retained

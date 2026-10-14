@@ -145,8 +145,11 @@ pub fn (mut v Point) vartime_double_scalar_base_mult(xa Scalar, aa Point, xb Sca
 	atable.from_p3(aa)
 	// Because the basepoint is fixed, we can use a wider NAF
 	// corresponding to a bigger table.
-	mut a := xa
-	mut b := xb
+	mut a := new_scalar_owned()
+	mut b := new_scalar_owned()
+	defer { unsafe { free(a); free(b) } }
+	a.set(xa)
+	b.set(xb)
 	anaf := a.non_adjacent_form(5)
 	bnaf := b.non_adjacent_form(8)
 	defer { unsafe { anaf.free(); bnaf.free() } }

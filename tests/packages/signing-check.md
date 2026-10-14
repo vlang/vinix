@@ -1,5 +1,8 @@
 # Package signing qualification
 
+The later [buffer ownership qualification](signing-buffers-check.md) adds
+explicit digest/scalar/encoding cleanup and a zero-retention allocation probe.
+
 The package publisher and consumer use the
 [pinned MIT-licensed V signing module](../../tools/packages/signing/README.md).
 It retains the standard-library arithmetic/encoding from commit

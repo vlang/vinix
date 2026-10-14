@@ -60,6 +60,10 @@ fn check() ! {
 			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/signing-tables-check',
 			repository + '/tests/packages/signing-tables-check.v'])!
 		run(work + '/signing-tables-check', [])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/signing-buffers-check',
+			repository + '/tests/packages/signing-buffers-check.v'])!
+		run(work + '/signing-buffers-check', [])!
 		check_tests(v, ['-gc', 'none'], repository + '/tools/packages/pkgcore', work)!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgprotocol', work)!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/appsdk', work)!
