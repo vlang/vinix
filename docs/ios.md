@@ -5397,8 +5397,8 @@ under the runtime lock. The complete accessor ignores its request, including
 the tested all-ones request, and the existing symbolic metadata lookup reuses
 its descriptor. The descriptor has the measured field offset and its accessor;
 field reflection and native descriptor initialization extensions are omitted.
-OptionSet/RawRepresentable conformances, named flags constants, DispatchQoS
-and Swift queue adapters remain unsupported. SetAlgebra support is described
+OptionSet/RawRepresentable conformances, named flags constants and Swift queue
+adapters remain unsupported. SetAlgebra and basic QoS support are described
 below.
 
 The caller borrows metadata and accessor pointers through the active runtime
@@ -5482,9 +5482,53 @@ unlocked Array release. Thirteen C streams/executables, SDK/LLVM/IPA references,
 native trial diagnostics and guest probes/audits are retained under
 `build/ios/fortnite/dispatch-algebra-checks`; full iOS regression remains unpassed.
 
-The supplied IPA now gets past the SetAlgebra conformance and exits with
+The SetAlgebra-only IPA probe got past that conformance and exited with
 status 1 at MarketplaceKitWrapper's required DispatchQoS.unspecified getter,
 `_$s8Dispatch0A3QoSV11unspecifiedACvgZ`, in
+`/usr/lib/swift/libswiftDispatch.dylib`. Fortnite has not entered application
+code and remained unplayable at that stage.
+
+Swift Dispatch now exports DispatchQoS's unspecified getter, complete metadata
+accessor and nominal descriptor: `_$s8Dispatch0A3QoSV11unspecifiedACvgZ`,
+`_$s8Dispatch0A3QoSVMa` and `_$s8Dispatch0A3QoSVMn`. The native getter initializes
+the QoSClass byte to tag 5 and the relativePriority word at offset eight to zero,
+through the indirect result in `x8`. It leaves seven padding bytes untouched.
+Vinix adapts that ABI to a V body and preserves `x20`/`x21`.
+
+The distinct nominal metadata describes a 16-byte POD value, stride 16,
+alignment eight, packed u32 field offsets zero/eight and 250 extra inhabitants.
+Copy, take and assignment move all 16 bytes, including padding, with both words
+loaded before either is stored. Destruction reuses the existing no-op witness.
+Optional populations through 250 use unused QoSClass byte values; larger
+populations use a tag byte at offset 16 and a UInt32 payload. The get/store
+witnesses reproduce native branches, wrapping arithmetic and exact payload/tag
+writes, including large tags with zero empty cases. Metadata responses are
+complete and ignore the request, and symbolic descriptor lookup reuses them.
+
+QoS shares the existing runtime-owned adjacent Dispatch pages. Its getter and
+accessor are RX; metadata, witnesses and a private nongeneric descriptor are RO.
+Both protections precede publication under the runtime lock. Cached entries
+remain borrowed until users have drained and the shared mapping is unmapped.
+Reflection, native descriptor initialization extensions, QoSClass's separate
+metadata/conformances, QoS equality, other named constants/constructors and
+Swift queue adapters remain unsupported.
+
+Ten fresh ASan/UBSan runs and five ARM64 Vinix suites pass across QoS, Dispatch
+flags, SetAlgebra, String metadata and Array. Native/V checks cover getter
+padding and result guards, protected unused arguments, Swift context/error
+preservation, nominal layout, every metadata request, guarded 16-byte copies,
+self-assignment and overlap, no-op destruction, all 256 class byte values,
+both optional populations and UInt32 wrapping. Vinix checks exact export/library
+scope, symbolic lookup, typed POD Array ownership, eight concurrent resolvers,
+RX/RO protection and two quiescent unmapped lifetimes. Generated C confirms
+allocation/ARC/lock-free value bodies and sealing before publication. Thirteen
+C streams/executables, SDK/LLVM references, eight actual MarketplaceKitWrapper
+QoS call sites, the retained header-generation trial and IPA probes/audits are
+under `build/ios/fortnite/dispatch-qos-checks`; full iOS regression remains unpassed.
+
+The supplied IPA now gets past the QoS getter and metadata accessor and exits
+with status 1 at MarketplaceKitWrapper's required DispatchQueue.main getter,
+`_$sSo17OS_dispatch_queueC8DispatchE4mainABvgZ`, in
 `/usr/lib/swift/libswiftDispatch.dylib`. Fortnite has not entered application
 code and remains unplayable.
 
@@ -5493,12 +5537,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,468 | 692 | 79 |
+| Fortnite executable | 1,470 | 690 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 162 | 14 | 23 |
-| All images | 2,289 | 709 | 120 |
+| MarketplaceKitWrapper | 164 | 12 | 23 |
+| All images | 2,293 | 705 | 120 |
 
-The C++/GLES/Text variant reports 2,302 resolved imports, 696 unresolved strong
+The C++/GLES/Text variant reports 2,306 resolved imports, 692 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
