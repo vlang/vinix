@@ -4992,11 +4992,50 @@ executables, native SDK/LLVM measurements, retained fixture/audit correction
 trials and actual IPA probe/audit evidence are under
 `build/ios/fortnite/string-guts-checks`. Full iOS regression remains unpassed.
 
-Both audits resolve the required `_StringGuts` metadata import. The actual IPA
-now exits with status 1 at MarketplaceKitWrapper's required
-`_$ss13_StringObjectV10sharedUTF8SRys5UInt8VGvg` getter. Native getter/delegate
-measurements are retained for the next implementation. Fortnite has not entered
-application code and remains unplayable.
+Both audits resolve the required `_StringGuts` metadata import. That cohort
+reached MarketplaceKitWrapper's required
+`_$ss13_StringObjectV10sharedUTF8SRys5UInt8VGvg` getter.
+
+`_StringObject.sharedUTF8` and its `getSharedUTF8Start` delegate now return
+borrowed storage through their measured ARM64 register ABI. Self occupies
+x0/x1; the getter returns pointer/count in x0/x1, masking count to 48 bits;
+the delegate returns the pointer in x0. Native disassembly and the
+[Swift storage declaration](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/StringObject.swift)
+identify three paths: constant Cocoa owner+16, shared Swift owner+24, and
+Cocoa `_fastCStringContents:` with NUL termination requested.
+
+The checked subset validates owner registration before reading its fields.
+UTF-8 NSString constants require matching byte counts. Ordinary Cocoa strings
+provide stable ASCII backing with matching extent, using the existing 1 MiB
+text bound; custom NSString subclasses can return borrowed UTF-8 through the
+selector, invoked after releasing the registry lock. Shared Swift records
+require a live registered heap allocation of at least 40 bytes and matching
+count/flags at offset 32. Their initialized start pointer and backing lifetime
+remain the caller's responsibility. The getter never copies, converts or
+retains that payload. UTF-16 constants, unknown owners, tail/foreign/inline
+representations, invalid flags, missing pointers and dead or undersized owners
+are rejected. Shared-storage construction and general shared String operations
+remain separate work.
+
+Native fixtures compare constant Unicode/NUL and real Cocoa ASCII/NUL buffers,
+getter/delegate pointer identity, unchanged ownership, both shared pointer
+offsets and 48-bit counts with protected payloads. V fixtures also exercise
+four readers, an unlocked reentrant subclass callback, rejected invalid states
+and two drained runtimes. Ten fresh ASan/UBSan runs and five Vinix ARM64 guest
+suites pass across shared UTF-8, foreign count/copy, String and heap ownership.
+The public `build-swift-shared-utf8` target and full build/regression/Swift guest
+modes include the fixture. Thirteen final generated-C streams and executables,
+native SDK/LLVM measurements, the retained C-audit helper correction and actual
+IPA probe/audit evidence are under `build/ios/fortnite/shared-utf8-checks`.
+Generated C confirms the checked paths add no allocation or ARC and invoke
+the subclass after unlocking. Full iOS regression remains unpassed.
+
+Both audits resolve the required shared UTF-8 getter. The supplied IPA now
+exits with status 1 at MarketplaceKitWrapper's required
+`_$ss23_ContiguousArrayStorageCMn` nominal descriptor. Native descriptor
+measurements are retained for the next implementation; existing Vinix Array
+headers use a private descriptor rather than Swift class metadata. Fortnite
+has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -5005,10 +5044,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,460 | 700 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 145 | 31 | 23 |
-| All images | 2,264 | 734 | 120 |
+| MarketplaceKitWrapper | 146 | 30 | 23 |
+| All images | 2,265 | 733 | 120 |
 
-The C++/GLES/Text variant reports 2,277 resolved imports, 721 unresolved strong
+The C++/GLES/Text variant reports 2,278 resolved imports, 720 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
