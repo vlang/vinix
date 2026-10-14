@@ -44,6 +44,9 @@ reference. The previous kernels fail case 0 with `EROFS` at the writable file
 creation. Fresh result directories retain all nine fixture sources, generated
 C, kernels, probe ELFs, images, logs and hash receipts. The existing identity
 suite also checks refusal through detached and retired read-only descriptions.
+The subsequent [pathname truncation checks](truncate-policy.md) qualify
+`truncate(path, length)` against the same attachment policy, including retained
+descriptions, before any size change or overlay copy-up.
 
 Evidence from 2026-10-14 is under `build/development17-20261013`:
 

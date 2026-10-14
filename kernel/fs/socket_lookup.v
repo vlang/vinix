@@ -5,6 +5,7 @@ import proc
 import resource
 import katomic
 import errno
+import lib
 
 // Resolve and authorize while namespace writers are excluded: permission
 // snapshots can block on backing storage, so a fixed retirement grace is not
@@ -47,6 +48,19 @@ fn retain_path_target(parent &VFSNode, path string, follow bool) ?PathTarget {
 	vfs_lock.acquire()
 	defer { vfs_lock.release() }
 	mut node := get_node(parent, path, follow)?
+	katomic.inc(mut &node.handles)
+	mut res := node.resource
+	resource.retain_resource(mut res)
+	return PathTarget{node, res}
+}
+
+// The caller supplies a saved starting route and receives the resolved one.
+// Keep the existing node/resource pins without extending PathTarget's layout.
+fn retain_path_target_on_mount(parent &VFSNode, path string, follow bool,
+	identity &lib.MountContext) ?PathTarget {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
+	mut node := get_node_on_mount(parent, path, follow, identity)?
 	katomic.inc(mut &node.handles)
 	mut res := node.resource
 	resource.retain_resource(mut res)

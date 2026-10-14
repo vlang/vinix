@@ -2503,17 +2503,18 @@ pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
 		return errno.err, errno.enoent
 	}
 
-	mut process := proc.current_thread().process
-
-	mut node := get_node(proc.current_directory_of(process), path, true) or {
-		return errno.err, errno.get()
-	}
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	parent := parent_and_mount_for(at_fdcwd, path, identity) or { return errno.err, errno.get() }
+	held := retain_path_target_on_mount(parent, path, true, identity) or { return errno.err, errno.get() }
+	defer { release_path_target(held) }
+	mut node := held.node
 	mode := node.resource.stat.mode
 	if stat.isdir(mode) { return errno.err, errno.eisdir }
 	if !stat.isreg(mode) { return errno.err, errno.einval }
 	if !policy_check(node, proc.policy_write) {
 		return errno.err, errno.get()
 	}
+	if read_only_on_mount(node, identity) { return errno.err, errno.erofs }
 	if !attr_allows_write(node, false) {
 		return errno.err, errno.get()
 	}

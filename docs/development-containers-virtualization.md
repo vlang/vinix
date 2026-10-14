@@ -437,6 +437,14 @@ apply. Retained fds, copied namespaces, chroot/cwd aliases and private thread
 views pass on both architectures and the same-ELF Linux reference. Internal
 inode-only creators keep their conservative fallback; metadata, symlink/link,
 rename, unlink and descriptor truncation still need complete route-based policy.
+The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
+also require a writable resolved attachment before changing size or copying up
+an overlay. Lookup retains the node and original resource under the VFS lock,
+and releases both after the complete operation, including denied requests and
+backend errors. Both native architectures and same-ELF Linux checks cover bind
+aliases, namespace copies, chroot/cwd, detached roots and retired namespaces,
+with preserved data and UID/GID 1000 denial. Concurrent remount and namespace
+switching remain outside this qualification.
 Mount reclamation, busy-reference accounting and full OCI acceptance remain open.
 The overlay-depth refusal measurements also exposed an event-record allocation per call.
 The separate [security event producer correction](../tests/overlay-rename/security-events.md)
