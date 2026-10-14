@@ -272,8 +272,9 @@ fn xattr_set(given XAttrTarget, _name charptr, value voidptr, size u64, flags in
 		return errno.err, errno.efault
 	}
 	if label_change { security.mac_parse_label(data) or { return errno.err, errno.get() } }
-	if posix_acl.is_name(name) && data.len != 0 && !posix_acl.valid(data) {
-		return errno.err, errno.einval
+	if posix_acl.is_name(name) && data.len != 0 {
+		if posix_acl.unsupported_version(data) { return errno.err, errno.enotsup }
+		if !posix_acl.valid(data) { return errno.err, errno.einval }
 	}
 	xattr_may_change(target, name, data.len <= 4) or { return errno.err, errno.get() }
 	mut backend_flags := if posix_acl.is_name(name) { 0 } else { flags }

@@ -20,6 +20,12 @@ pub:
 
 pub fn is_name(name string) bool { return name == access_name || name == default_name }
 
+// Decode a complete userspace header before inspecting entry lengths or tags.
+// Unsupported wire formats differ from malformed version-2 ACLs at the ABI.
+pub fn unsupported_version(data []u8) bool {
+	return data.len >= 4 && le32(data, 0) != 2
+}
+
 fn le16(data []u8, offset int) u16 {
 	return u16(data[offset]) | (u16(data[offset + 1]) << 8)
 }

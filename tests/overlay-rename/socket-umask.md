@@ -82,7 +82,10 @@ native/Linux probe hashes. Its assertion-enabled run is
 
 This qualifies the tested pathname bind masks and existing abstract behavior.
 Full socket/path metadata separation, broader capability/MAC/user-namespace
-matrices, unsupported ACL-version errno parity and OCI/rootless acceptance
+matrices and OCI/rootless acceptance
 remain open. The existing 25-second final retirement wait remains part of the
 disk fixture; unmount draining and crash recovery with pending cleanup are
 outside this qualification.
+
+The subsequent [wire-format correction](acl-wire.md) qualifies unsupported
+ACL-version and malformed-payload errno ordering.

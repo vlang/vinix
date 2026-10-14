@@ -116,6 +116,20 @@ fn socket_live_xattrs(path &char, listener int) {
 		check(C.write(client, c'Y', 1) == 1 && C.read(accepted, &byte, 1) == 1
 			&& byte == char(`Y`) && C.close(accepted) == 0 && C.close(client) == 0, 592)
 		check(C.setxattr(path, c'system.posix_acl_access', &original[0], 44, 0) == 0, 593)
+		for version in [u8(0), 1, 3, 255]! {
+			acl = original
+			acl[0] = version
+			for wire_size in [usize(4), 5, 43, 44]! {
+				xattr_refusal(C.setxattr(path, c'system.posix_acl_access', &acl[0], wire_size, 0), C.ENOTSUP, 621)
+				xattr_refusal(C.lsetxattr(path, c'system.posix_acl_access', &acl[0], wire_size, 0), C.ENOTSUP, 622)
+			}
+			xattr_refusal(C.setxattr(path, c'system.posix_acl_access', &acl[0], 3, 0), C.EINVAL, 623)
+		}
+		acl = original
+		acl[3] = 1
+		xattr_refusal(C.setxattr(path, c'system.posix_acl_access', &acl[0], 44, 0), C.ENOTSUP, 624)
+		acl = original
+		xattr_refusal(C.setxattr(path, c'system.posix_acl_access', &acl[0], 5, 0), C.EINVAL, 625)
 		acl = original
 		// Keep the supported wire version and reject invalid permission bits.
 		acl[6] = 8

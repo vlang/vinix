@@ -135,6 +135,9 @@ and survive transport retirement and disk remount. Socket descriptions remain
 unsupported for filesystem ACLs; all four descriptor xattr calls reject
 `O_PATH` with `EBADF` before inspecting user pointers or writing output buffers.
 See [pathname socket xattr evidence](socket-xattrs.md).
+The wire-format probe requires `ENOTSUP` for complete unsupported ACL headers
+and `EINVAL` for truncated headers or malformed version-2 payloads, while
+preserving the existing ACL. See [ACL wire-format evidence](acl-wire.md).
 The creation probe checks umasks `0000`, `0022`, `0077`, `0222` and `0777` for
 stream, record and datagram sockets, with and without a default ACL. It verifies
 pathname/O_PATH metadata and actual access, then checks persisted masked ACLs
