@@ -338,6 +338,13 @@ broader authorization matrix remain open. The
 applies umask before pathname ACL inheritance. Five masks across stream,
 record and datagram sockets pass on both native architectures and identical
 Linux probes, with masked ext2/overlay ACL metadata preserved after remount.
+The [overlay xattr preflight correction](../tests/overlay-rename/xattr-preflight.md)
+validates input and checks the original inode before copy-up, preventing an
+immutable lower inode from becoming writable through its new upper copy.
+Ordinary-account native tests cover authorization and input refusals without
+upper-file creation, successful copy-up and flat allocation counts on both
+architectures. Generic copy-up inode protections, concurrent metadata changes
+and the broader container authorization matrix remain open.
 The [UNIX descriptor ownership correction](../tests/overlay-rename/socket-ownership.md)
 initializes unnamed/pair metadata from creator credentials and accepted metadata
 from the accepting account. Ordinary-account metadata changes and acceptance of

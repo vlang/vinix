@@ -71,6 +71,7 @@ fn main() {
 		'path_acl_fixture': digest(state + '/sources/overlayfixture/path_acl.v')!
 		'path_xattr_fixture': digest(state + '/sources/overlayfixture/path_xattrs.v')!
 		'path_umask_fixture': digest(state + '/sources/overlayfixture/path_umask.v')!
+		'xattr_copyup_fixture': digest(state + '/sources/overlayfixture/xattr_copyup.v')!
 		'abi_header':          digest(state + '/sources/overlayfixture/native-abi.h')!
 	}
 	disk := state + '/store.ext2'
@@ -152,6 +153,7 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 	}
 	if case_name in ['failure', 'all'] { expected << 'OVERLAY BACKEND FAILURE: PASS' }
 	if case_name in ['disk', 'all'] {
+		expected << ['OVERLAY XATTR UNSUPPORTED LOWER: PASS', 'OVERLAY XATTR PREFLIGHT: PASS']
 		expected << ['OVERLAY DISK: PASS', 'OVERLAY PERSISTENCE: PASS', 'OVERLAY WHITEOUT: PASS',
 			'OVERLAY PRIVATE WORK: PASS', 'OVERLAY RECREATION PERSISTENCE: PASS']
 	}
@@ -163,6 +165,7 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 		expected << ['OVERLAY OPAQUE STORAGE FULL: PASS', 'OVERLAY STATFS: PASS']
 	}
 	if case_name == 'sockets' {
+		expected << ['OVERLAY XATTR UNSUPPORTED LOWER: PASS', 'OVERLAY XATTR PREFLIGHT: PASS']
 		expected << ['OVERLAY PERSISTENT SOCKETS: PASS', 'OVERLAY SOCKET REMOUNT: PASS', 'OVERLAY SOCKET PATH CLOSE: PASS', 'OVERLAY SOCKET ACCESS: PASS', 'OVERLAY SOCKET PERMISSION: PASS']
 		expected << 'OVERLAY SOCKET XATTR: PASS'
 		expected << ['OVERLAY SOCKET UMASK: PASS', 'OVERLAY SOCKET UMASK PERSISTENCE: PASS']
@@ -170,6 +173,10 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 	if case_name == 'socket-access' { expected << ['OVERLAY SOCKET REFERENCE: PASS', 'OVERLAY SOCKET UMASK: PASS'] }
 	positive, negative := guesthost.verdict_policy(expected, ['FAIL: overlay'], false)
 	code := guesthost.boot(command, configured.env, state, positive, negative, timeout, true)!
+	if code == 0 && case_name in ['disk', 'all', 'sockets'] && !samples_flat(os.read_file(state + '/serial.log')!, 50, 51) {
+		eprintln('refused xattr operations retained live kernel allocations')
+		return 1
+	}
 	if code == 0 && case_name == 'opaque-full' {
 		if !statfs_samples_flat(os.read_file(state + '/serial.log')!) {
 			eprintln('statfs/fstatfs retained live kernel allocations')

@@ -84,6 +84,16 @@ checks consistent backing values. The host compares live slab samples and
 fails on retained objects even if guest functional checks pass. See the
 [filesystem-stat leak qualification](statfs.md).
 
+`disk`, `all` and `sockets` also check xattr preflight on lower-only regular
+files. Immutable-inode, owner, write-permission and privileged-namespace refusals,
+invalid ACL payloads, a bad value pointer and invalid flags must leave the raw
+upper path absent and preserve the lower contents and attributes. Two batches
+each repeat nine cases 200 times; every live slab class and the large count must
+match. A subsequent authorized setter must create an upper attribute while
+leaving it absent from the lower. Root separately checks that a lower without
+xattr storage can copy into an upper that supports it.
+See [xattr copy-up authorization](xattr-preflight.md).
+
 The default `all` case additionally removes the shared work directory beneath
 two mounted overlays, waits past the grace period and verifies that both refuse
 further staging with `ENOENT` while preserving the destination. `disk` leaves

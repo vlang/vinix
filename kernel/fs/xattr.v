@@ -263,9 +263,9 @@ fn xattr_set(given XAttrTarget, _name charptr, value voidptr, size u64, flags in
 	label_change := name == security.mac_label_name
 	if label_change && !proc.mac_begin_label_change() { return errno.err, errno.eperm }
 	defer { if label_change { proc.mac_end_label_change() } }
-	target := xattr_target_to_change(given, name) or { return errno.err, errno.get() }
-	mut res := target.res
-	if !resource.has_xattrs(mut res) { return errno.err, errno.enotsup }
+	mut res := given.res
+	// A lower without xattr storage can still copy into a capable upper.
+	if !xattr_on_overlay(given) && !resource.has_xattrs(mut res) { return errno.err, errno.enotsup }
 	mut data := []u8{len: int(size)} @[freed]
 	defer { unsafe { data.free() } }
 	if size > 0 && !usercopy.copy_from_user(unsafe { &data[0] }, u64(value), size) {
@@ -276,7 +276,15 @@ fn xattr_set(given XAttrTarget, _name charptr, value voidptr, size u64, flags in
 		if posix_acl.unsupported_version(data) { return errno.err, errno.enotsup }
 		if !posix_acl.valid(data) { return errno.err, errno.einval }
 	}
-	xattr_may_change(target, name, data.len <= 4) or { return errno.err, errno.get() }
+	// Refused metadata requests must not create an upper copy or shed lower
+	// inode protections. The origin stays pinned while these callbacks run.
+	xattr_may_change(given, name, data.len <= 4) or { return errno.err, errno.get() }
+	target := xattr_target_to_change(given, name) or { return errno.err, errno.get() }
+	res = target.res
+	if xattr_on_overlay(target) {
+		if !resource.has_xattrs(mut res) { return errno.err, errno.enotsup }
+		xattr_may_change(target, name, data.len <= 4) or { return errno.err, errno.get() }
+	}
 	mut backend_flags := if posix_acl.is_name(name) { 0 } else { flags }
 	if name == posix_acl.access_name && !may_keep_setgid(res.stat.gid) {
 		backend_flags |= resource.acl_clear_setgid
@@ -362,8 +370,9 @@ fn xattr_remove(given XAttrTarget, _name charptr) (u64, u64) {
 	label_change := name == security.mac_label_name
 	if label_change && !proc.mac_begin_label_change() { return errno.err, errno.eperm }
 	defer { if label_change { proc.mac_end_label_change() } }
+	xattr_may_change(given, name, true) or { return errno.err, errno.get() }
 	target := xattr_target_to_change(given, name) or { return errno.err, errno.get() }
-	xattr_may_change(target, name, true) or { return errno.err, errno.get() }
+	if xattr_on_overlay(target) { xattr_may_change(target, name, true) or { return errno.err, errno.get() } }
 	mut res := target.res
 	resource.remove_xattr(mut res, name) or { return errno.err, errno.get() }
 	xattr_changed(target)

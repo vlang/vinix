@@ -531,6 +531,7 @@ pub fn run() int {
 		if concurrent || retention { prepare() }
 		if retention { prepare_retained_layers() }
 		if failure || disk || opaque || full || sockets { prepare_disk(opaque, full) }
+		if disk || sockets { prepare_xattr_guards() }
 		if sockets { check(C.mkdir(c'/tmp/overlay-volume/protected', 0o700) == 0, 427) }
 		if access { owned_directory(c'/tmp/overlay-state/reference', 474) }
 		root_listener := if sockets || access { root_socket_listener() } else { -1 }
@@ -559,6 +560,7 @@ pub fn run() int {
 				socket_acl_connections(c'/tmp/overlay-volume', acl_ext2)
 				socket_acl_connections(c'/tmp/overlay-state/diskmerged', acl_overlay)
 			}
+			if disk || sockets { xattr_copyup_preflight() }
 			if concurrent {
 				sample(0)
 				exercise(false)

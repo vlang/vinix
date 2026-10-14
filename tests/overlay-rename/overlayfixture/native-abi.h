@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <grp.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <sys/uio.h>
 /* Declaration-only symbol alias: V cannot express connect's const pointer. */
 extern int vinix_overlay_connect(int, void *, unsigned int) __asm__("connect");
