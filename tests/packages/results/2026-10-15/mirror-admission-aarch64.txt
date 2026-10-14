@@ -1,0 +1,2 @@
+PASS aarch64 packages-mirror-admission (177.1s)
+package-mirror-admission aarch64: 1 passed, 0 failed, 0 skipped

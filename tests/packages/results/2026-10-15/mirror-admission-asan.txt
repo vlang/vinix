@@ -1,0 +1,109 @@
+clang ASan/UBSan; detect_leaks=0; halt_on_error=1
+
+mirror:
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-63846-1792016519588420/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Data 1.0.0 (2/2) from fixture
+Downloading data/share/data (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-63846-1792016523352014/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-63846-1792016527145291/unsafe/nested/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-63846-1792016531313570/interrupted; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-63846-1792016534078200/missing/media/export; $literal; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-63846-1792016544403926/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+MIRROR ADMISSION late-index refused=true unpublished=true
+Offline mirror ready: /private/tmp/vinix-mirror-63846-1792016547426969/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION changed staged metadata refuses before publication; verified cache survives and offline retry succeeds PASS
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-63846-1792016550261485/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION 34 late metadata/payload/mode/link/namespace refusals preserve source state, outside data and cache; no completion, clean staging and offline retry PASS
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-63846-1792016562691951/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION 128 valid and refused complete-stage scans retire descriptors under a 32-descriptor limit and restored namespace retries PASS
+PASS
+
+deployment:
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-pins-82827-1792016789567597/locked export; $literal; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-capture-82827-1792016800098984/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-final-lock-82827-1792016803846730/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION locked export binds exact captured deployment bytes through publication; changed staged lock refuses and retry preserves pins PASS
+Updating trusted repository fixture
+Updating trusted repository deployment.json
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-namespace-82827-1792016807624488/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/2) from fixture
+Installing Runtime 2.0.0 (2/2) from fixture
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Offline mirror ready: /private/tmp/vinix-deployment-reproducible-82827-1792016813960200/mirror; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Rolled back to generation 1; application data was retained
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading unused/bin/runner (14 bytes)
+Activated package generation 1
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+PASS

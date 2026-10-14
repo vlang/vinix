@@ -1836,6 +1836,17 @@ catalog metadata, policy or trust does. Progress emits `resolve`, transfer/copy
 and verification phases, then `complete` after durable publication; it does not
 emit installed-generation activation. The installed state is preserved.
 
+Complete-stage admission runs before directory flushing and again immediately
+before publication, after the final staging checkpoint. It requires the exact
+reviewed repository/metadata/object namespace, original signed metadata and
+captured deployment-lock bytes, ordinary single-link files, authenticated object
+lengths/hashes and final modes 0755/0644. Directory enumeration is bounded by the
+expected entries and refuses aliases. These read-only scans rehash unique
+exported objects; they never import abandoned staging data. A failure emits no
+completion, cleans the unpublished stage and retains verified cache for retry.
+Controlled ancestors and stable administrative inputs remain required. See
+[mirror admission qualification](../../tests/packages/mirror-admission-check.md).
+
 For a locked organization deployment use
 `mirror-deployment-review NEW_DIRECTORY LOCK.json`, followed by
 `mirror-deployment-apply FINGERPRINT NEW_DIRECTORY LOCK.json`. The lock must be

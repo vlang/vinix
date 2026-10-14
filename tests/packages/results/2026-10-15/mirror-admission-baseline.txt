@@ -1,0 +1,43 @@
+Baseline 382e71801 with the new final-checkpoint assertion. The old export publishes changed signed metadata and reports ready; the regression exits 1. This is a deterministic staging component check.
+
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-23282-1792014921506263/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Data 1.0.0 (2/2) from fixture
+Downloading data/share/data (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-23282-1792014921651220/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-23282-1792014921761903/unsafe/nested/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-23282-1792014921919056/interrupted; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-23282-1792014922045439/missing/media/export; $literal; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-23282-1792014922448227/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-23282-1792014922589198/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION late-index refused=false unpublished=false
+tools/packages/pkgcore/mirror_test.v:294: fn test_mirror_late_metadata_change_refuses_publication_and_retries_verified_cache
+    assert message.contains('offline mirror verification') && !os.exists(destination)

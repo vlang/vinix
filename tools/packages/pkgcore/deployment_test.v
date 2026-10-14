@@ -161,6 +161,25 @@ fn test_deployment_mirror_captures_one_document_and_cleans_unpublished_lock_on_f
 	assert service.state()!.generation == 0
 }
 
+fn deployment_change_staged_lock(phase string, stage string) ! {
+	if phase == 'ready' { os.write_file(stage + '/_deployment.json', os.read_file(stage + '/_deployment.json')! + '\n')! }
+}
+
+fn test_locked_mirror_preserves_captured_document_through_final_publication() {
+	work, service, config := deployment_fixture('mirror-final-lock')!; defer { os.rmdir_all(work) or {} }
+	path := write_deployment(work, service.lock_deployment(['app'])!)!
+	text := os.read_file(path)!
+	store := state_directory(service.root)
+	mut message := ''
+	mirror_export(config, store, work + '/export', [], MirrorOptions{ deployment: path, checkpoint: deployment_change_staged_lock }) or { message = err.msg() }
+	assert message.contains('offline mirror verification') && !os.exists(work + '/export')
+	assert os.ls(work)!.all(!it.starts_with('.vinix-mirror-')) && os.read_file(path)! == text && service.state()!.generation == 0
+	os.rmdir_all(work + '/repository')!
+	mirror_export(config, store, work + '/export', [], MirrorOptions{ deployment: path })!
+	assert os.read_file(work + '/export/_deployment.json')! == text
+	println('MIRROR ADMISSION locked export binds exact captured deployment bytes through publication; changed staged lock refuses and retry preserves pins PASS')
+}
+
 fn test_deployment_mirror_lock_filename_cannot_collide_with_repository_identifiers() {
 	work, service, config := deployment_fixture('mirror-namespace')!
 	defer { os.rmdir_all(work) or {} }

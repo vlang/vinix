@@ -966,6 +966,11 @@ A retry builds fresh staging data from authenticated metadata and verified cache
 it never imports abandoned staging data or sweeps other exports. A directory-flush
 failure after publication reports that the complete mirror exists but its storage
 durability needs checking. Keep media attached until export finishes.
+Before flushing and after the final staging checkpoint, the service admits the
+complete export again: exact signed index/signature and deployment-lock bytes,
+the selected object set and its hashes, ordinary single-link files and readable
+final modes. Unexpected entries or changed data refuse before publication and
+completion. See [mirror admission checks](../tests/packages/mirror-admission-check.md).
 The destination's resolved ancestors must belong to root or the invoking
 administrator. Shared writable ancestors need the sticky bit (as `/tmp` has), so
 another user cannot replace the staging path while an administrator writes it.

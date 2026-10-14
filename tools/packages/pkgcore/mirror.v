@@ -236,8 +236,18 @@ fn mirror_export(config Config, directory string, destination string, names []st
 			copied[key] = true
 		}
 	}
+	verify_mirror_stage(stage, prepared, false) or {
+		message := err.msg()
+		defer { unsafe { message.free(); err.free() } }
+		return error('offline mirror verification failed before publication: ' + message)
+	}
 	flush_tree(stage)!
 	options.checkpoint('ready', stage)!
+	verify_mirror_stage(stage, prepared, true) or {
+		message := err.msg()
+		defer { unsafe { message.free(); err.free() } }
+		return error('offline mirror verification failed before publication: ' + message)
+	}
 	publish_new_directory(stage, target, 'offline mirror')!
 	published = true
 	// Publication already happened. A flush error must leave the complete tree

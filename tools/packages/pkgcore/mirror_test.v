@@ -10,6 +10,12 @@ import tools.packages.pkgprotocol
 fn C.fork() int
 fn C.waitpid(int, &int, int) int
 fn C._exit(int)
+fn C.link(&char, &char) int
+fn C.mkfifo(&char, u32) int
+#include <sys/resource.h>
+fn C.getrlimit(int, voidptr) int
+fn C.setrlimit(int, voidptr) int
+struct MirrorAdmissionLimit { current u64 maximum u64 }
 
 fn mirror_fixture() !(string, Config, []Package) {
 	work := os.real_path(os.temp_dir()) + '/vinix-mirror-' + os.getpid().str() + '-' + time.now().unix_micro().str()
@@ -277,4 +283,122 @@ fn test_mirror_progress_and_cache_recovery_do_not_invalidate_review_or_complete_
 	assert events.any(it.phase == 'verify') && events.any(it.phase == 'download' && it.package == 'data')
 	assert events.all(it.phase != 'activate')
 	assert read_state(state_directory(service.root), config.architecture)!.generation == 0
+}
+
+fn mirror_change_ready(phase string, stage string) ! {
+	if phase != 'ready' { return }
+	path := stage + '/fixture/index.json'
+	os.write_file(path, 'changed after copying')!
+}
+
+fn test_mirror_late_metadata_change_refuses_publication_and_retries_verified_cache() {
+	work, config, packages := mirror_fixture()!; defer { os.rmdir_all(work) or {} }
+	destination := work + '/export'
+	mut message := ''
+	mirror_export(config, work + '/store', destination, ['app'], MirrorOptions{ checkpoint: mirror_change_ready }) or { message = err.msg() }
+	println('MIRROR ADMISSION late-index refused=' + message.contains('offline mirror verification').str() + ' unpublished=' + (!os.exists(destination)).str())
+	assert message.contains('offline mirror verification') && !os.exists(destination)
+	assert mirror_stages(work)!.len == 0 && read_state(work + '/store', 'aarch64')!.generation == 0
+	for p in packages { for file in p.files { assert verified_file(work + '/store/objects/' + file.sha256, file) } }
+	os.rmdir_all(work + '/repository')!
+	mirror(config, work + '/store', destination, ['app'])!
+	assert os.read_file(destination + '/fixture/index.json')! != 'changed after copying'
+	println('MIRROR ADMISSION changed staged metadata refuses before publication; verified cache survives and offline retry succeeds PASS')
+}
+
+fn mirror_admission_mutate(phase string, input string) ! {
+	if phase != os.getenv('VINIX_MIRROR_ADMISSION_PHASE') { return }
+	work := os.getenv('VINIX_MIRROR_ADMISSION_WORK')
+	if os.exists(work + '/mutated') { return }
+	stage := if phase == 'copied' { os.dir(os.dir(os.dir(input))) } else { input }
+	subject := os.getenv('VINIX_MIRROR_ADMISSION_SUBJECT')
+	kind := os.getenv('VINIX_MIRROR_ADMISSION_KIND')
+	path := stage + '/' + subject
+	os.write_file(work + '/mutated', 'once')!
+	match kind {
+		'extra' { os.write_file(path + '/unrequested', 'unreviewed object')! }
+		'mode' { os.chmod(path, if os.is_dir(path) { 0o700 } else { 0o600 })! }
+		'link' { assert C.link(path.str, (work + '/linked').str) == 0 }
+		'rewrite' { os.write_file(path, 'changed after copy')! }
+		else {
+			os.rename(path, work + '/saved')!
+			match kind {
+				'alias' { os.symlink(work + '/outside', path)! }
+				'fifo' { assert C.mkfifo(path.str, 0o600) == 0 }
+				'dir-alias' { os.symlink(work + '/outside-dir', path)! }
+				'missing' {}
+				else { panic('unknown mirror admission mutation') }
+			}
+		}
+	}
+}
+
+fn test_mirror_whole_stage_refuses_late_changes_and_unreviewed_namespace_without_completion() {
+	work, config, packages := mirror_fixture()!; defer { os.rmdir_all(work) or {} }
+	os.write_file(work + '/outside', 'preserved')!; os.chmod(work + '/outside', 0o600)!
+	os.mkdir(work + '/outside-dir')!; os.chmod(work + '/outside-dir', 0o700)!
+	os.write_file(work + '/outside-dir/keep', 'preserved')!
+	os.setenv('VINIX_MIRROR_ADMISSION_WORK', work, true)
+	os.setenv('VINIX_MIRROR_PROGRESS_TEST', work + '/events', true)
+	defer { for name in ['VINIX_MIRROR_ADMISSION_WORK', 'VINIX_MIRROR_ADMISSION_PHASE', 'VINIX_MIRROR_ADMISSION_SUBJECT', 'VINIX_MIRROR_ADMISSION_KIND', 'VINIX_MIRROR_PROGRESS_TEST'] { os.unsetenv(name) } }
+	store := work + '/store'
+	catalog := os.read_file(store + '/catalog.json')!; history := os.read_file(store + '/trust-history.json')!
+	mut cases := 0
+	for phase in ['copied', 'ready'] {
+		mut subjects := ['fixture/index.json', 'fixture/index.sig', '']
+		if phase == 'ready' { subjects << ['fixture/objects/' + packages[0].files[0].sha256, 'fixture', 'fixture/objects'] }
+		for subject in subjects {
+			kinds := if subject == '' { ['extra'] }
+				else if subject in ['fixture', 'fixture/objects'] { ['extra', 'missing', 'dir-alias', 'mode'] }
+				else if phase == 'copied' { ['rewrite', 'missing', 'alias'] }
+				else { ['rewrite', 'missing', 'alias', 'fifo', 'link', 'mode'] }
+			for kind in kinds {
+				for key, value in {'VINIX_MIRROR_ADMISSION_PHASE': phase, 'VINIX_MIRROR_ADMISSION_SUBJECT': subject, 'VINIX_MIRROR_ADMISSION_KIND': kind} { os.setenv(key, value, true) }
+				os.write_file(work + '/events', '')!
+				mut message := ''
+				mirror_export(config, store, work + '/export', ['app'], MirrorOptions{ checkpoint: mirror_admission_mutate, progress: mirror_report }) or { message = err.msg() }
+				assert message.contains('offline mirror verification') && !os.exists(work + '/export'), phase + '/' + subject + '/' + kind + ': ' + message
+				assert os.exists(work + '/mutated') && mirror_stages(work)!.len == 0
+				for line in os.read_file(work + '/events')!.split_into_lines() { assert pkgprotocol.decode_progress(line)!.phase != 'complete' }
+				assert os.read_file(store + '/catalog.json')! == catalog && os.read_file(store + '/trust-history.json')! == history
+				assert read_state(store, 'aarch64')!.generation == 0 && os.read_file(work + '/outside')! == 'preserved'
+				assert os.lstat(work + '/outside')!.mode & 0o777 == 0o600 && os.lstat(work + '/outside-dir')!.mode & 0o777 == 0o700
+				assert os.read_file(work + '/outside-dir/keep')! == 'preserved'
+				for name in ['mutated', 'linked', 'saved'] {
+					path := work + '/' + name
+					if os.is_dir(path) { os.rmdir_all(path)! } else if os.exists(path) { os.rm(path)! }
+				}
+				cases++
+			}
+		}
+	}
+	assert cases == 34
+	os.rmdir_all(work + '/repository')!
+	mirror(config, store, work + '/export', ['app'])!
+	assert os.ls(work + '/export/fixture/objects')!.len == 2
+	println('MIRROR ADMISSION 34 late metadata/payload/mode/link/namespace refusals preserve source state, outside data and cache; no completion, clean staging and offline retry PASS')
+}
+
+fn test_mirror_stage_admission_retires_descriptors_and_accepts_only_the_exported_closure() {
+	work, config, _ := mirror_fixture()!; defer { os.rmdir_all(work) or {} }
+	mirror(config, work + '/store', work + '/export', ['app'])!
+	prepared := prepare_mirror(config, work + '/store', work + '/unused', ['app'])!
+	mut original := MirrorAdmissionLimit{}
+	assert C.getrlimit(C.RLIMIT_NOFILE, voidptr(&original)) == 0
+	limit := MirrorAdmissionLimit{ current: 32, maximum: original.maximum }
+	assert C.setrlimit(C.RLIMIT_NOFILE, voidptr(&limit)) == 0
+	defer { assert C.setrlimit(C.RLIMIT_NOFILE, voidptr(&original)) == 0 }
+	for _ in 0 .. 128 { verify_mirror_stage(work + '/export', prepared, true)! }
+	os.write_file(work + '/export/fixture/unrequested', 'extra')!
+	for _ in 0 .. 128 {
+		mut refused := false
+		verify_mirror_stage(work + '/export', prepared, true) or {
+			message := err.msg(); refused = message.contains('unexpected mirror entry')
+			unsafe { message.free(); err.free() }
+		}
+		assert refused
+	}
+	os.rm(work + '/export/fixture/unrequested')!
+	verify_mirror_stage(work + '/export', prepared, true)!
+	println('MIRROR ADMISSION 128 valid and refused complete-stage scans retire descriptors under a 32-descriptor limit and restored namespace retries PASS')
 }

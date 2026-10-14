@@ -1,0 +1,49 @@
+PASS x86_64 packages-mirror-admission (153.1s)
+package-mirror-admission x86_64: 1 passed, 0 failed, 0 skipped
+
+Previous attempt with the default 300-second timer; the final repeat above used --timeout 600:
+FAIL x86_64 packages-mirror-admission (300.9s)
+  timed out after 300 s without "MIRROR ADMISSION locked export binds exact captured deployment bytes through publication; changed staged lock refuses and retry preserves pins PASS", "MIRROR PROCESS mirror-admission-deployment PASS", "HWTEST PASS packages-mirror-admission"
+  last 40 serial lines:
+  | Downloading app/bin/app (19 bytes)
+  | Downloading data/share/data (19 bytes)
+  | Downloading data/share/data (19 bytes)
+  | Offline mirror ready: /tmp/vinix-mirror-58406-1792016755699090/export; enroll its file:// repository paths with the same public keys
+  | Updating trusted repository fixture
+  | Downloading app/bin/app (19 bytes)
+  | Downloading data/share/data (19 bytes)
+  | Offline mirror ready: /tmp/vinix-mirror-58406-1792016762693568/unsafe/nested/export; enroll its file:// repository paths with the same public keys
+  | Updating trusted repository fixture
+  | Downloading app/bin/app (19 bytes)
+  | Downloading data/share/data (19 bytes)
+  | Offline mirror ready: /tmp/vinix-mirror-58406-1792016772737691/interrupted; enroll its file:// repository paths with the same public keys
+  | Updating trusted repository fixture
+  | Updating trusted repository fixture
+  | Downloading app/bin/app (19 bytes)
+  | Downloading data/share/data (19 bytes)
+  | Offline mirror ready: /tmp/vinix-mirror-58406-1792016781643006/missing/media/export; $literal; enroll its file:// repository paths with the same public keys
+  | Updating trusted repository fixture
+  | Updating trusted repository fixture
+  | Downloading app/bin/app (19 bytes)
+  | Downloading data/share/data (19 bytes)
+  | Downloading data/share/data (19 bytes)
+  | Offline mirror ready: /tmp/vinix-mirror-58406-1792016805167427/export; enroll its file:// repository paths with the same public keys
+  | Updating trusted repository fixture
+  | Downloading app/bin/app (19 bytes)
+  | Downloading data/share/data (19 bytes)
+  | MIRROR ADMISSION late-index refused=true unpublished=true
+  | Offline mirror ready: /tmp/vinix-mirror-58406-1792016814015713/export; enroll its file:// repository paths with the same public keys
+  | MIRROR ADMISSION changed staged metadata refuses before publication; verified cache survives and offline retry succeeds PASS
+  | Updating trusted repository fixture
+  | Downloading app/bin/app (19 bytes)
+  | Downloading data/share/data (19 bytes)
+  | Offline mirror ready: /tmp/vinix-mirror-58406-1792016821527053/export; enroll its file:// repository paths with the same public keys
+  | MIRROR ADMISSION 34 late metadata/payload/mode/link/namespace refusals preserve source state, outside data and cache; no completion, clean staging and offline retry PASS
+  | Updating trusted repository fixture
+  | Downloading app/bin/app (19 bytes)
+  | Downloading data/share/data (19 bytes)
+  | Offline mirror ready: /tmp/vinix-mirror-58406-1792016856078209/export; enroll its file:// repository paths with the same public keys
+  | MIRROR ADMISSION 128 valid and refused complete-stage scans retire descriptors under a 32-descriptor limit and restored namespace retries PASS
+  | MIRROR PROCESS mirror-admission-core PASS
+  logs: /Users/alex/code/vinix/build/pkg-miad-x86/packages-mirror-admission
+package-mirror-admission x86_64: 0 passed, 1 failed, 0 skipped
