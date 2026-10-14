@@ -1,0 +1,10 @@
+PASS baseline e500d4938 reproduces late metadata refusal after recovery cleanup and payload staging
+
+Previous implementation, isolated fixture data:
+Updating trusted repository trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+Installing Seed 1.0.0 (1/1) from trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+Downloading seed/asset (4 bytes)
+Activated package generation 1
+Updating trusted repository trustedrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+STATE PREFLIGHT valid signed cache 8388326 bytes; resolved installed state 8389904 bytes
+STATE PREFLIGHT BEFORE review accepts oversized state; apply retires recovery work and fills cache before rejecting metadata

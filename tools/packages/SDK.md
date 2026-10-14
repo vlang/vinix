@@ -1522,6 +1522,17 @@ On a fresh image, status/verification do not initialize package state. Direct
 administrator edits to configuration must honor the same lock or quiesce package
 operations; arbitrary root filesystem writes are outside this contract.
 
+Changed install/remove/upgrade/deployment reviews also preflight the exact future
+generation's serialized state, including its generation and previous counters.
+The persistent state must fit the existing 8 MiB metadata limit even when every
+signed repository and individual manifest is valid. Apply repeats this check
+under its writer lock before retiring abandoned stages, acquiring objects or
+creating a generation. Oversized state returns a diagnostic asking for a smaller
+requested set or less package metadata; the active state, caches and recovery
+work survive. A successful apply writes the same bytes it preflighted. No-op
+reviews and rollback retain their existing behavior. See
+[generation metadata checks](../../tests/packages/state-preflight-check.md).
+
 Configuration JSON preserves legacy omitted-field defaults, including partial
 policy objects. Present fields must have the declared JSON types; null values,
 unknown keys and duplicate keys (including escaped equivalent spellings) are

@@ -529,7 +529,12 @@ format and reports completion only after a healthy scan. Plain/JSON Verify
 output stays compatible. See [qualification](../tests/packages/verify-progress-check.md).
 
 Each generation contains package state, the full payload closure, launcher
-records and a running-application lease. Files/directories are flushed before
+records and a running-application lease. Changed reviews and transactions check
+the exact future state against the persistent metadata limit before downloading,
+staging or deleting interrupted work. Oversized plans fail with guidance to
+reduce the requested set or package metadata; a smaller set can retry normally.
+See [metadata preflight qualification](../tests/packages/state-preflight-check.md).
+Files/directories are flushed before
 publication; POSIX rename switches `current` atomically. The next state-changing transaction
 retires abandoned stages. A crash before activation exposes the old complete set;
 a crash after it exposes the new complete set. Actual durability depends on the

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import json2
 import os
 import strings
 import tools.packages.pkgprotocol
@@ -292,6 +291,15 @@ fn activate_repair_plan_locked(config Config, directory string, current State, p
 	}
 	// Parse all generation identities before retiring any abandoned work.
 	generation := next_generation(directory)!
+	state := State{
+		generation: generation
+		previous: current.generation
+		architecture: config.architecture
+		requested: plan.requested
+		packages: plan.packages
+	}
+	encoded := encode_generation_state(state)!
+	defer { unsafe { encoded.free() } }
 	// Retire abandoned work only after a supplied review has been accepted.
 	for name in os.ls(directory + '/generations')! {
 		if name.starts_with('.stage-') { os.rmdir_all(directory + '/generations/' + name)! }
@@ -341,15 +349,6 @@ fn activate_repair_plan_locked(config Config, directory string, current State, p
 		done++
 		options.progress(pkgprotocol.Progress{ phase: 'stage', package: p.id, current: u64(done), total: u64(plan.packages.len) })
 	}
-	state := State{
-		generation:   generation
-		previous:     current.generation
-		architecture: config.architecture
-		requested:    plan.requested
-		packages:     plan.packages
-	}
-	encoded := json2.encode(state)
-	if encoded.len > max_metadata { return error('installed state exceeds metadata limit') }
 	os.write_file(stage + '/state.json', encoded)!
 	os.chmod(stage + '/state.json', 0o644)!
 	sync_file(stage + '/state.json')!

@@ -1,0 +1,2 @@
+PASS aarch64 packages-state-preflight (66.3s)
+package-state-preflight aarch64: 1 passed, 0 failed, 0 skipped

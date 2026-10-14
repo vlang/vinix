@@ -1,0 +1,7 @@
+STATE PREFLIGHT exact metadata byte boundary, reader round-trip and future generation counter width PASS
+STATE PREFLIGHT install/upgrade/deploy/remove reject before stage retirement, object acquisition or activation PASS
+
+Tracked heap run:
+STATE PREFLIGHT exact metadata byte boundary, reader round-trip and future generation counter width PASS
+STATE PREFLIGHT install/upgrade/deploy/remove reject before stage retirement, object acquisition or activation PASS
+STATE PREFLIGHT 64 accepted and 8 oversized encodings retain zero tracked bytes PASS
