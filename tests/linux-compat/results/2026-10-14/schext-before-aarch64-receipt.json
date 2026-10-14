@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "c9d23cdb6e35cb4a297e8198f2bb97cede7425f5218ee76734a4d8129dfb793b",
+    "results": [
+        {
+            "name": "schext",
+            "source_sha256": "355b497a5984b728a3838c352a99bcc75b9f4ee294c1cca2fc62e0eea3425536",
+            "init_sha256": "a5535c690f40ecc1f971fa572ed37c705c52d0e0b3117d9eca38407d09c5f55d",
+            "iso_sha256": "0e347f8d0d946f834f3a67fc14b60245f3a72e633e252d0335556d8f0d9cc40e",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

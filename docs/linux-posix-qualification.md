@@ -5720,3 +5720,70 @@ the three broad section 15 acceptance gates remain open.
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-14/schedabi-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-14/schedabi-after-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/schedabi-reference-x86_64-receipt.json).
 - [Maintained V audit](../tests/linux-compat/schedabi-check.v), [verdict](../tests/linux-compat/results/2026-10-14/schedabi-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-14/schedabi-lifetime-review.md).
 - [x86 QoS receipt](../tests/linux-compat/results/2026-10-14/schedabi-qos-after-x86_64-inputs.json), [AArch64 original failure](../tests/linux-compat/results/2026-10-14/schedabi-qos-before-aarch64-serial.log), [AArch64 decoded failure](../tests/linux-compat/results/2026-10-14/schedabi-qos-after-aarch64-serial.log).
+
+## Native SCHED_EXT priority metadata
+
+`sched_get_priority_min(7)` and `sched_get_priority_max(7)` now return zero,
+matching Linux's fixed SCHED_EXT priority metadata. Linux defines policy 7
+in its [UAPI](https://github.com/torvalds/linux/blob/v6.12/include/uapi/linux/sched.h)
+and returns these bounds independently of class availability in its
+[scheduler queries](https://github.com/torvalds/linux/blob/v6.12/kernel/sched/syscalls.c).
+This change recognizes that metadata; installing or running a SCHED_EXT/BPF
+scheduler remains unsupported, and the setter validation is unchanged.
+
+The native `schext` probe runs independent root and UID/GID1000 children.
+Sixteen policies cover ordinary, FIFO, RR, BATCH, IDLE, DEADLINE, EXT,
+reserved policy 4, unknown policy 8, negative and signed32 limits, and
+RESET_ON_FORK combinations. Each bound uses six raw register-word forms
+and the actual musl libc function. Raw calls also pass ignored extra
+arguments. FIFO/RR retain their 1/99 range; valid nonrealtime metadata
+returns zero and invalid policies return `EINVAL`. Queries leave observed
+policy and priority unchanged. The probe makes no scheduling-class
+availability inference from a successful metadata query.
+
+Each credential cohort records 180 raw existing/invalid-policy checks,
+14 EXT raw/libc checks, 30 other libc checks and one final state control.
+Across both children there are 448 bounds queries and two state controls.
+
+| Architecture | Checks | Original failures | Corrected failures | Same-ELF Linux failures |
+| --- | --- | --- | --- | --- |
+| AArch64 | 450 | 28 | 0 | 0 |
+| x86-64 | 450 | 28 | 0 | 0 |
+
+Both original kernels fail only the 14 EXT queries per credential cohort.
+All other controls pass. Corrected Vinix and actual Linux 6.12.51 references
+execute identical architecture-specific probe ELFs and pass every row.
+Preview, final preflight and both native phases have byte-identical raw C.
+
+After 32 warmups, two corrected credential cohorts repeat 200 cycles of
+raw/libc EXT queries, flagged-policy errors, FIFO bounds and state checks.
+All 18 ARM and 14 x86 slab classes stay flat, with large pages 63/63 ARM
+and 160/160 x86. Four fresh ordinary production builds use detached
+worktrees at `4142e9a49e2a4b317272e73cc98c5b698cad8d4f`. Complete generated C
+differs only in the two pure query bodies and one scalar constant macro;
+each body adds only the EXT zero-bound predicate. Setters, queue operations,
+target lookup, user-copy and allocation code are unchanged.
+
+Both five-case corrected guest profiles
+(schext/runtime/schedabi/open/fcntlabi), eight host test files and frozen
+64-input inventories pass. Allocation scans retain 398 ARM/290 x86 sites
+and the same existing allowance failures; whole-kernel allocation approval
+is not claimed. Independent review checks genuine stack scalars, fixed
+arrays, synchronous pointer borrows, the 64-byte result-pipe handoff,
+descriptor cleanup and child reaping. The V audit executes both a false
+assertion and a passing-capture-as-baseline negative control without `-prod`.
+
+The first standalone preflight failed compilation because safe fixed-array
+loops emitted an unavailable bounds helper. Its raw C and replayed compiler
+errors are retained as preparation evidence. Explicit literal-bounded loops
+produce the final C with six allocas and no heap/index helpers. No failed
+preflight is counted as a syscall result.
+
+Class registration/BPF programs and runtime behavior, scheduler permissions,
+realtime mutations, target races, glibc and translated/ELF32 paths remain
+separate. The previously reported AArch64 multi-CPU QoS blocker and all
+three broad section 15 acceptance gates remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-14/schext-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-14/schext-after-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/schext-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-14/schext-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-14/schext-after-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/schext-reference-x86_64-receipt.json).
+- [Maintained V audit](../tests/linux-compat/schext-check.v), [verdict](../tests/linux-compat/results/2026-10-14/schext-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-14/schext-lifetime-review.md).

@@ -1,0 +1,3 @@
+tests/linux-compat/schext-check.v:154: FAIL: fn main.main: assert false,'schext assertions must execute';
+      message: schext assertions must execute
+V panic: Assertion failed...

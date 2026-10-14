@@ -207,13 +207,17 @@ fn syscall_linux_sched_setparam(_ voidptr, raw_pid int, param u64) (u64, u64) {
 	return 0, 0
 }
 
+// Linux exposes SCHED_EXT's fixed priority metadata even without that class
+// enabled. Its setters still require an actual supported scheduling policy.
+const linux_sched_ext = int(7)
+
 fn syscall_linux_sched_get_priority_max(_ voidptr, raw_policy int) (u64, u64) {
 	policy := int(i32(u32(raw_policy)))
 	match policy {
 		proc.sched_fifo, proc.sched_rr {
 			return u64(proc.rt_priority_max), 0
 		}
-		proc.sched_other, proc.sched_batch, proc.sched_idle, proc.sched_deadline {
+		proc.sched_other, proc.sched_batch, proc.sched_idle, proc.sched_deadline, linux_sched_ext {
 			return 0, 0
 		}
 		else {
@@ -228,7 +232,7 @@ fn syscall_linux_sched_get_priority_min(_ voidptr, raw_policy int) (u64, u64) {
 		proc.sched_fifo, proc.sched_rr {
 			return u64(proc.rt_priority_min), 0
 		}
-		proc.sched_other, proc.sched_batch, proc.sched_idle, proc.sched_deadline {
+		proc.sched_other, proc.sched_batch, proc.sched_idle, proc.sched_deadline, linux_sched_ext {
 			return 0, 0
 		}
 		else {

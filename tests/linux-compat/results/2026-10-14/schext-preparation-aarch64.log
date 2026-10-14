@@ -1,0 +1,7 @@
+/Users/alex/.cache/vinix-linux-compat/schext-20261014/states/preflight1-schext-arm/fixture.c:1206:30: error: call to undeclared function 'v_fixed_index'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1206 |                         bool maximum = __in_lhs_0[v_fixed_index(__for_idx_1, 2)];
+      |                                                   ^
+/Users/alex/.cache/vinix-linux-compat/schext-20261014/states/preflight1-schext-arm/fixture.c:1251:28: error: call to undeclared function 'v_fixed_index'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1251 |                         i32 policy = __in_lhs_0[v_fixed_index(__for_idx_1, 16)];
+      |                                                 ^
+2 errors generated.

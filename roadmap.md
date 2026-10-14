@@ -877,6 +877,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   Publish musl wrapper refusals and the AArch64 multi-CPU QoS blocker.
   See [the scheduler receipts](docs/linux-posix-qualification.md#native-scheduler-scalar-words-and-error-precedence).
 
+- [x] Report native SCHED_EXT priority bounds as Linux metadata while retaining
+  real errors for invalid policies; qualify raw/libc words, unchanged policy
+  and priority, and flat query storage on both architectures and same-ELF Linux.
+  Keep SCHED_EXT/BPF class installation and runtime support explicitly separate.
+  See [the priority metadata receipts](docs/linux-posix-qualification.md#native-sched_ext-priority-metadata).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

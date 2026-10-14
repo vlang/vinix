@@ -1398,3 +1398,21 @@ publishes setup/oracle diagnostics, independent lifetime review and the
 existing AArch64 small-QoS CPU-affinity blocker. Realtime/deadline, capability/
 limit/reset rules, SCHED_EXT, target races, namespaces/pledge, RR/attribute/
 affinity argument ABIs and GNU/foreign paths remain separate.
+
+The `schext` case qualifies Linux SCHED_EXT priority metadata separately
+from class availability. Root/UID1000 children check sixteen policies,
+both priority bounds, six raw words and actual musl wrappers: 450 controls
+per architecture. Only 28 EXT queries fail on the original kernels;
+corrected Vinix and identical probe ELFs on Linux 6.12.51 pass all rows.
+Reserved/unknown/negative/reset-flagged policies retain EINVAL, FIFO/RR
+retain 1/99 bounds, and queries retain observed policy/priority. Two warmed
+200-cycle cohorts keep every slab/large-page count flat. Run
+`--cases schext,runtime,schedabi,open,fcntlabi` with fresh state directories.
+`schext-reference.v --arch ARCH --kernel LINUX --init NATIVE-PROBE-ELF
+--state-dir FRESH-DIR` executes the Linux oracle; compile `schext-check.v`
+without `-prod` and pass the retained evidence directory to audit the
+captured artifacts and negative controls. [The report](../../docs/linux-posix-qualification.md#native-sched_ext-priority-metadata)
+binds four builds, exact C scope, compiler/source/ELF pins, lifetime review
+and the failed standalone-helper preparation. Installing or running a
+SCHED_EXT/BPF scheduler, permission rules, GNU/foreign paths and the
+AArch64 multi-CPU QoS blocker remain open.

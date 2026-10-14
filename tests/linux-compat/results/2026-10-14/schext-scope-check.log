@@ -1,0 +1,2 @@
+arm: complete C unchanged outside two query bodies and one scalar macro; each body adds only the SCHED_EXT zero-bound predicate
+x86: complete C unchanged outside two query bodies and one scalar macro; each body adds only the SCHED_EXT zero-bound predicate
