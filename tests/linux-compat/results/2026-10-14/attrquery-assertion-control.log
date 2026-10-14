@@ -1,0 +1,3 @@
+tests/linux-compat/attrquery-check.v:174: FAIL: fn main.main: assert false,'attrquery assertions must execute';
+      message: attrquery assertions must execute
+V panic: Assertion failed...

@@ -11,6 +11,7 @@ module table
 import errno
 import file
 import katomic
+import memory
 import proc
 import socket
 import socket.public as sock_pub
@@ -376,14 +377,12 @@ fn syscall_linux_sched_setattr(_ voidptr, pid int, attr_ptr u64, flags u32) (u64
 	return 0, 0
 }
 
-fn syscall_linux_sched_getattr(_ voidptr, pid int, attr_ptr u64, size u32, flags u32) (u64, u64) {
-	if flags != 0 {
-		return errno.err, errno.einval
-	}
-	if attr_ptr == 0 {
-		return errno.err, errno.efault
-	}
-	if size < sched_attr_v0_size {
+fn syscall_linux_sched_getattr(_ voidptr, raw_pid int, attr_ptr u64, size u32, flags u32) (u64, u64) {
+	pid := int(i32(u32(raw_pid)))
+	// Linux checks the signed pid_t, null output, flags and page-bounded
+	// request size before lookup. A valid short buffer receives its exact prefix.
+	if attr_ptr == 0 || pid < 0 || flags != 0 || size < sched_attr_v0_size
+		|| u64(size) > memory.page_size {
 		return errno.err, errno.einval
 	}
 	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
@@ -405,7 +404,7 @@ fn syscall_linux_sched_getattr(_ voidptr, pid int, attr_ptr u64, size u32, flags
 	proc.unlock_table()
 
 	mut attr := SchedAttr{
-		size: if size >= sizeof(SchedAttr) { u32(sizeof(SchedAttr)) } else { sched_attr_v0_size }
+		size: if size >= sizeof(SchedAttr) { u32(sizeof(SchedAttr)) } else { size }
 		sched_policy: u32(params.policy)
 		sched_nice: i32(nice)
 		sched_priority: u32(params.priority)
@@ -419,7 +418,10 @@ fn syscall_linux_sched_getattr(_ voidptr, pid int, attr_ptr u64, size u32, flags
 		attr.sched_flags |= sched_flag_reset_on_fork
 	}
 
-	if !usercopy.copy_to_user(attr_ptr, voidptr(&attr), attr.size) {
+	// The advertised range must fit userspace even when only the known prefix
+	// is copied; inaccessible pages beyond that prefix need not be touched.
+	if !usercopy.user_range(attr_ptr, u64(size))
+		|| !usercopy.copy_to_user(attr_ptr, voidptr(&attr), attr.size) {
 		return errno.err, errno.efault
 	}
 	return 0, 0

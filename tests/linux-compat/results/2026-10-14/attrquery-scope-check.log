@@ -1,0 +1,2 @@
+arm: complete C differs only in getter prototype/body; signed32/input guards, exact prefix and full range check; all lookup/lock/value-copy/allocation code unchanged
+x86: complete C differs only in getter prototype/body; signed32/input guards, exact prefix and full range check; all lookup/lock/value-copy/allocation code unchanged

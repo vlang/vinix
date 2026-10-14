@@ -889,6 +889,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   Keep scheduler-dependent durations and remaining policy/foreign gaps explicit.
   See [the interval receipts](docs/linux-posix-qualification.md#native-rr-interval-pid-words-and-output-errors).
 
+- [x] Match native scheduling-attribute query PID words, input errors and exact
+  short-buffer prefixes; validate full advertised user ranges before copying.
+  Qualify RR/BATCH state, native page bounds, guarded outputs and flat storage
+  on both architectures and identical-ELF Linux; publish reference setup limits.
+  See [the attribute-query receipts](docs/linux-posix-qualification.md#native-scheduling-attribute-query-prefixes-and-errors).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

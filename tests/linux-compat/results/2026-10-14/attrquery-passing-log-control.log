@@ -1,0 +1,3 @@
+tests/linux-compat/attrquery-check.v:109: FAIL: fn main.failure: assert log.contains('LINUX ATTRQUERY DETAIL:'), 'attrquery baseline failure markers required';
+      message: attrquery baseline failure markers required
+V panic: Assertion failed...

@@ -1,0 +1,67 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=79960
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX ATTRQUERY DETAIL: ordinary=0 kind=3 pid=0 size=31 flags=0 form=-1 call=2 ret=0 errno=0 expected=0
+LINUX ATTRQUERY DETAIL: ordinary=0 kind=3 pid=0 size=37 flags=0 form=-1 call=3 ret=0 errno=0 expected=0
+LINUX ATTRQUERY DETAIL: ordinary=0 kind=3 pid=3a47 size=31 flags=0 form=-1 call=7 ret=0 errno=0 expected=0
+LINUX ATTRQUERY DETAIL: ordinary=0 kind=3 pid=3a47 size=37 flags=0 form=-1 call=8 ret=0 errno=0 expected=0
+LINUX ATTRQUERY DETAIL: ordinary=0 kind=0 pid=0 size=0 flags=0 form=3 call=4 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=0 kind=1 pid=1234567800000000 size=0 flags=0 form=3 call=7 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=0 kind=1 pid=ffffffff00000000 size=0 flags=0 form=3 call=8 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=0 kind=2 pid=0 size=ffffffff00000000 flags=1234567800000000 form=3 call=4 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=0 kind=0 pid=0 size=1 flags=0 form=3 call=24 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=0 kind=1 pid=1234567800000000 size=1 flags=0 form=3 call=47 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=0 kind=1 pid=ffffffff00000000 size=1 flags=0 form=3 call=48 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=0 kind=2 pid=0 size=ffffffff00000001 flags=1234567800000000 form=3 call=24 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=0 kind=0 pid=0 size=2f flags=0 form=3 call=44 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=0 kind=2 pid=0 size=ffffffff0000002f flags=1234567800000000 form=3 call=44 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=0 kind=0 pid=0 size=30 flags=0 form=3 call=64 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=0 kind=2 pid=0 size=ffffffff00000030 flags=1234567800000000 form=3 call=64 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY RANGE: ordinary=0 limit=100000000000000 page=4096
+LINUX ATTRQUERY CASES: ordinary=0 kind=0 calls=1920 failures=210
+LINUX ATTRQUERY CASES: ordinary=0 kind=1 calls=3840 failures=1092
+LINUX ATTRQUERY CASES: ordinary=0 kind=2 calls=1920 failures=210
+LINUX ATTRQUERY CASES: ordinary=0 kind=3 calls=23 failures=8
+LINUX ATTRQUERY FINAL: ordinary=0 kind=0 calls=1920 failures=210
+LINUX ATTRQUERY FINAL: ordinary=0 kind=1 calls=3840 failures=1092
+LINUX ATTRQUERY FINAL: ordinary=0 kind=2 calls=1920 failures=210
+LINUX ATTRQUERY FINAL: ordinary=0 kind=3 calls=23 failures=8
+LINUX ATTRQUERY DETAIL: ordinary=1 kind=3 pid=0 size=31 flags=0 form=-1 call=2 ret=0 errno=0 expected=0
+LINUX ATTRQUERY DETAIL: ordinary=1 kind=3 pid=0 size=37 flags=0 form=-1 call=3 ret=0 errno=0 expected=0
+LINUX ATTRQUERY DETAIL: ordinary=1 kind=3 pid=5558 size=31 flags=0 form=-1 call=7 ret=0 errno=0 expected=0
+LINUX ATTRQUERY DETAIL: ordinary=1 kind=3 pid=5558 size=37 flags=0 form=-1 call=8 ret=0 errno=0 expected=0
+LINUX ATTRQUERY DETAIL: ordinary=1 kind=0 pid=0 size=0 flags=0 form=3 call=4 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=1 kind=1 pid=1234567800000000 size=0 flags=0 form=3 call=7 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=1 kind=1 pid=ffffffff00000000 size=0 flags=0 form=3 call=8 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=1 kind=2 pid=0 size=ffffffff00000000 flags=1234567800000000 form=3 call=4 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=1 kind=0 pid=0 size=1 flags=0 form=3 call=24 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=1 kind=1 pid=1234567800000000 size=1 flags=0 form=3 call=47 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=1 kind=1 pid=ffffffff00000000 size=1 flags=0 form=3 call=48 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=1 kind=2 pid=0 size=ffffffff00000001 flags=1234567800000000 form=3 call=24 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=1 kind=0 pid=0 size=2f flags=0 form=3 call=44 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=1 kind=2 pid=0 size=ffffffff0000002f flags=1234567800000000 form=3 call=44 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=1 kind=0 pid=0 size=30 flags=0 form=3 call=64 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY DETAIL: ordinary=1 kind=2 pid=0 size=ffffffff00000030 flags=1234567800000000 form=3 call=64 ret=-1 errno=14 expected=22
+LINUX ATTRQUERY RANGE: ordinary=1 limit=100000000000000 page=4096
+LINUX ATTRQUERY CASES: ordinary=1 kind=0 calls=1920 failures=210
+LINUX ATTRQUERY CASES: ordinary=1 kind=1 calls=3840 failures=1092
+LINUX ATTRQUERY CASES: ordinary=1 kind=2 calls=1920 failures=210
+LINUX ATTRQUERY CASES: ordinary=1 kind=3 calls=23 failures=8
+LINUX ATTRQUERY FINAL: ordinary=1 kind=0 calls=1920 failures=210
+LINUX ATTRQUERY FINAL: ordinary=1 kind=1 calls=3840 failures=1092
+LINUX ATTRQUERY FINAL: ordinary=1 kind=2 calls=1920 failures=210
+LINUX ATTRQUERY FINAL: ordinary=1 kind=3 calls=23 failures=8
+LINUX ATTRQUERY FAIL: query layout, arguments or state
+QEMU: Terminated
+

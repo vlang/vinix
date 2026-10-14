@@ -1436,3 +1436,19 @@ negative controls. [The report](../../docs/linux-posix-qualification.md#native-r
 publishes the independent lifetime review and retained dependency limits.
 Scheduling-class timing, cross-task policy/permissions/races, attribute and
 affinity ABIs, GNU/foreign paths and the broad compatibility gates remain open.
+
+The `attrquery` case qualifies native `sched_getattr` PID/size/flag handling,
+exact 48–57-byte prefixes, native page caps and full advertised user ranges.
+Separate root/UID1000 children cover six targets, sixteen sizes, ten buffers,
+flags 0/1, upper-word controls, real RR/BATCH state and user-half boundaries:
+15,406 checks per architecture. Originals fail 3,040; corrected kernels and
+identical probe ELFs on Linux 6.12.51 pass all rows. Both 200-cycle cohorts
+retain flat storage. Run `--cases attrquery,runtime,schedabi,rrabi,open,fcntlabi`
+with a fresh state directory. `attrquery-reference.v --arch ARCH --kernel
+LINUX --init NATIVE-PROBE-ELF --state-dir FRESH-DIR` runs the Linux oracle;
+compile `attrquery-check.v` without `-prod` and pass the retained evidence
+directory to audit counts, ranges, source/C/ELF pins and actual negative
+controls. [The report](../../docs/linux-posix-qualification.md#native-scheduling-attribute-query-prefixes-and-errors)
+publishes the initial x86 reserved-top-page setup failure, final receipts,
+storage measurements and independent lifetime review. Setter semantics,
+other state/permission/race controls, GNU/foreign paths and broad gates remain open.

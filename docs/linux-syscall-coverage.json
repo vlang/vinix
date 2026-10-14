@@ -4,7 +4,7 @@
         "kernel/c/pthread.h": "349a5a9d0b696749923c0632cd28a42e52d41bdc067d31d53fb686ce48f353d2",
         "kernel/event/event.v": "a92daf2add03c5304742ad1b112ca04635b94f49e4279e8316f2bee57da6b708",
         "kernel/file/file.v": "bb05660fb6b07f7ae2e63d96fc4682f2581ebf350e2baa09cab5c3fbed204672",
-        "kernel/fs/mount.v": "438018c91402eaf04bdf8abd47d5a2c0bf3373071fd68d1e61f53c20edf3b361",
+        "kernel/fs/mount.v": "033ef55a69c4a4a94336b485912793f18af6a83f10db68bc7f2b10a9631a50e1",
         "kernel/fs/mount_policy.v": "1772561c079559e768610cd7ef988a195c2aefdbb71679b036714ecf046be82c",
         "kernel/fs/procfs.v": "b924f6eee11e596e4abdeaf1816421ed0c2964956f9a75b1c34a3d60fe6ccb86",
         "kernel/fs/tmpfs.v": "99a10d885597ccb745530e639685f282703332667066a28dd79f18195ec3e010",

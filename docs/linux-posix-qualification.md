@@ -5883,3 +5883,109 @@ three broad section 15 acceptance gates remain open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-14/rrabi-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-14/rrabi-after-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/rrabi-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-14/rrabi-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-14/rrabi-after-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/rrabi-reference-x86_64-receipt.json).
 - [Maintained V audit](../tests/linux-compat/rrabi-check.v), [verdict](../tests/linux-compat/results/2026-10-14/rrabi-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-14/rrabi-lifetime-review.md).
+
+## Native scheduling-attribute query prefixes and errors
+
+`sched_getattr` now decodes the native signed32 `pid_t`, validates null output,
+negative PID, flags and the 48..PAGE_SIZE request bounds before lookup, and
+copies exactly `min(request_size, 56)` bytes. Thus a 53-byte request receives
+53 bytes and a reported size of 53; its remaining buffer stays untouched.
+Requests above the native page size return `EINVAL`, rather than succeeding
+with a fixed-size copy. Missing/reaped tasks return `ESRCH` before output
+faults. The full advertised range must fit the user address half, including
+when the actual known prefix is shorter. Existing parameter value copies,
+PID-table locks, metadata construction and user-copy helpers are unchanged.
+Linux specifies this query and copy order in its
+[scheduler implementation](https://github.com/torvalds/linux/blob/v6.12/kernel/sched/syscalls.c).
+
+The `attrquery` V probe runs separate root and UID/GID1000 children. Each
+installs RR priority1 while privileged, queries it after any credential
+drop, switches to BATCH for six controls, then restores OTHER before the
+main error matrix. It uses the real musl `syscall` function; this does not
+qualify a dedicated glibc or musl scheduling-attribute wrapper. Observed
+policy, priority, ordinary nice, flags, deadline fields and returned byte
+prefixes are checked. Native fair runtime stays at its existing zero value;
+Linux fair slice and clamp defaults depend on its configuration and are
+validated separately from native constants.
+
+Six targets include implicit/explicit self, two negative signed32 values,
+a guaranteed absent positive PID and a fully reaped child. Sixteen sizes
+cover zero, undersized values, every prefix from 48 through 57 bytes, the
+native page size, one byte above it and UINT32_MAX. Ten output forms include
+aligned/unaligned buffers, an exactly page-ending prefix, null/address1,
+read-only and inaccessible pages, two page-crossing faults and a full-width
+invalid pointer. Flags0/1 distinguish valid requests from reserved flags.
+Canonical words, two upper-PID patterns and separate upper size/flag words
+exercise signed32 PID and unsigned32 request arguments without narrowing
+output pointers. Prefix guards and read-only bytes stay unchanged. A valid
+task's cross-page fault may write its accessible prefix; input/target errors
+must leave even that prefix untouched.
+
+Each cohort records 1,920 ordinary-word, 3,840 upper-PID and 1,920 upper
+size/flag controls, plus ten RR queries, six BATCH queries, four user-range
+controls and three final state/guard checks. This totals 15,400 query calls
+and six final controls across both cohorts.
+
+| Architecture | Checks | Original failures | Corrected failures | Same-ELF Linux failures |
+| --- | --- | --- | --- | --- |
+| AArch64 | 15,406 | 3,040 | 0 | 0 |
+| x86-64 | 15,406 | 3,040 | 0 | 0 |
+
+Both original kernels have the same per-cohort failure vector
+`210/1092/210/8`, including short-prefix, null/size, PID-word and full-range
+errors. Corrected kernels and actual Linux 6.12.51 execute identical final
+architecture-specific probe ELFs and pass every row. Preview, preflight and
+both final native phases have byte-identical C. Native request caps reflect
+16 KiB AArch64 and 4 KiB x86 pages; both supplied Linux references use 4 KiB.
+
+Boundary controls map the highest usable page with MAP_FIXED_NOREPLACE,
+verify the returned address exactly, and unmap it before storage measurement.
+A 56-byte prefix fits at its end; advertising 57 bytes or a full page must
+return `EFAULT` without writing that prefix. A missing task still returns
+`ESRCH` before checking this range. Vinix selects user limits of `2^47` ARM
+and `2^56` x86 in these captures. Linux selects `2^48` ARM and `2^47 - 4096`
+x86. Linux x86's
+[TASK_SIZE_MAX definition](https://github.com/torvalds/linux/blob/v6.12/arch/x86/include/asm/page_64_types.h)
+reserves its top page; treating the limit as an unadjusted power of two
+caused the first x86 reference to fail boundary setup with `ENOMEM`. Its
+receipt, complete serial and aggregate log remain preparation evidence.
+The corresponding initial ARM reference passes, but final qualification
+uses fresh captures and identical final probe ELFs on both architectures.
+Earlier preflight C/ELFs, before exact mapping verification and the reserved
+page fallback, remain pinned separately. A setup failure supplies no complete
+semantic verdict.
+
+After 32 warmups, both corrected credential cohorts repeat 200 cycles of
+53-byte queries, upper PID words, negative/missing-task precedence, null
+output, oversized requests and observed state. All 18 ARM and 14 x86 slab
+classes stay flat, with large pages 63/63 ARM and 160/160 x86. The observer FD
+closes on every nonfatal path, and the three-page guard mapping remains
+owned through all checks before being unmapped. Final probe C has eleven
+allocas and no heap, dynamic-array or index helpers.
+
+Four fresh original/corrected production builds use isolated worktrees at
+`8175c29c1559cad97f58820770d6e88c5befaa38`. Complete generated C differs only
+in this getter prototype/body: signed32/input guards, exact prefix length
+and the full-range predicate. All other getter work, scheduler setters,
+queues, locks, allocator and copy helpers are unchanged. Both six-case
+profiles (attrquery/runtime/schedabi/rrabi/open/fcntlabi), eight host test
+files and frozen 64-input inventories pass. Allocation scans retain the
+same 398 ARM/290 x86 sites and existing allowance failures; whole-kernel
+allocation approval is not claimed. A V watchdog retires only completed
+unbound boot staging while rechecking every retained probe input hash.
+
+The maintained audit binds compiler/source/C/ELF/kernel/ISO/capture inputs,
+actual reference receipts, exact counts and ranges, flat storage, preparation
+artifacts and independent lifetime review. Its false assertion and
+passing-reference-as-baseline controls execute without `-prod` and require
+exit 1. Review checks genuine stack values, synchronous borrows, both mapping
+lifetimes, observer cleanup, child reaping and the exact 64-byte result pipe.
+
+Setter semantics, nondefault nice/reset/clamp/deadline state, peer permissions,
+races, namespaces/pledge, glibc and translated/ELF32 paths remain separate.
+The AArch64 multi-CPU QoS blocker and the three broad section 15 acceptance
+gates remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-14/attrquery-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-14/attrquery-after-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/attrquery-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-14/attrquery-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-14/attrquery-after-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/attrquery-reference-x86_64-receipt.json).
+- [Maintained V audit](../tests/linux-compat/attrquery-check.v), [verdict](../tests/linux-compat/results/2026-10-14/attrquery-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-14/attrquery-lifetime-review.md).
