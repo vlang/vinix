@@ -1229,3 +1229,21 @@ Two 200-cycle cohorts measure alias/update/refusal cleanup with a live worker.
 Both baselines fail 1,290 controls; candidate Vinix and actual same-ELF Linux
 6.12.51 pass. Earlier join-timing and cached-path setup failures are preserved.
 See [receipts and limits](../../docs/linux-posix-qualification.md#native-fcntl-owner-task-kinds-and-namespaces).
+
+The `proctask` case qualifies cached procfs task lookup with 3,384 native
+controls per architecture as root and UID/GID1000 in initial/one-level PID
+namespaces. Three mounts, self/numeric parents, stat/status/directory leaves
+and five libc/raw open/openat forms include high words and original/dup/CLOEXEC
+parent handles. Joined workers return ESRCH to independent tgkill signal-zero
+queries before removal checks, without procfs polling; paths return ENOENT while main
+and surviving sibling paths remain visible. An unrelated child belongs to its
+own task directory; WNOWAIT zombie paths remain until reap. Retained stat and
+directory aliases preserve dev/ino/mode and descriptor flags. Both baselines
+fail 792 controls; candidates and actual same-ELF Linux 6.12.51 pass. Four
+200-cycle cohorts keep lookup/alias cleanup storage flat. Task/mount churn,
+tree reclamation, number reuse and exact concurrent detach remain unqualified.
+Run `tests/linux-compat/run` with `--arch ARCH --kernel-dir DIR --state-dir FRESH`
+and `--cases proctask,ownerquery,procself,open,runtime`; use
+`tests/linux-compat/proctask-reference.v` with `--kernel`, `--init`, `--arch`
+and a fresh `--state-dir` to run the identical probe on Linux. See
+[receipts and limits](../../docs/linux-posix-qualification.md#cached-procfs-task-path-invalidation).

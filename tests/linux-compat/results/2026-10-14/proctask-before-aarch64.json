@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "be799802210ab42c59c3c26a2091576a682f60dd5c003d427d393585fdd271f8",
+    "results": [
+        {
+            "name": "proctask",
+            "source_sha256": "f94e62701cdbb1e16594a22947f73aa29f5a7633cd51a8870b12ae09ba5b80a0",
+            "init_sha256": "194594c91cd191769556b0bc2be9918a57a5cf6ddfc7055fd9f01b1ec29856da",
+            "iso_sha256": "7e706214e19a24bad05ef626c52d62f70ffb72659cbda314a457569e70c63c5f",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

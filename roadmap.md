@@ -830,6 +830,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   storage on both architectures. See
   [the getter receipts](docs/linux-posix-qualification.md#native-fcntl-owner-task-kinds-and-namespaces).
 
+- [x] Invalidate selected cached procfs task paths after thread removal/reaping;
+  qualify live siblings, zombie leaders, aliases, one-level PID views and flat
+  repeated lookup storage on both architectures. See
+  [the task-path receipts](docs/linux-posix-qualification.md#cached-procfs-task-path-invalidation).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

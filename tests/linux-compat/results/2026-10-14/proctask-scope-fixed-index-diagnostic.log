@@ -1,0 +1,3 @@
+Independent proctask source lifetime checks: PASS
+/Users/alex/.cache/vinix-linux-compat/proctask-20261014/independent-review.v:70: FAIL: fn main.check_scope: assert !body.contains(forbidden)
+V panic: Assertion failed...

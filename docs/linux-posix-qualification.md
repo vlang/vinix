@@ -4949,3 +4949,91 @@ identity. PID recycling, exact exit/update races, SIGIO/queued notifications,
 restrictive ownership/security policy, deeper PID namespaces, cached task-path
 invalidation and GNU/translated/ELF32 paths remain unqualified. The three broad
 section 15 acceptance gates stay open.
+
+## Cached procfs task-path invalidation
+
+Cached `/proc/PID/task/TID` entries now consult the registered process/thread
+tables before resolving an existing child. A removed non-main thread or reaped
+main task returns ENOENT through stat, status and directory paths. The selected
+task is checked individually: a bulk try-locked thread-list snapshot can omit
+live siblings while its lock is busy. Registered main tasks remain reachable
+through zombie lifetime, and non-main tasks must belong to the selected process.
+
+The `proctask` native musl fixture runs four cohorts per architecture: root and
+UID/GID1000, each in the initial and a one-level PID namespace. Three proc
+mounts, self/numeric parent paths and five libc/raw open/openat forms cover
+native high argument words and original/dup/CLOEXEC task-directory handles.
+Every completed cohort reports the following independent controls twice, from
+its own CASES rows and the supervisor's pipe-transferred FINAL rows.
+
+| Controls per cohort | Calls | Baseline failures |
+| --- | ---: | ---: |
+| Main task and two live worker paths | 270 | 0 |
+| Joined worker paths after observed tgkill ESRCH | 180 | 180 |
+| Main and surviving sibling paths | 180 | 0 |
+| Unrelated child absent from parent's task directory, present in its own | 99 | 0 |
+| WNOWAIT zombie main present, then absent after reap | 27 | 18 |
+| Retained parent/worker metadata and descriptor flags | 90 | 0 |
+
+Both baselines fail exactly 792 of 3,384 controls per architecture. Both
+candidates and actual Linux 6.12.51 pass all controls using the same native
+musl ELF bytes. Successful pthread joins are followed by bounded signal-zero
+tgkill observations of ESRCH; positive live controls use the same independent
+syscall. This records the observed signal-zero boundary rather than a universal
+simultaneous PID-table detach barrier. No procfs pathname or directory-list
+polling refreshes the cached entry before the removal controls. The child is
+forked before workers start.
+WNOWAIT records successful exit without reaping; waitpid supplies the separate
+reap boundary. Retained stat and directory descriptions remain usable for
+fstat/F_GETFD through all three aliases; dev/ino/mode are checked, without
+claiming Linux/Vinix detached nlink equivalence. These checks qualify opens
+and retained descriptor metadata; stat/status contents and reads through
+already-open retired files require separate qualification.
+
+The new predicate holds pid_lock, compares process pointers by identity and
+returns only a bool. No thread/process/namespace pointer escapes and no
+allocation is added. The table lock is released before the existing procfs
+unlink/nlink/unref steps under procfs_lock. Their extracted helper retains the
+previous node/resource lifetime even at zero refcount, since path walkers,
+cwd/root users and descriptors can still hold the subtree. There is no new
+reclamation path. Fixture failures after launch terminate with _exit while
+workers still borrow their frame; successful paths join, reap and close all
+aliases before unwinding.
+
+Four warm/settled 200-cycle cohorts per architecture repeatedly query missing
+and live tasks, reopen child paths and create/close parent aliases. All 18 ARM
+and 14 x86 live slab classes remain flat. Large pages stay at 65/65 for initial
+ARM views and 71/71 for namespace views; x86 stays at 164/164 and 175/175.
+These measurements cover repeated lookups of existing trees, not task/mount churn or
+whole-tree reclamation. Four production builds, five candidate guest cases
+(proctask/ownerquery/procself/open/runtime), eight host files and coverage
+checks pass. Allocation inventory remains 659/655 copied source files and
+400 ARM/292 x86 sites with unchanged existing allowance refusals. Complete
+generated C differs only in the lookup, prune function, extracted drop helper
+and new predicate bodies/prototypes.
+The fixture has 21 explicit allocas and no hidden heap/index helpers. The
+assertion-enabled audit executes both deliberately failing controls and binds
+63 frozen kernel inputs plus C/ELF/ISO/captures/builds and independent review.
+
+The original compiler binary baked a shared source directory that disappeared
+during qualification. The exact f6358ec revision was rebuilt in a private
+worktree, with compiler sources and host GC/TCC inputs pinned. Final builds
+and profiles use this self-contained compiler; earlier successful kernels,
+generated C and build logs are retained as diagnostics. Separate preflight
+C/ELF bytes match the executed native probe exactly; whole-C comparison logs
+are empty, without normalization. Completed temporary artifacts have durable
+SHA-verified copies. Runtime evidence freezes parent
+1a9c4c4981cb0f0b2a5b31f08504150410226afe; the public
+inventory is generated separately from the committed publication parent plus
+this fix, excluding other sessions' dirty files.
+
+- [AArch64 receipt](../tests/linux-compat/results/2026-10-14/proctask-after-aarch64.json), [capture](../tests/linux-compat/results/2026-10-14/proctask-after-aarch64-native.log), [Linux reference](../tests/linux-compat/results/2026-10-14/proctask-reference-aarch64.json), [evidence](../tests/linux-compat/results/2026-10-14/proctask-evidence-aarch64.json).
+- [x86-64 receipt](../tests/linux-compat/results/2026-10-14/proctask-after-x86_64.json), [capture](../tests/linux-compat/results/2026-10-14/proctask-after-x86_64-native.log), [Linux reference](../tests/linux-compat/results/2026-10-14/proctask-reference-x86_64.json), [evidence](../tests/linux-compat/results/2026-10-14/proctask-evidence-x86_64.json).
+- [Audit](../tests/linux-compat/results/2026-10-14/proctask-audit.v), [verdict](../tests/linux-compat/results/2026-10-14/proctask-audit.log), [independent review](../tests/linux-compat/results/2026-10-14/proctask-lifetime-review.md); compiler/build/allocation/host and negative-control logs sit beside them.
+
+The earlier ownerquery cached-path diagnostics remain historical captures;
+the selected behavior is qualified here separately. PID/TID reuse, exact
+concurrent detach after a positive check, leader-only exit, general process-root
+cache invalidation, deeper namespaces, retained-tree reclamation/churn and
+GNU/translated/ELF32 paths remain unqualified. The three broad section 15
+acceptance gates stay open.

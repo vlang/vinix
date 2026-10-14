@@ -1,0 +1,8 @@
+{
+    "commit": "f6358ecff9cffbf2d8b03e6a09269aac7707e26c",
+    "context": "Copied binary baked a missing shared root. Rebuilt exact f6358ec sources in a private worktree with the same old binary as bootstrap, explicit module path, and frozen host TCC/GC inputs. Final before/after kernels and profiles are built with the local compiler. Earlier production kernels and C are diagnostics.",
+    "inputs_manifest": "fbcba16306f70092c3b0df0cad3776ab7c3e8be13ef1a4797a07b21f3dd71074",
+    "local_binary": "9e506a9fbd95e2e7c227cc144da023b57a288d0974ea902f1d12270e28bc416b",
+    "old_binary": "f532f1b78b7f6f385bfa0bff05eb98a714d2355028748b3dfaa7d8e4025eee39",
+    "rebuild_log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

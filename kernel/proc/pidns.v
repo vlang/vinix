@@ -249,6 +249,20 @@ pub fn pid_owner_number(global int, kind int) int {
 	return 0
 }
 
+// Procfs nodes keep kernel numbers. Validate a cached task without borrowing
+// its thread or using the process's transient thread-list snapshot. The main
+// task's process identity stays registered through zombie lifetime.
+pub fn task_attached(pid int, tid int) bool {
+	if pid <= 0 || pid >= max_pid || tid <= 0 || tid >= max_pid { return false }
+	pid_lock.acquire()
+	defer { pid_lock.release() }
+	p := processes[pid]
+	if p == unsafe { nil } { return false }
+	if tid == pid { return true }
+	t := threads_by_tid[tid]
+	return t != unsafe { nil } && voidptr(t.process) == voidptr(p)
+}
+
 // The process `viewer` calls `local`, or nil. The caller holds the table lock,
 // as for process_at().
 pub fn process_in(viewer &Namespace, local int) &Process {

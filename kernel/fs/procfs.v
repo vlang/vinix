@@ -1547,13 +1547,26 @@ fn procfs_refresh_named_locked(node &VFSNode, name string) {
 // Called for every name looked up in a procfs directory. The descriptor and
 // namespace directories, and a process' exe, cwd and root links, change under
 // a process that is already listed, so they are brought up to date on each
-// lookup; the rest of the tree only when a name is missing.
+// lookup. A cached task is validated on its own: a bulk thread-list snapshot
+// can temporarily omit live siblings while the list lock is busy.
 fn procfs_lookup_refresh_locked(node &VFSNode, name string) {
 	if unsafe { procfs_root == 0 } || node == unsafe { nil } || node.resource == unsafe { nil }
 		|| node.children == unsafe { nil } || !is_procfs_resource(node.resource) {
 		return
 	}
 	directory := unsafe { &ProcFSResource(node.resource) }
+	if directory.pid != 0 && directory.tid == 0 && node.name == 'task'
+		&& name in node.children {
+		child := unsafe { node.children[name] }
+		if child != unsafe { nil } && is_procfs_resource(child.resource) {
+			task := unsafe { &ProcFSResource(child.resource) }
+			if task.kind == .directory && task.pid == directory.pid && task.tid > 0
+				&& !proc.task_attached(task.pid, task.tid) {
+				drop_procfs_directory(mut unsafe { node }, child)
+			}
+		}
+		return
+	}
 	if directory.pid != 0 && (node.name == 'fd' || node.name == 'ns') {
 		procfs_refresh_named_locked(node, '')
 		return
@@ -2067,9 +2080,9 @@ fn refresh_thread_directories(mut task VFSNode, pid int) {
 	prune_directories(mut task, numbers)
 }
 
-// Drop the directories whose process or thread has gone. A node is only freed
-// when procfs holds the last reference to its resource; one that a descriptor
-// is still open on is unlinked from the tree and left to that descriptor.
+// Drop the directories whose process or thread has gone. Nodes and resources
+// remain retained, even at zero refcount: path walkers, cwd/root users and
+// descriptors may still hold this subtree. Pruning changes namespace reachability.
 //
 // The nodes are gone through by value and known by their own names, which in
 // procfs are their keys: a loop over the keys copies every one, and nothing
@@ -2112,20 +2125,24 @@ fn prune_directories(mut parent VFSNode, live []int) {
 	}
 
 	for stale_node in stale {
-		mut node := unsafe { stale_node }
-		// A pruned link may still be held by a lookup, and must not lead to a
-		// node that goes when its descriptor does.
-		node.magic_target = unsafe { nil }
-		parent.children.delete(node.name)
-		unsafe {
-			if parent.resource.stat.nlink > 2 {
-				parent.resource.stat.nlink--
-			}
-		}
-		mut node_resource := node.resource
-		if node_resource != unsafe { nil } {
-			node_resource.stat.nlink = 0
-			node_resource.unref(unsafe { nil }) or {}
-		}
+		drop_procfs_directory(mut parent, stale_node)
+	}
+}
+
+// Called with procfs_lock held. Keep the existing retained-node lifetime:
+// path walkers, descriptors and cwd/root users can still hold this subtree.
+fn drop_procfs_directory(mut parent VFSNode, child &VFSNode) {
+	mut node := unsafe { child }
+	// A pruned link may still be held by a lookup, and must not lead to a
+	// node that goes when its descriptor does.
+	node.magic_target = unsafe { nil }
+	parent.children.delete(node.name)
+	unsafe {
+		if parent.resource.stat.nlink > 2 { parent.resource.stat.nlink-- }
+	}
+	mut node_resource := node.resource
+	if node_resource != unsafe { nil } {
+		node_resource.stat.nlink = 0
+		node_resource.unref(unsafe { nil }) or {}
 	}
 }

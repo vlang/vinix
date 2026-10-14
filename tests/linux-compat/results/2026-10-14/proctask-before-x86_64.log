@@ -1,0 +1,146 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   211k      0  0:00:01  0:00:01 --:--:--  211k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 23 2880k   23  687k    0     0   645k      0  0:00:04  0:00:01  0:00:03  645k 54 2880k   54 1567k    0     0   752k      0  0:00:03  0:00:02  0:00:01  752k 87 2880k   87 2511k    0     0   810k      0  0:00:03  0:00:03 --:--:--  810k100 2880k  100 2880k    0     0   828k      0  0:00:03  0:00:03 --:--:--  828k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 87 22528   87 19666    0     0  36257      0 --:--:-- --:--:-- --:--:-- 36217100 22528  100 22528    0     0  35406      0 --:--:-- --:--:-- --:--:-- 35365
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   261k      0 --:--:-- --:--:-- --:--:--  262k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0   129k      0 --:--:-- --:--:-- --:--:--  129k
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   325k      0 --:--:-- --:--:-- --:--:--  326k
+==> Building the Limine host installer...
+==> Assembling /Volumes/VinixOwnerQueryScratch/final-proctask-before-x86/proctask/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixOwnerQueryScratch/final-proctask-before-x86/proctask/.vinix-amd64.iso.cGvWR1'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 2784m free
+Added to ISO image: directory '/'='/Volumes/VinixOwnerQueryScratch/final-proctask-before-x86/proctask/iso-build/.iso-staging.bTQJx7/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13612 sectors
+Written to medium : 13612 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixOwnerQueryScratch/final-proctask-before-x86/proctask/.vinix-amd64.iso.cGvWR1' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd4af.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Volumes/VinixOwnerQueryScratch/final-proctask-before-x86/proctask/test.iso (27877376 bytes)
+Guest artifacts: /Volumes/VinixOwnerQueryScratch/final-proctask-before-x86/proctask
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=85920
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000038035400
+initramfs: Done (9 entries)
+LINUX PROCTASK DETAIL: ordinary=1 namespace=0 kind=1 call=1
+LINUX PROCTASK DETAIL: ordinary=1 namespace=0 kind=1 call=2
+LINUX PROCTASK DETAIL: ordinary=1 namespace=0 kind=1 call=3
+LINUX PROCTASK DETAIL: ordinary=1 namespace=0 kind=4 call=10
+LINUX PROCTASK DETAIL: ordinary=1 namespace=0 kind=4 call=11
+LINUX PROCTASK DETAIL: ordinary=1 namespace=0 kind=4 call=12
+LINUX PROCTASK CASES: ordinary=1 namespace=0 kind=0 calls=270 failures=0
+LINUX PROCTASK CASES: ordinary=1 namespace=0 kind=1 calls=180 failures=180
+LINUX PROCTASK CASES: ordinary=1 namespace=0 kind=2 calls=180 failures=0
+LINUX PROCTASK CASES: ordinary=1 namespace=0 kind=3 calls=99 failures=0
+LINUX PROCTASK CASES: ordinary=1 namespace=0 kind=4 calls=27 failures=18
+LINUX PROCTASK CASES: ordinary=1 namespace=0 kind=5 calls=90 failures=0
+LINUX PROCTASK FINAL: ordinary=1 namespace=0 kind=0 calls=270 failures=0
+LINUX PROCTASK FINAL: ordinary=1 namespace=0 kind=1 calls=180 failures=180
+LINUX PROCTASK FINAL: ordinary=1 namespace=0 kind=2 calls=180 failures=0
+LINUX PROCTASK FINAL: ordinary=1 namespace=0 kind=3 calls=99 failures=0
+LINUX PROCTASK FINAL: ordinary=1 namespace=0 kind=4 calls=27 failures=18
+LINUX PROCTASK FINAL: ordinary=1 namespace=0 kind=5 calls=90 failures=0
+LINUX PROCTASK DETAIL: ordinary=0 namespace=0 kind=1 call=1
+LINUX PROCTASK DETAIL: ordinary=0 namespace=0 kind=1 call=2
+LINUX PROCTASK DETAIL: ordinary=0 namespace=0 kind=1 call=3
+LINUX PROCTASK DETAIL: ordinary=0 namespace=0 kind=4 call=10
+LINUX PROCTASK DETAIL: ordinary=0 namespace=0 kind=4 call=11
+LINUX PROCTASK DETAIL: ordinary=0 namespace=0 kind=4 call=12
+LINUX PROCTASK CASES: ordinary=0 namespace=0 kind=0 calls=270 failures=0
+LINUX PROCTASK CASES: ordinary=0 namespace=0 kind=1 calls=180 failures=180
+LINUX PROCTASK CASES: ordinary=0 namespace=0 kind=2 calls=180 failures=0
+LINUX PROCTASK CASES: ordinary=0 namespace=0 kind=3 calls=99 failures=0
+LINUX PROCTASK CASES: ordinary=0 namespace=0 kind=4 calls=27 failures=18
+LINUX PROCTASK CASES: ordinary=0 namespace=0 kind=5 calls=90 failures=0
+LINUX PROCTASK FINAL: ordinary=0 namespace=0 kind=0 calls=270 failures=0
+LINUX PROCTASK FINAL: ordinary=0 namespace=0 kind=1 calls=180 failures=180
+LINUX PROCTASK FINAL: ordinary=0 namespace=0 kind=2 calls=180 failures=0
+LINUX PROCTASK FINAL: ordinary=0 namespace=0 kind=3 calls=99 failures=0
+LINUX PROCTASK FINAL: ordinary=0 namespace=0 kind=4 calls=27 failures=18
+LINUX PROCTASK FINAL: ordinary=0 namespace=0 kind=5 calls=90 failures=0
+LINUX PROCTASK DETAIL: ordinary=1 namespace=1 kind=1 call=1
+LINUX PROCTASK DETAIL: ordinary=1 namespace=1 kind=1 call=2
+LINUX PROCTASK DETAIL: ordinary=1 namespace=1 kind=1 call=3
+LINUX PROCTASK DETAIL: ordinary=1 namespace=1 kind=4 call=10
+LINUX PROCTASK DETAIL: ordinary=1 namespace=1 kind=4 call=11
+LINUX PROCTASK DETAIL: ordinary=1 namespace=1 kind=4 call=12
+LINUX PROCTASK CASES: ordinary=1 namespace=1 kind=0 calls=270 failures=0
+LINUX PROCTASK CASES: ordinary=1 namespace=1 kind=1 calls=180 failures=180
+LINUX PROCTASK CASES: ordinary=1 namespace=1 kind=2 calls=180 failures=0
+LINUX PROCTASK CASES: ordinary=1 namespace=1 kind=3 calls=99 failures=0
+LINUX PROCTASK CASES: ordinary=1 namespace=1 kind=4 calls=27 failures=18
+LINUX PROCTASK CASES: ordinary=1 namespace=1 kind=5 calls=90 failures=0
+LINUX PROCTASK FINAL: ordinary=1 namespace=1 kind=0 calls=270 failures=0
+LINUX PROCTASK FINAL: ordinary=1 namespace=1 kind=1 calls=180 failures=180
+LINUX PROCTASK FINAL: ordinary=1 namespace=1 kind=2 calls=180 failures=0
+LINUX PROCTASK FINAL: ordinary=1 namespace=1 kind=3 calls=99 failures=0
+LINUX PROCTASK FINAL: ordinary=1 namespace=1 kind=4 calls=27 failures=18
+LINUX PROCTASK FINAL: ordinary=1 namespace=1 kind=5 calls=90 failures=0
+LINUX PROCTASK DETAIL: ordinary=0 namespace=1 kind=1 call=1
+LINUX PROCTASK DETAIL: ordinary=0 namespace=1 kind=1 call=2
+LINUX PROCTASK DETAIL: ordinary=0 namespace=1 kind=1 call=3
+LINUX PROCTASK DETAIL: ordinary=0 namespace=1 kind=4 call=10
+LINUX PROCTASK DETAIL: ordinary=0 namespace=1 kind=4 call=11
+LINUX PROCTASK DETAIL: ordinary=0 namespace=1 kind=4 call=12
+LINUX PROCTASK CASES: ordinary=0 namespace=1 kind=0 calls=270 failures=0
+LINUX PROCTASK CASES: ordinary=0 namespace=1 kind=1 calls=180 failures=180
+LINUX PROCTASK CASES: ordinary=0 namespace=1 kind=2 calls=180 failures=0
+LINUX PROCTASK CASES: ordinary=0 namespace=1 kind=3 calls=99 failures=0
+LINUX PROCTASK CASES: ordinary=0 namespace=1 kind=4 calls=27 failures=18
+LINUX PROCTASK CASES: ordinary=0 namespace=1 kind=5 calls=90 failures=0
+LINUX PROCTASK FINAL: ordinary=0 namespace=1 kind=0 calls=270 failures=0
+LINUX PROCTASK FINAL: ordinary=0 namespace=1 kind=1 calls=180 failures=180
+LINUX PROCTASK FINAL: ordinary=0 namespace=1 kind=2 calls=180 failures=0
+LINUX PROCTASK FINAL: ordinary=0 namespace=1 kind=3 calls=99 failures=0
+LINUX PROCTASK FINAL: ordinary=0 namespace=1 kind=4 calls=27 failures=18
+LINUX PROCTASK FINAL: ordinary=0 namespace=1 kind=5 calls=90 failures=0
+LINUX PROCTASK FAIL: cached task lookup or retained description
+QEMU: Terminated
+Missing verdicts: ['LINUX PROCTASK: PASS']; failures: ['FAIL:', 'LINUX PROCTASK FAIL']
+Linux compatibility qualification failed; see /Volumes/VinixOwnerQueryScratch/final-proctask-before-x86/receipt.json
