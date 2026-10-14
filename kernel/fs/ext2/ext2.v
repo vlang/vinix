@@ -1357,14 +1357,14 @@ fn init_volume(backing_device &vfs.VFSNode, ext4 bool) (&EXT2Filesystem, bool) {
 	}
 	other := vfs.block_filesystem(if ext4 { 'ext2' } else { 'ext4' }, backing_device)
 	if other != unsafe { nil } {
-		errno.set(errno.ebusy); return 0, false
+		errno.set(errno.ebusy); return unsafe { nil }, false
 	}
 	sector_size := u64(backing_device.resource.stat.blksize)
 	if sector_size == 0 || sector_size > pagecache.page_bytes
 		|| pagecache.page_bytes % sector_size != 0 || backing_device.resource.stat.size < 2048
 		|| u64(backing_device.resource.stat.size) % sector_size != 0 {
 		errno.set(errno.einval)
-		return 0, false
+		return unsafe { nil }, false
 	}
 	reserve_bounce()
 	mut backend := backing_device.resource
@@ -1390,22 +1390,22 @@ fn init_volume(backing_device &vfs.VFSNode, ext4 bool) (&EXT2Filesystem, bool) {
 	// The fixed tail locator is independent of possibly torn home metadata.
 	// Replay must precede even the first superblock/cache read.
 	volume_lock := memory.calloc(sizeof(klock.Lock), 1) @[freed]
-	if volume_lock == unsafe { nil } { return 0, false }
+	if volume_lock == unsafe { nil } { return unsafe { nil }, false }
 	new_filesystem.l = unsafe { &klock.Lock(volume_lock) }
 	if !ext4 {
 		new_filesystem.journal = journal.open(voidptr(new_filesystem), journal_load,
 			journal_store, journal_barrier, journal_publish,
-			u64(backing_device.resource.stat.size), !new_filesystem.read_only) or { return 0, false }
+			u64(backing_device.resource.stat.size), !new_filesystem.read_only) or { return unsafe { nil }, false }
 	}
 	superblock_data := unsafe { &u8(C.vinix_stack_alloc(1024)) }
-	new_filesystem.raw_device_read(superblock_data, 1024, 1024) or { return 0, false }
+	new_filesystem.raw_device_read(superblock_data, 1024, 1024) or { return unsafe { nil }, false }
 	unsafe { C.memcpy(new_filesystem.superblock, superblock_data, sizeof(EXT2Superblock)) }
 	signature := new_filesystem.superblock.signature
 	if (signature != 0xef53 && signature != journaled_signature)
 		|| (signature == journaled_signature) != (new_filesystem.journal != unsafe { nil })
-		|| (ext4 && signature != 0xef53) { errno.set(errno.einval); return 0, false }
+		|| (ext4 && signature != 0xef53) { errno.set(errno.einval); return unsafe { nil }, false }
 	layout := volume_layout(mut new_filesystem.superblock, superblock_data,
-		u64(backing_device.resource.stat.size), ext4) or { return 0, false }
+		u64(backing_device.resource.stat.size), ext4) or { return unsafe { nil }, false }
 	new_filesystem.read_only = new_filesystem.read_only || layout.read_only
 	new_filesystem.block_size = layout.block_bytes
 	new_filesystem.frag_size = layout.block_bytes
@@ -1414,11 +1414,11 @@ fn init_volume(backing_device &vfs.VFSNode, ext4 bool) (&EXT2Filesystem, bool) {
 		new_filesystem.superblock.blocks_per_group)
 	if new_filesystem.journal != unsafe { nil } {
 		if new_filesystem.journal.volume_bytes != u64(new_filesystem.superblock.block_cnt) * layout.block_bytes
-			|| new_filesystem.journal.uuid != new_filesystem.superblock.uuid { return 0, false }
-		new_filesystem.recover_orphans() or { return 0, false }
+			|| new_filesystem.journal.uuid != new_filesystem.superblock.uuid { return unsafe { nil }, false }
+		new_filesystem.recover_orphans() or { return unsafe { nil }, false }
 	}
 	if !register_mapped_writeback()
-		|| !new_filesystem.register_volume_cache() { return 0, false }
+		|| !new_filesystem.register_volume_cache() { return unsafe { nil }, false }
 	vfs.register_block_filesystem(kind, backing_device, new_filesystem.as_filesystem(),
 		new_filesystem.block_identity())
 	ready = true
