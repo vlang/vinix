@@ -118,8 +118,17 @@ fn syscall_linux_sched_getscheduler(_ voidptr, pid int) (u64, u64) {
 }
 
 fn syscall_linux_sched_setscheduler(_ voidptr, pid int, policy int, param u64) (u64, u64) {
+	// Linux validates scalar/null arguments and imports sched_param before
+	// looking up the thread. An invalid input must not be masked by ESRCH.
+	if policy < 0 || pid < 0 || param == 0 {
+		return errno.err, errno.einval
+	}
+	mut priority32 := i32(0)
+	if !usercopy.copy_from_user(voidptr(&priority32), param, sizeof(i32)) {
+		return errno.err, errno.efault
+	}
+	priority := int(priority32)
 	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
-
 	reset_on_fork := policy & proc.sched_reset_on_fork != 0
 	wanted := policy & ~proc.sched_reset_on_fork
 
@@ -128,15 +137,6 @@ fn syscall_linux_sched_setscheduler(_ voidptr, pid int, policy int, param u64) (
 	if wanted == proc.sched_deadline {
 		return errno.err, errno.einval
 	}
-
-	if param == 0 {
-		return errno.err, errno.efault
-	}
-	mut priority32 := i32(0)
-	if !usercopy.copy_from_user(voidptr(&priority32), param, sizeof(i32)) {
-		return errno.err, errno.efault
-	}
-	priority := int(priority32)
 
 	checked := validate_sched_priority(wanted, priority) or { return errno.err, errno.einval }
 	if !may_set_sched_params(tid, wanted, checked) {
@@ -156,8 +156,8 @@ fn syscall_linux_sched_setscheduler(_ voidptr, pid int, policy int, param u64) (
 // sched_getparam/sched_setparam: the priority on its own, leaving the policy
 // where it is.
 fn syscall_linux_sched_getparam(_ voidptr, pid int, param u64) (u64, u64) {
-	if param == 0 {
-		return errno.err, errno.efault
+	if pid < 0 || param == 0 {
+		return errno.err, errno.einval
 	}
 	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
 	params := proc.thread_sched_params(tid) or { return errno.err, errno.get() }
@@ -170,17 +170,16 @@ fn syscall_linux_sched_getparam(_ voidptr, pid int, param u64) (u64, u64) {
 }
 
 fn syscall_linux_sched_setparam(_ voidptr, pid int, param u64) (u64, u64) {
-	if param == 0 {
+	if pid < 0 || param == 0 {
 		return errno.err, errno.einval
 	}
-	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
-	mut params := proc.thread_sched_params(tid) or { return errno.err, errno.get() }
-
 	mut priority32 := i32(0)
 	if !usercopy.copy_from_user(voidptr(&priority32), param, sizeof(i32)) {
 		return errno.err, errno.efault
 	}
 	priority := int(priority32)
+	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
+	mut params := proc.thread_sched_params(tid) or { return errno.err, errno.get() }
 
 	// A deadline thread's parameters have to be checked against each other and
 	// against the machine, which is sched_setattr(2)'s job and not this call's.
