@@ -1,0 +1,2 @@
+arm: full C differs only in setter prototype/body and two allocation-free synchronous import helpers; existing scheduling/permission/lifetime code unchanged
+x86: full C differs only in setter prototype/body and two allocation-free synchronous import helpers; existing scheduling/permission/lifetime code unchanged

@@ -1,0 +1,3 @@
+tests/linux-compat/attrimport-check.v:109: FAIL: fn main.failure: assert log.contains('LINUX ATTRIMPORT DETAIL:'), 'attrimport baseline failure markers required';
+      message: attrimport baseline failure markers required
+V panic: Assertion failed...

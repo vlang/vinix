@@ -895,6 +895,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   on both architectures and identical-ELF Linux; publish reference setup limits.
   See [the attribute-query receipts](docs/linux-posix-qualification.md#native-scheduling-attribute-query-prefixes-and-errors).
 
+- [x] Match native scheduling-attribute input layouts, PID words and real errors,
+  including size-zero compatibility, exact short imports, zero extensions and
+  best-effort E2BIG size writebacks. Qualify root/UID1000 state, guarded inputs
+  and flat storage on both architectures and identical-ELF Linux; retain setup
+  and oracle failures separately. See [the import receipts](docs/linux-posix-qualification.md#native-scheduling-attribute-import-contract).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

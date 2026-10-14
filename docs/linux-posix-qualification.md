@@ -5989,3 +5989,101 @@ gates remain open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-14/attrquery-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-14/attrquery-after-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/attrquery-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-14/attrquery-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-14/attrquery-after-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/attrquery-reference-x86_64-receipt.json).
 - [Maintained V audit](../tests/linux-compat/attrquery-check.v), [verdict](../tests/linux-compat/results/2026-10-14/attrquery-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-14/attrquery-lifetime-review.md).
+
+## Native scheduling-attribute import contract
+
+`sched_setattr` now narrows native PIDs to signed32 and returns `EINVAL` for
+negative PIDs, null input or reserved syscall flags before accessing input.
+It imports attributes before resolving the target. Zero size means the
+original 48-byte layout; other sizes below 48 or above the native page limit
+return `E2BIG`, with a best-effort writeback of the supported 56-byte size.
+Read-only writeback failures retain `E2BIG`, matching Linux's documented
+[scheduler copy implementation](https://github.com/torvalds/linux/blob/v6.12/kernel/sched/syscalls.c).
+
+Short layouts copy exactly their advertised bytes into a zero-initialized
+stack value. Larger layouts must contain only zero bytes after byte 56.
+The extension is checked first, using aligned 64-bit reads and masks for
+the first/last word, as in Linux's
+[copy_struct_from_user](https://github.com/torvalds/linux/blob/v6.12/include/linux/uaccess.h)
+and [check_zeroed_user](https://github.com/torvalds/linux/blob/v6.12/lib/usercopy.c).
+An early nonzero extension returns `E2BIG` before a later inaccessible word;
+an unreadable zero extension returns `EFAULT`. Negative policy values and
+clamp flags in layouts shorter than 56 return `EINVAL` before target lookup.
+Other existing scheduling validation and mutations retain their prior order.
+
+The `attrimport` V fixture runs separate root and UID/GID1000 children. Six
+PID classes cover implicit/explicit self, two signed32 negatives, an absent
+positive PID and a fully reaped child. Sixteen sizes cover zero, undersized
+values, every length 48..57, PAGE_SIZE, PAGE_SIZE+1 and UINT32_MAX. Twelve
+input forms include aligned/unaligned writable storage, read-only storage,
+null/address1, inaccessible/full-width invalid pointers, exact and partial
+page-ending inputs, nonzero extensions and a nonzero word before a later
+inaccessible page. Reserved syscall flags and three upper-word forms qualify
+signed32 PID and unsigned32 flag handling without narrowing pointers.
+
+Each call checks its actual errno, BATCH/OTHER policy and priority, retained
+known input bytes and the preceding guard. Only writable `E2BIG` inputs may
+change their four-byte size; successful imports retain their original header,
+including size zero. Extension guards stay unchanged. Successful calls make
+real BATCH transitions, which the unchanged legacy setter restores to OTHER.
+Thirty-six extra controls per cohort check negative policies, short clamp
+layouts and unknown attribute flags across target/upper-word forms; three
+final controls check restored state and guards.
+
+| Architecture | Checks | Original failures | Corrected failures | Same-ELF Linux failures |
+| --- | --- | --- | --- | --- |
+| AArch64 | 18,510 | 5,324 | 0 | 0 |
+| x86-64 | 18,510 | 5,324 | 0 | 0 |
+
+Counts per cohort are `2304/4608/2304/39`; original failures are
+`414/1814/414/20`. Both original and corrected kernels and actual Linux
+6.12.51 use identical final architecture-specific probe ELFs. Native size
+caps follow 16 KiB ARM and 4 KiB x86 pages; Linux references use 4 KiB pages.
+This uses real musl `syscall`, with no dedicated libc wrapper claim.
+
+Both corrected cohorts run 32 warmups followed by 200 import/error/state
+cycles, with thirteen-second settling intervals around storage snapshots.
+All 18 ARM and 14 x86 slab classes and large-page totals stay exactly flat.
+The observer FD closes on every nonfatal path. A four-page mapping owns
+guarded inputs through the matrix and observation; only three pages are
+accessed, and the entire mapping is unmapped before reporting. Final probe
+C has nine explicit allocas and no heap, dynamic-array or index helpers.
+
+Four fresh production builds use isolated worktrees at
+`9e884558a291c38cbf550fc85a90052ecdb04e80`. Full generated C differs only in
+the setter and the two synchronous scalar import helpers, including their
+prototypes. The existing mutation tail matches exactly after removing the
+relocated clamp-size guard and normalizing the compiler's two scratch names
+for the existing deadline division. Scheduler queues, permissions, locks,
+allocator, user-copy helpers and the preceding getter fix are unchanged.
+Both seven-case profiles (attrimport/runtime/schedabi/rrabi/attrquery/open/
+fcntlabi), eight host files and four frozen inventory checks pass. Allocation
+scans retain identical 398 ARM/290 x86 sites and existing allowance refusals;
+whole-kernel allocation approval is not claimed.
+
+The first fresh builds failed when concurrent host use exhausted disk space,
+including missing generated symlinks. Their full logs remain preparation;
+fresh builds after space recovered provide the actual kernels. Initial
+Linux references then exposed a fixture expectation error: a PAGE_SIZE input
+starting eight bytes into the read-only page reaches the following PROT_NONE
+page, so `EFAULT` precedes lookup. Those receipts record 32 failed controls
+per architecture. Their native/preflight C and ELFs and full reference logs
+are retained separately. The corrected oracle supplies fresh native and
+Linux captures; failed preparation supplies no passing semantic verdict.
+
+The maintained V auditor binds compiler/source/C/ELF/kernel/ISO and reference
+inputs, complete counts, storage, preparation and independent lifetime review.
+Its false assertion and passing-reference-as-baseline controls execute without
+`-prod` and require exit 1. Independent review also checks alignment masks,
+synchronous stack borrows, guarded mappings, child reaping and descriptor
+cleanup. A bounded watchdog retires completed unbound boot staging while
+rehashing every retained input.
+
+Nice-value clamping, complete attribute flags/clamps/classes/runtime behavior,
+peer permissions, capabilities/RLIMITs, races, namespaces/pledge, glibc and
+translated/ELF32 paths remain separate. The existing ARM multi-CPU QoS blocker
+and the three broad section 15 acceptance gates stay open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-14/attrimport-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-14/attrimport-after-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/attrimport-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-14/attrimport-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-14/attrimport-after-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/attrimport-reference-x86_64-receipt.json).
+- [Maintained V audit](../tests/linux-compat/attrimport-check.v), [verdict](../tests/linux-compat/results/2026-10-14/attrimport-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-14/attrimport-lifetime-review.md).

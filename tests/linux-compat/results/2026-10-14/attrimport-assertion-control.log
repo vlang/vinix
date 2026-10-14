@@ -1,0 +1,3 @@
+tests/linux-compat/attrimport-check.v:183: FAIL: fn main.main: assert false,'attrimport assertions must execute';
+      message: attrimport assertions must execute
+V panic: Assertion failed...

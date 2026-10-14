@@ -1452,3 +1452,20 @@ controls. [The report](../../docs/linux-posix-qualification.md#native-scheduling
 publishes the initial x86 reserved-top-page setup failure, final receipts,
 storage measurements and independent lifetime review. Setter semantics,
 other state/permission/race controls, GNU/foreign paths and broad gates remain open.
+
+The `attrimport` case qualifies the native `sched_setattr` input contract:
+signed32 PIDs, entry errors, zero-size compatibility, exact short imports,
+page bounds, best-effort size writebacks and zero-only extensions. Root and
+UID1000 cohorts combine six targets, sixteen sizes, twelve input forms,
+flags and upper words, plus negative policy/short clamp/unknown flag controls:
+18,510 checks per architecture. BATCH/OTHER state and input guards are checked
+after every call. Original kernels fail 5,324; corrected kernels and identical
+ELFs on Linux 6.12.51 pass. Both 200-cycle cohorts retain flat storage.
+Run `--cases attrimport,runtime,schedabi,rrabi,attrquery,open,fcntlabi` with
+a fresh state directory. `attrimport-reference.v` accepts the same arguments
+as the preceding reference controller; compile `attrimport-check.v` without
+`-prod` and pass the retained evidence directory. [The report](../../docs/linux-posix-qualification.md#native-scheduling-attribute-import-contract)
+publishes the initial disk-full builds and corrected read-only page-crossing
+oracle as preparation, final receipts and independent lifetime review.
+Nice clamping, full scheduling flags/classes/permissions and GNU/foreign
+paths remain separate; the three broad compatibility gates stay open.

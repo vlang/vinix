@@ -269,28 +269,68 @@ const sched_attr_v0_size = u32(48)
 // for the kernel itself.
 const deadline_bandwidth_budget_ppm = u64(950000)
 
-fn syscall_linux_sched_setattr(_ voidptr, pid int, attr_ptr u64, flags u32) (u64, u64) {
-	if flags != 0 {
+// Linux reports the supported size even if this best-effort writeback faults.
+fn sched_attr_size_error(address u64) (u64, u64) {
+	mut known_size := u32(sizeof(SchedAttr))
+	usercopy.copy_to_user(address, unsafe { voidptr(&known_size) }, sizeof(u32))
+	return errno.err, errno.e2big
+}
+
+// Read aligned words, masking bytes outside the extension, just as Linux's
+// check_zeroed_user does. A nonzero word precedes a fault in a later word.
+fn sched_attr_tail_error(address u64, length u64) u64 {
+	if length == 0 { return 0 }
+	mut skip := address & 7
+	mut position := address - skip
+	mut remaining := length + skip
+	if !usercopy.user_range(position, remaining) { return errno.efault }
+	for remaining > 0 {
+		mut word := u64(0)
+		if !usercopy.copy_from_user(unsafe { voidptr(&word) }, position, sizeof(u64)) {
+			return errno.efault
+		}
+		if remaining < 8 { word &= (u64(1) << u32(remaining * 8)) - 1 }
+		if skip != 0 { word &= ~((u64(1) << u32(skip * 8)) - 1) }
+		if word != 0 { return errno.e2big }
+		if remaining <= 8 { break }
+		remaining -= 8
+		position += 8
+		skip = 0
+	}
+	return 0
+}
+
+fn syscall_linux_sched_setattr(_ voidptr, raw_pid int, attr_ptr u64, flags u32) (u64, u64) {
+	pid := int(i32(u32(raw_pid)))
+	if attr_ptr == 0 || pid < 0 || flags != 0 {
 		return errno.err, errno.einval
 	}
-	if attr_ptr == 0 {
-		return errno.err, errno.efault
-	}
-	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
 
 	mut size := u32(0)
 	if !usercopy.copy_from_user(voidptr(&size), attr_ptr, sizeof(u32)) {
 		return errno.err, errno.efault
 	}
-	if size < sched_attr_v0_size {
-		return errno.err, errno.einval
+	if size == 0 { size = sched_attr_v0_size }
+	if size < sched_attr_v0_size || u64(size) > memory.page_size {
+		return sched_attr_size_error(attr_ptr)
 	}
 
 	mut attr := SchedAttr{}
-	copy_size := if size >= sizeof(SchedAttr) { u64(sizeof(SchedAttr)) } else { u64(sched_attr_v0_size) }
+	copy_size := if size >= sizeof(SchedAttr) { u64(sizeof(SchedAttr)) } else { u64(size) }
+	if !usercopy.user_range(attr_ptr, u64(size)) { return errno.err, errno.efault }
+	if u64(size) > copy_size {
+		tail_error := sched_attr_tail_error(attr_ptr + copy_size, u64(size) - copy_size)
+		if tail_error == errno.e2big { return sched_attr_size_error(attr_ptr) }
+		if tail_error != 0 { return errno.err, tail_error }
+	}
 	if !usercopy.copy_from_user(voidptr(&attr), attr_ptr, copy_size) {
 		return errno.err, errno.efault
 	}
+	util_flags := attr.sched_flags & (sched_flag_util_min | sched_flag_util_max)
+	if int(i32(attr.sched_policy)) < 0 || (util_flags != 0 && size < sizeof(SchedAttr)) {
+		return errno.err, errno.einval
+	}
+	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
 	if attr.sched_flags & ~(sched_flag_reset_on_fork | sched_flag_util_min | sched_flag_util_max) != 0 {
 		return errno.err, errno.einval
 	}
@@ -304,8 +344,6 @@ fn syscall_linux_sched_setattr(_ voidptr, pid int, attr_ptr u64, flags u32) (u64
 	old := proc.thread_sched_params(tid) or { return errno.err, errno.get() }
 	params.util_min = old.util_min
 	params.util_max = old.util_max
-	util_flags := attr.sched_flags & (sched_flag_util_min | sched_flag_util_max)
-	if util_flags != 0 && size < sizeof(SchedAttr) { return errno.err, errno.einval }
 	if attr.sched_flags & sched_flag_util_min != 0 {
 		params.util_min = if attr.sched_util_min == u32(-1) { u32(0) } else { attr.sched_util_min }
 	}

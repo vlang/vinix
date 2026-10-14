@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "e40c9603b56fe78caf54fbe2b5489a9780a5c5ea8807139aa96f857cb6a3d657",
+    "results": [
+        {
+            "name": "attrimport",
+            "source_sha256": "ea50d5decd874adb05f39d61b06e650f4163647c3fb7df84795333d55d1d62aa",
+            "init_sha256": "4805664d48a3609e91df4d388b3d2caed44459b9496d450b0f93e96c5d819d1a",
+            "iso_sha256": "33844210e4bac4414fa519f6f867d04248349955271f297eb9640d6a76deac06",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}
