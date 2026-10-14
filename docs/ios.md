@@ -4911,11 +4911,54 @@ are retained under `build/ios/fortnite/set-algebra-checks`. Full iOS regression
 remains unpassed.
 
 Both audits resolve two more required imports, including MarketplaceKitWrapper's
-SetAlgebra initializer dispatch. The actual IPA now exits with status 1 at
+SetAlgebra initializer dispatch. That cohort reached
 `_$ss11_StringGutsV16_foreignCopyUTF84intoSiSgSrys5UInt8VG_tF`, the required
-`_StringGuts._foreignCopyUTF8` import in MarketplaceKitWrapper. Its native
-implementation is recorded for the next change. Fortnite has not entered
-application code and remains unplayable.
+`_StringGuts._foreignCopyUTF8` import in MarketplaceKitWrapper.
+
+Foreign UTF-8 copying now supports registered NSString owners and decoded
+constant strings. Native ARM64 passes destination/count in x0/x1 and borrowed
+guts in x2/x3; Optional<Int> returns its payload in x0 and nil discriminator
+in the low byte of x1. The V implementation validates the span, existing
+foreign discriminator, complete UTF-16 extent and stored UTF-8 before writing.
+It holds the recursive registry borrow through `memmove`, copies exactly the
+payload without a terminator, and adds no allocation, ARC or arena lifetime.
+The caller supplies writable destination storage. Native/inline Swift guts,
+unregistered owners and arbitrary NSString subclass methods remain outside
+this checked foreign subset.
+
+Insufficient capacity returns nil with the destination unchanged; empty
+strings return zero without accessing the destination. Swift's
+[copying contract](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/StringGuts.swift)
+leaves buffer contents unspecified on nil. A measured native deviation is
+retained explicitly: some UTF-16-backed NSStrings treat zero capacity as a
+length query and return a nonzero count without writes, while ASCII-backed
+owners return nil. V consistently applies the capacity check, including zero.
+The fixture records those native query outcomes separately from comparisons
+of successful copying and positive insufficient capacities.
+
+The new fixture passes both ASan/UBSan hash modes and a Vinix ARM64 guest.
+Native measurements cover 285 capacity, unaligned and protected page-edge
+cases, all UTF-8 widths, combining characters, embedded NUL, preserved buffer
+neighbours and unchanged source ownership. V checks also cover decoded UTF-16
+constants, nil/protected empty destinations, malformed spans/flags/counts,
+unknown/protected/dead/wrong-type owners, invalid stored bytes, four concurrent
+readers and two drained lifetimes. Generated host/guest C confirms borrowed
+static checked errors, stack results and no adapter allocation or ARC.
+
+Ten fresh sanitizer runs and five guest suites pass across foreign copying,
+foreign count/subscript, UTF-16 offsets and raw copying. The dedicated public
+`build-swift-foreign-copy` target, full build, regression and Swift guest modes
+include the fixture. Thirteen final generated-C streams and executables,
+native SDK/LLVM measurements, the original zero-capacity assertion trial and
+actual IPA probe/audit evidence are retained under
+`build/ios/fortnite/foreign-copy-checks`. Full iOS regression remains unpassed.
+
+Both audits resolve one more required MarketplaceKitWrapper import. The actual
+IPA now exits with status 1 at `_$ss11_StringGutsVN`, its required `_StringGuts`
+type metadata. Native data measurements show a distinct nominal descriptor
+with matching value-witness entries, size 16 and stride 16 as String; they are
+retained for the next implementation. Fortnite has not entered application
+code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -4924,10 +4967,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,460 | 700 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 143 | 33 | 23 |
-| All images | 2,262 | 736 | 120 |
+| MarketplaceKitWrapper | 144 | 32 | 23 |
+| All images | 2,263 | 735 | 120 |
 
-The C++/GLES/Text variant reports 2,275 resolved imports, 723 unresolved strong
+The C++/GLES/Text variant reports 2,276 resolved imports, 722 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

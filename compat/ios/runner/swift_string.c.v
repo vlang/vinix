@@ -253,6 +253,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_$sSS8UTF8ViewV13_foreignIndex_8offsetBySS0D0VAF_SitF' { u64(unsafe { voidptr(swift_foreign_offset) }) }
 		'_$sSS8UTF8ViewV13_foreignIndex5afterSS0D0VAF_tF' { u64(unsafe { voidptr(swift_foreign_index_after) }) }
 		'_$sSS8UTF8ViewV13_foreignCountSiyF' { u64(unsafe { voidptr(swift_foreign_count) }) }
+		'_$ss11_StringGutsV16_foreignCopyUTF84intoSiSgSrys5UInt8VG_tF' { u64(unsafe { voidptr(swift_foreign_copy) }) }
 		'_$sSS11withCStringyxxSPys4Int8VGKXEKlF' { swift_cstring_entry() }
 		'_$sSS10describingSSx_tclufC' { u64(unsafe { voidptr(swift_string_describing) }) }
 		'_$sS2SycfC' { u64(unsafe { voidptr(swift_string_empty) }) }
