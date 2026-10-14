@@ -1,0 +1,6 @@
+pack: busy workspace refused without publishing
+publish: busy workspace refused without publishing
+release: busy workspace refused without publishing
+All writers recover after lock release with identical legacy/release metadata
+Unsafe workspace aliases and nested/alias-dotdot outputs refuse without changing source or publication
+Publisher workspace qualification passed

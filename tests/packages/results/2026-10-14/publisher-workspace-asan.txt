@@ -1,0 +1,38 @@
+publisher_workspace ASan/UBSan (detect_leaks=0, halt_on_error=1):
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PASS
+pack_source ASan/UBSan (detect_leaks=0, halt_on_error=1):
+PASS
+release ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+PASS

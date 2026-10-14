@@ -1,0 +1,28 @@
+FAIL x86_64 packages-publisher-workspace (67.1s)
+  forbidden "HWTEST FAIL" in the line: HWTEST FAIL packages-publisher-workspace
+  last 23 serial lines:
+  | BdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+  | BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+  | initramfs: Unpacking...
+  | >+ [1] ./ sz=0
+  | >+ [2] ./proc/ sz=0
+  | !>+ [3] ./usr/ sz=0
+  | !>+ [4] ./sbin/ sz=0
+  | !>+ [5] ./etc/ sz=0
+  | !>+ [6] ./sys/ sz=0
+  | !>+ [7] ./root/ sz=0
+  | !>+ [8] ./dev/ sz=0
+  | !>+ [9] ./tmp/ sz=0
+  | !>+ [10] ./etc/hwtest-scenario sz=29
+  | !>+ [11] ./sbin/init sz=210944
+  | !>+ [12] ./usr/share/ sz=0
+  | !>+ [13] ./usr/share/package-fixtures/ sz=0
+  | !>+ [14] ./usr/share/package-fixtures/publisher-workspace-core sz=1200392
+  | !>+ [15] ./.vinix-image-id sz=17
+  | !>initramfs: no ustar sig at 0xff00000037e8ac00
+  | initramfs: Done (15 entries)
+  | HWTEST START packages-publisher-workspace
+  | publisher-workspace-core failed (139)
+  | HWTEST FAIL packages-publisher-workspace
+  logs: /Users/alex/code/vinix/build/pkg-pubws-x86/packages-publisher-workspace
+package-publisher-workspace x86_64: 0 passed, 1 failed, 0 skipped

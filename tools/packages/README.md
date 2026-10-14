@@ -108,6 +108,13 @@ directory work cannot enter a new manifest. Sorted ordinary inputs retain
 canonical metadata. See [source qualification](../../tests/packages/pack-source-check.md)
 for limits, mutation/retry checks and target results.
 
+Packing, legacy index publication and release export now share the publisher
+workspace lock. Busy writers refuse before changing package documents or
+objects, and interrupted owners release their locks automatically. Unsafe
+workspace roots/child directories and hard-linked or replaced locks refuse;
+packing output inside the captured source tree refuses before output creation.
+See [workspace qualification](../../tests/packages/publisher-workspace-check.md).
+
 HTTPS acquisition also captures its regular destination before starting curl.
 Curl supplies bytes through a pipe; the service enforces the size bound before
 writing, preserves retry prefixes and refuses changed destination identities.

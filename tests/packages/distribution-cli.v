@@ -170,7 +170,10 @@ fn qualify_catalog_cli(binary string, work string) ! {
 	assert info.format == 1 && info.directory == workspace && info.architectures == ['aarch64']
 	assert info.package_count == 1 && info.object_count == 1
 	assert info.catalog_sha256 == pkgcore.hash_file(workspace + '/catalog.json')!
-	assert !os.exists(workspace + '/index.json') && !os.exists(workspace + '/.publisher')
+	assert !os.exists(workspace + '/index.json') && !os.exists(workspace + '/.publisher/history.json')
+	assert os.ls(workspace + '/.publisher')! == ['lock']
+	assert os.lstat(workspace + '/.publisher')!.mode & 0o777 == 0o700
+	assert os.lstat(workspace + '/.publisher/lock')!.mode & 0o777 == 0o600
 	assert command(binary, ['pack-catalog', path, roots, workspace])!.code != 0
 	assert command(binary, ['pack-catalog', path, roots])!.code != 0
 	composed_directory := work + '/composed lock; $literal'

@@ -17,14 +17,20 @@ fn pack_with(manifest string, source string, repository string, options PackSour
 	text := read_metadata(manifest)!
 	defer { unsafe { text.free() } }
 	template := decode_manifest(text, false)!
-	os.mkdir_all(repository + '/objects')!
-	mut input := PackSource{ repository: repository, options: options }
+	publisher_outside_source(root, repository)!
+	workspace := publisher_workspace(repository, true)!
+	defer { unsafe { workspace.free() } }
+	guard := publisher_lock(workspace)!
+	defer { guard.release() }
+	options.checkpoint('locked', workspace)!
+	owned_directory(workspace + '/objects', 0o755)!
+	mut input := PackSource{ repository: workspace, options: options }
 	input.walk(root, '', 0)!
 	p := Package{ ...template, files: input.files }
 	p.validate()!
-	os.mkdir_all(repository + '/manifests')!
-	atomic_write(repository + '/manifests/${p.id}-${p.architecture}-${p.version}.json', json2.encode(p) + '\n')!
-	sync_directory(repository + '/objects')!
+	owned_directory(workspace + '/manifests', 0o755)!
+	atomic_write(workspace + '/manifests/${p.id}-${p.architecture}-${p.version}.json', json2.encode(p) + '\n')!
+	sync_directory(workspace + '/objects')!
 	return p
 }
 
@@ -37,6 +43,10 @@ fn publication(repository string, id string, seed_path string, sequence u64, exp
 fn publication_with_seed(repository string, id string, seed SigningSeed, sequence u64, expires i64) !(Index, string, string, string) {
 	if !identifier(id) || sequence == 0 || expires <= time.now().unix() {
 		return error('publishing requires a repository ID, positive sequence and future expiry')
+	}
+	for name in ['objects', 'manifests'] {
+		directory := publisher_workspace(repository + '/' + name, false)!
+		unsafe { directory.free() }
 	}
 	mut private_key := ed25519.new_key_from_seed(seed.bytes)
 	defer { retire_signing_bytes(mut private_key) }
@@ -64,9 +74,13 @@ fn publication_with_seed(repository string, id string, seed SigningSeed, sequenc
 }
 
 pub fn publish(repository string, id string, seed_path string, sequence u64, expires i64) ! {
-	_, text, sig, _ := publication(repository, id, seed_path, sequence, expires)!
+	workspace := publisher_workspace(repository, false)!
+	defer { unsafe { workspace.free() } }
+	guard := publisher_lock(workspace)!
+	defer { guard.release() }
+	_, text, sig, _ := publication(workspace, id, seed_path, sequence, expires)!
 	// Publish in a new repository directory, then switch the server's release
 	// directory. Clients reject a torn index/signature pair without changing state.
-	atomic_write(repository + '/index.sig', sig + '\n')!
-	atomic_write(repository + '/index.json', text)!
+	atomic_write(workspace + '/index.sig', sig + '\n')!
+	atomic_write(workspace + '/index.json', text)!
 }

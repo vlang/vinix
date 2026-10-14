@@ -27,6 +27,17 @@ struct ReleaseOptions {
 	available_space fn (string) !u64 = free_bytes
 }
 
+fn check_publisher_lock(fd int, path string) ! {
+	mut opened := C.stat{}
+	mut named := C.stat{}
+	if C.fstat(fd, &opened) != 0 || opened.st_mode & 0o170000 != 0o100000
+		|| opened.st_uid != u32(os.geteuid()) || opened.st_mode & 0o077 != 0 || opened.st_nlink != 1
+		|| C.fstatat(C.AT_FDCWD, path.str, &named, C.AT_SYMLINK_NOFOLLOW) != 0
+		|| named.st_mode & 0o170000 != 0o100000 || named.st_dev != opened.st_dev || named.st_ino != opened.st_ino {
+		return error('publisher lock must be a stable private ordinary file owned by this administrator without hard links')
+	}
+}
+
 fn publisher_lock(repository string) !Lock {
 	info := os.lstat(repository)!
 	if os.is_link(repository) || !os.is_dir(repository) || info.uid != u32(os.geteuid()) || info.mode & 0o022 != 0 {
@@ -38,16 +49,12 @@ fn publisher_lock(repository string) !Lock {
 	path := repository + '/.publisher/lock'
 	fd := C.open(path.str, C.O_RDWR | C.O_CREAT | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK, 0o600)
 	if fd < 0 { return error('cannot open publisher release lock') }
-	mut lock_info := C.stat{}
-	if C.fstat(fd, &lock_info) != 0 || lock_info.st_mode & 0o170000 != 0o100000
-		|| lock_info.st_uid != u32(os.geteuid()) || lock_info.st_mode & 0o077 != 0 {
-		C.close(fd)
-		return error('publisher release lock must be a private ordinary file owned by this administrator')
-	}
+	check_publisher_lock(fd, path) or { C.close(fd); return err }
 	if C.flock(fd, C.LOCK_EX | C.LOCK_NB) != 0 {
 		C.close(fd)
-		return error('another publisher release is running; try again when it finishes')
+		return error('another publisher release or workspace change is running; try again when it finishes')
 	}
+	check_publisher_lock(fd, path) or { C.close(fd); return err }
 	return Lock{ fd: fd }
 }
 
@@ -93,10 +100,8 @@ fn release_closures(index Index, public_key string) ! {
 }
 
 pub fn publish_release(repository string, id string, seed_path string, sequence u64, expires i64, destination string) !ReleaseInfo {
-	if os.is_link(repository) || !os.is_dir(repository) { return error('publisher workspace must be an ordinary directory') }
-	// Bind source aliases before taking the lock; all subsequent accesses use
-	// these controlled physical ancestors rather than a mutable alias path.
-	workspace := os.real_path(repository)
+	workspace := publisher_workspace(repository, false)!
+	defer { unsafe { workspace.free() } }
 	guard := publisher_lock(workspace)!
 	defer { guard.release() }
 	return release_locked(workspace, id, seed_path, sequence, expires, destination, ReleaseOptions{})

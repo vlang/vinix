@@ -125,9 +125,10 @@ one directory, 16,384 regular files, 4 GiB per file and 64 GiB total payload.
 Oversized file/total lengths refuse before reading that file. Ordinary/slashed
 roots, sorted paths, empty files and shared read-only source files retain
 canonical metadata. Root parent aliases keep ordinary path semantics.
-Keep contents stable and repository parents controlled, serialize publishers,
-and keep output outside the source
-tree. Capture does not freeze same-user writes or authenticate upstream inputs.
+Keep contents stable and repository parents controlled. Publisher commands share
+the workspace lock described below. Output inside the captured source tree is
+refused before creating output parents, including through aliases and `alias/..`.
+Capture does not freeze same-user writes or authenticate upstream inputs.
 A failed walk can retain verified objects/partial object temporaries but does
 not replace the package manifest; inspect its diagnostic and correct the input
 before retrying. See [source qualification](../../tests/packages/pack-source-check.md).
@@ -236,8 +237,26 @@ failure reports that the complete directory exists but its durability is uncerta
 Upload this complete release to a new remote directory, then switch the server's
 release route. Serving a mutable workspace can expose a torn metadata pair.
 
-Keep `.publisher/history.json` with the workspace and back it up. A private
-publisher lock serializes release commands. Before publication, durable history
+Keep `.publisher/history.json` with the workspace and back it up. `pack`, legacy
+`publish` and `publish-release` share the private `.publisher/lock`; prepared-root
+and catalog imports take it when packing their materialized payloads. Busy
+writers fail without waiting or changing payloads, manifests, indexes or release
+history. Retry after the writer finishes. `pack` holds the lock through object
+verification and manifest publication; both signing commands hold it throughout
+their publication. Process exit releases it; preserve the lock file rather than
+removing it to bypass a busy writer.
+
+Workspace roots must be ordinary directories owned by the publisher, without
+group/other write access. Empty/NUL/over-4096-byte roots and leaf aliases refuse,
+including aliases with trailing separators. Parent aliases resolve once to controlled
+physical ancestors; ordinary roots with redundant separators remain supported.
+`pack` creates missing roots beneath controlled parents. Object/manifest folders
+must also be ordinary owned directories. Locks require an owned private regular
+file with one hard link and matching named identity before/after acquisition.
+Neither admission nor locking freezes manual writes by the same administrator.
+See [workspace qualification](../../tests/packages/publisher-workspace-check.md).
+
+Before release publication, durable history
 reserves the index sequence/digest for the repository ID and public key. Lower
 sequences or changed metadata at the same sequence are refused. After a failure
 or abrupt termination, retry the same seed, metadata, sequence and expiry into

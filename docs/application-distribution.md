@@ -123,6 +123,14 @@ directory work refuse; ordinary inputs retain canonical manifests. Keep source
 contents stable and publisher output outside the source tree. See
 [source traversal qualification](../tests/packages/pack-source-check.md).
 
+Packing and both publication commands share a private workspace lock, so a
+release cannot race another cooperating package writer. Busy writers preserve
+objects, manifests, index bytes and release history; retry after the owner exits.
+Workspace admission refuses NUL paths, leaf aliases and directories writable by
+other users. Packing output inside its captured source tree also refuses before
+creating output parents. See
+[workspace qualification](../tests/packages/publisher-workspace-check.md).
+
 The [native SDK publisher profile](../tools/packages/SDK.md#native-sdk-publisher-profile)
 provides a single pinned catalog for Hello, Counter and Memo on both targets.
 Its [V builder](../examples/package-catalog/README.md) compiles six static apps

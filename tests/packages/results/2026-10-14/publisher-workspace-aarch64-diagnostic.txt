@@ -1,0 +1,45 @@
+FAIL aarch64 packages-publisher-workspace (9.9s)
+  forbidden "HWTEST FAIL" in the line: HWTEST FAIL packages-publisher-workspace
+  last 40 serial lines:
+  | drm: created device node /dev/dri/card0
+  | simpledrm: software GBM allocator ready
+  | simplefb: initialized
+  | kmain_thread: fbdev done
+  | pci: Building device scan
+  | pci: Found [0:0:0:-1]
+  | pci: Found [0:1:0:-1]
+  | pci: Found [0:2:0:-1]
+  | devcore: 3 PCI functions enumerated
+  | xhci: no USB controller
+  | virtio-gpu: no GPU transport found
+  | kmain_thread: pointer done
+  | kmain_thread: processes done
+  | kmain_thread: pty done
+  | apple-spi-kbd: no device tree; not probing
+  | kmain_thread: console done
+  | devcore: 3 VirtIO devices listed
+  | kmain_thread: writeback done
+  | 
+  | *** aarch64: Kernel initialisation complete ***
+  | *** Starting /sbin/init ***
+  | syspower: power button through the event device at 0x9080000
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x221250
+  | HWTEST START packages-publisher-workspace
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x244540
+  | PUBLISHER FIXTURE created
+  | PUBLISHER FIXTURE packed
+  | PUBLISHER FIXTURE signed
+  | PUBLISHER FIXTURE released
+  | PUBLISHER FIXTURE created
+  | PUBLISHER FIXTURE packed
+  | malloc(0x28)
+  | V panic: memory allocation failure
+  |  v hash: 826e96f
+  |     pid: 0x8693
+  |     tid: 0x8693
+  | publisher-workspace-core failed (1)
+  | HWTEST FAIL packages-publisher-workspace
+  | syspower: power off: stopping devices
+  logs: /Users/alex/code/vinix/build/pkg-pubws-arm-diagnostic/packages-publisher-workspace
+package-publisher-workspace aarch64: 0 passed, 1 failed, 0 skipped

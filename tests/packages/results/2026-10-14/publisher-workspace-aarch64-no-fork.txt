@@ -1,0 +1,45 @@
+FAIL aarch64 publisher-debug (301.2s)
+  timed out after 300 s without "HWTEST PASS publisher-debug"
+  last 40 serial lines:
+  | syspower: power button through the event device at 0x9080000
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x23f450
+  | HWTEST START publisher-debug
+  | DEBUG fixture 0 begin
+  | DEBUG fixture 0 packed
+  | VmLck:	0 kB
+  | MemFree:        919312 kB
+  | Slab:           1760 kB
+  | DEBUG fixture 0 signed
+  | VmLck:	0 kB
+  | MemFree:        896368 kB
+  | Slab:           2064 kB
+  | DEBUG fixture 0 released
+  | VmLck:	0 kB
+  | MemFree:        874080 kB
+  | Slab:           2320 kB
+  | DEBUG fixture 1 begin
+  | DEBUG fixture 1 packed
+  | VmLck:	0 kB
+  | MemFree:        873936 kB
+  | Slab:           2384 kB
+  | DEBUG fixture 1 signed
+  | VmLck:	0 kB
+  | MemFree:        851600 kB
+  | Slab:           2656 kB
+  | DEBUG fixture 1 released
+  | VmLck:	0 kB
+  | MemFree:        829136 kB
+  | Slab:           2960 kB
+  | DEBUG fixture 2 begin
+  | DEBUG fixture 2 packed
+  | VmLck:	0 kB
+  | MemFree:        828880 kB
+  | Slab:           2992 kB
+  | malloc(0x28)
+  | V panic: memory allocation failure
+  |  v hash: 826e96f
+  |     pid: 0x1
+  |     tid: 0x1
+  | random: reseeded from 4754 events, 4 hardware words
+  logs: /Users/alex/code/vinix/build/pkg-pubws-debug/publisher-debug
+publisher-debug aarch64: 0 passed, 1 failed, 0 skipped

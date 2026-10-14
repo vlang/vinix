@@ -1,0 +1,5 @@
+pack: previous writer ignored the held release lock
+publish: previous writer ignored the held release lock
+release: busy workspace refused without publishing
+All writers recover after lock release with identical legacy/release metadata
+Publisher workspace qualification passed
