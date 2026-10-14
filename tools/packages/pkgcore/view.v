@@ -166,7 +166,7 @@ fn read_software_view(root string, offline bool) !SoftwareView {
 
 pub fn software_view(root string, offline bool) !SoftwareView {
 	directory := state_directory(root)
-	if os.exists(directory + '/lock') || os.is_link(directory + '/lock') {
+	if state_requires_lock(directory) {
 		guard := acquire_reader(directory)!
 		defer { guard.release() }
 		return read_software_view(root, offline)

@@ -49,6 +49,11 @@ packing, publishing, installation, presentation and launch. Repeated or excess
 grants are refused before a new package can install and fail its launch context.
 See [permission qualification](../../tests/packages/permission-contract-check.md).
 
+Package state locks and launch generation leases reject special files and busy
+holders with diagnostics. FIFO replacements cannot hang status, transactions or
+launch admission; restoring a sound lock/lease permits retry. See
+[coordination qualification](../../tests/packages/coordination-check.md).
+
 Use `publish-release REPOSITORY_DIR ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY`
 to emit a complete signed consumer repository with atomic publication, dependency
 closure validation on each declared architecture and retained publisher sequence

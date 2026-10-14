@@ -95,7 +95,7 @@ fn (service Service) installed_locked(directory string, verify bool) !State {
 
 fn (service Service) installed(verify bool) !State {
 	directory := service.directory()!
-	if os.exists(directory + '/lock') || os.is_link(directory + '/lock') {
+	if state_requires_lock(directory) {
 		guard := acquire_reader(directory)!
 		defer { guard.release() }
 		return service.installed_locked(directory, verify)

@@ -1,0 +1,38 @@
+Pinned V 0.5.2 826e96f56ca12fcb8fd02dfd6edf1551008e62a8; V_MACOS_V3_NO_FALLBACK=1; native assertions use -nocache -no-skip-unused -gc none -manualfree. Ten broad native suites plus six final read-only followups cover fourteen distinct core assertion runners. These are separate successful phases.
+PASS pkgcore/coordination_test.v
+PASS pkgcore/service_test.v
+PASS pkgcore/state_test.v
+PASS pkgcore/collection_limit_test.v
+PASS pkgcore/distribution_test.v
+PASS pkgcore/purge_test.v
+PASS pkgcore/personal_data_test.v
+PASS pkgcore/session_test.v
+PASS pkgcore/command_test.v
+PASS pkgcore/window_test.v
+PASS coordination ASan/UBSan
+PASS complete signed CLI lifecycle and bounded coordination refusal/recovery
+
+Final read-only followup:
+PASS final read-only state admission coordination_test.v
+PASS final read-only state admission service_test.v
+PASS final read-only state admission view_test.v
+PASS final read-only state admission policy_test.v
+PASS final read-only state admission administration_test.v
+PASS final read-only state admission review_test.v
+
+Final bounded/refusal/descriptor assertions:
+Package coordination: malformed locks refuse promptly without changing special entries or link targets
+Package coordination: malformed and exclusively held generation leases refuse within the deadline
+Package coordination: fresh read-only status stays available; retained metadata without its lock refuses before parsing
+Package coordination: 128 valid and repeated malformed reader/writer/lease cycles preserve exclusion and recovery under a 32-descriptor limit
+
+Complete signed CLI lifecycle:
+Package CLI: malformed publisher history refuses release without changing prior publication
+Package CLI: malformed locks refuse within two seconds, preserve state/cache/history and permit verified recovery
+Package CLI: ambiguous configuration refused without activation, cache or trust changes
+Package CLI: malformed retained history refuses replay after revocation and empty refresh
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed
+
+Maintained static target stages (no guest execution):
+PASS maintained static service/session/Linux SDK runner stage and target-machine checks aarch64
+PASS maintained static service/session/Linux SDK runner stage and target-machine checks x86_64

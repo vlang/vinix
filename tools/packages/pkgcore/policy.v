@@ -3,7 +3,6 @@ module pkgcore
 
 import crypto.sha256
 import json2
-import os
 
 pub struct PolicyDocument {
 pub:
@@ -217,7 +216,7 @@ fn policy_review_locked(root string, path string) !PolicyReview {
 
 pub fn (service Service) policy() !PolicyDocument {
 	directory := service.directory()!
-	if os.exists(directory + '/lock') || os.is_link(directory + '/lock') {
+	if state_requires_lock(directory) {
 		guard := acquire_reader(directory)!
 		defer { guard.release() }
 		config := load_config(service.root)!
@@ -229,7 +228,7 @@ pub fn (service Service) policy() !PolicyDocument {
 
 pub fn (service Service) review_policy(path string) !PolicyReview {
 	directory := service.directory()!
-	if os.exists(directory + '/lock') || os.is_link(directory + '/lock') {
+	if state_requires_lock(directory) {
 		guard := acquire_reader(directory)!
 		defer { guard.release() }
 		return policy_review_locked(service.root, path)

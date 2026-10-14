@@ -379,6 +379,19 @@ The [collection descriptor qualification](../tests/packages/collection-limit-che
 reproduces the previous failure with 128 obsolete generations under a 32-FD limit
 and checks successful cleanup with bounded descriptor use and protected live leases.
 
+Readers, writers and launch admission also check the captured lock/lease file
+type. FIFO replacements refuse promptly, without opening a blocking read or
+changing the FIFO's permissions. Directory, socket and symbolic replacements
+cannot become coordination files. A busy writer or exclusive generation holder
+returns a retry diagnostic instead of waiting indefinitely. Read-only status,
+Software views, trust and policy requests require a lock whenever durable
+catalog/history or active state exists; fresh-image reads still create no state.
+Refusal preserves malformed entries, retained metadata, payloads and abandoned
+stages. Stop package workers and application processes before repairing a lock
+or lease: replacing a file that is still held would separate its existing holders
+from new requests. Restore trusted state rather than bypassing the checks, then
+retry `verify`. See [coordination qualification](../tests/packages/coordination-check.md).
+
 Personal data under `~/.local/share/vinix-apps/ID` survives uninstall/rollback.
 After uninstall an ordinary user can explicitly erase it with
 `vinix-package purge-data ID`. No package owns arbitrary home files. Data/schema

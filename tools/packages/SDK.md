@@ -21,6 +21,14 @@ The writer lock excludes new launch admission throughout both phases; an already
 admitted holder that becomes busy remains protected. See
 [descriptor-limit qualification](../../tests/packages/collection-limit-check.md).
 
+State readers, writers and launch admission require ordinary regular lock/lease
+files. Opens and advisory lock acquisition refuse malformed or busy entries
+without waiting on FIFOs or exclusive holders. Read-only requests require the
+state lock whenever active state, a catalog or trust history exists; a fresh
+image can still report empty status without creating state. Invalid entries are
+retained for administrator recovery. See
+[coordination qualification](../../tests/packages/coordination-check.md).
+
 ## Administrator package transport
 
 `vinix-package admin [--progress] [--offline] COMMAND ...` is the ordinary-account

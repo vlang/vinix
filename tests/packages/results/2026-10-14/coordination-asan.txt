@@ -1,0 +1,5 @@
+Final clang ASan/UBSan; ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1. Final assertion runner exited 0. No whole-service heap retention claim.
+Package coordination: malformed locks refuse promptly without changing special entries or link targets
+Package coordination: malformed and exclusively held generation leases refuse within the deadline
+Package coordination: fresh read-only status stays available; retained metadata without its lock refuses before parsing
+Package coordination: 128 valid and repeated malformed reader/writer/lease cycles preserve exclusion and recovery under a 32-descriptor limit

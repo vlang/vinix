@@ -266,9 +266,31 @@ pub struct Lock {
 	fd int
 }
 
+// Only a fresh image may answer read-only requests without a state lock. A
+// missing lock beside durable state is corruption, not an empty installation.
+fn state_requires_lock(directory string) bool {
+	for name in ['lock', 'current', 'catalog.json', 'trust-history.json']! {
+		path := directory + '/' + name
+		present := os.exists(path) || os.is_link(path)
+		unsafe { path.free() }
+		if present { return true }
+	}
+	return false
+}
+
+fn check_coordination_file(fd int, kind string) ! {
+	mut info := C.stat{}
+	if C.fstat(fd, &info) != 0 { return error('cannot inspect ${kind}') }
+	if u32(info.st_mode) & 0o170000 != 0o100000 {
+		return error('${kind} must be an ordinary regular file; repair package state before retrying')
+	}
+}
+
 fn acquire_reader(directory string) !Lock {
-	fd := C.open((directory + '/lock').str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
+	// A malformed FIFO must not block before its captured type can be checked.
+	fd := C.open((directory + '/lock').str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
 	if fd < 0 { return error('package state is unavailable; refresh trusted repositories before reviewing changes') }
+	check_coordination_file(fd, 'package state lock') or { C.close(fd); return err }
 	if C.flock(fd, C.LOCK_SH | C.LOCK_NB) != 0 {
 		C.close(fd)
 		return error('another package transaction is running; review again when it finishes')
@@ -291,10 +313,12 @@ pub fn owned_directory(path string, mode int) ! {
 pub fn acquire(directory string) !Lock {
 	owned_directory(directory, 0o755)!
 	path := directory + '/lock'
-	fd := C.open(path.str, C.O_RDWR | C.O_CREAT | C.O_CLOEXEC | C.O_NOFOLLOW, 0o644)
+	fd := C.open(path.str, C.O_RDWR | C.O_CREAT | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK, 0o644)
 	if fd < 0 {
 		return error('cannot open package lock; package changes require administrator access')
 	}
+	// Refuse before chmod/flock: neither operation establishes a file's type.
+	check_coordination_file(fd, 'package state lock') or { C.close(fd); return err }
 	if C.fchmod(fd, 0o644) != 0 {
 		C.close(fd)
 		return error('cannot set package lock reader permissions')

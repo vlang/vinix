@@ -137,16 +137,12 @@ pub fn run_application(config Config, directory string, id string, documents []s
 		return run_in_session(config, id, documents)
 	}
 	// A reader locks the activation pointer until its generation lease is held.
-	fd := C.open((directory + '/lock').str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
-	if fd < 0 || C.flock(fd, C.LOCK_SH) != 0 {
-		if fd >= 0 { C.close(fd) }
-		return error('cannot read package state lock')
-	}
+	guard := acquire_reader(directory)!
 	state, lease := generation_lease(directory, config.architecture, id) or {
-		C.close(fd)
+		guard.release()
 		return err
 	}
-	C.close(fd)
+	guard.release()
 	defer { C.close(lease) }
 	return run_leased_application(config, directory, state, id, documents)
 }
@@ -154,15 +150,20 @@ pub fn run_application(config Config, directory string, id string, documents []s
 // The caller holds the package reader lock until this lease has been acquired.
 fn generation_lease(directory string, architecture string, id string) !(State, int) {
 	state := read_state(directory, architecture)!
+	mut admitted := false
+	defer { if !admitted && state.generation != 0 { close_decoded_state(state) } }
 	if state.generation == 0 || !state.packages.any(it.package.id == id) {
 		return error('application is not installed: ${id}')
 	}
 	lease_path := directory + '/generations/' + state.generation.str() + '/lease'
-	lease := C.open(lease_path.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
-	if lease < 0 || C.flock(lease, C.LOCK_SH) != 0 {
-		if lease >= 0 { C.close(lease) }
-		return error('cannot hold application generation lease')
+	lease := C.open(lease_path.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
+	if lease < 0 { return error('cannot open application generation lease; repair package state before retrying') }
+	check_coordination_file(lease, 'application generation lease') or { C.close(lease); return err }
+	if C.flock(lease, C.LOCK_SH | C.LOCK_NB) != 0 {
+		C.close(lease)
+		return error('cannot hold application generation lease; another holder may be collecting it, retry after it finishes')
 	}
+	admitted = true
 	return state, lease
 }
 

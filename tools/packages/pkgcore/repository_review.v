@@ -120,7 +120,7 @@ fn read_repository_review(root string, operation string, repository Repository, 
 
 pub fn review_repository(root string, operation string, repository Repository, offline bool) !pkgprotocol.RepositoryReview {
 	directory := state_directory(root)
-	if os.exists(directory + '/lock') || os.is_link(directory + '/lock') {
+	if state_requires_lock(directory) {
 		guard := acquire_reader(directory)!
 		defer { guard.release() }
 		return read_repository_review(root, operation, repository, offline)

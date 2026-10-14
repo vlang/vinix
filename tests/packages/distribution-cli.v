@@ -26,6 +26,73 @@ fn command(binary string, arguments []string) !Reply {
 	return Reply{ code: code, text: text }
 }
 
+// These refusal probes must fail rather than hang even against the old CLI.
+// Their diagnostics fit in the pipe; collect output after bounded child exit.
+fn coordination_command(binary string, arguments []string) !Reply {
+	mut process := os.new_process(binary)
+	defer { process.close() }
+	process.set_args(arguments)
+	process.set_redirect_stdio_merged()
+	process.run()
+	deadline := time.sys_mono_now() + 2 * time.second
+	for process.is_alive() && time.sys_mono_now() < deadline { time.sleep(10 * time.millisecond) }
+	if process.is_alive() {
+		process.signal_kill(); process.wait()
+		return error('package coordination command exceeded its two-second deadline: ${arguments}')
+	}
+	process.wait()
+	return Reply{ code: process.code, text: process.stdout_slurp() }
+}
+
+fn C.mkfifo(&char, u32) int
+
+fn qualify_coordination_files(binary string, root string) ! {
+	store := pkgcore.state_directory(root)
+	path := store + '/lock'
+	saved := path + '.coordination-saved'
+	outside := root + '/coordination-outside'
+	os.write_file(outside, 'preserved')!
+	os.chmod(outside, 0o600)!
+	defer { os.rm(outside) or {} }
+	current := os.readlink(store + '/current')!
+	retained := ['catalog.json', 'trust-history.json', current + '/state.json']
+	mut hashes := []string{}
+	for file in retained { hashes << pkgcore.hash_file(store + '/' + file)! }
+	objects := os.ls(store + '/objects')!.sorted()
+	sentinel := store + '/generations/.stage-coordination-sentinel'
+	os.mkdir_all(sentinel)!
+	os.write_file(sentinel + '/keep', 'retained')!
+	defer { os.rmdir_all(sentinel) or {} }
+	for kind in ['fifo', 'directory', 'symlink', 'dangling', 'missing'] {
+		os.rename(path, saved)!
+		match kind {
+			'fifo' { assert C.mkfifo(path.str, 0o600) == 0 }
+			'directory' { os.mkdir(path)! }
+			'symlink' { os.symlink(outside, path)! }
+			'dangling' { os.symlink(outside + '-absent', path)! }
+			else {}
+		}
+		mut arguments := [['status'], ['--json', 'verify'], ['plan', 'install', 'app'], ['view'], ['policy'], ['repo-list'],
+			['policy-review', root + '/absent-policy.json'], ['repo-review', 'revoke', 'fixture']]
+		if kind != 'missing' { arguments << [['update'], ['install', 'app'], ['remove', 'app'], ['gc']] }
+		for args in arguments {
+			reply := coordination_command(binary, ['--root', root, ...args])!
+			assert reply.code == 1 && !reply.text.contains('V panic:')
+			assert reply.text.contains('lock') || reply.text.contains('state is unavailable'), reply.text
+		}
+		assert os.readlink(store + '/current')! == current && os.ls(store + '/objects')!.sorted() == objects
+		for i, file in retained { assert pkgcore.hash_file(store + '/' + file)! == hashes[i] }
+		assert os.read_file(sentinel + '/keep')! == 'retained'
+		assert os.read_file(outside)! == 'preserved' && os.lstat(outside)!.mode & 0o777 == 0o600
+		if kind == 'fifo' { assert os.lstat(path)!.mode & 0o777 == 0o600 }
+		if kind == 'directory' { os.rmdir(path)! }
+		else if os.exists(path) || os.is_link(path) { os.rm(path)! }
+		os.rename(saved, path)!
+		assert json2.decode[pkgcore.State](success(binary, ['--root', root, '--json', 'verify'])!)!.generation == 1
+	}
+	println('Package CLI: malformed locks refuse within two seconds, preserve state/cache/history and permit verified recovery')
+}
+
 fn success(binary string, arguments []string) !string {
 	result := command(binary, arguments)!
 	if result.code != 0 { return error('CLI ${arguments.join(' ')} failed: ${result.text}') }
@@ -328,6 +395,7 @@ fn qualify(binary string) ! {
 	installed := json2.decode[pkgcore.State](success(binary, [...root_args, 'status'])!)!
 	assert installed.generation == 1
 	assert installed.packages[0].package.id == 'app'
+	qualify_coordination_files(binary, work + '/root')!
 	qualify_configuration_schema(binary, work + '/root')!
 	mut launchers := packagecore.Registry{}
 	defer { launchers.close() }
