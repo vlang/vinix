@@ -50,6 +50,10 @@ fn view_policy_allows(p Package, policy Policy) bool {
 // complete review. Installed changes come from one full upgrade resolution,
 // including dependency additions/removals and same-version manifest changes.
 fn catalog_view(config Config, catalog Catalog, current State, catalog_error string) !SoftwareView {
+	installed_diagnostics := package_diagnostics(config, current.packages)
+	defer { close_package_diagnostics(installed_diagnostics) }
+	mut publisher_keys := map[string]bool{}
+	defer { unsafe { publisher_keys.free() } }
 	mut installed := map[string]Installed{}
 	mut choices := map[string]Installed{}
 	for item in current.packages {
@@ -104,11 +108,12 @@ fn catalog_view(config Config, catalog Catalog, current State, catalog_error str
 		candidate := choices[id]
 		p := candidate.package
 		old := installed[id] or { Installed{} }
-		mut diagnostic := ''
-		if !config.repositories.any(it.id == candidate.repository && it.public_key == candidate.public_key) {
-			diagnostic = '${id}: publisher key has been revoked; uninstall remains available'
+		// Pending updates do not repair the installed launch closure until they
+		// activate. Keep its blocker visible even when the preview drops it.
+		diagnostic := if installed_diagnostics[id] != '' {
+			installed_diagnostics[id].clone()
 		} else {
-			check_policy(p, config.policy) or { diagnostic = err.msg() }
+			package_diagnostic(config, candidate, mut publisher_keys)
 		}
 		action := changes[id] or { '' }
 		rows << SoftwareRow{

@@ -69,6 +69,10 @@ fn check() ! {
 			repository + '/tests/packages/publisher-key-memory.v'])!
 		run(work + '/publisher-key-memory', [])!
 		check_tests(v, ['-gc', 'none'], repository + '/tools/packages/pkgcore', work)!
+		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/diagnostics-memory', repository + '/tools/packages/pkgcore/view_test.v'])!
+		run(work + '/diagnostics-memory', [])!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgprotocol', work)!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/appsdk', work)!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgadmin', work)!

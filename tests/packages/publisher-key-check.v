@@ -4,6 +4,7 @@ module main
 import json2
 import os
 import tools.packages.pkgcore
+import tools.packages.pkgprotocol
 
 fn forged(sequence u64) string {
 	return '{"format":1,"repository":"fixture","sequence":${sequence},"expires":2000000000,"packages":[]}'
@@ -95,6 +96,25 @@ fn check() ! {
 	personal := work + '/home/user/.local/share/vinix-apps/data'
 	os.mkdir_all(personal)!
 	os.write_file(personal + '/note', 'retained')!
+	legacy_config := os.read_file(config_path)!
+	legacy_catalog := os.read_file(pkgcore.state_directory(work) + '/catalog.json')!
+	view := pkgcore.software_view(work, true)!
+	assert view.catalog_error.contains('publisher key') && view.rows.len == 1
+	assert view.rows[0].diagnostic.contains('data: repository fixture has an invalid publisher key')
+	assert view.rows[0].diagnostic.contains('uninstall remains available')
+	mut decoded := pkgprotocol.decode_software_view(json2.encode(view))!
+	assert decoded.rows[0].diagnostic == view.rows[0].diagnostic
+	decoded.close()
+	os.write_file(work + '/policy.json', json2.encode(pkgcore.PolicyDocument{ architecture: 'aarch64', policy: initial.policy }))!
+	mut impact := service.review_policy(work + '/policy.json')!
+	assert impact.rows.len == 1 && impact.rows[0].diagnostic_before == impact.rows[0].diagnostic_after
+	assert impact.rows[0].diagnostic_before == view.rows[0].diagnostic
+	impact.close()
+	assert service.state()! == old_state && os.read_file(history_path)! == history
+	assert os.read_file(config_path)! == legacy_config
+	assert os.read_file(pkgcore.state_directory(work) + '/catalog.json')! == legacy_catalog
+	assert os.read_file(personal + '/note')! == 'retained'
+	println('PUBLISHER KEY Software and policy review disclose invalid installed trust without changing state/history/data PASS')
 	if _ := service.refresh() { assert false } else { refused(err.msg()) }
 	if _ := service.plan('upgrade', []) { assert false } else { refused(err.msg()) }
 	if _ := service.rollback('') { assert false } else { refused(err.msg()) }
@@ -112,6 +132,21 @@ fn check() ! {
 		pkgcore.state_directory(work), pkgcore.State{ ...old_state, packages: [good_app, runtime] },
 		'data', personal, 1000, 1000, []) { assert false } else { refused(err.msg()) }
 	assert os.read_file(history_path)! == history
+	// Software diagnoses an implicit runtime, even when the app's own publisher
+	// is admitted. This works with an unusable cache and follows the launch check.
+	closure_state := pkgcore.State{ ...old_state, packages: [good_app, runtime] }
+	os.write_file(config_path, json2.encode(pkgcore.Config{ ...initial, repositories: [good, pkgcore.Repository{ ...bad, id: 'legacy' }] }))!
+	os.write_file(pkgcore.state_directory(work) + '/generations/' + state.generation.str() + '/state.json', json2.encode(closure_state))!
+	closure_view := pkgcore.software_view(work, true)!
+	assert closure_view.rows.len == 2 && closure_view.rows.all(it.diagnostic.contains('runtime: repository legacy has an invalid publisher key'))
+	mut closure_impact := service.review_policy(work + '/policy.json')!
+	assert closure_impact.rows.all(it.diagnostic_before.contains('runtime: repository legacy has an invalid publisher key')
+		&& it.diagnostic_after == it.diagnostic_before)
+	closure_impact.close()
+	assert service.state()! == closure_state && os.read_file(history_path)! == history
+	os.write_file(config_path, json2.encode(pkgcore.Config{ ...initial, repositories: [bad] }))!
+	os.write_file(pkgcore.state_directory(work) + '/generations/' + state.generation.str() + '/state.json', json2.encode(old_state))!
+	println('PUBLISHER KEY Software and policy review propagate implicit runtime trust denial PASS')
 	revocation := pkgcore.review_repository(work, 'revoke', bad, true)!
 	pkgcore.revoke_repository_reviewed(work, 'fixture', revocation.fingerprint)!
 	assert pkgcore.load_config(work)!.repositories.len == 0

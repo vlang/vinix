@@ -5,6 +5,13 @@ import json2
 import os
 import time
 
+$if track_heap ? {
+	#include "@VMODROOT/../../../desktop/tools/tests/heap_tracker.h"
+}
+fn C.vinix_heap_begin()
+fn C.vinix_heap_end() u64
+fn C.vinix_heap_count() u32
+
 fn view_package(id string, version string, kind string) Package {
 	p := Package{
 		id:           id
@@ -22,7 +29,7 @@ fn view_package(id string, version string, kind string) Package {
 }
 
 fn view_installed(p Package) Installed {
-	return Installed{ package: p, repository: 'fixture', public_key: '01'.repeat(32), sequence: 1 }
+	return Installed{ package: p, repository: 'fixture', public_key: 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a', sequence: 1 }
 }
 
 fn view_configuration() Config {
@@ -31,7 +38,7 @@ fn view_configuration() Config {
 		repositories: [Repository{
 			id:         'fixture'
 			url:        'https://example.invalid'
-			public_key: '01'.repeat(32)
+			public_key: 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a'
 		}]
 	}
 }
@@ -125,7 +132,7 @@ fn test_update_flags_cover_manifest_key_changes_and_policy_downgrades() {
 	assert !catalog_view(config, Catalog{ packages: [renewed] }, current, '')!.rows[0].updatable
 	changed := Installed{ ...app, package: Package{ ...app.package, permissions: ['network'] } }
 	assert catalog_view(config, Catalog{ packages: [changed] }, current, '')!.rows[0].update_action == 'update'
-	new_key := '02'.repeat(32)
+	new_key := '3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c'
 	rotated := Config{ ...config, repositories: [Repository{ ...config.repositories[0], public_key: new_key }] }
 	key_change := Installed{ ...app, public_key: new_key }
 	assert catalog_view(rotated, Catalog{ packages: [key_change] }, current, '')!.rows[0].updatable
@@ -149,6 +156,7 @@ fn test_failed_resolution_reports_reason_without_advertising_other_publishers() 
 	assert view.update_error.contains('permissions blocked')
 	assert view.rows.all(!it.updatable && it.version == '1.0.0')
 	assert view_row(view, 'runtime').diagnostic.contains('permissions blocked')
+	assert view_row(view, 'app').diagnostic == view_row(view, 'runtime').diagnostic
 	replacement := Installed{
 		...app
 		repository: 'replacement'
@@ -225,4 +233,117 @@ fn test_disk_view_is_read_only_and_uses_package_reader_lock() {
 		assert false, 'view ignored package writer lock'
 	}
 	guard.release()
+}
+
+
+fn diagnostic_fixture() (Config, State) {
+	config := view_configuration()
+	app := view_installed(Package{ ...view_package('app', '1.0.0', 'native'), dependencies: [Dependency{ id: 'bridge' }] })
+	bridge := view_installed(Package{ ...view_package('bridge', '1.0.0', 'data'), dependencies: [Dependency{ id: 'runtime' }] })
+	runtime := Installed{ ...view_installed(Package{ ...view_package('runtime', '1.0.0', 'runtime'), dependencies: [Dependency{ id: 'bridge' }] }), repository: 'legacy' }
+	return Config{ ...config, repositories: [config.repositories[0], Repository{ ...config.repositories[0], id: 'legacy' }] },
+		State{ architecture: 'aarch64', generation: 1, requested: ['app', 'independent'], packages: [app, bridge, runtime,
+			view_installed(view_package('independent', '1.0.0', 'native'))] }
+}
+
+fn test_diagnostics_propagate_trust_failures_through_cycles_without_blocking_other_apps() {
+	config, state := diagnostic_fixture()
+	for key in ['01' + '00'.repeat(31), '95' + '99'.repeat(31), '02' + '00'.repeat(31)] {
+		packages := state.packages.map(if it.repository == 'legacy' { Installed{ ...it, public_key: key } } else { it })
+		invalid := Config{ ...config, repositories: [config.repositories[0], Repository{ ...config.repositories[1], public_key: key }] }
+		messages := package_diagnostics(invalid, packages)
+		assert messages['runtime'].contains('runtime: repository legacy has an invalid publisher key')
+		assert messages['runtime'].contains('administrator') && messages['runtime'].contains('uninstall remains available')
+		assert messages['app'] == messages['runtime'] && messages['bridge'] == messages['runtime']
+		assert messages['independent'] == ''
+		close_package_diagnostics(messages)
+		// No global key cache: a subsequent trust/configuration read must differ.
+		revoked := package_diagnostics(Config{ ...invalid, repositories: [config.repositories[0]] }, packages)
+		assert revoked['app'].contains('runtime: publisher key has been revoked')
+		close_package_diagnostics(revoked)
+	}
+	valid := package_diagnostics(config, state.packages)
+	assert valid.values().all(it == '')
+	close_package_diagnostics(valid)
+}
+
+fn test_software_keeps_installed_dependency_blocker_until_an_update_activates() {
+	config, state := diagnostic_fixture()
+	revoked := Config{ ...config, repositories: [config.repositories[0]] }
+	// This update removes the old runtime/bridge. It does not repair the launch
+	// snapshot currently used by Run, even when its preview resolves successfully.
+	updated := view_installed(view_package('app', '2.0.0', 'native'))
+	catalog := Catalog{ packages: [updated, state.packages[3]] }
+	view := catalog_view(revoked, catalog, state, '')!
+	assert view.update_error == '' && view_row(view, 'app').updatable
+	assert view_row(view, 'app').version == '2.0.0' && view_row(view, 'app').installed_version == '1.0.0'
+	assert view_row(view, 'app').diagnostic.contains('runtime: publisher key has been revoked')
+	assert view_row(view, 'runtime').update_action == 'remove'
+	assert view_row(view, 'independent').diagnostic == ''
+	activated := catalog_view(revoked, catalog, State{ ...state, generation: 2, packages: catalog.packages }, '')!
+	assert view_row(activated, 'app').diagnostic == ''
+}
+
+fn test_software_reports_invalid_keys_without_a_usable_catalog_and_after_policy_changes() {
+	config, state := diagnostic_fixture()
+	weak := '01' + '00'.repeat(31)
+	packages := state.packages.map(if it.repository == 'legacy' { Installed{ ...it, public_key: weak } } else { it })
+	invalid := Config{ ...config, repositories: [config.repositories[0], Repository{ ...config.repositories[1], public_key: weak }] }
+	view := catalog_view(invalid, Catalog{}, State{ ...state, packages: packages }, 'publisher key admission failed')!
+	assert view.catalog_error != '' && view.rows.all(!it.updatable)
+	assert view_row(view, 'app').diagnostic.contains('runtime: repository legacy has an invalid publisher key')
+	assert view_row(view, 'independent').diagnostic == ''
+	// A newly advertised application also reports direct trust denial.
+	fresh := view_installed(view_package('fresh', '1.0.0', 'native'))
+	bad_app := Installed{ ...fresh, public_key: weak, repository: 'legacy' }
+	assert catalog_view(invalid, Catalog{ packages: [bad_app] }, State{ architecture: 'aarch64' }, '')!.rows[0].diagnostic.contains('invalid publisher key')
+	policy := Config{ ...config, policy: Policy{ permissions: [] } }
+	restricted := state.packages.map(if it.package.id == 'runtime' { Installed{ ...it, package: Package{ ...it.package, permissions: ['process'] } } } else { it })
+	blocked := catalog_view(policy, Catalog{}, State{ ...state, packages: restricted }, 'expired index')!
+	assert view_row(blocked, 'app').diagnostic.contains('runtime: permissions blocked')
+}
+
+fn test_diagnostic_graphs_retire_owned_messages_edges_and_key_checks() {
+	$if track_heap ? {
+		config, state := diagnostic_fixture()
+		weak := '01' + '00'.repeat(31)
+		packages := state.packages.map(if it.repository == 'legacy' { Installed{ ...it, public_key: weak } } else { it })
+		invalid := Config{ ...config, repositories: [config.repositories[0], Repository{ ...config.repositories[1], public_key: weak }] }
+		for installed in packages {
+			C.vinix_heap_begin()
+			mut keys := map[string]bool{}
+			message := package_diagnostic(invalid, installed, mut keys)
+			unsafe { message.free(); keys.free() }
+			kept := C.vinix_heap_end()
+			assert kept == 0 && C.vinix_heap_count() == 0, '${installed.package.id}: direct diagnostic retained ${kept}'
+		}
+		for _ in 0 .. 32 {
+			for index, checked in [config, invalid, Config{ ...config, repositories: [] }, Config{ ...invalid, policy: Policy{ allowed: ['runtime'] } }] {
+				C.vinix_heap_begin()
+				messages := package_diagnostics(checked, packages)
+				assert messages['app'] != '' && messages['runtime'] != ''
+				close_package_diagnostics(messages)
+				kept := C.vinix_heap_end()
+				assert kept == 0 && C.vinix_heap_count() == 0, 'case ${index}: package diagnostics retained ${kept} bytes'
+			}
+		}
+		println('Package diagnostics: 128 valid/invalid/revoked/policy graph reads and retirement cycles retain zero tracked bytes PASS')
+	}
+}
+
+fn test_publisher_key_decoding_preserves_canonical_lowercase_admission() {
+	for encoded in ['d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a',
+		'3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c',
+		'fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025'] {
+		key := admitted_publisher_key(encoded)!
+		assert key.len == 32 && key.hex() == encoded
+		unsafe { key.free() }
+	}
+	for encoded in ['', 'f'.repeat(63), 'f'.repeat(65), 'A'.repeat(64), 'g'.repeat(64),
+		'0x' + '01'.repeat(31), '01' + '00'.repeat(31)] {
+		if _ := admitted_publisher_key(encoded) { assert false, encoded } else {
+			assert err.msg().contains('publisher key')
+			unsafe { err.free() }
+		}
+	}
 }

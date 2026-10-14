@@ -45,6 +45,8 @@ fn suite() hwhost.Suite {
 				'SIGNING REPEAT 16/16 identical publication and verification PASS',
 				'PACKAGE SIGNING REPEAT 32 publications one-process canonical-bytes PASS',
 				'SIGNING PROCESS signing-repeat PASS', 'Publisher key admission qualification passed',
+				'PUBLISHER KEY Software and policy review disclose invalid installed trust without changing state/history/data PASS',
+				'PUBLISHER KEY Software and policy review propagate implicit runtime trust denial PASS',
 				'SIGNING PROCESS publisher-key PASS', 'HWTEST PASS packages-signing-repeat']
 			ending: .poweroff
 			timeout: 300

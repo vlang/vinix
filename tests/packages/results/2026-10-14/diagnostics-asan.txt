@@ -1,0 +1,53 @@
+view ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Updating trusted repository fixture
+Installing app 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (20 bytes)
+Installing runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+PASS
+policy ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+PASS
+publisher-key ASan/UBSan (detect_leaks=0, halt_on_error=1):
+PUBLISHER KEY forged indexes and first enrollment refused PASS
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading data/payload (7 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Data 1.0.1 (1/1) from fixture
+Activated package generation 2
+PUBLISHER KEY valid enrollment/install and rejected replacement preserve trust/history/state PASS
+PUBLISHER KEY Software and policy review disclose invalid installed trust without changing state/history/data PASS
+PUBLISHER KEY Software and policy review propagate implicit runtime trust denial PASS
+Activated package generation 3
+PUBLISHER KEY legacy refresh/upgrade/rollback/app/dependency launch refused; reviewed revoke/uninstall preserve history/data PASS
+Publisher key admission qualification passed
+PASS

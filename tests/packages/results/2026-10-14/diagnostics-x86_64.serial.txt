@@ -1,0 +1,113 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=24
+!>+ [11] ./sbin/init sz=210840
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/publisher-workspace-batch sz=1208760
+!>+ [15] ./usr/share/package-fixtures/signing-repeat sz=1082504
+!>+ [16] ./usr/share/package-fixtures/publisher-key sz=1547040
+!>+ [17] ./usr/share/package-fixtures/signing-reference sz=366880
+!>+ [18] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e87e00
+initramfs: Done (18 entries)
+HWTEST START packages-signing-repeat
+Package signing: RFC8032 keys/signatures and tamper/canonical-scalar refusal passed
+SIGNING PROCESS signing-reference PASS
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+SIGNING PROCESS publisher-workspace-batch PASS
+SIGNING REPEAT 1/16 identical publication and verification PASS
+MemFree:        886904 kB
+Slab:           2316 kB
+SIGNING REPEAT 2/16 identical publication and verification PASS
+MemFree:        886500 kB
+Slab:           2340 kB
+SIGNING REPEAT 3/16 identical publication and verification PASS
+MemFree:        886140 kB
+Slab:           2372 kB
+SIGNING REPEAT 4/16 identical publication and verification PASS
+MemFree:        885812 kB
+Slab:           2396 kB
+SIGNING REPEAT 5/16 identical publication and verification PASS
+MemFree:        885496 kB
+Slab:           2412 kB
+SIGNING REPEAT 6/16 identical publication and verification PASS
+MemFree:        885308 kB
+Slab:           2388 kB
+SIGNING REPEAT 7/16 identical publication and verification PASS
+MemFree:        884940 kB
+Slab:           2404 kB
+SIGNING REPEAT 8/16 identical publication and verification PASS
+MemFree:        884628 kB
+Slab:           2436 kB
+SIGNING REPEAT 9/16 identical publication and verification PASS
+MemFree:        884488 kB
+Slab:           2352 kB
+SIGNING REPEAT 10/16 identical publication and verification PASS
+MemFree:        884120 kB
+Slab:           2384 kB
+SIGNING REPEAT 11/16 identical publication and verification PASS
+MemFree:        883936 kB
+Slab:           2368 kB
+SIGNING REPEAT 12/16 identical publication and verification PASS
+MemFree:        883704 kB
+Slab:           2392 kB
+SIGNING REPEAT 13/16 identical publication and verification PASS
+MemFree:        883400 kB
+Slab:           2412 kB
+SIGNING REPEAT 14/16 identical publication and verification PASS
+MemFree:        883260 kB
+Slab:           2376 kB
+SIGNING REPEAT 15/16 identical publication and verification PASS
+MemFree:        882940 kB
+Slab:           2392 kB
+SIGNING REPEAT 16/16 identical publication and verification PASS
+MemFree:        882716 kB
+Slab:           2404 kB
+PACKAGE SIGNING REPEAT 32 publications one-process canonical-bytes PASS
+SIGNING PROCESS signing-repeat PASS
+PUBLISHER KEY forged indexes and first enrollment refused PASS
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading data/payload (7 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Data 1.0.1 (1/1) from fixture
+Activated package generation 2
+PUBLISHER KEY valid enrollment/install and rejected replacement preserve trust/history/state PASS
+PUBLISHER KEY Software and policy review disclose invalid installed trust without changing state/history/data PASS
+PUBLISHER KEY Software and policy review propagate implicit runtime trust denial PASS
+Activated package generation 3
+PUBLISHER KEY legacy refresh/upgrade/rollback/app/dependency launch refused; reviewed revoke/uninstall preserve history/data PASS
+Publisher key admission qualification passed
+SIGNING PROCESS publisher-key PASS
+HWTEST PASS packages-signing-repeat

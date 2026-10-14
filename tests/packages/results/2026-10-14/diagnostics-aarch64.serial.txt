@@ -1,0 +1,229 @@
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FC86000 start failed: Unsupported
+Error: Image at 0007FC0B000 start failed: Not Found
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+BdsDxe: starting Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x77e74000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x77e74000 to 0xffffffff80000000, length: 0x2c4000
+vmm: Kernel: Mapping 0x78138000 to 0xffffffff802c4000, length: 0x2c000
+vmm: Kernel: Mapping 0x78164000 to 0xffffffff802f0000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x77e74000 +0x2f0000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 29
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 30
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 1000000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+initramfs: Module:  1
+initramfs: Address: 0xffff000077a27000
+initramfs: Size:    4508672
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=24
+!>+ [11] ./sbin/init sz=248288
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/publisher-workspace-batch sz=1253296
+!>+ [15] ./usr/share/package-fixtures/signing-repeat sz=1121360
+!>+ [16] ./usr/share/package-fixtures/publisher-key sz=1503096
+!>+ [17] ./usr/share/package-fixtures/signing-reference sz=371328
+!>initramfs: no ustar sig at 0xffff000077e73800
+initramfs: Done (17 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 1000000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+pci: Found [0:2:0:-1]
+devcore: 3 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 3 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x2211f0
+HWTEST START packages-signing-repeat
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x2268d0
+Package signing: RFC8032 keys/signatures and tamper/canonical-scalar refusal passed
+SIGNING PROCESS signing-reference PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x244750
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+PUBLISHER FIXTURE created
+PUBLISHER FIXTURE packed
+PUBLISHER FIXTURE signed
+PUBLISHER FIXTURE released
+SIGNING PROCESS publisher-workspace-batch PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x23fa40
+SIGNING REPEAT 1/16 identical publication and verification PASS
+MemFree:        905456 kB
+Slab:           2384 kB
+SIGNING REPEAT 2/16 identical publication and verification PASS
+MemFree:        904976 kB
+Slab:           2416 kB
+SIGNING REPEAT 3/16 identical publication and verification PASS
+MemFree:        904544 kB
+Slab:           2416 kB
+SIGNING REPEAT 4/16 identical publication and verification PASS
+MemFree:        904240 kB
+Slab:           2416 kB
+SIGNING REPEAT 5/16 identical publication and verification PASS
+MemFree:        903776 kB
+Slab:           2432 kB
+SIGNING REPEAT 6/16 identical publication and verification PASS
+MemFree:        903440 kB
+Slab:           2480 kB
+SIGNING REPEAT 7/16 identical publication and verification PASS
+MemFree:        903232 kB
+Slab:           2480 kB
+SIGNING REPEAT 8/16 identical publication and verification PASS
+MemFree:        902928 kB
+Slab:           2480 kB
+SIGNING REPEAT 9/16 identical publication and verification PASS
+MemFree:        902576 kB
+Slab:           2496 kB
+SIGNING REPEAT 10/16 identical publication and verification PASS
+MemFree:        902176 kB
+Slab:           2512 kB
+SIGNING REPEAT 11/16 identical publication and verification PASS
+MemFree:        902032 kB
+Slab:           2528 kB
+SIGNING REPEAT 12/16 identical publication and verification PASS
+MemFree:        901632 kB
+Slab:           2544 kB
+SIGNING REPEAT 13/16 identical publication and verification PASS
+MemFree:        901264 kB
+Slab:           2544 kB
+SIGNING REPEAT 14/16 identical publication and verification PASS
+MemFree:        901200 kB
+Slab:           2544 kB
+SIGNING REPEAT 15/16 identical publication and verification PASS
+MemFree:        900800 kB
+Slab:           2560 kB
+SIGNING REPEAT 16/16 identical publication and verification PASS
+MemFree:        900640 kB
+Slab:           2576 kB
+PACKAGE SIGNING REPEAT 32 publications one-process canonical-bytes PASS
+SIGNING PROCESS signing-repeat PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x249fc0
+PUBLISHER KEY forged indexes and first enrollment refused PASS
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading data/payload (7 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Data 1.0.1 (1/1) from fixture
+Activated package generation 2
+PUBLISHER KEY valid enrollment/install and rejected replacement preserve trust/history/state PASS
+PUBLISHER KEY Software and policy review disclose invalid installed trust without changing state/history/data PASS
+PUBLISHER KEY Software and policy review propagate implicit runtime trust denial PASS
+Activated package generation 3
+PUBLISHER KEY legacy refresh/upgrade/rollback/app/dependency launch refused; reviewed revoke/uninstall preserve history/data PASS
+Publisher key admission qualification passed
+SIGNING PROCESS publisher-key PASS
+HWTEST PASS packages-signing-repeat
+syspower: power off: stopping devices

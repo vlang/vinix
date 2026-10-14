@@ -144,50 +144,16 @@ fn policy_fingerprint(config Config, state State, proposed PolicyDocument) strin
 	return fingerprint
 }
 
-fn policy_diagnostics(config Config, state State) map[string]string {
-	mut diagnostics := map[string]string{}
-	mut dependents := map[string][]string{}
-	mut pending := []string{cap: state.packages.len}
-	for installed in state.packages {
-		id := installed.package.id
-		mut diagnostic := ''
-		if !config.repositories.any(it.id == installed.repository && it.public_key == installed.public_key) {
-			diagnostic = '${id}: publisher key has been revoked'
-		} else {
-			check_policy(installed.package, config.policy) or { diagnostic = err.msg() }
-		}
-		diagnostics[id] = diagnostic
-		if diagnostic != '' { pending << id }
-		for dependency in installed.package.dependencies {
-			mut users := dependents[dependency.id] or { []string{} }
-			users.flags |= .noslices
-			users << id
-			dependents[dependency.id] = users
-		}
-	}
-	// Each package enters the queue once. Denial flows through reverse edges,
-	// including cycles, without repeatedly traversing every app's full closure.
-	mut next := 0
-	for next < pending.len {
-		blocked := pending[next]
-		next++
-		for id in dependents[blocked] {
-			if diagnostics[id] != '' { continue }
-			diagnostics[id] = diagnostics[blocked]
-			pending << id
-		}
-	}
-	return diagnostics
-}
-
 fn policy_review_locked(root string, path string) !PolicyReview {
 	config := load_config(root)!
 	state := read_state(state_directory(root), config.architecture)!
 	mut proposed := read_policy_document(path, config.architecture)!
 	defer { proposed.close() }
 	next := Config{ ...config, policy: proposed.policy }
-	before := policy_diagnostics(config, state)
-	after := policy_diagnostics(next, state)
+	before := package_diagnostics(config, state.packages)
+	defer { close_package_diagnostics(before) }
+	after := package_diagnostics(next, state.packages)
+	defer { close_package_diagnostics(after) }
 	mut rows := []PolicyImpact{cap: state.packages.len}
 	for installed in state.packages {
 		p := installed.package

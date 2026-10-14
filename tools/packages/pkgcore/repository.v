@@ -18,8 +18,17 @@ pub:
 // Keep syntax-only configuration/history readers compatible with revocation of
 // old keys. New trust and every authenticated index must pass curve admission.
 fn admitted_publisher_key(encoded string) ![]u8 {
-	if !digest_valid(encoded) { return error('invalid repository publisher key: expected 32 lowercase hex bytes') }
-	key := hex.decode(encoded)!
+	if encoded.len != 64 { return error('invalid repository publisher key: expected 32 lowercase hex bytes') }
+	// Decode directly into the owned key. The pinned hex decoder and bytes().all
+	// validation keep temporary byte arrays under -gc none -manualfree.
+	mut key := []u8{len: 32}
+	for i, byte in encoded {
+		digit := if byte >= `0` && byte <= `9` { byte - `0` } else if byte >= `a` && byte <= `f` { byte - `a` + 10 } else {
+			unsafe { key.free() }
+			return error('invalid repository publisher key: expected 32 lowercase hex bytes')
+		}
+		key[i / 2] = (key[i / 2] << 4) | digit
+	}
 	if !ed25519.publisher_key_valid(ed25519.PublicKey(key)) {
 		unsafe { key.free() }
 		return error('invalid repository publisher key: expected a canonical non-identity Ed25519 point in the prime-order subgroup')

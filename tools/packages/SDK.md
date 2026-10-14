@@ -1314,6 +1314,14 @@ manifest for launch controls; an explicitly empty installed permission set must
 not inherit the planned candidate's permissions. Older consumers may ignore
 these fields; older services retain the previous presentation fallback.
 `installed_window_protocol` adds the installed native-window declaration.
+For an installed row, `diagnostic` gives the first trust/policy blocker in the
+active installed dependency closure, including a revoked or cryptographically
+invalid runtime publisher. A pending candidate cannot hide that blocker until
+activation. If the installed closure has no blocker, the field checks the
+displayed candidate's own trust/policy. It does not resolve a new application's
+complete closure or promise a successful launch. Catalog expiry, payload
+integrity and sandbox/device/runtime failures are separate checks. Uninstall
+remains available. See [diagnostic checks](../../tests/packages/diagnostics-check.md).
 Pending rows include `update_action`
 (`install`, `update`, `remove`; otherwise empty), with `updatable:true`. They
 come from one complete `upgrade` resolution and include runtime/data additions,
@@ -1540,6 +1548,10 @@ proprietary/firmware flags, publisher ID/key, requested-root flag and
 type, including false flags and empty diagnostics. Empty diagnostics mean the complete
 dependency closure is allowed by current trust and the corresponding policy.
 Runtime restrictions consequently appear on dependent application rows too.
+Key admission includes the same canonical non-identity prime-order check used
+by launch; relaxing policy cannot repair an invalid publisher key. Diagnostic
+reads validate each distinct enrolled key once per graph, with no persistent
+validation cache. Configuration/state decoding stays readable for revocation.
 Review needs neither a usable catalog nor a live publisher.
 
 `policy-apply FINGERPRINT FILE` loads the complete configuration, installed state

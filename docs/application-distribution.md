@@ -264,6 +264,11 @@ launch and rollback enforce this check. Existing configuration/history stays
 readable for reviewed revocation and uninstall of an old unusable key, preserving
 replay floors and personal data. See
 [publisher key qualification](../tests/packages/publisher-key-check.md).
+Software and organization-policy reviews also identify invalid installed keys,
+including a runtime's publisher when the application's own key is valid.
+These read-only diagnostics remain available with an unusable catalog and
+explicitly preserve the uninstall path. See
+[diagnostic qualification](../tests/packages/diagnostics-check.md).
 
 Ed25519 authenticates the exact index bytes **before** decoding. The service
 uses a [pinned, licensed V signing dependency](../tools/packages/signing/README.md)
@@ -595,6 +600,13 @@ Each section has **Previous**/**Next** pages, including long UTF-8 text. Control
 bytes appear as `\xHH`. Catalog and update details identify the displayed version
 separately from installed launch permissions and native-window protocol; older
 services report unavailable installed fields explicitly.
+Installed package diagnostics follow the active dependency closure: revoked or
+invalid publisher keys, permission restrictions, licenses, firmware policy and
+version pins on a runtime are also shown against its dependent applications.
+A pending update that removes or repairs a blocked dependency keeps the current
+launch diagnostic until activation. Unrelated applications remain unaffected;
+uninstall remains available. These are trust/policy diagnostics, not a payload
+integrity scan or an application launch test.
 
 The same button is available for each package in an install, uninstall, update,
 deployment, rollback or offline-export review. It shows the reviewed operation,
