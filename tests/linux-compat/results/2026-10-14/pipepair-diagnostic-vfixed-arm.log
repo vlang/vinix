@@ -1,0 +1,5 @@
+/Users/alex/.cache/vinix-linux-compat/pipepair-20261014/diagnostic-vfixed2-arm/fixture.c:1203:27: error: call to undeclared function 'v_fixed_index'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1203 |                         u64 upper = __in_lhs_0[v_fixed_index(__for_idx_1, 5)];
+      |                                                ^
+1 error generated.
+Command failed; code: 1

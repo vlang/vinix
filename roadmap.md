@@ -850,6 +850,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   transfers, errors and flat storage as root/UID1000 on both architectures.
   See [the pipe receipts](docs/linux-posix-qualification.md#native-pipe2-flag-words-and-errors).
 
+- [x] Construct native pipe endpoints privately and publish both descriptor slots
+  together; qualify EMFILE cleanup, lowest-slot selection, transfers and retained
+  state under descriptor pressure, with flat storage on both architectures.
+  See [the construction receipts](docs/linux-posix-qualification.md#native-pipe-construction-under-descriptor-pressure).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

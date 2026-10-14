@@ -1,0 +1,5 @@
+/Users/alex/.cache/vinix-linux-compat/pipepair-20261014/diagnostic-vfixed2-x86/fixture.c: In function 'pipepairfixture__cycle':
+/Users/alex/.cache/vinix-linux-compat/pipepair-20261014/diagnostic-vfixed2-x86/fixture.c:1203:48: error: implicit declaration of function 'v_fixed_index' [-Wimplicit-function-declaration]
+ 1203 |                         u64 upper = __in_lhs_0[v_fixed_index(__for_idx_1, 5)];
+      |                                                ^~~~~~~~~~~~~
+Command failed; code: 1

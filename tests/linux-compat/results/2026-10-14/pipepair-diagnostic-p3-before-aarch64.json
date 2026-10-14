@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "05da448986ad0d7d3da9484866e71e8846e68198f0248be178ca111a3cf03fcf",
+    "results": [
+        {
+            "name": "pipepair",
+            "source_sha256": "b172a70f4f16b4108c45cd4629041bc130595e7e15bc62cfffebd6cb346ea36a",
+            "init_sha256": "",
+            "iso_sha256": "",
+            "exit_code": 1,
+            "detail": "Command failed"
+        }
+    ]
+}

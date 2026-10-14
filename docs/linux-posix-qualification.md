@@ -5282,3 +5282,97 @@ Packet/watch queues, F_SETFL packet mode, partially constructed pipes under
 descriptor exhaustion, concurrent publication/close races, limit-versus-pointer
 precedence, concurrent credentials, physical exhaustion, named FIFOs,
 GNU/translated/ELF32 paths and the three broad section 15 gates remain open.
+
+## Native pipe construction under descriptor pressure
+
+The native constructor now creates both endpoint descriptors privately. The
+reader retains the pipe while the writer is constructed, so another thread
+cannot close that private reader and free the object beneath construction.
+Writer-construction refusal captures errno and releases the reader. A new
+helper holds the descriptor-table lock, finds the two lowest free slots below
+the current soft limit, grows the existing table if needed, and adopts both
+references together. On refusal it changes neither slots nor output scratch;
+the caller preserves errno and releases both private owners.
+
+Previously the reader was installed before the writer was attempted. With
+one free slot the writer returned EMFILE, leaving that reader open. The
+fix changes constructor ownership and slot publication; existing allocation,
+resource boxing, FD/Handle/Pipe unrefs, table growth and checked usercopy
+implementations stay unchanged. Linux likewise returns its unused first
+slot and both endpoint owners on a second-slot refusal in its
+[pipe implementation](https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux/+/b91872c56940950a6a0852e499d249c3091d4284/fs/pipe.c).
+Linux copies results before installing the endpoints; Vinix's later usercopy
+publication/rollback races are a separate boundary, not closed by this fix.
+
+The `pipepair` musl probe runs root and UID/GID1000 cohorts. Soft limits of
+48 and 64 are filled with CLOEXEC aliases, then zero, one, two or three
+nonadjacent holes are reopened. Four ordinary pipe flag combinations and
+five upper-register patterns exercise aligned, unaligned, address-one,
+full-width bad-address, PROT_NONE, readonly and cross-page outputs. Nil is
+excluded here because its descriptor-limit precedence remains unqualified.
+Immediate table checks occur before repairing the known baseline leak;
+only temporary filler holes can be repaired. Every query restores those
+filler aliases and verifies the original 64-slot vector.
+
+| Controls per root/UID cohort | Calls | Baseline failures |
+| --- | ---: | ---: |
+| Return/error, lowest-slot pairs, metadata/flags and real transfers | 1,120 | 0 |
+| Immediate table state before cleanup | 1,120 | 280 |
+| Applicable output canaries and restored filler aliases | 2,240 | 0 |
+| Retained aliases, data/cursor, queued AB and original slots | 13 | 0 |
+
+Both baselines fail 560 of 8,986 controls per architecture. Corrected Vinix
+and actual Linux6.12.51 pass every row with the same native probe C/ELF;
+child CASES and supervisor FINAL rows agree. Successful pairs temporarily
+restore the original soft limit before creating all six original/dup/CLOEXEC
+aliases, then verify FIFO0600, creator UID/GID, shared inode identity, exact
+libc and raw 64-bit status flags, descriptor flags, nonblocking EAGAIN, ABC
+transfers and EOF after every writer closes. Every known alias is closed
+before filler restoration. Faulting ordinary copies may commit a prefix;
+unchanged-output assertions apply to EMFILE, not EFAULT.
+
+Two warmed and settled 200-cycle cohorts per architecture alternate full and
+one-slot refusals, successful pair creation/aliases/transfers/close, and
+cross-page copy faults. All 18 ARM/14 x86 slab classes and observed large
+pages stay exactly flat: 68/68 ARM and 177/177 x86 for both credentials.
+The existing AArch64 desktop harness separately runs ops/churn/cache and
+idle/apps/drag on both frozen kernels. Its 36 operation rows and four
+300-run churn programs retain zero bytes, and all three desktop scenarios
+complete. Actual staged kernel, measurement ELF/source, desktop and config
+are captured before VM cleanup; measurement/desktop inputs are identical
+across controls. The automatic cache-pruning callback is skipped to protect
+other sessions' build artifacts; production measurement, ISO preparation,
+guest supervision and report validation remain in use. These are AArch64
+memory/startup controls, not new x86 desktop-performance qualification.
+
+Four production builds use detached worktrees at
+d6a33ce248887d5dd8e400eb6d3b78d315a6567d. Removing only the constructor
+body/prototype and the new pair-helper body/prototype makes entire generated
+C identical to baseline. The helper has no new allocation, retention or
+destructor, and all existing constructors/unrefs are byte-identical.
+Independent review covers private ownership on each failure and synchronous
+fixture stack/mapping borrows. The probe has sixteen explicit allocas and
+zero hidden heap/index helpers. Both five-case profiles
+(pipepair/pipeabi/access/open/runtime), eight host files and the 64-input
+inventory pass. Allocation scans retain 400 ARM/292 x86 sites with identical
+existing allowance refusals. Preflight/native/Linux ELFs and fixture C match;
+the complete raw preflight C drift is empty.
+
+Initial incomplete host preparations, a vanished mounted TMPDIR, an errno
+assignment type check and an unavailable bounded-index helper are retained
+as diagnostics. Their empty init/ISO hashes and host details do not establish
+semantic baselines. Only fresh p4 profiles on private durable TMPDIR qualify
+the final fixture. The assertion-enabled auditor rejects a passing capture
+presented as a failing baseline, binds the final receipts and evidence, and
+reuses the self-contained f6358ec compiler and its 15,146 input pins.
+
+- [AArch64 receipt](../tests/linux-compat/results/2026-10-14/pipepair-after-aarch64.json), [Linux reference](../tests/linux-compat/results/2026-10-14/pipepair-reference-aarch64.json), [evidence](../tests/linux-compat/results/2026-10-14/pipepair-evidence-aarch64.json).
+- [x86-64 receipt](../tests/linux-compat/results/2026-10-14/pipepair-after-x86_64.json), [Linux reference](../tests/linux-compat/results/2026-10-14/pipepair-reference-x86_64.json), [evidence](../tests/linux-compat/results/2026-10-14/pipepair-evidence-x86_64.json).
+- [Audit](../tests/linux-compat/results/2026-10-14/pipepair-audit.v), [verdict](../tests/linux-compat/results/2026-10-14/pipepair-audit.log), [independent review](../tests/linux-compat/results/2026-10-14/pipepair-lifetime-review.md).
+- [Baseline memory controls](../tests/linux-compat/results/2026-10-14/pipepair-perf-before-ops-result.json), [corrected memory controls](../tests/linux-compat/results/2026-10-14/pipepair-perf-after-ops-result.json), [baseline desktop](../tests/linux-compat/results/2026-10-14/pipepair-perf-before-desktop-result.json), [corrected desktop](../tests/linux-compat/results/2026-10-14/pipepair-perf-after-desktop-result.json).
+
+The measured limits are below the initial 1,024 descriptor slots, so table
+growth, its budget refusal and physical exhaustion require separate tests.
+Concurrent prlimit/close, copy-before-publication and output-fault rollback
+races, nil-versus-limit precedence, packet/watch semantics, GNU/translated/
+ELF32 paths and the three broad section 15 gates remain open.

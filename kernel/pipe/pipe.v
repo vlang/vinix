@@ -236,17 +236,24 @@ pub fn syscall_pipe(_ voidptr, pipefds &i32, flags int) (u64, u64) {
 	mut new_pipe := create() or { return errno.err, errno.get() }
 	mut box := new_pipe.box
 
-	rd_fd := file.fdnum_create_from_resource(unsafe { nil }, mut box, flags | resource.o_rdonly, 0, false) or {
+	// Keep the first endpoint private while constructing the second. A shared
+	// descriptor table cannot close the first owner and free the pipe beneath
+	// the writer constructor, and a failed writer never leaves a reader open.
+	mut read_end := file.fd_create_from_resource(mut box, flags | resource.o_rdonly) or {
 		return errno.err, errno.get()
 	}
 
-	wr_fd := file.fdnum_create_from_resource(unsafe { nil }, mut box, flags | resource.o_wronly, 0, false) or {
-		return errno.err, errno.get()
+	mut write_end := file.fd_create_from_resource(mut box, flags | resource.o_wronly) or {
+		saved := errno.get()
+		read_end.unref()
+		return errno.err, saved
 	}
 
-	unsafe {
-		pipefds[0] = i32(rd_fd)
-		pipefds[1] = i32(wr_fd)
+	if !file.fdnum_create_pair(process, read_end, write_end, pipefds) {
+		saved := errno.get()
+		read_end.unref()
+		write_end.unref()
+		return errno.err, saved
 	}
 	return 0, 0
 }

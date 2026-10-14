@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-14/pipepair-audit.v:88: FAIL: fn main.failure: assert log.contains('LINUX PIPEPAIR DETAIL:'), 'pipepair baseline failure markers required';
+      message: pipepair baseline failure markers required
+V panic: Assertion failed...

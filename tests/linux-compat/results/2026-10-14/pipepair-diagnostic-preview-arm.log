@@ -1,0 +1,9 @@
+Compiler output from the default V compiler:
+/Volumes/VinixOwnerQueryScratch/tmp/vinix-v-module-YpJI9r/pipepairfixture/core.v:136:9: error: cannot dereference a function call on the left side of an assignment, use a temporary variable
+  134 |     unsafe { mut value := &Filled(destination); *value = Filled{}; value.limit = soft
+  135 |         if C.getrlimit(C.RLIMIT_NOFILE, &value.original) != 0 || value.original.rlim_cur < 80 || !limit(soft, value.original.rlim_max) { fatal() }
+  136 |         for { *C.__errno_location() = 0; fd := C.fcntl(bank.fds[0], C.F_DUPFD_CLOEXEC, 0)
+      |               ^
+  137 |             if fd < 0 { if *C.__errno_location() != C.EMFILE { fatal() }; break }
+  138 |             if value.count >= 64 || u64(fd) >= soft { fatal() }; value.fds[value.count] = fd; value.count++
+

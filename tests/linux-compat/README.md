@@ -1306,3 +1306,24 @@ for the QMP socket limit. Use `tests/linux-compat/pipeabi-reference.v` with
 on Linux. Descriptor exhaustion cleanup, concurrent publication/closure,
 limit/pointer precedence and F_SETFL packet mode require separate work. See
 [receipts and limits](../../docs/linux-posix-qualification.md#native-pipe2-flag-words-and-errors).
+
+The `pipepair` case qualifies native pipe construction under descriptor
+pressure. Root/UID1000 cohorts lower the soft limit to 48/64, fill available
+slots, and reopen zero through three nonadjacent holes. Four ordinary flags,
+five upper-register patterns and seven aligned/unaligned/fault outputs check
+actual return/error behavior, immediate descriptor state, output canaries and
+filler restoration. Successful pairs select the two lowest holes, retain
+original/dup/CLOEXEC aliases and pass inode/owner/status/FD flags, EAGAIN,
+ABC transfers and EOF. Original regular data/cursor, nine aliases, queued AB
+and 64 descriptor slots survive. Baselines leak a reader on each one-slot
+refusal, failing 560 of 8,986 controls per architecture; corrected Vinix and
+the identical ELF on actual Linux6.12.51 pass all rows. Two 200-cycle pressure,
+copy-fault and success/alias cohorts retain exactly flat storage.
+Run `tests/linux-compat/run` with `--arch ARCH --kernel-dir DIR --state-dir FRESH`
+and `--cases pipepair,pipeabi,access,open,runtime`. Use
+`tests/linux-compat/pipepair-reference.v` with `--arch`, `--kernel`, `--init`
+and a fresh `--state-dir` for Linux. These limits are below the initial 1,024
+table slots; growth, allocation-budget refusal and concurrent limit changes
+remain unqualified. User-copy publication/rollback races and nil-versus-limit
+precedence are separate. See
+[receipts and limits](../../docs/linux-posix-qualification.md#native-pipe-construction-under-descriptor-pressure).

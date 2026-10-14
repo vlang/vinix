@@ -832,6 +832,32 @@ pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific 
 	}
 }
 
+// Adopt two privately constructed descriptors together. On refusal neither
+// table slot changes and the caller still owns both references; on success
+// the table owns them. Both borrowed output words are kernel scratch.
+pub fn fdnum_create_pair(_process &proc.Process, first &FD, second &FD, numbers &i32) bool {
+	mut process := if _process == unsafe { nil } { proc.current_thread().process } else { unsafe { _process } }
+	process.fds_lock.acquire()
+	defer { process.fds_lock.release() }
+	limit := if process.rlimits[proc.rlimit_nofile].cur < u64(proc.max_fds) {
+		int(process.rlimits[proc.rlimit_nofile].cur)
+	} else { proc.max_fds }
+	mut first_num := -1
+	mut second_num := -1
+	for number in 0 .. limit {
+		if number < process.fds.len && process.fds[number] != unsafe { nil } { continue }
+		if first_num < 0 { first_num = number } else { second_num = number; break }
+	}
+	if second_num < 0 || (second_num >= process.fds.len && !grow_fd_table(mut process, second_num)) {
+		errno.set(errno.emfile)
+		return false
+	}
+	process.fds[first_num] = voidptr(first)
+	process.fds[second_num] = voidptr(second)
+	unsafe { numbers[0] = i32(first_num); numbers[1] = i32(second_num) }
+	return true
+}
+
 // Make room in a descriptor table for `fdnum`, doubling it until there is. The
 // caller holds fds_lock, which everything that reads the table while another
 // thread may make descriptors holds too.
