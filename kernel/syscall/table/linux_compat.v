@@ -230,15 +230,15 @@ fn syscall_linux_setrlimit(gpr_state voidptr, which_resource int, new_limit u64)
 	return syscall_linux_prlimit64(gpr_state, 0, which_resource, new_limit, 0)
 }
 
-fn syscall_linux_sched_rr_get_interval(_ voidptr, pid int, interval_ptr u64) (u64, u64) {
-	if interval_ptr == 0 {
-		return errno.err, errno.efault
-	}
+fn syscall_linux_sched_rr_get_interval(_ voidptr, raw_pid int, interval_ptr u64) (u64, u64) {
+	// Native Linux pid_t is signed32. Resolve it before checking the output:
+	// negative and absent task errors take precedence over a bad timespec.
+	pid := int(i32(u32(raw_pid)))
 	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
 	params := proc.thread_sched_params(tid) or { return errno.err, errno.get() }
 
-	// Only SCHED_RR rotates on a quantum. Every other policy has none to
-	// report, and says so with a zero interval, as Linux does.
+	// Vinix reports a fixed quantum for SCHED_RR and zero for other policies.
+	// Interval durations depend on the scheduler implementation/configuration.
 	mut interval := time.TimeSpec{}
 	if params.policy == proc.sched_rr {
 		// The scheduler's round-robin timeslice is five milliseconds.

@@ -1,0 +1,3 @@
+tests/linux-compat/rrabi-check.v:109: FAIL: fn main.failure: assert log.contains('LINUX RRABI DETAIL:'), 'rrabi baseline failure markers required';
+      message: rrabi baseline failure markers required
+V panic: Assertion failed...

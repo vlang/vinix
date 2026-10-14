@@ -883,6 +883,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   Keep SCHED_EXT/BPF class installation and runtime support explicitly separate.
   See [the priority metadata receipts](docs/linux-posix-qualification.md#native-sched_ext-priority-metadata).
 
+- [x] Decode native RR interval PID words and resolve targets before output
+  faults; qualify guarded raw/musl calls, real RR intervals, retained state
+  and flat query storage on both architectures and identical-ELF Linux.
+  Keep scheduler-dependent durations and remaining policy/foreign gaps explicit.
+  See [the interval receipts](docs/linux-posix-qualification.md#native-rr-interval-pid-words-and-output-errors).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

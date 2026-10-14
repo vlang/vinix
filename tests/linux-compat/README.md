@@ -1416,3 +1416,23 @@ binds four builds, exact C scope, compiler/source/ELF pins, lifetime review
 and the failed standalone-helper preparation. Installing or running a
 SCHED_EXT/BPF scheduler, permission rules, GNU/foreign paths and the
 AArch64 multi-CPU QoS blocker remain open.
+
+The `rrabi` case qualifies native `sched_rr_get_interval` PID decoding and
+task-before-output error precedence. Root/UID1000 children make 998 controls
+per architecture: six PID targets, seven raw register-word forms, ten guarded
+output forms and genuine musl wrapper calls. Both cohorts query a real RR
+task at priority1 before returning to OTHER. Vinix retains its 5ms RR quantum
+and zero OTHER interval; Linux references validate normalized timespecs and
+positive RR intervals without requiring configuration-dependent durations
+to match. Original kernels fail 520 checks; corrected kernels and identical
+ELFs on Linux 6.12.51 pass every row. Two warmed 200-cycle query cohorts keep
+all slab/large-page counts flat. Run
+`--cases rrabi,runtime,schedabi,schext,open,fcntlabi` in a fresh state directory.
+`rrabi-reference.v --arch ARCH --kernel LINUX --init NATIVE-PROBE-ELF
+--state-dir FRESH-DIR` executes the Linux oracle. Compile `rrabi-check.v`
+without `-prod` and pass the retained evidence directory to audit original,
+corrected and reference artifacts, compiler/source/C/ELF pins and executing
+negative controls. [The report](../../docs/linux-posix-qualification.md#native-rr-interval-pid-words-and-output-errors)
+publishes the independent lifetime review and retained dependency limits.
+Scheduling-class timing, cross-task policy/permissions/races, attribute and
+affinity ABIs, GNU/foreign paths and the broad compatibility gates remain open.

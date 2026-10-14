@@ -1,0 +1,2 @@
+arm: complete C unchanged outside RR query prototype/body; PID narrows through signed32 and target resolution precedes unchanged output copy; no allocation or scheduler mutation
+x86: complete C unchanged outside RR query prototype/body; PID narrows through signed32 and target resolution precedes unchanged output copy; no allocation or scheduler mutation

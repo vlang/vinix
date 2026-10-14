@@ -1,0 +1,122 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  3  248k    3  7866    0     0  12785      0  0:00:19 --:--:--  0:00:19 12769100  248k  100  248k    0     0   213k      0  0:00:01  0:00:01 --:--:--  213k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 76 2880k   76 2191k    0     0  1727k      0  0:00:01  0:00:01 --:--:-- 1727k100 2880k  100 2880k    0     0  1933k      0  0:00:01  0:00:01 --:--:-- 1932k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  38511      0 --:--:-- --:--:-- --:--:-- 38575
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   207k      0 --:--:-- --:--:-- --:--:--  207k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  82508      0 --:--:-- --:--:-- --:--:-- 82507
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  4  117k    4  5615    0     0  10780      0  0:00:11 --:--:--  0:00:11 10777100  117k  100  117k    0     0   208k      0 --:--:-- --:--:-- --:--:--  208k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/rrabi-20261014/states/p1-before-x86/rrabi/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/rrabi-20261014/states/p1-before-x86/rrabi/.vinix-amd64.iso.TjbKYc'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 1485m free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/rrabi-20261014/states/p1-before-x86/rrabi/iso-build/.iso-staging.V2BhKa/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13648 sectors
+Written to medium : 13648 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/rrabi-20261014/states/p1-before-x86/rrabi/.vinix-amd64.iso.TjbKYc' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd53f.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/rrabi-20261014/states/p1-before-x86/rrabi/test.iso (27951104 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/rrabi-20261014/states/p1-before-x86/rrabi
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=75712
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91c00
+initramfs: Done (9 entries)
+LINUX RRABI DETAIL: ordinary=0 kind=3 pid=1234567800000000 form=-1 libc=0 call=2 ret=-1 errno=3 expected=0
+LINUX RRABI DETAIL: ordinary=0 kind=3 pid=ffffffff00000000 form=-1 libc=0 call=3 ret=-1 errno=22 expected=0
+LINUX RRABI DETAIL: ordinary=0 kind=3 pid=8000000000000000 form=-1 libc=0 call=4 ret=-1 errno=22 expected=0
+LINUX RRABI DETAIL: ordinary=0 kind=3 pid=7fffffff00000000 form=-1 libc=0 call=5 ret=-1 errno=3 expected=0
+LINUX RRABI DETAIL: ordinary=0 kind=1 pid=1234567800000000 form=0 libc=0 call=1 ret=-1 errno=3 expected=0
+LINUX RRABI DETAIL: ordinary=0 kind=1 pid=ffffffff00000000 form=0 libc=0 call=2 ret=-1 errno=22 expected=0
+LINUX RRABI DETAIL: ordinary=0 kind=1 pid=8000000000000000 form=0 libc=0 call=3 ret=-1 errno=22 expected=0
+LINUX RRABI DETAIL: ordinary=0 kind=1 pid=7fffffff00000000 form=0 libc=0 call=4 ret=-1 errno=3 expected=0
+LINUX RRABI DETAIL: ordinary=0 kind=0 pid=ffffffffffffffff form=3 libc=0 call=24 ret=-1 errno=14 expected=22
+LINUX RRABI DETAIL: ordinary=0 kind=2 pid=ffffffff form=3 libc=1 call=24 ret=-1 errno=14 expected=22
+LINUX RRABI DETAIL: ordinary=0 kind=0 pid=ffffffff80000000 form=3 libc=0 call=34 ret=-1 errno=14 expected=22
+LINUX RRABI DETAIL: ordinary=0 kind=2 pid=80000000 form=3 libc=1 call=34 ret=-1 errno=14 expected=22
+LINUX RRABI DETAIL: ordinary=0 kind=0 pid=7fffffff form=3 libc=0 call=44 ret=-1 errno=14 expected=3
+LINUX RRABI DETAIL: ordinary=0 kind=2 pid=7fffffff form=3 libc=1 call=44 ret=-1 errno=14 expected=3
+LINUX RRABI DETAIL: ordinary=0 kind=0 pid=df7 form=3 libc=0 call=54 ret=-1 errno=14 expected=3
+LINUX RRABI DETAIL: ordinary=0 kind=2 pid=df7 form=3 libc=1 call=54 ret=-1 errno=14 expected=3
+LINUX RRABI CASES: ordinary=0 kind=0 calls=60 failures=4
+LINUX RRABI CASES: ordinary=0 kind=1 calls=360 failures=240
+LINUX RRABI CASES: ordinary=0 kind=2 calls=60 failures=4
+LINUX RRABI CASES: ordinary=0 kind=3 calls=19 failures=12
+LINUX RRABI FINAL: ordinary=0 kind=0 calls=60 failures=4
+LINUX RRABI FINAL: ordinary=0 kind=1 calls=360 failures=240
+LINUX RRABI FINAL: ordinary=0 kind=2 calls=60 failures=4
+LINUX RRABI FINAL: ordinary=0 kind=3 calls=19 failures=12
+LINUX RRABI DETAIL: ordinary=1 kind=3 pid=1234567800000000 form=-1 libc=0 call=2 ret=-1 errno=3 expected=0
+LINUX RRABI DETAIL: ordinary=1 kind=3 pid=ffffffff00000000 form=-1 libc=0 call=3 ret=-1 errno=22 expected=0
+LINUX RRABI DETAIL: ordinary=1 kind=3 pid=8000000000000000 form=-1 libc=0 call=4 ret=-1 errno=22 expected=0
+LINUX RRABI DETAIL: ordinary=1 kind=3 pid=7fffffff00000000 form=-1 libc=0 call=5 ret=-1 errno=3 expected=0
+LINUX RRABI DETAIL: ordinary=1 kind=1 pid=1234567800000000 form=0 libc=0 call=1 ret=-1 errno=3 expected=0
+LINUX RRABI DETAIL: ordinary=1 kind=1 pid=ffffffff00000000 form=0 libc=0 call=2 ret=-1 errno=22 expected=0
+LINUX RRABI DETAIL: ordinary=1 kind=1 pid=8000000000000000 form=0 libc=0 call=3 ret=-1 errno=22 expected=0
+LINUX RRABI DETAIL: ordinary=1 kind=1 pid=7fffffff00000000 form=0 libc=0 call=4 ret=-1 errno=3 expected=0
+LINUX RRABI DETAIL: ordinary=1 kind=0 pid=ffffffffffffffff form=3 libc=0 call=24 ret=-1 errno=14 expected=22
+LINUX RRABI DETAIL: ordinary=1 kind=2 pid=ffffffff form=3 libc=1 call=24 ret=-1 errno=14 expected=22
+LINUX RRABI DETAIL: ordinary=1 kind=0 pid=ffffffff80000000 form=3 libc=0 call=34 ret=-1 errno=14 expected=22
+LINUX RRABI DETAIL: ordinary=1 kind=2 pid=80000000 form=3 libc=1 call=34 ret=-1 errno=14 expected=22
+LINUX RRABI DETAIL: ordinary=1 kind=0 pid=7fffffff form=3 libc=0 call=44 ret=-1 errno=14 expected=3
+LINUX RRABI DETAIL: ordinary=1 kind=2 pid=7fffffff form=3 libc=1 call=44 ret=-1 errno=14 expected=3
+LINUX RRABI DETAIL: ordinary=1 kind=0 pid=dce2 form=3 libc=0 call=54 ret=-1 errno=14 expected=3
+LINUX RRABI DETAIL: ordinary=1 kind=2 pid=dce2 form=3 libc=1 call=54 ret=-1 errno=14 expected=3
+LINUX RRABI CASES: ordinary=1 kind=0 calls=60 failures=4
+LINUX RRABI CASES: ordinary=1 kind=1 calls=360 failures=240
+LINUX RRABI CASES: ordinary=1 kind=2 calls=60 failures=4
+LINUX RRABI CASES: ordinary=1 kind=3 calls=19 failures=12
+LINUX RRABI FINAL: ordinary=1 kind=0 calls=60 failures=4
+LINUX RRABI FINAL: ordinary=1 kind=1 calls=360 failures=240
+LINUX RRABI FINAL: ordinary=1 kind=2 calls=60 failures=4
+LINUX RRABI FINAL: ordinary=1 kind=3 calls=19 failures=12
+LINUX RRABI FAIL: interval metadata, error precedence or state
+QEMU: Terminated
+Missing verdicts: ['LINUX RRABI: PASS']; failures: ['FAIL:', 'LINUX RRABI FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/rrabi-20261014/states/p1-before-x86/receipt.json

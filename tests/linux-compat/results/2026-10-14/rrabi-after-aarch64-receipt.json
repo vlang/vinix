@@ -1,0 +1,55 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "02cfdf36f0f917367b8228408bf6e5ad3c421c0b364f3b1174754117f506291f",
+    "results": [
+        {
+            "name": "rrabi",
+            "source_sha256": "1dbb6631fbff3080966eaabecb56c4efa37b53bb3df2979ad68da9be7e8b874e",
+            "init_sha256": "c4fa4490cfc1f9997ab8018831a242c1c4fdc5099bb6c59bbccceb1b88890f5a",
+            "iso_sha256": "0eeda913c80cb54db77d0d9e0591eb29c0f237acab1f6f8e2578bd7ddc9c3991",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "57f59bc080e1325ea77857814c970f9115e5c70d5dd80c34cf13baffeb844578",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "schedabi",
+            "source_sha256": "de18a603b819a8534ec998e1229c6b6b5103bfe515bff8e81b81ee78b9c21d7d",
+            "init_sha256": "aaf0c1175a0b32bee276fc84f5619c7c468643a97337fb4ee44b45900b81af18",
+            "iso_sha256": "17d0a6ce72e73d316ca9135f28af6f911fd7bd6ea76efaa5e8d130d718429b84",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "schext",
+            "source_sha256": "355b497a5984b728a3838c352a99bcc75b9f4ee294c1cca2fc62e0eea3425536",
+            "init_sha256": "a5535c690f40ecc1f971fa572ed37c705c52d0e0b3117d9eca38407d09c5f55d",
+            "iso_sha256": "179f6eb9deeb24673e4f29868b11343b67eee84a0e015db826ba958e0d92a063",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "open",
+            "source_sha256": "923b9cfdaa49bf37b0c82d235294b2785f61366c39d9af8f1d5dfe45cbe65262",
+            "init_sha256": "b41456ec1e04ca2e2e83e39ac5f01da498edfc8011f4eb71541bbc9ec9ec7c6a",
+            "iso_sha256": "2431c89759bcb7920bcd5cca65419ecc45e7d8ac2c53e89f87a7196385575a29",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "fcntlabi",
+            "source_sha256": "6f70bc290dff8671cbde66025806b7b5d99d82468dc6e7098ec86a27cc43c3ac",
+            "init_sha256": "b92892f1860ff4aae349f27924922645aed79becbcff2dd00a0a18fc797fd3fd",
+            "iso_sha256": "84aa790b417305407b2781135051fd4f1a30a764788131b5ab0ababd52b65210",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

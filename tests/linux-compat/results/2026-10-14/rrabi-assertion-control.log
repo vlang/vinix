@@ -1,0 +1,3 @@
+tests/linux-compat/rrabi-check.v:168: FAIL: fn main.main: assert false,'rrabi assertions must execute';
+      message: rrabi assertions must execute
+V panic: Assertion failed...

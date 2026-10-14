@@ -5787,3 +5787,99 @@ three broad section 15 acceptance gates remain open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-14/schext-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-14/schext-after-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/schext-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-14/schext-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-14/schext-after-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/schext-reference-x86_64-receipt.json).
 - [Maintained V audit](../tests/linux-compat/schext-check.v), [verdict](../tests/linux-compat/results/2026-10-14/schext-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-14/schext-lifetime-review.md).
+
+## Native RR interval PID words and output errors
+
+`sched_rr_get_interval` now decodes the native signed32 `pid_t` before
+resolving a task, and resolves that task before accessing its output buffer.
+Negative PIDs return `EINVAL`; absent and fully reaped tasks return `ESRCH`,
+including when the interval pointer is null or inaccessible. A valid task
+with an invalid output pointer returns `EFAULT`. Linux follows this order in
+its [RR query implementation](https://github.com/torvalds/linux/blob/v6.12/kernel/sched/syscalls.c).
+The existing task lookup, copied scheduling parameters, lock scopes and
+timespec copy remain unchanged.
+
+The native `rrabi` V probe runs independent root and UID/GID1000 children.
+Each child starts with a real RR task at priority1, queries through raw
+syscalls and the genuine musl `sched_rr_get_interval` wrapper, and switches
+back to OTHER before the guarded error matrix. RR installation happens
+while privileged; the ordinary cohort queries its own task after dropping
+credentials. The probe does not infer unprivileged RR-install permissions
+from successful queries. Unlike musl's obsolete process scheduler wrappers,
+this musl function invokes the native syscall.
+
+Six PID targets include implicit and explicit self, two negative signed32
+values, a guaranteed absent positive value and a fully reaped child. Each
+target uses the ordinary signed word, six varied upper-word patterns and
+a libc call. Ten output forms cover aligned/unaligned buffers, an exactly
+page-ending timespec, null/address1, read-only and inaccessible pages,
+read-only/inaccessible and writable/read-only crossings, and a pointer with
+an invalid upper address bit. Guards and read-only bytes remain unchanged;
+a valid task's faulting cross-page copy may write its accessible prefix.
+Task validation errors must leave even that prefix untouched. All output
+pointers retain their full native width.
+
+Each cohort records 60 ordinary-word queries, 360 varied-upper-word queries,
+60 libc queries, 16 real RR queries and three final state/guard controls.
+The two cohorts total 992 syscall/wrapper checks plus six final controls.
+
+| Architecture | Checks | Original failures | Corrected failures | Same-ELF Linux failures |
+| --- | --- | --- | --- | --- |
+| AArch64 | 998 | 520 | 0 | 0 |
+| x86-64 | 998 | 520 | 0 | 0 |
+
+Original kernels have the same per-cohort failure vector `4/240/4/12`.
+Their ordinary raw and libc failures expose null-output error precedence;
+upper-word and RR failures expose the native PID decoder. Final policy,
+priority and buffer controls remain intact. Corrected Vinix and actual
+Linux 6.12.51 execute identical architecture-specific probe ELFs and pass
+every row. Preview, preflight and both native phases have identical raw C.
+
+Interval duration depends on the scheduler and its configuration. Native
+controls retain Vinix's 5ms RR quantum and zero OTHER interval. Linux
+references require normalized nonnegative OTHER and positive RR timespecs,
+without requiring those durations to match Vinix. Other policy intervals,
+fair-task timing and the query's relationship to actual CPU entitlement
+need separate qualification.
+
+After 32 warmups, both corrected cohorts repeat 200 cycles of raw/libc self
+queries, varied PID words, negative/missing-task precedence, bad-pointer
+errors and retained policy/priority. All slab classes and large-page counts
+stay flat. The probe holds and closes one slab observer per cohort and
+unmaps its three-page guard region before reporting.
+
+The first corrected profiles exhausted host disk space after five completed
+cases. ARM's final fcntlabi ISO build explicitly failed with `ENOSPC`; the
+x86 driver could not save its aggregate log, leaving five completed receipt
+rows. The original receipts, completed probe artifacts and ARM failure log
+remain retained and are bound separately as preparation diagnostics. A V
+cleaner verified all 108 completed probe files byte-identical before removing
+18 disposable boot-staging/NVRAM paths. Fresh corrected profiles in new
+directories provide the complete six-case verdicts below.
+
+Four original/final production build captures use isolated worktrees at
+`509d83f1903c9b968bd942a487754f16356e2a73`. Two earlier corrected builds,
+followed by a source-comment clarification, have identical generated C;
+their build logs and C remain retained. Full generated kernel C differs
+only in the RR query prototype/body: the PID cast replaces the early null
+guard. No allocator, mutation, queue, lookup, lock or user-copy helper changes.
+The final standalone probe C has eight allocas and no heap/index helpers.
+
+Both six-case profiles (rrabi/runtime/schedabi/schext/open/fcntlabi), eight
+host test files and frozen 64-input inventories pass. Allocation scans retain
+398 ARM/290 x86 sites and the same existing allowance failures; this does
+not qualify the whole kernel's allocation policy. The maintained V auditor
+pins compiler/source/C/ELF/kernel/ISO/capture inputs and executes a false
+assertion and a passing-reference-as-baseline refusal without `-prod`.
+Independent review checks the existing copied kernel value, synchronous
+stack borrows, guarded mapping lifetime, observer cleanup, child reaping and
+the exact 64-byte result handoff.
+
+Cross-task permissions/races, namespaces/pledge, realtime/deadline admission
+and timing, attribute/affinity ABIs, glibc and translated/ELF32 paths remain
+separate. The previously published AArch64 multi-CPU QoS blocker and all
+three broad section 15 acceptance gates remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-14/rrabi-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-14/rrabi-after-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/rrabi-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-14/rrabi-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-14/rrabi-after-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/rrabi-reference-x86_64-receipt.json).
+- [Maintained V audit](../tests/linux-compat/rrabi-check.v), [verdict](../tests/linux-compat/results/2026-10-14/rrabi-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-14/rrabi-lifetime-review.md).
