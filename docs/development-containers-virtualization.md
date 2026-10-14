@@ -412,9 +412,16 @@ fds observe subsequent remount policy and the new parent, including across a
 second pivot. Tmpfs roots, nested destinations and directory bind roots pass
 on both architectures and Linux with the same probe ELFs. Lazy teardown follows
 mount identity ancestry rather than inode ancestry. Cursor-depth admission,
-namespace-root self mounts, same-directory pivot stacking and root/cwd updates
-across other bind aliases still need runtime qualification; publication and
-namespace-switching concurrency remain open.
+namespace-root self mounts and same-directory pivot stacking still need runtime
+qualification; publication and namespace-switching concurrency remain open.
+The [pivot alias checks](../tests/mount-lifecycle/pivot-aliases.md) qualify
+matching mount identity as well as the inode when updating roots and cwd.
+Synchronized processes using separate bind aliases retain their paths and
+read-only policy while references through the pivoted attachment move. The
+caller's private `CLONE_FS` state and a shared sibling thread pass the same
+checks on both architectures and Linux with shared probe ELFs. Updates to other
+threads' independently owned filesystem views, multithreaded namespace changes
+and inode-based creation checks outside this pivot path remain open.
 Mount reclamation, busy-reference accounting and full OCI acceptance remain open.
 The overlay-depth refusal measurements also exposed an event-record allocation per call.
 The separate [security event producer correction](../tests/overlay-rename/security-events.md)

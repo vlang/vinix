@@ -27,6 +27,13 @@ The default `--case all` requires every positive marker. `--case flags`,
 individual cases.
 `--case pivot-life` selects pivot publication and old-root teardown;
 `pl-0` through `pl-3` select its individual cases.
+`--case pivot-alias` selects root/cwd attachment identity checks;
+`pa-0` through `pa-4` select its individual cases.
+
+The [pivot alias checks](pivot-aliases.md) separate roots and cwd that share an
+inode through different mount attachments. Synchronized process holders and a
+caller with private `CLONE_FS` state verify that only paths through the old-root
+attachment move, preserving read-only policy through the other alias.
 
 The [pivot lifecycle checks](pivot-lifecycle.md) preserve held old-root mount
 identity, remount policy and parent routes across pivots. They verify that the
@@ -57,7 +64,7 @@ iterations, verifies capability denial and finishes with valid local operations.
 
 Use `--probe-state /path/to/prior-native-result` to reuse its probe ELF and
 generated C with a different kernel or case. The controller requires a matching
-architecture and identical current/copied hashes of all six fixture files,
+architecture and identical current/copied hashes of all seven fixture files,
 verifies both artifact hashes against the prior receipt and checks the ELF
 architecture before boot.
 The prior result may be a failed control; its receipt hash is pinned in the new
@@ -104,8 +111,9 @@ every active attachment's current parent chain without allocating a snapshot.
 The Linux reference executes the exact same probe ELF with `move-reference`
 selected. It runs the portable cycle, type, namespace, holder, all seven
 identity checks, all eight admission cases, all five propagation validation
-cases, all seven pivot admission cases and all four pivot lifecycle cases.
-Vinix's cursor limit and unsupported unmount modes are excluded. Supply a matching Linux kernel and
+cases, all seven pivot admission cases, all four pivot lifecycle cases and
+all five pivot alias cases. Vinix's cursor limit and unsupported unmount modes
+are excluded. Supply a matching Linux kernel and
 the ELF preserved by a native run:
 
 ```sh

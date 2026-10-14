@@ -1173,6 +1173,17 @@ pub fn syscall_chroot(_ voidptr, _path charptr) (u64, u64) {
 	return 0, 0
 }
 
+// A bind alias can share the root inode while naming another attachment.
+// Root/cwd updates must match the mount identity as well as the node. Only
+// the original namespace root can have the boot-time empty saved context.
+fn pivot_matches_path(node voidptr, context &lib.MountContext, old_root &VFSNode,
+	old_top &VFSNode, old_entry &Mount, bootstrap_root bool) bool {
+	if node != voidptr(old_root) && node != voidptr(old_top) { return false }
+	identity := lib.mount_context_top(context)
+	return if identity == unsafe { nil } { bootstrap_root }
+		else { unsafe { &Mount(identity) }.id == old_entry.id }
+}
+
 pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, u64) {
 	if !security.permitted(security.filesystem_mount) {
 		return errno.err, errno.eperm
@@ -1207,6 +1218,7 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 	if old_mount.depth == 0 && !native_context(old_root, old_mount) { return errno.err, errno.get() }
 	old_top := reduce_node_on_mount(old_root, false, 0, true, old_mount)
 	if old_top == unsafe { nil } { return errno.err, errno.get() }
+	bootstrap_root := old_mount.depth == 1
 	mut table := table_of(process)
 	require_mount_destination(mut table, put_mount, false) or { return errno.err, errno.get() }
 	old_entry := attached_namespace_mount(mut table, lib.mount_context_top(old_mount))
@@ -1250,12 +1262,12 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 		} else {
 			unsafe { &VFSNode(other.root_directory) }
 		}
-		if voidptr(other_root) == voidptr(old_root) || voidptr(other_root) == voidptr(old_top) {
+		if pivot_matches_path(voidptr(other_root), &other.root_mount, old_root, old_top, old_entry, bootstrap_root) {
 			proc.directory_releasing(other.root_directory)
 			other.root_directory = voidptr(new_root)
 			other.root_mount = unsafe { *new_mount }
 		}
-		if other.current_directory == voidptr(old_root) || other.current_directory == voidptr(old_top) {
+		if pivot_matches_path(other.current_directory, &other.current_mount, old_root, old_top, old_entry, bootstrap_root) {
 			proc.directory_releasing(other.current_directory)
 			other.current_directory = voidptr(new_root)
 			other.current_mount = unsafe { *new_mount }
@@ -1272,12 +1284,12 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 		} else {
 			unsafe { &VFSNode(own.root_directory) }
 		}
-		if voidptr(own_root) == voidptr(old_root) || voidptr(own_root) == voidptr(old_top) {
+		if pivot_matches_path(voidptr(own_root), &own.root_mount, old_root, old_top, old_entry, bootstrap_root) {
 			proc.directory_releasing(own.root_directory)
 			own.root_directory = voidptr(new_root)
 			own.root_mount = unsafe { *new_mount }
 		}
-		if own.current_directory == voidptr(old_root) || own.current_directory == voidptr(old_top) {
+		if pivot_matches_path(own.current_directory, &own.current_mount, old_root, old_top, old_entry, bootstrap_root) {
 			proc.directory_releasing(own.current_directory)
 			own.current_directory = voidptr(new_root)
 			own.current_mount = unsafe { *new_mount }

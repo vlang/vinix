@@ -9,7 +9,7 @@ import os
 
 struct ReferenceReceipt {
 	architecture string
-	context string = 'Linux QEMU reference; same native musl probe ELF; portable mount lifecycle, pivot admission and teardown checks; networking disabled'
+	context string = 'Linux QEMU reference; same native musl probe ELF; portable mount lifecycle, pivot admission, teardown and alias checks; networking disabled'
 	artifacts map[string]string
 	command []string
 	passed bool
@@ -87,12 +87,14 @@ fn run() ! {
 		&& result.text.contains('MOUNT PROPAGATION VALIDATION: PASS')
 		&& result.text.contains('MOUNT PIVOT ADMISSION: PASS')
 		&& result.text.contains('MOUNT PIVOT LIFECYCLE: PASS')
+		&& result.text.contains('MOUNT PIVOT ALIASES: PASS')
 	mut cases_pass := true
 	for kind in 0 .. 7 { cases_pass = cases_pass && result.text.contains('MOUNT IDENTITY CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT ADMISSION CASE: ${kind} PASS') }
 	for kind in 0 .. 5 { cases_pass = cases_pass && result.text.contains('MOUNT PROPAGATION CASE: ${kind} PASS') }
 	for kind in 0 .. 7 { cases_pass = cases_pass && result.text.contains('MOUNT PIVOT CASE: ${kind} PASS') }
 	for kind in 0 .. 4 { cases_pass = cases_pass && result.text.contains('MOUNT PIVOT LIFE CASE: ${kind} PASS') }
+	for kind in 0 .. 5 { cases_pass = cases_pass && result.text.contains('MOUNT PIVOT ALIAS CASE: ${kind} PASS') }
 	artifacts := {
 		'kernel': digest(state + '/linux')!
 		'probe': digest(state + '/probe')!

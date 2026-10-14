@@ -87,3 +87,6 @@ pivot stacking, mount-aware reporting through other bind aliases, other
 processes' root/cwd alias updates, concurrent publication/namespace switching,
 busy-reference accounting and reclamation remain open. Propagation semantics,
 full OCI/rootless acceptance and the rest of roadmap section 17 remain open.
+
+The subsequent [pivot alias checks](pivot-aliases.md) qualify root/cwd updates
+for separate process aliases and the caller's private `CLONE_FS` state.
