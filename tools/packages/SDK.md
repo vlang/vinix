@@ -1541,7 +1541,18 @@ borrowed lifetime. A later repository's signature, schema, expiry, identity or
 replay failure returns no partial catalog. Revoked snapshots remain ignored by
 catalog admission, without weakening enrolled publisher checks. The
 [catalog ownership qualification](../../tests/packages/catalog-ownership-check.md)
-records the measured reduction and the remaining validation allocations.
+records that initial reduction and its remaining allocations.
+
+Model admission now checks identifiers, digests, printable fields, relative paths
+and version components directly from their bytes. Manifest, dependency,
+configuration and organization-policy validators release their duplicate maps
+on success and rejection. Path collision checks borrow a prefix only for map
+membership. These functions preserve their borrowed inputs and existing error
+messages. `version_parts` still returns an owned three-element array; clients
+using manual memory management must free it, and rejected calls return only an
+owned diagnostic. The [validation memory qualification](../../tests/packages/validation-memory-check.md)
+measures model scratch separately from decoded metadata, returned errors and
+whole-service memory.
 
 Configuration JSON preserves legacy omitted-field defaults, including partial
 policy objects. Present fields must have the declared JSON types; null values,

@@ -106,40 +106,58 @@ pub:
 }
 
 pub fn identifier(value string) bool {
-	return value.len > 0 && value.len <= 128 && value[0] >= `a` && value[0] <= `z`
-		&& value.bytes().all((it >= `a` && it <= `z`) || (it >= `0` && it <= `9`) || it in [
-			u8(`.`),
-			`-`,
-			`_`,
-		])
+	if value.len == 0 || value.len > 128 || value[0] < `a` || value[0] > `z` { return false }
+	for byte in value {
+		if !((byte >= `a` && byte <= `z`) || (byte >= `0` && byte <= `9`) || byte in [u8(`.`), `-`, `_`]) { return false }
+	}
+	return true
 }
 
 pub fn relative_path(path string) bool {
-	return path.len > 0 && path.len <= 1024 && !path.starts_with('/')
-		&& !path.contains('\\') && !path.bytes().any(it < 32 || it == 127)
-		&& path.split('/').all(it != '' && it != '.' && it != '..')
+	return relative_path_from(path, 0)
+}
+
+// A file:// URL uses the same byte rules without copying its relative suffix.
+fn relative_path_from(path string, start int) bool {
+	if path.len <= start || path.len - start > 1024 { return false }
+	mut component := start
+	for i := start; i <= path.len; i++ {
+		if i == path.len || path[i] == `/` {
+			length := i - component
+			if length == 0 || (length == 1 && path[component] == `.`)
+				|| (length == 2 && path[component] == `.` && path[component + 1] == `.`) { return false }
+			component = i + 1
+		} else if path[i] < 32 || path[i] == 127 || path[i] == `\\` { return false }
+	}
+	return true
 }
 
 pub fn digest_valid(value string) bool {
-	return value.len == 64 && value.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`))
+	if value.len != 64 { return false }
+	for byte in value {
+		if !((byte >= `0` && byte <= `9`) || (byte >= `a` && byte <= `f`)) { return false }
+	}
+	return true
 }
 
 fn printable(value string, limit int) bool {
-	return value.len <= limit && !value.bytes().any(it < 32 || it == 127)
+	if value.len > limit { return false }
+	for byte in value { if byte < 32 || byte == 127 { return false } }
+	return true
 }
 
 pub fn version_parts(version string) ![]u64 {
-	parts := version.split('.')
-	if parts.len != 3 { return error('version must contain three numeric components: ${version}') }
-	mut result := []u64{}
-	for part in parts {
-		if part.len == 0 || part.len > 9 || !part.bytes().all(it >= `0` && it <= `9`)
-			|| (part.len > 1 && part[0] == `0`) {
-			return error('invalid version: ${version}')
-		}
-		result << part.u64()
+	values := validated_version(version)!
+	return [values[0], values[1], values[2]]
+}
+
+// Admission needs no owned result. Keep the public version_parts array contract
+// for callers that need components, and preserve its diagnostic precedence.
+fn validated_version(version string) ![3]u64 {
+	return version_values(version) or {
+		if version.count('.') != 2 { return error('version must contain three numeric components: ${version}') }
+		return error('invalid version: ${version}')
 	}
-	return result
 }
 
 // Sorting and constraint checks run repeatedly during dependency search. Keep
@@ -182,8 +200,8 @@ pub fn (d Dependency) accepts(p Package) bool {
 
 pub fn (d Dependency) validate() ! {
 	if !identifier(d.id) { return error('invalid dependency ID: ${d.id}') }
-	if d.minimum != '' { version_parts(d.minimum)! }
-	if d.before != '' { version_parts(d.before)! }
+	if d.minimum != '' { validated_version(d.minimum)! }
+	if d.before != '' { validated_version(d.before)! }
 	if d.minimum != '' && d.before != '' && compare_versions(d.minimum, d.before) >= 0 {
 		return error('empty dependency range for ${d.id}')
 	}
@@ -197,7 +215,7 @@ fn check_package_permissions(p Package) ! {
 
 pub fn (p Package) validate() ! {
 	if !identifier(p.id) { return error('invalid package ID: ${p.id}') }
-	version_parts(p.version)!
+	validated_version(p.version)!
 	if p.architecture !in ['aarch64', 'x86_64', 'all'] {
 		return error('unsupported architecture: ${p.architecture}')
 	}
@@ -234,12 +252,14 @@ pub fn (p Package) validate() ! {
 	if p.dependencies.len > 128 { return error('${p.id}: too many dependencies') }
 	for dependency in p.dependencies { dependency.validate()! }
 	mut dependencies := map[string]bool{}
+	defer { unsafe { dependencies.free() } }
 	for dependency in p.dependencies {
 		if dependency.id in dependencies { return error('${p.id}: duplicate dependency ID') }
 		dependencies[dependency.id] = true
 	}
 	if p.files.len == 0 || p.files.len > max_files { return error('${p.id}: invalid file count') }
 	mut paths := map[string]bool{}
+	defer { unsafe { paths.free() } }
 	mut size := u64(0)
 	for file in p.files {
 		if !relative_path(file.path) || !digest_valid(file.sha256) || file.path in paths
@@ -251,10 +271,11 @@ pub fn (p Package) validate() ! {
 		if size > u64(64) * 1024 * 1024 * 1024 { return error('${p.id}: payload too large') }
 	}
 	for file in p.files {
-		mut parent := ''
-		parts := file.path.split('/')
-		for component in parts[..parts.len - 1] {
-			parent = if parent == '' { component } else { parent + '/' + component }
+		for i, byte in file.path {
+			if byte != `/` { continue }
+			// Membership only reads this bounded prefix; the map owns its keys
+			// and never retains the temporary view into the caller's path.
+			parent := unsafe { tos(file.path.str, i) }
 			if parent in paths { return error('${p.id}: file/directory collision: ${file.path}') }
 		}
 	}
@@ -266,7 +287,7 @@ pub fn (p Package) validate() ! {
 fn valid_repository(repository Repository) bool {
 	return identifier(repository.id) && digest_valid(repository.public_key)
 		&& printable(repository.url, 4096) && !repository.url.contains('?') && !repository.url.contains('#')
-		&& (repository.url.starts_with('https://') || (repository.url.starts_with('file:///') && relative_path(repository.url[8..])))
+		&& (repository.url.starts_with('https://') || (repository.url.starts_with('file:///') && relative_path_from(repository.url, 8)))
 }
 
 pub fn (c Config) validate() ! {
@@ -278,6 +299,7 @@ pub fn (c Config) validate() ! {
 	}
 	if c.repositories.len > 4096 { return error('package configuration exceeds the repository identity limit') }
 	mut ids := map[string]bool{}
+	defer { unsafe { ids.free() } }
 	for repository in c.repositories {
 		if !valid_repository(repository) || repository.id in ids {
 			return error('invalid or duplicate repository: ${repository.id}')
@@ -292,22 +314,28 @@ pub fn (policy Policy) validate() ! {
 		|| policy.permissions.len > 5 || policy.reserve_bytes > u64(1024) * 1024 * 1024 * 1024 {
 		return error('organization policy exceeds its supported limits')
 	}
-	for label, values in {'allowlist': policy.allowed, 'permissions': policy.permissions, 'licenses': policy.licenses} {
-		mut seen := map[string]bool{}
-		for value in values {
-			if value in seen || value == '' || !printable(value, 256)
-				|| (label == 'allowlist' && !identifier(value))
-				|| (label == 'permissions' && value !in ['network', 'files', 'process', 'display', 'audio']) {
-				return error('invalid or duplicate organization ${label} entry: ${value}')
-			}
-			seen[value] = true
-		}
-	}
+	validate_policy_entries('allowlist', policy.allowed)!
+	validate_policy_entries('permissions', policy.permissions)!
+	validate_policy_entries('licenses', policy.licenses)!
 	mut pins := map[string]bool{}
+	defer { unsafe { pins.free() } }
 	for pin in policy.pins {
 		pin.validate()!
 		if pin.id in pins { return error('duplicate organization version pin: ${pin.id}') }
 		pins[pin.id] = true
+	}
+}
+
+fn validate_policy_entries(label string, values []string) ! {
+	mut seen := map[string]bool{}
+	defer { unsafe { seen.free() } }
+	for value in values {
+		if value in seen || value == '' || !printable(value, 256)
+			|| (label == 'allowlist' && !identifier(value))
+			|| (label == 'permissions' && value !in ['network', 'files', 'process', 'display', 'audio']) {
+			return error('invalid or duplicate organization ${label} entry: ${value}')
+		}
+		seen[value] = true
 	}
 }
 

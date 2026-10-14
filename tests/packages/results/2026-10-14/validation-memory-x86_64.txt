@@ -1,0 +1,2 @@
+PASS x86_64 packages-validation-memory (122.4s)
+package-validation-memory x86_64: 1 passed, 0 failed, 0 skipped

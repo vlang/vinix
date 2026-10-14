@@ -1,0 +1,11 @@
+VALIDATION 64 manifest/configuration admissions release all scratch and preserve caller fields PASS
+VALIDATION growing duplicate maps and 1024-byte nested paths release scratch PASS
+VALIDATION late manifest/repository/policy rejection releases scratch and preserves diagnostics PASS
+VALIDATION all 256 byte values and identifier/digest/path boundaries preserve admission PASS
+VALIDATION version component ownership, numeric limits and diagnostic precedence PASS
+
+Catalog allocation regression:
+CATALOG OWNERSHIP returned manifests and configured publisher identities survive scratch retirement PASS
+CATALOG OWNERSHIP 64 loads/retirements stay within scratch budget: maximum 862 bytes / 11 allocations PASS
+CATALOG OWNERSHIP growing catalog survives source wrapper/index retirement with intact nested manifests PASS
+CATALOG OWNERSHIP later signature/syntax/schema/expiry/floor/equivocation/ambiguity/missing/identity refusal and revoked snapshots preserve metadata and configured identities PASS

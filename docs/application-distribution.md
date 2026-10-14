@@ -537,6 +537,10 @@ See [metadata preflight qualification](../tests/packages/state-preflight-check.m
 Catalog reads also release redundant authenticated metadata while preserving
 publisher, expiry and replay checks; see
 [catalog ownership qualification](../tests/packages/catalog-ownership-check.md).
+Manifest, dependency, repository and organization-policy validation also release
+their temporary duplicate maps and avoid copying scalar fields and path
+components. Repeated validation preserves the caller's metadata; see
+[validation memory qualification](../tests/packages/validation-memory-check.md).
 Files/directories are flushed before
 publication; POSIX rename switches `current` atomically. The next state-changing transaction
 retires abandoned stages. A crash before activation exposes the old complete set;

@@ -1,0 +1,15 @@
+Paired tracked-heap control: same manifest/configuration, baseline 671d3b7dd versus final model.
+Four measured calls per executable, extracted below from the pinned full logs.
+The final maintained fixture separately runs 64 calls.
+
+Before:
+VALIDATION MEMORY kept=16587 allocations=152
+VALIDATION MEMORY kept=16587 allocations=152
+VALIDATION MEMORY kept=16587 allocations=152
+VALIDATION MEMORY kept=16587 allocations=152
+
+After:
+VALIDATION MEMORY kept=0 allocations=0
+VALIDATION MEMORY kept=0 allocations=0
+VALIDATION MEMORY kept=0 allocations=0
+VALIDATION MEMORY kept=0 allocations=0
