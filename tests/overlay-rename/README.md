@@ -94,6 +94,11 @@ leaving it absent from the lower. Root separately checks that a lower without
 xattr storage can copy into an upper that supports it.
 See [xattr copy-up authorization](xattr-preflight.md).
 
+`--case flags-persistence` separately sets immutable and append-only flags on
+a direct ext2 regular file, directory and volume root. After a writable remount,
+all flags and their write/metadata/creation refusals must remain effective.
+See [ext2 inode-flag loading](ext2-flags.md).
+
 The default `all` case additionally removes the shared work directory beneath
 two mounted overlays, waits past the grace period and verifies that both refuse
 further staging with `ENOENT` while preserving the destination. `disk` leaves

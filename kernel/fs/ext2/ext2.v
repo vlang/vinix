@@ -673,6 +673,7 @@ fn (mut this EXT2Filesystem) populate_checked_locked(node &vfs.VFSNode) ? {
 		resource.stat.ctim = time.TimeSpec{i64(inode.creation_time), 0}
 		resource.stat.mtim = time.TimeSpec{i64(inode.mod_time), 0}
 		resource.can_mmap = stat.isreg(mode)
+		resource.attr_bits = inode.flags & resource_mod.attributes_kept
 
 		vfs_node.resource = resource.boxed()
 		if stat.islnk(mode) && inode.size32l != 0 {
@@ -796,6 +797,7 @@ fn (mut this EXT2Filesystem) mount(parent &vfs.VFSNode, name string, source &vfs
 	resource.stat.gid = this.root_inode.group_id
 	resource.stat.nlink = this.root_inode.hard_link_cnt
 	resource.stat.ino = 2
+	resource.attr_bits = this.root_inode.flags & resource_mod.attributes_kept
 
 	resource.stat.atim = time.TimeSpec{i64(this.root_inode.access_time), 0}
 	resource.stat.ctim = time.TimeSpec{i64(this.root_inode.creation_time), 0}

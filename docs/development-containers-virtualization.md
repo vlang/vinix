@@ -350,6 +350,10 @@ initializes unnamed/pair metadata from creator credentials and accepted metadata
 from the accepting account. Ordinary-account metadata changes and acceptance of
 an inherited root listener pass with preserved peer credentials on both native
 architectures and identical Linux probes.
+The [ext2 inode-flag loading correction](../tests/overlay-rename/ext2-flags.md)
+restores persisted immutable and append-only protections for files, directories
+and the volume root after remount. A separate direct-ext2 native probe checks
+both architectures without invoking overlay flag updates.
 Crash consistency, full OCI/rootless-runtime acceptance and broader server-load
 qualification remain open. Full pins and native CI
 instructions are recorded in [the guest evidence](../tests/development/README.md).

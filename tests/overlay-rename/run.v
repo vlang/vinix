@@ -29,10 +29,10 @@ fn main() {
 		hosttest.Option{
 			name:    '--case'
 			value:   true
-			choices: ['atomic', 'retention', 'failure', 'disk', 'opaque', 'opaque-full', 'sockets', 'socket-access', 'all']
+			choices: ['atomic', 'retention', 'failure', 'disk', 'opaque', 'opaque-full', 'sockets', 'socket-access', 'flags-persistence', 'all']
 		},
 		hosttest.Option{ name: '--timeout', value: true },
-	], [], 'Usage: run.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case atomic|retention|failure|disk|opaque|opaque-full|sockets|socket-access|all] [--timeout SECONDS]')!
+	], [], 'Usage: run.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case atomic|retention|failure|disk|opaque|opaque-full|sockets|socket-access|flags-persistence|all] [--timeout SECONDS]')!
 	for key in ['--arch', '--kernel-dir', '--state-dir'] {
 		if !options.has(key) {
 			eprintln('missing ' + key)
@@ -72,6 +72,7 @@ fn main() {
 		'path_xattr_fixture': digest(state + '/sources/overlayfixture/path_xattrs.v')!
 		'path_umask_fixture': digest(state + '/sources/overlayfixture/path_umask.v')!
 		'xattr_copyup_fixture': digest(state + '/sources/overlayfixture/xattr_copyup.v')!
+		'disk_flags_fixture': digest(state + '/sources/overlayfixture/disk_flags.v')!
 		'abi_header':          digest(state + '/sources/overlayfixture/native-abi.h')!
 	}
 	disk := state + '/store.ext2'
@@ -147,6 +148,7 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 		}
 	}
 	mut expected := ['OVERLAY GUEST: PASS']
+	if case_name == 'flags-persistence' { expected << 'EXT2 FLAGS REMOUNT: PASS' }
 	if case_name in ['atomic', 'all'] { expected << 'OVERLAY REPLACE: PASS' }
 	if case_name in ['retention', 'all'] {
 		expected << ['OVERLAY RETENTION: PASS', 'OVERLAY DIRECTORY LIFETIME: PASS', 'OVERLAY SOCKET LIFETIME: PASS', 'OVERLAY STACKED LIFETIME: PASS']

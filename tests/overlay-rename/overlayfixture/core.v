@@ -505,7 +505,7 @@ fn exercise(crowded bool) {
 @[export: 'main']
 pub fn run() int {
 	unsafe {
-		mut selected := [16]char{}
+		mut selected := [32]char{}
 		fd := C.open(c'/overlay-case', C.O_RDONLY)
 		if fd >= 0 {
 			check(C.read(fd, &selected[0], selected.len - 1) > 0 && C.close(fd) == 0, 85)
@@ -526,11 +526,18 @@ pub fn run() int {
 		full := C.strcmp(&selected[0], c'opaque-full') == 0
 		sockets := C.strcmp(&selected[0], c'sockets') == 0
 		access := C.strcmp(&selected[0], c'socket-access') == 0
-		check(concurrent || retention || failure || disk || opaque || full || sockets || access, 86)
+		flags_disk := C.strcmp(&selected[0], c'flags-persistence') == 0
+		check(concurrent || retention || failure || disk || opaque || full || sockets || access || flags_disk, 86)
 		owned_directory(c'/tmp/overlay-state', 30)
 		if concurrent || retention { prepare() }
 		if retention { prepare_retained_layers() }
-		if failure || disk || opaque || full || sockets { prepare_disk(opaque, full) }
+		if failure || disk || opaque || full || sockets || flags_disk { prepare_disk(opaque, full) }
+		if flags_disk {
+			direct_inode_flags_persistence()
+			C.puts(c'OVERLAY GUEST: PASS')
+			C.fflush(nil)
+			for { C.pause() }
+		}
 		if disk || sockets { prepare_xattr_guards() }
 		if sockets { check(C.mkdir(c'/tmp/overlay-volume/protected', 0o700) == 0, 427) }
 		if access { owned_directory(c'/tmp/overlay-state/reference', 474) }
