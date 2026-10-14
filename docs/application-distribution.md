@@ -541,6 +541,11 @@ Manifest, dependency, repository and organization-policy validation also release
 their temporary duplicate maps and avoid copying scalar fields and path
 components. Repeated validation preserves the caller's metadata; see
 [validation memory qualification](../tests/packages/validation-memory-check.md).
+Refresh checks the exact serialized cache prefix after each authenticated
+repository, including wrapper escaping and the closing byte. An oversized
+prefix stops before contacting later repositories and preserves the active
+cache/history; reducing the repository metadata allows a normal retry. See
+[cache preflight qualification](../tests/packages/cache-preflight-check.md).
 Files/directories are flushed before
 publication; POSIX rename switches `current` atomically. The next state-changing transaction
 retires abandoned stages. A crash before activation exposes the old complete set;

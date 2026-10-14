@@ -3,7 +3,6 @@ module pkgcore
 
 import tools.packages.signing as ed25519
 import encoding.hex
-import json2
 import os
 import time
 import tools.packages.pkgprotocol
@@ -162,8 +161,19 @@ fn refresh_locked(config Config, directory string) !Catalog {
 
 fn refresh_progress(config Config, directory string, report fn (pkgprotocol.Progress)) !Catalog {
 	previous := read_snapshots(directory)!
+	defer { close_decoded_snapshots(previous) }
 	mut history := history_with_snapshots(config, directory, previous)!
 	mut snapshots := []Snapshot{}
+	unsafe { snapshots.flags |= .noslices }
+	defer {
+		// These records own fetched text/signatures and borrow Config identities.
+		unsafe {
+			for snapshot in snapshots { snapshot.text.free(); snapshot.signature.free() }
+			snapshots.free()
+		}
+	}
+	mut encoding := new_snapshot_encoding()
+	defer { unsafe { encoding.free() } }
 	work := directory + '/refresh'
 	if os.exists(work) { os.rmdir_all(work)! }
 	owned_directory(work, 0o700)!
@@ -177,21 +187,30 @@ fn refresh_progress(config Config, directory string, report fn (pkgprotocol.Prog
 		fetch_progress(repository.url.trim_right('/') + '/index.sig', sig_path, 256, false, config.policy.offline,
 			pkgprotocol.Progress{ phase: 'metadata', repository: repository.id, path: 'index.sig' }, report)!
 		text := read_metadata(index_path)!
-		signature := read_metadata(sig_path)!.trim_space()
+		raw_signature := read_metadata(sig_path) or { unsafe { text.free() }; return err }
+		signature := raw_signature.trim_space()
+		unsafe { raw_signature.free() }
+		snapshot := Snapshot{ repository: repository, text: text, signature: signature }
+		pointer := unsafe { &snapshot }
+		unsafe { snapshots.push_many(pointer, 1) }
 		report(pkgprotocol.Progress{ phase: 'verify', repository: repository.id, path: 'index.json' })
 		index := verify_index(repository, text, signature, time.now().unix())!
+		defer { close_decoded_index(index) }
 		history = remember_index(history, repository, index, text)!
-		snapshots << Snapshot{ repository: repository, text: text, signature: signature }
+		// Authenticate and check replay first. Refuse this prefix before fetching
+		// another repository or constructing the independently decoded catalog.
+		append_snapshot_metadata(snapshot, mut encoding)!
 	}
+	encoded := finish_snapshot_encoding(mut encoding)
+	defer { unsafe { encoded.free() } }
 	catalog := snapshots_catalog(config, snapshots, time.now().unix())!
-	encoded := json2.encode(snapshots)
-	if encoded.len > max_metadata {
-		return error('combined repository metadata exceeds cache limit')
-	}
+	mut published := false
+	defer { if !published { close_authenticated_catalog(catalog) } }
 	// Record authenticated sequence/digest floors before exposing the new cache.
 	// Revocation and empty refreshes never discard identities from this history.
 	save_history(directory, history)!
 	atomic_write(directory + '/catalog.json', encoded)!
 	report(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 })
+	published = true
 	return catalog
 }

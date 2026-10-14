@@ -1,0 +1,3 @@
+CACHE PREFLIGHT exact snapshot wrapper encoding, empty cache, order, escaping and reader round-trip PASS
+CACHE PREFLIGHT limit-minus-one and exact 8 MiB accepted; closing byte, cumulative prefix and escape expansion overflow refused PASS
+CACHE PREFLIGHT 16 accepted and 16 oversized encodings retire all encoder scratch PASS

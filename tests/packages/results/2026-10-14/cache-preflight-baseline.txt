@@ -1,0 +1,15 @@
+Paired tracked-heap control: same two snapshot wrappers, baseline generic encoding versus final incremental encoding.
+Four measured calls per executable, extracted below from the pinned full logs.
+The maintained fixture separately runs 16 accepted and 16 oversized calls.
+
+Before:
+CACHE MEMORY kept=6206 allocations=2
+CACHE MEMORY kept=6206 allocations=2
+CACHE MEMORY kept=6206 allocations=2
+CACHE MEMORY kept=6206 allocations=2
+
+After:
+CACHE MEMORY kept=0 allocations=0
+CACHE MEMORY kept=0 allocations=0
+CACHE MEMORY kept=0 allocations=0
+CACHE MEMORY kept=0 allocations=0

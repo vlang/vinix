@@ -97,6 +97,10 @@ fn check() ! {
 			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/validation-memory', repository + '/tools/packages/pkgcore/validation_memory_test.v'])!
 		run(work + '/validation-memory', [])!
+		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/cache-preflight-memory', repository + '/tools/packages/pkgcore/catalog_metadata_test.v'])!
+		run(work + '/cache-preflight-memory', [])!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgprotocol', work)!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
 			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/repository-configuration-memory',
@@ -138,6 +142,10 @@ fn check() ! {
 			'-o', work + '/state-preflight-check', repository + '/tests/packages/state-preflight-check.v'])!
 		run(work + '/state-preflight-check', [work + '/state-preflight-service'])!
 		run(work + '/state-preflight-check', [work + '/state-preflight-cli', work + '/vinix-package'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/cache-preflight-check', repository + '/tests/packages/cache-preflight-check.v'])!
+		run(work + '/cache-preflight-check', [work + '/cache-preflight-service'])!
+		run(work + '/cache-preflight-check', [work + '/cache-preflight-cli', work + '/vinix-package'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository,
 			'-o', work + '/elf-profile-check', repository + '/tests/packages/elf-profile-check.v'])!
 		run(work + '/elf-profile-check', [work + '/vinix-package', work + '/elf-profiles'])!

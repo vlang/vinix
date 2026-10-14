@@ -1554,6 +1554,17 @@ owned diagnostic. The [validation memory qualification](../../tests/packages/val
 measures model scratch separately from decoded metadata, returned errors and
 whole-service memory.
 
+Refresh incrementally encodes authenticated snapshot wrappers in their existing
+JSON array format. After each repository passes signature, schema, expiry and
+retained sequence/digest checks, its serialized prefix must fit the 8 MiB cache
+limit, including commas, JSON escaping and the final closing bracket. A prefix
+that cannot fit fails before later repositories are fetched or the new catalog
+is decoded. The existing cache and replay history remain unchanged; refresh's
+temporary workspace is removed. A smaller set of metadata can retry normally.
+Fetched signed text, its decoded indexes and encoder buffers retire on
+success and failure; returned catalog manifests remain independently owned.
+See [cache preflight qualification](../../tests/packages/cache-preflight-check.md).
+
 Configuration JSON preserves legacy omitted-field defaults, including partial
 policy objects. Present fields must have the declared JSON types; null values,
 unknown keys and duplicate keys (including escaped equivalent spellings) are

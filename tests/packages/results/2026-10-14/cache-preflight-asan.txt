@@ -1,0 +1,16 @@
+clang ASan/UBSan; detect_leaks=0; halt_on_error=1
+
+cache-sanitize:
+CACHE PREFLIGHT exact snapshot wrapper encoding, empty cache, order, escaping and reader round-trip PASS
+CACHE PREFLIGHT limit-minus-one and exact 8 MiB accepted; closing byte, cumulative prefix and escape expansion overflow refused PASS
+PASS
+
+probe-sanitize:
+Updating trusted repository first
+Updating trusted repository second
+Installing Seed 1.0.0 (1/1) from first
+Downloading seed/asset (4 bytes)
+Activated package generation 1
+CACHE PREFLIGHT authenticated prefix overflow stops before later repository fetch; signature precedence, active cache/history/generation and recovery data preserved PASS
+CACHE PREFLIGHT signed service/CLI refresh rejects oversized cache before later acquisition/publication and accepts a bounded retry PASS
+PASS
