@@ -135,6 +135,10 @@ and survive transport retirement and disk remount. Socket descriptions remain
 unsupported for filesystem ACLs; all four descriptor xattr calls reject
 `O_PATH` with `EBADF` before inspecting user pointers or writing output buffers.
 See [pathname socket xattr evidence](socket-xattrs.md).
+The creation probe checks umasks `0000`, `0022`, `0077`, `0222` and `0777` for
+stream, record and datagram sockets, with and without a default ACL. It verifies
+pathname/O_PATH metadata and actual access, then checks persisted masked ACLs
+after remount. See [socket creation-mask evidence](socket-umask.md).
 Two batches each run 32 cycles on each backend; every live slab class and the
 large-allocation count must match. A protected-directory bind must fail with
 `EACCES`. Root remounts the volume read-only, verifies that removed names stay

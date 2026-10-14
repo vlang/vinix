@@ -102,8 +102,10 @@ Earlier reference failures remain separate: the initial probe assumed a
 creation ACL mask unaffected by umask, used an unsupported ACL wire version
 and used a malformed capability payload. Final tests set the mask explicitly,
 use supported ACL version 2 with invalid permission bits and a valid capability
-payload. Native creation umask behavior and the unsupported-version errno
-still differ from Linux; they are outside this qualification.
+payload. These tested kernels differed from Linux in creation umask behavior
+and the unsupported-version errno. The subsequent
+[creation-mask correction](socket-umask.md) qualifies pathname bind masks;
+unsupported-version errno parity remains open.
 
 Lower-only socket copy-up still returns `EPERM`. The transport and pathname
 still share metadata representation; full Linux sockfs separation, generic

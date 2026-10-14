@@ -551,7 +551,10 @@ pub fn run() int {
 			check(C.mknod(c'/tmp/overlay-state/denied-device', u32(C.S_IFCHR | 0o600), denied_device) == -1
 				&& *C.__errno_location() == C.EPERM, 119)
 			if root_listener >= 0 { inherited_socket_owner(root_listener) }
-			if sockets || access { socket_acl_connections(acl_base, acl_tmpfs) }
+			if sockets || access {
+				socket_acl_connections(acl_base, acl_tmpfs)
+				socket_creation_modes(acl_base)
+			}
 			if sockets {
 				socket_acl_connections(c'/tmp/overlay-volume', acl_ext2)
 				socket_acl_connections(c'/tmp/overlay-state/diskmerged', acl_overlay)

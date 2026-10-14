@@ -332,8 +332,12 @@ retain their targets through backing callbacks. The
 [pathname xattr correction](../tests/overlay-rename/socket-xattrs.md) exposes a
 live socket's backing ACL through pathname calls while preserving mount,
 owner/capability and descriptor restrictions. Native tmpfs/ext2/overlay checks
-and identical Linux probes pass; full socket/path metadata separation, creation
-umask parity and the broader authorization matrix remain open.
+and identical Linux probes pass; full socket/path metadata separation and the
+broader authorization matrix remain open. The
+[socket creation-mask correction](../tests/overlay-rename/socket-umask.md)
+applies umask before pathname ACL inheritance. Five masks across stream,
+record and datagram sockets pass on both native architectures and identical
+Linux probes, with masked ext2/overlay ACL metadata preserved after remount.
 The [UNIX descriptor ownership correction](../tests/overlay-rename/socket-ownership.md)
 initializes unnamed/pair metadata from creator credentials and accepted metadata
 from the accepting account. Ordinary-account metadata changes and acceptance of

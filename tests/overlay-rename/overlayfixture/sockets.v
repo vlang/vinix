@@ -125,6 +125,8 @@ fn persistent_sockets() {
 	unsafe {
 		denied_socket_bind(c'/tmp/overlay-volume/protected/denied', C.EACCES)
 		check(C.mkdir(c'/tmp/overlay-volume/direct', 0o700) == 0, 414)
+		socket_creation_modes(c'/tmp/overlay-volume/direct')
+		socket_creation_modes(c'/tmp/overlay-state/diskmerged')
 		persistent_socket_cycle(c'/tmp/overlay-volume/direct', c'/tmp/overlay-volume/direct', true)
 		persistent_socket_cycle(c'/tmp/overlay-state/diskmerged', c'/tmp/overlay-volume/upper', true)
 		persistent_socket_links(c'/tmp/overlay-volume/direct')
@@ -188,6 +190,7 @@ fn persistent_sockets_remount() {
 			&& C.umount(c'/tmp/overlay-volume') == 0, 416)
 		check(C.mount(volume_device(), c'/tmp/overlay-volume', c'ext2', usize(C.MS_RDONLY), nil) == 0, 417)
 		socket_acl_persistence()
+		socket_creation_persistence()
 		for base in [&char(c'/tmp/overlay-volume/direct'), &char(c'/tmp/overlay-volume/upper')]! {
 			mut path := [108]char{}
 			for name in [&char(c'socket-source'), &char(c'socket-target')]! {

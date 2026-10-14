@@ -1474,7 +1474,10 @@ fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 	}
 
 	this.path_bound = true
-	fs.create_with_resource(proc.current_directory_of(t.process), path, stat.ifsock | 0o777,
+	// UNIX pathname sockets mask their requested mode before ACL inheritance.
+	// Abstract names have already returned and have no filesystem permissions.
+	mode := stat.ifsock | (u32(0o777) & ~t.process.umask)
+	fs.create_with_resource(proc.current_directory_of(t.process), path, mode,
 		this.boxed(), unsafe { &this.namespace_resource }) or {
 		this.path_bound = false
 		return none
