@@ -19,6 +19,13 @@ V_C_ERROR_BUG_REPORT_DISABLED=1 USE_TCG=1 build-support/run-v-tool.sh \
 The default `--case all` requires every positive marker. `--case flags`,
 `--case move` and `--case identities` select a group; `--case id-0` through
 `id-6` select one identity case. The timeout defaults to 180 seconds.
+`--case admission` selects the new-filesystem/bind/devpts admission group;
+`ad-0` through `ad-7` select its individual cases.
+
+The [new mount admission checks](admission.md) cover detached and foreign
+destinations and bind sources. Each case checks authorization, repeated
+refusal and retained data/policy, then exercises valid fd-based directory/file
+binds, tmpfs and devpts in the original and a copied namespace.
 
 The [attachment identity checks](identities.md) cover detached and foreign
 mounts reached through held descriptors or cwd. They also verify retained
@@ -28,8 +35,9 @@ iterations, verifies capability denial and finishes with valid local operations.
 
 Use `--probe-state /path/to/prior-native-result` to reuse its probe ELF and
 generated C with a different kernel or case. The controller requires a matching
-architecture and identical current/copied fixture hashes, verifies both artifact
-hashes against the prior receipt and checks the ELF architecture before boot.
+architecture and identical current/copied hashes of all three fixture files,
+verifies both artifact hashes against the prior receipt and checks the ELF
+architecture before boot.
 The prior result may be a failed control; its receipt hash is pinned in the new
 result. A changed source or artifact requires a fresh compilation.
 
@@ -72,10 +80,10 @@ contents. The probe unmounts these roots in reverse order. Admission checks
 every active attachment's current parent chain without allocating a snapshot.
 
 The Linux reference executes the exact same probe ELF with `move-reference`
-selected. It runs the portable cycle, type, namespace, holder and all seven
-identity checks; Vinix's cursor limit and unsupported unmount modes are
-excluded. Supply a matching
-Linux kernel and the ELF preserved by a native run:
+selected. It runs the portable cycle, type, namespace, holder, all seven
+identity checks and all eight admission cases. Vinix's cursor limit and
+unsupported unmount modes are excluded. Supply a matching Linux kernel and
+the ELF preserved by a native run:
 
 ```sh
 V_C_ERROR_BUG_REPORT_DISABLED=1 build-support/run-v-tool.sh \

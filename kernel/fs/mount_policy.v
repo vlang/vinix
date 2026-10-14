@@ -51,6 +51,21 @@ fn mount_destination_error(mut table MountTable, identity voidptr) u64 {
 	return if entry.detached { errno.enoent } else { errno.einval }
 }
 
+// Check the containing attachment before preparing a filesystem or bind. The
+// first boot mount alone can attach to the as-yet unmounted root sentinel.
+fn require_mount_destination(mut table MountTable, identity &lib.MountContext, bootstrap bool) ? {
+	top := lib.mount_context_top(identity)
+	if attached_namespace_mount(mut table, top) != unsafe { nil } { return }
+	if bootstrap && top == unsafe { nil } && table != unsafe { nil } && table.initial {
+		table.lock.acquire()
+		empty := table.mounts.len == 0
+		table.lock.release()
+		if empty { return }
+	}
+	errno.set(mount_destination_error(mut table, top))
+	return none
+}
+
 pub fn mount_flags(identity &lib.MountContext) u64 {
 	entry := namespace_mount(lib.mount_context_top(identity))
 	return if entry == unsafe { nil } { u64(0) } else { entry.flags }

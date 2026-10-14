@@ -522,6 +522,8 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 		errno.set(errno.enoent)
 		return none
 	}
+	mut table := table_of(calling_process())
+	require_mount_destination(mut table, target_mount, voidptr(target_node) == voidptr(vfs_root))?
 	if volume_mount_node(target_node) { errno.set(errno.ebusy); return none }
 	vfs_lock.release()
 	resolving = false
@@ -618,7 +620,6 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 		apply_tmpfs_options(mut mount_node, options)
 	}
 
-	mut table := table_of(calling_process())
 	attach_mount(mut table, mut target_node, mount_node)
 	shown := if fstype == kind { display_fstype(kind) } else { fstype }
 	record_mount(mut table, target_node, mount_node, if source.len > 0 { source } else { shown },
@@ -678,12 +679,9 @@ fn mount_devpts(parent &VFSNode, target string, flags u64, options string) ? {
 		errno.set(errno.enodev)
 		return none
 	}
-	mut pts := &VFSNode(unsafe { nil })
-	if 'pts' in devtmpfs_root.children {
-		pts = unsafe { devtmpfs_root.children['pts'] }
-	} else {
-		pts = internal_create(devtmpfs_root, 'pts', stat.ifdir | 0o755)?
-	}
+	vfs_lock.acquire()
+	mut resolving := true
+	defer { if resolving { vfs_lock.release() } }
 	target_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	if !starting_mount(parent, target_mount) { return none }
 	_, mut target_node, _ := walk_path_on_mount(parent, target, 0, true, target_mount)
@@ -701,6 +699,17 @@ fn mount_devpts(parent &VFSNode, target string, flags u64, options string) ? {
 		return none
 	}
 	mut table := table_of(calling_process())
+	require_mount_destination(mut table, target_mount, false)?
+	vfs_lock.release()
+	resolving = false
+	// Preparing the shared backend can call internal_create, which takes the
+	// VFS lock itself. Invalid destinations must not prepare that directory.
+	mut pts := &VFSNode(unsafe { nil })
+	if 'pts' in devtmpfs_root.children {
+		pts = unsafe { devtmpfs_root.children['pts'] }
+	} else {
+		pts = internal_create(devtmpfs_root, 'pts', stat.ifdir | 0o755)?
+	}
 	if voidptr(target_node) != voidptr(pts) {
 		attach_mount(mut table, mut target_node, pts)
 	}
@@ -715,6 +724,11 @@ fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
 	defer { vfs_lock.release() }
 	source_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	source_node := get_node_and_mount(parent, source, true, source_mount)?
+	mut table := table_of(calling_process())
+	if attached_namespace_mount(mut table, lib.mount_context_top(source_mount)) == unsafe { nil } {
+		errno.set(errno.einval)
+		return none
+	}
 	target_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	if !starting_mount(parent, target_mount) { return none }
 	_, mut target_node, _ := walk_path_on_mount(parent, target, 0, true, target_mount)
@@ -727,6 +741,7 @@ fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
 		errno.set(errno.enoent)
 		return none
 	}
+	require_mount_destination(mut table, target_mount, false)?
 	if volume_mount_node(source_node) || volume_mount_node(target_node) { errno.set(errno.ebusy); return none }
 	if stat.isdir(source_node.resource.stat.mode) != stat.isdir(target_node.resource.stat.mode) {
 		errno.set(if stat.isdir(target_node.resource.stat.mode) {
@@ -736,7 +751,6 @@ fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
 		})
 		return none
 	}
-	mut table := table_of(calling_process())
 	// Binding a directory onto itself -- how a runtime turns its root into a
 	// mount point -- changes nothing about where paths lead.
 	if voidptr(source_node) != voidptr(target_node) {

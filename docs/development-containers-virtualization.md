@@ -385,6 +385,12 @@ and cwd, while valid local operations remain available. Retained read-only
 descriptions refuse creation, writable opens and truncation even after their
 namespace retires. Native ARM/x86 runs and Linux references use the same probe
 ELFs; capability denial still precedes attachment validation.
+The [new mount admission checks](../tests/mount-lifecycle/admission.md) also
+cover new filesystem/devpts destinations and bind sources/targets reached
+through detached or foreign fds and cwd. Checks precede backend construction,
+and valid local fd-based mounts/binds pass in original and copied namespaces
+on both architectures and Linux with shared probe ELFs. Concurrent publication,
+propagation and independent PTY namespaces remain open.
 Mount reclamation, busy-reference accounting and full OCI acceptance remain open.
 The overlay-depth refusal measurements also exposed an event-record allocation per call.
 The separate [security event producer correction](../tests/overlay-rename/security-events.md)

@@ -26,6 +26,7 @@ fn C.openat(int, &char, int, ...) int
 fn C.read(int, voidptr, usize) isize
 fn C.write(int, voidptr, usize) isize
 fn C.close(int) int
+fn C.unlink(&char) int
 fn C.stat(&char, &C.stat) int
 fn C.fstat(int, &C.stat) int
 fn C.chdir(&char) int
@@ -340,15 +341,21 @@ pub fn run() int {
 		selected := &char(&name[0])
 		identity := if count == 4 && name[0] == `i` && name[1] == `d` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `6` { int(name[3] - `0`) } else { -1 }
+		admission := if count == 4 && name[0] == `a` && name[1] == `d` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		check(C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'move') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 || C.strcmp(selected, c'all') == 0
-			|| C.strcmp(selected, c'identities') == 0 || identity >= 0, 4)
+			|| C.strcmp(selected, c'identities') == 0 || identity >= 0
+			|| C.strcmp(selected, c'admission') == 0 || admission >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
 		if C.strcmp(selected, c'identities') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { identity_cases(-1) }
 		if identity >= 0 { identity_cases(identity) }
+		if C.strcmp(selected, c'admission') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { admission_cases(-1) }
+		if admission >= 0 { admission_cases(admission) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }
