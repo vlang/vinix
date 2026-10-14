@@ -22,8 +22,11 @@ the receiver; its operations, order and returned limbs remain the same. The
 qualified compiler otherwise heap-promotes a 40-byte temporary on every field
 operation. The [allocation and repeated-publication qualification](../../../tests/packages/signing-repeat-check.md)
 records the measured reduction, reference checks, source regeneration and target
-results. Table, digest and encoding allocations still need separate ownership
-work; these checks do not establish zero retained heap for the signing API.
+results. Subsequent [table ownership qualification](../../../tests/packages/signing-tables-check.md)
+gives lookup tables/digits an operation lifetime and avoids heap-promoting point
+addition/subtraction temporaries. The generator records those adaptations too.
+Small digest, scalar and encoding allocations remain; these checks do not
+establish zero retained heap for the signing API.
 
 The package publisher and consumer import this dependency rather than whichever
 Ed25519 implementation happens to accompany the build compiler. No demonstration

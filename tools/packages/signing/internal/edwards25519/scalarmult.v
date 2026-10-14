@@ -1,42 +1,16 @@
 module edwards25519
 
-import sync
-
-struct BasepointTablePrecomp {
-mut:
-	table    []AffineLookupTable
-	initonce sync.Once
-}
-
-// basepoint_table is a set of 32 affineLookupTables, where table i is generated
-// from 256i * basepoint. It is precomputed the first time it's used.
+// This table belongs to the scalar multiplication that requested it.
 fn basepoint_table() []AffineLookupTable {
-	mut bpt := &BasepointTablePrecomp{
-		table:    []AffineLookupTable{len: 32}
-		initonce: sync.new_once()
+	mut table := []AffineLookupTable{len: 32}
+	mut p := new_generator_point()
+	for i := 0; i < 32; i++ {
+		table[i].from_p3(p)
+		for j := 0; j < 8; j++ {
+			p.add(p, p)
+		}
 	}
-
-	// replaced to use do_with_param on newest sync lib
-	/*
-	bpt.initonce.do(fn [mut bpt] () {
-		mut p := new_generator_point()
-		for i := 0; i < 32; i++ {
-			bpt.table[i].from_p3(p)
-			for j := 0; j < 8; j++ {
-				p.add(p, p)
-			}
-		}
-	})*/
-	bpt.initonce.do_with_param(fn (mut o BasepointTablePrecomp) {
-		mut p := new_generator_point()
-		for i := 0; i < 32; i++ {
-			o.table[i].from_p3(p)
-			for j := 0; j < 8; j++ {
-				p.add(p, p)
-			}
-		}
-	}, bpt)
-	return bpt.table
+	return table
 }
 
 // scalar_base_mult sets v = x * B, where B is the canonical generator, and
@@ -45,6 +19,7 @@ fn basepoint_table() []AffineLookupTable {
 // The scalar multiplication is done in constant time.
 pub fn (mut v Point) scalar_base_mult(mut x Scalar) Point {
 	mut bpt_table := basepoint_table()
+	defer { unsafe { bpt_table.free() } }
 
 	// Write x = sum(x_i * 16^i) so  x*B = sum( B*x_i*16^i )
 	// as described in the Ed25519 paper
@@ -58,6 +33,7 @@ pub fn (mut v Point) scalar_base_mult(mut x Scalar) Point {
 	// We use a lookup table for each i to get x_i*16^(2*i)*B
 	// and do four doublings to multiply by 16.
 	digits := x.signed_radix16()
+	defer { unsafe { digits.free() } }
 
 	mut multiple := AffineCached{}
 	mut tmp1 := ProjectiveP1{}
@@ -109,6 +85,7 @@ pub fn (mut v Point) scalar_mult(mut x Scalar, q Point) Point {
 	// We use the lookup table to get the x_i*Q values
 	// and do four doublings to compute 16*Q
 	digits := x.signed_radix16()
+	defer { unsafe { digits.free() } }
 
 	// Unwrap first loop iteration to save computing 16*identity
 	mut multiple := ProjectiveCached{}
@@ -135,18 +112,8 @@ pub fn (mut v Point) scalar_mult(mut x Scalar, q Point) Point {
 	return v
 }
 
-struct BasepointNaftablePrecomp {
-mut:
-	table    NafLookupTable8
-	initonce sync.Once
-}
-
-fn basepoint_naf_table() NafLookupTable8 {
-	mut bnft := &BasepointNaftablePrecomp{}
-	bnft.initonce.do_with_param(fn (mut o BasepointNaftablePrecomp) {
-		o.table.from_p3(new_generator_point())
-	}, bnft)
-	return bnft.table
+fn basepoint_naf_table(mut table NafLookupTable8) {
+	table.from_p3(new_generator_point())
 }
 
 // vartime_double_scalar_base_mult sets v = a * A + b * B, where B is the canonical
@@ -170,8 +137,11 @@ pub fn (mut v Point) vartime_double_scalar_base_mult(xa Scalar, aa Point, xb Sca
 	// "mass" of the scalar onto sparse coefficients (meaning
 	// fewer additions).
 
-	mut bp_naftable := basepoint_naf_table()
-	mut atable := NafLookupTable5{}
+	mut bp_naftable := &NafLookupTable8{}
+	defer { unsafe { free(bp_naftable) } }
+	basepoint_naf_table(mut bp_naftable)
+	mut atable := &NafLookupTable5{}
+	defer { unsafe { free(atable) } }
 	atable.from_p3(aa)
 	// Because the basepoint is fixed, we can use a wider NAF
 	// corresponding to a bigger table.
@@ -179,6 +149,7 @@ pub fn (mut v Point) vartime_double_scalar_base_mult(xa Scalar, aa Point, xb Sca
 	mut b := xb
 	anaf := a.non_adjacent_form(5)
 	bnaf := b.non_adjacent_form(8)
+	defer { unsafe { anaf.free(); bnaf.free() } }
 
 	// Find the first nonzero coefficient.
 	mut i := 255

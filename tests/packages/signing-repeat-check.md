@@ -87,6 +87,10 @@ They do not establish zero retained heap or an unbounded lifetime; table, digest
 and encoding ownership remain separate work. Broader roadmap 14 acceptance
 gates remain open.
 
+The subsequent [table ownership qualification](signing-tables-check.md) measures
+a revised signing tuple that frees lookup tables and scalar digits. Results
+in this report retain the earlier field-temporary tuple.
+
 Evidence:
 
 - [baseline allocation probe](results/2026-10-14/signing-repeat-before.txt)

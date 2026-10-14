@@ -43,6 +43,14 @@ fn main() {
 	carry, carry_text := run(work + '/validator', arguments)!
 	assert carry != 0 && carry_text.contains('differs'), carry_text
 	os.write_file(field_path, field)!
+	table_path := copy + '/internal/edwards25519/scalarmult.v'
+	table := os.read_file(table_path)!
+	ownership := '\tdefer { unsafe { bpt_table.free() } }\n'
+	assert table.count(ownership) == 1
+	os.write_file(table_path, table.replace(ownership, ''))!
+	tables, tables_text := run(work + '/validator', arguments)!
+	assert tables != 0 && tables_text.contains('differs'), tables_text
+	os.write_file(table_path, table)!
 	os.write_file(copy + '/unexpected.v', 'module signing\n')!
 	extra, extra_text := run(work + '/validator', arguments)!
 	assert extra != 0 && extra_text.contains('unrecorded'), extra_text
@@ -60,5 +68,5 @@ fn main() {
 	assert root_linked != 0 && root_text.contains('ordinary directory'), root_text
 	os.rm(copy)!
 	os.rename(work + '/actual', copy)!
-	println('Signing source checks: pinned bytes, mutation, redundant-carry regression, extra implementation and file/root symlink refusal passed')
+	println('Signing source checks: pinned bytes, mutation, redundant-carry regression, table ownership, extra implementation and file/root symlink refusal passed')
 }

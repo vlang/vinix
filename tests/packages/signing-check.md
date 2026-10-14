@@ -15,6 +15,10 @@ carry operation and returned limbs, measures the allocation reduction, and runs
 the reference vectors and repeated publication on both target architectures.
 The original results below describe the earlier signing tuple.
 
+The later [table ownership checks](signing-tables-check.md) add explicit table
+and digit cleanup, live-allocation budgets and renewed reference/sanitizer/target
+qualification. Small scalar/digest/encoding ownership remains separate work.
+
 The signing runner checks published empty, one-byte and two-byte message vectors
 from [RFC 8032 section 7.1](https://www.rfc-editor.org/rfc/rfc8032#section-7.1).
 Derived public keys and deterministic signatures must equal the reference bytes;

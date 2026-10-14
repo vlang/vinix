@@ -56,6 +56,10 @@ fn check() ! {
 			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/signing-allocation-check',
 			repository + '/tests/packages/signing-allocation-check.v'])!
 		run(work + '/signing-allocation-check', [])!
+		run(v, [...helper_flags, '-d', 'track_heap', '-gc', 'none', '-manualfree',
+			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/signing-tables-check',
+			repository + '/tests/packages/signing-tables-check.v'])!
+		run(work + '/signing-tables-check', [])!
 		check_tests(v, ['-gc', 'none'], repository + '/tools/packages/pkgcore', work)!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgprotocol', work)!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/appsdk', work)!

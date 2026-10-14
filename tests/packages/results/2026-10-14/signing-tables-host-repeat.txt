@@ -1,0 +1,17 @@
+SIGNING REPEAT 1/16 identical publication and verification PASS
+SIGNING REPEAT 2/16 identical publication and verification PASS
+SIGNING REPEAT 3/16 identical publication and verification PASS
+SIGNING REPEAT 4/16 identical publication and verification PASS
+SIGNING REPEAT 5/16 identical publication and verification PASS
+SIGNING REPEAT 6/16 identical publication and verification PASS
+SIGNING REPEAT 7/16 identical publication and verification PASS
+SIGNING REPEAT 8/16 identical publication and verification PASS
+SIGNING REPEAT 9/16 identical publication and verification PASS
+SIGNING REPEAT 10/16 identical publication and verification PASS
+SIGNING REPEAT 11/16 identical publication and verification PASS
+SIGNING REPEAT 12/16 identical publication and verification PASS
+SIGNING REPEAT 13/16 identical publication and verification PASS
+SIGNING REPEAT 14/16 identical publication and verification PASS
+SIGNING REPEAT 15/16 identical publication and verification PASS
+SIGNING REPEAT 16/16 identical publication and verification PASS
+PACKAGE SIGNING REPEAT 32 publications one-process canonical-bytes PASS

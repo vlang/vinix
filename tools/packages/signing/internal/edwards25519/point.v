@@ -288,10 +288,10 @@ pub fn (mut v Point) add(p Point, q Point) Point {
 	check_initialized(q)
 	mut pc := ProjectiveCached{}
 	mut p1 := ProjectiveP1{}
-	qcached := pc.from_p3(q)
+	pc.from_p3(q)
 
-	result := p1.add(p, qcached)
-	return v.from_p1(result)
+	p1.add(p, pc)
+	return v.from_p1(p1)
 }
 
 // subtract sets v = p - q, and returns v.
@@ -300,9 +300,9 @@ pub fn (mut v Point) subtract(p Point, q Point) Point {
 	check_initialized(q)
 	mut pc := ProjectiveCached{}
 	mut p1 := ProjectiveP1{}
-	qcached := pc.from_p3(q)
-	result := p1.sub(p, qcached)
-	return v.from_p1(result)
+	pc.from_p3(q)
+	p1.sub(p, pc)
+	return v.from_p1(p1)
 }
 
 fn (mut v ProjectiveP1) add(p Point, q ProjectiveCached) ProjectiveP1 {

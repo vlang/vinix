@@ -1,0 +1,4 @@
+key: 114698 live bytes, 533 allocations, 1 allocations of at least 1024 bytes
+sign: 119885 live bytes, 602 allocations, 1 allocations of at least 1024 bytes
+verify: 21714 live bytes, 63 allocations, 3 allocations of at least 1024 bytes
+Signing table ownership qualification passed; reference bytes and live allocation budgets retained

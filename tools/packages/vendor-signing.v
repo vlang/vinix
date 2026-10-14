@@ -40,6 +40,11 @@ fn signing_git(checkout string, arguments []string) !string {
 	return output
 }
 
+fn signing_replace(source string, original string, replacement string, count int) !string {
+	if source.count(original) != count { return error('unexpected signing ownership source layout') }
+	return source.replace(original, replacement)
+}
+
 fn signing_adapt(path string, source string) !string {
 	mut result := source.replace('import crypto.ed25519.internal.edwards25519',
 		'import tools.packages.signing.internal.edwards25519')
@@ -57,6 +62,11 @@ fn signing_adapt(path string, source string) !string {
 		result = result.replace_once(original, replacement)
 		result = result.replace('check_initialized(p, q)', 'check_initialized(p)\n\tcheck_initialized(q)')
 		result = result.replace_once('check_initialized(v, u)', 'check_initialized(v)\n\tcheck_initialized(u)')
+		result = signing_replace(result, 'qcached := pc.from_p3(q)', 'pc.from_p3(q)', 2)!
+		result = signing_replace(result, 'result := p1.add(p, qcached)\n\treturn v.from_p1(result)',
+			'p1.add(p, pc)\n\treturn v.from_p1(p1)', 1)!
+		result = signing_replace(result, 'result := p1.sub(p, qcached)\n\treturn v.from_p1(result)',
+			'p1.sub(p, pc)\n\treturn v.from_p1(p1)', 1)!
 	}
 	if path == 'internal/edwards25519/extra.v' {
 		if result.count('check_initialized(...points)') != 2 { return error('unexpected multiscalar source layout') }
@@ -69,6 +79,30 @@ fn signing_adapt(path string, source string) !string {
 		// the qualified compiler heap-promote this temporary on every field
 		// multiply/square. Keep the same carry and return the updated value.
 		result = result.replace(original, '\tv.carry_propagate_generic()\n\treturn v')
+	}
+	if path == 'internal/edwards25519/scalarmult.v' {
+		// Upstream's Once belongs to a new wrapper on every call, so it never
+		// shares a table. Retain that construction order with explicit ownership.
+		marker := '// scalar_base_mult sets v = x * B'
+		if result.count(marker) != 1 || !result.starts_with('module edwards25519\n\nimport sync\n') {
+			return error('unexpected signing basepoint source layout')
+		}
+		prefix := 'module edwards25519\n\n// This table belongs to the scalar multiplication that requested it.\nfn basepoint_table() []AffineLookupTable {\n\tmut table := []AffineLookupTable{len: 32}\n\tmut p := new_generator_point()\n\tfor i := 0; i < 32; i++ {\n\t\ttable[i].from_p3(p)\n\t\tfor j := 0; j < 8; j++ {\n\t\t\tp.add(p, p)\n\t\t}\n\t}\n\treturn table\n}\n\n'
+		result = prefix + marker + result.all_after(marker)
+		naf_start := 'struct BasepointNaftablePrecomp {'
+		naf_end := '// vartime_double_scalar_base_mult sets v = a * A'
+		if result.count(naf_start) != 1 || result.count(naf_end) != 1 { return error('unexpected signing NAF source layout') }
+		result = result.all_before(naf_start) + 'fn basepoint_naf_table(mut table NafLookupTable8) {\n\ttable.from_p3(new_generator_point())\n}\n\n' + naf_end + result.all_after(naf_end)
+		result = signing_replace(result, 'mut bp_naftable := basepoint_naf_table()',
+			'mut bp_naftable := &NafLookupTable8{}\n\tdefer { unsafe { free(bp_naftable) } }\n\tbasepoint_naf_table(mut bp_naftable)', 1)!
+		result = signing_replace(result, 'mut atable := NafLookupTable5{}',
+			'mut atable := &NafLookupTable5{}\n\tdefer { unsafe { free(atable) } }', 1)!
+		result = signing_replace(result, 'mut bpt_table := basepoint_table()',
+			'mut bpt_table := basepoint_table()\n\tdefer { unsafe { bpt_table.free() } }', 1)!
+		result = signing_replace(result, 'digits := x.signed_radix16()',
+			'digits := x.signed_radix16()\n\tdefer { unsafe { digits.free() } }', 2)!
+		result = signing_replace(result, 'bnaf := b.non_adjacent_form(8)',
+			'bnaf := b.non_adjacent_form(8)\n\tdefer { unsafe { anaf.free(); bnaf.free() } }', 1)!
 	}
 	return result
 }
@@ -118,7 +152,8 @@ fn synchronize_signing() ! {
 	}
 	provenance := json2.encode(SigningProvenance{ revision: signing_source_revision,
 		adaptations: ['package-local module namespace', 'non-variadic point-initialization checks; arithmetic and encoding retained',
-			'field multiplication/squaring discard redundant carry-result assignment; receiver mutation and returned limbs retained'],
+			'field multiplication/squaring discard redundant carry-result assignment; receiver mutation and returned limbs retained',
+			'per-operation lookup table and digit ownership; point addition/subtraction use updated stack receivers'],
 		files: records }) + '\n'
 	if os.args[1] == '--write' {
 		os.write_file(destination + '/provenance.json', provenance)!
