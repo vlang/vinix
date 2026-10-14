@@ -110,7 +110,7 @@ fn pump_https_output(output HttpsOutput, path string, maximum u64, offset u64, a
 	if event.phase != '' { report(pkgprotocol.Progress{ ...event, current: done }) }
 	for {
 		mut polling := OutputPoll{ fd: fds[0], events: i16(C.POLLIN) }
-		ready := C.vinix_package_poll(unsafe { &polling }, 1, 200)
+		ready := C.vinix_package_poll(unsafe { voidptr(&polling) }, 1, 200)
 		if ready < 0 && C.errno == C.EINTR { continue }
 		if ready < 0 { return error('cannot monitor download output') }
 		if ready > 0 {
