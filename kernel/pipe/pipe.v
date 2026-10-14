@@ -70,6 +70,10 @@ pub fn create() ?&Pipe {
 	// Linux shows a pipe as a FIFO no name leads to, prw-------. A type of its
 	// own was nothing a program could tell: every test for a type said no.
 	p.stat.mode = stat.ififo | 0o600
+	// Set the creator before the resource interface copies the inode fields.
+	process := proc.current_thread().process
+	p.stat.uid = process.euid
+	p.stat.gid = process.egid
 	// An empty pipe is writable. pollout was only ever raised by read(), when
 	// it freed space, so until something had been read a fresh pipe reported
 	// itself unwritable and anything waiting for room to write blocked for good.
