@@ -97,6 +97,7 @@ mut:
 	quick_launch            bool
 	quick_launch_chord_held bool
 	query                   []u8
+	search                  QuickLaunchSearch
 	// The start of a sequence that the read ended inside, held until the next
 	// read completes it.
 	pending string
@@ -358,6 +359,7 @@ fn (mut d Desktop) switcher_close() {
 		return
 	}
 	if d.switcher.quick_launch {
+		d.quick_launch_search_changed()
 		d.quick_launch_free_query()
 		d.switcher.quick_launch = false
 	}

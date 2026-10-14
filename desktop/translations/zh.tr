@@ -824,10 +824,13 @@ jump.unpin
 将此程序从任务栏取消固定
 -----
 quick_launch.empty
-未找到应用或文档
+未找到应用、文件夹或文档
 -----
 quick_launch.search
-搜索应用和文档
+搜索应用、文件夹和文档
+-----
+quick_launch.searching
+正在搜索文件夹和文档…
 -----
 registration.button.create
 创建用户

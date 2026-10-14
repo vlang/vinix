@@ -50,7 +50,7 @@ fn test_cmd_space_opens_spotlight_style_app_search_and_owns_typing() {
 
 	root := desktop.build_tree()
 	assert quick_launch_element_named(root, quick_launch_panel_action) != none
-	assert quick_launch_tree_has_text(root, 'Search applications and documents')
+	assert quick_launch_tree_has_text(root, 'Search applications, folders and documents')
 	assert quick_launch_tree_has_text(root, 'Files')
 	assert !quick_launch_tree_has_text(root, 'Shut down')
 	free_tree(root)
@@ -64,6 +64,10 @@ fn test_cmd_space_opens_spotlight_style_app_search_and_owns_typing() {
 	assert desktop.take_switcher_keys('term') == ''
 	assert desktop.quick_launch_query_text() == 'term'
 	assert desktop.quick_launch_match_count() == 1
+	// Application filtering uses the in-memory catalog before any search worker
+	// is started, so a slow or unindexed home cannot delay typing.
+	assert desktop.switcher.search.worker == 0
+	assert !desktop.switcher.search.requested
 	app_index := desktop.quick_launch_app_index(0) or { panic('missing Terminal result') }
 	assert available_apps[app_index].title == 'Terminal'
 

@@ -7,15 +7,7 @@
 module main
 
 import ui2
-import os
 import desktop.workflowcore
-
-__global launcher_documents = workflowcore.SearchIndex{}
-__global launcher_index_worker = int(0)
-__global launcher_index_home = ''
-__global launcher_index_started = u64(0)
-__global launcher_policy_checked = u64(0)
-__global launcher_index_seen = workflowcore.Identity{}
 
 const quick_launch_key = '\x1b[32;9u'
 const quick_launch_cmd_release = '\x1b[57444;1:3u'
@@ -26,6 +18,7 @@ const quick_launch_up_keys = ['\x1b[A', '\x1bOA']
 const quick_launch_panel_action = 'switch.-1'
 const quick_launch_backdrop_action = 'switch.-2'
 const quick_launch_max_results = 7
+const quick_launch_max_query = 4096
 const quick_launch_panel_width = 620
 const quick_launch_search_height = 58
 const quick_launch_row_height = 48
@@ -52,10 +45,8 @@ fn (mut d Desktop) toggle_quick_launch() {
 	}
 	d.refresh_package_apps()
 	d.quick_launch_reset_query()
-	launcher_documents.close()
-	launcher_documents = workflowcore.load_index(d.home) or { workflowcore.SearchIndex{} }
-	d.start_workflow_search()
-	// Action IDs describe the seven visible slots, including document results.
+	d.quick_launch_search_changed()
+	// Action IDs describe the seven visible slots, including filesystem results.
 	for d.switcher.ids.len < quick_launch_max_results { d.switcher.ids << '${action_switch_prefix}${d.switcher.ids.len}' }
 	d.switcher.quick_launch = true
 	d.switcher.active = true
@@ -65,64 +56,9 @@ fn (mut d Desktop) toggle_quick_launch() {
 	d.dirty = true
 }
 
-fn (mut d Desktop) start_workflow_search() {
-	if launcher_index_worker > 0 || d.home.len == 0 { return }
-	now := desktop_monotonic_ms()
-	if launcher_index_home == d.home && now >= launcher_index_started && now - launcher_index_started < 60000 { return }
-	home := os.real_path(d.home)
-	defer { unsafe { home.free() } }
-	if launcher_documents.roots.len == 0 {
-		if id := workflowcore.identify(home) { launcher_documents.roots << workflowcore.SearchRoot{path: home.clone(), identity: id, enabled: true, contents: true} } else { return }
-	}
-	unsafe { launcher_index_home.free() }
-	launcher_index_home = d.home.clone()
-	launcher_index_started = now
-	pid := C.fork()
-	if pid < 0 { return }
-	if pid == 0 {
-		for fd in 3 .. 1024 { C.close(fd) }
-		mut index := workflowcore.SearchIndex{}
-		index.begin(launcher_documents.roots)
-		for index.indexing { index.tick() }
-		mut settings := load_files_settings(home)
-		for path, ids in settings.assignments {
-			mut tags := []string{}
-			for id in ids { for tag in settings.tags { if tag.id == id { tags << tag.name.clone() } } }
-			index.set_tags(path, tags)
-			unsafe { tags.free() }
-		}
-		index.publish(home) or { C._exit(1) }
-		C._exit(0)
-	}
-	launcher_index_worker = pid
-}
-
-fn (mut d Desktop) poll_workflow_search() {
-	mut completed := false
-	if launcher_index_worker > 0 {
-		mut status := 0
-		if C.waitpid(launcher_index_worker, unsafe { &status }, C.WNOHANG) == launcher_index_worker { launcher_index_worker = 0; completed = true }
-	}
-	if !d.switcher.quick_launch && !completed { return }
-	now := desktop_monotonic_ms()
-	if !completed && now >= launcher_policy_checked && now - launcher_policy_checked < 1000 { return }
-	launcher_policy_checked = now
-	path := os.join_path(d.home, '.vinix-search', 'index.json')
-	defer { unsafe { path.free() } }
-	id := workflowcore.identify(path) or {
-		if launcher_documents.records.len > 0 { launcher_documents.close(); d.dirty = true }
-		return
-	}
-	if !completed && launcher_index_seen.unchanged(id) { return }
-	launcher_index_seen = id
-	launcher_documents.close()
-	launcher_documents = workflowcore.load_index(d.home) or { workflowcore.SearchIndex{} }
-	if d.switcher.quick_launch { d.switcher.index = 0; d.dirty = true }
-}
-
 fn (mut d Desktop) quick_launch_reset_query() {
 	d.quick_launch_free_query()
-	d.switcher.query = []u8{cap: start_menu_max_query}
+	d.switcher.query = []u8{cap: quick_launch_max_query}
 	// The launcher only appends and removes bytes. No slice escapes from this
 	// buffer, so replacing it later can release the old allocation directly.
 	unsafe { d.switcher.query.flags |= .noslices }
@@ -150,9 +86,7 @@ fn (d &Desktop) quick_launch_match_count() int {
 			count++
 		}
 	}
-	paths := launcher_documents.query(query, quick_launch_max_results)
-	defer { unsafe { paths.free() } }
-	return count + paths.len
+	return count + d.switcher.search.results.len
 }
 
 fn (d &Desktop) quick_launch_visible_limit() int {
@@ -217,14 +151,21 @@ fn (mut d Desktop) quick_launch_launch_selected() {
 	query := d.quick_launch_query_text()
 	mut app_count := 0
 	for index in 0 .. desktop_menu_count() { if desktop_menu_matches(index, query) { app_count++ } }
-	paths := launcher_documents.query(query, quick_launch_max_results)
-	defer { unsafe { paths.free() } }
 	i := d.switcher.index - app_count
-	if i < 0 || i >= paths.len { return }
-	path := paths[i].clone()
+	if i < 0 || i >= d.switcher.search.results.len { return }
+	result := d.switcher.search.results[i]
+	// Recheck the one selected item before opening it; a delayed result may
+	// have disappeared or been replaced since its worker finished.
+	current := workflowcore.identify(result.path) or { d.quick_launch_search_changed(); return }
+	if !result.identity.same_node(current) || C.access(&char(result.path.str), C.R_OK | if result.directory { C.X_OK } else { 0 }) != 0 {
+		d.quick_launch_search_changed()
+		return
+	}
+	path := result.path.clone()
 	defer { unsafe { path.free() } }
 	d.switcher_close()
-	d.open_workflow_document(path)
+	if result.directory { d.open_document_in_handler('vinix-files', path) }
+	else { d.open_workflow_document(path) }
 }
 
 // quick_launch_take_keys owns all keyboard input while the overlay is open.
@@ -270,6 +211,7 @@ fn (mut d Desktop) quick_launch_take_keys(input string) string {
 					}
 					d.switcher.query.delete_last()
 					d.switcher.index = 0
+					d.quick_launch_search_changed()
 					d.dirty = true
 				}
 			}
@@ -281,9 +223,10 @@ fn (mut d Desktop) quick_launch_take_keys(input string) string {
 				d.quick_launch_move_selection(1)
 			}
 			else {
-				if ch >= 0x20 && ch != 0x7f && d.switcher.query.len < start_menu_max_query {
+				if ch >= 0x20 && ch != 0x7f && d.switcher.query.len < quick_launch_max_query {
 					d.switcher.query << ch
 					d.switcher.index = 0
+					d.quick_launch_search_changed()
 					d.dirty = true
 				}
 			}
@@ -354,7 +297,7 @@ fn (mut d Desktop) quick_launch_take_sequence(input string, at int) int {
 
 // quick_launch_element is a centered search field with a short result stack,
 // intentionally closer to Spotlight than to a menu. Application entries use
-// the shared built-in/package registry, followed by matching documents.
+// the shared built-in/package registry, followed by cached folders/documents.
 fn (d &Desktop) quick_launch_element() ui2.Element {
 	mut width := quick_launch_panel_width
 	if width > d.canvas.width - 32 {
@@ -393,7 +336,7 @@ fn (d &Desktop) quick_launch_element() ui2.Element {
 
 	row_y := quick_launch_panel_padding + quick_launch_search_height + 8
 	if result_count == 0 {
-		panel_children << ui2.label('quick-launch.empty', tr('quick_launch.empty'), ui2.rect(24, f64(row_y + 9), f64(width - 48), 30), ui2.TextStyle{
+		panel_children << ui2.label('quick-launch.empty', tr(if d.quick_launch_search_pending() { 'quick_launch.searching' } else { 'quick_launch.empty' }), ui2.rect(24, f64(row_y + 9), f64(width - 48), 30), ui2.TextStyle{
 			color: quick_launch_muted
 			size: 13
 			align: .left
@@ -425,13 +368,11 @@ fn (d &Desktop) quick_launch_element() ui2.Element {
 			})
 			result++
 		}
-		paths := launcher_documents.query(query, quick_launch_max_results)
-		defer { unsafe { paths.free() } }
-		for path in paths {
+		for path in d.switcher.search.results {
 			if result >= result_count { break }
 			id := d.switcher.ids[result]
 			selected := result == d.switcher.index
-			panel_children << ui2.Element{...ui2.button_with_image(id, path.clone(), 'builtin:file', ui2.rect(f64(quick_launch_panel_padding), f64(row_y + result * quick_launch_row_height), f64(width - 2 * quick_launch_panel_padding), f64(quick_launch_row_height)), ui2.BoxStyle{bg: if selected { d.theme().accent } else { quick_launch_bg }, radius: 7}, ui2.TextStyle{color: if selected { u32(0xffffff) } else { quick_launch_text }, size: 12, align: .left}), key: workflow_owned_text_key}
+			panel_children << ui2.Element{...ui2.button_with_image(id, path.path.clone(), if path.directory { 'builtin:folder' } else { 'builtin:file' }, ui2.rect(f64(quick_launch_panel_padding), f64(row_y + result * quick_launch_row_height), f64(width - 2 * quick_launch_panel_padding), f64(quick_launch_row_height)), ui2.BoxStyle{bg: if selected { d.theme().accent } else if d.hover == id { quick_launch_hover } else { quick_launch_bg }, radius: 7}, ui2.TextStyle{color: if selected { u32(0xffffff) } else { quick_launch_text }, size: 12, align: .left}), key: workflow_owned_text_key}
 			result++
 		}
 	}

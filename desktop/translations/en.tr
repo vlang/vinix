@@ -824,10 +824,13 @@ jump.unpin
 Unpin this program from taskbar
 -----
 quick_launch.empty
-No applications or documents found
+No applications, folders or documents found
 -----
 quick_launch.search
-Search applications and documents
+Search applications, folders and documents
+-----
+quick_launch.searching
+Searching folders and documents…
 -----
 registration.button.create
 Create user

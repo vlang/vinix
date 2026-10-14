@@ -824,10 +824,13 @@ jump.unpin
 Desanclar de la barra de tareas
 -----
 quick_launch.empty
-No se encontraron aplicaciones ni documentos
+No se encontraron aplicaciones, carpetas ni documentos
 -----
 quick_launch.search
-Buscar aplicaciones y documentos
+Buscar aplicaciones, carpetas y documentos
+-----
+quick_launch.searching
+Buscando carpetas y documentos…
 -----
 registration.button.create
 Crear usuario

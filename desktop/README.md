@@ -809,6 +809,15 @@ ranking holds more than the window has room for.
 
 ## The window switcher
 
+`Cmd-Space` opens a Spotlight-style search box from any application. Type an
+application name to filter the installed apps immediately; matching folders
+and documents arrive in the background after a short typing pause. Applications
+stay above filesystem results, and folders come before documents. Search by
+folder name, an absolute path, or a path beginning with `~/` to find a directory
+to open in Files. Up and Down choose a result, Return opens it, and Escape or
+a click outside the box dismisses it. Releasing Cmd leaves the search box open;
+pressing `Cmd-Space` again closes it.
+
 `Cmd-Tab` moves to the window under the one on top, and pressing it again goes
 back — which is what a tap is for. Holding Cmd down instead asks "what else is
 open?", and after 400 ms the desktop answers: a translucent panel in the middle
@@ -826,6 +835,7 @@ A terminal has no way to say "Cmd", so the keyboard drivers say it for it and
 the desktop reads these sequences out of the byte stream before applications
 see them:
 
+    \e[32;9u       Cmd-Space
     \e[9;9u        Cmd-Tab
     \e[9;10u       Cmd-Shift-Tab
     \e[57444;1:3u  Cmd let go

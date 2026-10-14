@@ -1069,7 +1069,8 @@ fn (mut d Desktop) poll_apps() {
 // opening a stopwatch or a continuously hosted framebuffer lowers the timeout
 // to that application's requested cadence.
 fn (d &Desktop) idle_wait_interval(maximum i64, frame_interval i64) i64 {
-	if d.clipboard.pid > 0 {
+	if d.clipboard.pid > 0 || d.switcher.search.worker > 0
+		|| (d.switcher.quick_launch && d.quick_launch_search_pending()) {
 		return frame_interval
 	}
 	mut interval := d.keyboard_hud_wait(maximum)
@@ -1183,6 +1184,7 @@ fn (mut d Desktop) take_power_signal() {
 // slots are intentionally stable while windows are open, so walk the slots
 // themselves: a closed window has already closed its process and is harmless.
 fn (mut d Desktop) close_apps() {
+	d.close_quick_launch_search()
 	packaged_apps.close()
 	d.preview_cache.clear()
 	for index in 0 .. d.apps.len {
