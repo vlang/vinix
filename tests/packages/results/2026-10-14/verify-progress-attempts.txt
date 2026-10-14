@@ -1,0 +1,34 @@
+Initial disk-limited host compile:
+C compilation error (from cc):
+error: unable to open output file '/var/folders/5s/gdmd5zq90y52hchygpfzp2m00000gn/T/src-040621.o': 'No space left on device'
+1 error generated.
+
+
+Initial x86 ISO build:
+FAIL x86_64 packages-verify-progress (1.4s)
+  /Users/alex/code/vinix/build-support/build-amd64-iso.sh
+build-amd64-iso.sh: exit status 32
+==> Assembling /Users/alex/code/vinix/build/pkg-vfy-x86/packages-verify-progress/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/code/vinix/build/pkg-vfy-x86/packages-verify-progress/.vinix-amd64.iso.ycxJEh'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data,  117m free
+Added to ISO image: directory '/'='/Users/alex/code/vinix/build/pkg-vfy-x86/packages-verify-progress/iso/.iso-staging.caX89A/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :  7.24% done
+libisofs: MISHAP : Image write cancelled
+libburn : SORRY : Cannot write desired amount of 32768 bytes. write(2) returned -1. : No space left on device
+libburn : FATAL : Burn run failed
+xorriso : FATAL : -abort_on 'FAILURE' encountered 'FATAL' during image writing
+xorriso : NOTE : libburn has now been urged to cancel its operation
+xorriso : FAILURE : libburn indicates failure with writing.
+xorriso : NOTE : -return_with SORRY 32 triggered by problem severity FATAL
+  nothing was printed on the serial port
+  logs: /Users/alex/code/vinix/build/pkg-vfy-x86/packages-verify-progress
+package-verify-progress x86_64: 0 passed, 1 failed, 0 skipped
+
+Recovery:
+PASS retained seven completed assertion runners; retried disk-limited state compile/run; unmeasured original durations omitted

@@ -1500,6 +1500,24 @@ review/plan/status/verification use its reader lock. The command's startup canno
 retain an older policy or publisher after a completed administration change.
 `verify`, including `--json verify`, checks all installed payloads before reporting
 success. Readers and launches return a busy-transaction diagnostic promptly.
+`--progress verify` uses the existing format-1 indeterminate `verify` frames:
+one scan-start event, an event identifying each payload and application launcher,
+and `complete` only after all checks pass. It remains read-only under one reader
+lock. Plain and JSON Verify output retain their existing shapes; `--progress`
+cannot be combined with `--json`. A failed scan emits its diagnostic and no
+completion or partial JSON state. Status does not scan or emit verification
+progress. Empty/fresh installations report a completed empty scan without
+creating package state. Integrity verification does not authorize launch or
+require a working catalog, repository history, network or publisher enrollment.
+
+Software's **Verify installed** starts this read-only worker without an
+administrator prompt or catalog refresh. It preserves the current package list,
+filter and selection, shows streamed check paths, and retains failures in
+**Failure details** with repair guidance. Success stays visible instead of being
+replaced by a catalog reload. Exit failure or a missing/finally superseded
+completion frame cannot report success. The window may close during a scan;
+closing stops only its verification reader. Review confirmation screens do not
+offer verification. See [verification checks](../../tests/packages/verify-progress-check.md).
 On a fresh image, status/verification do not initialize package state. Direct
 administrator edits to configuration must honor the same lock or quiesce package
 operations; arbitrary root filesystem writes are outside this contract.

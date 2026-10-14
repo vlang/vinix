@@ -1,0 +1,5 @@
+VERIFY PROGRESS payload/launcher identity, compatible counters, empty state and no completion on byte/mode/registration failure PASS
+
+Tracked heap run:
+VERIFY PROGRESS payload/launcher identity, compatible counters, empty state and no completion on byte/mode/registration failure PASS
+VERIFY PROGRESS 128 healthy/failed scans retain zero tracked bytes PASS

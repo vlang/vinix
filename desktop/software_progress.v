@@ -5,7 +5,7 @@ import ui2
 import tools.packages.pkgprotocol
 
 fn software_progress_command(arguments []string) bool {
-	return arguments.len > 0 && arguments[0] in ['update', 'install', 'remove', 'upgrade', 'apply', 'deploy', 'deployment-apply', 'rollback', 'mirror', 'mirror-apply', 'mirror-deployment-apply']
+	return arguments.len > 0 && arguments[0] in ['update', 'install', 'remove', 'upgrade', 'apply', 'deploy', 'deployment-apply', 'rollback', 'verify', 'mirror', 'mirror-apply', 'mirror-deployment-apply']
 }
 
 fn (mut a SoftwareApp) clear_progress() {
@@ -24,7 +24,7 @@ fn software_progress_text(event pkgprotocol.Progress) string {
 		'metadata' { 'Reading signed metadata: ${event.repository}/${event.path} · ${current} bytes' }
 		'download' { 'Downloading ${event.package}/${event.path} · ${current} / ${total} bytes' }
 		'copy' { 'Copying ${event.package}/${event.path} · ${current} / ${total} bytes' }
-		'verify' { 'Verifying ${event.package}/${event.path}…' }
+		'verify' { if event.package == '' { 'Verifying installed packages…'.clone() } else { 'Verifying ${event.package}/${event.path}…' } }
 		'stage' { 'Staged ${current} / ${total} packages' }
 		'activate' { 'Activating the complete package set…'.clone() }
 		'complete' { 'Package operation completed.'.clone() }

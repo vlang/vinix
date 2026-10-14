@@ -1,0 +1,20 @@
+Package CLI: durable private key creation, existing-seed refusal and read-only public-key recovery passed
+Package CLI: malformed publisher history refuses release without changing prior publication
+Package CLI: scoped repository configuration survives damaged cache/history; strict listing/enrollment/update still refuse; reviewed revocation preserves active state and recovery data
+Package CLI: malformed locks refuse within two seconds, preserve state/cache/history and permit verified recovery
+Package CLI: special and oversized configuration, catalog, history and state refuse promptly, preserve recovery data and permit restored verification
+Package CLI: ambiguous configuration refused without activation, cache or trust changes
+Package CLI: malformed cached snapshots preserve trust/state/recovery and permit verified refresh after restoration
+Package CLI: malformed retained history refuses replay after revocation and empty refresh
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed
+
+Real CLI verification probe:
+Updating trusted repository trusted
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (18 bytes)
+Installing assets 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (21 bytes)
+Installing runtime 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (22 bytes)
+Activated package generation 1
+VERIFY PROGRESS signed service/CLI, read-only locking/state, compatible frames, legacy text/JSON, offline catalog independence and payload/mode/launcher failure recovery PASS

@@ -1,0 +1,12 @@
+PASS baseline 9d8068b2e reproduces missing Service.verify progress and rejected CLI progress verification
+
+Previous implementation, isolated fixture data:
+Updating trusted repository trusted
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (18 bytes)
+Installing assets 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (21 bytes)
+Installing runtime 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (22 bytes)
+Activated package generation 1
+VERIFY PROGRESS BEFORE Service.verify emits no progress and the CLI refuses --progress verify

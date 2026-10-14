@@ -1,0 +1,9 @@
+Updating trusted repository trusted
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (18 bytes)
+Installing assets 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (21 bytes)
+Installing runtime 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (22 bytes)
+Activated package generation 1
+VERIFY PROGRESS signed service/CLI, read-only locking/state, compatible frames, legacy text/JSON, offline catalog independence and payload/mode/launcher failure recovery PASS

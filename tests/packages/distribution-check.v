@@ -81,6 +81,10 @@ fn check() ! {
 			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/installation-health-memory', repository + '/tools/packages/pkgcore/installed_health_test.v'])!
 		run(work + '/installation-health-memory', [])!
+		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/verify-memory', repository + '/tools/packages/pkgcore/verify_test.v'])!
+		run(work + '/verify-memory', [])!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgprotocol', work)!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
 			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/repository-configuration-memory',
@@ -114,6 +118,10 @@ fn check() ! {
 			'-o', work + '/installation-health-check', repository + '/tests/packages/installation-health-check.v'])!
 		run(work + '/installation-health-check', [work + '/installation-health-service'])!
 		run(work + '/installation-health-check', [work + '/installation-health-cli', work + '/vinix-package'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/verify-progress-check', repository + '/tests/packages/verify-progress-check.v'])!
+		run(work + '/verify-progress-check', [work + '/verify-progress-service'])!
+		run(work + '/verify-progress-check', [work + '/verify-progress-cli', work + '/vinix-package'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository,
 			'-o', work + '/elf-profile-check', repository + '/tests/packages/elf-profile-check.v'])!
 		run(work + '/elf-profile-check', [work + '/vinix-package', work + '/elf-profiles'])!
@@ -172,6 +180,7 @@ fn check() ! {
 	os.cp(repository + '/desktop/software_progress.v', work + '/software/software_progress.v')!
 	os.cp(repository + '/desktop/software_failure.v', work + '/software/software_failure.v')!
 	os.cp(repository + '/tests/packages/software_failure_fixture.v', work + '/software/failure_fixture.v')!
+	os.cp(repository + '/tests/packages/software_verify_fixture.v', work + '/software/verify_fixture.v')!
 	os.cp(repository + '/desktop/software_deployment.v', work + '/software/software_deployment.v')!
 	os.cp(repository + '/desktop/software_mirror.v', work + '/software/software_mirror.v')!
 	os.cp(repository + '/desktop/software_terminal.v', work + '/software/software_terminal.v')!

@@ -56,6 +56,7 @@ mut:
 	worker_view     bool
 	worker_review   bool
 	worker_run      bool
+	worker_verify   bool
 	worker_failed   bool
 	data_mode       bool
 	data_status     pkgprotocol.PersonalDataStatus
@@ -204,6 +205,7 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	a.worker_view = view
 	a.worker_review = false
 	a.worker_run = false
+	a.worker_verify = arguments.len == 1 && arguments[0] == 'verify'
 	a.worker_mirror = false
 	a.repository_worker = .none
 	a.data_worker = .none
@@ -501,17 +503,22 @@ fn (mut a SoftwareApp) poll() bool {
 	}
 	code := a.worker.code
 	if !a.worker_view && !a.worker_review { a.finish_operation_output() }
+	if a.worker_verify && code == 0 && (!a.progress_seen || a.progress_snapshot.phase != 'complete') {
+		a.operation_line('Verification ended without a complete result. Retry Verify installed.')
+		a.worker_failed = true
+	}
 	if code != 0 || a.worker_failed { a.capture_failure(a.worker.args, code) }
 	view := a.worker_view
 	reviewing := a.worker_review
 	running := a.worker_run
+	verifying := a.worker_verify
 	repository_worker := a.repository_worker
 	data_worker := a.data_worker
 	policy_worker := a.policy_worker
 	mirroring := a.worker_mirror
 	a.retire_worker()
 	a.clear_admin_prompt()
-	if code != 0 {
+	if code != 0 || (verifying && a.worker_failed) {
 		if policy_worker == .review { a.clear_policy_review(); a.prepare_policy_pages(false) }
 		if policy_worker == .apply { a.policy_ready = false; a.clear_policy_pages() }
 		if repository_worker == .review { a.clear_repository_review() }
@@ -524,11 +531,16 @@ fn (mut a SoftwareApp) poll() bool {
 			unsafe { diagnostic.free() }
 			return true
 		}
-		a.set_status(if diagnostic.len > 0 {
+		if verifying && diagnostic.len > 0 {
+			// Preserve the final failure rather than an earlier success-looking
+			// line from an incomplete or failed verification worker.
+			start := (diagnostic.last_index('\n') or { -1 }) + 1
+			a.set_status(unsafe { tos(diagnostic.str + start, diagnostic.len - start) })
+		} else { a.set_status(if diagnostic.len > 0 {
 			diagnostic
 		} else {
 			'The package service failed. Check administrator access, repository configuration and disk space.'
-		})
+		}) }
 		unsafe { diagnostic.free() }
 	} else if policy_worker == .list {
 		if !a.worker_failed { a.load_policy_document() }
@@ -570,6 +582,8 @@ fn (mut a SoftwareApp) poll() bool {
 		tail := software_output_tail(a.output)
 		a.set_status(if tail.len > 0 { tail } else { 'Offline repository export completed.' })
 		unsafe { tail.free() }
+	} else if verifying {
+		a.set_status('Installed files and launchers verified. Trust and organization policy still apply at launch.')
 	} else {
 		a.start(['view'], true)
 	}
@@ -770,6 +784,10 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		'software.reload' {
 			a.clear_review()
 			a.start(['view'], true)
+		}
+		'software.verify' {
+			if a.worker != unsafe { nil } || a.review != '' { return }
+			a.start(['verify'], false)
 		}
 		'software.up' {
 			if a.review_ready {
@@ -1006,7 +1024,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		} else {
 			a.rows[a.selected]
 		}
-		children << software_button('software.details', 'Package details…', 14, height - 176, 232)
+		children << software_button('software.details', if reviewing { 'Package details…' } else { 'Details…' }, 14, height - 176, if reviewing { 232 } else { 110 })
 		children << software_label(row.name, 274, 90, if !reviewing && row.installed_version != '' && software_launch_kind(row) !in ['runtime', 'data'] { width - 466 } else { width - 288 }, 28, false)
 		children << software_label(row.description, 274, 124, if !reviewing && row.installed_version != '' && software_launch_kind(row) !in ['runtime', 'data'] { width - 466 } else { width - 288 }, 72, false)
 		children << software_label(if !reviewing && row.update_action == 'remove' {
@@ -1066,6 +1084,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		children << software_button('software.upgrade', 'Update all', 274, height - 138, 112)
 		children << software_button('software.rollback', 'Rollback', 394, height - 138, 100)
 		children << software_button('software.data', 'Personal data', 502, height - 138, 124)
+		children << software_button('software.verify', 'Verify installed', 136, height - 176, 110)
 	}
 	if a.progress_seen { children << a.progress_bar(width, height) }
 	a.add_status_footer(mut children, width, height, a.progress_seen)
@@ -1082,7 +1101,7 @@ fn (mut a SoftwareApp) prepare_close() bool {
 		a.set_status('Exit the application before closing Software.')
 		return false
 	}
-	if a.worker != unsafe { nil } && !a.worker_view && !a.worker_review {
+	if a.worker != unsafe { nil } && !a.worker_view && !a.worker_review && !a.worker_verify {
 		a.set_status(if a.data_worker == .purge {
 			'Wait for personal data deletion to finish before closing Software.'
 		} else if a.worker_run {

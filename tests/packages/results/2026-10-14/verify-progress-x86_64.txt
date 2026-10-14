@@ -1,0 +1,2 @@
+PASS x86_64 packages-verify-progress (19.2s)
+package-verify-progress x86_64: 1 passed, 0 failed, 0 skipped

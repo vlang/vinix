@@ -373,6 +373,7 @@ fn main() {
 	// view/run transitions. It deliberately returns useful launch diagnostics.
 	if args.len > 1 {
 		if software_failure_service_fixture(args) { return }
+		if software_verify_service_fixture(args) { return }
 		if software_view_service_fixture(args) { return }
 		if software_policy_service_fixture(args) or { panic(err) } { return }
 		if software_metadata_service_fixture(args) { return }
@@ -553,6 +554,7 @@ fn main() {
 	check_resolved_updates() or { panic(err) }
 	check_repository_management() or { panic(err) }
 	check_software_progress() or { panic(err) }
+	check_software_verify() or { panic(err) }
 	check_software_deployment() or { panic(err) }
 	check_software_mirror() or { panic(err) }
 	check_software_locked_mirror() or { panic(err) }

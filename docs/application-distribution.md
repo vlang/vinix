@@ -518,6 +518,16 @@ emitting state, just as the text command does. Administrators editing policy
 files directly must serialize those writes with the package lock or stop package
 operations; an unrestricted administrator can bypass the service's guarantees.
 
+Software's **Verify installed** checks payload contents/permissions and generated
+launchers without changing packages or requiring a working catalog. It displays
+check progress, keeps the current list/filter/selection, and retains failures and
+repair guidance in **Failure details**. Successful results remain visible;
+publisher trust and organization policy still apply separately at launch.
+Verification runs without an administrator prompt and may be stopped by closing
+the window. The CLI's `--progress verify` uses the existing bounded progress
+format and reports completion only after a healthy scan. Plain/JSON Verify
+output stays compatible. See [qualification](../tests/packages/verify-progress-check.md).
+
 Each generation contains package state, the full payload closure, launcher
 records and a running-application lease. Files/directories are flushed before
 publication; POSIX rename switches `current` atomically. The next state-changing transaction

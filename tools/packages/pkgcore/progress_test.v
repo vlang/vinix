@@ -63,7 +63,7 @@ fn test_progress_tracks_resumed_bytes_and_only_completes_after_activation() {
 	assert stale && os.read_file(work + '/events')! == '' && os.is_dir(directory + '/generations/.stage-sentinel')
 	state := service.transact('install', ['app'], TransactionOptions{ expected_review: review.fingerprint })!
 	review.close()
-	assert state.generation == 1 && service.verify()!.generation == 1
+	assert state.generation == 1 && Service{ root: root }.verify()!.generation == 1
 	events := progress_events(work + '/events')!
 	downloads := events.filter(it.phase == 'download')
 	assert downloads.first().current == 16384 && downloads.last().current == u64(payload.len)

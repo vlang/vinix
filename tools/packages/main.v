@@ -76,8 +76,8 @@ fn checked(arguments []string) !int {
 		return 2
 	}
 	command := args[0]
-	if progress && (as_json || command !in ['update', 'install', 'remove', 'upgrade', 'apply', 'deploy', 'deployment-apply', 'rollback', 'mirror', 'mirror-apply', 'mirror-deployment-apply']) {
-		return error('--progress supports update, install/remove/upgrade, apply, deploy/deployment-apply, rollback and mirror/mirror-apply/mirror-deployment-apply without --json')
+	if progress && (as_json || command !in ['update', 'install', 'remove', 'upgrade', 'apply', 'deploy', 'deployment-apply', 'rollback', 'verify', 'mirror', 'mirror-apply', 'mirror-deployment-apply']) {
+		return error('--progress supports update, install/remove/upgrade, apply, deploy/deployment-apply, rollback, verify and mirror/mirror-apply/mirror-deployment-apply without --json')
 	}
 	names := args[1..].clone()
 	if command in ['run', 'run-terminal', 'run-window', 'run-args', 'run-terminal-args'] && os.geteuid() != 0 {
@@ -298,6 +298,7 @@ fn checked(arguments []string) !int {
 				p := installed.package
 				println('${p.id} ${p.version} ${p.architecture} ${installed.repository}')
 			}
+			if command == 'verify' && progress { println('Installed package files and launchers verified.') }
 		}
 		'install', 'remove', 'upgrade' {
 			service.transact(command, names, pkgcore.TransactionOptions{})!

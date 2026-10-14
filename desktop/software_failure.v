@@ -34,6 +34,7 @@ fn software_failure_operation(arguments []string) string {
 			'remove' { 'Remove software' }
 			'upgrade' { 'Update software' }
 			'rollback' { 'Roll back software' }
+			'verify' { 'Verify installed software' }
 			'repo-list', 'repo-review', 'repo-apply', 'repo-enroll', 'repo-revoke' { 'Repository administration' }
 			'policy', 'policy-review', 'policy-apply' { 'Organization policy' }
 			'deploy', 'deployment-review', 'deployment-apply' { 'Organization deployment' }
@@ -86,7 +87,8 @@ fn (mut a SoftwareApp) capture_failure(arguments []string, code int) {
 	a.failure_pages = []SoftwareFailurePage{cap: 16}
 	unsafe { a.failure_pages.flags |= .noslices }
 	number := code.str()
-	a.failure_heading = if code == 0 && a.worker_failed { software_failure_operation(arguments) + ' · response too large' }
+	a.failure_heading = if code == 0 && a.worker_failed && a.worker_verify { 'Verify installed software · incomplete response'.clone() }
+		else if code == 0 && a.worker_failed { software_failure_operation(arguments) + ' · response too large' }
 		else { software_failure_operation(arguments) + ' · exit ' + number }
 	unsafe { number.free() }
 	a.failure_truncated = a.output_truncated || a.output.len > software_failure_limit
