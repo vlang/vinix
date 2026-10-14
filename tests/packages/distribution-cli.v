@@ -253,6 +253,56 @@ fn qualify_configuration_schema(binary string, root string) ! {
 	println('Package CLI: ambiguous configuration refused without activation, cache or trust changes')
 }
 
+fn qualify_metadata_files(binary string, root string) ! {
+	store := pkgcore.state_directory(root)
+	current := os.readlink(store + '/current')!
+	paths := [root + '/etc/vinix-packages/config.json', store + '/catalog.json',
+		store + '/trust-history.json', store + '/' + current + '/state.json']
+	mut hashes := []string{}
+	for path in paths { hashes << pkgcore.hash_file(path)! }
+	objects := os.ls(store + '/objects')!.sorted()
+	sentinel := store + '/generations/.stage-metadata-read'
+	os.mkdir(sentinel)!
+	os.write_file(sentinel + '/keep', 'retained recovery data')!
+	defer { os.rmdir_all(sentinel) or {} }
+	for index, path in paths {
+		original := os.read_file(path)!
+		outside := path + '.metadata-outside'
+		saved := path + '.metadata-saved'
+		os.write_file(outside, original)!
+		os.chmod(outside, 0o600)!
+		defer { os.rm(outside) or {} }
+		for kind in ['fifo', 'directory', 'symlink', 'dangling', 'oversized'] {
+			os.rename(path, saved)!
+			match kind {
+				'fifo' { assert C.mkfifo(path.str, 0o600) == 0 }
+				'directory' { os.mkdir(path)! }
+				'symlink' { os.symlink(outside, path)! }
+				'dangling' { os.symlink(outside + '-absent', path)! }
+				else {
+					mut file := os.open_file(path, 'w', 0o600)!
+					file.seek(pkgcore.max_metadata, .start)!; file.write_string('x')!; file.close()
+				}
+			}
+			probes := if index in [0, 3] { [['status'], ['install', 'app'], ['gc']] }
+				else { [['update'], ['install', 'app'], ['plan', 'install', 'app']] }
+			for args in probes {
+				reply := coordination_command(binary, ['--root', root, ...args])!
+				assert reply.code == 1 && reply.text.contains('metadata must be a bounded regular file:')
+					&& !reply.text.contains('V panic:'), '${path}/${kind}: ${reply.text}'
+			}
+			assert os.readlink(store + '/current')! == current && os.ls(store + '/objects')!.sorted() == objects
+			assert os.read_file(sentinel + '/keep')! == 'retained recovery data'
+			assert os.read_file(outside)! == original && os.lstat(outside)!.mode & 0o777 == 0o600
+			for other, retained in paths { assert pkgcore.hash_file(if index == other { saved } else { retained })! == hashes[other] }
+			if kind == 'directory' { os.rmdir(path)! } else { os.rm(path)! }
+			os.rename(saved, path)!
+			assert json2.decode[pkgcore.State](success(binary, ['--root', root, '--json', 'verify'])!)!.generation == 1
+		}
+	}
+	println('Package CLI: special and oversized configuration, catalog, history and state refuse promptly, preserve recovery data and permit restored verification')
+}
+
 fn qualify_history_schema(binary string, root string, repository string, key string) ! {
 	store := pkgcore.state_directory(root)
 	path := store + '/trust-history.json'
@@ -434,6 +484,7 @@ fn qualify(binary string) ! {
 	assert installed.generation == 1
 	assert installed.packages[0].package.id == 'app'
 	qualify_coordination_files(binary, work + '/root')!
+	qualify_metadata_files(binary, work + '/root')!
 	qualify_configuration_schema(binary, work + '/root')!
 	qualify_snapshot_schema(binary, work + '/root', repository, key)!
 	mut launchers := packagecore.Registry{}

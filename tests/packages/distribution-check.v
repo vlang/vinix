@@ -73,6 +73,9 @@ fn check() ! {
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository,
 			'-o', work + '/elf-profile-check', repository + '/tests/packages/elf-profile-check.v'])!
 		run(work + '/elf-profile-check', [work + '/vinix-package', work + '/elf-profiles'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/metadata-race-check', repository + '/tests/packages/metadata-race-check.v'])!
+		run(work + '/metadata-race-check', [work + '/metadata-races'])!
 		run(v, [...helper_flags, '-o', work + '/terminal-check', repository + '/tests/packages/terminal-check.v'])!
 		run(work + '/terminal-check', [])!
 	}

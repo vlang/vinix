@@ -1,0 +1,3 @@
+fifo: reader wait status 14 (0=bounded captured reads, 14=alarm, 10752=alias bytes read)
+symlink: reader wait status 10752 (0=bounded captured reads, 14=alarm, 10752=alias bytes read)
+Metadata race qualification passed

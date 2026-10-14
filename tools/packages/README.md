@@ -83,6 +83,11 @@ types while preserving legacy defaults for omitted fields. Policy typos fail
 before acquisition, cleanup or activation; correcting the configuration permits
 a normal retry. See [qualification](../../tests/packages/configuration-check.md).
 
+Package metadata reads validate and consume one captured ordinary-file descriptor,
+with a fixed 8 MiB limit. Replaced leaf paths cannot redirect the read to an alias
+or stall it on a FIFO; in-place size changes fail with retry diagnostics. See
+[metadata read qualification](../../tests/packages/metadata-read-check.md).
+
 Consumer and publisher sequence histories also require complete, unambiguous
 records. Missing/null floor arrays cannot reset replay protection; damaged files
 are retained for administrator recovery. Revocation stays available. See

@@ -88,15 +88,6 @@ fn ordinary_file(path string) bool {
 	return info.mode & 0o170000 == 0o100000
 }
 
-pub fn read_metadata(path string) !string {
-	if !ordinary_file(path) || os.file_size(path) > max_metadata {
-		return error('metadata must be a bounded regular file: ${path}')
-	}
-	text := os.read_file(path)!
-	if text.len > max_metadata { return error('metadata grew while reading: ${path}') }
-	return text
-}
-
 pub fn hash_file(path string) !string {
 	if !ordinary_file(path) {
 		return error('payload must be a regular file: ${path}')

@@ -6,6 +6,14 @@ application generations on AArch64 and x86_64. The desktop security-tools stage
 installs the service, sandbox launcher, Software process link and XDG registration
 directory. It preserves existing configuration; a fresh image enrolls no keys.
 
+Configuration, cached catalogs, trust histories, installed state and publisher
+documents share a bounded metadata reader. It captures a nonblocking descriptor,
+refuses leaf symlinks and nonregular files, and reads at most the admitted file
+size plus one sentinel byte, within the 8 MiB metadata limit. Size changes fail
+before parsing; an atomically replaced pathname can still return its previously
+captured file. Restoring trusted ordinary metadata permits retry without deleting
+package state. See [qualification](../tests/packages/metadata-read-check.md).
+
 This application store is separate from the Alpine `pkg`/`apk` system layer.
 Existing Alpine ports and special downloads still use that frontend and its
 persistence rules. They do **not** acquire these rollback guarantees. Release
