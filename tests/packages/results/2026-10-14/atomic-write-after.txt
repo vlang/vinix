@@ -1,0 +1,9 @@
+temporary-alias: wait status 0; atomic result and external contents preserved
+temporary-hardlink: wait status 0; atomic result and external contents preserved
+temporary-fifo: wait status 0; atomic result and external contents preserved
+temporary-directory: wait status 0; atomic result and external contents preserved
+destination-directory-alias: wait status 0; atomic result and external contents preserved
+destination-directory: wait status 256; atomic result and external contents preserved
+nul-path: wait status 256; atomic result and external contents preserved
+oversized-metadata: wait status 256; atomic result and external contents preserved
+Atomic write qualification passed

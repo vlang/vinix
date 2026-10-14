@@ -8,6 +8,7 @@ import tools.packages.pkgcore
 import tools.packages.pkgprotocol
 
 #include <sys/resource.h>
+fn C.link(&char, &char) int
 
 struct PackageCollectionLimit {
 	current u64
@@ -181,6 +182,49 @@ fn qualify_package_payload_hash(architecture string, application pkgcore.Package
 	mut refused := false
 	pkgcore.hash_file(path + '\x00ignored') or { refused = true }
 	assert refused
+}
+
+fn qualify_package_atomic_metadata(architecture string) ! {
+	root := '/tmp/oversized-source-client'
+	directory := pkgcore.state_directory(root)
+	before := pkgcore.read_state(directory, architecture)!
+	history := pkgcore.repository_status(root)!.history
+	victim := '/tmp/atomic-metadata-outside'
+	os.write_file(victim, 'preserved outside metadata')!
+	os.chmod(victim, 0o600)!
+	config := root + '/etc/vinix-packages/config.json'
+	configuration := os.read_file(config)!
+	for path in [config + '.new', directory + '/trust-history.json.new'] { os.symlink(victim, path)! }
+	legacy := directory + '/catalog.json.new'
+	for kind in ['alias', 'hardlink', 'fifo', 'directory'] {
+		match kind {
+			'alias' { os.symlink(victim, legacy)! }
+			'hardlink' { assert C.link(victim.str, legacy.str) == 0 }
+			'fifo' { assert C.mkfifo(legacy.str, 0o600) == 0 }
+			'directory' { os.mkdir(legacy)! }
+			else { return error('unknown stale metadata fixture') }
+		}
+		package_success(['--root', root, 'update'])!
+		assert !os.is_link(directory + '/catalog.json')
+		assert os.read_file(victim)! == 'preserved outside metadata' && mode_of(victim) == 0o600
+		assert os.read_file(config)! == configuration
+		assert pkgcore.read_state(directory, architecture)! == before
+		assert pkgcore.repository_status(root)!.history == history
+		assert os.ls(directory)!.all(!it.starts_with('.package-'))
+		assert os.ls(root + '/etc/vinix-packages')!.all(!it.starts_with('.package-'))
+		package_success(['--root', root, 'verify'])!
+		if kind == 'directory' { assert os.ls(legacy)!.len == 0; os.rmdir(legacy)! }
+		else { os.rm(legacy)! }
+	}
+	for path in [config + '.new', directory + '/trust-history.json.new'] { assert os.is_link(path); os.rm(path)! }
+	os.mkdir('/tmp/atomic-outside-folder')!
+	os.symlink('/tmp/atomic-outside-folder', '/tmp/atomic-destination')!
+	pkgcore.atomic_write('/tmp/atomic-destination', 'complete metadata')!
+	assert !os.is_link('/tmp/atomic-destination') && os.read_file('/tmp/atomic-destination')! == 'complete metadata'
+	assert os.ls('/tmp/atomic-outside-folder')!.len == 0
+	mut refused := false
+	pkgcore.atomic_write('/tmp/atomic-destination\x00ignored', 'unsafe metadata') or { refused = true }
+	assert refused && os.read_file('/tmp/atomic-destination')! == 'complete metadata'
 }
 
 fn qualify_package_stored_state(root string, architecture string, application_id string, runtime_id string) ! {
@@ -519,6 +563,8 @@ fn qualify_package_linux(mut t Test) ! {
 	t.say('PACKAGE OFFLINE COPY captured-files oversized-source retained-prefix restored-resume PASS')
 	qualify_package_payload_hash(architecture, probe_package)!
 	t.say('PACKAGE PAYLOAD HASH captured-files signed-length special-file-refusal preserved-state restored-retry PASS')
+	qualify_package_atomic_metadata(architecture)!
+	t.say('PACKAGE METADATA WRITE exclusive-temporary captured-parent stale-names preserved-state restored-verification PASS')
 	// Organization restrictions are reviewed and atomically persisted without
 	// editing trust, the account selection or the installed generation.
 	policy_path := '/tmp/organization-policy.json'

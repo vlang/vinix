@@ -304,7 +304,8 @@ fn test_administration_rejects_unsafe_configuration_and_ignores_predictable_temp
 	enroll_repository(root, repository, false)!
 	assert os.read_file(root + '/victim')! == 'do not overwrite'
 	assert os.is_link(path + '.new')
-	assert os.ls(os.dir(path))!.all(!it.starts_with('.administration-'))
+	assert os.ls(os.dir(path))!.all(!it.starts_with('.administration-') && !it.starts_with('.package-'))
+	assert os.ls(state_directory(root))!.all(!it.starts_with('.package-'))
 	guard := acquire(state_directory(root))!
 	if _ := repository_status(root) {
 		assert false, 'listing bypassed package writer lock'

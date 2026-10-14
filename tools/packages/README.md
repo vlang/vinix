@@ -98,6 +98,11 @@ admits the signed length before reading, bounds hashing to that size plus one
 sentinel byte, and refuses changed sizes or pathname identity. See
 [hash qualification](../../tests/packages/hash-file-check.md).
 
+Metadata publication now shares one writer for catalogs, publisher documents,
+configuration and trust history. Exclusive private temporary files replace
+predictable `.new` names; publication, cleanup and durability checks use captured
+descriptors. See [atomic write qualification](../../tests/packages/atomic-write-check.md).
+
 Consumer and publisher sequence histories also require complete, unambiguous
 records. Missing/null floor arrays cannot reset replay protection; damaged files
 are retained for administrator recovery. Revocation stays available. See

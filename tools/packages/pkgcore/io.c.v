@@ -70,15 +70,6 @@ pub fn sync_file(path string) ! {
 	if C.fsync(file.fd) != 0 { return error('cannot flush file: ${path}') }
 }
 
-pub fn atomic_write(path string, text string) ! {
-	temporary := path + '.new'
-	os.write_file(temporary, text)!
-	os.chmod(temporary, 0o644)!
-	sync_file(temporary)!
-	os.rename(temporary, path)!
-	sync_directory(os.dir(path))!
-}
-
 fn ordinary_file(path string) bool {
 	// This compiler's os.is_file only excludes directories, so it accepts
 	// FIFOs/devices. Inspect the file type before any potentially blocking read.

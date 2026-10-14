@@ -4,8 +4,6 @@ module pkgcore
 import json2
 import os
 
-fn C.mkstemp(&u8) i32
-
 pub struct RepositoryStatus {
 pub:
 	format       int = 1
@@ -52,33 +50,7 @@ fn write_administration_metadata(path string, text string) ! {
 	if text.len > max_metadata {
 		return error('package administration metadata exceeds its size limit')
 	}
-	mut template := (os.dir(path) + '/.administration-XXXXXX').bytes()
-	template << u8(0)
-	fd := C.mkstemp(template.data)
-	if fd < 0 { return error('cannot create a private package administration temporary file') }
-	temporary := unsafe { cstring_to_vstring(&char(template.data)).clone() }
-	mut moved := false
-	defer {
-		C.close(fd)
-		if !moved { os.rm(temporary) or {} }
-	}
-	mut offset := 0
-	for offset < text.len {
-		written := C.write(fd, unsafe { text.str + offset }, usize(text.len - offset))
-		if written < 0 && C.errno == C.EINTR { continue }
-		if written <= 0 {
-			return error('cannot write package administration metadata; check disk space')
-		}
-		offset += int(written)
-	}
-	if C.fchmod(fd, 0o644) != 0 || C.fsync(fd) != 0 {
-		return error('cannot flush package administration metadata')
-	}
-	replace_path(temporary, path)!
-	moved = true
-	sync_directory(os.dir(path)) or {
-		return error('package administration metadata saved, but directory flush failed; inspect repo-list and check storage')
-	}
+	atomic_write(path, text)!
 }
 
 fn save_configuration(path string, config Config) ! {

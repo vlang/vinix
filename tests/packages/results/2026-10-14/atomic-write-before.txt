@@ -1,0 +1,9 @@
+temporary-alias: wait status 0; previous behavior reproduced
+temporary-hardlink: wait status 0; previous behavior reproduced
+temporary-fifo: wait status 14; previous behavior reproduced
+temporary-directory: wait status 256; previous behavior reproduced
+destination-directory-alias: wait status 0; previous behavior reproduced
+destination-directory: wait status 0; previous behavior reproduced
+nul-path: wait status 0; previous behavior reproduced
+oversized-metadata: wait status 0; previous behavior reproduced
+Atomic write qualification passed
