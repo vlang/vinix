@@ -5397,8 +5397,9 @@ under the runtime lock. The complete accessor ignores its request, including
 the tested all-ones request, and the existing symbolic metadata lookup reuses
 its descriptor. The descriptor has the measured field offset and its accessor;
 field reflection and native descriptor initialization extensions are omitted.
-SetAlgebra/OptionSet/RawRepresentable conformances, flags constructors and
-constants, DispatchQoS and Swift queue adapters remain unsupported.
+OptionSet/RawRepresentable conformances, named flags constants, DispatchQoS
+and Swift queue adapters remain unsupported. SetAlgebra support is described
+below.
 
 The caller borrows metadata and accessor pointers through the active runtime
 lifetime. Shutdown requires users and callbacks to have drained; it marks
@@ -5423,9 +5424,67 @@ streams/executables, SDK/LLVM references, actual IPA call sites, retained helper
 and guard-expectation trials and IPA probe/audits are under
 `build/ios/fortnite/dispatch-flags-checks`; full iOS regression remains unpassed.
 
-The supplied IPA gets past both flags metadata imports and exits with status 1
-at MarketplaceKitWrapper's required SetAlgebra conformance record,
+The metadata-only IPA probe got past both flags metadata imports and exited
+with status 1 at MarketplaceKitWrapper's required SetAlgebra conformance record,
 `_$s8Dispatch0A13WorkItemFlagsVs10SetAlgebraAAMc`, in
+`/usr/lib/swift/libswiftDispatch.dylib`.
+
+Swift Dispatch now exports that conformance record. Vinix supplies a complete
+concrete SetAlgebra table with all 21 requirements, inherited Equatable and
+ExpressibleByArrayLiteral tables, and complete Flags metadata in both
+associated-type slots. These are private concrete records, rather than the
+installed runtime's resilient/generic descriptor with a null witness pattern.
+Ordinary witness lookup validates the exact nominal Self metadata before
+returning any of these tables. The existing Flags mapping holds the tables,
+protocol descriptors and ABI bridges; its Swift module and Equatable protocol
+identity come from the canonical Int arena, which outlives it.
+
+Scalar operations borrow one-word operands. Swift carries Self in `x20`;
+result-producing methods use `x8`, except insert's member result in `x0` and
+Bool return in `w0`. Remove/update return a nine-byte Optional: the payload is
+the overlapping bits, and zero overlap returns nil with a zero payload. Insert
+returns the supplied member and reports whether any new bits were added.
+Contains, subset, superset, disjointness, empty, unions, intersections,
+differences and in-place operations follow the installed native witnesses.
+Bridges preserve `x20`/`x21` and use allocation-free V scalar bodies.
+
+Empty initialization returns zero. Array-literal and generic Sequence
+initialization OR every element and consume exactly one source reference.
+Generic initialization accepts canonical Vinix Array<DispatchWorkItemFlags>
+metadata, its canonical Sequence table and registered POD storage, including
+the immortal empty array. It receives source, Sequence metadata, Sequence
+witness, Self metadata and Self witness in `x0` through `x4`, with the result
+in `x8`. The existing SetAlgebra dispatcher selects this constructor at byte
+offset 160. Foreign/custom sequences and malformed storage reject before
+reading foreign headers or invoking callbacks, without publishing a result or
+consuming the source. OptionSet/RawRepresentable conformance, named constants,
+reflection and Swift queue adapters remain unsupported.
+
+The supplied MarketplaceKitWrapper's default async flags constructor at
+`0x70a8` prepares this exact argument order. Its witness accessor at `0xc098`
+loads the required conformance and calls ordinary witness lookup with Flags
+metadata. Both instruction sequences are retained without executing app code.
+The first native constructor trial trapped because the fixture initially
+placed Self metadata before the Sequence arguments; retained native
+disassembly and the crash report established the corrected ABI.
+
+Ten fresh ASan/UBSan runs and five ARM64 Vinix suites pass across Dispatch
+SetAlgebra, Dispatch metadata, generic SetAlgebra dispatch, Array Sequence and
+witness lookup. Checks compare every scalar/inherited equality operation over
+zero, overlapping and high-bit values, guarded optional payload/tag writes,
+preserved Swift context/error registers, literal/direct/dispatched construction
+over empty and populated arrays, and one-reference source consumption. Vinix
+also checks canonical associated metadata, protected foreign-profile rejection,
+malformed counts without partial writes or release, eight concurrent resolvers
+and two quiescent unmapped lifetimes. Generated C confirms no extra bridge or
+scalar allocation, sealed publication, validation before foreign reads and one
+unlocked Array release. Thirteen C streams/executables, SDK/LLVM/IPA references,
+native trial diagnostics and guest probes/audits are retained under
+`build/ios/fortnite/dispatch-algebra-checks`; full iOS regression remains unpassed.
+
+The supplied IPA now gets past the SetAlgebra conformance and exits with
+status 1 at MarketplaceKitWrapper's required DispatchQoS.unspecified getter,
+`_$s8Dispatch0A3QoSV11unspecifiedACvgZ`, in
 `/usr/lib/swift/libswiftDispatch.dylib`. Fortnite has not entered application
 code and remains unplayable.
 
@@ -5434,12 +5493,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,467 | 693 | 79 |
+| Fortnite executable | 1,468 | 692 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 161 | 15 | 23 |
-| All images | 2,287 | 711 | 120 |
+| MarketplaceKitWrapper | 162 | 14 | 23 |
+| All images | 2,289 | 709 | 120 |
 
-The C++/GLES/Text variant reports 2,300 resolved imports, 698 unresolved strong
+The C++/GLES/Text variant reports 2,302 resolved imports, 696 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

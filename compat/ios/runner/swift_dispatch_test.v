@@ -152,7 +152,7 @@ fn test_swift_dispatch_flags_metadata() {
 	dispatch_flags_reject_lifetime()
 	for _ in 0..2 {
 		objc_start()
-		for unknown in ['_$s8Dispatch0A13WorkItemFlagsVN','_$s8Dispatch0A13WorkItemFlagsVs10SetAlgebraAAMc','_$s8Dispatch0A3QoSVMa']! {
+		for unknown in ['_$s8Dispatch0A13WorkItemFlagsVN','_$s8Dispatch0A3QoSVMa']! {
 			if _:=runtime_symbol('/usr/lib/swift/libswiftDispatch.dylib',unknown) {assert false}
 		}
 		assert ios_runtime.swift_dispatch_flags_arena==0

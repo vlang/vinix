@@ -9,6 +9,13 @@ fn swift_witness_table_checked(conformance u64, metadata u64, _arguments u64) !u
 	if conformance == 0 || conformance & 3 != 0 || conformance > ~u64(0) - 15 {
 		return error('iOS: invalid Swift conformance descriptor')
 	}
+	if ios_runtime != unsafe { nil } && ios_runtime.swift_dispatch_flags_arena != 0 {
+		data := ios_runtime.swift_dispatch_flags_arena + u64(C.getpagesize())
+		if conformance in [data + 256, data + 272, data + 288]! {
+			swift_dispatch_algebra_table_checked(metadata)!
+			return if conformance == data + 256 { data + 320 } else if conformance == data + 272 { data + 512 } else { data + 544 }
+		}
+	}
 	if ios_runtime != unsafe { nil } && ios_runtime.swift_set_arena != 0 {
 		data := ios_runtime.swift_set_arena + u64(C.getpagesize())
 		if conformance == data + 32 { return swift_set_table_checked(metadata, false) }

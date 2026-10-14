@@ -23,6 +23,9 @@ fn swift_dispatch_flags_arena_checked() !u64 {
 	defer { C.ios_objc_initialize_unlock() }
 	if ios_runtime.swift_dispatch_flags_retired { return swift_dispatch_metadata_failure() }
 	if ios_runtime.swift_dispatch_flags_arena != 0 { return ios_runtime.swift_dispatch_flags_arena }
+	// Reuse the canonical Swift module/Equatable identity. Their arenas outlive
+	// this arena, and the recursive runtime lock permits their initialization.
+	swift_integer_metadata()
 	page := u64(C.getpagesize())
 	arena := C.mmap(unsafe { nil }, usize(page * 2), C.PROT_READ | C.PROT_WRITE,
 		C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
@@ -60,7 +63,9 @@ fn swift_dispatch_flags_arena_checked() !u64 {
 	swift_protocol_relative(module_descriptor + 8, data + 208)
 	C.memcpy(voidptr(data + 208), c'Dispatch', 9)
 	C.memcpy(voidptr(data + 224), c'DispatchWorkItemFlags', 22)
-	C.__builtin___clear_cache(arena, voidptr(base + 24))
+	integer_data := ios_runtime.swift_integer_arena + page
+	swift_dispatch_algebra_build(base, data, integer_data + 192, integer_data + 432)
+	C.__builtin___clear_cache(arena, voidptr(base + 672))
 	if C.mprotect(arena, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(voidptr(data), usize(page), C.PROT_READ) != 0 {
 		if C.munmap(arena, usize(page * 2)) != 0 { panic('iOS: cannot retire unsealed Swift Dispatch metadata') }
@@ -81,9 +86,9 @@ fn swift_dispatch_flags_stop() {
 }
 
 fn swift_dispatch_symbol(symbol string) !u64 {
-	if symbol !in ['_$s8Dispatch0A13WorkItemFlagsVMa', '_$s8Dispatch0A13WorkItemFlagsVMn']! {
+	if symbol !in ['_$s8Dispatch0A13WorkItemFlagsVMa', '_$s8Dispatch0A13WorkItemFlagsVMn', '_$s8Dispatch0A13WorkItemFlagsVs10SetAlgebraAAMc']! {
 		return error('iOS: Swift Dispatch symbol is not implemented: ${symbol}')
 	}
 	base := swift_dispatch_flags_arena_checked()!
-	return if symbol.ends_with('Ma') { base } else { base + u64(C.getpagesize()) + 160 }
+	return if symbol.ends_with('Ma') { base } else { base + u64(C.getpagesize()) + if symbol.ends_with('Mn') { u64(160) } else { u64(256) } }
 }
