@@ -865,6 +865,107 @@ fn mount_parent_in_namespace(mut table MountTable, _entry &Mount) (&Mount, bool)
 	return parent, parent != unsafe { nil }
 }
 
+// Predict the two changed parent links before publishing a pivot. Every other
+// mount keeps its current namespace parent, including descendants of either
+// root. This checks cycles and cursor capacity without modifying any entry.
+fn pivot_parent(mut table MountTable, _entry &Mount, old_entry &Mount,
+	new_entry &Mount, put_entry &Mount) (&Mount, bool) {
+	if _entry.id == old_entry.id { return put_entry, true }
+	mut entry := unsafe { if _entry.id == new_entry.id { old_entry } else { _entry } }
+	return mount_parent_in_namespace(mut table, entry)
+}
+
+fn pivot_context(mut table MountTable, _entry &Mount, old_entry &Mount,
+	new_entry &Mount, put_entry &Mount, context &lib.MountContext) bool {
+	mut reversed := [64]lib.MountStep{}
+	mut depth := 0
+	mut entry := unsafe { _entry }
+	for entry != unsafe { nil } {
+		if depth == 64 { errno.set(errno.eloop); return false }
+		entry.lock.acquire()
+		epoch := entry.move_epoch + if entry.id == old_entry.id || entry.id == new_entry.id { u64(1) } else { u64(0) }
+		entry.lock.release()
+		reversed[depth] = lib.MountStep{identity: voidptr(entry), move_epoch: epoch}
+		depth++
+		next, valid := pivot_parent(mut table, entry, old_entry, new_entry, put_entry)
+		if !valid { errno.set(errno.einval); return false }
+		entry = next
+	}
+	if context != unsafe { nil } {
+		lib.copy_mount_context(context, unsafe { nil })
+		unsafe {
+			for i in 0 .. depth { context.steps[i] = reversed[depth - i - 1] }
+			context.depth = depth
+		}
+	}
+	return true
+}
+
+fn prepare_pivot(mut table MountTable, old_entry &Mount, new_entry &Mount,
+	put_entry &Mount, new_context &lib.MountContext, put_context &lib.MountContext) bool {
+	table.lock.acquire()
+	count := table.mounts.len
+	table.lock.release()
+	for i in 0 .. count {
+		table.lock.acquire()
+		if i >= table.mounts.len { table.lock.release(); errno.set(errno.enoent); return false }
+		entry := table.mounts[i]
+		detached := entry.detached
+		table.lock.release()
+		if !detached && !pivot_context(mut table, entry, old_entry, new_entry, put_entry, unsafe { nil }) { return false }
+	}
+	return pivot_context(mut table, new_entry, old_entry, new_entry, put_entry, new_context)
+		&& pivot_context(mut table, put_entry, old_entry, new_entry, put_entry, put_context)
+}
+
+fn publish_pivot(mut table MountTable, _old_entry &Mount, _new_entry &Mount,
+	put_old &VFSNode, new_context &lib.MountContext, put_context &lib.MountContext) {
+	mut old_entry := unsafe { _old_entry }
+	mut new_entry := unsafe { _new_entry }
+	mut old_covered := old_entry.covered
+	mut new_covered := new_entry.covered
+	self_root := voidptr(old_covered) == voidptr(old_entry.root)
+	if !self_root { detach_mount(mut table, mut old_covered) }
+	if voidptr(new_covered) != voidptr(new_entry.root) { detach_mount(mut table, mut new_covered) }
+	mut destination := unsafe { put_old }
+	attach_mount(mut table, mut destination, old_entry.root)
+	// A namespace root represented by a self mount has no containing redirect.
+	// Its processes and root hint select the new root, while held old-root fds
+	// continue to name the original inode rather than following a redirect.
+	if !self_root { attach_mount(mut table, mut old_covered, new_entry.root) }
+	new_entry.lock.acquire()
+	new_entry.covered = if self_root { new_entry.root } else { old_covered }
+	lib.copy_mount_context(&new_entry.parent, new_context)
+	new_entry.parent.depth--
+	new_entry.move_epoch++
+	new_entry.lock.release()
+	old_entry.lock.acquire()
+	old_entry.covered = destination
+	lib.copy_mount_context(&old_entry.parent, put_context)
+	old_entry.move_epoch++
+	old_entry.lock.release()
+}
+
+// Called with table.lock held. Detached records remain permanent, so a child
+// can still follow its parent after an earlier teardown step detached it.
+// This is ancestry for removal, never admission to a detached attachment.
+fn mount_descends_locked(table &MountTable, _entry &Mount, ancestor &Mount) bool {
+	mut entry := unsafe { _entry }
+	for _ in 0 .. 64 {
+		if entry.id == ancestor.id { return true }
+		entry.lock.acquire()
+		identity := lib.mount_context_top(&entry.parent)
+		entry.lock.release()
+		if identity == unsafe { nil } { return false }
+		parent_id := unsafe { &Mount(identity) }.id
+		mut parent := &Mount(unsafe { nil })
+		for candidate in table.mounts { if candidate.id == parent_id { parent = candidate; break } }
+		if parent == unsafe { nil } { return false }
+		entry = parent
+	}
+	return false
+}
+
 // Called under vfs_lock before changing either attachment. Saved cwd/fd routes
 // can predate reparenting, so follow current namespace parents by stable id.
 fn validate_mount_move(mut table MountTable, entry &Mount, target_mount &lib.MountContext) ? {
@@ -1019,45 +1120,33 @@ fn unmount(parent &VFSNode, target string, flags u64) ? {
 		errno.set(errno.einval)
 		return none
 	}
+	// A lazy unmount removes the current attachment subtree. Inode ancestry
+	// crosses bind aliases and cannot tell a pivoted new root from the old one.
+	if flags & mnt_detach != 0 {
+		table.lock.acquire()
+		count := table.mounts.len
+		table.lock.release()
+		for i in 0 .. count {
+			table.lock.acquire()
+			if i >= table.mounts.len { table.lock.release(); break }
+			mut candidate := table.mounts[i]
+			remove := !candidate.detached && mount_descends_locked(table, candidate, entry)
+			if remove { candidate.detached = true }
+			table.lock.release()
+			if remove && voidptr(candidate.covered) != voidptr(candidate.root) {
+				mut covered := candidate.covered
+				detach_mount(mut table, mut covered)
+			}
+		}
+		return
+	}
 	if voidptr(entry.covered) != voidptr(entry.root) {
 		mut covered := entry.covered
 		detach_mount(mut table, mut covered)
 	}
 	table.lock.acquire()
-	// Keep detached identities for descriptors and cwd references, including
-	// namespace copies. The entries themselves were already permanent.
 	entry.detached = true
 	table.lock.release()
-
-	// A lazy unmount takes everything mounted inside the tree with it. What
-	// is still reachable from the caller's root stays, which is how the old
-	// root is shed after pivot_root without losing the new root's mounts.
-	if flags & mnt_detach != 0 {
-		root := calling_root()
-		mut stale := []&Mount{}
-		table.lock.acquire()
-		for candidate in table.mounts {
-			if !candidate.detached && is_beneath(candidate.covered, entry.root) {
-				stale << candidate
-			}
-		}
-		table.lock.release()
-		for candidate in stale {
-			if still_reachable := path_from_root(candidate.covered, root) {
-				unsafe { still_reachable.free() }
-				continue
-			}
-			table.lock.acquire()
-			mut removed := unsafe { candidate }
-			removed.detached = true
-			table.lock.release()
-			if voidptr(candidate.covered) != voidptr(candidate.root) {
-				mut covered := candidate.covered
-				detach_mount(mut table, mut covered)
-			}
-		}
-		unsafe { stale.free() }
-	}
 }
 
 // ── chroot(2) and pivot_root(2) ──────────────────────────────────────────────
@@ -1135,9 +1224,10 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 		return errno.err, errno.einval
 	}
 
-	attach_mount(mut table, mut put_old, old_top)
-	record_mount(mut table, put_old, old_top, old_entry.source, old_entry.fstype,
-		old_entry.flags, '', put_mount)
+	if !prepare_pivot(mut table, old_entry, new_entry, put_entry, new_mount, put_mount) {
+		return errno.err, errno.get()
+	}
+	publish_pivot(mut table, old_entry, new_entry, put_old, new_mount, put_mount)
 
 	table.lock.acquire()
 	table.root_hint = new_root

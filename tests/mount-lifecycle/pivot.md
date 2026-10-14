@@ -88,8 +88,12 @@ baseline sources and generated admission/publication ordering. The ancestry
 helper contains no allocation calls. No new kernel ownership or freeing is
 introduced; complete operations are not claimed allocation-flat.
 
-This qualifies admission and the existing one-pivot publication path. Complete
+This revision qualifies admission and the existing one-pivot publication path. Complete
 mount reparenting, old-root detachment, repeated pivots, busy accounting, mount
 reclamation, namespace switching/teardown and root/cwd updates across other bind
 aliases remain unqualified. Propagation semantics, full OCI/rootless acceptance
 and the remaining roadmap section 17 work remain open.
+
+The subsequent [pivot lifecycle qualification](pivot-lifecycle.md) covers
+reparenting the existing records, held old-root descriptors, repeated pivots and
+lazy old-root detachment. It records the remaining publication and alias limits.

@@ -351,12 +351,15 @@ pub fn run() int {
 			&& name[3] >= `0` && name[3] <= `4` { int(name[3] - `0`) } else { -1 }
 		pivot := if count == 4 && name[0] == `p` && name[1] == `v` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `6` { int(name[3] - `0`) } else { -1 }
+		lifecycle := if count == 4 && name[0] == `p` && name[1] == `l` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `3` { int(name[3] - `0`) } else { -1 }
 		check(C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'move') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'identities') == 0 || identity >= 0
 			|| C.strcmp(selected, c'admission') == 0 || admission >= 0
 			|| C.strcmp(selected, c'propagation') == 0 || propagation >= 0
-			|| C.strcmp(selected, c'pivot') == 0 || pivot >= 0, 4)
+			|| C.strcmp(selected, c'pivot') == 0 || pivot >= 0
+			|| C.strcmp(selected, c'pivot-life') == 0 || lifecycle >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
@@ -372,6 +375,9 @@ pub fn run() int {
 		if C.strcmp(selected, c'pivot') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { pivot_cases(-1) }
 		if pivot >= 0 { pivot_cases(pivot) }
+		if C.strcmp(selected, c'pivot-life') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { pivot_lifecycle_cases(-1) }
+		if lifecycle >= 0 { pivot_lifecycle_cases(lifecycle) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }

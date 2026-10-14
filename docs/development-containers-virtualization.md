@@ -403,9 +403,18 @@ and follow current mount parents when checking ancestry. A shared inode through
 another bind alias cannot authorize the destination. The VFS writer lock covers
 resolution, admission and existing publication; nested destinations record their
 own containing mount. Native ARM/x86 and same-ELF Linux checks cover repeated
-refusals, capability denial and valid tmpfs/bind/nested pivots. Complete pivot
-reparenting, old-root detachment and root/cwd updates across other aliases remain
-unqualified.
+refusals, capability denial and valid tmpfs/bind/nested pivots.
+The [pivot lifecycle checks](../tests/mount-lifecycle/pivot-lifecycle.md) qualify
+moving the existing old/new mount records, updating their parent routes and
+epochs, extracting the new root from its former attachment, and lazy removal
+of the old-root attachment subtree while retaining the new root. Held old-root
+fds observe subsequent remount policy and the new parent, including across a
+second pivot. Tmpfs roots, nested destinations and directory bind roots pass
+on both architectures and Linux with the same probe ELFs. Lazy teardown follows
+mount identity ancestry rather than inode ancestry. Cursor-depth admission,
+namespace-root self mounts, same-directory pivot stacking and root/cwd updates
+across other bind aliases still need runtime qualification; publication and
+namespace-switching concurrency remain open.
 Mount reclamation, busy-reference accounting and full OCI acceptance remain open.
 The overlay-depth refusal measurements also exposed an event-record allocation per call.
 The separate [security event producer correction](../tests/overlay-rename/security-events.md)
