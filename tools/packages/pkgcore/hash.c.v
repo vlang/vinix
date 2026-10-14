@@ -6,6 +6,7 @@ import crypto.sha256
 struct HashReadOptions {
 	exact bool
 	bytes u64
+	mode u32 // zero permits any regular-file mode, as required for cache objects
 	checkpoint fn (string, string) ! = mirror_no_checkpoint
 }
 
@@ -46,13 +47,17 @@ fn hash_file_with(path string, options HashReadOptions) !string {
 	if options.exact && expected != options.bytes {
 		return error('payload size differs from authenticated length: ${path}')
 	}
+	if options.mode != 0 && info.st_mode & 0o7777 != options.mode {
+		return error('installed payload permissions differ from the package: ${path}')
+	}
 	device := u64(info.st_dev)
 	inode := u64(info.st_ino)
 	options.checkpoint('sized', path)!
 	digest := hash_opened(fd, expected, path, options)!
 	mut named := C.stat{}
 	if C.lstat(path.str, unsafe { &named }) != 0 || named.st_mode & 0o170000 != 0o100000
-		|| u64(named.st_dev) != device || u64(named.st_ino) != inode || named.st_size < 0 || u64(named.st_size) != expected {
+		|| u64(named.st_dev) != device || u64(named.st_ino) != inode || named.st_size < 0 || u64(named.st_size) != expected
+		|| (options.mode != 0 && named.st_mode & 0o7777 != options.mode) {
 		unsafe { digest.free() }
 		return error('payload path changed while hashing: ${path}')
 	}
@@ -91,7 +96,8 @@ fn hash_opened(fd int, expected u64, path string, options HashReadOptions) !stri
 	options.checkpoint('read', path)!
 	mut info := C.stat{}
 	if C.fstat(fd, unsafe { &info }) != 0 || info.st_mode & 0o170000 != 0o100000
-		|| info.st_size < 0 || u64(info.st_size) != expected {
+		|| info.st_size < 0 || u64(info.st_size) != expected
+		|| (options.mode != 0 && info.st_mode & 0o7777 != options.mode) {
 		return error('payload changed size while hashing: ${path}')
 	}
 	mut digest := []u8{len: sha256.size}

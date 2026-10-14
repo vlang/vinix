@@ -1589,6 +1589,25 @@ retain no scratch allocations under manual memory management; this does not
 claim whole-service allocation freedom. See
 [repair checks](../../tests/packages/repair-check.md).
 
+Installation health includes the canonical payload modes: 0755 when the signed
+`executable` flag is true, otherwise 0644, with no setuid/setgid/sticky bits.
+Verification checks the captured descriptor before/after hashing and its final
+named identity/mode. Object caches and publisher sources keep their separate
+mode rules. Non-runtime/data packages also require a regular desktop launcher
+at mode 0644, with leaf symlinks refused and the exact service-generated Name, Comment,
+Exec, MIME and package/runtime fields derived from installed metadata. Canonical
+launcher bytes are unchanged, and staging sets their mode independently of umask.
+
+Verify and rollback enforce payload modes and desktop registration; launch
+enforces payload modes before executing the application closure. Repair uses
+the existing affected-package IDs and `update` rows for these faults, so its
+space, stale-confirmation, trust/policy and offline behavior remains the same.
+Checks are read-only: repair stages fresh files rather than chmodding installed
+files or launcher aliases. A healthy hard-linked regular launcher is readable;
+a changed alias is never repaired in place. Per-user MIME defaults and personal
+data remain outside this projection. See
+[installation health checks](../../tests/packages/installation-health-check.md).
+
 V clients use `Service.lock_deployment`, `Service.review_deployment`,
 `Service.apply_deployment`, `DeploymentLock`, `DeploymentPackage` and
 `package_metadata_digest`. Returned reviews own presentation fields and use the

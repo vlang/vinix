@@ -1,0 +1,7 @@
+INSTALLATION HEALTH canonical executable/data modes, special bits, captured permission changes and cache isolation PASS
+INSTALLATION HEALTH canonical launcher/MIME bytes, independent runtime/data, permissions/type/content refusal and unchanged outside files PASS
+
+Tracked heap run:
+INSTALLATION HEALTH canonical executable/data modes, special bits, captured permission changes and cache isolation PASS
+INSTALLATION HEALTH canonical launcher/MIME bytes, independent runtime/data, permissions/type/content refusal and unchanged outside files PASS
+INSTALLATION HEALTH 128 healthy/registration-damaged discovery cycles retain zero tracked bytes PASS

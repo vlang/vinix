@@ -3,6 +3,7 @@ module pkgcore
 
 import json2
 import os
+import strings
 import tools.packages.pkgprotocol
 
 pub fn state_directory(root string) string {
@@ -207,9 +208,19 @@ fn cached_payload_progress(config Config, installed Installed, payload Payload, 
 }
 
 fn desktop_entry(p Package) string {
-	return '[Desktop Entry]\nType=Application\nName=' + p.name + '\nComment=' + p.description +
-		'\nExec=/usr/bin/vinix-package run ' + p.id + ' %F\nTerminal=false\nMimeType=' + p.associations.join(';') +
-		';\nX-Vinix-Package=' + p.id + '\nX-Vinix-Runtime=' + p.runtime + '\n'
+	mut capacity := 256 + p.name.len + p.description.len + 2 * p.id.len + p.runtime.len + p.associations.len
+	for mime in p.associations { capacity += mime.len }
+	mut text := &strings.Builder(strings.new_builder(capacity))
+	// Builder is an array alias: retire both its buffer and owned descriptor.
+	defer { unsafe { text.free(); free(voidptr(text)) } }
+	text.write_string('[Desktop Entry]\nType=Application\nName='); text.write_string(p.name)
+	text.write_string('\nComment='); text.write_string(p.description)
+	text.write_string('\nExec=/usr/bin/vinix-package run '); text.write_string(p.id)
+	text.write_string(' %F\nTerminal=false\nMimeType=')
+	for i, mime in p.associations { if i > 0 { text.write_u8(`;`) }; text.write_string(mime) }
+	text.write_string(';\nX-Vinix-Package='); text.write_string(p.id)
+	text.write_string('\nX-Vinix-Runtime='); text.write_string(p.runtime); text.write_u8(`\n`)
+	return text.str()
 }
 
 fn flush_tree(path string) ! {
@@ -321,7 +332,10 @@ fn activate_repair_plan_locked(config Config, directory string, current State, p
 		}
 		if p.kind !in ['data', 'runtime'] {
 			entry := stage + '/share/applications/vinix-' + p.id + '.desktop'
-			os.write_file(entry, desktop_entry(p))!
+			text := desktop_entry(p)
+			defer { unsafe { text.free() } }
+			os.write_file(entry, text)!
+			os.chmod(entry, 0o644)!
 			sync_file(entry)!
 		}
 		done++
@@ -372,9 +386,12 @@ fn rollback_target(config Config, directory string, current State) !State {
 			return error('${installed.package.id}: rollback repository key is no longer trusted')
 		}
 		for file in installed.package.files {
-			if !verified_file(directory + '/generations/' + old.generation.str() + '/apps/' + installed.package.id + '/' + file.path, file) {
+			if !verified_installed_file(directory + '/generations/' + old.generation.str() + '/apps/' + installed.package.id + '/' + file.path, file) {
 				return error('${installed.package.id}: rollback payload verification failed')
 			}
+		}
+		if !verified_registration(directory + '/generations/' + old.generation.str(), installed.package) {
+			return error('${installed.package.id}: rollback application registration verification failed')
 		}
 	}
 	return old

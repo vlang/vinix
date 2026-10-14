@@ -1,0 +1,2 @@
+PASS aarch64 packages-installation-health (19.5s)
+package-installation-health aarch64: 1 passed, 0 failed, 0 skipped

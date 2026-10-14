@@ -45,8 +45,9 @@ v -nocache -no-skip-unused -gc none -manualfree \
 [target controller](repair-runtime-check.v) runs core assertions and the signed
 service probe on both architectures. Writer serialization and controlled parent
 directories remain required. Same-authority external writes after verification
-remain outside the transaction lock. Mode-only and launcher-only damage are not
-detected by payload discovery.
+remain outside the transaction lock. The original payload-only discovery did not
+detect mode-only or launcher-only damage; the
+[installation health checks](installation-health-check.md) now cover those faults.
 Repair requires approved current catalog metadata and usable verified objects;
 it grants no trust, permission or license exception. Broader graphical sessions,
 public publisher/catalog release and foreign runtime gates remain open.

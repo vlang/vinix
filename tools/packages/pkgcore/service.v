@@ -84,9 +84,12 @@ fn (service Service) installed_locked(directory string, verify bool) !State {
 		for installed in state.packages {
 			for file in installed.package.files {
 				path := directory + '/generations/' + state.generation.str() + '/apps/' + installed.package.id + '/' + file.path
-				if !verified_file(path, file) {
+				if !verified_installed_file(path, file) {
 					return error('${installed.package.id}: installed payload verification failed: ${file.path}')
 				}
+			}
+			if !verified_registration(directory + '/generations/' + state.generation.str(), installed.package) {
+				return error('${installed.package.id}: installed application registration verification failed; use Repair / install')
 			}
 		}
 	}

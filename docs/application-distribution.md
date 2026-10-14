@@ -472,6 +472,14 @@ set; restoration or different damage requires review again before cleanup or
 downloads. Healthy identical targets remain a no-op. Trust, policy, offline and
 hash checks still apply, personal data is retained, and rollback refuses damaged
 previous generations. See [repair qualification](../tests/packages/repair-check.md).
+Installation health also checks payload modes (0755 for executables, 0644 for
+other files) and the exact generated desktop launcher/MIME contents at mode 0644.
+Verify and rollback enforce these checks; launch checks payload permissions
+before execution. Missing, altered, symlinked or special-file launchers and wrong
+modes trigger reviewed repair using a fresh generation. Existing inodes and
+outside aliases are never chmodded during discovery. Launcher staging sets its
+mode explicitly, including under umask 077. Cache object modes remain independent.
+See [installation health qualification](../tests/packages/installation-health-check.md).
 Files stream in 64 KiB blocks.
 Partial downloads persist as `objects/HASH.part`; retries resume and verify the
 complete hash. A damaged resumed prefix triggers one fresh download from the

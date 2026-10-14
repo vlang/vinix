@@ -188,7 +188,7 @@ fn run_leased_mode(config Config, directory string, state State, id string, inpu
 		}
 		for file in installed.package.files {
 			path := directory + '/generations/' + state.generation.str() + '/apps/' + installed.package.id + '/' + file.path
-			if !verified_file(path, file) {
+			if !verified_installed_file(path, file) {
 				return error('installed application payload changed: ${path}')
 			}
 		}

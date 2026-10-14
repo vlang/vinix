@@ -1,0 +1,21 @@
+PASS baseline 0c9e21ad9 reproduces Verify and unchanged install accepting permission and launcher damage
+
+Previous implementation, isolated fixture data:
+Updating trusted repository trusted
+Installing Editor é 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing Editor é 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing Editor é 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+INSTALLATION HEALTH BEFORE app-mode: Verify and unchanged install report healthy success with damaged installation
+Updating trusted repository trusted
+Installing Editor é 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing Editor é 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing Editor é 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+INSTALLATION HEALTH BEFORE launcher-missing: Verify and unchanged install report healthy success with damaged installation

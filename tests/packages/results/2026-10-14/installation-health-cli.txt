@@ -1,0 +1,92 @@
+Package CLI: durable private key creation, existing-seed refusal and read-only public-key recovery passed
+Package CLI: malformed publisher history refuses release without changing prior publication
+Package CLI: scoped repository configuration survives damaged cache/history; strict listing/enrollment/update still refuse; reviewed revocation preserves active state and recovery data
+Package CLI: malformed locks refuse within two seconds, preserve state/cache/history and permit verified recovery
+Package CLI: special and oversized configuration, catalog, history and state refuse promptly, preserve recovery data and permit restored verification
+Package CLI: ambiguous configuration refused without activation, cache or trust changes
+Package CLI: malformed cached snapshots preserve trust/state/recovery and permit verified refresh after restoration
+Package CLI: malformed retained history refuses replay after revocation and empty refresh
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed
+
+Real CLI repair probe:
+Updating trusted repository trusted
+Installing Editor é 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing Editor é 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing Editor é 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Activated package generation 3
+INSTALLATION HEALTH app-mode: reviewed offline repair, canonical modes/launcher, stale health refusal, preserved outside/data/history, rollback refusal/restoration and clean uninstall PASS
+Updating trusted repository trusted
+Installing Editor é 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing Editor é 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing Editor é 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Activated package generation 3
+INSTALLATION HEALTH runtime-mode: reviewed offline repair, canonical modes/launcher, stale health refusal, preserved outside/data/history, rollback refusal/restoration and clean uninstall PASS
+Updating trusted repository trusted
+Installing Editor é 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing Editor é 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing Editor é 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Activated package generation 3
+INSTALLATION HEALTH data-mode: reviewed offline repair, canonical modes/launcher, stale health refusal, preserved outside/data/history, rollback refusal/restoration and clean uninstall PASS
+Updating trusted repository trusted
+Installing Editor é 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing Editor é 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing Editor é 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Activated package generation 3
+INSTALLATION HEALTH launcher-missing: reviewed offline repair, canonical modes/launcher, stale health refusal, preserved outside/data/history, rollback refusal/restoration and clean uninstall PASS
+Updating trusted repository trusted
+Installing Editor é 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing Editor é 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing Editor é 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Activated package generation 3
+INSTALLATION HEALTH launcher-content: reviewed offline repair, canonical modes/launcher, stale health refusal, preserved outside/data/history, rollback refusal/restoration and clean uninstall PASS
+Updating trusted repository trusted
+Installing Editor é 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing Editor é 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing Editor é 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Activated package generation 3
+INSTALLATION HEALTH launcher-alias: reviewed offline repair, canonical modes/launcher, stale health refusal, preserved outside/data/history, rollback refusal/restoration and clean uninstall PASS
+Updating trusted repository trusted
+Installing Editor é 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing Editor é 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing Editor é 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Activated package generation 3
+INSTALLATION HEALTH launcher-hardlink: reviewed offline repair, canonical modes/launcher, stale health refusal, preserved outside/data/history, rollback refusal/restoration and clean uninstall PASS
+Updating trusted repository trusted
+Installing Editor é 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing Editor é 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing Editor é 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Activated package generation 3
+INSTALLATION HEALTH launcher-mode: reviewed offline repair, canonical modes/launcher, stale health refusal, preserved outside/data/history, rollback refusal/restoration and clean uninstall PASS
+INSTALLATION HEALTH signed application/runtime/data modes and desktop registration repair, Verify and rollback consistency PASS

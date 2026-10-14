@@ -1,0 +1,2 @@
+PASS x86_64 packages-installation-health (31.9s)
+package-installation-health x86_64: 1 passed, 0 failed, 0 skipped

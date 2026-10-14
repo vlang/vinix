@@ -77,6 +77,10 @@ fn check() ! {
 			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/repair-memory', repository + '/tools/packages/pkgcore/repair_test.v'])!
 		run(work + '/repair-memory', [])!
+		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/installation-health-memory', repository + '/tools/packages/pkgcore/installed_health_test.v'])!
+		run(work + '/installation-health-memory', [])!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgprotocol', work)!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
 			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/repository-configuration-memory',
@@ -106,6 +110,10 @@ fn check() ! {
 			'-o', work + '/repair-check', repository + '/tests/packages/repair-check.v'])!
 		run(work + '/repair-check', [work + '/repair-service'])!
 		run(work + '/repair-check', [work + '/repair-cli', work + '/vinix-package'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/installation-health-check', repository + '/tests/packages/installation-health-check.v'])!
+		run(work + '/installation-health-check', [work + '/installation-health-service'])!
+		run(work + '/installation-health-check', [work + '/installation-health-cli', work + '/vinix-package'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository,
 			'-o', work + '/elf-profile-check', repository + '/tests/packages/elf-profile-check.v'])!
 		run(work + '/elf-profile-check', [work + '/vinix-package', work + '/elf-profiles'])!
