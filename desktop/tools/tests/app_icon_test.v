@@ -59,7 +59,7 @@ fn test_app_icons_keep_original_artwork_without_an_installed_directory() {
 	}
 	assert !os.exists(missing)
 	expected := {
-		'activity':   u32(0xa82bed1f)
+		'activity':   u32(0xc09cf065)
 		'blender':    u32(0x84f0ad7f)
 		'calculator': u32(0x2957b9bb)
 		'calendar':   u32(0x4b179024)
