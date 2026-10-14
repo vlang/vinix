@@ -231,14 +231,14 @@ fn reduce_node_resolved(node &VFSNode, follow_symlinks bool, depth int, effectiv
 		target := procfs_dynamic_link_target(node)
 		if target.len == 0 {
 			errno.set(errno.enoent)
-			return unsafe { nil }
+			return 0
 		}
 		_, next_node, _ := walk_path_resolved(node.parent, target, depth + 1, effective, identity, resolve)
 		// Made afresh for every walk through the link, and nothing the walk
 		// returned points into it.
 		unsafe { target.free() }
 		if unsafe { next_node == 0 } {
-			return unsafe { nil }
+			return 0
 		}
 		return reduce_node_resolved(next_node, follow_symlinks, depth + 1, effective, identity, resolve)
 	}
@@ -257,7 +257,7 @@ fn reduce_node_resolved(node &VFSNode, follow_symlinks bool, depth int, effectiv
 		_, next_node, _ := walk_path_resolved(node.parent, target, depth + 1,
 			effective, identity, resolve)
 		if unsafe { next_node == 0 } {
-			return unsafe { nil }
+			return 0
 		}
 		return reduce_node_resolved(next_node, follow_symlinks, depth + 1, effective, identity, resolve)
 	}
@@ -270,7 +270,7 @@ fn reduce_node_resolved(node &VFSNode, follow_symlinks bool, depth int, effectiv
 // copying it for every lookup left the copies behind on every other path.
 fn walk_path(parent &VFSNode, path string, depth int, effective bool) (&VFSNode, &VFSNode, string) {
 	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
-	if !starting_mount(parent, identity) { return unsafe { nil }, unsafe { nil }, '' }
+	if !starting_mount(parent, identity) { return 0, 0, '' }
 	return walk_path_on_mount(parent, path, depth, effective, identity)
 }
 
@@ -279,20 +279,20 @@ fn walk_path_on_mount(parent &VFSNode, path string, depth int, effective bool, i
 }
 
 fn walk_path_resolved(parent &VFSNode, path string, depth int, effective bool, identity &lib.MountContext, resolve u64) (&VFSNode, &VFSNode, string) {
-	if depth > 64 { errno.set(errno.eloop); return unsafe { nil }, unsafe { nil }, '' }
-	if path.len > 4096 { errno.set(errno.einval); return unsafe { nil }, unsafe { nil }, '' }
+	if depth > 64 { errno.set(errno.eloop); return 0, 0, '' }
+	if path.len > 4096 { errno.set(errno.einval); return 0, 0, '' }
 	if path.len == 0 {
 		errno.set(errno.enoent)
-		return unsafe { nil }, unsafe { nil }, ''
+		return 0, 0, ''
 	}
 	mut index := u64(0)
 	mut current_node := reduce_node_resolved(parent, false, depth + 1, effective, identity, resolve)
-	if current_node == unsafe { nil } { return unsafe { nil }, unsafe { nil }, '' }
+	if current_node == unsafe { nil } { return 0, 0, '' }
 
 	if path[index] == `/` {
 		previous_mount := lib.mount_context_top(identity)
-		root := root_with_context(identity) or { return unsafe { nil }, unsafe { nil }, '' }
-		if !resolve_mount_allowed(resolve, previous_mount, identity) { return unsafe { nil }, unsafe { nil }, '' }
+		root := root_with_context(identity) or { return 0, 0, '' }
+		if !resolve_mount_allowed(resolve, previous_mount, identity) { return 0, 0, '' }
 		current_node = reduce_node_resolved(root, false, depth + 1, effective, identity, resolve)
 		for path[index] == `/` {
 			if index == u64(path.len) - 1 {
@@ -319,22 +319,22 @@ fn walk_path_resolved(parent &VFSNode, path string, depth int, effective bool, i
 		last := index == u64(path.len)
 
 		current_node = reduce_node_resolved(current_node, false, depth + 1, effective, identity, resolve)
-		if current_node == unsafe { nil } { return unsafe { nil }, unsafe { nil }, '' }
+		if current_node == unsafe { nil } { return 0, 0, '' }
 
 		if current_node == unsafe { nil } || current_node.resource == unsafe { nil }
 			|| current_node.children == unsafe { nil } || !stat.isdir(current_node.resource.stat.mode) {
 			errno.set(errno.enotdir)
-			return unsafe { nil }, unsafe { nil }, ''
+			return 0, 0, ''
 		}
-		check_access(current_node, access_exec, effective) or { return unsafe { nil }, unsafe { nil }, '' }
+		check_access(current_node, access_exec, effective) or { return 0, 0, '' }
 		mut new_node := &VFSNode(unsafe { nil })
 		if elem_str == '..' {
 			// The way out of a directory depends on how it was reached: see
 			// logical_parent().
 			previous_mount := lib.mount_context_top(identity)
 			parent_node := parent_on_mount(current_node, identity)
-			if parent_node == unsafe { nil } { return unsafe { nil }, unsafe { nil }, '' }
-			if !resolve_mount_allowed(resolve, previous_mount, identity) { return unsafe { nil }, unsafe { nil }, '' }
+			if parent_node == unsafe { nil } { return 0, 0, '' }
+			if !resolve_mount_allowed(resolve, previous_mount, identity) { return 0, 0, '' }
 			new_node = reduce_node_resolved(parent_node, false, depth + 1,
 				effective, identity, resolve)
 		} else {
@@ -343,9 +343,9 @@ fn walk_path_resolved(parent &VFSNode, path string, depth int, effective bool, i
 			if child == unsafe { nil } {
 				errno.set(errno.enoent)
 				if last == true {
-					return current_node, unsafe { nil }, elem_str
+					return current_node, 0, elem_str
 				}
-				return unsafe { nil }, unsafe { nil }, ''
+				return 0, 0, ''
 			}
 
 			new_node = reduce_node_resolved(child, false,
@@ -356,24 +356,24 @@ fn walk_path_resolved(parent &VFSNode, path string, depth int, effective bool, i
 			return current_node, new_node, elem_str
 		}
 
-		if new_node == unsafe { nil } { return unsafe { nil }, unsafe { nil }, '' }
+		if new_node == unsafe { nil } { return 0, 0, '' }
 		current_node = new_node
 
 		if stat.islnk(current_node.resource.stat.mode) {
 			current_node = reduce_node_resolved(current_node, true, depth + 1, effective, identity, resolve)
 			if voidptr(current_node) == unsafe { nil } {
-				return unsafe { nil }, unsafe { nil }, ''
+				return 0, 0, ''
 			}
 		}
 
 		if !stat.isdir(current_node.resource.stat.mode) {
 			errno.set(errno.enotdir)
-			return unsafe { nil }, unsafe { nil }, ''
+			return 0, 0, ''
 		}
 	}
 
 	errno.set(errno.enoent)
-	return unsafe { nil }, unsafe { nil }, ''
+	return 0, 0, ''
 }
 
 fn resolve_mount_allowed(resolve u64, previous voidptr, identity &lib.MountContext) bool {
