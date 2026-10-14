@@ -419,9 +419,17 @@ matching mount identity as well as the inode when updating roots and cwd.
 Synchronized processes using separate bind aliases retain their paths and
 read-only policy while references through the pivoted attachment move. The
 caller's private `CLONE_FS` state and a shared sibling thread pass the same
-checks on both architectures and Linux with shared probe ELFs. Updates to other
-threads' independently owned filesystem views, multithreaded namespace changes
-and inode-based creation checks outside this pivot path remain open.
+checks on both architectures and Linux with shared probe ELFs.
+The [private thread pivot checks](../tests/mount-lifecycle/pivot-threads.md)
+extend that traversal to every owned thread view in the caller's namespace,
+including when the shared process namespace differs. Separate bind aliases and
+copied namespaces retain their root/cwd identity and read-only policy. A full
+process-table-locked pass preserves fork inheritance ordering; a busy thread
+list is waited for outside that lock using a pinned process, then the traversal
+restarts. Independent source/generated-C lifetime review and native ARM/x86
+plus same-ELF Linux checks cover the change and a thread-view creation/retirement
+loop. Concurrent unshare/setns remains unsynchronized; inode-based creation
+and copied-root writable-open checks outside this pivot path remain open.
 Mount reclamation, busy-reference accounting and full OCI acceptance remain open.
 The overlay-depth refusal measurements also exposed an event-record allocation per call.
 The separate [security event producer correction](../tests/overlay-rename/security-events.md)

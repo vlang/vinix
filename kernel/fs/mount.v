@@ -1246,55 +1246,73 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 	table.root_hint_mount = unsafe { *new_mount }
 	table.lock.release()
 
-	// Every process of this namespace that was rooted, or standing, at the
-	// old root moves to the new one. These are the processes' own roots, not
-	// the calling thread's view of its own process.
+	// Keep a complete pass under the table lock so a fork cannot inherit an
+	// old root into an already-visited PID. A busy thread list ends a partial
+	// pass: pin its process, wait outside the table lock, then restart. Updates
+	// already made are idempotent because their mount identity has changed.
 	ns := proc.mount_namespace_of(process)
-	proc.lock_table()
-	for pid := 1; pid < proc.max_pid; pid++ {
-		mut other := proc.process_at(pid)
-		if other == unsafe { nil } || voidptr(other.ns.mnt) != voidptr(ns) {
-			continue
+	for {
+		mut busy := &proc.Process(unsafe { nil })
+		proc.lock_table()
+		for pid := 1; pid < proc.max_pid; pid++ {
+			mut other := proc.process_at(pid)
+			if other == unsafe { nil } { continue }
+			if voidptr(other.ns.mnt) == voidptr(ns) {
+				other.fs_lock.acquire()
+				other_root := if other.root_directory == unsafe { nil } {
+					vfs_root
+				} else {
+					unsafe { &VFSNode(other.root_directory) }
+				}
+				if pivot_matches_path(voidptr(other_root), &other.root_mount, old_root, old_top, old_entry, bootstrap_root) {
+					proc.directory_releasing(other.root_directory)
+					other.root_directory = voidptr(new_root)
+					other.root_mount = unsafe { *new_mount }
+				}
+				if pivot_matches_path(other.current_directory, &other.current_mount, old_root, old_top, old_entry, bootstrap_root) {
+					proc.directory_releasing(other.current_directory)
+					other.current_directory = voidptr(new_root)
+					other.current_mount = unsafe { *new_mount }
+				}
+				other.fs_lock.release()
+			}
+			// A process can have thread-owned views in different namespaces. The
+			// list lock protects ThreadFS publication and retirement; do not skip
+			// these views merely because the shared process namespace differs.
+			if !other.threads_lock.test_and_acquire() {
+				proc.pin_process(other)
+				busy = other
+				break
+			}
+			for task in other.threads {
+				mut own := task.fs
+				if own == unsafe { nil } { continue }
+				own.lock.acquire()
+				if voidptr(own.mnt) != voidptr(ns) { own.lock.release(); continue }
+				own_root := if own.root_directory == unsafe { nil } {
+					vfs_root
+				} else {
+					unsafe { &VFSNode(own.root_directory) }
+				}
+				if pivot_matches_path(voidptr(own_root), &own.root_mount, old_root, old_top, old_entry, bootstrap_root) {
+					proc.directory_releasing(own.root_directory)
+					own.root_directory = voidptr(new_root)
+					own.root_mount = unsafe { *new_mount }
+				}
+				if pivot_matches_path(own.current_directory, &own.current_mount, old_root, old_top, old_entry, bootstrap_root) {
+					proc.directory_releasing(own.current_directory)
+					own.current_directory = voidptr(new_root)
+					own.current_mount = unsafe { *new_mount }
+				}
+				own.lock.release()
+			}
+			other.threads_lock.release()
 		}
-		other.fs_lock.acquire()
-		other_root := if other.root_directory == unsafe { nil } {
-			vfs_root
-		} else {
-			unsafe { &VFSNode(other.root_directory) }
-		}
-		if pivot_matches_path(voidptr(other_root), &other.root_mount, old_root, old_top, old_entry, bootstrap_root) {
-			proc.directory_releasing(other.root_directory)
-			other.root_directory = voidptr(new_root)
-			other.root_mount = unsafe { *new_mount }
-		}
-		if pivot_matches_path(other.current_directory, &other.current_mount, old_root, old_top, old_entry, bootstrap_root) {
-			proc.directory_releasing(other.current_directory)
-			other.current_directory = voidptr(new_root)
-			other.current_mount = unsafe { *new_mount }
-		}
-		other.fs_lock.release()
-	}
-	proc.unlock_table()
-	// A thread with a view of its own moves by itself.
-	mut own := proc.thread_fs_of(process)
-	if own != unsafe { nil } {
-		own.lock.acquire()
-		own_root := if own.root_directory == unsafe { nil } {
-			vfs_root
-		} else {
-			unsafe { &VFSNode(own.root_directory) }
-		}
-		if pivot_matches_path(voidptr(own_root), &own.root_mount, old_root, old_top, old_entry, bootstrap_root) {
-			proc.directory_releasing(own.root_directory)
-			own.root_directory = voidptr(new_root)
-			own.root_mount = unsafe { *new_mount }
-		}
-		if pivot_matches_path(own.current_directory, &own.current_mount, old_root, old_top, old_entry, bootstrap_root) {
-			proc.directory_releasing(own.current_directory)
-			own.current_directory = voidptr(new_root)
-			own.current_mount = unsafe { *new_mount }
-		}
-		own.lock.release()
+		proc.unlock_table()
+		if busy == unsafe { nil } { break }
+		busy.threads_lock.acquire()
+		busy.threads_lock.release()
+		proc.unpin_process(busy)
 	}
 	return 0, 0
 }

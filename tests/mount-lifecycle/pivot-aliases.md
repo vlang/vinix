@@ -82,3 +82,6 @@ accounting, reclamation, general bind-alias isolation and the inode-based
 creation check seen during setup remain open. Native bootstrap/self-root cases,
 cursor-depth boundaries, same-directory stacking, full OCI/rootless acceptance
 and the remaining roadmap section 17 work are also unqualified.
+
+The subsequent [private thread qualification](pivot-threads.md) extends updates
+to other threads' owned views, including across differing shared process namespaces.

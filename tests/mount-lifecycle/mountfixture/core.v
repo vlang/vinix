@@ -356,6 +356,8 @@ pub fn run() int {
 			&& name[3] >= `0` && name[3] <= `3` { int(name[3] - `0`) } else { -1 }
 		alias := if count == 4 && name[0] == `p` && name[1] == `a` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `4` { int(name[3] - `0`) } else { -1 }
+		thread_case := if count == 4 && name[0] == `p` && name[1] == `t` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `6` { int(name[3] - `0`) } else { -1 }
 		check(C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'move') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'identities') == 0 || identity >= 0
@@ -363,7 +365,8 @@ pub fn run() int {
 			|| C.strcmp(selected, c'propagation') == 0 || propagation >= 0
 			|| C.strcmp(selected, c'pivot') == 0 || pivot >= 0
 			|| C.strcmp(selected, c'pivot-life') == 0 || lifecycle >= 0
-			|| C.strcmp(selected, c'pivot-alias') == 0 || alias >= 0, 4)
+			|| C.strcmp(selected, c'pivot-alias') == 0 || alias >= 0
+			|| C.strcmp(selected, c'pivot-threads') == 0 || thread_case >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
@@ -385,6 +388,9 @@ pub fn run() int {
 		if C.strcmp(selected, c'pivot-alias') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { pivot_alias_cases(-1) }
 		if alias >= 0 { pivot_alias_cases(alias) }
+		if C.strcmp(selected, c'pivot-threads') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { pivot_thread_cases(-1) }
+		if thread_case >= 0 { pivot_thread_cases(thread_case) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }
