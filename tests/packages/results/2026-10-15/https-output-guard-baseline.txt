@@ -1,0 +1,7 @@
+Baseline 9fdadb1f6, pre-fix HTTPS implementation with the new mutation regression. The first admission callback adds a hard link. The old implementation refuses only after overwriting retained data; the regression exits 1. This is a component producer test, not a TLS/publisher attack simulation.
+
+Restarting app/payload: repository does not support byte ranges
+HTTPS GUARD opened-link-false refused=true preserved=false
+tools/packages/pkgcore/https_output_test.v:196: fn test_https_output_callbacks_refuse_changes_before_further_writes_and_after_final_progress
+    assert message.contains('destination changed') && preserved, name + ': ' + message
+        Message: opened-link-false: download destination changed while transferring; inspect retained data before retrying: /private/tmp/vinix-output-19061-1792013193247890/opened-link-false

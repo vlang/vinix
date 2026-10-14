@@ -1,0 +1,194 @@
+clang ASan/UBSan; detect_leaks=0; halt_on_error=1
+
+https_output:
+Restarting app/payload: repository does not support byte ranges
+HTTPS GUARD opened-link-false refused=true preserved=true
+HTTPS GUARD opened-link-true refused=true preserved=true
+HTTPS GUARD opened-grow-false refused=true preserved=true
+HTTPS GUARD opened-grow-true refused=true preserved=true
+HTTPS GUARD opened-alias-false refused=true preserved=true
+HTTPS GUARD opened-alias-true refused=true preserved=true
+HTTPS GUARD opened-fifo-false refused=true preserved=true
+HTTPS GUARD opened-fifo-true refused=true preserved=true
+HTTPS GUARD opened-ordinary-false refused=true preserved=true
+HTTPS GUARD opened-ordinary-true refused=true preserved=true
+HTTPS GUARD opened-missing-false refused=true preserved=true
+HTTPS GUARD opened-missing-true refused=true preserved=true
+HTTPS GUARD written-link-false refused=true preserved=true
+HTTPS GUARD written-link-true refused=true preserved=true
+HTTPS GUARD written-grow-false refused=true preserved=true
+HTTPS GUARD written-grow-true refused=true preserved=true
+HTTPS GUARD written-alias-false refused=true preserved=true
+HTTPS GUARD written-alias-true refused=true preserved=true
+HTTPS GUARD written-fifo-false refused=true preserved=true
+HTTPS GUARD written-fifo-true refused=true preserved=true
+HTTPS GUARD written-ordinary-false refused=true preserved=true
+HTTPS GUARD written-ordinary-true refused=true preserved=true
+HTTPS GUARD written-missing-false refused=true preserved=true
+HTTPS GUARD written-missing-true refused=true preserved=true
+HTTPS GUARD finished-link-false refused=true preserved=true
+HTTPS GUARD finished-link-true refused=true preserved=true
+HTTPS GUARD finished-grow-false refused=true preserved=true
+HTTPS GUARD finished-grow-true refused=true preserved=true
+HTTPS GUARD finished-alias-false refused=true preserved=true
+HTTPS GUARD finished-alias-true refused=true preserved=true
+HTTPS GUARD finished-fifo-false refused=true preserved=true
+HTTPS GUARD finished-fifo-true refused=true preserved=true
+HTTPS GUARD finished-ordinary-false refused=true preserved=true
+HTTPS GUARD finished-ordinary-true refused=true preserved=true
+HTTPS GUARD finished-missing-false refused=true preserved=true
+HTTPS GUARD finished-missing-true refused=true preserved=true
+HTTPS GUARD start-link-false refused=true preserved=true
+HTTPS GUARD start-link-true refused=true preserved=true
+HTTPS GUARD start-grow-false refused=true preserved=true
+HTTPS GUARD start-grow-true refused=true preserved=true
+HTTPS GUARD start-alias-false refused=true preserved=true
+HTTPS GUARD start-alias-true refused=true preserved=true
+HTTPS GUARD start-fifo-false refused=true preserved=true
+HTTPS GUARD start-fifo-true refused=true preserved=true
+HTTPS GUARD start-ordinary-false refused=true preserved=true
+HTTPS GUARD start-ordinary-true refused=true preserved=true
+HTTPS GUARD start-missing-false refused=true preserved=true
+HTTPS GUARD start-missing-true refused=true preserved=true
+HTTPS GUARD middle-link-false refused=true preserved=true
+HTTPS GUARD middle-link-true refused=true preserved=true
+HTTPS GUARD middle-grow-false refused=true preserved=true
+HTTPS GUARD middle-grow-true refused=true preserved=true
+HTTPS GUARD middle-alias-false refused=true preserved=true
+HTTPS GUARD middle-alias-true refused=true preserved=true
+HTTPS GUARD middle-fifo-false refused=true preserved=true
+HTTPS GUARD middle-fifo-true refused=true preserved=true
+HTTPS GUARD middle-ordinary-false refused=true preserved=true
+HTTPS GUARD middle-ordinary-true refused=true preserved=true
+HTTPS GUARD middle-missing-false refused=true preserved=true
+HTTPS GUARD middle-missing-true refused=true preserved=true
+HTTPS GUARD finish-link-false refused=true preserved=true
+HTTPS GUARD finish-link-true refused=true preserved=true
+HTTPS GUARD finish-grow-false refused=true preserved=true
+HTTPS GUARD finish-grow-true refused=true preserved=true
+HTTPS GUARD finish-alias-false refused=true preserved=true
+HTTPS GUARD finish-alias-true refused=true preserved=true
+HTTPS GUARD finish-fifo-false refused=true preserved=true
+HTTPS GUARD finish-fifo-true refused=true preserved=true
+HTTPS GUARD finish-ordinary-false refused=true preserved=true
+HTTPS GUARD finish-ordinary-true refused=true preserved=true
+HTTPS GUARD finish-missing-false refused=true preserved=true
+HTTPS GUARD finish-missing-true refused=true preserved=true
+HTTPS GUARD 72 fresh/resumed checkpoint and progress mutations stop before further writes; replacements survive and restored output retries PASS
+HTTPS GUARD 96 fresh/resumed flush interruption, storage failure and link-change cycles preserve partials and retire children/descriptors under a 32-descriptor limit PASS
+PASS
+
+download_recovery:
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Restarting app/bin/app: resumed payload failed verification
+Activated package generation 3
+Package download recovery: damaged resumed prefix restarted once and verified before activation
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Restarting app/bin/app: resumed payload failed verification
+Rolled back to generation 1; application data was retained
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Rolled back to generation 1; application data was retained
+Package download recovery: bad source refused after bounded attempts; activation and rollback preserved
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+PASS

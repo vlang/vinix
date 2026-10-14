@@ -22,6 +22,7 @@ fn C.vinix_package_waitpid(int, &i32, int) int
 struct HttpsOutputOptions {
 	program string = '/usr/bin/curl'
 	checkpoint fn (string, string) ! = mirror_no_checkpoint
+	flush fn (int) int = atomic_flush
 }
 
 struct HttpsOutput { fd int bytes u64 device u64 inode u64 }
@@ -32,7 +33,7 @@ fn open_https_output(path string, maximum u64, resume bool) !HttpsOutput {
 	fd := C.open(path.str, C.O_WRONLY | C.O_CREAT | C.O_NOFOLLOW | C.O_CLOEXEC | C.O_NONBLOCK, 0o600)
 	if fd < 0 { return error('cannot open ordinary download destination: ${path}') }
 	mut info := C.stat{}
-	if C.fstat(fd, &info) != 0 || info.st_mode & 0o170000 != 0o100000 || info.st_size < 0 || info.st_nlink != 1 {
+	if C.fstat(fd, unsafe { &info }) != 0 || info.st_mode & 0o170000 != 0o100000 || info.st_size < 0 || info.st_nlink != 1 {
 		C.close(fd)
 		return error('download destination must be an ordinary regular file without hard links: ${path}')
 	}
@@ -46,8 +47,11 @@ fn open_https_output(path string, maximum u64, resume bool) !HttpsOutput {
 fn check_https_output(output HttpsOutput, path string, bytes u64) ! {
 	mut opened := C.stat{}
 	mut named := C.stat{}
-	if C.fstat(output.fd, &opened) != 0 || opened.st_size < 0 || u64(opened.st_size) != bytes
-		|| opened.st_nlink != 1 || C.fstatat(C.AT_FDCWD, path.str, &named, C.AT_SYMLINK_NOFOLLOW) != 0
+	// These synchronous calls retain neither pointer. Repeated stream checks
+	// must keep their stat scratch on the stack under -gc none -manualfree.
+	if C.fstat(output.fd, unsafe { &opened }) != 0 || opened.st_mode & 0o170000 != 0o100000
+		|| opened.st_size < 0 || u64(opened.st_size) != bytes
+		|| opened.st_nlink != 1 || C.fstatat(C.AT_FDCWD, path.str, unsafe { &named }, C.AT_SYMLINK_NOFOLLOW) != 0
 		|| named.st_mode & 0o170000 != 0o100000 || u64(named.st_dev) != output.device || u64(named.st_ino) != output.inode {
 		return error('download destination changed while transferring; inspect retained data before retrying: ${path}')
 	}
@@ -78,6 +82,7 @@ fn reap_output(pid int) !int {
 }
 
 fn pump_https_output(output HttpsOutput, path string, maximum u64, offset u64, args []string, event pkgprotocol.Progress, report fn (pkgprotocol.Progress), options HttpsOutputOptions) !int {
+	check_https_output(output, path, output.bytes)!
 	if C.lseek(output.fd, i64(offset), C.SEEK_SET) != i64(offset) { return error('cannot seek download destination: ${path}') }
 	fds := output_pipe()!
 	defer { C.close(fds[0]) }
@@ -108,6 +113,7 @@ fn pump_https_output(output HttpsOutput, path string, maximum u64, offset u64, a
 	mut started := false
 	mut last := time.sys_mono_now()
 	if event.phase != '' { report(pkgprotocol.Progress{ ...event, current: done }) }
+	check_https_output(output, path, output.bytes)!
 	for {
 		mut polling := OutputPoll{ fd: fds[0], events: i16(C.POLLIN) }
 		ready := C.vinix_package_poll(unsafe { voidptr(&polling) }, 1, 200)
@@ -119,6 +125,7 @@ fn pump_https_output(output HttpsOutput, path string, maximum u64, offset u64, a
 			if count < 0 { return error('cannot read download output') }
 			if count == 0 { break }
 			if u64(count) > maximum - done { return error('download exceeded its authenticated size limit; retained bounded partial data for retry') }
+			check_https_output(output, path, if started { done } else { output.bytes })!
 			if !started && offset == 0 && C.ftruncate(output.fd, 0) != 0 { return error('cannot restart download destination: ${path}') }
 			started = true
 			mut sent := 0
@@ -130,23 +137,33 @@ fn pump_https_output(output HttpsOutput, path string, maximum u64, offset u64, a
 			}
 			done += u64(count)
 			options.checkpoint('written', path)!
+			check_https_output(output, path, done)!
 		}
 		if event.phase != '' && time.sys_mono_now() - last >= 200_000_000 {
 			report(pkgprotocol.Progress{ ...event, current: done })
+			check_https_output(output, path, if started { done } else { output.bytes })!
 			last = time.sys_mono_now()
 		}
 	}
 	reaped = true
 	code := reap_output(pid)!
+	check_https_output(output, path, if started { done } else { output.bytes })!
 	// Delay fresh truncation until bytes arrive (or successful empty EOF), so
 	// certificate/HTTP failures and range refusal preserve the retained prefix.
 	if code == 0 && !started && offset == 0 && C.ftruncate(output.fd, 0) != 0 { return error('cannot clear empty download destination: ${path}') }
 	expected := if !started && code != 0 { output.bytes } else { done }
 	check_https_output(output, path, expected)!
-	if code == 0 && C.fsync(output.fd) != 0 { return error('cannot flush captured download destination: ${path}') }
+	if code == 0 {
+		for {
+			if options.flush(output.fd) == 0 { break }
+			if C.errno == C.EINTR { continue }
+			return error('cannot flush captured download destination; retained partial data may need retry after checking storage: ${path}')
+		}
+	}
 	options.checkpoint('finished', path)!
 	check_https_output(output, path, expected)!
 	if event.phase != '' { report(pkgprotocol.Progress{ ...event, current: done }) }
+	check_https_output(output, path, expected)!
 	return code
 }
 
@@ -156,6 +173,7 @@ fn fetch_https_with(url string, destination string, maximum u64, resume bool, of
 	output := open_https_output(destination, maximum, resume)!
 	defer { C.close(output.fd) }
 	options.checkpoint('opened', destination)!
+	check_https_output(output, destination, output.bytes)!
 	mut resumed := resume && output.bytes > 0
 	limit := maximum.str()
 	defer { unsafe { limit.free() } }

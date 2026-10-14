@@ -8,6 +8,8 @@ import tools.packages.pkgprotocol
 #include <sys/resource.h>
 fn C.getrlimit(int, voidptr) int
 fn C.setrlimit(int, voidptr) int
+fn C.link(&char, &char) int
+fn C.mkfifo(&char, u32) int
 struct OutputLimit { current u64 maximum u64 }
 
 fn output_work() !string {
@@ -136,4 +138,134 @@ fn test_https_output_capture_bounded_writes_recovery_progress_and_descriptor_ret
 			output_no_children()
 		}
 	}
+}
+
+fn output_guard_change(phase string, path string) ! {
+	if phase != os.getenv('VINIX_OUTPUT_GUARD_PHASE') || os.exists(path + '.before') { return }
+	os.write_file(path + '.before', os.read_file(path)!)!
+	match os.getenv('VINIX_OUTPUT_GUARD_KIND') {
+		'link' { assert C.link(path.str, (path + '.linked').str) == 0 }
+		'grow' { mut file := os.open_append(path)!; file.write_string('extra')!; file.close() }
+		else {
+			os.rename(path, path + '.saved')!
+			match os.getenv('VINIX_OUTPUT_GUARD_KIND') {
+				'alias' { os.symlink(os.getenv('VINIX_OUTPUT_OUTSIDE'), path)! }
+				'fifo' { assert C.mkfifo(path.str, 0o600) == 0 }
+				'ordinary' { os.write_file(path, 'replacement')! }
+				'missing' {}
+				else { panic('unknown HTTPS output mutation') }
+			}
+		}
+	}
+}
+
+fn output_guard_event(event pkgprotocol.Progress) {
+	phase := if event.current == event.total { 'finish' } else if event.current == 0 || event.current == 4096 { 'start' } else { 'middle' }
+	output_guard_change(phase, os.getenv('VINIX_OUTPUT_TARGET')) or { panic(err) }
+}
+
+fn test_https_output_callbacks_refuse_changes_before_further_writes_and_after_final_progress() {
+	work := output_work()!; defer { os.rmdir_all(work) or {} }
+	fixture := output_fixture(work)!
+	text := '0123456789abcdef'.repeat(16384)
+	os.write_file(work + '/source', text)!; os.write_file(work + '/calls', '')!
+	os.write_file(work + '/outside', 'preserved')!; os.chmod(work + '/outside', 0o640)!
+	for key, value in {'VINIX_OUTPUT_SOURCE': work + '/source', 'VINIX_OUTPUT_CALLS': work + '/calls',
+		'VINIX_OUTPUT_OUTSIDE': work + '/outside'} { os.setenv(key, value, true) }
+	defer { for key in ['VINIX_OUTPUT_SOURCE', 'VINIX_OUTPUT_CALLS', 'VINIX_OUTPUT_OUTSIDE',
+		'VINIX_OUTPUT_TARGET', 'VINIX_OUTPUT_GUARD_PHASE', 'VINIX_OUTPUT_GUARD_KIND'] { os.unsetenv(key) } }
+	for phase in ['opened', 'written', 'finished', 'start', 'middle', 'finish'] {
+		for kind in ['link', 'grow', 'alias', 'fifo', 'ordinary', 'missing'] {
+			for resume in [false, true] {
+				name := phase + '-' + kind + '-' + resume.str()
+				path := work + '/' + name
+				prefix := if resume { text[..4096] } else { 'retained prefix' }
+				os.write_file(path, prefix)!
+				os.setenv('VINIX_OUTPUT_TARGET', path, true); os.setenv('VINIX_OUTPUT_GUARD_PHASE', phase, true)
+				os.setenv('VINIX_OUTPUT_GUARD_KIND', kind, true)
+				calls := os.read_file(work + '/calls')!.split_into_lines().len
+				mut message := ''
+				fetch_https_with('https://fixture/slow', path, u64(text.len), resume, false,
+					pkgprotocol.Progress{ phase: 'download', package: 'app', path: 'payload', total: u64(text.len) },
+					output_guard_event, HttpsOutputOptions{ program: fixture, checkpoint: output_guard_change }) or { message = err.msg() }
+				assert os.exists(path + '.before'), name + ': mutation was not reached'
+				before := os.read_file(path + '.before')!
+				after := os.read_file(path + if kind == 'link' { '.linked' } else if kind == 'grow' { '' } else { '.saved' })!
+				preserved := after == before + if kind == 'grow' { 'extra' } else { '' }
+				println('HTTPS GUARD ' + name + ' refused=' + message.contains('destination changed').str() + ' preserved=' + preserved.str())
+				assert message.contains('destination changed') && preserved, name + ': ' + message
+				if phase in ['opened', 'start'] { assert before == prefix }
+				if phase == 'opened' { assert os.read_file(work + '/calls')!.split_into_lines().len == calls }
+				if phase in ['written', 'middle'] { assert before.len < text.len && text.starts_with(before) }
+				assert os.read_file(work + '/outside')! == 'preserved' && os.lstat(work + '/outside')!.mode & 0o777 == 0o640
+				if kind == 'alias' { assert os.is_link(path) }
+				if kind == 'ordinary' { assert os.read_file(path)! == 'replacement' }
+				if kind == 'missing' { assert !os.exists(path) }
+				output_no_children()
+				// Retire only the deliberate mutation, then retry the retained prefix.
+				if kind == 'link' { os.rm(path + '.linked')! }
+				else if kind == 'grow' { mut file := os.open_file(path, 'w', 0o600)!; file.write_string(before)!; file.close() }
+				else { if os.exists(path) || os.is_link(path) { os.rm(path)! }; os.rename(path + '.saved', path)! }
+				os.setenv('VINIX_OUTPUT_GUARD_PHASE', '', true)
+				fetch_https_with('https://fixture/full', path, u64(text.len), resume, false, pkgprotocol.Progress{}, no_progress,
+					HttpsOutputOptions{ program: fixture })!
+				assert os.read_file(path)! == text
+				output_no_children()
+			}
+		}
+	}
+	println('HTTPS GUARD 72 fresh/resumed checkpoint and progress mutations stop before further writes; replacements survive and restored output retries PASS')
+}
+
+fn output_guard_flush(fd int) int {
+	marker := os.getenv('VINIX_OUTPUT_GUARD_FLUSH')
+	mode := os.getenv('VINIX_OUTPUT_GUARD_FLUSH_MODE')
+	first := !os.exists(marker)
+	os.write_file(marker, if first { 'once' } else { 'retried' }) or { panic(err) }
+	if mode == 'interrupted' && first { C.errno = C.EINTR; return -1 }
+	if mode == 'failure' { C.errno = C.EIO; return -1 }
+	if mode == 'link' {
+		path := os.getenv('VINIX_OUTPUT_TARGET')
+		assert C.link(path.str, (path + '.linked').str) == 0
+	}
+	return C.fsync(fd)
+}
+
+fn test_https_output_flush_retries_interruptions_preserves_failures_and_retires_descriptors() {
+	work := output_work()!; defer { os.rmdir_all(work) or {} }
+	fixture := output_fixture(work)!
+	text := 'payload'.repeat(8192)
+	os.write_file(work + '/source', text)!; os.write_file(work + '/calls', '')!
+	for key, value in {'VINIX_OUTPUT_SOURCE': work + '/source', 'VINIX_OUTPUT_CALLS': work + '/calls',
+		'VINIX_OUTPUT_TARGET': work + '/target', 'VINIX_OUTPUT_GUARD_FLUSH': work + '/flushed'} { os.setenv(key, value, true) }
+	defer { for key in ['VINIX_OUTPUT_SOURCE', 'VINIX_OUTPUT_CALLS', 'VINIX_OUTPUT_TARGET',
+		'VINIX_OUTPUT_GUARD_FLUSH', 'VINIX_OUTPUT_GUARD_FLUSH_MODE'] { os.unsetenv(key) } }
+	mut original := OutputLimit{}
+	assert C.getrlimit(C.RLIMIT_NOFILE, voidptr(&original)) == 0
+	limit := OutputLimit{ current: 32, maximum: original.maximum }
+	assert C.setrlimit(C.RLIMIT_NOFILE, voidptr(&limit)) == 0
+	defer { assert C.setrlimit(C.RLIMIT_NOFILE, voidptr(&original)) == 0 }
+	for _ in 0 .. 16 {
+		for mode in ['interrupted', 'failure', 'link'] {
+			for resume in [false, true] {
+				os.write_file(work + '/target', text[..4096])!
+				if os.exists(work + '/flushed') { os.rm(work + '/flushed')! }
+				os.setenv('VINIX_OUTPUT_GUARD_FLUSH_MODE', mode, true)
+				mut message := ''
+				resumed := fetch_https_with('https://fixture/full', work + '/target', u64(text.len), resume, false,
+					pkgprotocol.Progress{}, no_progress, HttpsOutputOptions{ program: fixture, flush: output_guard_flush }) or { message = err.msg(); false }
+				assert os.read_file(work + '/target')! == text
+				if mode == 'interrupted' { assert message == '' && resumed == resume && os.read_file(work + '/flushed')! == 'retried' }
+				else if mode == 'failure' { assert message.contains('cannot flush captured download destination') && os.read_file(work + '/flushed')! == 'once' }
+				else { assert message.contains('destination changed') && os.read_file(work + '/target.linked')! == text; os.rm(work + '/target.linked')! }
+				output_no_children()
+				// A successful empty resumed response still flushes the retained file.
+				assert fetch_https_with('https://fixture/full', work + '/target', u64(text.len), true, false,
+					pkgprotocol.Progress{}, no_progress, HttpsOutputOptions{ program: fixture })!
+				assert os.read_file(work + '/target')! == text
+				output_no_children()
+			}
+		}
+	}
+	println('HTTPS GUARD 96 fresh/resumed flush interruption, storage failure and link-change cycles preserve partials and retire children/descriptors under a 32-descriptor limit PASS')
 }

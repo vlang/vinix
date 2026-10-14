@@ -1,0 +1,114 @@
+PASS HTTPS ranges recovered authenticated bytes
+curl: (33) HTTP server doesn't seem to support byte ranges. Cannot resume.
+Restarting download: repository does not support byte ranges
+PASS HTTPS no-range recovered authenticated bytes
+curl: (60) SSL certificate problem: self signed certificate
+More details here: https://curl.se/docs/sslcerts.html
+
+curl failed to verify the legitimacy of the server and therefore could not
+establish a secure connection to it. To learn more about this situation and
+how to fix it, please visit the web page mentioned above.
+PASS HTTPS untrusted-ca refusal preserves the prefix
+curl: (60) SSL: no alternative certificate subject name matches target host name 'localhost'
+More details here: https://curl.se/docs/sslcerts.html
+
+curl failed to verify the legitimacy of the server and therefore could not
+establish a secure connection to it. To learn more about this situation and
+how to fix it, please visit the web page mentioned above.
+PASS HTTPS wrong-host refusal preserves the prefix
+PASS HTTPS offline refusal preserves the prefix
+PASS HTTPS plain-http refusal preserves the prefix
+curl: (63) Maximum file size exceeded
+PASS HTTPS oversized refusal preserves the prefix
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+Activated package generation 3
+PASS HTTPS signed transaction ranges bounded requests, progress and persistent state
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+curl: (33) HTTP server doesn't seem to support byte ranges. Cannot resume.
+Restarting https-app/share/payload: repository does not support byte ranges
+Activated package generation 3
+PASS HTTPS signed transaction no-range bounded requests, progress and persistent state
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+Restarting https-app/share/payload: resumed payload failed verification
+Activated package generation 3
+PASS HTTPS signed transaction bad-prefix bounded requests, progress and persistent state
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+curl: (33) HTTP server doesn't seem to support byte ranges. Cannot resume.
+Restarting https-app/share/payload: repository does not support byte ranges
+Rolled back to generation 1; application data was retained
+PASS HTTPS signed transaction no-range-corrupt bounded requests, progress and persistent state
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+curl: (18) transfer closed with 224256 bytes remaining to read
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+Activated package generation 3
+PASS HTTPS interrupted transfer retained prefix and resumed on the next transaction
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+curl: (22) The requested URL returned error: 403
+Rolled back to generation 1; application data was retained
+PASS HTTPS signed transaction forbidden bounded requests, progress and persistent state
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+curl: (1) Protocol "http" disabled (in redirect)
+Rolled back to generation 1; application data was retained
+PASS HTTPS signed transaction insecure-redirect bounded requests, progress and persistent state
+Package HTTPS: real curl, certificate and redirect enforcement, Range fallback, interrupted recovery, bounded integrity retry and rollback passed
+
+TLS destination cases:
+alias: wait status 256; refused with external files preserved
+hardlink: wait status 256; refused with external files preserved
+fifo: wait status 256; refused with external files preserved
+directory: wait status 256; refused with external files preserved
+nul-path: wait status 256; refused with external files preserved
+oversized-resume: wait status 256; refused with external files preserved
+delayed-alias: wait status 256; refused with external files preserved
+HTTPS destination qualification passed

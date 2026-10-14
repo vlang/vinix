@@ -64,6 +64,12 @@ fn (fixture DownloadRecoveryFixture) service() Service {
 	return Service{ root: fixture.root, progress: download_recovery_record }
 }
 
+// Verification emits progress too. Keep health reads out of the transaction's
+// event log so assertions describe only the download/recovery under test.
+fn (fixture DownloadRecoveryFixture) verified_state() !State {
+	return Service{ root: fixture.root }.verify()
+}
+
 fn (fixture DownloadRecoveryFixture) events() ![]pkgprotocol.Progress {
 	mut result := []pkgprotocol.Progress{}
 	for line in os.read_file(fixture.work + '/events')!.split_into_lines() {
@@ -80,7 +86,7 @@ fn test_corrupt_resumed_prefix_restarts_once_and_activates_verified_bytes() {
 	defer { review.close() }
 	state := fixture.service().transact('install', ['app'], TransactionOptions{ expected_review: review.fingerprint })!
 	assert state.generation == 3 && state.previous == 2
-	assert fixture.service().verify()!.generation == 3 && verified_file(fixture.object, fixture.payload)
+	assert fixture.verified_state()!.generation == 3 && verified_file(fixture.object, fixture.payload)
 	assert !os.exists(fixture.part) && os.read_file(fixture.directory + '/current/apps/app/bin/app')! == fixture.text
 	events := fixture.events()!
 	downloads := events.filter(it.phase == 'download')
@@ -124,14 +130,14 @@ fn test_bad_repository_stops_after_bounded_recovery_and_preserves_activation_and
 		fixture.service().transact('install', ['app'], TransactionOptions{}) or {
 			refused = err.msg().contains('payload checksum or size mismatch')
 		}
-		assert refused && fixture.service().verify()!.generation == 2
+		assert refused && fixture.verified_state()!.generation == 2
 		assert os.readlink(fixture.directory + '/current')! == 'generations/2'
 		assert !os.exists(fixture.part) && !os.exists(fixture.object)
 		assert os.ls(fixture.directory + '/generations')!.sorted() == ['1', '2']
 		events := fixture.events()!
 		assert events.filter(it.phase == 'verify').len == if resumed { 2 } else { 1 }
 		assert events.all(it.phase !in ['activate', 'complete'])
-		assert fixture.service().rollback('')!.generation == 1 && fixture.service().verify()!.generation == 1
+		assert fixture.service().rollback('')!.generation == 1 && fixture.verified_state()!.generation == 1
 	}
 	println('Package download recovery: bad source refused after bounded attempts; activation and rollback preserved')
 }
@@ -195,7 +201,7 @@ fn test_oversized_offline_source_preserves_partial_activation_and_restored_resum
 	fixture.service().transact('install', ['app'], TransactionOptions{}) or {
 		refused = err.msg().contains('exceeds authenticated size')
 	}
-	assert refused && fixture.service().verify()!.generation == 2
+	assert refused && fixture.verified_state()!.generation == 2
 	assert os.read_file(fixture.part)! == prefix && !os.exists(fixture.object)
 	assert fixture.events()!.all(it.phase !in ['download', 'verify', 'activate', 'complete'])
 	assert os.ls(fixture.directory + '/generations')!.sorted() == ['1', '2']

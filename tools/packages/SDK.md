@@ -1478,6 +1478,15 @@ hostname, access-denial and redirect failures preserve the prefix. The existing
 HTTPS-only, TLS, size and retry/time bounds apply to both attempts. See
 [real TLS transport qualification](../../tests/packages/https-check.md).
 
+HTTPS output rechecks captured size, named identity and the single-link rule
+after admission/progress callbacks and before writing each body chunk. A changed
+file stops further writes, including when only an empty response remains; final
+progress cannot change it and still produce transport success. Flushes retry
+`EINTR`; other storage errors retain bounded data for inspection and retry.
+These checks require controlled package directories and the writer lock; they
+do not freeze concurrent administrator changes between system calls. See
+[callback/recovery qualification](../../tests/packages/https-output-guard-check.md).
+
 Frames are bounded to 8192 bytes. Identifiers/paths, phase-specific counter
 limits, JSON field types and formats are validated by
 [`pkgprotocol.decode_progress`](pkgprotocol/progress.v). Decoded events own their

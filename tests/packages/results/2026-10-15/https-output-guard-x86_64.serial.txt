@@ -1,0 +1,99 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=28
+!>+ [11] ./sbin/init sz=210912
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/https-output-guard-core sz=981952
+!>+ [15] ./usr/share/package-fixtures/https-output-producer sz=168592
+!>+ [16] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e8ac00
+initramfs: Done (16 entries)
+HWTEST START packages-https-output-guard
+Restarting app/payload: repository does not support byte ranges
+HTTPS GUARD opened-link-false refused=true preserved=true
+HTTPS GUARD opened-link-true refused=true preserved=true
+HTTPS GUARD opened-grow-false refused=true preserved=true
+HTTPS GUARD opened-grow-true refused=true preserved=true
+HTTPS GUARD opened-alias-false refused=true preserved=true
+HTTPS GUARD opened-alias-true refused=true preserved=true
+HTTPS GUARD opened-fifo-false refused=true preserved=true
+HTTPS GUARD opened-fifo-true refused=true preserved=true
+HTTPS GUARD opened-ordinary-false refused=true preserved=true
+HTTPS GUARD opened-ordinary-true refused=true preserved=true
+HTTPS GUARD opened-missing-false refused=true preserved=true
+HTTPS GUARD opened-missing-true refused=true preserved=true
+HTTPS GUARD written-link-false refused=true preserved=true
+HTTPS GUARD written-link-true refused=true preserved=true
+HTTPS GUARD written-grow-false refused=true preserved=true
+HTTPS GUARD written-grow-true refused=true preserved=true
+HTTPS GUARD written-alias-false refused=true preserved=true
+HTTPS GUARD written-alias-true refused=true preserved=true
+HTTPS GUARD written-fifo-false refused=true preserved=true
+HTTPS GUARD written-fifo-true refused=true preserved=true
+HTTPS GUARD written-ordinary-false refused=true preserved=true
+HTTPS GUARD written-ordinary-true refused=true preserved=true
+HTTPS GUARD written-missing-false refused=true preserved=true
+HTTPS GUARD written-missing-true refused=true preserved=true
+HTTPS GUARD finished-link-false refused=true preserved=true
+HTTPS GUARD finished-link-true refused=true preserved=true
+HTTPS GUARD finished-grow-false refused=true preserved=true
+HTTPS GUARD finished-grow-true refused=true preserved=true
+HTTPS GUARD finished-alias-false refused=true preserved=true
+HTTPS GUARD finished-alias-true refused=true preserved=true
+HTTPS GUARD finished-fifo-false refused=true preserved=true
+HTTPS GUARD finished-fifo-true refused=true preserved=true
+HTTPS GUARD finished-ordinary-false refused=true preserved=true
+HTTPS GUARD finished-ordinary-true refused=true preserved=true
+HTTPS GUARD finished-missing-false refused=true preserved=true
+HTTPS GUARD finished-missing-true refused=true preserved=true
+HTTPS GUARD start-link-false refused=true preserved=true
+HTTPS GUARD start-link-true refused=true preserved=true
+HTTPS GUARD start-grow-false refused=true preserved=true
+HTTPS GUARD start-grow-true refused=true preserved=true
+HTTPS GUARD start-alias-false refused=true preserved=true
+HTTPS GUARD start-alias-true refused=true preserved=true
+HTTPS GUARD start-fifo-false refused=true preserved=true
+HTTPS GUARD start-fifo-true refused=true preserved=true
+HTTPS GUARD start-ordinary-false refused=true preserved=true
+HTTPS GUARD start-ordinary-true refused=true preserved=true
+HTTPS GUARD start-missing-false refused=true preserved=true
+HTTPS GUARD start-missing-true refused=true preserved=true
+HTTPS GUARD middle-link-false refused=true preserved=true
+HTTPS GUARD middle-link-true refused=true preserved=true
+HTTPS GUARD middle-grow-false refused=true preserved=true
+HTTPS GUARD middle-grow-true refused=true preserved=true
+HTTPS GUARD middle-alias-false refused=true preserved=true
+HTTPS GUARD middle-alias-true refused=true preserved=true
+HTTPS GUARD middle-fifo-false refused=true preserved=true
+HTTPS GUARD middle-fifo-true refused=true preserved=true
+HTTPS GUARD middle-ordinary-false refused=true preserved=true
+HTTPS GUARD middle-ordinary-true refused=true preserved=true
+HTTPS GUARD middle-missing-false refused=true preserved=true
+HTTPS GUARD middle-missing-true refused=true preserved=true
+HTTPS GUARD finish-link-false refused=true preserved=true
+HTTPS GUARD finish-link-true refused=true preserved=true
+HTTPS GUARD finish-grow-false refused=true preserved=true
+HTTPS GUARD finish-grow-true refused=true preserved=true
+HTTPS GUARD finish-alias-false refused=true preserved=true
+HTTPS GUARD finish-alias-true refused=true preserved=true
+HTTPS GUARD finish-fifo-false refused=true preserved=true
+HTTPS GUARD finish-fifo-true refused=true preserved=true
+HTTPS GUARD finish-ordinary-false refused=true preserved=true
+HTTPS GUARD finish-ordinary-true refused=true preserved=true
+HTTPS GUARD finish-missing-false refused=true preserved=true
+HTTPS GUARD finish-missing-true refused=true preserved=true
+HTTPS GUARD 72 fresh/resumed checkpoint and progress mutations stop before further writes; replacements survive and restored output retries PASS
+HTTPS GUARD 96 fresh/resumed flush interruption, storage failure and link-change cycles preserve partials and retire children/descriptors under a 32-descriptor limit PASS
+HTTPS OUTPUT GUARD process PASS
+HWTEST PASS packages-https-output-guard

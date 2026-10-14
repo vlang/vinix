@@ -365,8 +365,11 @@ HTTPS acquisition opens one nonblocking, no-follow regular destination before
 starting curl, refusing hard links and oversized resume prefixes. Curl writes to
 a pipe; the service bounds each write before sending it to the captured file.
 The file and named identity must still agree before successful completion, and
-the captured file is flushed without reopening the pathname. See
-[HTTPS output qualification](../tests/packages/https-output-check.md).
+the captured file is flushed without reopening the pathname. Identity, length
+and link count are rechecked before writing each body chunk and after progress
+callbacks, including final progress. Changed output stops further writes; interrupted
+flushes retry. See [HTTPS output qualification](../tests/packages/https-output-check.md)
+and [callback/recovery checks](../tests/packages/https-output-guard-check.md).
 
 If an HTTPS repository refuses byte-range resume, acquisition retries once from
 byte zero, replacing the old prefix when fresh bytes arrive. A corrupt fresh
