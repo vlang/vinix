@@ -1,0 +1,8 @@
+Three native assertion runners exited 0 with clang ASan/UBSan; ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1. No whole-service heap retention claim.
+PASS ASan/UBSan launch_data
+Launch data: private owned creation, retained contents, existing modes, inventory, purge and recreation passed
+Launch data: every parent/app/tmp alias, dangling link, FIFO, regular file and app/tmp socket refuses within two seconds
+Launch data: 128 success/refusal cycles under a 32-descriptor limit and restored-directory retry passed
+Launch alias probe: refused=true outside_tmp=false outside_mode=493
+PASS ASan/UBSan purge
+PASS ASan/UBSan personal_data

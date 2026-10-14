@@ -191,8 +191,7 @@ fn run_leased_mode(config Config, directory string, state State, id string, inpu
 			}
 		}
 	}
-	os.mkdir_all(data + '/tmp')!
-	os.chmod(data, 0o700)!
+	prepare_launch_data(home, id, u32(uid))!
 	mut process := os.new_process(launch.program)
 	process.set_args(launch.arguments)
 	process.set_work_folder(launch.directory)

@@ -104,9 +104,9 @@ fn purge_child(parent int, name &char, original C.stat, uid u32, device u64, dep
 	if C.unlinkat(parent, name, C.AT_REMOVEDIR) != 0 { return error('cannot remove personal data directory') }
 }
 
-// Returns an owned descriptor, or -1 when the personal data parent is absent.
-// Inventory and deletion share the same no-follow account-home traversal.
-fn personal_data_parent(home string, uid u32) !int {
+// Return an owned descriptor to an ordinary, caller-owned account home.
+// Launch, inventory and deletion share this no-follow traversal.
+fn personal_data_home(home string, uid u32) !int {
 	if !home.starts_with('/') || !printable(home, 4096) || home == '/' {
 		return error('personal application data requires an absolute ordinary account home')
 	}
@@ -125,14 +125,23 @@ fn personal_data_parent(home string, uid u32) !int {
 		C.close(directory); directory = next
 	}
 	purge_directory_info(directory, uid, true)!
+	retained = true
+	return directory
+}
+
+// Returns an owned descriptor, or -1 when a read-only caller has no data parent.
+fn personal_data_parent(home string, uid u32) !int {
+	return personal_data_parent_mode(home, uid, false)
+}
+
+fn personal_data_parent_mode(home string, uid u32, create bool) !int {
+	mut directory := personal_data_home(home, uid)!
+	mut retained := false
+	defer { if !retained { C.close(directory) } }
 	for part in ['.local', 'share', 'vinix-apps']! {
-		next := C.openat(directory, part.str, C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC)
-		if next < 0 {
-			if C.errno == C.ENOENT { return -1 }
-			return error('personal application data parent must be an ordinary directory: ${part}')
-		}
+		next := personal_data_child(directory, part, uid, create)!
+		if next < 0 { return -1 }
 		C.close(directory); directory = next
-		purge_directory_info(directory, uid, true)!
 	}
 	retained = true
 	return directory

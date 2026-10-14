@@ -776,6 +776,17 @@ lease before releasing that lock. The ordinary child repeats this admission chec
 after the credential handoff. Later revocation prevents new launches; an already
 admitted process retains its validated snapshot and lease until exit.
 
+After trust, payload and document admission, launch prepares private data through
+captured directory descriptors. The account home and every `.local/share/vinix-apps`
+component must be ordinary caller-owned directories without write access for
+other accounts. Missing data parents are created with mode `0700`; the existing
+home and parent modes are retained. App data and its `tmp` child must also be
+ordinary, caller-owned, and on the same filesystem as their respective parents.
+Both receive mode `0700` through captured descriptors after validation. Links,
+special files, foreign ownership and shared writable modes refuse launch before
+the application starts. Correcting the entry permits retry with existing contents
+retained. See [launch-data qualification](../../tests/packages/launch-data-check.md).
+
 The built-in `NativeApp` V interface and VAPP version 11 remain internal desktop
 contracts. Third-party ui2 clients need compositor adapter qualification. Importing
 `desktop/app_process.v` is not a supported standalone UI SDK protocol.

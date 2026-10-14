@@ -1,0 +1,99 @@
+Initial real run_leased_mode probe against unchanged 19c36cca2 production sources. Synthetic invalid ELF payload; host sandbox is absent. Unsafe effects precede the failed spawn.
+os: failed to execute "/usr/bin/vinix-sandbox"; code: 2
+Launch alias probe: refused=false outside_tmp=true outside_mode=448
+tools/packages/pkgcore/launch_data_test.v:41: fn test_launch_refuses_aliased_app_data_before_creating_or_chmodding_the_target
+    assert refused && !os.exists(work + '/outside/tmp') && os.lstat(work + '/outside')!.mode & 0o777 == 0o755
+
+Final same probe:
+Launch data: private owned creation, retained contents, existing modes, inventory, purge and recreation passed
+Launch data: every parent/app/tmp alias, dangling link, FIFO, regular file and app/tmp socket refuses within two seconds
+Launch data: 128 success/refusal cycles under a 32-descriptor limit and restored-directory retry passed
+Launch alias probe: refused=true outside_tmp=false outside_mode=493
+
+Initial guest build attempts: corrected the CLI option; moved a conditional out of a progress callback argument to avoid a cross C signature inference bug; returned to default unused pruning; corrected probe getegid/geteuid declarations to match the V standard library. Fresh a5/x5 builds then passed without generated-C or V-library patches.
+
+guest-aarch64.txt:
+unknown argument: --scenarios
+
+guest-aarch64-run.txt:
+clang --target=aarch64-linux-musl --sysroot=/Users/alex/code/vinix/build-aarch64-userland/sysroot -static -O1 -w -D_GNU_SOURCE -fno-stack-protector -L/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib -fuse-ld=lld -o /Volumes/LoomScratch/vld/a/guest/init /Volumes/LoomScratch/vld/a/guest/init.c -lm -lpthread
+clang: exit status 1
+  494 | }
+  495 | 
+  496 | fn check_on_curve(points ...Point) bool {
+      |    ~~~~~~~~~~~~~~
+  497 |     for p in points {
+  498 |         mut xx := Element{}
+tools/packages/signing/internal/edwards25519/scalar.v:1133:4: notice: unused function: `generate_notzero_scalar`
+ 1131 | type NotZeroScalar = Scalar
+ 1132 | 
+ 1133 | fn generate_notzero_scalar(size int) !NotZeroScalar {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+ 1134 |     mut s := Scalar{}
+ 1135 |     for s == sc_zero {
+/Volumes/LoomScratch/vld/a/guest/init.c:60845:28: error: incompatible function pointer types initializing '_fn_ptr_7f059683983429d4' (aka 'long (*)(long)') with an expression of type '_fn_ptr_53a78c06d684e59' (aka 'void (*)(struct pkgprotocol__Progress)') [-Wincompatible-function-pointer-types]
+ 60845 |                 _fn_ptr_7f059683983429d4 __order_snapshot_23 = report;
+       |                                          ^                     ~~~~~~
+/Volumes/LoomScratch/vld/a/guest/init.c:60854:23: error: passing 'pkgprotocol__Progress' (aka 'struct pkgprotocol__Progress') to parameter of incompatible type 'i64' (aka 'long')
+ 60854 |                 __order_snapshot_23(__assoc_24);
+       |                                     ^~~~~~~~~~
+2 errors generated.
+
+guest-aarch64-flags.txt:
+clang --target=aarch64-linux-musl --sysroot=/Users/alex/code/vinix/build-aarch64-userland/sysroot -static -O1 -w -D_GNU_SOURCE -fno-stack-protector -L/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib -fuse-ld=lld -o /Volumes/LoomScratch/vld/a2/guest/init /Volumes/LoomScratch/vld/a2/guest/init.c -lm -lpthread
+clang: exit status 1
+   82 |     private_directory(directory, uid)!
+   83 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+   84 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+   85 |     mut accepted := false
+   86 |     defer { if !accepted { unsafe { path.free() } } }
+tools/packages/pkgadmin/socket.c.v:103:2: notice: variable `path` shadows a function declaration
+  101 |     private_directory(directory, uid)!
+  102 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+  103 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+  104 |     defer { unsafe { path.free() } }
+  105 |     location := address(path)!
+/Volumes/LoomScratch/vld/a2/guest/init.c:94419:28: error: incompatible function pointer types initializing '_fn_ptr_7f059683983429d4' (aka 'long (*)(long)') with an expression of type '_fn_ptr_53a78c06d684e59' (aka 'void (*)(struct pkgprotocol__Progress)') [-Wincompatible-function-pointer-types]
+ 94419 |                 _fn_ptr_7f059683983429d4 __order_snapshot_23 = report;
+       |                                          ^                     ~~~~~~
+/Volumes/LoomScratch/vld/a2/guest/init.c:94428:23: error: passing 'pkgprotocol__Progress' (aka 'struct pkgprotocol__Progress') to parameter of incompatible type 'i64' (aka 'long')
+ 94428 |                 __order_snapshot_23(__assoc_24);
+       |                                     ^~~~~~~~~~
+2 errors generated.
+
+guest-aarch64-final.txt:
+clang --target=aarch64-linux-musl --sysroot=/Users/alex/code/vinix/build-aarch64-userland/sysroot -static -O1 -w -D_GNU_SOURCE -fno-stack-protector -L/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib -fuse-ld=lld -o /Volumes/LoomScratch/vld/a3/guest/init /Volumes/LoomScratch/vld/a3/guest/init.c -lm -lpthread
+clang: exit status 1
+  101 |     private_directory(directory, uid)!
+  102 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+  103 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+  104 |     defer { unsafe { path.free() } }
+  105 |     location := address(path)!
+ld.lld: error: undefined symbol: v_os_exec_capture_start
+>>> referenced by init.c
+>>>               /var/folders/5s/gdmd5zq90y52hchygpfzp2m00000gn/T/init-53849d.o:(os__exec)
+
+ld.lld: error: undefined symbol: v_os_execute_capture_start
+>>> referenced by init.c
+>>>               /var/folders/5s/gdmd5zq90y52hchygpfzp2m00000gn/T/init-53849d.o:(os__execute_shell)
+
+ld.lld: error: undefined symbol: v_sync_thread_create_detached_with_stack
+>>> referenced by init.c
+>>>               /var/folders/5s/gdmd5zq90y52hchygpfzp2m00000gn/T/init-53849d.o:(sync__start_waitgroup_thread)
+>>> referenced by init.c
+>>>               /var/folders/5s/gdmd5zq90y52hchygpfzp2m00000gn/T/init-53849d.o:(sync__start_timer)
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+
+guest-aarch64-default.txt:
+/Users/alex/code/vinix/build/package-release-work/v-toolchain/v -os linux -arch arm64 -gc none -d no_backtrace -d no_segfault_handler -path @vlib|@vmodules|/Users/alex/code/vinix/.|/Users/alex/code/vinix/tools/accounts|/Users/alex/code/vinix/tools/security-events|/Users/alex/code/vinix/tools/keyring -o /Volumes/LoomScratch/vld/a4/guest/program-4/launch-data-probe.c /Users/alex/code/vinix/tests/packages/launch-data-probe.v
+v: exit status 1
+/Users/alex/code/v/.codex-worktrees/no-c-headers-native-fixes/vlib/os/os_nix.c.v:66:6: error: C function `C.getegid` was already declared with a different signature in module `main` at /Users/alex/code/vinix/tests/packages/launch-data-probe.v:9:6
+   64 | fn C.getgid() i32
+   65 | 
+   66 | fn C.getegid() i32
+      |      ^
+   67 | 
+   68 | fn C.v_os_execute_capture_start(cmd &char, child_pid &int, read_fd &int) int

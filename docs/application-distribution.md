@@ -399,6 +399,14 @@ from new requests. Restore trusted state rather than bypassing the checks, then
 retry `verify`. See [coordination qualification](../tests/packages/coordination-check.md).
 
 Personal data under `~/.local/share/vinix-apps/ID` survives uninstall/rollback.
+Launch captures the account home and each data-parent directory without following
+links, and requires caller ownership without write access for other accounts.
+Missing data parents are created privately. App data and its `tmp` child are
+validated before their captured descriptors receive mode `0700`; symlinks,
+special files, foreign ownership and shared writable modes refuse launch. This
+prevents creation or permission changes through a planted app-data alias.
+Existing contents survive a corrected-entry retry. See
+[launch-data qualification](../tests/packages/launch-data-check.md).
 After uninstall an ordinary user can explicitly erase it with
 `vinix-package purge-data ID`. No package owns arbitrary home files. Data/schema
 compatibility across rollback remains the developer's responsibility.

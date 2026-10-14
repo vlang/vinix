@@ -233,7 +233,13 @@ fn https_transfer(url string, destination string, maximum u64, resume bool, even
 	mut process := os.new_process('/usr/bin/curl')
 	defer { process.close() }
 	process.set_args(args)
-	if event.phase != '' { report(pkgprotocol.Progress{ ...event, current: if resume { transfer_size(destination) } else { u64(0) } }) }
+	if event.phase != '' {
+		// Keep the conditional outside the callback argument: the cross C
+		// backend can otherwise infer the callback snapshot's signature wrongly.
+		mut current := u64(0)
+		if resume { current = transfer_size(destination) }
+		report(pkgprotocol.Progress{ ...event, current: current })
+	}
 	if event.phase == '' {
 		process.wait()
 		return process.code

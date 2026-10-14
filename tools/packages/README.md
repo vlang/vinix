@@ -54,6 +54,11 @@ holders with diagnostics. FIFO replacements cannot hang status, transactions or
 launch admission; restoring a sound lock/lease permits retry. See
 [coordination qualification](../../tests/packages/coordination-check.md).
 
+Launch, inventory and purge share account-home directory checks. Launch creates
+private app data and temporary directories without following aliases or changing
+an alias target's permissions. Unsafe entries fail with diagnostics and remain
+available for correction. See [launch-data qualification](../../tests/packages/launch-data-check.md).
+
 Space checks use filesystem allocation units and reject invalid or overflowing
 reports. The V [space qualification](../../tests/packages/space-check.md) covers
 differing I/O/allocation sizes through the production function; run
