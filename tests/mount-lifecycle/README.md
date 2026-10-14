@@ -21,6 +21,14 @@ The default `--case all` requires every positive marker. `--case flags`,
 `id-6` select one identity case. The timeout defaults to 180 seconds.
 `--case admission` selects the new-filesystem/bind/devpts admission group;
 `ad-0` through `ad-7` select its individual cases.
+`--case propagation` selects propagation request validation; `pr-0` through
+`pr-4` select its individual cases.
+
+The [propagation request checks](propagation.md) cover conflicting/extra flags,
+ordinary directory/file targets, detached roots, retained foreign descriptions
+and bind dispatch precedence. Valid mounted directory/file roots accept each
+propagation mode with `MS_REC` and `MS_SILENT`. These are request validation
+checks; propagation between namespaces remains unimplemented.
 
 The [new mount admission checks](admission.md) cover detached and foreign
 destinations and bind sources. Each case checks authorization, repeated
@@ -35,7 +43,7 @@ iterations, verifies capability denial and finishes with valid local operations.
 
 Use `--probe-state /path/to/prior-native-result` to reuse its probe ELF and
 generated C with a different kernel or case. The controller requires a matching
-architecture and identical current/copied hashes of all three fixture files,
+architecture and identical current/copied hashes of all four fixture files,
 verifies both artifact hashes against the prior receipt and checks the ELF
 architecture before boot.
 The prior result may be a failed control; its receipt hash is pinned in the new
@@ -81,7 +89,8 @@ every active attachment's current parent chain without allocating a snapshot.
 
 The Linux reference executes the exact same probe ELF with `move-reference`
 selected. It runs the portable cycle, type, namespace, holder, all seven
-identity checks and all eight admission cases. Vinix's cursor limit and
+identity checks, all eight admission cases and all five propagation validation
+cases. Vinix's cursor limit and
 unsupported unmount modes are excluded. Supply a matching Linux kernel and
 the ELF preserved by a native run:
 

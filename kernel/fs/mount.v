@@ -37,6 +37,7 @@ pub const ms_nodiratime = u64(0x800)
 pub const ms_bind = u64(0x1000)
 pub const ms_move = u64(0x2000)
 pub const ms_rec = u64(0x4000)
+pub const ms_silent = u64(0x8000)
 pub const ms_unbindable = u64(0x20000)
 pub const ms_private = u64(0x40000)
 pub const ms_slave = u64(0x80000)
@@ -431,19 +432,36 @@ fn mount_request(parent &VFSNode, source string, target string, fstype string, _
 	if flags & ms_remount != 0 {
 		return remount(parent, target, flags, options)
 	}
-	if flags & ms_propagation != 0 {
-		// Propagation types are accepted but not modelled: see the top of this
-		// file for the one arrangement every namespace has.
-		get_node(parent, target, true)?
-		return
-	}
 	if flags & ms_bind != 0 {
 		return bind_mount(parent, source, target, flags)
+	}
+	if flags & ms_propagation != 0 {
+		// Propagation types are accepted but not modelled: see the top of this
+		// file for the one arrangement every namespace has. Data options do not
+		// supply flags for this request.
+		return validate_mount_propagation(parent, target, _flags & ~ms_wxallowed)
 	}
 	if flags & ms_move != 0 {
 		return move_mount(parent, source, target)
 	}
 	return new_mount(parent, source, target, fstype, flags, options)
+}
+
+fn validate_mount_propagation(parent &VFSNode, target string, flags u64) ? {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	node := get_node_and_mount(parent, target, true, identity)?
+	entry := namespace_mount(lib.mount_context_top(identity))
+	type_flags := flags & ~(ms_rec | ms_silent)
+	// A retained path may name a detached tree. Propagation requires a mounted
+	// root; ordinary directories and files cannot stand in for that root.
+	if entry == unsafe { nil } || entry.detached || voidptr(entry.root) != voidptr(node)
+		|| type_flags & ~ms_propagation != 0 || type_flags == 0
+		|| type_flags & (type_flags - 1) != 0 {
+		errno.set(errno.einval)
+		return none
+	}
 }
 
 // Kernel callers: mount a new filesystem instance with default options.

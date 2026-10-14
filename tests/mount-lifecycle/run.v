@@ -22,10 +22,10 @@ fn main() {
 		hosttest.Option{ name: '--arch', value: true, choices: ['aarch64', 'x86_64'] },
 		hosttest.Option{ name: '--kernel-dir', value: true },
 		hosttest.Option{ name: '--state-dir', value: true },
-		hosttest.Option{ name: '--case', value: true, choices: ['flags', 'move', 'identities', 'id-0', 'id-1', 'id-2', 'id-3', 'id-4', 'id-5', 'id-6', 'admission', 'ad-0', 'ad-1', 'ad-2', 'ad-3', 'ad-4', 'ad-5', 'ad-6', 'ad-7', 'all'] },
+		hosttest.Option{ name: '--case', value: true, choices: ['flags', 'move', 'identities', 'id-0', 'id-1', 'id-2', 'id-3', 'id-4', 'id-5', 'id-6', 'admission', 'ad-0', 'ad-1', 'ad-2', 'ad-3', 'ad-4', 'ad-5', 'ad-6', 'ad-7', 'propagation', 'pr-0', 'pr-1', 'pr-2', 'pr-3', 'pr-4', 'all'] },
 		hosttest.Option{ name: '--timeout', value: true },
 		hosttest.Option{ name: '--probe-state', value: true },
-	], [], 'Usage: run.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case flags|move|identities|id-0..id-6|admission|ad-0..ad-7|all] [--timeout SECONDS] [--probe-state RECEIPT-DIR]')!
+	], [], 'Usage: run.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case flags|move|identities|id-0..id-6|admission|ad-0..ad-7|propagation|pr-0..pr-4|all] [--timeout SECONDS] [--probe-state RECEIPT-DIR]')!
 	for key in ['--arch', '--kernel-dir', '--state-dir'] {
 		if !options.has(key) { eprintln('missing ' + key); exit(2) }
 	}
@@ -50,6 +50,7 @@ fn main() {
 		'fixture': digest(state + '/sources/mountfixture/core.v')!
 		'identities_fixture': digest(state + '/sources/mountfixture/identities.v')!
 		'admission_fixture': digest(state + '/sources/mountfixture/admission.v')!
+		'propagation_fixture': digest(state + '/sources/mountfixture/propagation.v')!
 		'controller': digest(@FILE)!
 	}
 	if probe_state != '' { inputs['probe_receipt'] = digest(os.abs_path(probe_state) + '/receipt.json')! }
@@ -68,7 +69,7 @@ fn fixture_init(state string, arch string, probe_state string) !string {
 	prior := os.abs_path(probe_state)
 	receipt := json2.decode[Receipt](os.read_file(prior + '/receipt.json')!)!
 	if receipt.architecture != arch { return error('cached probe architecture differs') }
-	for key, file in {'fixture': 'sources/mountfixture/core.v', 'identities_fixture': 'sources/mountfixture/identities.v', 'admission_fixture': 'sources/mountfixture/admission.v'} {
+	for key, file in {'fixture': 'sources/mountfixture/core.v', 'identities_fixture': 'sources/mountfixture/identities.v', 'admission_fixture': 'sources/mountfixture/admission.v', 'propagation_fixture': 'sources/mountfixture/propagation.v'} {
 		if receipt.inputs[key] != digest(prior + '/' + file)! || receipt.inputs[key] != digest(state + '/' + file)! {
 			return error('cached probe source differs: ' + file)
 		}
@@ -104,6 +105,12 @@ fn run_guest(state string, arch string, selected string, timeout int, probe_stat
 		for kind in 0 .. 8 { expected << 'MOUNT ADMISSION CASE: ${kind} PASS' }
 	} else if selected.starts_with('ad-') {
 		expected << ['MOUNT ADMISSION: PASS', 'MOUNT ADMISSION CASE: ' + selected.all_after('ad-') + ' PASS']
+	}
+	if selected in ['propagation', 'all'] {
+		expected << 'MOUNT PROPAGATION VALIDATION: PASS'
+		for kind in 0 .. 5 { expected << 'MOUNT PROPAGATION CASE: ${kind} PASS' }
+	} else if selected.starts_with('pr-') {
+		expected << ['MOUNT PROPAGATION VALIDATION: PASS', 'MOUNT PROPAGATION CASE: ' + selected.all_after('pr-') + ' PASS']
 	}
 	positive, negative := guesthost.verdict_policy(expected, ['MOUNT LIFECYCLE FAIL:'], false)
 	return guesthost.boot(configured.command, configured.env, state, positive, negative, timeout, true)!

@@ -391,6 +391,12 @@ through detached or foreign fds and cwd. Checks precede backend construction,
 and valid local fd-based mounts/binds pass in original and copied namespaces
 on both architectures and Linux with shared probe ELFs. Concurrent publication,
 propagation and independent PTY namespaces remain open.
+The [propagation request checks](../tests/mount-lifecycle/propagation.md) qualify
+mount-root/detachment checks, single-mode flag validation and bind-before-
+propagation dispatch on both native architectures and the same-ELF Linux
+reference. Valid mounted roots still accept propagation requests, including
+directory/file bind roots and privileged foreign roots; namespace propagation
+effects and their complete authorization model remain unimplemented.
 Mount reclamation, busy-reference accounting and full OCI acceptance remain open.
 The overlay-depth refusal measurements also exposed an event-record allocation per call.
 The separate [security event producer correction](../tests/overlay-rename/security-events.md)

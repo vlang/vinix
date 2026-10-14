@@ -9,7 +9,7 @@ import os
 
 struct ReferenceReceipt {
 	architecture string
-	context string = 'Linux QEMU reference; same native musl probe ELF; portable move, identity and admission checks; networking disabled'
+	context string = 'Linux QEMU reference; same native musl probe ELF; portable move, identity, admission and propagation validation checks; networking disabled'
 	artifacts map[string]string
 	command []string
 	passed bool
@@ -84,9 +84,11 @@ fn run() ! {
 		&& result.text.contains('MOUNT REPARENTED HOLDERS: PASS')
 		&& result.text.contains('MOUNT IDENTITIES: PASS')
 		&& result.text.contains('MOUNT ADMISSION: PASS')
+		&& result.text.contains('MOUNT PROPAGATION VALIDATION: PASS')
 	mut cases_pass := true
 	for kind in 0 .. 7 { cases_pass = cases_pass && result.text.contains('MOUNT IDENTITY CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT ADMISSION CASE: ${kind} PASS') }
+	for kind in 0 .. 5 { cases_pass = cases_pass && result.text.contains('MOUNT PROPAGATION CASE: ${kind} PASS') }
 	artifacts := {
 		'kernel': digest(state + '/linux')!
 		'probe': digest(state + '/probe')!
