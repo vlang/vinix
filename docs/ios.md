@@ -5194,10 +5194,33 @@ include the fixture. Thirteen final C streams and executables, native SDK/LLVM
 inputs, generated-C audit and actual IPA probe/audits are retained under
 `build/ios/fortnite/empty-array-checks`. Full iOS regression remains unpassed.
 
-The supplied IPA gets past this singleton import and exits with status 1 at
-MarketplaceKitWrapper's required `__swift_stdlib_bridgeErrorToNSError`. Its
-actual required import and native Swift bridge instructions are retained.
-Fortnite has not entered application code and remains unplayable.
+Swift Core now exports `__swift_stdlib_bridgeErrorToNSError` for existing
+CFError and ordinary Objective-C NSError instances, including registered
+NSError subclasses. The SDK declares a consuming Error argument; native
+Swift returns the same object, transferring its reference to the result.
+The V bridge preserves identity and fields without allocation, retain,
+release or autorelease. It checks live registered storage and class ancestry
+before accepting an owner. Unknown, stale, releasing and private Swift heap
+owners reject; native Swift error boxes still need lazy Error witnesses and
+cache initialization and remain unsupported.
+
+Ten fresh ASan/UBSan runs and five ARM64 Vinix suites pass across the bridge,
+Error ARC, Error value extraction, localizedDescription and object type.
+Thirty native/V field and ownership cases cover CFError, NSError and an ObjC
+subclass, Int64 limits, repeated transfers, final domain disposal, preserved
+`x20`/`x21`, eight workers, guarded rejection, weak zeroing and unlocked
+destructor reentry. Native getter autorelease temporaries are drained before
+reference-count measurements. The public `build-swift-error-bridge` target
+and full build, regression and Swift modes include the fixture. Thirteen
+final C streams and executables, native SDK/LLVM references, generated-C
+allocation/lifetime checks, retained fixture trials and actual IPA probes
+are under `build/ios/fortnite/error-bridge-checks`. Full iOS regression remains
+unpassed.
+
+The supplied IPA gets past the error bridge and exits with status 1 at
+MarketplaceKitWrapper's required `_swift_dynamicCast`. Its required import
+and native Swift cast instructions are retained. Fortnite has not entered
+application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -5206,10 +5229,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,463 | 697 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 153 | 23 | 23 |
-| All images | 2,275 | 723 | 120 |
+| MarketplaceKitWrapper | 154 | 22 | 23 |
+| All images | 2,276 | 722 | 120 |
 
-The C++/GLES/Text variant reports 2,288 resolved imports, 710 unresolved strong
+The C++/GLES/Text variant reports 2,289 resolved imports, 709 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

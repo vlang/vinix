@@ -173,6 +173,7 @@ fn swift_error_value(owner u64, scratch &u64, output &SwiftErrorValue) {
 
 fn swift_error_value_symbol(symbol string) ?u64 {
 	return match symbol {
+		'__swift_stdlib_bridgeErrorToNSError' { u64(unsafe { voidptr(swift_error_bridge) }) }
 		'_$sypN' { swift_any_full_metadata() }
 		'_swift_getErrorValue' { u64(unsafe { voidptr(swift_error_value) }) }
 		'_swift_getObjCClassMetadata' { u64(unsafe { voidptr(swift_objc_metadata) }) }
