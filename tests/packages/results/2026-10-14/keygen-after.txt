@@ -1,0 +1,11 @@
+path-nul: wait status 256; refused with existing inputs preserved
+parent-alias: wait status 256; refused with existing inputs preserved
+parent-alias-slashes: wait status 256; refused with existing inputs preserved
+parent-writable: wait status 256; refused with existing inputs preserved
+leaf-existing: wait status 256; refused with existing inputs preserved
+leaf-alias: wait status 256; refused with existing inputs preserved
+leaf-dangling: wait status 256; refused with existing inputs preserved
+leaf-fifo: wait status 256; refused with existing inputs preserved
+leaf-directory: wait status 256; refused with existing inputs preserved
+leaf-hardlink: wait status 256; refused with existing inputs preserved
+Package key generation: private ordinary retry PASS

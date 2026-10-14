@@ -25,8 +25,9 @@ fn qualify_package_window(mut t Test) ! {
 	repository := '/tmp/window-repository'
 	p := pkgcore.pack('/usr/share/window-fixtures/manifest.json', prepared, repository)!
 	assert p.window_protocol == 1 && p.architecture == architecture
-	key := pkgcore.keygen('/tmp/window-seed')!
-	pkgcore.publish(repository, 'window-publisher', '/tmp/window-seed', 1, time.now().unix() + 3600)!
+	os.mkdir_all('/tmp/package-publisher', mode: 0o700)!
+	key := pkgcore.keygen('/tmp/package-publisher/window-seed')!
+	pkgcore.publish(repository, 'window-publisher', '/tmp/package-publisher/window-seed', 1, time.now().unix() + 3600)!
 	os.mkdir_all('/etc/vinix-packages')!
 	os.write_file('/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{ architecture: architecture, launch_user: 'alex',
 		policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 } }))!

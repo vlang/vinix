@@ -26,7 +26,8 @@ fn composed_media() !string {
 fn qualify_package_composition(mut t Test) ! {
 	t.make_accounts()
 	architecture := $if arm64 { 'aarch64' } $else { 'x86_64' }
-	key := package_success(['keygen', '/tmp/composed-seed'])!.trim_space()
+	os.mkdir_all('/tmp/package-publisher', mode: 0o700)!
+	key := package_success(['keygen', '/tmp/package-publisher/composed-seed'])!.trim_space()
 	expires := time.now().unix() + 3600
 	for i, variant in ['base', 'math'] {
 		root := '/tmp/composed-roots-' + variant
@@ -55,7 +56,7 @@ fn qualify_package_composition(mut t Test) ! {
 		workspace := '/tmp/composed-workspace-' + variant
 		assert json2.decode[pkgcore.CatalogInfo](package_success(['pack-catalog', composed.catalog, root, workspace])!)!.package_count == 10
 		released := json2.decode[pkgcore.ReleaseInfo](package_success(['publish-release', workspace, 'composed-fixture',
-			'/tmp/composed-seed', (i + 1).str(), expires.str(), '/tmp/composed-release-' + variant])!)!
+			'/tmp/package-publisher/composed-seed', (i + 1).str(), expires.str(), '/tmp/composed-release-' + variant])!)!
 		assert released.public_key == key && released.package_count == 10
 	}
 	t.say('PACKAGE COMPOSITION canonical-order scoped-roots pinned-two-target-catalog single-signed-publisher PASS')

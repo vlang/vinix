@@ -23,13 +23,14 @@ fn qualify_package_native_catalog(mut t Test) ! {
 	t.make_accounts()
 	architecture := $if arm64 { 'aarch64' } $else { 'x86_64' }
 	roots := '/usr/share/native-catalog/roots'
-	key := pkgcore.keygen('/tmp/native-seed')!
+	os.mkdir_all('/tmp/package-publisher', mode: 0o700)!
+	key := pkgcore.keygen('/tmp/package-publisher/native-seed')!
 	for i, version in ['1.0.0', '1.1.0'] {
 		profile := pkgcore.native_catalog(version, roots, '/tmp/native-lock-' + version)!
 		if i == 0 { assert os.read_file(profile.catalog)! == os.read_file('/usr/share/native-catalog/catalog.json')! }
 		workspace := '/tmp/native-workspace-' + version
 		assert pkgcore.pack_catalog(profile.catalog, roots, workspace)!.package_count == 6
-		pkgcore.publish_release(workspace, 'native', '/tmp/native-seed', u64(i + 1), time.now().unix() + 3600, '/tmp/native-release-' + version)!
+		pkgcore.publish_release(workspace, 'native', '/tmp/package-publisher/native-seed', u64(i + 1), time.now().unix() + 3600, '/tmp/native-release-' + version)!
 	}
 	os.mkdir_all('/etc/vinix-packages')!
 	os.write_file('/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{ architecture: architecture, launch_user: 'alex',

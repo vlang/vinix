@@ -25,7 +25,8 @@ fn qualify_package_state_schema(mut t Test) ! {
 	repository := '/tmp/stored-repository'
 	os.mkdir_all(source)!
 	os.write_file(source + '/COPYING', 'MIT redistribution fixture')!
-	key := pkgcore.keygen('/tmp/stored-seed')!
+	os.mkdir_all('/tmp/package-publisher', mode: 0o700)!
+	key := pkgcore.keygen('/tmp/package-publisher/stored-seed')!
 	os.mkdir_all('/etc/vinix-packages')!
 	os.write_file('/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{ architecture: architecture,
 		policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 } }))!
@@ -34,7 +35,7 @@ fn qualify_package_state_schema(mut t Test) ! {
 		os.write_file('/tmp/stored-manifest.json', json2.encode(pkgcore.Package{ id: 'stored-data', version: version,
 			architecture: 'all', name: 'Stored-state fixture', license: 'MIT', kind: 'data' }))!
 		pkgcore.pack('/tmp/stored-manifest.json', source, repository)!
-		pkgcore.publish(repository, 'stored', '/tmp/stored-seed', u64(i + 1), time.now().unix() + 3600)!
+		pkgcore.publish(repository, 'stored', '/tmp/package-publisher/stored-seed', u64(i + 1), time.now().unix() + 3600)!
 		if i == 0 { package_success(['repo-enroll', 'stored', 'file://' + repository, key])! }
 		package_success(['update'])!
 		package_success(if i == 0 { ['install', 'stored-data'] } else { ['upgrade'] })!

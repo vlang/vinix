@@ -66,7 +66,8 @@ fn qualify_package_context(mut t Test) ! {
 	os.cp('/sbin/init', '/tmp/context-source/bin/app')!
 	os.chmod('/tmp/context-source/bin/app', 0o755)!
 	os.mkdir_all('/tmp/context-assets')!
-	key := package_success(['keygen', '/tmp/context-seed'])!.trim_space()
+	os.mkdir_all('/tmp/package-publisher', mode: 0o700)!
+	key := package_success(['keygen', '/tmp/package-publisher/context-seed'])!.trim_space()
 	version := '1.0.0'
 	os.write_file('/tmp/context-source/version.txt', version + '\n')!
 	os.write_file('/tmp/context-assets/version.txt', version + '\n')!
@@ -78,7 +79,7 @@ fn qualify_package_context(mut t Test) ! {
 	os.cp('/usr/share/context-fixtures/package-hello', '/tmp/hello-source/bin/package-hello')!
 	os.chmod('/tmp/hello-source/bin/package-hello', 0o755)!
 	pkgcore.pack('/usr/share/context-fixtures/manifest.json', '/tmp/hello-source', '/tmp/context-repository')!
-	pkgcore.publish('/tmp/context-repository', 'context-fixture', '/tmp/context-seed', 1, time.now().unix() + 3600)!
+	pkgcore.publish('/tmp/context-repository', 'context-fixture', '/tmp/package-publisher/context-seed', 1, time.now().unix() + 3600)!
 	os.mkdir_all('/etc/vinix-packages')!
 	os.write_file('/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{ architecture: architecture, launch_user: 'alex',
 		policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 } }))!
@@ -118,7 +119,7 @@ fn qualify_package_context(mut t Test) ! {
 		os.write_file('/tmp/context-manifest.json', json2.encode(p))!
 		pkgcore.pack('/tmp/context-manifest.json', if p.id == 'sdk-leased' { '/tmp/context-assets' } else { '/tmp/context-source' }, '/tmp/context-repository')!
 	}
-	pkgcore.publish('/tmp/context-repository', 'context-fixture', '/tmp/context-seed', 2, time.now().unix() + 3600)!
+	pkgcore.publish('/tmp/context-repository', 'context-fixture', '/tmp/package-publisher/context-seed', 2, time.now().unix() + 3600)!
 	package_success(['--offline', 'update'])!
 	reviewed_package_operation('upgrade', [])!
 	assert_package_context('sdk-native', architecture)!

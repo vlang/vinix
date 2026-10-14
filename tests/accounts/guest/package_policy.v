@@ -134,7 +134,7 @@ fn qualify_package_enforcement(mut t Test) ! {
 		source := if package.id == 'leased' { '/tmp/package-assets' } else { '/tmp/package-source' }
 		pkgcore.pack('/tmp/package-manifest.json', source, '/tmp/package-repository')!
 	}
-	pkgcore.publish('/tmp/package-repository', 'fixture', '/tmp/package-signing-seed', 2, time.now().unix() + 3600)!
+	pkgcore.publish('/tmp/package-repository', 'fixture', '/tmp/package-publisher/package-signing-seed', 2, time.now().unix() + 3600)!
 	package_success(['update'])!
 	package_success(['install', 'restricted', 'no-network', 'network', 'no-fork', 'leased', 'process'])!
 	assert package_success(['run', 'restricted'])!.contains('PACKAGE FILES')
@@ -187,7 +187,7 @@ fn qualify_package_enforcement(mut t Test) ! {
 	pkgcore.pack('/tmp/package-manifest.json', '/tmp/package-assets', '/tmp/package-repository')!
 	os.write_file('/tmp/package-manifest.json', json2.encode(pkgcore.Package{ ...packages[5], version: '2.0.0' }))!
 	pkgcore.pack('/tmp/package-manifest.json', '/tmp/package-source', '/tmp/package-repository')!
-	pkgcore.publish('/tmp/package-repository', 'fixture', '/tmp/package-signing-seed', 3, time.now().unix() + 3600)!
+	pkgcore.publish('/tmp/package-repository', 'fixture', '/tmp/package-publisher/package-signing-seed', 3, time.now().unix() + 3600)!
 	package_success(['update'])!
 	package_success(['upgrade'])!
 	upgraded := pkgcore.read_state('/var/lib/vinix-packages', config.architecture)!

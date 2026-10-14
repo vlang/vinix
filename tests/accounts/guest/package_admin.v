@@ -29,8 +29,9 @@ fn qualify_package_admin(mut t Test) ! {
 	os.write_file(manifest, json2.encode(pkgcore.Package{ id: 'admin-fixture', version: '1.0.0', architecture: 'all',
 		name: 'Administrator fixture', description: 'Signed data only', license: 'MIT', kind: 'data' }))!
 	pkgcore.pack(manifest, root, repository)!
-	key := pkgcore.keygen('/tmp/admin-seed')!
-	pkgcore.publish(repository, 'admin-publisher', '/tmp/admin-seed', 1, time.now().unix() + 3600)!
+	os.mkdir_all('/tmp/package-publisher', mode: 0o700)!
+	key := pkgcore.keygen('/tmp/package-publisher/admin-seed')!
+	pkgcore.publish(repository, 'admin-publisher', '/tmp/package-publisher/admin-seed', 1, time.now().unix() + 3600)!
 	os.mkdir_all('/etc/vinix-packages')!
 	os.write_file('/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{ architecture: architecture,
 		policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 } }))!

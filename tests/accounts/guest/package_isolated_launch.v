@@ -172,8 +172,9 @@ fn qualify_package_isolated_launch(mut t Test) ! {
 			window_protocol: if id == 'isolated-window' { 1 } else { 0 }, permissions: if id == 'isolated-window' { ['display', 'files'] } else { ['files'] } }))!
 		pkgcore.pack(manifest, root, repository)!
 	}
-	key := pkgcore.keygen('/tmp/isolated-seed')!
-	pkgcore.publish(repository, 'isolated-publisher', '/tmp/isolated-seed', 1, time.now().unix() + 3600)!
+	os.mkdir_all('/tmp/package-publisher', mode: 0o700)!
+	key := pkgcore.keygen('/tmp/package-publisher/isolated-seed')!
+	pkgcore.publish(repository, 'isolated-publisher', '/tmp/package-publisher/isolated-seed', 1, time.now().unix() + 3600)!
 	os.mkdir_all('/etc/vinix-packages')!
 	// A conflicting root-desktop identity must never select the caller's account.
 	os.write_file('/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{ architecture: architecture, launch_user: 'sam',

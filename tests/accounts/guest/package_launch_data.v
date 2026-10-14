@@ -38,8 +38,9 @@ fn qualify_package_launch_data(mut t Test) ! {
 	os.write_file('/tmp/launch-data.json', json2.encode(pkgcore.Package{ id: 'launch-data-app', name: 'Launch data fixture',
 		version: '1.0.0', architecture: architecture, kind: 'native', license: 'GPL-2.0-or-later', entrypoint: 'bin/probe' }))!
 	pkgcore.pack('/tmp/launch-data.json', source, repository)!
-	key := pkgcore.keygen('/tmp/launch-data-seed')!
-	pkgcore.publish(repository, 'launch-data', '/tmp/launch-data-seed', 1, time.now().unix() + 3600)!
+	os.mkdir_all('/tmp/package-publisher', mode: 0o700)!
+	key := pkgcore.keygen('/tmp/package-publisher/launch-data-seed')!
+	pkgcore.publish(repository, 'launch-data', '/tmp/package-publisher/launch-data-seed', 1, time.now().unix() + 3600)!
 	os.mkdir_all('/etc/vinix-packages')!
 	os.write_file('/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{ architecture: architecture,
 		launch_user: 'sam', policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 } }))!

@@ -30,7 +30,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  run-terminal ID [ABSOLUTE_FILE...] (terminal standard input/output required)\n' +
 	'  run-window ID [ABSOLUTE_FILE...] (declared native window broker protocol)\n' +
 	'  run-args|run-terminal-args ID [--data-cwd] [--file ABSOLUTE_FILE]... -- [LITERAL_ARGUMENT...]\n' +
-	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
+	'  keygen NEW_SEED_FILE | key-public SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
 	'  pack-catalog CATALOG.json PREPARED_ROOTS NEW_WORKSPACE\n' +
 	'  compose-catalog NEW_LOCK_DIRECTORY PROFILE CATALOG.json [PROFILE CATALOG.json...]\n' +
@@ -98,6 +98,11 @@ fn checked(arguments []string) !int {
 		'keygen' {
 			if names.len != 1 { return error('keygen requires a new signing seed filename') }
 			println(pkgcore.keygen(names[0])!)
+			return 0
+		}
+		'key-public' {
+			if names.len != 1 { return error('key-public requires a private signing seed filename') }
+			println(pkgcore.key_public(names[0])!)
 			return 0
 		}
 		'pack' {

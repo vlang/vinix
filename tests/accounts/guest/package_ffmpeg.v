@@ -34,9 +34,10 @@ fn qualify_package_ffmpeg(mut t Test) ! {
 	workspace := '/tmp/ffmpeg-workspace'
 	catalog := json2.decode[pkgcore.CatalogInfo](package_success(['pack-catalog', profile.catalog, roots, workspace])!)!
 	assert catalog.package_count == 6
-	key := package_success(['keygen', '/tmp/ffmpeg-seed'])!.trim_space()
+	os.mkdir_all('/tmp/package-publisher', mode: 0o700)!
+	key := package_success(['keygen', '/tmp/package-publisher/ffmpeg-seed'])!.trim_space()
 	release := json2.decode[pkgcore.ReleaseInfo](package_success(['publish-release', workspace, 'ffmpeg-fixture',
-		'/tmp/ffmpeg-seed', '1', (time.now().unix() + 3600).str(), '/tmp/ffmpeg-release'])!)!
+		'/tmp/package-publisher/ffmpeg-seed', '1', (time.now().unix() + 3600).str(), '/tmp/ffmpeg-release'])!)!
 	assert release.public_key == key && release.package_count == 6
 	t.say('PACKAGE FFMPEG signed release PASS')
 	os.mkdir_all('/etc/vinix-packages')!

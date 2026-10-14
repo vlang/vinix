@@ -64,7 +64,8 @@ fn qualify_package_session(mut t Test, enforced bool) ! {
 		os.chmod('/usr/bin/vinix-sandbox', 0o755)!
 	}
 	architecture := $if arm64 { 'aarch64' } $else { 'x86_64' }
-	public_key := pkgcore.keygen('/tmp/package-signing-seed')!
+	os.mkdir_all('/tmp/package-publisher', mode: 0o700)!
+	public_key := pkgcore.keygen('/tmp/package-publisher/package-signing-seed')!
 	package := pkgcore.Package{
 		id:           'editor'
 		version:      '1.0.0'
@@ -79,7 +80,7 @@ fn qualify_package_session(mut t Test, enforced bool) ! {
 	}
 	os.write_file('/tmp/package-manifest.json', json2.encode(package))!
 	pkgcore.pack('/tmp/package-manifest.json', '/tmp/package-source', '/tmp/package-repository')!
-	pkgcore.publish('/tmp/package-repository', 'fixture', '/tmp/package-signing-seed', 1, time.now().unix() + 3600)!
+	pkgcore.publish('/tmp/package-repository', 'fixture', '/tmp/package-publisher/package-signing-seed', 1, time.now().unix() + 3600)!
 	config := pkgcore.Config{
 		architecture: architecture
 		launch_user:  'alex'

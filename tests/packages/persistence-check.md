@@ -56,6 +56,15 @@ the exact initial filesystem. This blank formatted image contains no signing
 credentials. See [captured durability qualification](durability-check.md) for
 renewed runs of all three checkpoints on both targets.
 
+`--keygen` instead selects the publisher seed scenario and requires a new
+`--state-dir`. It kills QEMU after the real CLI's `keygen` returns and before any
+extra guest sync or metadata write. Reboot reads the same seed with `key-public`,
+checks its mode/owner/length and rejects a replacement key generation. The
+controller compares the public key in the two serial logs before issuing its
+six-artifact receipt (kernel, initial image, guest, service and two serial logs).
+No host filesystem repair or seed write occurs between boots. See
+[key creation qualification](keygen-check.md) for recorded runs and limits.
+
 All three cases passed on 2026-10-12 on each architecture. Hash receipts:
 [AArch64](results/2026-10-12/persistence-aarch64.json) and
 [x86_64](results/2026-10-12/persistence-x86_64.json).

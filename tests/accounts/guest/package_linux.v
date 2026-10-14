@@ -390,20 +390,21 @@ fn qualify_package_linux(mut t Test) ! {
 	assert !os.exists('/tmp/linux-catalog-changed') && os.ls('/tmp')!.all(!it.starts_with('.vinix-catalog-'))
 	os.write_file_array(prepared + '/bin/probe', catalog_probe_bytes)!
 	t.say('PACKAGE CATALOG pinned-import architecture-closure canonical-workspace refusal-cleanup PASS')
-	key := pkgcore.keygen('/tmp/linux-signing-seed')!
-	pkgcore.publish(repository, 'fixture', '/tmp/linux-signing-seed', 1, time.now().unix() + 3600)!
+	os.mkdir_all('/tmp/package-publisher', mode: 0o700)!
+	key := pkgcore.keygen('/tmp/package-publisher/linux-signing-seed')!
+	pkgcore.publish(repository, 'fixture', '/tmp/package-publisher/linux-signing-seed', 1, time.now().unix() + 3600)!
 	first_index := os.read_file(repository + '/index.json')!
 	first_signature := os.read_file(repository + '/index.sig')!
 	expires := json2.decode[pkgcore.Index](first_index)!.expires
 	release_path := '/tmp/linux-published-release'
 	release := json2.decode[pkgcore.ReleaseInfo](package_success(['publish-release', repository,
-		'fixture', '/tmp/linux-signing-seed', '1', expires.str(), release_path])!)!
+		'fixture', '/tmp/package-publisher/linux-signing-seed', '1', expires.str(), release_path])!)!
 	assert release.package_count == 2 && release.public_key == key && release.sequence == 1
 	assert os.read_file(release_path + '/index.json')! == first_index
 	assert os.read_file(release_path + '/index.sig')! == first_signature
 	assert os.ls(release_path)!.len == 3 && !os.exists(release_path + '/manifests') && !os.exists(release_path + '/.publisher')
 	forked_release := run(['/usr/bin/vinix-package', 'publish-release', repository, 'fixture',
-		'/tmp/linux-signing-seed', '1', (expires + 1).str(), '/tmp/linux-forked-release'], '', none, none)
+		'/tmp/package-publisher/linux-signing-seed', '1', (expires + 1).str(), '/tmp/linux-forked-release'], '', none, none)
 	assert forked_release.status != 0 && forked_release.output.contains('sequence equivocation'), forked_release.output
 	assert !os.exists('/tmp/linux-forked-release') && os.ls('/tmp')!.all(!it.starts_with('.vinix-release-'))
 	release_root := '/tmp/release-client'
@@ -576,6 +577,10 @@ fn qualify_package_linux(mut t Test) ! {
 	durability_check := run(['/usr/share/package-fixtures/durability-check', '/tmp/package-durability-contract'], '', none, none)
 	assert durability_check.status == 0, durability_check.output
 	t.say('PACKAGE DURABILITY captured-files captured-directories alias-special-nul-refusal ordinary-retry PASS')
+	keygen_check := run(['/usr/share/package-fixtures/keygen-check', '/tmp/package-keygen-contract'], '', none, none)
+	assert keygen_check.status == 0, keygen_check.output
+	assert run(['/usr/bin/vinix-package', 'key-public', '/tmp/package-keygen-contract/ordinary'], '', none, none).status == 0
+	t.say('PACKAGE KEYGEN captured-parent private-exclusive-publication unsafe-path-refusal public-key-recovery PASS')
 	// Organization restrictions are reviewed and atomically persisted without
 	// editing trust, the account selection or the installed generation.
 	policy_path := '/tmp/organization-policy.json'
@@ -648,7 +653,7 @@ fn qualify_package_linux(mut t Test) ! {
 	}
 	os.write_file('/tmp/linux-recipe.json', json2.encode(broken_recipe))!
 	package_success(['pack-root', '/tmp/linux-recipe.json', prepared, repository])!
-	pkgcore.publish(repository, 'fixture', '/tmp/linux-signing-seed', 2, time.now().unix() + 3600)!
+	pkgcore.publish(repository, 'fixture', '/tmp/package-publisher/linux-signing-seed', 2, time.now().unix() + 3600)!
 	latest_index := os.read_file(repository + '/index.json')!
 	latest_signature := os.read_file(repository + '/index.sig')!
 	package_success(['update'])!

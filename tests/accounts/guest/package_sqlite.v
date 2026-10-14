@@ -71,7 +71,8 @@ fn qualify_sqlite_terminal(mut t Test, architecture string) ! {
 fn qualify_package_sqlite(mut t Test) ! {
 	t.make_accounts()
 	architecture := $if arm64 { 'aarch64' } $else { 'x86_64' }
-	key := package_success(['keygen', '/tmp/sqlite-seed'])!.trim_space()
+	os.mkdir_all('/tmp/package-publisher', mode: 0o700)!
+	key := package_success(['keygen', '/tmp/package-publisher/sqlite-seed'])!.trim_space()
 	expires := time.now().unix() + 3600
 	for i, variant in ['base', 'math'] {
 		roots := '/usr/share/sqlite-fixtures/' + variant
@@ -82,7 +83,7 @@ fn qualify_package_sqlite(mut t Test) ! {
 		catalog := json2.decode[pkgcore.CatalogInfo](package_success(['pack-catalog', profile.catalog, roots, workspace])!)!
 		assert catalog.package_count == 4
 		pub_result := json2.decode[pkgcore.ReleaseInfo](package_success(['publish-release', workspace,
-			'sqlite-fixture', '/tmp/sqlite-seed', (i + 1).str(), expires.str(), '/tmp/sqlite-release-' + variant])!)!
+			'sqlite-fixture', '/tmp/package-publisher/sqlite-seed', (i + 1).str(), expires.str(), '/tmp/sqlite-release-' + variant])!)!
 		assert pub_result.public_key == key && pub_result.package_count == 4
 	}
 	os.mkdir_all('/etc/vinix-packages')!

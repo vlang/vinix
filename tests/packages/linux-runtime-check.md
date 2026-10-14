@@ -105,6 +105,12 @@ deterministic name/size changes, interrupted/error flushes and descriptor checks
 the ext2 controller separately exercises all three completed crash checkpoints.
 See [durability qualification](durability-check.md).
 
+`PACKAGE KEYGEN` adds the target key-creation probe and CLI public-key recovery.
+It refuses aliased/shared-writable parents, NUL paths and all existing leaves,
+then creates an ordinary private seed successfully. The current receipt pins
+sixteen artifacts/logs, including this probe. See
+[key creation qualification](keygen-check.md).
+
 The scenario passed on both targets on 2026-10-12 using an isolated build of
 committed kernel revision `7ac619bd`. Retained receipts and complete serial logs:
 [AArch64 receipt](results/2026-10-12/linux-aarch64.json),

@@ -93,6 +93,9 @@ fn check() ! {
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/durability-check', repository + '/tests/packages/durability-check.v'])!
 		run(work + '/durability-check', [work + '/durability'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/keygen-check', repository + '/tests/packages/keygen-check.v'])!
+		run(work + '/keygen-check', [work + '/keygen'])!
 		run(v, [...helper_flags, '-o', work + '/terminal-check', repository + '/tests/packages/terminal-check.v'])!
 		run(work + '/terminal-check', [])!
 	}

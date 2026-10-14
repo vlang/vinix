@@ -1,0 +1,4 @@
+PASS public-key comparison accepts matching CRLF/plain serial logs
+PASS public-key comparison refuses changed keys and missing recovery markers
+PASS public-key comparison refuses non-hex key material
+PASS default transaction scenarios and explicit keygen selector remain separate

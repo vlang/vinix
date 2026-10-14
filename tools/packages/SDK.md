@@ -111,7 +111,31 @@ v -path '@vlib|@vmodules|.|tools/accounts' -o /tmp/vinix-package tools/packages/
 ```
 
 `keygen` prints the lowercase-hex public key and creates a mode-0600, 32-byte
-signing seed encoded as hex. Keep it outside repositories/deployment images.
+signing seed encoded as 64 lowercase hex digits and a newline. Its parent must
+already be an ordinary directory owned by the publisher, without group/other
+write access. Empty/NUL paths, invalid leaf names and a symlink at the parent
+directory's final component (including redundant trailing separators) refuse
+before creation. Keep the seed outside repositories/deployment images.
+
+The service captures that directory, exclusively creates a private temporary
+file, handles short/interrupted writes, checks its identity/type/owner/mode/link
+count/length, and retries interrupted flushes. It then publishes with exclusive
+atomic rename and flushes the captured parent. An existing or raced destination
+is never replaced, including aliases and special files. Normal failures before
+publication remove only the still-matching temporary; cleanup cannot remove a
+replacement. Storage failure or abrupt termination can leave an unpublished
+mode-0600 `.package-key-*.tmp`; inspect the owned directory before retrying.
+
+A failure after publication explicitly says **signing seed saved**. Preserve
+that seed and inspect its path and storage before retrying. After verifying
+the ordinary private file, `vinix-package key-public SEED_FILE` prints its existing
+public key without creating a new key or modifying the seed. It uses the same
+captured, private, bounded seed admission as publishing; it accepts no public,
+aliased, foreign-owned or hard-linked seed. No administrative transport exposes
+these publisher commands. Controlled ancestors remain required, and arbitrary
+same-user in-place edits and physical-device write-cache loss are not frozen or
+qualified. See [key creation qualification](../../tests/packages/keygen-check.md).
+
 Distribute the public key through an authenticated channel. Upload objects first,
 then switch the web server to the complete new repository directory. Never change
 content at an existing hash. Increase sequence for every index change, including

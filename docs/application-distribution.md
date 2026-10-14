@@ -43,6 +43,13 @@ seed-payload exclusion use the same bytes. Unsafe inputs refuse without changing
 their contents or publishing an index; restoring a valid seed permits retry.
 See [signing seed qualification](../tests/packages/signing-seed-check.md).
 
+Publisher key generation captures an owned parent without shared write access,
+writes and flushes a private temporary, publishes it exclusively and flushes the
+captured directory. Failed writes retain existing files; a failure after
+publication explicitly reports that the seed was saved. `key-public` recovers that
+seed's public key without replacing it or granting publisher trust. See
+[key creation qualification](../tests/packages/keygen-check.md).
+
 File and directory flushes also use captured nonblocking, no-follow descriptors.
 They require the correct type, check the named device/inode before and after
 `fsync`, and require unchanged file sizes. Interrupted flushes retry; changed

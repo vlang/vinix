@@ -113,6 +113,13 @@ Both publishing commands read one captured private signing seed, bounded to
 must agree before signing. Release secret exclusion uses that same capture.
 See [signing seed qualification](../../tests/packages/signing-seed-check.md).
 
+`keygen NEW_SEED_FILE` now captures an owned parent without shared write access,
+writes and flushes a private temporary, exclusively publishes the new seed and flushes
+that parent. Existing/raced destinations are preserved. Post-publication failures
+identify the saved seed; `key-public SEED_FILE` recovers its public key through
+the normal private-seed reader without changing it. See
+[key creation qualification](../../tests/packages/keygen-check.md).
+
 File and directory durability helpers capture nonblocking, no-follow descriptors,
 check their types and named identities, and retry interrupted flushes. A changed
 target refuses with storage/state diagnostics. See

@@ -378,6 +378,15 @@ fn qualify(binary string) ! {
 	key := success(binary, ['keygen', work + '/seed'])!.trim_space()
 	assert key.len == 64
 	assert os.stat(work + '/seed')!.mode & 0o777 == 0o600
+	seed_text := os.read_file(work + '/seed')!
+	assert success(binary, ['key-public', work + '/seed'])!.trim_space() == key
+	assert command(binary, ['keygen', work + '/seed'])!.code == 1
+	assert command(binary, ['key-public'])!.code == 1
+	os.chmod(work + '/seed', 0o644)!
+	assert command(binary, ['key-public', work + '/seed'])!.code == 1
+	os.chmod(work + '/seed', 0o600)!
+	assert success(binary, ['key-public', work + '/seed'])!.trim_space() == key && os.read_file(work + '/seed')! == seed_text
+	println('Package CLI: durable private key creation, existing-seed refusal and read-only public-key recovery passed')
 	root_args := ['--root', work + '/root']
 	repository := work + '/repository'
 	config := pkgcore.Config{ architecture: 'aarch64', policy: pkgcore.Policy{ reserve_bytes: 0 } }

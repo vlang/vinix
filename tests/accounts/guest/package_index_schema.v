@@ -34,7 +34,7 @@ fn qualify_package_index_case(mut t Test, index int) ! {
 	workspace := '/tmp/admin-repository'
 	text := os.read_file(workspace + '/index.json')!
 	original_signature := os.read_file(workspace + '/index.sig')!
-	seed := hex.decode(os.read_file('/tmp/admin-seed')!.trim_space())!
+	seed := hex.decode(os.read_file('/tmp/package-publisher/admin-seed')!.trim_space())!
 	private_key := signing.new_key_from_seed(seed)
 	repository := pkgcore.load_config('')!.repositories[0]
 	broken := [text.replace('"sequence":1', '"sequence":2,"sequ\\u0065nce":2'),

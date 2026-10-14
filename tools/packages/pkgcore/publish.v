@@ -57,19 +57,6 @@ pub fn pack(manifest string, source string, repository string) !Package {
 	return p
 }
 
-pub fn keygen(path string) !string {
-	if os.exists(path) || os.is_link(path) { return error('signing seed file already exists') }
-	public_key, private_key := ed25519.generate_key()!
-	fd := C.open(path.str, C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_NOFOLLOW | C.O_CLOEXEC, 0o600)
-	if fd < 0 { return error('cannot exclusively create signing seed') }
-	defer { C.close(fd) }
-	text := private_key.seed().hex() + '\n'
-	if C.write(fd, text.str, usize(text.len)) != text.len || C.fsync(fd) != 0 {
-		return error('cannot write/flush signing seed')
-	}
-	return public_key.hex()
-}
-
 fn publication(repository string, id string, seed_path string, sequence u64, expires i64) !(Index, string, string, string) {
 	seed := read_signing_seed(seed_path, SigningSeedOptions{})!
 	defer { seed.close() }

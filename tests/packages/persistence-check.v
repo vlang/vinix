@@ -58,10 +58,37 @@ fn persistence_suite(image string) hwhost.Suite {
 	}
 }
 
+fn keygen_persistence_suite(image string) hwhost.Suite {
+	base := persistence_suite(image)
+	return hwhost.Suite{ ...base, name: 'package-keygen-persistence', scenarios: [hwhost.Scenario{
+		...base.scenarios[0]
+		name: 'packages-keygen'
+		about: 'SIGKILL after keygen returns, recover the same seed without any extra guest sync'
+		required: ['HWTEST START packages-keygen', 'PACKAGE KEYGEN PUBLIC', 'PACKAGE CUT keygen', 'PACKAGE KEYGEN RECOVERY', 'HWTEST PASS packages-keygen']
+		forbidden: ['V panic:', 'HWTEST FAIL']
+		reboots: [hwhost.Reboot{ power_cut_after: 'PACKAGE CUT keygen' }]
+	}] }
+}
+
+fn check_recovered_key(directory string) ! {
+	first := os.read_file(directory + '/packages-keygen/serial.log')!
+	second := os.read_file(directory + '/packages-keygen/serial-2.log')!
+	key := first.all_after('PACKAGE KEYGEN PUBLIC ').all_before('\n').trim_space()
+	if key.len != 64 || !key.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`))
+		|| !second.contains('PACKAGE KEYGEN RECOVERY ' + key + ' private-file existing-refusal unchanged-content PASS') {
+		return error('recovered publisher public key differs from the successful pre-cut keygen result')
+	}
+}
+
 fn persistence_check() !int {
-	args := os.args[1..]
+	keygen := '--keygen' in os.args[1..]
+	args := os.args[1..].filter(it != '--keygen')
 	options := hwhost.parse_options(args)!
-	if options.help || options.list { return hwhost.run_suite(persistence_suite(''), args, @FILE) }
+	if options.help || options.list {
+		if options.help { println('--keygen selects publisher seed cut/recovery (requires --state-dir); default tests package transactions') }
+		return hwhost.run_suite(if keygen { keygen_persistence_suite('') } else { persistence_suite('') }, args, @FILE)
+	}
+	if keygen && options.state_dir == '' { return error('--keygen requires --state-dir to compare both serial public keys') }
 	if !os.is_file(options.kernel) { return error('--kernel is not a file: ${options.kernel}') }
 	work := os.temp_dir() + '/vinix-package-persistence-' + os.getpid().str()
 	os.mkdir_all(work)!
@@ -76,9 +103,10 @@ fn persistence_check() !int {
 	}
 	hwhost.run_tool([tool, '-q', '-F', '-t', 'ext2', '-b', '4096', '-I', '128', '-m', '0', '-O',
 		'none,filetype,sparse_super,large_file', image], map[string]string{}, work + '/format.log', 60)!
-	suite := persistence_suite(image)
+	suite := if keygen { keygen_persistence_suite(image) } else { persistence_suite(image) }
 	status := hwhost.run_suite(suite, [...args, '--kernel', kernel], @FILE)
 	if status == 0 && options.state_dir != '' {
+		if keygen { check_recovered_key(options.state_dir)! }
 		// Retain the exact formatted input whose digest the receipt records.
 		os.cp(image, options.state_dir + '/initial.ext2')!
 		selected := hwhost.select_scenarios(suite.scenarios, options.arch, options.scenarios)!.run
