@@ -4,6 +4,7 @@ module main
 @[heap]
 struct DispatchQueue {
 mut:
+	isa u64 // Opaque ObjC header; scheduler state follows it in private storage.
 	identity u64
 	label &char = unsafe { nil }
 	target &DispatchQueue = unsafe { nil }
@@ -43,6 +44,7 @@ mut:
 	worker_count int
 	sequence u64
 	stopping bool
+	objc_classes [3]u64 // Main, serial and global, published before guest use.
 }
 
 __global dispatch_runtime = unsafe { &DispatchRuntime(nil) }
@@ -59,15 +61,19 @@ fn dispatch_start() {
 		|| C.ios_key_create(unsafe { &dispatch_runtime.key }, unsafe { nil }) != 0 {
 		panic('iOS: cannot initialize dispatch scheduler')
 	}
+	dispatch_objc_publish_classes()
 	mut queue := dispatch_queue_allocate(c'com.apple.main-thread')
 	queue.identity = darwin_dispatch_get_main_queue()
 	queue.main = true
 	queue.immortal = true
+	queue.isa = dispatch_runtime.objc_classes[0]
+	unsafe { *(&u64(queue.identity)) = queue.isa }
 	dispatch_runtime.queues[queue.identity] = queue
 }
 
 fn dispatch_queue_allocate(label &char) &DispatchQueue {
 	mut queue := &DispatchQueue{}
+	queue.isa = dispatch_runtime.objc_classes[1]
 	length := if label == unsafe { nil } { usize(0) } else { darwin_strlen(label) }
 	queue.label = unsafe { &char(C.calloc(1, length + 1)) }
 	if queue.label == unsafe { nil } { panic('iOS: cannot copy dispatch queue label') }
@@ -94,6 +100,7 @@ fn dispatch_global_locked(index int) &DispatchQueue {
 	mut queue := dispatch_queue_allocate(label)
 	queue.concurrent = true
 	queue.immortal = true
+	queue.isa = dispatch_runtime.objc_classes[2]
 	dispatch_runtime.globals[index] = queue.identity
 	dispatch_runtime.queues[queue.identity] = queue
 	return queue
@@ -156,7 +163,7 @@ fn darwin_dispatch_retain(identity u64) {
 
 // Apple blocks may capture a dispatch queue as an Objective-C object. These
 // queues have private V storage, so retain/release must not inspect ObjHeader.
-// This does not advertise OS_dispatch_queue classes or other ObjC methods.
+// The queue's isa supports class queries; ownership still uses this registry.
 fn dispatch_objc_is_queue(identity u64) bool {
 	if dispatch_runtime == unsafe { nil } { return false }
 	C.pthread_mutex_lock(dispatch_runtime.mutex)

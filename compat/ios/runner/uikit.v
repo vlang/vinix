@@ -73,6 +73,9 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 		return 0
 	}
 	selector := ctext(frame.x[1])
+	if dispatch_objc_is_queue(object) && ios_runtime.swift_concurrency_retired {
+		panic('iOS: dispatch queue messages outside Objective-C runtime lifetime')
+	}
 	if is_block(object) {
 		if !foundation_dispatch(object, selector, mut frame) {
 			panic('iOS: unsupported block message')
@@ -92,6 +95,7 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 }
 
 fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
+	if dispatch_objc_dispatch(object,selector,mut frame) { return true }
 	if ns_pool_dispatch(object, selector, mut frame) { return true }
 	if layout_dispatch(object, selector, mut frame) { return true }
 	if json_dispatch(object, selector, mut frame) { return true }

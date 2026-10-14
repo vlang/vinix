@@ -83,6 +83,7 @@ fn objc_record_method(cls u64, name &char, imp u64, types &char, builtin bool) &
 fn C.ios_objc_builtin()
 fn objc_builtin_types(cls u64, selector string) ?string {
 	info := ios_runtime.classes[cls] or { return none }
+	if types := dispatch_objc_types(info.name,info.meta,selector) { return types }
 	if types := ns_pool_types(info.name, info.meta, selector) { return types }
 	if types := layout_builtin_types(info.name, info.meta, selector) { return types }
 	if types := json_builtin_types(info.name, info.meta, selector) { return types }
@@ -128,6 +129,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if current == 0 { return 0 }
 		info := ios_runtime.classes[current] or { return 0 }
 		if method := info.method_info[name] { return u64(method) }
+		if !info.meta && dispatch_objc_name(info.name) && dispatch_objc_types(info.name,false,name) == none { return 0 }
 		if !info.meta && info.name == 'NSAutoreleasePool' && name in ['copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }
 		if !info.meta && info.name == 'NSFileManager' && name in ['copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }
 		if !info.meta && info.name == 'NSInputStream' && name in ['init', 'copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }
@@ -247,6 +249,8 @@ fn objc_dispose_class(cls u64) {
 }
 fn objc_set_class(object u64, cls u64) u64 {
 	if object == 0 { return 0 }
+	dispatch_objc_allocation_checked(cls) or { panic(err) }
+	if dispatch_objc_is_queue(object) { panic('iOS: dispatch queue isa replacement is unsupported') }
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if object in ios_runtime.classes || object in ios_runtime.constants { panic('iOS: changing a class or constant string isa is not implemented') }

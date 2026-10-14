@@ -40,6 +40,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	if address := core_foundation_symbol(symbol) { return address }
 	for prefix in ['_OBJC_CLASS_$_', '_OBJC_METACLASS_$_'] {
 		if symbol.starts_with(prefix) {
+			if _ := dispatch_objc_import_name(symbol) { return none }
 			cls := ios_runtime.names[symbol[prefix.len..]] or { return none }
 			return if prefix == '_OBJC_CLASS_$_' { cls } else { read64(cls) }
 		}

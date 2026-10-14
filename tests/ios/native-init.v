@@ -79,6 +79,7 @@ fn main() {
 		require_child('/opt/ios/inputstream-checks')
 		require_child('/opt/ios/connection-checks')
 		require_child('/opt/ios/type-encoding-checks')
+		require_child('/opt/ios/dispatch-queue-class-checks')
 		require_child('/opt/ios/oslog-checks')
 		require_child('/opt/ios/secure-memory-checks')
 		require_child('/opt/ios/objc-storage-checks')
@@ -178,6 +179,7 @@ fn main() {
 			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg', 'void', 'version', 'initializer', 'set-algebra', 'raw-copy', 'pointer-alloc', 'pointer-deinit', 'raw-alloc', 'dispatch-async', 'dispatch-main', 'dispatch-scheduler', 'dispatch-qos', 'dispatch-algebra', 'dispatch-flags', 'stack', 'heap', 'error-bridge', 'error', 'error-value', 'dynamic-cast', 'objc-cast', 'foreign-metadata', 'object-type', 'mangled-state', 'mangled', 'witness', 'once', 'set-bridge', 'logger', 'main-actor-witness', 'main-actor', 'nsobject-hashable', 'objc-bool-metadata', 'objc-bool', 'actor-executor', 'task-priority', 'task-alloc', 'task-create', 'task-switch', 'nslog', 'string-unbridge', 'error-description'] {
 			require_child('/opt/ios/swift-' + name + '-checks')
 		}
+		require_child('/opt/ios/dispatch-queue-class-checks')
 		println('VINIX iOS SWIFT: PASS')
 		C.fflush(unsafe { nil })
 	} else {

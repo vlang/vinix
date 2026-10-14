@@ -325,7 +325,7 @@ fn objc_start() {
 	ios_runtime.observers.flags |= .noslices
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
-	for name in ['NSObject', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
+	for name in ['NSObject', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
@@ -344,6 +344,11 @@ fn objc_start() {
 		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor', 'VinixCGImage', 'VinixCGDataProvider', 'VinixSecCertificate', 'VinixSecKey', 'VinixSecPolicy', 'VinixSecTrust', 'VinixCFDate', 'VinixCFError'] {
 		parent := match name {
 			'NSObject' { u64(0) }
+			'OS_dispatch_object' { ios_runtime.names['OS_object'] }
+			'OS_dispatch_queue' { ios_runtime.names['OS_dispatch_object'] }
+			'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_global' { ios_runtime.names['OS_dispatch_queue'] }
+			'OS_dispatch_queue_serial' { ios_runtime.names['OS_dispatch_queue_serial_executor'] }
+			'OS_dispatch_queue_main' { ios_runtime.names['OS_dispatch_queue_serial'] }
 			'VinixCFDate' { ios_runtime.names['NSDate'] }
 			'NSInputStream' { ios_runtime.names['NSStream'] }
 			'NSNumber', 'NSConcreteValue' { ios_runtime.names['NSValue'] }
@@ -378,6 +383,7 @@ fn objc_start() {
 		metaclass.isa = if parent == 0 { meta } else { read64(parent) }
 		metaclass.parent = if parent == 0 { u64(cls) } else { read64(parent) }
 		size := match name {
+			'OS_object', 'OS_dispatch_object', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global' { u32(8) }
 			'NSConstantDictionary' { u32(40) }
 			'NSConcreteValue' { u32(24) }
 			'NSError' { u32(sizeof(AbiNSError)) }
@@ -409,6 +415,7 @@ fn objc_start() {
 		ios_runtime.classes[meta] = &ObjClass{ name: name, parent: metaclass.parent, size: 40, meta: true }
 		ios_runtime.names[name] = u64(cls)
 	}
+	dispatch_objc_publish_classes()
 	mut root := ios_runtime.classes[ios_runtime.names['NSObject']] or { panic('iOS: missing NSObject') }
 	root.ivars['isa'] = &ObjIvar{name: 'isa'.clone(), types: '#'.clone(), offset: 0, size: 8}
 	mut dictionary := ios_runtime.classes[ios_runtime.names['NSConstantDictionary']] or { panic('iOS: missing constant dictionary class') }
@@ -461,6 +468,7 @@ fn obj_header(object u64) &ObjHeader {
 }
 
 fn objc_allocate(cls u64) u64 {
+	dispatch_objc_allocation_checked(cls) or { panic(err) }
 	if connection_family(cls) && cls != ios_runtime.names['NSURLConnection'] { panic('iOS: custom connection subclass construction is not implemented') }
 	ns_input_stream_require_class(cls)
 	ns_pool_require_class(cls)
@@ -692,6 +700,7 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		}
 	}
 	if library == '/usr/lib/libSystem.B.dylib' {
+		if address := dispatch_objc_symbol(symbol) { return address }
 		if address := system_data_symbol(symbol) { return address }
 		if address := block_symbol(symbol) { return address }
 		if symbol == '_strtod' { return u64(unsafe { voidptr(C.strtod) }) }
@@ -751,6 +760,7 @@ fn runtime_symbol(library string, symbol string) !u64 {
 	if symbol == '_CGAffineTransformIdentity' { return u64(unsafe { &ios_runtime.transform[0] }) }
 	for prefix in ['_OBJC_CLASS_$_', '_OBJC_METACLASS_$_'] {
 		if symbol.starts_with(prefix) {
+			if _ := dispatch_objc_import_name(symbol) { return error('iOS: dispatch class import requires libSystem or libobjc') }
 			cls := ios_runtime.names[symbol[prefix.len..]] or { break }
 			return if prefix == '_OBJC_CLASS_$_' { cls } else { read64(cls) }
 		}

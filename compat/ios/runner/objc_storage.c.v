@@ -2,6 +2,7 @@
 module main
 
 fn objc_install_storage(cls u64, object u64, caller_storage bool) {
+	dispatch_objc_allocation_checked(cls) or { panic(err) }
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	info := ios_runtime.classes[cls] or { panic('iOS: construction of an unknown class') }

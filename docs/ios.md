@@ -5851,22 +5851,64 @@ failures and a class-reference address calculation failure are retained
 separately. Full iOS regression remains unpassed and published runners remain
 unchanged.
 
-The actual IPA startup probe passes the Set bridge import and exits with
+The Set bridge's IPA startup probe passed that import and exited with
 status 1 at MarketplaceKitWrapper's required `_OBJC_CLASS_$_OS_dispatch_queue`
-from `/usr/lib/libSystem.B.dylib`. Fortnite has not entered application code
-and remains unplayable.
+from `/usr/lib/libSystem.B.dylib`.
+
+Dispatch queues now expose the required libSystem class identity, its
+OS_dispatch_object/OS_object/NSObject ancestors, and the observed native
+main/serial/global subclass hierarchy. Native runtime queries and Swift
+metadata calls establish eight-byte public isa layouts and canonical ObjC
+wrapper metadata. Vinix gives its existing scheduler-owned queues an isa;
+their reference count, jobs, labels and destruction remain in the scheduler.
+Class/self/superclass, ancestry/equality/hash queries, retain/release,
+retainCount and autorelease messages use that storage. Existing Swift wrapper
+value witnesses and DispatchQueue.main operate on the same owners. Class
+lookup uses static names, and class imports resolve through libSystem or
+libobjc. Generic allocation, caller-storage construction and isa changes
+reject the dispatch family and subclasses before changing storage. Queue
+copy/init and messages after Objective-C teardown also fail explicitly.
+Descriptions, weak references, queue borrowing through Swift dynamic casts
+or NSObject Hashable collections, serial-executor conformances and other
+dispatch object families remain outside this profile.
+
+Twelve final ASan/UBSan runs and six ARM64 guest suites pass across queue
+classes, Dispatch main/async, unknown-object ownership, foreign metadata and
+ObjC casts. Native differential checks cover physical/metaclass ancestry,
+canonical wrappers, real main/serial/global queue identities, class-typed
+getter ABI with preserved x20/x21 and protected x8, value-witness ARC and
+eight concurrent readers. Vinix also checks autorelease ownership, guarded
+foreign lookup, both initialization orders and two drained lifetimes. Fifteen
+final generated C streams/executables and joined probe/audit evidence are
+retained under `build/ios/fortnite/dispatch-queue-class-checks`. The first smoke
+failure caught Foundation's generic class resolver accepting the new libSystem
+class; native checks passed before that V assertion. The corrected resolver
+restricts that import. A native discovery failure records assuming Darwin's
+inline main-queue accessor was a dynamic function; the corrected helper reads
+the actual `_dispatch_main_q` export. An LLVM inspector compile failure is
+retained separately. The first complete passing cohort is also preserved;
+final builds include the allocation-free symbol matcher and the additional
+initialization-order checks. Full iOS regression remains unpassed and
+published runners remain unchanged.
+
+Two more strong imports resolve, and both bundled frameworks have zero
+unresolved strong imports in the C++/GLES/Text audit. The actual IPA startup
+probe passes their binding and exits with status 1 in the main executable at
+Foundation's required
+`_$s10Foundation10CocoaErrorV19fileWriteFileExistsAC4CodeVvgZ`. Fortnite has
+not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,475 | 685 | 79 |
+| Fortnite executable | 1,476 | 684 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 175 | 1 | 23 |
-| All images | 2,309 | 689 | 120 |
+| MarketplaceKitWrapper | 176 | 0 | 23 |
+| All images | 2,311 | 687 | 120 |
 
-The C++/GLES/Text variant reports 2,322 resolved imports, 676 unresolved strong
+The C++/GLES/Text variant reports 2,324 resolved imports, 674 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
