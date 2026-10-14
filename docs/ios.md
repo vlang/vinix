@@ -5380,22 +5380,66 @@ C streams/executables, native SDK/LLVM references, actual IPA caller instruction
 generated-C allocation/ownership checks and IPA probe/audits are retained under
 `build/ios/fortnite/stack-checks`; full iOS regression remains unpassed.
 
-The supplied IPA gets past the stack initializer import and exits with status 1
-at MarketplaceKitWrapper's required DispatchWorkItemFlags metadata accessor,
-`_$s8Dispatch0A13WorkItemFlagsVMa`, in `/usr/lib/swift/libswiftDispatch.dylib`.
-Fortnite has not entered application code and remains unplayable.
+Swift Dispatch exports the DispatchWorkItemFlags metadata accessor and nominal
+descriptor, `_$s8Dispatch0A13WorkItemFlagsVMa` and
+`_$s8Dispatch0A13WorkItemFlagsVMn`. The installed runtime and SDK expose one
+8-byte UInt field at offset zero, POD/inline value witnesses, no extra
+inhabitants and a complete metadata response in `x0`/`x1`. Copies, takes and
+assignments preserve the word; destruction performs no reads or ownership
+work. Its single-payload tag store writes a nonzero tag's payload even with
+zero empty cases, and writes the extra tag byte only with nonzero empty cases.
+
+Vinix keeps this nominal identity distinct from Int and resolves both exports
+only in `/usr/lib/swift/libswiftDispatch.dylib`. One runtime-owned adjacent
+two-page arena contains an RX accessor and read-only metadata, witnesses and
+Dispatch module/type descriptors. Publication follows both page protections
+under the runtime lock. The complete accessor ignores its request, including
+the tested all-ones request, and the existing symbolic metadata lookup reuses
+its descriptor. The descriptor has the measured field offset and its accessor;
+field reflection and native descriptor initialization extensions are omitted.
+SetAlgebra/OptionSet/RawRepresentable conformances, flags constructors and
+constants, DispatchQoS and Swift queue adapters remain unsupported.
+
+The caller borrows metadata and accessor pointers through the active runtime
+lifetime. Shutdown requires users and callbacks to have drained; it marks
+resolution retired, unmaps the arena and clears its pointer. Resolution before
+startup or after teardown rejects. Cached pointers must not be invoked after retirement.
+MarketplaceKitWrapper has eleven inspected calls to the accessor, including
+Array allocation and SetAlgebra witness lookup helpers; this metadata change
+does not implement those helpers' complete behavior.
+
+Ten fresh ASan/UBSan runs and five ARM64 Vinix suites pass across Dispatch flags,
+String metadata, Array, mangled lookup and metadata-state lookup. Native/V
+comparisons cover pointer/state returns, seven request forms, preserved
+`x20`/`x21`, descriptor and witness layout, guarded copy/take/self-assignment,
+protected eight-byte payloads and unused metadata, no-op destruction, enum
+tag/payload bounds, UInt32 wrapping and canonical indirect symbolic lookup.
+V additionally checks eight concurrent resolvers, exact library/export spelling,
+RX/RO protections, unsupported exports before allocation and two drained,
+unmapped lifetimes. Generated C verifies one arena allocation, both protections
+before publication, failure/shutdown cleanup, static borrowed errors and POD
+witnesses without extra allocation, ARC, locks or metadata reads. Thirteen C
+streams/executables, SDK/LLVM references, actual IPA call sites, retained helper
+and guard-expectation trials and IPA probe/audits are under
+`build/ios/fortnite/dispatch-flags-checks`; full iOS regression remains unpassed.
+
+The supplied IPA gets past both flags metadata imports and exits with status 1
+at MarketplaceKitWrapper's required SetAlgebra conformance record,
+`_$s8Dispatch0A13WorkItemFlagsVs10SetAlgebraAAMc`, in
+`/usr/lib/swift/libswiftDispatch.dylib`. Fortnite has not entered application
+code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,465 | 695 | 79 |
+| Fortnite executable | 1,467 | 693 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 159 | 17 | 23 |
-| All images | 2,283 | 715 | 120 |
+| MarketplaceKitWrapper | 161 | 15 | 23 |
+| All images | 2,287 | 711 | 120 |
 
-The C++/GLES/Text variant reports 2,296 resolved imports, 702 unresolved strong
+The C++/GLES/Text variant reports 2,300 resolved imports, 698 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -210,6 +210,8 @@ mut:
 	swift_set_metadata map[u64]SwiftSetType // Sealed specialization page -> exact Element/Hashable pair.
 	swift_empty_set u64 // Immutable native empty singleton; retired with Set records.
 	swift_integer_arena u64 // Int metadata, value witnesses and Equatable/Hashable conformances.
+	swift_dispatch_flags_arena u64 // Sealed DispatchWorkItemFlags metadata/accessor pages.
+	swift_dispatch_flags_retired bool // Reject resolution after quiescent metadata teardown.
 	swift_foundation_arena u64 // Sealed CVarArg calls and Foundation's concrete String conformance.
 	swift_void_arena u64 // Sealed empty-tuple full metadata and zero-size value witnesses.
 	swift_unknown_value_arena u64 // Sealed Builtin.UnknownObject value witnesses.
@@ -650,6 +652,7 @@ fn format_double(destination &char, size usize, format &char, value f64) int {
 }
 
 fn runtime_symbol(library string, symbol string) !u64 {
+	if library == '/usr/lib/swift/libswiftDispatch.dylib' { return swift_dispatch_symbol(symbol) }
 	if library == '/usr/lib/swift/libswiftFoundation.dylib' { return swift_foundation_symbol(symbol) }
 	if library == '/usr/lib/swift/libswiftos.dylib' && symbol == '_$sSo13os_log_type_ta0A0E5errorABvgZ' { return u64(unsafe { voidptr(swift_os_log_error_type) }) }
 	if library == '/usr/lib/swift/libswift_Concurrency.dylib' { return swift_concurrency_symbol(symbol) }

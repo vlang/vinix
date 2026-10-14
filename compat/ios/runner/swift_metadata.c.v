@@ -169,6 +169,7 @@ fn swift_string_metadata() u64 {
 fn swift_string_guts_metadata() u64 { return swift_string_metadata() - 16 + 648 }
 
 fn swift_metadata_stop() {
+	swift_dispatch_flags_stop()
 	swift_foreign_metadata_stop()
 	// Like ARC thunks, metadata is retired only after all workers/callbacks and
 	// owned buffers have drained.
