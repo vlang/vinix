@@ -1505,19 +1505,19 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 		f_getpipe_sz {
 			if !stat.isifo(handle.resource.stat.mode) {
 				fd.unref()
-				return errno.err, errno.einval
+				return errno.err, errno.ebadf
 			}
 			mut res := handle.resource
 			ret = resource.pipe_capacity(mut res) or {
 				fd.unref()
-				return errno.err, errno.einval
+				return errno.err, errno.ebadf
 			}
 			fd.unref()
 		}
 		f_setpipe_sz {
 			if !stat.isifo(handle.resource.stat.mode) {
 				fd.unref()
-				return errno.err, errno.einval
+				return errno.err, errno.ebadf
 			}
 			mut res := handle.resource
 			ret = resource.set_pipe_capacity(mut res, arg) or {
