@@ -163,6 +163,7 @@ fn refresh_progress(config Config, directory string, report fn (pkgprotocol.Prog
 	previous := read_snapshots(directory)!
 	defer { close_decoded_snapshots(previous) }
 	mut history := history_with_snapshots(config, directory, previous)!
+	defer { close_decoded_history(history) }
 	mut snapshots := []Snapshot{}
 	unsafe { snapshots.flags |= .noslices }
 	defer {
@@ -196,7 +197,9 @@ fn refresh_progress(config Config, directory string, report fn (pkgprotocol.Prog
 		report(pkgprotocol.Progress{ phase: 'verify', repository: repository.id, path: 'index.json' })
 		index := verify_index(repository, text, signature, time.now().unix())!
 		defer { close_decoded_index(index) }
-		history = remember_index(history, repository, index, text)!
+		next := remember_index(history, repository, index, text)!
+		close_decoded_history(history)
+		history = next
 		// Authenticate and check replay first. Refuse this prefix before fetching
 		// another repository or constructing the independently decoded catalog.
 		append_snapshot_metadata(snapshot, mut encoding)!

@@ -103,7 +103,10 @@ fn read_repository_review(root string, operation string, repository Repository, 
 	if operation != 'enroll' { return error('unknown repository operation') }
 	next := enrollment_configuration(config, repository)!
 	directory := state_directory(root)
-	history := history_with_snapshots(next, directory, read_snapshots(directory)!)!
+	snapshots := read_snapshots(directory)!
+	defer { close_decoded_snapshots(snapshots) }
+	history := history_with_snapshots(next, directory, snapshots)!
+	defer { close_decoded_history(history) }
 	mut template := (os.temp_dir().trim_right('/') + '/vinix-repository-review-XXXXXX').bytes()
 	template << u8(0)
 	defer { unsafe { template.free() } }
@@ -116,7 +119,10 @@ fn read_repository_review(root string, operation string, repository Repository, 
 		unsafe { work.free() }
 	}
 	snapshot, index := enrollment_snapshot(config, repository, offline, work)!
-	check_floor(history, repository, index, index_digest(snapshot.text))!
+	defer { close_decoded_index(index); unsafe { snapshot.text.free(); snapshot.signature.free() } }
+	digest := index_digest(snapshot.text)
+	defer { unsafe { digest.free() } }
+	check_floor(history, repository, index, digest)!
 	return repository_review(config, history, operation, repository, snapshot.text, index)
 }
 

@@ -13,7 +13,9 @@ pub:
 }
 
 fn configured_repository_status(config Config, directory string) !RepositoryStatus {
-	history := history_with_snapshots(config, directory, read_snapshots(directory)!)!
+	snapshots := read_snapshots(directory)!
+	defer { close_decoded_snapshots(snapshots) }
+	history := history_with_snapshots(config, directory, snapshots)!
 	return RepositoryStatus{
 		architecture: config.architecture
 		repositories: config.repositories
@@ -72,14 +74,20 @@ pub fn enroll_repository_reviewed(root string, repository Repository, offline bo
 	next := enrollment_configuration(current, repository)!
 	// A reviewed replacement disables the old ID/key. Recovery uses that exact
 	// proposed configuration in both review and apply, before publishing trust.
-	mut history := history_with_snapshots(next, directory, read_snapshots(directory)!)!
+	snapshots := read_snapshots(directory)!
+	defer { close_decoded_snapshots(snapshots) }
+	mut history := history_with_snapshots(next, directory, snapshots)!
+	defer { close_decoded_history(history) }
 	work := directory + '/enrollment'
 	if os.exists(work) { os.rmdir_all(work)! }
 	owned_directory(work, 0o700)!
 	defer { os.rmdir_all(work) or {} }
 	snapshot, index := enrollment_snapshot(current, repository, offline, work)!
+	defer { close_decoded_index(index); unsafe { snapshot.text.free(); snapshot.signature.free() } }
 	check_repository_review(expected, repository_fingerprint(current, history, 'enroll', repository, index_digest(snapshot.text)))!
-	history = remember_index(history, repository, index, snapshot.text)!
+	remembered := remember_index(history, repository, index, snapshot.text)!
+	close_decoded_history(history)
+	history = remembered
 	// History becomes durable before trust is enabled. An interrupted attempt
 	// may remember a newer floor, but can never trust a replayed older index.
 	save_history(directory, history)!

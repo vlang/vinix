@@ -546,6 +546,10 @@ repository, including wrapper escaping and the closing byte. An oversized
 prefix stops before contacting later repositories and preserves the active
 cache/history; reducing the repository metadata allows a normal retry. See
 [cache preflight qualification](../tests/packages/cache-preflight-check.md).
+Replay-history migration and updates now own their identity/digest fields and
+retire superseded records and decoded indexes. Refresh, repository review and
+enrollment, status and publishing retain the same replay rules; see
+[history ownership qualification](../tests/packages/history-ownership-check.md).
 Files/directories are flushed before
 publication; POSIX rename switches `current` atomically. The next state-changing transaction
 retires abandoned stages. A crash before activation exposes the old complete set;

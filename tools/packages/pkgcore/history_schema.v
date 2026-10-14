@@ -74,7 +74,8 @@ fn decode_history(text string, publisher bool) !TrustHistory {
 	return history
 }
 
-// Only JSON-decoded histories own these fields. remember_index can borrow floors.
+// Decoded histories and remember_index/history_with_snapshots results own their
+// fields. Synthetic histories can borrow fields and must not use this cleanup.
 fn close_decoded_history(history TrustHistory) {
 	unsafe {
 		for floor in history.repositories { floor.id.free(); floor.public_key.free(); floor.index_sha256.free() }

@@ -1565,6 +1565,15 @@ Fetched signed text, its decoded indexes and encoder buffers retire on
 success and failure; returned catalog manifests remain independently owned.
 See [cache preflight qualification](../../tests/packages/cache-preflight-check.md).
 
+Replay-history updates and legacy-cache migration return independent identity,
+key and digest fields. Their internal consumers retire the superseded history
+and temporary authenticated indexes instead of keeping borrowed snapshots alive.
+Repository status transfers those owned history records to its result; reviewed
+enrollment and publisher release retire their private copies after use. Sorting,
+identity limits, rollback/equivocation checks, retired-key recovery and persistent
+JSON stay compatible. The [history ownership qualification](../../tests/packages/history-ownership-check.md)
+separates history/hash scratch from remaining reader and whole-service memory.
+
 Configuration JSON preserves legacy omitted-field defaults, including partial
 policy objects. Present fields must have the declared JSON types; null values,
 unknown keys and duplicate keys (including escaped equivalent spellings) are

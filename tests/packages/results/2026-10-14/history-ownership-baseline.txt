@@ -1,0 +1,16 @@
+Paired tracked-heap control: same expired snapshot, baseline 794ac3edb versus independent history ownership.
+Four measured calls per executable, extracted below from the pinned full logs.
+Before cleanup retires the owned array/digest and preserves borrowed source identity.
+After cleanup retires the independently owned result. The maintained fixture runs 64 calls.
+
+Before:
+HISTORY MEMORY kept=6233 allocations=26
+HISTORY MEMORY kept=6233 allocations=26
+HISTORY MEMORY kept=6233 allocations=26
+HISTORY MEMORY kept=6233 allocations=26
+
+After:
+HISTORY MEMORY kept=336 allocations=4
+HISTORY MEMORY kept=336 allocations=4
+HISTORY MEMORY kept=336 allocations=4
+HISTORY MEMORY kept=336 allocations=4

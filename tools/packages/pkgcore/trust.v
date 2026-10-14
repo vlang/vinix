@@ -32,6 +32,7 @@ fn floor_order(a &RepositoryFloor, b &RepositoryFloor) int {
 
 fn read_history(directory string) !TrustHistory {
 	path := directory + '/trust-history.json'
+	defer { unsafe { path.free() } }
 	if !os.exists(path) && !os.is_link(path) { return TrustHistory{} }
 	text := read_metadata(path)!
 	defer { unsafe { text.free() } }
@@ -40,9 +41,12 @@ fn read_history(directory string) !TrustHistory {
 
 fn index_digest(text string) string {
 	bytes := text.bytes()
-	digest := sha256.sum(bytes).hex()
-	unsafe { bytes.free() }
-	return digest
+	mut hash := sha256.new()
+	mut sum := []u8{len: sha256.size}
+	defer { unsafe { bytes.free(); sum.free(); hash.free(); free(hash) } }
+	hash.write(bytes) or { panic(err) }
+	hash.checksum_into(mut sum)
+	return sum.hex()
 }
 
 fn check_floor(history TrustHistory, repository Repository, index Index, digest string) ! {
@@ -56,19 +60,33 @@ fn check_floor(history TrustHistory, repository Repository, index Index, digest 
 
 fn remember_index(history TrustHistory, repository Repository, index Index, text string) !TrustHistory {
 	digest := index_digest(text)
+	defer { unsafe { digest.free() } }
 	check_floor(history, repository, index, digest)!
-	mut records := history.repositories.filter(it.id != repository.id || it.public_key != repository.public_key)
-	records << RepositoryFloor{
-		id:           repository.id
-		public_key:   repository.public_key
-		sequence:     index.sequence
-		index_sha256: digest
+	mut count := 1
+	for floor in history.repositories {
+		if floor.id != repository.id || floor.public_key != repository.public_key { count++ }
 	}
-	if records.len > 4096 {
+	if count > 4096 {
 		return error('repository trust history exceeds its supported identity limit')
 	}
+	// Both retained and new records own their strings. Callers may retire the
+	// previous history and the snapshot/configuration that supplied this identity.
+	mut records := []RepositoryFloor{cap: count}
+	unsafe { records.flags |= .noslices }
+	for floor in history.repositories {
+		if floor.id != repository.id || floor.public_key != repository.public_key { append_owned_floor(mut records, floor) }
+	}
+	append_owned_floor(mut records, RepositoryFloor{ id: repository.id, public_key: repository.public_key,
+		sequence: index.sequence, index_sha256: digest })
 	records.sort_with_compare(floor_order)
 	return TrustHistory{ repositories: records }
+}
+
+fn append_owned_floor(mut records []RepositoryFloor, floor RepositoryFloor) {
+	owned := RepositoryFloor{ id: floor.id.clone(), public_key: floor.public_key.clone(),
+		sequence: floor.sequence, index_sha256: floor.index_sha256.clone() }
+	pointer := unsafe { &owned }
+	unsafe { records.push_many(pointer, 1) }
 }
 
 // An explicitly revoked/replaced key may fail newer curve admission rules.
@@ -109,15 +127,21 @@ fn recorded_retired_snapshot(config Config, history TrustHistory, snapshot Snaps
 // Recorded retired snapshots add no trust and leave every existing floor intact.
 fn history_with_snapshots(config Config, directory string, snapshots []Snapshot) !TrustHistory {
 	mut history := read_history(directory)!
+	mut accepted := false
+	defer { if !accepted { close_decoded_history(history) } }
 	for snapshot in snapshots {
 		if recorded_retired_snapshot(config, history, snapshot) { continue }
 		index := verify_index(snapshot.repository, snapshot.text, snapshot.signature, 0)!
+		defer { close_decoded_index(index) }
 		if history.repositories.any(it.id == snapshot.repository.id && it.public_key == snapshot.repository.public_key
 			&& it.sequence > index.sequence) {
 			continue
 		}
-		history = remember_index(history, snapshot.repository, index, snapshot.text)!
+		next := remember_index(history, snapshot.repository, index, snapshot.text)!
+		close_decoded_history(history)
+		history = next
 	}
+	accepted = true
 	return history
 }
 

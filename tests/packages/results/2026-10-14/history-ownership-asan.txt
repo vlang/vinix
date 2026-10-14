@@ -1,0 +1,49 @@
+clang ASan/UBSan; detect_leaks=0; halt_on_error=1
+
+history-sanitize:
+HISTORY OWNERSHIP migrated expired snapshots produce independent replay records and survive input retirement PASS
+HISTORY OWNERSHIP 64 authenticated migrations/retirements preserve source snapshots within reader budget: 0 bytes / 0 allocations PASS
+HISTORY OWNERSHIP remembered indexes detach both existing and new identity fields and preserve sorted floors PASS
+HISTORY OWNERSHIP later signature/equivocation failures retire partial results without publishing history PASS
+HISTORY OWNERSHIP newer retained floors survive authenticated older cache migration with bounded lifetimes PASS
+HISTORY OWNERSHIP full 4096-identity replacement and overflow refusal release scratch without mutating source floors PASS
+HISTORY OWNERSHIP SHA256 vectors, binary/Unicode bytes and block boundaries preserve replay digests with zero hashing scratch PASS
+PASS
+
+administration-sanitize:
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository unreachable
+Updating trusted repository fixture
+Updating trusted repository fixture
+PASS
+
+release-sanitize:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+PASS
+
+probe-sanitize:
+Updating trusted repository first
+Updating trusted repository second
+Installing Seed 1.0.0 (1/1) from first
+Downloading seed/asset (4 bytes)
+Activated package generation 1
+CACHE PREFLIGHT authenticated prefix overflow stops before later repository fetch; signature precedence, active cache/history/generation and recovery data preserved PASS
+CACHE PREFLIGHT signed service/CLI refresh rejects oversized cache before later acquisition/publication and accepts a bounded retry PASS
+PASS

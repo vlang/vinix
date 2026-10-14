@@ -125,7 +125,10 @@ fn release_locked(repository string, id string, seed_path string, sequence u64, 
 	options.checkpoint('seed', signing_seed)!
 	index, text, signature, public_key := publication_with_seed(repository, id, seed, sequence, expires)!
 	identity := Repository{ id: id, public_key: public_key }
-	remembered := remember_index(release_history(repository)!, identity, index, text)!
+	history := release_history(repository)!
+	defer { close_decoded_history(history) }
+	remembered := remember_index(history, identity, index, text)!
+	defer { close_decoded_history(remembered) }
 	release_closures(index, public_key)!
 	mut objects := map[string]Payload{}
 	mut needed := mirror_cost(u64(4 * 1024 * 1024), u64(text.len + signature.len))!
