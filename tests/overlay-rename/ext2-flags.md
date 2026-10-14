@@ -14,12 +14,15 @@ must be refused a writable file open, directory chmod and new child creation,
 while the original file bytes remain readable.
 
 Results from 14 October 2026 are retained in `build/development17-20261013`:
-`diskflags-first-{arm,x86}-before-a` fail assertion 684 with flags zero;
-`diskflags-first-{arm,x86}-after-a` pass. Both final volumes pass read-only
+`diskflags-drain-{arm,x86}-before-a` fail assertion 684 with flags zero;
+`diskflags-drain-{arm,x86}-after-a` pass. Both final volumes pass read-only
 `e2fsck -f -n`. The dedicated controller/fixtures are frozen in
-`diskflags-first-snapshot`; its direct probe does not call the pending overlay
+`diskflags-drain-snapshot`; its direct probe does not call the pending overlay
 flag-update or held-alias fixtures. The first combined overlay tests exposed
-the same lost protection at their remount assertion 666.
+the same lost protection at their remount assertion 666. The initial fast direct
+probe passed functional checks but its filesystem check found pending setup
+retirement allocations. The final probe waits 25 seconds for those queues before
+unmounting; those initial results remain separate from final evidence.
 
 Both final kernels use isolated `kernel-inodeflags3-{arm,x86}-tree` worktrees
 derived from the previously qualified [xattr preflight kernels](xattr-preflight.md),
@@ -30,7 +33,7 @@ for this legacy compiler remains in the isolated sources. The evidence checker
 compares the committed source after that normalization.
 
 `inodeflags3-lifetime-review.md` binds the independent source/generated-C
-review to both final generated files. `diskflags-first-evidence.log` records
+review to both final generated files. `diskflags-drain-evidence.log` records
 the dedicated receipts, controls, preserved source hashes and filesystem checks.
 Broader flag masks, journal failure/crash recovery, concurrent flag changes and
 shared-mapping adversarial matrices remain open.

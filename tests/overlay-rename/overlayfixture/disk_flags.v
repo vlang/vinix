@@ -28,6 +28,9 @@ fn direct_inode_flags_persistence() {
 			disk_flags_set(fd, 0x10 | 0x20)
 			check(disk_flags_get(fd) == 0x30 && C.close(fd) == 0, 682)
 		}
+		// prepare_disk exercises refused work directories and retires their
+		// temporary backing inodes. Drain those queues before unmounting.
+		check(C.usleep(25000000) == 0, 687)
 		C.sync()
 		check(C.umount(c'/tmp/overlay-state/diskmerged') == 0 && C.umount(c'/tmp/overlay-volume') == 0, 683)
 		check(C.mount(volume_device(), c'/tmp/overlay-volume', c'ext2', 0, nil) == 0, 683)
