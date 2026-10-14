@@ -311,6 +311,12 @@ all four read-only filesystem checks are clean.
 Closing a separate metadata-only `O_PATH` description also preserves the live
 listener; the extended native socket tests qualify this release behavior and
 balanced retirement on both architectures.
+The [socket metadata authorization checks](../tests/overlay-rename/socket-access.md)
+also reject socket operations through `O_PATH` handles before reaching endpoint
+state. Native tests cover 16 operations, untouched outputs and pending
+connections, and permitted `SCM_RIGHTS` transfer after the sending descriptor
+closes. Both architectures pass the same probe binary in Linux reference guests;
+the persistent ext2/overlay workloads retain flat live allocations.
 Crash consistency, full OCI/rootless-runtime acceptance and broader server-load
 qualification remain open. Full pins and native CI
 instructions are recorded in [the guest evidence](../tests/development/README.md).

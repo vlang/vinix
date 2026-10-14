@@ -97,3 +97,7 @@ bytes or additional slab pages. It also passes the 32-MiB cache workload
 (16 MiB cached) and the idle, app and drag checks. Its JSON, serial log, screenshots
 and assertion-enabled evidence result are retained as `socket-desktop-perf-a*`
 and `socket-perf-evidence-checked.log` under the same artifact root.
+
+The subsequent [socket metadata authorization correction](socket-access.md)
+prevents these filesystem descriptions from being used for transport operations,
+while preserving metadata queries and descriptor passing.

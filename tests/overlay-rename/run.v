@@ -29,10 +29,10 @@ fn main() {
 		hosttest.Option{
 			name:    '--case'
 			value:   true
-			choices: ['atomic', 'retention', 'failure', 'disk', 'opaque', 'opaque-full', 'sockets', 'all']
+			choices: ['atomic', 'retention', 'failure', 'disk', 'opaque', 'opaque-full', 'sockets', 'socket-access', 'all']
 		},
 		hosttest.Option{ name: '--timeout', value: true },
-	], [], 'Usage: run.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case atomic|retention|failure|disk|opaque|opaque-full|sockets|all] [--timeout SECONDS]')!
+	], [], 'Usage: run.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case atomic|retention|failure|disk|opaque|opaque-full|sockets|socket-access|all] [--timeout SECONDS]')!
 	for key in ['--arch', '--kernel-dir', '--state-dir'] {
 		if !options.has(key) {
 			eprintln('missing ' + key)
@@ -66,10 +66,11 @@ fn main() {
 		'statfs_fixture':      digest(state + '/sources/overlayfixture/statfs.v')!
 		'retention_fixture':   digest(state + '/sources/overlayfixture/retention.v')!
 		'sockets_fixture':     digest(state + '/sources/overlayfixture/sockets.v')!
+		'path_access_fixture': digest(state + '/sources/overlayfixture/path_access.v')!
 		'abi_header':          digest(state + '/sources/overlayfixture/native-abi.h')!
 	}
 	disk := state + '/store.ext2'
-	if case_name !in ['atomic', 'retention'] {
+	if case_name !in ['atomic', 'retention', 'socket-access'] {
 		os.write_file(disk, '')!
 		size_mb := if case_name == 'opaque-full' { 4 } else { 128 }
 		if unsafe { C.truncate(disk.str, i64(size_mb) * 1024 * 1024) } != 0 {
@@ -110,7 +111,7 @@ fn main() {
 	} {
 		inputs[name] = digest(path) or { '' }
 	}
-	if case_name !in ['atomic', 'retention'] { inputs['disk_after'] = digest(disk) or { '' } }
+	if case_name !in ['atomic', 'retention', 'socket-access'] { inputs['disk_after'] = digest(disk) or { '' } }
 	os.write_file(state + '/receipt.json', json2.encode(Receipt{
 		architecture: arch
 		case_name:    case_name
@@ -127,12 +128,12 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 	os.mkdir_all(state + '/rootfs')!
 	os.write_file(state + '/rootfs/overlay-case', case_name)!
 	archive := guesthost.image(init, state)!
-	if arch == 'x86_64' && case_name !in ['atomic', 'retention'] {
+	if arch == 'x86_64' && case_name !in ['atomic', 'retention', 'socket-access'] {
 		os.setenv('VINIX_CMDLINE', os.getenv('VINIX_CMDLINE') + ' vinix.disk=auto', true)
 	}
 	configured := guesthost.launch(init, archive, state, state + '/kernel', arch, true)!
 	mut command := configured.command.clone()
-	if case_name !in ['atomic', 'retention'] {
+	if case_name !in ['atomic', 'retention', 'socket-access'] {
 		command << if arch == 'aarch64' {
 			['-drive', 'if=none,format=raw,file=' + disk + ',id=overlay-data', '-device',
 				'virtio-blk-device,drive=overlay-data']
@@ -158,8 +159,9 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 		expected << ['OVERLAY OPAQUE STORAGE FULL: PASS', 'OVERLAY STATFS: PASS']
 	}
 	if case_name == 'sockets' {
-		expected << ['OVERLAY PERSISTENT SOCKETS: PASS', 'OVERLAY SOCKET REMOUNT: PASS', 'OVERLAY SOCKET PATH CLOSE: PASS']
+		expected << ['OVERLAY PERSISTENT SOCKETS: PASS', 'OVERLAY SOCKET REMOUNT: PASS', 'OVERLAY SOCKET PATH CLOSE: PASS', 'OVERLAY SOCKET ACCESS: PASS']
 	}
+	if case_name == 'socket-access' { expected << 'OVERLAY SOCKET REFERENCE: PASS' }
 	positive, negative := guesthost.verdict_policy(expected, ['FAIL: overlay'], false)
 	code := guesthost.boot(command, configured.env, state, positive, negative, timeout, true)!
 	if code == 0 && case_name == 'opaque-full' {

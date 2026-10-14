@@ -101,11 +101,38 @@ across the grace period, and rebinds the removed name. Hardlinks and moves acros
 directories must preserve inode identity and update held-descriptor link counts.
 Closing a separate `O_PATH` description of the listener must preserve its ability
 to accept a new connection through the renamed pathname.
+Metadata descriptions must also refuse all 16 tested socket operations with
+`EBADF`, preserve output buffers and pending connections, and remain transferable
+as `SCM_RIGHTS` payloads after the original descriptor closes. The listener's
+pathname has mode 0000 during these metadata checks.
 Two batches each run 32 cycles on each backend; every live slab class and the
 large-allocation count must match. A protected-directory bind must fail with
 `EACCES`. Root remounts the volume read-only, verifies that removed names stay
 absent, and checks that an ordinary-account bind fails with `EROFS`.
 See [persistent socket qualification](sockets.md) for controls, pins and limits.
+
+`--case socket-access` runs one socket cycle on tmpfs without an ext2 volume or
+retention sampling. It supports running the exact same native probe ELF in a
+Linux reference guest. Compile the V reference controller from the repository root:
+
+```sh
+V_C_ERROR_BUG_REPORT_DISABLED=1 v -cc cc \
+  -path "$PWD/tests/native-guest-tools|$PWD/tests/linuxkpi|@vlib|@vmodules" \
+  -o /tmp/vinix-socket-reference tests/overlay-rename/socket-reference.v
+
+/tmp/vinix-socket-reference --arch aarch64 --kernel /path/to/linux-arm64 \
+  --init /path/to/native-socket-access-result/init \
+  --state-dir /path/to/fresh-linux-reference
+```
+
+Use `--arch x86_64` and a matching Linux kernel/probe for x86. The reference uses
+HVF on ARM and TCG on x86, 512 MiB, two CPUs and no networking. Its V launcher
+mounts procfs and executes the preserved probe. Both runs must report
+`OVERLAY SOCKET REFERENCE: PASS` and `OVERLAY GUEST: PASS`; the reference receipt
+pins the shared probe, Linux kernel, launcher source/C/ELF, cpio, QEMU and serial
+output. This case checks denied creation of a real device (1:3); disk cases
+retain Vinix's separate refusal of user-created 0/0 whiteouts. See
+[socket metadata authorization evidence](socket-access.md).
 
 [Durable whiteout evidence and limits](whiteouts.md) and
 [persistent directory opacity](opacity.md) record the current storage

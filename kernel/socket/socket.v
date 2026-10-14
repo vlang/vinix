@@ -168,10 +168,23 @@ pub fn initialise() {
 	sock_inet.initialise()
 }
 
+// O_PATH retains filesystem metadata without opening the endpoint. Each
+// successful lookup transfers one temporary FD pin to its caller; a refusal
+// drops that pin here, before any socket interface or queue is touched.
+fn socket_operation_fd(fdnum int) ?&file.FD {
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum)?
+	if fd.handle.flags & resource.o_path != 0 {
+		fd.unref()
+		errno.set(errno.ebadf)
+		return none
+	}
+	return fd
+}
+
 // The address family of the socket `fdnum` names, or -1 when it names no
 // socket. pledge(2) decides by it which promise a call on the socket needs.
 pub fn family_of(fdnum int) int {
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return -1 }
+	mut fd := socket_operation_fd(fdnum) or { return -1 }
 	defer {
 		fd.unref()
 	}
@@ -310,7 +323,7 @@ pub fn syscall_accept(_ voidptr, fdnum int) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	mut fd := socket_operation_fd(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
 	}
@@ -350,7 +363,7 @@ pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u64)
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	mut fd := socket_operation_fd(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
 	}
@@ -397,7 +410,7 @@ pub fn syscall_listen(_ voidptr, fdnum int, backlog int) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	mut fd := socket_operation_fd(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
 	}
@@ -583,7 +596,7 @@ pub fn receive_message(fdnum int, mut header sock_pub.MsgHdr, flags int) (u64, u
 
 // recvmsg(2) with the header and all it points at in kernel memory.
 fn receive_into(fdnum int, message &sock_pub.MsgHdr, flags int) (u64, u64) {
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	mut fd := socket_operation_fd(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
 	}
@@ -674,7 +687,7 @@ fn send_from_kernel(fdnum int, buf voidptr, len u64, flags int, dest_addr voidpt
 	if flags & ~0x4040 != 0 { // MSG_DONTWAIT | MSG_NOSIGNAL
 		return errno.err, errno.eopnotsupp
 	}
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	mut fd := socket_operation_fd(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
 	}
@@ -776,7 +789,7 @@ fn receive_to_kernel(fdnum int, buf voidptr, len u64, flags int, src_addr voidpt
 	if flags & ~allowed != 0 {
 		return errno.err, errno.eopnotsupp
 	}
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	mut fd := socket_operation_fd(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
 	}
@@ -927,7 +940,7 @@ fn send_with_control(fdnum int, buffer voidptr, total u64, header &sock_pub.MsgH
 			msg_controllen: header.msg_controllen
 		}
 	}
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	mut fd := socket_operation_fd(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
 	}
@@ -958,7 +971,7 @@ pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	mut fd := socket_operation_fd(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
 	}
@@ -1025,7 +1038,7 @@ pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u
 // reject an ordinary file rather than answering for it. The socket is handed
 // back as an interface value, which needs no box on the heap.
 fn socket_from_fdnum(fdnum int) ?(&file.FD, sock_pub.Socket) {
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum)?
+	mut fd := socket_operation_fd(fdnum)?
 
 	mut res := fd.handle.resource
 	if mut res is sock_unix.UnixSocket {

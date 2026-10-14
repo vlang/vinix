@@ -49,15 +49,33 @@ fn persistent_socket_cycle(base &char, backing &char, hold bool) {
 		socket_absent(&disk_source[0], 405)
 		mut st := C.stat{}
 		check(C.fstat(old_path, &st) == 0 && st.st_nlink == 0, 406)
+		check(C.chmod(&target[0], 0) == 0, 472)
 		metadata := C.open(&target[0], C.O_PATH)
-		check(metadata >= 0 && C.fstat(metadata, &st) == 0 && st.st_nlink == 1
-			&& C.close(metadata) == 0, 433)
+		check(metadata >= 0 && C.fstat(metadata, &st) == 0 && st.st_nlink == 1, 433)
 		client := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0)
 		mut address := &C.sockaddr_un(C.alloca(sizeof(C.sockaddr_un)))
 		socket_address(&target[0], address)
+		socket_metadata_operations(metadata, address)
+		delivered_metadata := pass_socket_metadata(metadata)
+		check(C.close(delivered_metadata) == 0, 464)
+		keepalive := &i32(C.alloca(sizeof(i32)))
+		option_length := &u32(C.alloca(sizeof(u32)))
+		*keepalive = -1
+		*option_length = u32(sizeof(i32))
+		check(C.getsockopt(listener, C.SOL_SOCKET, C.SO_KEEPALIVE, keepalive, option_length) == 0
+			&& *keepalive == 0 && C.chmod(&target[0], 0o777) == 0, 473)
 		check(client >= 0 && C.vinix_overlay_connect(client, voidptr(address), u32(sizeof(C.sockaddr_un))) == 0, 407)
+		pending_metadata := C.open(&target[0], C.O_PATH)
+		check(pending_metadata >= 0, 465)
+		bad_socket_operation(C.accept(pending_metadata, nil, nil), 466)
+		bad_socket_operation(C.accept4(pending_metadata, nil, nil, C.SOCK_CLOEXEC), 471)
+		check(C.close(pending_metadata) == 0, 467)
 		accepted := C.accept(listener, nil, nil)
-		if hold { C.puts(c'OVERLAY SOCKET PATH CLOSE: PASS'); C.fflush(nil) }
+		if hold {
+			C.puts(c'OVERLAY SOCKET PATH CLOSE: PASS')
+			C.puts(c'OVERLAY SOCKET ACCESS: PASS')
+			C.fflush(nil)
+		}
 		path := C.open(&target[0], C.O_PATH)
 		check(accepted >= 0 && path >= 0 && C.unlink(&target[0]) == 0, 408)
 		socket_absent(&disk_target[0], 409)

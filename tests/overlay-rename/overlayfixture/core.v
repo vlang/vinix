@@ -523,12 +523,14 @@ pub fn run() int {
 		opaque := all || C.strcmp(&selected[0], c'opaque') == 0
 		full := C.strcmp(&selected[0], c'opaque-full') == 0
 		sockets := C.strcmp(&selected[0], c'sockets') == 0
-		check(concurrent || retention || failure || disk || opaque || full || sockets, 86)
+		access := C.strcmp(&selected[0], c'socket-access') == 0
+		check(concurrent || retention || failure || disk || opaque || full || sockets || access, 86)
 		owned_directory(c'/tmp/overlay-state', 30)
 		if concurrent || retention { prepare() }
 		if retention { prepare_retained_layers() }
 		if failure || disk || opaque || full || sockets { prepare_disk(opaque, full) }
 		if sockets { check(C.mkdir(c'/tmp/overlay-volume/protected', 0o700) == 0, 427) }
+		if access { owned_directory(c'/tmp/overlay-state/reference', 474) }
 		worker := C.fork()
 		check(worker >= 0, 87)
 		if worker == 0 {
@@ -536,7 +538,10 @@ pub fn run() int {
 			check(C.getuid() == 1000 && C.geteuid() == 1000, 6)
 			check(C.mount(c'tmpfs', c'/tmp/overlay-state', c'tmpfs', 0, nil) == -1
 				&& *C.__errno_location() == C.EPERM, 39)
-			check(C.mknod(c'/tmp/overlay-state/denied-device', u32(C.S_IFCHR | 0o600), 0) == -1
+			// The portable reference uses a real device number. Linux permits
+			// unprivileged 0/0 whiteouts; Vinix's separate refusal remains tested.
+			denied_device := if access { u64(0x103) } else { u64(0) }
+			check(C.mknod(c'/tmp/overlay-state/denied-device', u32(C.S_IFCHR | 0o600), denied_device) == -1
 				&& *C.__errno_location() == C.EPERM, 119)
 			if concurrent {
 				sample(0)
@@ -550,6 +555,10 @@ pub fn run() int {
 			if opaque { opaque_changes() }
 			if full { opaque_full_prepare_worker() }
 			if sockets { persistent_sockets() }
+			if access {
+				persistent_socket_cycle(c'/tmp/overlay-state/reference', c'/tmp/overlay-state/reference', false)
+				C.puts(c'OVERLAY SOCKET REFERENCE: PASS')
+			}
 			C.fflush(nil)
 			C._exit(0)
 		}
