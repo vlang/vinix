@@ -50,6 +50,12 @@ fn swift_pointer_deallocate(pointer u64, _metadata u64) {
 
 fn swift_raw_alloc_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_$sSw5countSivg', '_$sSW5countSivg', '_$sSw8endIndexSivg', '_$sSW8endIndexSivg' {
+			u64(unsafe { voidptr(swift_raw_buffer_count) })
+		}
+		'_$sSw11baseAddressSvSgvg', '_$sSW11baseAddressSVSgvg' { u64(unsafe { voidptr(swift_raw_buffer_base) }) }
+		'_$sSw10copyMemory4fromySW_tF' { u64(unsafe { voidptr(swift_raw_buffer_copy) }) }
+		'_$sSv10copyMemory4from9byteCountySV_SitF' { u64(unsafe { voidptr(swift_raw_pointer_copy) }) }
 		'_$sSp8allocate8capacitySpyxGSi_tFZ' { u64(unsafe { voidptr(swift_pointer_allocate) }) }
 		'_swift_arrayDestroy' { u64(unsafe { voidptr(swift_array_destroy_elements) }) }
 		'_$sSp12deinitialize5countSvSi_tF' { u64(unsafe { voidptr(swift_pointer_deinitialize) }) }

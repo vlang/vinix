@@ -4830,8 +4830,55 @@ Both import audits resolve one more required import. The actual IPA passes
 typed allocation linking and exits with status 1 before
 entry at MarketplaceKitWrapper's required raw-buffer `copyMemory(from:)`
 import, `_$sSw10copyMemory4fromySW_tF`. Its native disassembly is recorded for
-the next implementation. Fortnite has not entered application code and
-remains unplayable.
+the following implementation; Fortnite had not entered application code.
+
+Raw-pointer and raw-buffer `copyMemory` now resolve through V adapters,
+along with mutable/immutable raw-buffer `count`, `endIndex` and `baseAddress`
+getters. Native SwiftCore disassembly and the installed SDK establish a
+source/count/destination ABI in x0/x1/x2 for pointer copying. Buffer copying
+takes source start/end in x0/x1 and destination start/end in x2/x3, checks
+capacity, and forwards to the pointer method. The representation uses end
+addresses, not element counts. Copying uses overlap-safe `memmove`, as
+specified by Swift's [raw-pointer implementation](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/UnsafeRawPointer.swift)
+and [raw-buffer implementation](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb).
+
+The four count/endIndex getters share the native entry: Self start/end in
+x0/x1 and signed Int result in x0. Complete nonnil buffers return end-start;
+canonical nil buffers return zero. The base-address getters return the
+original optional pointer word, with zero representing nil. Getters access
+no viewed memory. The V checked span subset rejects malformed nil buffers,
+reversed or oversized ranges, insufficient capacity, negative byte counts,
+nonempty copies with null pointers and pointer/count overflow before copying.
+Zero-byte copies access no payload. Callers still supply readable/writable
+storage and follow Swift's raw-memory type rules. Valid calls need no owner
+registry, value-witness call, allocation, free or ARC operation.
+
+The final cohort passes ten fresh ASan/UBSan runs across raw copying,
+typed allocation, raw allocation, Collection and Array storage in both hash
+modes. These five suites also pass in a fresh Vinix ARM64 guest. Native
+comparisons cover 140 whole-allocation copy cases, 28 page-edge ranges,
+28 count/endIndex cases and 14 base-address cases. Checks include both
+overlap directions, self/disjoint copies, unaligned bytes, protected empty
+ranges, read-only sources, preserved neighbours/spare capacity, maximum
+signed count and opaque address bytes without ARC changes. V cases also
+reject malformed ranges before writes, run eight concurrent workers and
+drain two runtime lifetimes. Generated C confirms `memmove`, no adapter
+scratch allocation or registry locking, and borrowed static checked failures.
+
+The public dedicated `build-swift-raw-copy` target, full build, regression
+and Swift guest modes include the fixture. Thirteen final generated-C
+streams/executables, native SDK/LLVM measurements and actual IPA probe/audit
+evidence are retained under `build/ios/fortnite/raw-copy-checks`. Two passing
+intermediate cohorts are retained with their sources as startup progressed
+from copying to count and endIndex; every final stream was regenerated after
+completing those accessors. Full iOS regression remains unpassed.
+
+Both audits resolve three more required imports. MarketplaceKitWrapper's
+three required raw-buffer imports now resolve. The actual IPA exits with
+status 1 before entry at its required generic `SetAlgebra` sequence initializer
+thunk, `_$ss10SetAlgebraPyxqd__ncSTRd__7ElementQyd__ACRtzlufCTj`. The native
+thunk's witness-table dispatch is recorded for the next implementation.
+Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -4840,10 +4887,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,459 | 701 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 139 | 37 | 23 |
-| All images | 2,257 | 741 | 120 |
+| MarketplaceKitWrapper | 142 | 34 | 23 |
+| All images | 2,260 | 738 | 120 |
 
-The C++/GLES/Text variant reports 2,270 resolved imports, 728 unresolved strong
+The C++/GLES/Text variant reports 2,273 resolved imports, 725 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
