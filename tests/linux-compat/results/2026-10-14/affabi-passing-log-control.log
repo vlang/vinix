@@ -1,0 +1,3 @@
+tests/linux-compat/affabi-check.v:222: FAIL: fn main.failure: assert log.contains('LINUX AFFABI DETAIL:'), 'affabi baseline failure markers required'
+      message: affabi baseline failure markers required
+V panic: Assertion failed...

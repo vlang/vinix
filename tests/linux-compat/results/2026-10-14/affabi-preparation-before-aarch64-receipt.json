@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "8ef5fd3554a6753e3a6cc78acae609f472f814080e9a94255fb103baded4676e",
+    "results": [
+        {
+            "name": "affabi",
+            "source_sha256": "482d370ed1b1051e7a4c79cc8787e659d79ea9b22354b82237e2cbba0ab96bb9",
+            "init_sha256": "72b899faefb4c10e763f42cfae12e37a92cc3caaea58a338862477338296f503",
+            "iso_sha256": "cd9785ad08892e5bd33fe1cb588adaab6e6c92e84217d61d49efa1a533e74055",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

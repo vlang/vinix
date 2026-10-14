@@ -1469,3 +1469,21 @@ publishes the initial disk-full builds and corrected read-only page-crossing
 oracle as preparation, final receipts and independent lifetime review.
 Nice clamping, full scheduling flags/classes/permissions and GNU/foreign
 paths remain separate; the three broad compatibility gates stay open.
+
+The `affabi` case qualifies native affinity PID/length words, short masks,
+getter bit-count overflow and stable-peer owner/CAP_SYS_NICE permissions.
+Root/UID1000 cohorts exercise real worker TIDs, a UID1001 peer, eight target
+classes, nineteen lengths, ten buffers, upper words and genuine musl wrappers:
+49,416 checks per architecture. Original kernels fail 27,868; corrected kernels
+and identical probe ELFs on Linux 6.12.51 pass. Exact native eight-byte masks
+are distinguished from measured Linux bitmap widths, including the x86
+reference's 32 bytes. Each cohort restores masks/capabilities and retains flat
+storage through 200 cycles. Run `--cases affabi,runtime,schedabi,rrabi,attrquery,attrimport,open,fcntlabi`
+in a fresh state directory. `affabi-reference.v`
+accepts the same arguments as preceding reference controllers; compile
+`affabi-check.v` without `-prod` and pass the retained evidence directory.
+[The report](../../docs/linux-posix-qualification.md#native-affinity-masks-argument-words-and-stable-peer-permissions)
+publishes width-oracle/compile/disk-space preparations, final receipts and
+independent lifetime review. Target/credential races, namespaces/security,
+hotplug/cpusets/large masks, actual migration/fairness and GNU/foreign paths
+remain separate; the three broad compatibility gates remain open.

@@ -110,6 +110,7 @@ pub const cap_sys_chroot = 18
 pub const cap_sys_ptrace = 19
 pub const cap_sys_admin = 21
 pub const cap_sys_boot = 22
+pub const cap_sys_nice = 23
 pub const cap_sys_resource = 24
 pub const cap_sys_time = 25
 pub const cap_mknod = 27

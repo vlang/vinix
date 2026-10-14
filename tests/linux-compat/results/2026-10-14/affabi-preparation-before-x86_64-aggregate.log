@@ -1,0 +1,124 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   227k      0  0:00:01  0:00:01 --:--:--  227k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 61 2880k   61 1772k    0     0  1436k      0  0:00:02  0:00:01  0:00:01 1436k100 2880k  100 2880k    0     0  2010k      0  0:00:01  0:00:01 --:--:-- 2009k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  32760      0 --:--:-- --:--:-- --:--:-- 32791
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   266k      0 --:--:-- --:--:-- --:--:--  266k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  58703      0 --:--:-- --:--:-- --:--:-- 58652
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   118k      0 --:--:-- --:--:-- --:--:--  118k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/affabi-20261014/states/p1-before-x86/affabi/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/affabi-20261014/states/p1-before-x86/affabi/.vinix-amd64.iso.5i3uEy'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data,  811m free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/affabi-20261014/states/p1-before-x86/affabi/iso-build/.iso-staging.plqiNo/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13665 sectors
+Written to medium : 13665 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/affabi-20261014/states/p1-before-x86/affabi/.vinix-amd64.iso.5i3uEy' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd583.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/affabi-20261014/states/p1-before-x86/affabi/test.iso (27985920 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/affabi-20261014/states/p1-before-x86/affabi
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=89832
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000038013400
+initramfs: Done (9 entries)
+LINUX AFFABI TOPOLOGY: ordinary=0 mask=3 worker=8037 peer=6521 page=4096
+LINUX AFFABI DETAIL: ordinary=0 kind=1 pid=1234567800000000 size=0 flags=0 form=0 call=1 ret=-1 errno=3 expected=22
+LINUX AFFABI DETAIL: ordinary=0 kind=2 pid=0 size=ffffffff00000000 flags=0 form=0 call=1 ret=8 errno=0 expected=22
+LINUX AFFABI DETAIL: ordinary=0 kind=2 pid=0 size=ffffffff00000000 flags=1 form=0 call=3 ret=0 errno=0 expected=22
+LINUX AFFABI DETAIL: ordinary=0 kind=2 pid=0 size=ffffffff00000000 flags=1 form=0 call=4 ret=0 errno=0 expected=22
+LINUX AFFABI DETAIL: ordinary=0 kind=1 pid=1234567800000000 size=0 flags=0 form=1 call=9 ret=-1 errno=3 expected=22
+LINUX AFFABI DETAIL: ordinary=0 kind=2 pid=0 size=ffffffff00000000 flags=0 form=1 call=5 ret=8 errno=0 expected=22
+LINUX AFFABI DETAIL: ordinary=0 kind=1 pid=1234567800000000 size=0 flags=0 form=2 call=17 ret=-1 errno=3 expected=22
+LINUX AFFABI DETAIL: ordinary=0 kind=0 pid=0 size=0 flags=0 form=3 call=13 ret=-1 errno=14 expected=22
+LINUX AFFABI DETAIL: ordinary=0 kind=1 pid=1234567800000000 size=0 flags=0 form=3 call=25 ret=-1 errno=3 expected=22
+LINUX AFFABI DETAIL: ordinary=0 kind=0 pid=0 size=1 flags=1 form=0 call=43 ret=-1 errno=22 expected=0
+LINUX AFFABI DETAIL: ordinary=0 kind=0 pid=0 size=1 flags=1 form=0 call=44 ret=-1 errno=22 expected=0
+LINUX AFFABI DETAIL: ordinary=0 kind=0 pid=0 size=1 flags=1 form=1 call=47 ret=-1 errno=22 expected=0
+LINUX AFFABI DETAIL: ordinary=0 kind=3 pid=0 size=1 flags=1 form=0 call=9 ret=-1 errno=22 expected=0
+LINUX AFFABI DETAIL: ordinary=0 kind=3 pid=1234567800000000 size=1 flags=1 form=0 call=10 ret=-1 errno=22 expected=0
+LINUX AFFABI DETAIL: ordinary=0 kind=3 pid=1234567800000000 size=8 flags=1 form=0 call=16 ret=-1 errno=3 expected=0
+LINUX AFFABI DETAIL: ordinary=0 kind=3 pid=6873 size=1 flags=1 form=0 call=33 ret=-1 errno=22 expected=0
+LINUX AFFABI CASES: ordinary=0 kind=0 calls=6080 failures=3098
+LINUX AFFABI CASES: ordinary=0 kind=1 calls=12160 failures=8336
+LINUX AFFABI CASES: ordinary=0 kind=2 calls=6080 failures=2302
+LINUX AFFABI CASES: ordinary=0 kind=3 calls=388 failures=198
+LINUX AFFABI FINAL: ordinary=0 kind=0 calls=6080 failures=3098
+LINUX AFFABI FINAL: ordinary=0 kind=1 calls=12160 failures=8336
+LINUX AFFABI FINAL: ordinary=0 kind=2 calls=6080 failures=2302
+LINUX AFFABI FINAL: ordinary=0 kind=3 calls=388 failures=198
+LINUX AFFABI TOPOLOGY: ordinary=1 mask=3 worker=43360 peer=34 page=4096
+LINUX AFFABI DETAIL: ordinary=1 kind=1 pid=1234567800000000 size=0 flags=0 form=0 call=1 ret=-1 errno=3 expected=22
+LINUX AFFABI DETAIL: ordinary=1 kind=2 pid=0 size=ffffffff00000000 flags=0 form=0 call=1 ret=8 errno=0 expected=22
+LINUX AFFABI DETAIL: ordinary=1 kind=2 pid=0 size=ffffffff00000000 flags=1 form=0 call=3 ret=0 errno=0 expected=22
+LINUX AFFABI DETAIL: ordinary=1 kind=2 pid=0 size=ffffffff00000000 flags=1 form=0 call=4 ret=0 errno=0 expected=22
+LINUX AFFABI DETAIL: ordinary=1 kind=1 pid=1234567800000000 size=0 flags=0 form=1 call=9 ret=-1 errno=3 expected=22
+LINUX AFFABI DETAIL: ordinary=1 kind=2 pid=0 size=ffffffff00000000 flags=0 form=1 call=5 ret=8 errno=0 expected=22
+LINUX AFFABI DETAIL: ordinary=1 kind=1 pid=1234567800000000 size=0 flags=0 form=2 call=17 ret=-1 errno=3 expected=22
+LINUX AFFABI DETAIL: ordinary=1 kind=0 pid=0 size=0 flags=0 form=3 call=13 ret=-1 errno=14 expected=22
+LINUX AFFABI DETAIL: ordinary=1 kind=1 pid=1234567800000000 size=0 flags=0 form=3 call=25 ret=-1 errno=3 expected=22
+LINUX AFFABI DETAIL: ordinary=1 kind=0 pid=0 size=1 flags=1 form=0 call=43 ret=-1 errno=22 expected=0
+LINUX AFFABI DETAIL: ordinary=1 kind=0 pid=0 size=1 flags=1 form=0 call=44 ret=-1 errno=22 expected=0
+LINUX AFFABI DETAIL: ordinary=1 kind=0 pid=0 size=1 flags=1 form=1 call=47 ret=-1 errno=22 expected=0
+LINUX AFFABI DETAIL: ordinary=1 kind=3 pid=0 size=1 flags=1 form=0 call=9 ret=-1 errno=22 expected=0
+LINUX AFFABI DETAIL: ordinary=1 kind=3 pid=1234567800000000 size=1 flags=1 form=0 call=10 ret=-1 errno=22 expected=0
+LINUX AFFABI DETAIL: ordinary=1 kind=3 pid=1234567800000000 size=8 flags=1 form=0 call=16 ret=-1 errno=3 expected=0
+LINUX AFFABI DETAIL: ordinary=1 kind=3 pid=4811 size=1 flags=1 form=0 call=33 ret=-1 errno=22 expected=0
+LINUX AFFABI CASES: ordinary=1 kind=0 calls=6080 failures=3098
+LINUX AFFABI CASES: ordinary=1 kind=1 calls=12160 failures=8336
+LINUX AFFABI CASES: ordinary=1 kind=2 calls=6080 failures=2302
+LINUX AFFABI CASES: ordinary=1 kind=3 calls=388 failures=198
+LINUX AFFABI FINAL: ordinary=1 kind=0 calls=6080 failures=3098
+LINUX AFFABI FINAL: ordinary=1 kind=1 calls=12160 failures=8336
+LINUX AFFABI FINAL: ordinary=1 kind=2 calls=6080 failures=2302
+LINUX AFFABI FINAL: ordinary=1 kind=3 calls=388 failures=198
+LINUX AFFABI FAIL: query layout, arguments or state
+QEMU: Terminated
+Missing verdicts: ['LINUX AFFABI: PASS']; failures: ['FAIL:', 'LINUX AFFABI FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/affabi-20261014/states/p1-before-x86/receipt.json

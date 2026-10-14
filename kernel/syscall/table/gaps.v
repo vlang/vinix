@@ -468,23 +468,12 @@ fn syscall_linux_sched_getattr(_ voidptr, raw_pid int, attr_ptr u64, size u32, f
 // sched_getaffinity(pid, size, mask). This is how a libc counts the processors
 // for sysconf(_SC_NPROCESSORS_ONLN), so the answer decides how many threads a
 // program starts.
-fn syscall_linux_sched_getaffinity(_ voidptr, local_pid int, size u64, mask u64) (u64, u64) {
-	pid := proc.kernel_id(local_pid)
-	if pid < 0 {
-		return errno.err, errno.einval
-	}
+fn syscall_linux_sched_getaffinity(_ voidptr, raw_pid int, size u32, mask u64) (u64, u64) {
 	// The id is a thread's, which thread_affinity() below looks up. It was
 	// looked for among processes, where only a first thread is: glibc's
 	// pthread_getattr_np() asks this of the calling thread, and the JVM,
 	// which asks that of every thread it runs on, stopped with ESRCH in
 	// Elasticsearch's Ubuntu-based image.
-	if pid >= proc.max_pid {
-		return errno.err, errno.esrch
-	}
-	if mask == 0 {
-		return errno.err, errno.efault
-	}
-
 	mut cpus := cpu_locals.len
 	if cpus <= 0 {
 		cpus = 1
@@ -493,10 +482,12 @@ fn syscall_linux_sched_getaffinity(_ voidptr, local_pid int, size u64, mask u64)
 		cpus = 64
 	}
 
-	// The caller's buffer must be able to hold whole words, and at least one.
-	if size < sizeof(u64) || size % sizeof(u64) != 0 {
+	// Linux's unsigned32 bit-count multiplication wraps before validation.
+	// Length errors precede target lookup, including negative or absent PIDs.
+	if u32(size * u32(8)) < u32(cpus) || size % sizeof(u64) != 0 {
 		return errno.err, errno.einval
 	}
+	pid := proc.kernel_id(int(i32(u32(raw_pid))))
 
 	mut bits := u64(0)
 	for i := 0; i < cpus; i++ {
@@ -507,7 +498,7 @@ fn syscall_linux_sched_getaffinity(_ voidptr, local_pid int, size u64, mask u64)
 	configured := proc.thread_affinity(tid) or { return errno.err, errno.get() }
 	bits &= configured
 
-	mut written := size
+	mut written := u64(size)
 	if written > sizeof(u64) {
 		written = sizeof(u64)
 	}
@@ -519,19 +510,34 @@ fn syscall_linux_sched_getaffinity(_ voidptr, local_pid int, size u64, mask u64)
 	return written, 0
 }
 
-fn syscall_linux_sched_setaffinity(_ voidptr, local_pid int, size u64, mask u64) (u64, u64) {
-	pid := proc.kernel_id(local_pid)
-	if pid < 0 || size < sizeof(u64) {
-		return errno.err, errno.einval
-	}
-	if mask == 0 {
-		return errno.err, errno.efault
-	}
+// Keep borrowed target/owner pointers within the PID-table lock. Linux allows
+// the same real/effective owner or an effective CAP_SYS_NICE, independently of
+// a caller's UID being zero. MAC checks still apply to every later lookup.
+fn sched_affinity_permission(tid int) u64 {
+	if tid <= 0 || tid >= proc.max_pid { return errno.esrch }
+	caller := proc.current_thread().process
+	proc.lock_table()
+	defer { proc.unlock_table() }
+	target := threads_by_tid[tid]
+	if target == unsafe { nil } || target.process == unsafe { nil } { return errno.esrch }
+	owner := target.process
+	if !proc.mac_peer_allowed(caller, owner) { return errno.eperm }
+	if caller.euid != owner.euid && caller.euid != owner.uid
+		&& !proc.has_capability(caller, proc.cap_sys_nice) { return errno.eperm }
+	return 0
+}
 
+fn syscall_linux_sched_setaffinity(_ voidptr, raw_pid int, size u32, mask u64) (u64, u64) {
 	mut bits := u64(0)
-	if !usercopy.copy_from_user(voidptr(&bits), mask, sizeof(u64)) {
+	// Short masks are zero-extended; a zero-length mask never reads its pointer.
+	copy_size := if size < sizeof(u64) { u64(size) } else { u64(sizeof(u64)) }
+	if !usercopy.copy_from_user(voidptr(&bits), mask, copy_size) {
 		return errno.err, errno.efault
 	}
+	pid := proc.kernel_id(int(i32(u32(raw_pid))))
+	tid := if pid == 0 { proc.current_thread().tid } else { pid }
+	permission := sched_affinity_permission(tid)
+	if permission != 0 { return errno.err, permission }
 
 	mut cpus := cpu_locals.len
 	if cpus <= 0 {
@@ -545,8 +551,6 @@ fn syscall_linux_sched_setaffinity(_ voidptr, local_pid int, size u64, mask u64)
 	if bits & present == 0 {
 		return errno.err, errno.einval
 	}
-	tid := if pid == 0 { proc.current_thread().tid } else { pid }
-	if !proc.mac_thread_peer_allowed(tid) { return errno.err, errno.get() }
 	if !proc.set_thread_affinity(tid, bits & present) {
 		return errno.err, errno.get()
 	}

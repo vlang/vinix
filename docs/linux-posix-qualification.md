@@ -6087,3 +6087,106 @@ and the three broad section 15 acceptance gates stay open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-14/attrimport-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-14/attrimport-after-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/attrimport-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-14/attrimport-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-14/attrimport-after-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/attrimport-reference-x86_64-receipt.json).
 - [Maintained V audit](../tests/linux-compat/attrimport-check.v), [verdict](../tests/linux-compat/results/2026-10-14/attrimport-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-14/attrimport-lifetime-review.md).
+
+## Native affinity masks, argument words and stable-peer permissions
+
+Native `sched_getaffinity` and `sched_setaffinity` now decode PIDs as signed32
+and lengths as unsigned32 while retaining full-width buffer pointers. The
+getter validates whole-word length and Linux's wrapping unsigned32 bit-count
+multiplication before looking up the target. Negative and absent targets
+return `ESRCH`; valid targets retain real output `EFAULT` behavior.
+
+The setter imports `min(length, 8)` bytes into a zeroed stack mask before
+lookup. Short masks are zero-extended and zero-length masks do not access
+their pointer. Target lookup and permission checks precede empty-mask
+validation. Stable peers require the caller's effective UID to match the
+target's real/effective UID, or an effective `CAP_SYS_NICE`; UID0 alone does
+not authorize a different owner. Existing MAC checks and the final locked
+mask mutation remain in force. The new permission helper borrows target and
+owner pointers only while holding the PID-table lock and returns scalar errno.
+This follows Linux's [affinity syscall implementation](https://github.com/torvalds/linux/blob/v6.12/kernel/sched/syscalls.c).
+
+The V `affabi` probe runs separate root and UID/GID1000 cohorts. Each owns a
+blocked UID/GID1001 peer and a real waiting pthread whose non-main TID is
+reported through a pipe. Eight target classes cover implicit/explicit self,
+that worker, two signed32 negatives, a guaranteed absent positive PID, a
+fully reaped child and the differently owned peer. Nineteen lengths include
+zero, every short length, whole-word and larger buffers, unsigned32 wrap
+boundaries and UINT32_MAX. Ten buffer forms cover aligned/unaligned storage,
+page-ending prefixes, null/address1, inaccessible/read-only pages, crossing
+faults and a full-width invalid pointer. Upper PID and length words are tested
+separately. Three masks cover empty, the lowest available CPU and an extra
+unavailable high bit. Every live operation checks the resulting CPU mask;
+successful setters are restored before the next case.
+
+Additional controls toggle only effective capability23, exercise both errno
+and successful cross-owner authorization, and call genuine musl affinity wrappers.
+The libc getter must return zero and clear the requested unused tail. Three
+final mask checks and a full capability snapshot comparison confirm restoration.
+Each cohort records `6080/12160/6080/388` checks: 24,608 raw calls, 96 wrapper
+calls and four final state controls.
+
+| Architecture | Checks | Original failures | Corrected failures | Same-ELF Linux failures |
+| --- | --- | --- | --- | --- |
+| AArch64 | 49,416 | 27,868 | 0 | 0 |
+| x86-64 | 49,416 | 27,868 | 0 | 0 |
+
+Original failure vectors are `3098/8336/2302/198` per cohort. Final native
+original/corrected kernels and actual Linux 6.12.51 execute identical probe
+ELFs for each architecture. Both native bitmap widths are exactly eight
+bytes. The Linux references have eight-byte ARM and 32-byte x86 bitmaps,
+despite both exposing only CPU0/CPU1. A bounded 4096-byte discovery query
+verifies the returned width, zero higher active-mask words and output guards;
+native width is separately required to remain eight. Raw queries then check
+exact clipped lengths and zero tails. Imports and page-ending faults follow
+the measured width. Only the lowest available CPU is selected: native ARM
+reports mask1, native x86 and both references mask3. This leaves the existing
+ARM CPU1/QoS blocker unqualified. Native pages are 16 KiB ARM/4 KiB x86;
+both references use 4 KiB pages.
+
+An earlier probe assumed eight-byte Linux bitmaps. Its ARM reference passes,
+but x86 records 2,304 failures: larger raw queries copy more bytes, and a
+nine-byte page-ending input reaches an inaccessible page. Those old native
+probe inputs and reference receipts/logs remain preparation. Initial wrapper
+preflights also rejected untyped byte pointers; their generated C is retained
+and no ELF or semantic verdict exists. Earlier eight-case profiles encountered
+host `ENOSPC` after the affinity case passed. Their full receipts/aggregates
+retain partial build failures; fresh final profiles provide acceptance.
+
+Both corrected cohorts run 32 warmups and 200 cycles of short-mask mutation,
+upper words, cross-owner denial/authorization, empty-mask/missing-target and
+getter errors, with settling intervals around storage snapshots. All 18 ARM
+and 14 x86 slab classes stay exactly flat, as do large pages 71/71 ARM and
+175/175 x86. The slab observer closes on every nonfatal path. The worker's
+stack context remains live through `pthread_join`; the peer is released and
+reaped, command descriptors close, and the three-page guard mapping is fully
+unmapped before reporting. Final probe C has twenty allocas and no heap,
+dynamic-array or fixed-index helpers.
+
+Four fresh production builds use isolated worktrees at
+`16be6d0a204b509c75d456930af478de0232c36b`. Full generated C differs only in
+the two affinity prototypes/bodies, the scalar permission helper/prototype
+and capability23 define. CPU filtering, final mutation, scheduler locks and
+queues, allocator and user-copy implementations otherwise match exactly.
+Both final eight-case profiles (affabi/runtime/schedabi/rrabi/attrquery/
+attrimport/open/fcntlabi), eight host files and four frozen inventory checks
+pass. Allocation scans retain the same 398 ARM/290 x86 sites and existing
+allowance failures, with exactly two existing diagnostic positions shifted
+one line by the new constant; whole-kernel allocation approval is not claimed.
+
+The maintained V audit binds compiler/source/C/ELF/kernel/ISO/reference inputs,
+complete counts, topology/widths, guards, storage, preparation and independent
+lifetime review. Its false assertion and passing-reference-as-baseline controls
+execute without `-prod` and require exit1. Completed boot staging is retired
+only after hashing and rechecking retained inputs, including failed preparations.
+
+Permission and mutation use separate table-lock intervals. Credential changes,
+exit/TID reuse races, independent per-thread capability changes, nested PID/user
+namespaces, pledge/MAC denial, cpusets/cgroups, CPU hotplug and masks beyond 64
+native CPUs remain unqualified. Physical scheduling placement, migration and
+fairness, glibc and translated/ELF32 paths also remain separate. The three
+broad section15 acceptance gates stay open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-14/affabi-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-14/affabi-after-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/affabi-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-14/affabi-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-14/affabi-after-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/affabi-reference-x86_64-receipt.json).
+- [Maintained V audit](../tests/linux-compat/affabi-check.v), [verdict](../tests/linux-compat/results/2026-10-14/affabi-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-14/affabi-lifetime-review.md).

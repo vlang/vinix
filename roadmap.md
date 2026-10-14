@@ -901,6 +901,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   and flat storage on both architectures and identical-ELF Linux; retain setup
   and oracle failures separately. See [the import receipts](docs/linux-posix-qualification.md#native-scheduling-attribute-import-contract).
 
+- [x] Match native affinity PID/length words, short CPU masks and stable-peer
+  owner/CAP_SYS_NICE permissions with real errors and retained state. Qualify
+  guarded raw/musl calls, worker/peer targets and flat storage on both architectures
+  and identical-ELF Linux; measure bitmap widths and retain placement/security/race/foreign gaps.
+  See [the affinity receipts](docs/linux-posix-qualification.md#native-affinity-masks-argument-words-and-stable-peer-permissions).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

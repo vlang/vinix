@@ -1,0 +1,1 @@
+arm/x86: complete generated C differs only in two affinity bodies/prototypes, scalar locked permission helper/prototype and CAP_SYS_NICE define; other code unchanged

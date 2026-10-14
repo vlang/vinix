@@ -1,0 +1,3 @@
+tests/linux-compat/affabi-check.v:498: FAIL: fn main.main: assert false, 'affabi assertions must execute'
+      message: affabi assertions must execute
+V panic: Assertion failed...
