@@ -227,6 +227,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 		'_$s10Foundation5NSLogyySS_s7CVarArg_pdtF' { u64(voidptr(swift_nslog)) }
 		'_$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF' { u64(voidptr(swift_foundation_bridge)) }
 		'_$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ' { u64(voidptr(swift_foundation_unbridge)) }
+		'_$sSh10FoundationE36_unconditionallyBridgeFromObjectiveCyShyxGSo5NSSetCSgFZ' { u64(voidptr(swift_foundation_set_unbridge)) }
 		'_$sSSs7CVarArg10FoundationMc' { swift_foundation_arena() + u64(C.getpagesize()) + 32 }
 		'_$ss5ErrorP10FoundationE20localizedDescriptionSSvg' { swift_foundation_arena() + 96 }
 		else { return error('iOS: Swift Foundation symbol is not implemented: ${symbol}') }

@@ -5817,10 +5817,44 @@ are recorded separately; completed host archives were verified before resuming
 remaining checks, and unfinished guest programs were rebuilt. Full iOS
 regression remains unpassed and published runners remain unchanged.
 
-The actual IPA startup probe gets past the three Logger imports and exits
-with status 1 at MarketplaceKitWrapper's required Foundation Set bridge,
+The Logger implementation's IPA startup probe got past the three Logger
+imports and exited with status 1 at MarketplaceKitWrapper's required Set bridge,
 `_$sSh10FoundationE36_unconditionallyBridgeFromObjectiveCyShyxGSo5NSSetCSgFZ`.
-Fortnite has not entered application code and remains unplayable.
+
+The Foundation Set bridge now converts a borrowed registered NSSet or
+NSMutableSet into an owned Swift Set of registered NSObject references and
+subclasses, using canonical inherited Hashable witnesses. Native LLVM
+inspection and differential calls establish ordinary x0/x1/x2 arguments,
+an owned result in x0, unused Self x20, and nil returning the canonical empty
+Set without reading generic arguments. The actual IPA's class-reference fixup
+identifies `Set<UIScene>` and NSObject Hashable; its caller releases the source
+after bridging and then invokes Sequence.compactMap. The V implementation
+retains a member snapshot before hash/equality callbacks, materializes the
+existing native bitmap/bucket storage and publishes element ownership for
+the existing Set destructor and Sequence/Iterator implementation. It supports
+up to 4,096 object members. Foreign/dead objects, incorrect element metadata,
+noncanonical witnesses, raw CF pointers and value/scalar element conversion
+fail explicitly. Concurrent mutation of the source collection is unsupported.
+
+Twelve ASan/UBSan runs and six ARM64 guest suites pass across the new bridge,
+Objective-C NSSet, Swift Set, NSObject Hashable, String unbridging and
+unknown-reference ownership. The bridge fixture checks protected unused
+generic arguments, preserved x20/x21, borrowed source/owned result ARC,
+immutable/mutable source independence, collision probing, callback mutation,
+unlocked cross-thread reentry, eight concurrent readers and two drained
+runtime lifetimes. Fifteen fresh C streams and executables, SDK/native/IPA
+observations and joined startup/audit VMs are retained under
+`build/ios/fortnite/set-bridge-checks`. The original fixture failure records
+using the dispatcher IMP return as a message result; the corrected fixture
+calls the existing builtin message entry directly. Two SDK snapshot helper
+failures and a class-reference address calculation failure are retained
+separately. Full iOS regression remains unpassed and published runners remain
+unchanged.
+
+The actual IPA startup probe passes the Set bridge import and exits with
+status 1 at MarketplaceKitWrapper's required `_OBJC_CLASS_$_OS_dispatch_queue`
+from `/usr/lib/libSystem.B.dylib`. Fortnite has not entered application code
+and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -5829,10 +5863,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,475 | 685 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 174 | 2 | 23 |
-| All images | 2,308 | 690 | 120 |
+| MarketplaceKitWrapper | 175 | 1 | 23 |
+| All images | 2,309 | 689 | 120 |
 
-The C++/GLES/Text variant reports 2,321 resolved imports, 677 unresolved strong
+The C++/GLES/Text variant reports 2,322 resolved imports, 676 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
