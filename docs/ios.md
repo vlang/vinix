@@ -5175,23 +5175,41 @@ lifetime audit, retained fixture trials and actual IPA probe/audits are under
 `build/ios/fortnite/any-checks`. Final input pins include the newly added runtime
 and test sources. Full iOS regression remains unpassed.
 
-The supplied IPA now exits with status 1 at MarketplaceKitWrapper's required
-`__swiftEmptyArrayStorage`, the native immortal empty-array singleton. Its
-required import and native singleton/class header data are retained for the
-next implementation. Fortnite has not entered application code and remains
-unplayable.
+The exact Swift Core data export `__swiftEmptyArrayStorage` now returns the
+existing canonical empty-array object directly. Native Swift confirms the
+immortal reference bits, zero count, capacity flags and shared identity across
+zero-capacity Int, String, Any, UInt8 and nested Array factories. Imported
+payloads use the existing Array witnesses, ARC and Sequence count paths. The
+existing lock publishes one read-only page; quiescent teardown retires it.
+This adds no owner registry or arena. Its private typed-storage descriptor
+still provides no native storage-class hierarchy, reflection, class casts or
+ObjC bridging; `swift_getObjectType` rejects it as class metadata.
+
+Ten fresh ASan/UBSan runs and five ARM64 Vinix suites pass across the singleton,
+typed storage, Array Sequence, Collection and Any. Fixtures compare native
+ownership and padded Array witnesses, concurrent lookup, immutable header
+mapping permissions and two drained/unmapped lifetimes. The public
+`build-swift-empty-array` target and full build, regression and Swift modes
+include the fixture. Thirteen final C streams and executables, native SDK/LLVM
+inputs, generated-C audit and actual IPA probe/audits are retained under
+`build/ios/fortnite/empty-array-checks`. Full iOS regression remains unpassed.
+
+The supplied IPA gets past this singleton import and exits with status 1 at
+MarketplaceKitWrapper's required `__swift_stdlib_bridgeErrorToNSError`. Its
+actual required import and native Swift bridge instructions are retained.
+Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,462 | 698 | 79 |
+| Fortnite executable | 1,463 | 697 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 152 | 24 | 23 |
-| All images | 2,273 | 725 | 120 |
+| MarketplaceKitWrapper | 153 | 23 | 23 |
+| All images | 2,275 | 723 | 120 |
 
-The C++/GLES/Text variant reports 2,286 resolved imports, 712 unresolved strong
+The C++/GLES/Text variant reports 2,288 resolved imports, 710 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
