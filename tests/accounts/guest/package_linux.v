@@ -76,6 +76,43 @@ fn qualify_package_download_refusal(root string, architecture string, repository
 	assert pkgcore.read_state(directory, architecture)!.generation == 1
 }
 
+fn qualify_package_oversized_offline_source(architecture string, repository string, key string, application pkgcore.Package) ! {
+	root := '/tmp/oversized-source-client'
+	os.mkdir_all(root + '/etc/vinix-packages')!
+	os.write_file(root + '/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{
+		architecture: architecture, policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 }
+	}))!
+	package_success(['--root', root, 'repo-enroll', 'fixture', 'file://' + repository, key])!
+	package_success(['--root', root, 'update'])!
+	package_success(['--root', root, 'install', application.id])!
+	package_success(['--root', root, 'remove', application.id])!
+	payload := application.files.filter(it.path == 'bin/probe')[0]
+	directory := pkgcore.state_directory(root)
+	object := directory + '/objects/' + payload.sha256
+	part := object + '.part'
+	source := repository + '/objects/' + payload.sha256
+	original := os.read_bytes(source)!
+	assert original.len > 64
+	defer { os.write_file_array(source, original) or { panic(err) } }
+	os.rm(object)!
+	os.write_file_array(part, original[..64])!
+	mut oversized := original.clone(); oversized << u8(0)
+	os.write_file_array(source, oversized)!
+	refused := run(['/usr/bin/vinix-package', '--root', root, '--progress', 'install', application.id], '', none, none)
+	assert refused.status != 0 && refused.output.contains('exceeds authenticated size'), refused.output
+	assert os.read_bytes(part)! == original[..64] && !os.exists(object)
+	assert pkgcore.read_state(directory, architecture)!.generation == 2
+	assert os.ls(directory + '/generations')!.sorted() == ['1', '2']
+	assert package_progress_events(refused.output)!.all(it.phase !in ['activate', 'complete'])
+	package_success(['--root', root, 'verify'])!
+	os.write_file_array(source, original)!
+	recovered := package_success(['--root', root, '--progress', 'install', application.id])!
+	assert package_progress_events(recovered)!.filter(it.phase == 'download' && it.package == application.id && it.path == payload.path).first().current == 64
+	assert pkgcore.verified_file(object, payload) && !os.exists(part)
+	assert pkgcore.read_state(directory, architecture)!.generation == 3
+	package_success(['--root', root, 'verify'])!
+}
+
 fn qualify_package_configuration_lock() ! {
 	guard := pkgcore.acquire('/var/lib/vinix-packages')!
 	defer { guard.release() }
@@ -433,6 +470,8 @@ fn qualify_package_linux(mut t Test) ! {
 	t.say('PACKAGE OFFLINE atomic-export failure-cleanup cached-retry ordinary-read signed-runtime-closure PASS')
 	qualify_package_download_refusal('/tmp/recovery-client', architecture, mirror_path + '/fixture', key, probe_package)!
 	t.say('PACKAGE DOWNLOAD RECOVERY damaged-prefix complete-partial bounded-retry bad-source-refusal preserved-rollback PASS')
+	qualify_package_oversized_offline_source(architecture, mirror_path + '/fixture', key, probe_package)!
+	t.say('PACKAGE OFFLINE COPY captured-files oversized-source retained-prefix restored-resume PASS')
 	// Organization restrictions are reviewed and atomically persisted without
 	// editing trust, the account selection or the installed generation.
 	policy_path := '/tmp/organization-policy.json'

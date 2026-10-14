@@ -184,3 +184,23 @@ fn test_verification_metadata_and_offline_fetch_refuse_fifo_without_opening_it()
 	assert !os.exists(fixture.object) && !os.exists(fixture.part)
 	assert fixture.events()!.all(it.phase !in ['activate', 'complete'])
 }
+
+fn test_oversized_offline_source_preserves_partial_activation_and_restored_resume() {
+	fixture := download_recovery_fixture('oversized-source')!
+	defer { fixture.close() }
+	prefix := fixture.text[..4096]
+	os.write_file(fixture.part, prefix)!
+	os.write_file(fixture.source, fixture.text + 'overflow')!
+	mut refused := false
+	fixture.service().transact('install', ['app'], TransactionOptions{}) or {
+		refused = err.msg().contains('exceeds authenticated size')
+	}
+	assert refused && fixture.service().verify()!.generation == 2
+	assert os.read_file(fixture.part)! == prefix && !os.exists(fixture.object)
+	assert fixture.events()!.all(it.phase !in ['download', 'verify', 'activate', 'complete'])
+	assert os.ls(fixture.directory + '/generations')!.sorted() == ['1', '2']
+	os.write_file(fixture.source, fixture.text)!
+	assert fixture.service().transact('install', ['app'], TransactionOptions{})!.generation == 3
+	assert verified_file(fixture.object, fixture.payload) && !os.exists(fixture.part)
+	assert fixture.events()!.filter(it.phase == 'download').first().current == 4096
+}

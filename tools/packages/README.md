@@ -88,6 +88,11 @@ with a fixed 8 MiB limit. Replaced leaf paths cannot redirect the read to an ali
 or stall it on a FIFO; in-place size changes fail with retry diagnostics. See
 [metadata read qualification](../../tests/packages/metadata-read-check.md).
 
+Local payload copies and offline transfers validate captured source/destination
+descriptors before truncating or writing. Aliases, special files, the same inode
+and inconsistent resume offsets refuse; an oversized offline source preserves
+the existing partial for recovery. See [copy qualification](../../tests/packages/copy-file-check.md).
+
 Consumer and publisher sequence histories also require complete, unambiguous
 records. Missing/null floor arrays cannot reset replay protection; damaged files
 are retained for administrator recovery. Revocation stays available. See

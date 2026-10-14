@@ -16,6 +16,11 @@ transfer is never retried for integrity. Transport errors continue to retain
 partial data for later commands; they do not trigger this automatic retry.
 No generation publishes until cache and staged copies pass verification.
 
+The later [captured-copy qualification](copy-file-check.md) adds descriptor/type,
+identity, resume-offset and source-size admission for local copies. An oversized
+offline source now preserves a usable partial instead of deleting it; restoring
+the source permits a verified resumed install on both targets.
+
 The pinned V compiler's `os.is_file` only excludes directories and accepts FIFOs.
 Metadata, hashing, verification and offline acquisition now inspect ordinary
 regular-file type before a potentially blocking read. Nonregular partial paths

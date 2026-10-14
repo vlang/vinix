@@ -1,0 +1,166 @@
+copy ASan/UBSan (detect_leaks=0, halt_on_error=1):
+PASS
+download_recovery ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Restarting app/bin/app: resumed payload failed verification
+Activated package generation 3
+Package download recovery: damaged resumed prefix restarted once and verified before activation
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Restarting app/bin/app: resumed payload failed verification
+Rolled back to generation 1; application data was retained
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Rolled back to generation 1; application data was retained
+Package download recovery: bad source refused after bounded attempts; activation and rollback preserved
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+PASS
+mirror ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-18823-1791949658566549/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Data 1.0.0 (2/2) from fixture
+Downloading data/share/data (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-18823-1791949659015833/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-18823-1791949659406353/unsafe/nested/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-18823-1791949660009292/interrupted; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-18823-1791949660503426/missing/media/export; $literal; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-18823-1791949661890874/export; enroll its file:// repository paths with the same public keys
+PASS
+release ASan/UBSan (detect_leaks=0, halt_on_error=1):
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+PASS

@@ -1,0 +1,10 @@
+source-alias: wait status 256; refused with source, destination and external files preserved
+target-alias: wait status 256; refused with source, destination and external files preserved
+same-path: wait status 256; refused with source, destination and external files preserved
+same-inode: wait status 256; refused with source, destination and external files preserved
+source-fifo: wait status 256; refused with source, destination and external files preserved
+target-fifo: wait status 256; refused with source, destination and external files preserved
+oversized-source: wait status 256; refused with source, destination and external files preserved
+wrong-resume-offset: wait status 256; refused with source, destination and external files preserved
+offline-oversized-source: wait status 256; refused with source, destination and external files preserved
+Copy file qualification passed

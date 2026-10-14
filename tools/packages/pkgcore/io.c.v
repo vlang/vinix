@@ -3,7 +3,6 @@ module pkgcore
 
 import crypto.sha256
 import os
-import time
 import tools.packages.pkgprotocol
 
 #include <sys/file.h>
@@ -130,42 +129,6 @@ pub fn copy_file(source string, target string, offset u64, maximum u64) ! {
 	copy_file_progress(source, target, offset, maximum, pkgprotocol.Progress{}, no_progress)!
 }
 
-fn copy_file_progress(source string, target string, offset u64, maximum u64, event pkgprotocol.Progress, report fn (pkgprotocol.Progress)) ! {
-	mut input := os.open(source)!
-	defer { input.close() }
-	input.seek(i64(offset), .start)!
-	mut output := os.open_file(target, if offset == 0 { 'w' } else { 'a' }, 0o600)!
-	defer { output.close() }
-	output.set_unbuffered()
-	mut buffer := []u8{len: 64 * 1024}
-	defer { unsafe { buffer.free() } }
-	mut bytes := offset
-	mut last := time.sys_mono_now()
-	if event.phase != '' { report(pkgprotocol.Progress{ ...event, current: bytes }) }
-	for {
-		count := input.read(mut buffer) or {
-			if err is os.Eof { break }
-			return err
-		}
-		if count == 0 { break }
-		bytes += u64(count)
-		if bytes > maximum { return error('download exceeds authenticated size: ${source}') }
-		mut sent := 0
-		for sent < count {
-			written := output.write(buffer[sent..count])!
-			if written == 0 { return error('short payload write (check disk space): ${target}') }
-			sent += written
-		}
-		if event.phase != '' && time.sys_mono_now() - last >= 200_000_000 {
-			report(pkgprotocol.Progress{ ...event, current: bytes })
-			last = time.sys_mono_now()
-		}
-	}
-	output.flush()
-	if C.fsync(output.fd) != 0 { return error('cannot flush payload: ${target}') }
-	if event.phase != '' { report(pkgprotocol.Progress{ ...event, current: bytes }) }
-}
-
 pub fn fetch(url string, destination string, maximum u64, resume bool, offline bool) ! {
 	fetch_progress(url, destination, maximum, resume, offline, pkgprotocol.Progress{}, no_progress)!
 }
@@ -174,22 +137,7 @@ pub fn fetch(url string, destination string, maximum u64, resume bool, offline b
 // server can refuse ranges, requiring a bounded fresh transfer instead.
 fn fetch_progress(url string, destination string, maximum u64, resume bool, offline bool, event pkgprotocol.Progress, report fn (pkgprotocol.Progress)) !bool {
 	if url.starts_with('file:///') {
-		source := url[7..]
-		if !ordinary_file(source) {
-			return error('offline repository file unavailable: ${source}')
-		}
-		if os.file_size(source) > maximum {
-			if os.exists(destination) { os.rm(destination)! }
-			return error('offline repository file exceeds authenticated size: ${source}')
-		}
-		mut offset := u64(0)
-		if resume && os.is_file(destination) { offset = os.file_size(destination) }
-		if offset > maximum {
-			os.rm(destination)!
-			offset = 0
-		}
-		copy_file_progress(source, destination, offset, maximum, event, report)!
-		return offset > 0
+		return fetch_file_progress(url[7..], destination, maximum, resume, event, report)
 	}
 	if offline { return error('offline mode: verified payload is missing from cache: ${url}') }
 	if !url.starts_with('https://') {

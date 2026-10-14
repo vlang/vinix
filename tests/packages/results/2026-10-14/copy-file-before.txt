@@ -1,0 +1,10 @@
+source-alias: wait status 0; previous behavior reproduced
+target-alias: wait status 0; previous behavior reproduced
+same-path: wait status 0; previous behavior reproduced
+same-inode: wait status 0; previous behavior reproduced
+source-fifo: wait status 14; previous behavior reproduced
+target-fifo: wait status 14; previous behavior reproduced
+oversized-source: wait status 256; previous behavior reproduced
+wrong-resume-offset: wait status 0; previous behavior reproduced
+offline-oversized-source: wait status 256; previous behavior reproduced
+Copy file qualification passed

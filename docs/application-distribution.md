@@ -14,6 +14,13 @@ before parsing; an atomically replaced pathname can still return its previously
 captured file. Restoring trusted ordinary metadata permits retry without deleting
 package state. See [qualification](../tests/packages/metadata-read-check.md).
 
+Local payload copies validate ordinary source and destination descriptors before
+writing, refuse the same file even through a hard link, and enforce the captured
+source size. Oversized offline repository objects leave existing partial data
+available for a retry after restoring trusted media. Signed size/hash checks
+still gate cache promotion and generation activation. See
+[copy qualification](../tests/packages/copy-file-check.md).
+
 This application store is separate from the Alpine `pkg`/`apk` system layer.
 Existing Alpine ports and special downloads still use that frontend and its
 persistence rules. They do **not** acquire these rollback guarantees. Release
