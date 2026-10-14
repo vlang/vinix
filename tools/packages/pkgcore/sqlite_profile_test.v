@@ -3,18 +3,10 @@ module pkgcore
 
 import os
 import time
+import tests.packages.elffixture
 
 fn sqlite_fixture_elf(architecture string, pie bool, shared bool) []u8 {
-	mut bytes := []u8{len: 128}
-	for i, byte in [u8(127), `E`, `L`, `F`, 2, 1, 1] { bytes[i] = byte }
-	bytes[16] = if pie || shared { u8(3) } else { u8(2) }
-	bytes[18] = if architecture == 'aarch64' { u8(183) } else { u8(62) }
-	bytes[20] = 1
-	bytes[32] = 64
-	bytes[54] = 56
-	bytes[56] = 1
-	bytes[64] = if pie { u8(3) } else { u8(1) }
-	return bytes
+	return elffixture.image(architecture, if pie { 'pie' } else if shared { 'shared' } else { 'static' })
 }
 
 fn sqlite_profile_fixture() !string {
@@ -123,6 +115,27 @@ fn sqlite_oversized_imported_notice(phase string, stage string) ! {
 }
 
 fn sqlite_profile_zero_space(_ string) !u64 { return 0 }
+
+fn sqlite_imported_invalid_interpreter(phase string, stage string) ! {
+	if phase != 'created' { return }
+	mut bytes := elffixture.image('x86_64', 'pie')
+	bytes[321] = 0
+	os.write_file_array(os.dir(stage) + '/roots/x86_64/bin/sqlite3', bytes)!
+}
+
+fn test_sqlite_profile_rechecks_imported_interpreter_and_allows_exact_retry() {
+	work := sqlite_profile_fixture()!
+	defer { os.rmdir_all(work) or {} }
+	baseline := sqlite_catalog('3.53.4', '1.0.0', work + '/roots', work + '/baseline')!
+	mut refused := false
+	sqlite_catalog_with('3.53.4', '1.0.0', work + '/roots', work + '/refused', CatalogOptions{ checkpoint: sqlite_imported_invalid_interpreter }) or {
+		refused = err.msg().contains('imported') && err.msg().contains('NUL-terminated interpreter')
+	}
+	assert refused && !os.exists(work + '/refused')
+	assert os.ls(work)!.all(!it.starts_with('.vinix-sqlite-profile-'))
+	os.write_file_array(work + '/roots/x86_64/bin/sqlite3', elffixture.image('x86_64', 'pie'))!
+	assert sqlite_catalog('3.53.4', '1.0.0', work + '/roots', work + '/refused')!.catalog_sha256 == baseline.catalog_sha256
+}
 
 fn test_sqlite_profile_rechecks_imported_notices_cleans_failure_and_allows_exact_retry() {
 	for checkpoint in [sqlite_empty_imported_notice, sqlite_directory_imported_notice, sqlite_oversized_imported_notice] {

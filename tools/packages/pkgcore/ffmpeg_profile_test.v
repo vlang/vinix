@@ -3,15 +3,10 @@ module pkgcore
 
 import os
 import time
+import tests.packages.elffixture
 
 fn ffmpeg_test_elf(architecture string, kind string) []u8 {
-	mut bytes := []u8{len: 128}
-	for i, byte in [u8(127), `E`, `L`, `F`, 2, 1, 1] { bytes[i] = byte }
-	bytes[16] = if kind == 'static' { u8(2) } else { u8(3) }
-	bytes[18] = if architecture == 'aarch64' { u8(183) } else { u8(62) }
-	bytes[20] = 1; bytes[32] = 64; bytes[54] = 56; bytes[56] = 1
-	bytes[64] = if kind == 'pie' { u8(3) } else { u8(1) }
-	return bytes
+	return elffixture.image(architecture, kind)
 }
 
 fn ffmpeg_test_roots() !string {
@@ -116,6 +111,24 @@ fn ffmpeg_oversized_imported_notice(phase string, stage string) ! {
 }
 
 fn ffmpeg_profile_zero_space(_ string) !u64 { return 0 }
+
+fn ffmpeg_imported_invalid_entry(phase string, stage string) ! {
+	if phase != 'created' { return }
+	mut bytes := elffixture.image('aarch64', 'pie')
+	elffixture.put(mut bytes, 24, 0x100200)
+	os.write_file_array(os.dir(stage) + '/roots/aarch64/bin/ffmpeg', bytes)!
+}
+
+fn test_ffmpeg_profile_rechecks_imported_entry_before_source_pin_admission() {
+	work := ffmpeg_test_roots()!
+	defer { os.rmdir_all(work) or {} }
+	mut refused := false
+	ffmpeg_catalog_with('1.0.0', work + '/roots', work + '/refused', CatalogOptions{ checkpoint: ffmpeg_imported_invalid_entry }) or {
+		refused = err.msg().contains('imported') && err.msg().contains('executable entry')
+	}
+	assert refused && !os.exists(work + '/refused')
+	assert os.ls(work)!.all(!it.starts_with('.vinix-ffmpeg-profile-'))
+}
 
 fn test_ffmpeg_profile_requires_the_imported_source_filename_and_complete_bounded_notices() {
 	for checkpoint in [ffmpeg_directory_imported_source, ffmpeg_empty_imported_notice,

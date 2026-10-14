@@ -391,8 +391,15 @@ licenses/musl-MIT.txt
 ```
 
 Executables must be ordinary, executable, static ELF64 images for the declared
-host, without an ELF interpreter. The checks admit target/format structure;
-they do not prove every syscall, library function or application behavior.
+host, without an ELF interpreter. ELF headers must declare the supported 64-byte
+header and 56-byte program entries. Nonempty segment file ranges must fit the
+captured file; load segments need valid memory sizes and alignment. Static and
+PIE entries must point into file-backed executable load segments. PIE images
+need exactly one absolute, NUL-terminated interpreter of at most 4096 bytes
+including the terminator; shared libraries and static images cannot declare one.
+The checks admit target/format structure; they do not prove every instruction,
+syscall, library function or application behavior. See
+[ELF admission qualification](../../tests/packages/elf-profile-check.md).
 Notices must be nonempty ordinary files of at most 1 MiB. Root directories
 cannot be aliases; the importer captures both target directories before copying.
 Imported executable bytes and notice sizes are checked again before publication.
@@ -446,10 +453,11 @@ licenses/musl-COPYRIGHT
 licenses/vinix-COPYING
 ```
 
-The profile checks ELF64 little-endian target/type and bounded program headers,
-requires an interpreter on the CLI and no interpreter on the static runner or
-shared libraries, and checks the imported object headers again. Executable
-payloads are limited to 512 MiB each; notices must be nonempty and at most 1 MiB.
+The profile applies the same ELF64 target, segment, entry and interpreter
+checks as the native profile, with an interpreter on the PIE CLI and none on
+the static runner or shared libraries. It checks imported object bytes again.
+Executable payloads are limited to 512 MiB each; notices must be nonempty and
+at most 1 MiB.
 The imported inventory must contain every declared file at its exact path, with
 notice sizes checked again. A directory substituted after preflight cannot
 replace a required notice, executable or library in the catalog lock.
@@ -587,8 +595,9 @@ sources/linux-runner.v, ffmpeg-build.v, ffmpeg-source.json
 
 The source archive's length and SHA-256 must match
 [ffmpeg-source.json](../../tests/packages/ffmpeg-source.json). ELF format,
-architecture, interpreter presence and ordinary executable metadata are checked
-before import and again on captured payload objects. All notices/build sources
+architecture, load/entry structure, bounded interpreter path and ordinary
+executable metadata are checked before import and again on captured payload
+objects. All notices/build sources
 are required, nonempty and bounded, including in the imported inventory. Every
 declared file must retain its exact path: substituting a directory for the
 source archive cannot skip the archive's length, hash and mode checks.

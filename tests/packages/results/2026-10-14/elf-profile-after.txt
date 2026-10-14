@@ -1,0 +1,63 @@
+PASS native valid structural fixtures
+native/aarch64/no-load: exit=1 published=false
+vinix-package: ELF profile needs file-backed load segments and an executable entry: bin/memo
+PASS restored exact lock at refused destination
+native/aarch64/outside-entry: exit=1 published=false
+vinix-package: ELF profile needs file-backed load segments and an executable entry: bin/memo
+PASS restored exact lock at refused destination
+native/aarch64/truncated-load: exit=1 published=false
+vinix-package: ELF profile has a segment outside the file: bin/memo
+PASS restored exact lock at refused destination
+native/aarch64/invalid-alignment: exit=1 published=false
+vinix-package: ELF profile has an invalid load segment: bin/memo
+PASS restored exact lock at refused destination
+native/aarch64/invalid-header-size: exit=1 published=false
+vinix-package: ELF profile has invalid program headers: bin/memo
+PASS restored exact lock at refused destination
+native/x86_64/no-load: exit=1 published=false
+vinix-package: ELF profile needs file-backed load segments and an executable entry: bin/memo
+PASS restored exact lock at refused destination
+native/x86_64/outside-entry: exit=1 published=false
+vinix-package: ELF profile needs file-backed load segments and an executable entry: bin/memo
+PASS restored exact lock at refused destination
+native/x86_64/truncated-load: exit=1 published=false
+vinix-package: ELF profile has a segment outside the file: bin/memo
+PASS restored exact lock at refused destination
+native/x86_64/invalid-alignment: exit=1 published=false
+vinix-package: ELF profile has an invalid load segment: bin/memo
+PASS restored exact lock at refused destination
+native/x86_64/invalid-header-size: exit=1 published=false
+vinix-package: ELF profile has invalid program headers: bin/memo
+PASS restored exact lock at refused destination
+PASS sqlite valid structural fixtures
+sqlite/aarch64/empty-interpreter: exit=1 published=false
+vinix-package: ELF profile has an invalid interpreter: bin/sqlite3
+PASS restored exact lock at refused destination
+sqlite/aarch64/relative-interpreter: exit=1 published=false
+vinix-package: ELF profile needs an absolute NUL-terminated interpreter: bin/sqlite3
+PASS restored exact lock at refused destination
+sqlite/aarch64/unterminated-interpreter: exit=1 published=false
+vinix-package: ELF profile needs an absolute NUL-terminated interpreter: bin/sqlite3
+PASS restored exact lock at refused destination
+sqlite/aarch64/embedded-nul: exit=1 published=false
+vinix-package: ELF profile needs an absolute NUL-terminated interpreter: bin/sqlite3
+PASS restored exact lock at refused destination
+sqlite/aarch64/duplicate-interpreter: exit=1 published=false
+vinix-package: ELF profile has an invalid interpreter: bin/sqlite3
+PASS restored exact lock at refused destination
+sqlite/x86_64/empty-interpreter: exit=1 published=false
+vinix-package: ELF profile has an invalid interpreter: bin/sqlite3
+PASS restored exact lock at refused destination
+sqlite/x86_64/relative-interpreter: exit=1 published=false
+vinix-package: ELF profile needs an absolute NUL-terminated interpreter: bin/sqlite3
+PASS restored exact lock at refused destination
+sqlite/x86_64/unterminated-interpreter: exit=1 published=false
+vinix-package: ELF profile needs an absolute NUL-terminated interpreter: bin/sqlite3
+PASS restored exact lock at refused destination
+sqlite/x86_64/embedded-nul: exit=1 published=false
+vinix-package: ELF profile needs an absolute NUL-terminated interpreter: bin/sqlite3
+PASS restored exact lock at refused destination
+sqlite/x86_64/duplicate-interpreter: exit=1 published=false
+vinix-package: ELF profile has an invalid interpreter: bin/sqlite3
+PASS restored exact lock at refused destination
+PASS 20 malformed ELF cases (refusal, cleanup and restored retry)

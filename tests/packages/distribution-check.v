@@ -70,6 +70,9 @@ fn check() ! {
 		run(work + '/vinix-package', ['--help'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-o', work + '/cli-check', repository + '/tests/packages/distribution-cli.v'])!
 		run(work + '/cli-check', [work + '/vinix-package'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository,
+			'-o', work + '/elf-profile-check', repository + '/tests/packages/elf-profile-check.v'])!
+		run(work + '/elf-profile-check', [work + '/vinix-package', work + '/elf-profiles'])!
 		run(v, [...helper_flags, '-o', work + '/terminal-check', repository + '/tests/packages/terminal-check.v'])!
 		run(work + '/terminal-check', [])!
 	}

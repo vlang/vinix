@@ -105,6 +105,11 @@ retains redistribution notices and separates compatible library updates from
 the CLI. See the [publisher profile](SDK.md#sqlite-cli-publisher-profile) and
 [real SQLite lifecycle qualification](../../tests/packages/sqlite-profile-check.md).
 
+All fixed profiles check captured ELF segment ranges, load alignment and memory
+sizes, file-backed executable entry points and bounded interpreter paths before
+publishing a lock. These checks run on the copied objects as well as the source;
+see [ELF admission qualification](../../tests/packages/elf-profile-check.md).
+
 `native-catalog VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY` pins Hello, Counter and
 Memo for both hosts, retaining their SDK permissions, native window protocols
 and redistribution notices. The [combined V builder](../../examples/package-catalog/README.md)

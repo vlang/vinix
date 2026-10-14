@@ -1,0 +1,23 @@
+PASS native valid structural fixtures
+native/aarch64/no-load: exit=0 published=true
+native/aarch64/outside-entry: exit=0 published=true
+native/aarch64/truncated-load: exit=0 published=true
+native/aarch64/invalid-alignment: exit=0 published=true
+native/aarch64/invalid-header-size: exit=0 published=true
+native/x86_64/no-load: exit=0 published=true
+native/x86_64/outside-entry: exit=0 published=true
+native/x86_64/truncated-load: exit=0 published=true
+native/x86_64/invalid-alignment: exit=0 published=true
+native/x86_64/invalid-header-size: exit=0 published=true
+PASS sqlite valid structural fixtures
+sqlite/aarch64/empty-interpreter: exit=0 published=true
+sqlite/aarch64/relative-interpreter: exit=0 published=true
+sqlite/aarch64/unterminated-interpreter: exit=0 published=true
+sqlite/aarch64/embedded-nul: exit=0 published=true
+sqlite/aarch64/duplicate-interpreter: exit=0 published=true
+sqlite/x86_64/empty-interpreter: exit=0 published=true
+sqlite/x86_64/relative-interpreter: exit=0 published=true
+sqlite/x86_64/unterminated-interpreter: exit=0 published=true
+sqlite/x86_64/embedded-nul: exit=0 published=true
+sqlite/x86_64/duplicate-interpreter: exit=0 published=true
+PASS 20 malformed ELF cases (before-change admission)

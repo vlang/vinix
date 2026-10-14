@@ -4,17 +4,11 @@ module pkgcore
 import json2
 import os
 import time
+import tests.packages.elffixture
 
 fn native_fixture_elf(architecture string, interpreter bool) []u8 {
-	mut bytes := []u8{len: 128}
-	for i, byte in [u8(127), `E`, `L`, `F`, 2, 1, 1] { bytes[i] = byte }
+	mut bytes := elffixture.image(architecture, if interpreter { 'pie' } else { 'static' })
 	bytes[16] = 2
-	bytes[18] = if architecture == 'aarch64' { u8(183) } else { u8(62) }
-	bytes[20] = 1
-	bytes[32] = 64
-	bytes[54] = 56
-	bytes[56] = 1
-	bytes[64] = if interpreter { u8(3) } else { u8(1) }
 	return bytes
 }
 
@@ -92,6 +86,27 @@ fn native_profile_notice_directory(phase string, stage string) ! {
 		os.mkdir(path)!
 		os.write_file(path + '/nested', 'unexpected notice directory')!
 	}
+}
+
+fn native_profile_imported_invalid_elf(phase string, stage string) ! {
+	if phase != 'created' { return }
+	mut bytes := elffixture.image('aarch64', 'static')
+	elffixture.put(mut bytes, 96, u64(bytes.len + 1))
+	os.write_file_array(os.dir(stage) + '/roots/aarch64/bin/memo', bytes)!
+}
+
+fn test_native_profile_rechecks_imported_segment_ranges_and_allows_exact_retry() {
+	work := native_profile_fixture()!
+	defer { os.rmdir_all(work) or {} }
+	baseline := native_catalog('1.0.0', work + '/roots', work + '/baseline')!
+	mut refused := false
+	native_catalog_with('1.0.0', work + '/roots', work + '/refused', CatalogOptions{ checkpoint: native_profile_imported_invalid_elf }) or {
+		refused = err.msg().contains('imported org.vinix.memo') && err.msg().contains('segment outside the file')
+	}
+	assert refused && !os.exists(work + '/refused')
+	assert os.ls(work)!.all(!it.starts_with('.vinix-native-profile-'))
+	os.write_file_array(work + '/roots/aarch64/bin/memo', elffixture.image('aarch64', 'static'))!
+	assert native_catalog('1.0.0', work + '/roots', work + '/refused')!.catalog_sha256 == baseline.catalog_sha256
 }
 
 fn native_profile_raced_target(phase string, stage string) ! {
