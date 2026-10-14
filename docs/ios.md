@@ -5562,11 +5562,46 @@ Thirteen C streams/executables, native/IPA references, recovered archive and
 VM trial evidence, and completed probes/audits are retained under
 `build/ios/fortnite/dispatch-main-checks`; full iOS regression remains unpassed.
 
-The IPA startup probe now gets past the main queue getter and exits with
+The main-queue-only IPA probe got past the getter and exited with
 status 1 at MarketplaceKitWrapper's required
 `DispatchQueue.async(group:qos:flags:execute:)` adapter in
 `/usr/lib/swift/libswiftDispatch.dylib`:
 `_$sSo17OS_dispatch_queueC8DispatchE5async5group3qos5flags7executeySo0a1_b1_F0CSg_AC0D3QoSVAC0D13WorkItemFlagsVyyXBtF`.
+Fortnite has not entered application code and remains unplayable.
+
+Swift Dispatch now exports the async adapter for the supplied IPA's default
+profile: nil group, unspecified QoS and empty flags. The caller borrows QoS
+and flags storage in `x1`/`x2`, the block in `x3`, and queue Self in `x20`, with
+group in `x0`. A sealed bridge passes Self to the V body in `x4`, preserving
+`x20`/`x21` and ignoring `x8`. Native and IPA instructions confirm this ABI
+and seven MarketplaceKitWrapper calls using the default argument helpers.
+
+The adapter validates active registered queue state and the argument profile
+before reading block storage, copying captures or submitting work. It then
+uses the existing dispatcher with all locks released. Stack blocks are
+promoted, heap blocks retain one queued ownership, and global blocks preserve
+their identity. Execution or shutdown cancellation releases queued captures.
+Copy/dispose helpers may reenter queue/runtime locks. Main-thread callbacks
+remain deferred, with callbacks posted from a callback running on a later turn.
+Groups, non-default QoS/priorities, flags including barriers, WorkItem overloads,
+`asyncUnsafe` exports and queue metadata/type queries remain unsupported and
+reject explicitly. Cached bridge pointers expire after quiescent retirement.
+
+Ten fresh ASan/UBSan runs and five ARM64 Vinix suites pass across async,
+the main queue, QoS, SetAlgebra and the scheduler. Native/V comparisons cover
+guarded borrowed values, register preservation, stack promotion, global
+identity, heap-block ownership, captured queue ARC and reentrant callbacks.
+Vinix additionally checks unlocked helper reentry, next-turn main callbacks,
+shutdown cancellation, stop during copy, protected rejection before capture
+reads, eight resolvers and unmapped lifetimes. Generated C verifies validation
+and existing submission without additional wrapper allocation or ARC.
+Thirteen C streams/executables, native/IPA references, the retained descriptor
+lifetime trial, corrected sanitizer artifacts and completed probes/audits are
+under `build/ios/fortnite/dispatch-async-checks`; full iOS regression remains unpassed.
+
+The IPA startup probe now gets past the async adapter and exits with status 1
+at MarketplaceKitWrapper's required ObjCBool nominal descriptor,
+`_$s10ObjectiveC8ObjCBoolVMn`, in `/usr/lib/swift/libswiftObjectiveC.dylib`.
 Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -5574,12 +5609,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,471 | 689 | 79 |
+| Fortnite executable | 1,472 | 688 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 165 | 11 | 23 |
-| All images | 2,295 | 703 | 120 |
+| MarketplaceKitWrapper | 166 | 10 | 23 |
+| All images | 2,297 | 701 | 120 |
 
-The C++/GLES/Text variant reports 2,308 resolved imports, 690 unresolved strong
+The C++/GLES/Text variant reports 2,310 resolved imports, 688 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

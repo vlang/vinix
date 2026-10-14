@@ -67,7 +67,8 @@ fn swift_dispatch_flags_arena_checked() !u64 {
 	swift_dispatch_algebra_build(base, data, integer_data + 192, integer_data + 432)
 	swift_dispatch_qos_build(base, data)
 	swift_dispatch_main_build(base)
-	C.__builtin___clear_cache(arena, voidptr(base + 800))
+	swift_dispatch_async_build(base)
+	C.__builtin___clear_cache(arena, voidptr(base + 832))
 	if C.mprotect(arena, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(voidptr(data), usize(page), C.PROT_READ) != 0 {
 		if C.munmap(arena, usize(page * 2)) != 0 { panic('iOS: cannot retire unsealed Swift Dispatch metadata') }
@@ -95,6 +96,10 @@ fn swift_dispatch_symbol(symbol string) !u64 {
 		'_$sSo17OS_dispatch_queueC8DispatchE4mainABvgZ' {
 			swift_dispatch_main_queue_checked()!
 			u64(768)
+		}
+		'_$sSo17OS_dispatch_queueC8DispatchE5async5group3qos5flags7executeySo0a1_b1_F0CSg_AC0D3QoSVAC0D13WorkItemFlagsVyyXBtF' {
+			swift_dispatch_main_queue_checked()!
+			u64(800)
 		}
 		'_$s8Dispatch0A13WorkItemFlagsVMn', '_$s8Dispatch0A13WorkItemFlagsVs10SetAlgebraAAMc', '_$s8Dispatch0A3QoSVMn' { ~u64(0) }
 		else { return error('iOS: Swift Dispatch symbol is not implemented: ${symbol}') }
