@@ -452,8 +452,16 @@ directory's mount and existing target/resource pins; descriptor operations use
 the description's saved mount. Both architectures and same-ELF Linux checks
 cover actual mode/UID/GID changes, symlink no-follow behavior, retained read-only
 paths and UID/GID 1000 denial. Ownership, capabilities, MAC and attribute checks
-remain before mutation. Times, xattrs, inode flags and other metadata paths
+remain before mutation. Xattrs, inode flags and other metadata paths
 still need complete attachment-policy coverage.
+The [timestamp checks](../tests/mount-lifecycle/timestamp-policy.md) extend that
+policy to `utimensat` and its descriptor/legacy forms. Path and empty-path cwd
+operations preserve their starting mount; descriptors supply their saved route.
+Both native architectures and same-ELF Linux checks cover explicit and current
+times, one omitted timestamp, symlink no-follow, detached/retired descriptions,
+cwd aliases and UID/GID 1000 denial. Both-omit short-circuit semantics, invalid
+input error ordering and concurrent mount/cwd changes remain outside this
+qualification.
 Mount reclamation, busy-reference accounting and full OCI acceptance remain open.
 The overlay-depth refusal measurements also exposed an event-record allocation per call.
 The separate [security event producer correction](../tests/overlay-rename/security-events.md)

@@ -2746,10 +2746,11 @@ pub fn set_file_times(dirfd int, _path charptr, requested [2]time.TimeSpec, flag
 	defer { if held_fd != unsafe { nil } { held_fd.unref() } }
 	mut held_path := PathTarget{}
 	defer { release_path_target(held_path) }
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	if path.len == 0 {
 		if !on_descriptor && flags & at_empty_path == 0 { return errno.err, errno.enoent }
 		if is_fdcwd(dirfd) {
-			node = proc.current_directory_of(proc.current_thread().process)
+			node = parent_and_mount_for(dirfd, path, identity) or { return errno.err, errno.get() }
 			res = node.resource
 		} else {
 			// The descriptor may name something without a name, a pipe
@@ -2758,13 +2759,14 @@ pub fn set_file_times(dirfd int, _path charptr, requested [2]time.TimeSpec, flag
 				return errno.err, errno.get()
 			}
 			held_fd = fd
+			lib.copy_mount_context(identity, &fd.handle.mount)
 			fd.handle.mac_check(proc.mac_metadata) or { return errno.err, errno.get() }
 			node = unsafe { &VFSNode(fd.handle.node) }
 			res = fd.handle.resource
 		}
 	} else {
-		parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
-		held_path = retain_path_target(parent, path, flags & at_symlink_nofollow == 0) or {
+		parent := parent_and_mount_for(dirfd, path, identity) or { return errno.err, errno.get() }
+		held_path = retain_path_target_on_mount(parent, path, flags & at_symlink_nofollow == 0, identity) or {
 			return errno.err, errno.get()
 		}
 		node = held_path.node
@@ -2774,7 +2776,7 @@ pub fn set_file_times(dirfd int, _path charptr, requested [2]time.TimeSpec, flag
 		res = held_path.res
 	}
 	mac_resource(mut res, proc.mac_metadata) or { return errno.err, errno.get() }
-	if node != unsafe { nil } && read_only(node) { return errno.err, errno.erofs }
+	if node != unsafe { nil } && read_only_on_mount(node, identity) { return errno.err, errno.erofs }
 	if node != unsafe { nil } && !attr_allows_metadata(node) { return errno.err, errno.get() }
 
 	now := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }

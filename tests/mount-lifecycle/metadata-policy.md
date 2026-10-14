@@ -88,8 +88,11 @@ exhaustion. Fresh `before-b` controls reproduce the runtime errors with the
 final probe. Verified owned build caches were pruned; frozen sources, C, ELFs,
 stack-usage outputs, receipts and completed artifact hashes remain intact.
 
+The subsequent [timestamp checks](timestamp-policy.md) extend route-based policy
+to `utimensat`, descriptor/empty-path updates and the older timestamp APIs.
+
 Concurrent remount/namespace switching, inherited foreign-description policy,
-existing data writers during remount, O_PATH metadata semantics, times, xattrs,
+existing data writers during remount, O_PATH metadata semantics, xattrs,
 inode flags, overlay metadata integration, readonly disk backends, mount
 reclamation and complete OCI/rootless runtime acceptance remain open. These
 checks do not measure allocation-flat metadata loops. Roadmap section 17

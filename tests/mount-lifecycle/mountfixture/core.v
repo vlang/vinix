@@ -20,6 +20,9 @@ struct C.stat {
 	st_mode u32
 	st_uid u32
 	st_gid u32
+	st_atim C.timespec
+	st_mtim C.timespec
+	st_ctim C.timespec
 }
 
 fn C.mount(&char, &char, &char, usize, voidptr) int
@@ -368,6 +371,8 @@ pub fn run() int {
 			&& name[3] >= `0` && name[3] <= `5` { int(name[3] - `0`) } else { -1 }
 		metadata_case := if count == 4 && name[0] == `m` && name[1] == `p` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `6` { int(name[3] - `0`) } else { -1 }
+		timestamp_case := if count == 4 && name[0] == `t` && name[1] == `p` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		check(C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'move') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'identities') == 0 || identity >= 0
@@ -379,7 +384,8 @@ pub fn run() int {
 			|| C.strcmp(selected, c'pivot-threads') == 0 || thread_case >= 0
 			|| C.strcmp(selected, c'bind-policy') == 0 || bind_case >= 0
 			|| C.strcmp(selected, c'truncate') == 0 || truncate_case >= 0
-			|| C.strcmp(selected, c'metadata') == 0 || metadata_case >= 0, 4)
+			|| C.strcmp(selected, c'metadata') == 0 || metadata_case >= 0
+			|| C.strcmp(selected, c'times') == 0 || timestamp_case >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
@@ -413,6 +419,9 @@ pub fn run() int {
 		if C.strcmp(selected, c'metadata') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { metadata_cases(-1) }
 		if metadata_case >= 0 { metadata_cases(metadata_case) }
+		if C.strcmp(selected, c'times') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { timestamp_cases(-1) }
+		if timestamp_case >= 0 { timestamp_cases(timestamp_case) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }
