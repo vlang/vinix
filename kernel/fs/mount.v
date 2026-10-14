@@ -814,6 +814,60 @@ fn find_mount(mut table MountTable, root &VFSNode) &Mount {
 	return unsafe { nil }
 }
 
+// Mount objects remain permanent. Copy their parent identity under the entry
+// lock, then release it before namespace lookup takes the table lock.
+fn mount_parent_in_namespace(_entry &Mount) &Mount {
+	mut entry := unsafe { _entry }
+	entry.lock.acquire()
+	identity := lib.mount_context_top(&entry.parent)
+	entry.lock.release()
+	return namespace_mount(identity)
+}
+
+// Called under vfs_lock before changing either attachment. Saved cwd/fd routes
+// can predate reparenting, so follow current namespace parents by stable id.
+fn validate_mount_move(mut table MountTable, entry &Mount, target_mount &lib.MountContext) ? {
+	mut ancestor := namespace_mount(lib.mount_context_top(target_mount))
+	mut destination_depth := 0
+	// Reserve one of the cursor's 64 steps for the mount being moved.
+	for _ in 0 .. 63 {
+		if ancestor == unsafe { nil } { break }
+		if ancestor.id == entry.id { errno.set(errno.eloop); return none }
+		destination_depth++
+		ancestor = mount_parent_in_namespace(ancestor)
+	}
+	if ancestor != unsafe { nil } { errno.set(errno.eloop); return none }
+
+	// Moving a shallow root also moves its existing descendants. A destination
+	// that fits on its own must not make any of those mounts unreachable.
+	table.lock.acquire()
+	count := table.mounts.len
+	table.lock.release()
+	for i in 0 .. count {
+		table.lock.acquire()
+		if i >= table.mounts.len {
+			table.lock.release()
+			errno.set(errno.enoent)
+			return none
+		}
+		candidate := table.mounts[i]
+		detached := candidate.detached
+		table.lock.release()
+		if detached { continue }
+		mut current := candidate
+		mut depth := 1
+		for _ in 0 .. 64 {
+			if current == unsafe { nil } { break }
+			if current.id == entry.id {
+				if destination_depth + depth > 64 { errno.set(errno.eloop); return none }
+				break
+			}
+			depth++
+			current = mount_parent_in_namespace(current)
+		}
+	}
+}
+
 fn move_mount(parent &VFSNode, source string, target string) ? {
 	vfs_lock.acquire()
 	defer { vfs_lock.release() }
@@ -821,7 +875,7 @@ fn move_mount(parent &VFSNode, source string, target string) ? {
 	source_root := get_node_and_mount(parent, source, true, source_mount)?
 	mut table := table_of(calling_process())
 	mut entry := namespace_mount(lib.mount_context_top(source_mount))
-	if entry == unsafe { nil } || voidptr(entry.root) != voidptr(source_root) {
+	if entry == unsafe { nil } || entry.detached || voidptr(entry.root) != voidptr(source_root) {
 		errno.set(errno.einval)
 		return none
 	}
@@ -836,7 +890,12 @@ fn move_mount(parent &VFSNode, source string, target string) ? {
 	if target_node == unsafe { nil } {
 		return none
 	}
+	if stat.isdir(source_root.resource.stat.mode) != stat.isdir(target_node.resource.stat.mode) {
+		errno.set(errno.einval)
+		return none
+	}
 	if volume_mount_node(target_node) { errno.set(errno.ebusy); return none }
+	validate_mount_move(mut table, entry, target_mount)?
 	mut old_covered := entry.covered
 	if voidptr(old_covered) != voidptr(entry.root) {
 		detach_mount(mut table, mut old_covered)

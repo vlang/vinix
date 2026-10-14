@@ -374,7 +374,13 @@ with flat live allocation counts on both architectures.
 Mounted views retain cached backing references after unmount; complete mount
 teardown remains open. The stacked copy-up probe uses a private stable lower
 subtree and records unrelated lower-mutation/teardown failures separately.
-Those refusal measurements also exposed an event-record allocation per call.
+The [mount lifecycle checks](../tests/mount-lifecycle/README.md) cover explicit
+refusal of unsupported force/expiry unmount modes and cycle-safe mount moves,
+including namespace copies and holders whose ancestors were reparented. Moves
+reserve a step within the existing bounded mount cursor before publication
+and check existing descendant attachments against the resulting depth.
+Mount reclamation, busy-reference accounting and full OCI acceptance remain open.
+The overlay-depth refusal measurements also exposed an event-record allocation per call.
 The separate [security event producer correction](../tests/overlay-rename/security-events.md)
 keeps temporary records on the producer's stack before copying them into the
 fixed ring. Both producers now pass repeated native allocation checks; report
