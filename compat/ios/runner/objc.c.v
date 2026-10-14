@@ -212,6 +212,8 @@ mut:
 	swift_integer_arena u64 // Int metadata, value witnesses and Equatable/Hashable conformances.
 	swift_dispatch_flags_arena u64 // Sealed DispatchWorkItemFlags metadata/accessor pages.
 	swift_dispatch_flags_retired bool // Reject resolution after quiescent metadata teardown.
+	swift_objc_bool_arena u64 // Sealed ObjectiveC.ObjCBool metadata/accessor pages.
+	swift_objc_bool_retired bool // Reject resolution after quiescent metadata teardown.
 	swift_foundation_arena u64 // Sealed CVarArg calls and Foundation's concrete String conformance.
 	swift_void_arena u64 // Sealed empty-tuple full metadata and zero-size value witnesses.
 	swift_unknown_value_arena u64 // Sealed Builtin.UnknownObject value witnesses.

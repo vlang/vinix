@@ -9,6 +9,14 @@ fn swift_bool_to_objc_bool(value u64) u64 { return value & 1 }
 fn swift_objc_bool_to_bool(value u64) u64 { return value & 1 }
 
 fn swift_objc_bool_symbol(symbol string) ?u64 {
+	if symbol in ['_$s10ObjectiveC8ObjCBoolVMa', '_$s10ObjectiveC8ObjCBoolVMn', '_$s10ObjectiveC8ObjCBoolVN']! {
+		base := swift_objc_bool_arena_checked() or { return none }
+		return match symbol {
+			'_$s10ObjectiveC8ObjCBoolVMa' { base }
+			'_$s10ObjectiveC8ObjCBoolVMn' { base + u64(C.getpagesize()) + 160 }
+			else { base + u64(C.getpagesize()) + 16 }
+		}
+	}
 	return match symbol {
 		'_$s10ObjectiveC22_convertBoolToObjCBoolyAA0eF0VSbF' {
 			u64(unsafe { voidptr(swift_bool_to_objc_bool) })

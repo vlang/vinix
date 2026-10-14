@@ -45,7 +45,7 @@ fn objc_bool_suite(probe ObjcBoolProbe) {
 		if _ := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', name) { assert false }
 		if _ := runtime_symbol('/usr/lib/swift/libswiftObjectiveC.dylib', name[1..]) { assert false }
 	}
-	for name in ['_$s10ObjectiveC8ObjCBoolVMn', '_$sSo8NSObjectCSH10ObjectiveCMc', '_swift_once', '_objc_msgSend']! {
+	for name in ['_$s10ObjectiveC8ObjCBoolVSQAAMc', '_$sSo8NSObjectCSH10ObjectiveCMc', '_swift_once', '_objc_msgSend']! {
 		if _ := runtime_symbol('/usr/lib/swift/libswiftObjectiveC.dylib', name) { assert false }
 	}
 }

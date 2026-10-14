@@ -2343,7 +2343,8 @@ metadata/conformances, and passes before startup and before/during/after two
 runtime cycles. These entries allocate no owner, cache or metadata arena;
 generated C verifies scalar signatures, masking and absence of allocation or
 ARC operations. Invalid Boolean byte patterns are not additional supported
-values. `ObjCBool` metadata and `NSObject: Hashable` remain unsupported.
+values. At this stage, `ObjCBool` metadata and `NSObject: Hashable` remained unsupported;
+ObjCBool metadata was implemented in the later step below.
 
 All forty-two programs rebuild and all twenty-four focused Swift ABI guest
 checks pass. The supplied Fortnite probe passes the conversions and next exits
@@ -5599,9 +5600,43 @@ Thirteen C streams/executables, native/IPA references, the retained descriptor
 lifetime trial, corrected sanitizer artifacts and completed probes/audits are
 under `build/ios/fortnite/dispatch-async-checks`; full iOS regression remains unpassed.
 
-The IPA startup probe now gets past the async adapter and exits with status 1
-at MarketplaceKitWrapper's required ObjCBool nominal descriptor,
-`_$s10ObjectiveC8ObjCBoolVMn`, in `/usr/lib/swift/libswiftObjectiveC.dylib`.
+The next step implements ObjectiveC.ObjCBool nominal metadata in
+`swift_objc_bool_metadata.c.v`. The supplied MarketplaceKitWrapper contains one
+indirect symbolic nominal type reference to its required
+`_$s10ObjectiveC8ObjCBoolVMn` import. V/Mach-O inspection records the reference
+and import cell; V/LLVM disassembly records the installed ARM64 Mac accessor
+and all eight value witnesses, including every conditional return path.
+The retained ARM64 SDK interface gives this frozen struct Swift Bool storage.
+This is a native Mac comparison, without claiming an iOS device comparison.
+
+The ObjectiveC overlay now exports exactly ObjCBool's `VMn` descriptor, `VMa`
+accessor and `VN` metadata in addition to its existing two scalar conversions.
+The metadata has a distinct ObjectiveC nominal identity, kind `0x200`, one field
+at offset zero, size/stride 1, POD alignment 1 and 254 extra inhabitants.
+Every request returns complete metadata in `x0` with state zero in `x1`.
+Copy/take witnesses copy exactly one byte; destroy reads no value storage.
+The enum witnesses use byte values 2 through 255 before an external tag is
+needed, matching native unaligned little-endian widths and UInt32 count/tag
+wrapping. Reflection, initialization extensions, constructors and additional
+conformances remain unsupported. The checked resolver seals adjacent code/data
+pages as RX/RO before publication, rejects inactive or retired lifetimes, and
+unmaps both pages after workers, callbacks and owners drain. Scalar conversions
+continue to work before startup and after teardown without metadata allocation.
+
+Ten fresh ASan/UBSan runs and five ARM64 Vinix suites pass across ObjCBool
+metadata, scalar conversions, byte metadata, String metadata and symbolic
+metadata state lookup. The new native/V fixture covers every payload byte,
+five exact-byte copy/take witnesses and a no-read destroy at protected page
+boundaries, complete accessor requests, preserved `x20`/`x21`, extra-inhabitant
+and external enum tags including UInt32 overflow, library/export rejection,
+symbolic descriptor lookup, typed Array storage/POD destruction, eight readers
+and two drained/unmapped lifetimes. Thirteen C streams/executables and the
+joined probes, audits and native/IPA references are retained under
+`build/ios/fortnite/objc-bool-metadata-checks`; full iOS regression remains unpassed.
+
+The IPA startup probe gets past ObjCBool metadata and exits with status 1 at
+MarketplaceKitWrapper's required `NSObject: Hashable` conformance descriptor,
+`_$sSo8NSObjectCSH10ObjectiveCMc`, in `/usr/lib/swift/libswiftObjectiveC.dylib`.
 Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -5611,10 +5646,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,472 | 688 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 166 | 10 | 23 |
-| All images | 2,297 | 701 | 120 |
+| MarketplaceKitWrapper | 167 | 9 | 23 |
+| All images | 2,298 | 700 | 120 |
 
-The C++/GLES/Text variant reports 2,310 resolved imports, 688 unresolved strong
+The C++/GLES/Text variant reports 2,311 resolved imports, 687 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
