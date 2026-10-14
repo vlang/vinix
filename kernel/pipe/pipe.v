@@ -585,11 +585,17 @@ fn (mut this Pipe) pipe_capacity() u64 {
 // of the page size. Vinix has no capabilities yet, so apply the ordinary
 // unprivileged 1 MiB ceiling to every caller.
 fn normalized_capacity(requested u64) ?u64 {
+	// Linux rejects sizes above 2 GiB before power-of-two rounding;
+	// exactly 2 GiB remains a valid request for the permission check.
+	if requested > u64(1) << 31 {
+		errno.set(errno.einval)
+		return none
+	}
 	if requested > pipe_max_capacity {
 		errno.set(errno.eperm)
 		return none
 	}
-	mut capacity := u64(pipe_buf)
+	mut capacity := u64(memory.page_size)
 	for capacity < requested {
 		capacity *= 2
 	}
