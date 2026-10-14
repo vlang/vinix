@@ -379,6 +379,12 @@ refusal of unsupported force/expiry unmount modes and cycle-safe mount moves,
 including namespace copies and holders whose ancestors were reparented. Moves
 reserve a step within the existing bounded mount cursor before publication
 and check existing descendant attachments against the resulting depth.
+The [attachment identity checks](../tests/mount-lifecycle/identities.md) qualify
+unmount, remount and move refusal through detached/foreign mount descriptors
+and cwd, while valid local operations remain available. Retained read-only
+descriptions refuse creation, writable opens and truncation even after their
+namespace retires. Native ARM/x86 runs and Linux references use the same probe
+ELFs; capability denial still precedes attachment validation.
 Mount reclamation, busy-reference accounting and full OCI acceptance remain open.
 The overlay-depth refusal measurements also exposed an event-record allocation per call.
 The separate [security event producer correction](../tests/overlay-rename/security-events.md)

@@ -816,25 +816,33 @@ fn find_mount(mut table MountTable, root &VFSNode) &Mount {
 
 // Mount objects remain permanent. Copy their parent identity under the entry
 // lock, then release it before namespace lookup takes the table lock.
-fn mount_parent_in_namespace(_entry &Mount) &Mount {
+fn mount_parent_in_namespace(mut table MountTable, _entry &Mount) (&Mount, bool) {
 	mut entry := unsafe { _entry }
 	entry.lock.acquire()
 	identity := lib.mount_context_top(&entry.parent)
 	entry.lock.release()
-	return namespace_mount(identity)
+	if identity == unsafe { nil } { return unsafe { nil }, true }
+	parent := attached_namespace_mount(mut table, identity)
+	return parent, parent != unsafe { nil }
 }
 
 // Called under vfs_lock before changing either attachment. Saved cwd/fd routes
 // can predate reparenting, so follow current namespace parents by stable id.
 fn validate_mount_move(mut table MountTable, entry &Mount, target_mount &lib.MountContext) ? {
-	mut ancestor := namespace_mount(lib.mount_context_top(target_mount))
+	mut ancestor := attached_namespace_mount(mut table, lib.mount_context_top(target_mount))
+	if ancestor == unsafe { nil } {
+		errno.set(mount_destination_error(mut table, lib.mount_context_top(target_mount)))
+		return none
+	}
 	mut destination_depth := 0
 	// Reserve one of the cursor's 64 steps for the mount being moved.
 	for _ in 0 .. 63 {
 		if ancestor == unsafe { nil } { break }
 		if ancestor.id == entry.id { errno.set(errno.eloop); return none }
 		destination_depth++
-		ancestor = mount_parent_in_namespace(ancestor)
+		next, valid := mount_parent_in_namespace(mut table, ancestor)
+		if !valid { errno.set(errno.einval); return none }
+		ancestor = next
 	}
 	if ancestor != unsafe { nil } { errno.set(errno.eloop); return none }
 
@@ -863,7 +871,9 @@ fn validate_mount_move(mut table MountTable, entry &Mount, target_mount &lib.Mou
 				break
 			}
 			depth++
-			current = mount_parent_in_namespace(current)
+			next, valid := mount_parent_in_namespace(mut table, current)
+			if !valid { errno.set(errno.einval); return none }
+			current = next
 		}
 	}
 }
@@ -874,7 +884,7 @@ fn move_mount(parent &VFSNode, source string, target string) ? {
 	source_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	source_root := get_node_and_mount(parent, source, true, source_mount)?
 	mut table := table_of(calling_process())
-	mut entry := namespace_mount(lib.mount_context_top(source_mount))
+	mut entry := attached_namespace_mount(mut table, lib.mount_context_top(source_mount))
 	if entry == unsafe { nil } || entry.detached || voidptr(entry.root) != voidptr(source_root) {
 		errno.set(errno.einval)
 		return none
@@ -909,9 +919,12 @@ fn move_mount(parent &VFSNode, source string, target string) ? {
 }
 
 fn remount(parent &VFSNode, target string, flags u64, options string) ? {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
 	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	node := get_node_and_mount(parent, target, true, identity)?
-	mut entry := namespace_mount(lib.mount_context_top(identity))
+	mut table := table_of(calling_process())
+	mut entry := attached_namespace_mount(mut table, lib.mount_context_top(identity))
 	if entry == unsafe { nil } || voidptr(entry.root) != voidptr(node) {
 		errno.set(errno.einval)
 		return none
@@ -957,10 +970,12 @@ pub fn syscall_umount(_ voidptr, tgt charptr, flags u64) (u64, u64) {
 }
 
 fn unmount(parent &VFSNode, target string, flags u64) ? {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
 	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	node := get_node_and_mount(parent, target, flags & umount_nofollow == 0, identity)?
 	mut table := table_of(calling_process())
-	mut entry := namespace_mount(lib.mount_context_top(identity))
+	mut entry := attached_namespace_mount(mut table, lib.mount_context_top(identity))
 	if entry == unsafe { nil } || voidptr(entry.root) != voidptr(node) {
 		errno.set(errno.einval)
 		return none

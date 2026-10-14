@@ -9,7 +9,7 @@ import os
 
 struct ReferenceReceipt {
 	architecture string
-	context string = 'Linux QEMU reference; same native musl probe ELF; portable move checks; networking disabled'
+	context string = 'Linux QEMU reference; same native musl probe ELF; portable move and identity checks; networking disabled'
 	artifacts map[string]string
 	command []string
 	passed bool
@@ -82,6 +82,9 @@ fn run() ! {
 	valid := result.finished && result.passed && result.status == 0
 		&& result.text.contains('Linux version ') && result.text.contains('MOUNT MOVE CYCLES: PASS')
 		&& result.text.contains('MOUNT REPARENTED HOLDERS: PASS')
+		&& result.text.contains('MOUNT IDENTITIES: PASS')
+	mut cases_pass := true
+	for kind in 0 .. 7 { cases_pass = cases_pass && result.text.contains('MOUNT IDENTITY CASE: ${kind} PASS') }
 	artifacts := {
 		'kernel': digest(state + '/linux')!
 		'probe': digest(state + '/probe')!
@@ -95,9 +98,9 @@ fn run() ! {
 	}
 	os.write_file(state + '/receipt.json', json2.encode(ReferenceReceipt{
 		architecture: arch, artifacts: artifacts, command: command,
-		passed: valid, finished: result.finished, status: result.status
+		passed: valid && cases_pass, finished: result.finished, status: result.status
 	}, prettify: true) + '\n')!
-	if !valid { return error('Linux mount reference failed: ' + state) }
+	if !valid || !cases_pass { return error('Linux mount reference failed: ' + state) }
 	println('Linux mount reference: PASS')
 }
 

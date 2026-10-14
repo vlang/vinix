@@ -22,14 +22,16 @@ fn main() {
 		hosttest.Option{ name: '--arch', value: true, choices: ['aarch64', 'x86_64'] },
 		hosttest.Option{ name: '--kernel-dir', value: true },
 		hosttest.Option{ name: '--state-dir', value: true },
-		hosttest.Option{ name: '--case', value: true, choices: ['flags', 'move', 'all'] },
+		hosttest.Option{ name: '--case', value: true, choices: ['flags', 'move', 'identities', 'id-0', 'id-1', 'id-2', 'id-3', 'id-4', 'id-5', 'id-6', 'all'] },
 		hosttest.Option{ name: '--timeout', value: true },
-	], [], 'Usage: run.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case flags|move|all] [--timeout SECONDS]')!
+		hosttest.Option{ name: '--probe-state', value: true },
+	], [], 'Usage: run.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case flags|move|identities|id-0..id-6|all] [--timeout SECONDS] [--probe-state RECEIPT-DIR]')!
 	for key in ['--arch', '--kernel-dir', '--state-dir'] {
 		if !options.has(key) { eprintln('missing ' + key); exit(2) }
 	}
 	arch := options.value('--arch', '')
 	selected := options.value('--case', 'all')
+	probe_state := options.value('--probe-state', '')
 	state := os.abs_path(options.value('--state-dir', ''))
 	timeout := options.integer('--timeout', 180)!
 	if os.exists(state) || timeout <= 0 { eprintln('state must be fresh and timeout positive'); exit(2) }
@@ -46,9 +48,11 @@ fn main() {
 	mut inputs := {
 		'kernel': sha256.sum(kernel).hex()
 		'fixture': digest(state + '/sources/mountfixture/core.v')!
+		'identities_fixture': digest(state + '/sources/mountfixture/identities.v')!
 		'controller': digest(@FILE)!
 	}
-	code := run_guest(state, arch, selected, timeout) or { eprintln(err.msg()); 1 }
+	if probe_state != '' { inputs['probe_receipt'] = digest(os.abs_path(probe_state) + '/receipt.json')! }
+	code := run_guest(state, arch, selected, timeout, probe_state) or { eprintln(err.msg()); 1 }
 	for name, path in {'init': state + '/init', 'iso': state + '/test.iso', 'fixture_c': state + '/fixture.c'} {
 		inputs[name] = digest(path) or { '' }
 	}
@@ -58,8 +62,29 @@ fn main() {
 	exit(code)
 }
 
-fn run_guest(state string, arch string, selected string, timeout int) !int {
-	init := guesthost.compile_init(state + '/sources/mountfixture/core.v', state, arch, false)!
+fn fixture_init(state string, arch string, probe_state string) !string {
+	if probe_state == '' { return guesthost.compile_init(state + '/sources/mountfixture/core.v', state, arch, false)! }
+	prior := os.abs_path(probe_state)
+	receipt := json2.decode[Receipt](os.read_file(prior + '/receipt.json')!)!
+	if receipt.architecture != arch { return error('cached probe architecture differs') }
+	for key, file in {'fixture': 'sources/mountfixture/core.v', 'identities_fixture': 'sources/mountfixture/identities.v'} {
+		if receipt.inputs[key] != digest(prior + '/' + file)! || receipt.inputs[key] != digest(state + '/' + file)! {
+			return error('cached probe source differs: ' + file)
+		}
+	}
+	for key, file in {'init': 'init', 'fixture_c': 'fixture.c'} {
+		if receipt.inputs[key] != digest(prior + '/' + file)! { return error('cached probe artifact differs: ' + file) }
+		os.cp(prior + '/' + file, state + '/' + file)!
+	}
+	bytes := os.read_bytes(state + '/init')!
+	machine := if arch == 'aarch64' { 183 } else { 62 }
+	if bytes.len < 20 || bytes[..6] != [u8(127), `E`, `L`, `F`, 2, 1]
+		|| int(bytes[18]) + (int(bytes[19]) << 8) != machine { return error('cached probe ELF architecture differs') }
+	return state + '/init'
+}
+
+fn run_guest(state string, arch string, selected string, timeout int, probe_state string) !int {
+	init := fixture_init(state, arch, probe_state)!
 	os.mkdir_all(state + '/rootfs')!
 	os.write_file(state + '/rootfs/mount-case', selected)!
 	archive := guesthost.image(init, state)!
@@ -67,6 +92,12 @@ fn run_guest(state string, arch string, selected string, timeout int) !int {
 	mut expected := ['MOUNT LIFECYCLE: PASS']
 	if selected in ['flags', 'all'] { expected << 'MOUNT UNMOUNT MODES: PASS' }
 	if selected in ['move', 'all'] { expected << ['MOUNT MOVE CYCLES: PASS', 'MOUNT REPARENTED HOLDERS: PASS', 'MOUNT MOVE DEPTH: PASS'] }
+	if selected in ['identities', 'all'] {
+		expected << 'MOUNT IDENTITIES: PASS'
+		for kind in 0 .. 7 { expected << 'MOUNT IDENTITY CASE: ${kind} PASS' }
+	} else if selected.starts_with('id-') {
+		expected << ['MOUNT IDENTITIES: PASS', 'MOUNT IDENTITY CASE: ' + selected.all_after('id-') + ' PASS']
+	}
 	positive, negative := guesthost.verdict_policy(expected, ['MOUNT LIFECYCLE FAIL:'], false)
 	return guesthost.boot(configured.command, configured.env, state, positive, negative, timeout, true)!
 }

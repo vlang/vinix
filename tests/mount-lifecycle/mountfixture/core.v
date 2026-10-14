@@ -334,14 +334,21 @@ pub fn run() int {
 		check(C.mount(c'none', c'/', nil, usize(C.MS_PRIVATE | C.MS_REC), nil) == 0, 4)
 		directory(c'/tmp/mount-lifecycle')
 		fd := C.open(c'/mount-case', C.O_RDONLY)
-		mut name := [16]u8{}
-		count := C.read(fd, &name[0], 15)
+		mut name := [32]u8{}
+		count := C.read(fd, &name[0], 31)
 		check(fd >= 0 && count > 0 && C.close(fd) == 0, 4)
 		selected := &char(&name[0])
+		identity := if count == 4 && name[0] == `i` && name[1] == `d` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `6` { int(name[3] - `0`) } else { -1 }
 		check(C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'move') == 0
-			|| C.strcmp(selected, c'move-reference') == 0 || C.strcmp(selected, c'all') == 0, 4)
+			|| C.strcmp(selected, c'move-reference') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'identities') == 0 || identity >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
-		if C.strcmp(selected, c'flags') != 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
+		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
+		if C.strcmp(selected, c'identities') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { identity_cases(-1) }
+		if identity >= 0 { identity_cases(identity) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }

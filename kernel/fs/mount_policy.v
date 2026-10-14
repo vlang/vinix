@@ -23,6 +23,34 @@ fn namespace_mount(identity voidptr) &Mount {
 	return entry
 }
 
+// Policy can follow a retained or foreign description. Changing an attachment
+// requires an active identity in the table captured by the writer instead.
+fn attached_namespace_mount(mut table MountTable, identity voidptr) &Mount {
+	if table == unsafe { nil } || identity == unsafe { nil } { return unsafe { nil } }
+	entry := unsafe { &Mount(identity) }
+	table.lock.acquire()
+	defer { table.lock.release() }
+	for candidate in table.mounts {
+		if candidate.id == entry.id && !candidate.detached { return candidate }
+	}
+	return unsafe { nil }
+}
+
+// Once destination admission has failed, distinguish a detached target from
+// an active foreign one. Retained entries supply only the error, never access.
+fn mount_destination_error(mut table MountTable, identity voidptr) u64 {
+	if table == unsafe { nil } || identity == unsafe { nil } { return errno.enoent }
+	entry := unsafe { &Mount(identity) }
+	table.lock.acquire()
+	defer { table.lock.release() }
+	for candidate in table.mounts {
+		if candidate.id == entry.id {
+			return if candidate.detached { errno.enoent } else { errno.einval }
+		}
+	}
+	return if entry.detached { errno.enoent } else { errno.einval }
+}
+
 pub fn mount_flags(identity &lib.MountContext) u64 {
 	entry := namespace_mount(lib.mount_context_top(identity))
 	return if entry == unsafe { nil } { u64(0) } else { entry.flags }

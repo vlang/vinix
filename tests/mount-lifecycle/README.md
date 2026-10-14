@@ -16,8 +16,22 @@ V_C_ERROR_BUG_REPORT_DISABLED=1 USE_TCG=1 build-support/run-v-tool.sh \
   --kernel-dir /path/to/x86-worktree/kernel --state-dir /path/to/fresh-x86-result
 ```
 
-The default `--case all` requires every positive marker. `--case flags` and
-`--case move` select either group. The timeout defaults to 180 seconds.
+The default `--case all` requires every positive marker. `--case flags`,
+`--case move` and `--case identities` select a group; `--case id-0` through
+`id-6` select one identity case. The timeout defaults to 180 seconds.
+
+The [attachment identity checks](identities.md) cover detached and foreign
+mounts reached through held descriptors or cwd. They also verify retained
+read-only policy for creation, writable opens and truncation, including after
+namespace retirement. Each of the seven cases runs 200 refusal/preservation
+iterations, verifies capability denial and finishes with valid local operations.
+
+Use `--probe-state /path/to/prior-native-result` to reuse its probe ELF and
+generated C with a different kernel or case. The controller requires a matching
+architecture and identical current/copied fixture hashes, verifies both artifact
+hashes against the prior receipt and checks the ELF architecture before boot.
+The prior result may be a failed control; its receipt hash is pinned in the new
+result. A changed source or artifact requires a fresh compilation.
 
 `flags` repeats five unsupported unmount modes and five invalid flag sets 200
 times each. `MNT_FORCE`, `MNT_EXPIRE`, force with detach, and either unsupported
@@ -58,8 +72,9 @@ contents. The probe unmounts these roots in reverse order. Admission checks
 every active attachment's current parent chain without allocating a snapshot.
 
 The Linux reference executes the exact same probe ELF with `move-reference`
-selected. It runs the portable cycle, type, namespace and holder checks; Vinix's
-cursor limit and unsupported unmount modes are excluded. Supply a matching
+selected. It runs the portable cycle, type, namespace, holder and all seven
+identity checks; Vinix's cursor limit and unsupported unmount modes are
+excluded. Supply a matching
 Linux kernel and the ELF preserved by a native run:
 
 ```sh
@@ -72,7 +87,9 @@ Use `--arch x86_64` and matching artifacts for x86. The reference receipt pins
 the shared ELF, Linux kernel, launcher source/C/ELF, archive, QEMU and serial log.
 The launcher uses HVF on ARM, TCG on x86, two CPUs and no network devices.
 
-Results from 2026-10-14 are retained under `build/development17-20261013`:
+The original mode/depth qualification from 2026-10-14 is retained under
+`build/development17-20261013`; the subsequent identity/policy qualification
+is recorded in [identities.md](identities.md):
 
 | States (both `arm` and `x86`) | Result |
 | --- | --- |
@@ -86,8 +103,8 @@ Results from 2026-10-14 are retained under `build/development17-20261013`:
 The original controls and unmount-only runs preserve the earlier fixture
 revision, before the subtree boundary was expanded. Their unmount, cycle,
 holder and valid-move functions match the final fixture; the subtree controls
-and final runs use the current complete source. Earlier fixture compilation
-failures remain in the separate `before-a`/`before-b` states.
+and final runs use their preserved complete source revision. Earlier fixture
+compilation failures remain in the separate `before-a`/`before-b` states.
 
 | Architecture | Final kernel SHA-256 | Shared native/Linux probe SHA-256 |
 | --- | --- | --- |
@@ -105,8 +122,8 @@ the receipts, source versions, controls, copied ELF identity, selected positive
 markers and generated move/validation/parent functions without allocations.
 
 These checks do not qualify busy-reference accounting, mount-object reclamation,
-overlay cache teardown, concurrent mount publication/unmount, propagation or
-complete bind-alias attachment isolation. Mount identities and cached filesystem
-trees retain their existing permanent ownership; no allocation-flatness claim is
+overlay cache teardown, concurrent mount publication/namespace switching,
+propagation or complete bind-alias attachment isolation. Mount identities and
+cached filesystem trees retain their existing permanent ownership; no allocation-flatness claim is
 made for creating and removing mounts or namespace copies. Full OCI and rootless
 qualification remains open.
