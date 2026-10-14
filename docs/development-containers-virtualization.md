@@ -445,6 +445,15 @@ backend errors. Both native architectures and same-ELF Linux checks cover bind
 aliases, namespace copies, chroot/cwd, detached roots and retired namespaces,
 with preserved data and UID/GID 1000 denial. Concurrent remount and namespace
 switching remain outside this qualification.
+The [mode and ownership checks](../tests/mount-lifecycle/metadata-policy.md)
+extend attachment-based read-only policy to `fchmod`, `fchmodat`, `fchown` and
+both pathname and empty-path `fchownat`. Path operations preserve the starting
+directory's mount and existing target/resource pins; descriptor operations use
+the description's saved mount. Both architectures and same-ELF Linux checks
+cover actual mode/UID/GID changes, symlink no-follow behavior, retained read-only
+paths and UID/GID 1000 denial. Ownership, capabilities, MAC and attribute checks
+remain before mutation. Times, xattrs, inode flags and other metadata paths
+still need complete attachment-policy coverage.
 Mount reclamation, busy-reference accounting and full OCI acceptance remain open.
 The overlay-depth refusal measurements also exposed an event-record allocation per call.
 The separate [security event producer correction](../tests/overlay-rename/security-events.md)

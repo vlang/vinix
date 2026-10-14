@@ -35,6 +35,13 @@ individual cases.
 `bp-0` through `bp-4` select its individual cases.
 `--case truncate` selects pathname truncation policy; `tr-0` through `tr-5`
 select its individual cases.
+`--case metadata` selects mode/ownership attachment policy; `mp-0` through
+`mp-6` select its individual cases.
+
+The [mode and ownership checks](metadata-policy.md) preserve writable aliases
+and refuse changes through read-only aliases, detached mounts and retired
+namespace descriptions. They cover pathname, descriptor, empty-path and symlink
+no-follow operations with actual mode/UID/GID verification and unprivileged denial.
 
 The [pathname truncation checks](truncate-policy.md) refuse size changes through
 read-only aliases, including detached mounts and retired namespace descriptions,
@@ -84,7 +91,7 @@ iterations, verifies capability denial and finishes with valid local operations.
 
 Use `--probe-state /path/to/prior-native-result` to reuse its probe ELF and
 generated C with a different kernel or case. The controller requires a matching
-architecture and identical current/copied hashes of all ten fixture files,
+architecture and identical current/copied hashes of all eleven fixture files,
 verifies both artifact hashes against the prior receipt and checks the ELF
 architecture before boot.
 The prior result may be a failed control; its receipt hash is pinned in the new
@@ -133,7 +140,7 @@ selected. It runs the portable cycle, type, namespace, holder, all seven
 identity checks, all eight admission cases, all five propagation validation
 cases, all seven pivot admission cases, all four pivot lifecycle cases and
 all five pivot alias cases, all seven private-thread cases, all five bind-policy
-cases and all six pathname truncation cases. Vinix's cursor
+cases, all six pathname truncation cases and all seven mode/ownership cases. Vinix's cursor
 limit and unsupported unmount modes are excluded. Supply a matching Linux kernel and
 the ELF preserved by a native run:
 

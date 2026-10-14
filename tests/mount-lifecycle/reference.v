@@ -9,7 +9,7 @@ import os
 
 struct ReferenceReceipt {
 	architecture string
-	context string = 'Linux QEMU reference; same native musl probe ELF; portable mount lifecycle, pivot admission, teardown, alias, private-thread bind policy and pathname truncation checks; networking disabled'
+	context string = 'Linux QEMU reference; same native musl probe ELF; portable mount lifecycle, pivot admission, teardown, alias, private-thread, bind policy, pathname truncation and mode/ownership checks; networking disabled'
 	artifacts map[string]string
 	command []string
 	passed bool
@@ -91,6 +91,7 @@ fn run() ! {
 		&& result.text.contains('MOUNT PIVOT THREADS: PASS')
 		&& result.text.contains('MOUNT BIND POLICY: PASS')
 		&& result.text.contains('MOUNT TRUNCATE: PASS')
+		&& result.text.contains('MOUNT METADATA: PASS')
 	mut cases_pass := true
 	for kind in 0 .. 7 { cases_pass = cases_pass && result.text.contains('MOUNT IDENTITY CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT ADMISSION CASE: ${kind} PASS') }
@@ -101,6 +102,7 @@ fn run() ! {
 	for kind in 0 .. 7 { cases_pass = cases_pass && result.text.contains('MOUNT PIVOT THREAD CASE: ${kind} PASS') }
 	for kind in 0 .. 5 { cases_pass = cases_pass && result.text.contains('MOUNT BIND POLICY CASE: ${kind} PASS') }
 	for kind in 0 .. 6 { cases_pass = cases_pass && result.text.contains('MOUNT TRUNCATE CASE: ${kind} PASS') }
+	for kind in 0 .. 7 { cases_pass = cases_pass && result.text.contains('MOUNT METADATA CASE: ${kind} PASS') }
 	artifacts := {
 		'kernel': digest(state + '/linux')!
 		'probe': digest(state + '/probe')!

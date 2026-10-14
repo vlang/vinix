@@ -17,6 +17,9 @@ struct C.stat {
 	st_dev u64
 	st_ino u64
 	st_size i64
+	st_mode u32
+	st_uid u32
+	st_gid u32
 }
 
 fn C.mount(&char, &char, &char, usize, voidptr) int
@@ -363,6 +366,8 @@ pub fn run() int {
 			&& name[3] >= `0` && name[3] <= `4` { int(name[3] - `0`) } else { -1 }
 		truncate_case := if count == 4 && name[0] == `t` && name[1] == `r` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `5` { int(name[3] - `0`) } else { -1 }
+		metadata_case := if count == 4 && name[0] == `m` && name[1] == `p` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `6` { int(name[3] - `0`) } else { -1 }
 		check(C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'move') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'identities') == 0 || identity >= 0
@@ -373,7 +378,8 @@ pub fn run() int {
 			|| C.strcmp(selected, c'pivot-alias') == 0 || alias >= 0
 			|| C.strcmp(selected, c'pivot-threads') == 0 || thread_case >= 0
 			|| C.strcmp(selected, c'bind-policy') == 0 || bind_case >= 0
-			|| C.strcmp(selected, c'truncate') == 0 || truncate_case >= 0, 4)
+			|| C.strcmp(selected, c'truncate') == 0 || truncate_case >= 0
+			|| C.strcmp(selected, c'metadata') == 0 || metadata_case >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
@@ -404,6 +410,9 @@ pub fn run() int {
 		if C.strcmp(selected, c'truncate') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { truncate_cases(-1) }
 		if truncate_case >= 0 { truncate_cases(truncate_case) }
+		if C.strcmp(selected, c'metadata') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { metadata_cases(-1) }
+		if metadata_case >= 0 { metadata_cases(metadata_case) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }

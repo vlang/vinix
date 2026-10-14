@@ -10,7 +10,9 @@ The syscall snapshots the starting directory and mount together. A new
 `retain_path_target_on_mount` helper resolves under the VFS lock, retains the
 resolved node and its resource, then releases the lock. The syscall releases
 both references after its complete operation or any subsequent failure. The
-helper leaves the existing `PathTarget` layout and metadata callers unchanged.
+helper leaves the existing `PathTarget` layout unchanged; this truncation
+change leaves metadata callers unchanged. The subsequent
+[mode and ownership checks](metadata-policy.md) reuse that helper.
 Mount entries remain permanent; the resolved cursor needs no separate owner.
 The read-only check precedes attribute checks, copy-up and `grow`. Existing
 MAC/pledge/unveil checks, write permissions and immutable/append-only checks

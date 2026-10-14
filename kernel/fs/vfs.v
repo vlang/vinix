@@ -1839,7 +1839,7 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 
 	if fd.handle.node != unsafe { nil } {
 		node := unsafe { &VFSNode(fd.handle.node) }
-		if read_only(node) { return errno.err, errno.erofs }
+		if read_only_on_mount(node, &fd.handle.mount) { return errno.err, errno.erofs }
 		if !attr_allows_metadata(node) { return errno.err, errno.get() }
 	}
 	if !owns_resource(fd.handle.resource.stat.uid) {
@@ -1865,14 +1865,15 @@ pub fn syscall_fchmodat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64
 		return errno.err, errno.enoent
 	}
 
-	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
-	held := retain_path_target(parent, path, true) or { return errno.err, errno.get() }
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	parent := parent_and_mount_for(dirfd, path, identity) or { return errno.err, errno.get() }
+	held := retain_path_target_on_mount(parent, path, true, identity) or { return errno.err, errno.get() }
 	defer { release_path_target(held) }
 	mut node := held.node
 	if !policy_check(node, proc.policy_fattr) {
 		return errno.err, errno.get()
 	}
-	if read_only(node) {
+	if read_only_on_mount(node, identity) {
 		return errno.err, errno.erofs
 	}
 	if !attr_allows_metadata(node) {
@@ -2577,7 +2578,7 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 		mut res := fd.handle.resource
 		if fd.handle.node != unsafe { nil } {
 			node := unsafe { &VFSNode(fd.handle.node) }
-			if read_only(node) { return errno.err, errno.erofs }
+			if read_only_on_mount(node, &fd.handle.mount) { return errno.err, errno.erofs }
 			if !attr_allows_metadata(node) { return errno.err, errno.get() }
 		}
 		if !may_chown(res.stat.uid, uid, gid) {
@@ -2591,16 +2592,17 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 		return 0, 0
 	}
 
-	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	parent := parent_and_mount_for(dirfd, path, identity) or { return errno.err, errno.get() }
 
 	follow_links := flags & at_symlink_nofollow == 0
-	held := retain_path_target(parent, path, follow_links) or { return errno.err, errno.get() }
+	held := retain_path_target_on_mount(parent, path, follow_links, identity) or { return errno.err, errno.get() }
 	defer { release_path_target(held) }
 	mut node := held.node
 	if !policy_check(node, proc.policy_chown) {
 		return errno.err, errno.get()
 	}
-	if read_only(node) { return errno.err, errno.erofs }
+	if read_only_on_mount(node, identity) { return errno.err, errno.erofs }
 	if !attr_allows_metadata(node) { return errno.err, errno.get() }
 	mut res := node.resource
 	if !may_chown(res.stat.uid, uid, gid) {
@@ -2624,7 +2626,7 @@ pub fn syscall_fchown(_ voidptr, fdnum int, uid u32, gid u32) (u64, u64) {
 	mut res := fd.handle.resource
 	if fd.handle.node != unsafe { nil } {
 		node := unsafe { &VFSNode(fd.handle.node) }
-		if read_only(node) { return errno.err, errno.erofs }
+		if read_only_on_mount(node, &fd.handle.mount) { return errno.err, errno.erofs }
 		if !attr_allows_metadata(node) { return errno.err, errno.get() }
 	}
 	if !may_chown(res.stat.uid, uid, gid) {
