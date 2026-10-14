@@ -146,6 +146,7 @@ fn main() {
 		require_child('/opt/ios/swift-mangled-checks')
 		require_child('/opt/ios/swift-witness-checks')
 		require_child('/opt/ios/swift-once-checks')
+		require_child('/opt/ios/swift-logger-checks')
 		require_child('/opt/ios/swift-main-actor-witness-checks')
 		require_child('/opt/ios/swift-main-actor-checks')
 		require_child('/opt/ios/swift-nsobject-hashable-checks')
@@ -173,7 +174,7 @@ fn main() {
 		if os.is_dir('/opt/ios/lookup-native') { os.setenv('VINIX_IOS_LOOKUP_NATIVE', '/opt/ios/lookup-native', true) }
 		require_child('/opt/ios/module-lookup-checks')
 		for name in ['unknown-value', 'string', 'empty-string', 'describing', 'cstring', 'empty-array', 'any', 'byte-metadata', 'raw-equality', 'array-class', 'shared-utf8', 'string-guts', 'foreign-copy', 'foreign-count', 'foreign-index', 'foreign-offset', 'foreign-subscript', 'utf16-offset', 'sequence', 'array-sequence', 'collection', 'set', 'metadata', 'protocol', 'hash', 'hasher', 'raw-representable',
-			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg', 'void', 'version', 'initializer', 'set-algebra', 'raw-copy', 'pointer-alloc', 'pointer-deinit', 'raw-alloc', 'dispatch-async', 'dispatch-main', 'dispatch-scheduler', 'dispatch-qos', 'dispatch-algebra', 'dispatch-flags', 'stack', 'heap', 'error-bridge', 'error', 'error-value', 'dynamic-cast', 'objc-cast', 'foreign-metadata', 'object-type', 'mangled-state', 'mangled', 'witness', 'once', 'main-actor-witness', 'main-actor', 'nsobject-hashable', 'objc-bool-metadata', 'objc-bool', 'actor-executor', 'task-priority', 'task-alloc', 'task-create', 'task-switch', 'nslog', 'string-unbridge', 'error-description'] {
+			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg', 'void', 'version', 'initializer', 'set-algebra', 'raw-copy', 'pointer-alloc', 'pointer-deinit', 'raw-alloc', 'dispatch-async', 'dispatch-main', 'dispatch-scheduler', 'dispatch-qos', 'dispatch-algebra', 'dispatch-flags', 'stack', 'heap', 'error-bridge', 'error', 'error-value', 'dynamic-cast', 'objc-cast', 'foreign-metadata', 'object-type', 'mangled-state', 'mangled', 'witness', 'once', 'logger', 'main-actor-witness', 'main-actor', 'nsobject-hashable', 'objc-bool-metadata', 'objc-bool', 'actor-executor', 'task-priority', 'task-alloc', 'task-create', 'task-switch', 'nslog', 'string-unbridge', 'error-description'] {
 			require_child('/opt/ios/swift-' + name + '-checks')
 		}
 		println('VINIX iOS SWIFT: PASS')

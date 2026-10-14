@@ -5786,11 +5786,41 @@ concurrent identity queries. The corrected fixture retains a quiescent ARC
 comparison and all V immutable-header checks. Full iOS regression remains
 unpassed and published runners remain unchanged.
 
-The actual IPA startup probe now gets past MainActor's Actor conformance and
-exits with status 1 at MarketplaceKitWrapper's required Swift os.Logger
-logObject getter, `_$s2os6LoggerV9logObjectSo03OS_a1_C0Cvg`, from
-`/usr/lib/swift/libswiftos.dylib`. That native export is recorded without
-calling it. Fortnite has not entered application code and remains unplayable.
+Swift `os.Logger` now provides all three operations imported by
+MarketplaceKitWrapper: complete nongeneric metadata, initialization with
+subsystem/category Strings, and the `logObject` getter. Native LLVM inspection
+on this Mac and actual IPA caller instructions establish an eight-byte value,
+borrowed indirect Self in x20, an owned ObjC getter result, and initialization
+through x8 that consumes both String arguments. The V implementation uses the
+existing canonical logging handles, explicit reference copy/take/assignment/
+destroy witnesses and optional payload encoding. Code and metadata occupy
+sealed pages, retired after array/heap owners drain. Label handling supports
+inline, immortal and owned native-tail UTF-8, including Unicode and embedded
+NUL behavior, with the existing 255-byte logging limit. Shared/foreign String
+storage, native compact-layout strings/reflection and additional Logger or
+OSLogMessage exports remain outside this profile.
+
+Twelve ASan/UBSan runs and six ARM64 guest suites pass across Logger, os_log,
+unknown-object ownership, String, metadata and array storage. The differential
+fixture checks retained ObjC results, consumed distinct/aliased owned Strings,
+protected exact-size values/results, x20/x21 preservation, optional payloads
+through UINT32_MAX, eight concurrent workers and two drained/unmapped lifetimes.
+Fifteen final C streams and executables, SDK/native/IPA inspection, joined VM
+probes/audits and five original fixture failures are retained under
+`build/ios/fortnite/logger-checks`. The failures record a default-namespace
+ObjC release lookup, native compact-layout self-assignment of its sole owner,
+an unaligned fixture enum read, and two Linux-style mincore assumptions on
+Darwin. The corrected fixture resolves libobjc directly, uses distinct
+assignment storage, copies unaligned payloads with memcpy and inspects Mach
+VM regions on macOS. Temporary disk exhaustion and an interrupted CLI build
+are recorded separately; completed host archives were verified before resuming
+remaining checks, and unfinished guest programs were rebuilt. Full iOS
+regression remains unpassed and published runners remain unchanged.
+
+The actual IPA startup probe gets past the three Logger imports and exits
+with status 1 at MarketplaceKitWrapper's required Foundation Set bridge,
+`_$sSh10FoundationE36_unconditionallyBridgeFromObjectiveCyShyxGSo5NSSetCSgFZ`.
+Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -5799,10 +5829,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,475 | 685 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 171 | 5 | 23 |
-| All images | 2,305 | 693 | 120 |
+| MarketplaceKitWrapper | 174 | 2 | 23 |
+| All images | 2,308 | 690 | 120 |
 
-The C++/GLES/Text variant reports 2,318 resolved imports, 680 unresolved strong
+The C++/GLES/Text variant reports 2,321 resolved imports, 677 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

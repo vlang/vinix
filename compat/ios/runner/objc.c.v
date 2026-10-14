@@ -226,6 +226,8 @@ mut:
 	swift_concurrency_retired bool // Reject new resolution after quiescent teardown.
 	swift_main_actor_arena u64 // Sealed MainActor accessor, nominal class and immortal singleton.
 	swift_main_actor_retired bool
+	swift_logger_arena u64 // Sealed Swift os.Logger entries and nongeneric metadata.
+	swift_logger_retired bool
 	swift_task_priority_arena u64 // Sealed TaskPriority accessor and read-only metadata/value witnesses.
 	swift_task_alloc_top u64 // Shared no-current-task allocation stack; protected by the runtime lock.
 	swift_task_alloc_count u64 // Live fallback allocations; shutdown requires the stack to drain.
@@ -662,7 +664,7 @@ fn format_double(destination &char, size usize, format &char, value f64) int {
 fn runtime_symbol(library string, symbol string) !u64 {
 	if library == '/usr/lib/swift/libswiftDispatch.dylib' { return swift_dispatch_symbol(symbol) }
 	if library == '/usr/lib/swift/libswiftFoundation.dylib' { return swift_foundation_symbol(symbol) }
-	if library == '/usr/lib/swift/libswiftos.dylib' && symbol == '_$sSo13os_log_type_ta0A0E5errorABvgZ' { return u64(unsafe { voidptr(swift_os_log_error_type) }) }
+	if library == '/usr/lib/swift/libswiftos.dylib' { return swift_os_symbol(symbol) }
 	if library == '/usr/lib/swift/libswift_Concurrency.dylib' { return swift_concurrency_symbol(symbol) }
 	if library == '/usr/lib/swift/libswiftObjectiveC.dylib' {
 		if address := swift_nsobject_hashable_symbol(symbol) { return address }
