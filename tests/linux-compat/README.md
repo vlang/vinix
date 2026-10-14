@@ -1531,3 +1531,21 @@ binds receipts, source/C/ELF/compiler pins, actual auditor negative controls and
 independent lifetime review. Thread/credential/limit races, idle-exit/reset/
 deadline/timing, security configurations and GNU/foreign paths remain separate.
 The three broad compatibility gates remain open.
+
+The `idleexit` case qualifies stable single-thread leader exits from IDLE using
+target current nice and RLIMIT_NICE, independently of caller limits/requested
+nice. Effective CAP_SYS_NICE and owner admission remain real; setparam on IDLE
+stays allowed, and RT destinations also require target RTPRIO admission.
+Root/UID1000 each perform `3780/896/3584/4244` controls (25,008 per architecture),
+with guarded inputs, upper words, peer limits, imported nice and real state.
+Originals fail 632; corrected Vinix and identical ELFs on Linux 6.12.51 pass.
+Two warmed 200-cycle cohorts retain flat storage. Run
+`--cases idleexit,runtime,schedabi,rrabi,rtadmit,attrimport,attrnice,fcntlabi`
+with a fresh state directory. `idleexit-reference.v` accepts the preceding
+reference arguments; compile `idleexit-check.v` without `-prod` and pass the
+retained evidence area. [The report](../../docs/linux-posix-qualification.md#native-idle-scheduling-exit-permissions)
+binds first compile/native setup failures separately from final identities.
+Broker setup uses canonical signed64 setpriority words; setpriority signed32/
+permission/group semantics and RT getattr nice remain separate gaps. Worker
+threads, races, security/reset/deadline/timing and GNU/foreign paths remain
+unqualified, and the three broad compatibility gates remain open.

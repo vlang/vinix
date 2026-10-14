@@ -1,0 +1,3 @@
+tests/linux-compat/idleexit-check.v:394: FAIL: fn main.main: assert false, 'idleexit assertions must execute'
+      message: idleexit assertions must execute
+V panic: Assertion failed...

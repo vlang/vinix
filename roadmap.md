@@ -919,6 +919,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   with real errors/state/restoration, flat storage and independent lifetime review.
   See [the realtime admission contract](docs/linux-posix-qualification.md#native-realtime-scheduling-admission).
 
+- [x] Enforce target current-nice/RLIMIT_NICE admission before leaving IDLE,
+  including ordinary, batch and realtime destinations with real owner/capability
+  permissions. Qualify 25,008 leader controls per architecture against identical-ELF
+  Linux, guarded inputs, actual state/restoration and flat storage; retain setup gaps.
+  See [the idle scheduling contract](docs/linux-posix-qualification.md#native-idle-scheduling-exit-permissions).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

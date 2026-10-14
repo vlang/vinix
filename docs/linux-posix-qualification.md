@@ -6436,3 +6436,120 @@ work does not close the ARM CPU1 QoS blocker or the three broad section 15 gates
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/rtadmit-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/rtadmit-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/rtadmit-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/rtadmit-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/rtadmit-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/rtadmit-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/rtadmit-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/rtadmit-reference-x86_64-receipt.json).
 - [Maintained V audit](../tests/linux-compat/rtadmit-check.v), [verdict](../tests/linux-compat/results/2026-10-15/rtadmit-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-15/rtadmit-lifetime-review.md).
+
+## Native idle scheduling exit permissions
+
+The 2026-10-15 qualification covers stable single-thread process leaders leaving
+SCHED_IDLE through native sched_setscheduler and sched_setattr. Setparam on the
+existing IDLE policy remains allowed. The original shared helper admitted exits
+without the Linux nice-limit check. The corrected helper requires the target's
+current nice to fit its RLIMIT_NICE (`20 - current_nice <= target_limit`) unless
+effective CAP_SYS_NICE admits the caller. This applies to OTHER, BATCH and RT
+destinations; RT transitions also retain their independently qualified target
+RTPRIO admission. The imported requested nice does not replace the current-nice
+check. Existing owner/MAC/capability/deadline checks remain, followed by the
+existing ordinary/RT rules.
+
+The retained [Linux v6.12 scheduler source](https://raw.githubusercontent.com/torvalds/linux/v6.12/kernel/sched/syscalls.c)
+checks `task_has_idle_policy(p) && !idle_policy(policy)` and
+`is_nice_reduction(p, task_nice(p))`. Its SHA-256 is
+`a9c89bc6e1eca2587f39518718aa0a53fd8ef646f16927a0252e5fa7f25b5804`.
+Actual Linux 6.12.51 references execute the same final native musl probe ELF per
+architecture. Raw entry is genuine musl syscall; dedicated scheduling-wrapper
+ENOSYS behavior remains separately documented.
+
+Root and UID/GID1000 cohorts vary caller NICE limits 0/1/20/39/40 with hard 40,
+CAP_SYS_NICE off/on and current nice -20/0/19. Same-owner and UID/GID1001 peers
+have NICE 20/40 respectively with hard 40 and RTPRIO 1/hard 99; callers separately
+use RTPRIO 0/1/hard 99. Targets include zero/self, both peers, absent and reaped
+PIDs, plus signed-negative controls. Initial states are IDLE/OTHER/BATCH with
+priority 0, established with real privileged broker calls. Seven main operation
+choices cover legacy OTHER/BATCH/IDLE, attribute OTHER/BATCH/IDLE and setparam;
+four additional choices test legacy/attribute FIFO/RR priority 1.
+
+| Group | Controls per cohort | Qualification |
+| --- | --- | --- |
+| 0 | 3,780 | Five caller limits, capability off/on, six targets, three old classes/nice values and seven operations |
+| 1 | 896 | Upper PID words, current class/nice and owner/limit distinctions |
+| 2 | 3,584 | Aligned/unaligned read-only, inaccessible and NULL buffers; upper policy/flag words |
+| 3 | 4,244 | 960 RT-limit controls, 672 argument/error controls, 108 flag controls, 336 extreme-priority controls, 2,160 requested/clamped nice controls and eight initial/final observations |
+
+| Architecture | Controls | Original failures | Corrected failures | Same-ELF Linux failures |
+| --- | --- | --- | --- | --- |
+| AArch64 | 25,008 | 632 | 0 | 0 |
+| x86-64 | 25,008 | 632 | 0 | 0 |
+
+Each final original cohort fails `76/32/64/144`; both corrected and reference
+cohorts record zero. Native ARM pages are 16 KiB, x86 and Linux reference pages
+are 4 KiB. Negative PID/NULL/outer flag EINVAL precedes input import, EFAULT
+precedes lookup and missing ESRCH precedes priority validation. Failed calls
+preserve actual class/priority/nice and input bytes; successes apply the admitted
+class/priority and fair attribute nice, preserving nice for other operations.
+Raw and genuine musl getpriority verify retained nice for every class. Known
+getattr fields and output canaries are checked, including nice for ordinary/IDLE
+classes. RT getattr nice is deliberately outside this contract: Linux reports
+zero while native currently reports process nice. Nonself operations leave self
+OTHER/0/nice 0. Inputs retain their 56 bytes and eight-byte guards; unaligned input
+uses memcpy rather than unaligned struct dereferences.
+
+The broker validates positive registered cohort/peer PIDs, an allowed class and
+nice -20..19, restores OTHER/0/nice 0, sets actual nice, installs the requested
+class and verifies state before ACK. RT setup priority is fixed 1. Message,
+parameter, Attr and Counts storage remains live through synchronous syscalls/
+pipe I/O. Peers close inherited broker descriptors, are released/reaped, and
+the guarded mapping is unmapped before reporting. The cohort transfers counts
+before closing its pipes and being reaped. PR_SET_KEEPCAPS is confined to
+disposable children; complete process-state restoration is not claimed.
+Final probe C has 26 explicit allocas and no heap/dynamic-array/fixed-index helpers.
+
+Two native cohorts perform 32 warmups and 200 current-nice refusal/admission,
+different-peer-limit, same-IDLE setparam and privileged RT-exit cycles, with
+13-second settling intervals around slab snapshots. All 18 ARM/14 x86 classes
+and large-page counts remain exactly flat. These observations include broker
+IPC and retained leaders; they do not qualify general process churn or all
+kernel allocation paths. Four fresh production builds use isolated worktrees
+at `410d7c5e499acbb3c274be54161f84b59514d505`. Whole generated C is byte-identical
+after removing only may_set_sched_params, without identifier normalization.
+Source changes only the six-line locked guard and its exact internal comment.
+The helper retains one lock and adds one guarded unlock (10 to 11), with no
+allocation/free or pointer escape. Allocation diagnostics remain byte-identical
+at 398 ARM/290 x86 sites with existing allowance refusals; whole-kernel allocation
+approval is not claimed. Eight host files and four frozen inventory checks pass.
+
+The eight final cases are idleexit/runtime/schedabi/rrabi/rtadmit/attrimport/
+attrnice/fcntlabi, with original/corrected/reference source/C/ELF identities and
+actual kernel/ISO/serial receipts bound. The maintained auditor requires exact
+cohort counts/vectors, compiler and 64-input inventory pins, guarded state,
+storage and independent lifetime review. Its false-assertion and passing-Linux-
+as-failing-baseline controls must actually exit 1 without `-prod`. The final
+watchdog binds 18 distinct native captures and rechecks every retained regular
+file after retiring only unbound ISO staging and firmware variables. Public
+dispatch fingerprints use committed-parent sources plus this owned change.
+The initial final-capture watcher reaches its 1,200-iteration limit after ten
+completed captures. Its actual checkpoint, hashes and timeout output stay
+separate; a fresh bounded watcher rehashes/seeds those ten captures and finishes
+the remaining retirements. Passing native cases are not rerun. Watch timing
+supplies no semantic verdict.
+
+First preflight C compilations failed on an undeclared v_fixed_index emitted
+by fixed-array membership outside unsafe. The classifier now uses explicit
+scalar equality, with fresh previews/preflight3. First native probes then stop
+at broker stage 19 errno 0 before any CASES rows: negative i32 variadic setpriority
+setup exposes the separate native signed32-normalization gap. Their two actual
+failure receipts/source/C/ELF/ISO/serial/aggregates remain bound, alongside
+genuine passing initial Linux references. They supply no final baseline vector.
+Final broker setup explicitly widens nice through u64(i64(message.value)),
+verifies real state and uses fresh p2 original/corrected/reference identities.
+Native setpriority signed32 words, capability/limit permissions and process/
+group semantics remain separate work. No setup operation is replaced by success.
+
+Current nice remains process-wide natively, so this qualification covers leaders.
+Permission and mutation use separate lock intervals; identity/credential/limit/
+policy races remain open. Worker threads, RT getter nice, reset/deadline/KEEP/
+clamp/timing, security/namespace configurations, glibc, translated/ELF32 and
+physical priority/fairness remain unqualified. This work does not close the
+ARM CPU1 QoS blocker or the three broad section 15 gates.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/idleexit-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/idleexit-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/idleexit-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/idleexit-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/idleexit-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/idleexit-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/idleexit-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/idleexit-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/idleexit-check.v), [verdict](../tests/linux-compat/results/2026-10-15/idleexit-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-15/idleexit-lifetime-review.md).

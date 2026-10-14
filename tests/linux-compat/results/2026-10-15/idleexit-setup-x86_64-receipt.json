@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "d90d2c4eaab01ca8538e7c443b2e0ae676d572ef37ce17a6e131bfa320acc203",
+    "results": [
+        {
+            "name": "idleexit",
+            "source_sha256": "613124c47e5e07a858417534c3fcc8dc1747bf3430a7a5418cd0a5956c659971",
+            "init_sha256": "a8863679ea83cda1357808671fbd3c57d5b4a40ec7b053db816d2820893b041e",
+            "iso_sha256": "ae3cdfaa64693e745a99fd5785b9408796620109b44f5892e32abfa55cad2f06",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

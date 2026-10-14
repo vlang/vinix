@@ -1,0 +1,1 @@
+Primary bounded watchdog reached its 1200-iteration limit before the full slow native regression suites completed. Actual partial capture log, retained hashes and timeout output are preserved. Completed captures are rehashed and seeded into a fresh bounded watcher; native passing cases are not rerun, and no semantic verdict is supplied by watchdog timing.

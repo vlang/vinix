@@ -74,8 +74,14 @@ fn may_set_sched_params(target_tid int, policy int, priority int) bool {
 		return false
 	}
 
-	// Deadline needs privilege; ordinary classes retain their prior admission.
+	// Deadline needs privilege; IDLE exits need explicit nice admission.
 	if policy == proc.sched_deadline {
+		return false
+	}
+	// Leaving IDLE needs the target's current nice to fit its nice limit,
+	// even when the request would otherwise retain or lower priority.
+	if target.sched.policy == proc.sched_idle && policy != proc.sched_idle
+		&& !proc.limit_allows(owner, proc.rlimit_nice, u64(20 - owner.nice)) {
 		return false
 	}
 	if policy != proc.sched_fifo && policy != proc.sched_rr {

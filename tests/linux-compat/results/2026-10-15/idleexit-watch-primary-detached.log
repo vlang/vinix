@@ -1,0 +1,15 @@
+Retired completed boot staging: idleexit/arm/before
+Retired completed boot staging: idleexit/arm/after
+Retired completed boot staging: idleexit/x86/before
+Retired completed boot staging: runtime/arm/after
+Retired completed boot staging: idleexit/x86/after
+Retired completed boot staging: schedabi/arm/after
+Retired completed boot staging: runtime/x86/after
+Retired completed boot staging: rrabi/arm/after
+Retired completed boot staging: schedabi/x86/after
+Retired completed boot staging: rtadmit/arm/after
+V panic: completed-boot cleanup watchdog timed out
+ v hash: f6358ec
+    pid: 0xb1d1
+    tid: 0xb1d1
+0   dyld                                0x000000018c507e00 start + 6992
