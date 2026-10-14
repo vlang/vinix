@@ -6190,3 +6190,130 @@ broad section15 acceptance gates stay open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-14/affabi-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-14/affabi-after-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/affabi-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-14/affabi-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-14/affabi-after-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/affabi-reference-x86_64-receipt.json).
 - [Maintained V audit](../tests/linux-compat/affabi-check.v), [verdict](../tests/linux-compat/results/2026-10-14/affabi-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-14/affabi-lifetime-review.md).
+
+## Native scheduling-attribute nice normalization and admission
+
+Native `sched_setattr` now clamps imported signed32 nice values to -20..19,
+as Linux does during [attribute import](https://github.com/torvalds/linux/blob/v6.12/kernel/sched/syscalls.c).
+OTHER/BATCH requests apply the admitted value instead of silently succeeding
+without changing nice. Lowering nice requires the target's `RLIMIT_NICE`
+soft limit to admit `20 - wanted`, or effective `CAP_SYS_NICE`. The caller's
+effective UID must match the target's real/effective UID unless that capability
+is effective. Existing MAC checks remain in force. UID0 alone no longer grants
+the shared scheduling permission helper's privilege bypass. Native default
+nice limits are now soft 0/hard 0, matching the observed Linux references.
+IDLE/FIFO/RR requests leave nice unchanged regardless of the attribute value.
+
+Permission checks precede policy mutation. The new scalar helper holds the
+PID-table lock while borrowing the target and owner, returning only errno.
+Its emitted C has one lock and six compiler-emitted unlock sites, including
+the unreachable final defer. These changes add no kernel allocation or free.
+Vinix still stores nice on the process; this qualification uses single-thread
+process leaders and establishes no Linux per-thread nice contract.
+
+The V `attrnice` fixture runs root and UID/GID1000 cohorts. Each owns blocked
+same-UID and UID/GID1001 peers whose nice limits are respectively 20/40 and
+40/40. Self soft limits cycle through 0/20/40 with hard 40. Effective capability 23
+is toggled independently of UID; the full capability snapshot is checked and
+restored. Six target classes cover implicit/explicit self, both peers, an absent
+positive PID and a fully reaped child. Twelve signed32 nice values include both
+extremes and boundaries around -20 and 19. OTHER/BATCH, four guarded input forms
+(aligned, unaligned, read-only and inaccessible), upper PID words and upper
+reserved flag words complete the main matrix.
+
+Additional controls cover IDLE/FIFO/RR, the shared legacy scheduling permission
+helper, short read-only layouts (size 0/48/49/53/56), signed32 negative PIDs and
+NULL/input/flag/policy/priority error precedence. After every live call the
+fixture verifies policy, priority, raw getpriority, genuine musl getpriority,
+known getattr fields and output guards. Failed calls preserve state; successful
+fair calls apply the normalized nice; nonfair calls retain nice 0. Inputs retain
+all known bytes and canaries. External targets also leave self state unchanged.
+The probe does not assert configuration-dependent fair runtime/clamp defaults.
+
+A privileged UID0 broker restores every live target after both success and
+error using real legacy scheduling and setpriority calls. It accepts only the
+cohort process and its two registered peers, confirms restored OTHER/priority 0/
+nice 0 before acknowledging, and uses synchronous pipe messages backed by stack
+storage. This permits the original kernel's broken UID1000 capability path to
+finish without silently substituting setup success. Peers close inherited
+broker descriptors, are released and reaped, and the three-page guarded mapping
+is fully unmapped before case reporting. Cohort children transfer the final
+64-byte counts before closing their pipes and being reaped. PR_SET_KEEPCAPS is
+used only inside disposable cohort processes; complete process-state restoration
+is not claimed. Final probe C has 25 explicit allocas and no heap, dynamic-array
+or fixed-index helpers.
+
+| Architecture | Checks | Original failures | Corrected failures | Same-ELF Linux failures |
+| --- | --- | --- | --- | --- |
+| AArch64 | 29,310 | 9,366 | 0 | 0 |
+| x86-64 | 29,310 | 9,366 | 0 | 0 |
+
+Each cohort records `3456/6912/3456/831` checks. Original root failures are
+`1056/2112/1056/435`; original UID1000 failures are `1080/2160/1080/387` on
+both architectures. Original/corrected Vinix and actual Linux 6.12.51 execute
+identical final probe ELFs per architecture. Native pages are 16 KiB ARM/4 KiB x86;
+Linux references use 4 KiB. The syscall entry is genuine musl `syscall`; dedicated
+musl scheduling wrappers retain their separately documented ENOSYS behavior.
+
+Both corrected cohorts run 32 warmups and 200 denial/clamping/peer-admission/
+restoration cycles, with thirteen-second settling intervals around snapshots.
+All 18 ARM and 14 x86 slab classes remain exactly flat, as do large-page counts
+85/85 ARM and 216/216 x86. The observer descriptor closes on every nonfatal path.
+These bounded storage receipts include the probe's broker IPC; they do not
+establish whole-kernel allocation or process-churn qualification.
+
+Four fresh production builds use isolated worktrees at
+`4fd5c605d87b05208b73cf725ba93b59699b4f1c`. Full generated C differs only in
+`sched_setattr`, `may_set_sched_params`, `default_rlimits`, the new scalar
+helper/prototype and exactly three uses of an existing `proc__find_free_id`
+loop identifier per architecture. That identifier embeds the shifted process
+source byte offset; normalizing only its declaration/condition/increment leaves
+every other generated byte identical. Scheduler queues, allocator, user-copy
+and existing affinity/import/query implementations retain their prior code.
+
+Eight cases per architecture (attrnice/runtime/schedabi/rrabi/attrquery/
+attrimport/affabi/fcntlabi) pass across primary and completion receipts. Initial
+suites persisted five passing cases each, then host file writes failed during
+disk pressure. Neither initial aggregate was retained; the original watchdog
+stopped after eleven retirement events. Partial ARM attrimport boot files have
+no semantic verdict. All 117 retained interrupted files are hashed before
+retiring only their unbound ISO staging/firmware variables, then verified
+byte-identical. Fresh completion directories supply three ARM passes and two
+x86 passes on the same corrected kernel and frozen sources. X86 fcntlabi again
+fails while building its ISO, with explicit xorriso ENOSPC in the retained
+aggregate, empty ISO hash and no serial log. Its actual source/C/ELF remain
+bound; that build supplies no semantic verdict. A fresh one-case recovery
+provides the genuine x86 fcntlabi pass with identical source/C/ELF. All 67 p3
+regular retained files stay byte-identical after unbound staging retirement,
+and its sixteen-event interrupted watchdog remains separate from the final
+eighteen-event capture manifest. The auditor requires the
+initial aggregates to remain absent; it creates no complete eight-case receipt.
+An intervening retry stopped before recording any case receipt or aggregate.
+Its 30 regular staging/checkpoint files remain hashed and retained; its socket
+is a transport endpoint and supplies no file-content or semantic evidence.
+Eight host files and four frozen inventory checks also pass.
+Allocation scans retain 398 ARM/290 x86 sites and existing allowance refusals.
+Exactly four existing process-source diagnostics move two lines after the default
+limit initializer; every other allocation-report byte matches. Whole-kernel
+allocation approval is not claimed.
+
+The maintained V auditor binds counts, original cohort failure vectors, topology,
+guarded inputs, restoration, storage and compiler/source/C/ELF/kernel/ISO/reference
+inputs. Its deliberately false assertion and passing-reference-as-baseline
+controls execute without `-prod` and require exit 1. Independent review checks
+locked pointer lifetimes, exact source/full-C scope, synchronous broker messages,
+descriptor cleanup, mapping cleanup, child reaping and retained input hashes.
+The completed-boot watchdog hashes all retained case files before retiring only
+unbound ISO staging and firmware variables, then rechecks every retained file.
+
+Permission and final mutation still use separate table-lock intervals; target
+exit/reuse and credential/limit/policy changes between those intervals are
+unqualified. Per-thread nice, supplementary scheduling ownership/limits,
+complete realtime lowering/retention, deadline/reset/clamp/KEEP semantics,
+nice/setpriority process/group semantics, namespaces/pledge/MAC-denial, glibc,
+translated/ELF32 paths and physical priority/fairness remain separate. This work
+does not close the ARM CPU1 QoS blocker or the three broad section 15 gates.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-14/attrnice-evidence-aarch64.json), [primary native receipt](../tests/linux-compat/results/2026-10-14/attrnice-after-aarch64-receipt.json), [completion receipt](../tests/linux-compat/results/2026-10-14/attrnice-completion-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/attrnice-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-14/attrnice-evidence-x86_64.json), [primary native receipt](../tests/linux-compat/results/2026-10-14/attrnice-after-x86_64-receipt.json), [completion/build-failure receipt](../tests/linux-compat/results/2026-10-14/attrnice-completion-x86_64-receipt.json), [descriptor recovery](../tests/linux-compat/results/2026-10-14/attrnice-recovery-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-14/attrnice-reference-x86_64-receipt.json).
+- [Maintained V audit](../tests/linux-compat/attrnice-check.v), [verdict](../tests/linux-compat/results/2026-10-14/attrnice-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-14/attrnice-lifetime-review.md).

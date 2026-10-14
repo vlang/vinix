@@ -1,0 +1,67 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=84376
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003800ce00
+initramfs: Done (9 entries)
+LINUX ATTRNICE DETAIL: ordinary=0 kind=3 pid=0 nice=0 flags=0 form=-1 call=1 ret=0 errno=0 expected=0
+LINUX ATTRNICE TOPOLOGY: ordinary=0 uid=0 same=33934 cross=14526 page=4096
+LINUX ATTRNICE DETAIL: ordinary=0 kind=0 pid=0 nice=ffffffff80000000 flags=0 form=0 call=1 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=0 kind=1 pid=1234567800000000 nice=ffffffff80000000 flags=0 form=0 call=1 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=0 kind=1 pid=ffffffff00000000 nice=ffffffff80000000 flags=0 form=0 call=2 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=0 kind=2 pid=0 nice=ffffffff80000000 flags=ffffffff00000000 form=0 call=1 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=0 kind=0 pid=0 nice=ffffffff80000000 flags=0 form=1 call=2 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=0 kind=1 pid=1234567800000000 nice=ffffffff80000000 flags=0 form=1 call=3 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=0 kind=1 pid=ffffffff00000000 nice=ffffffff80000000 flags=0 form=1 call=4 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=0 kind=2 pid=0 nice=ffffffff80000000 flags=ffffffff00000000 form=1 call=2 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=0 kind=0 pid=0 nice=ffffffff80000000 flags=0 form=2 call=3 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=0 kind=2 pid=0 nice=ffffffff80000000 flags=ffffffff00000000 form=2 call=3 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=0 kind=0 pid=0 nice=ffffffff80000000 flags=0 form=0 call=5 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=0 kind=2 pid=0 nice=ffffffff80000000 flags=ffffffff00000000 form=0 call=5 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=0 kind=3 pid=0 nice=ffffffff80000000 flags=0 form=0 call=4 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=0 kind=3 pid=1234567800000000 nice=ffffffff80000000 flags=0 form=0 call=5 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=0 kind=3 pid=0 nice=ffffffff80000000 flags=0 form=0 call=6 ret=0 errno=0 expected=1
+LINUX ATTRNICE CASES: ordinary=0 kind=0 calls=3456 failures=1056
+LINUX ATTRNICE CASES: ordinary=0 kind=1 calls=6912 failures=2112
+LINUX ATTRNICE CASES: ordinary=0 kind=2 calls=3456 failures=1056
+LINUX ATTRNICE CASES: ordinary=0 kind=3 calls=831 failures=435
+LINUX ATTRNICE FINAL: ordinary=0 kind=0 calls=3456 failures=1056
+LINUX ATTRNICE FINAL: ordinary=0 kind=1 calls=6912 failures=2112
+LINUX ATTRNICE FINAL: ordinary=0 kind=2 calls=3456 failures=1056
+LINUX ATTRNICE FINAL: ordinary=0 kind=3 calls=831 failures=435
+LINUX ATTRNICE DETAIL: ordinary=1 kind=3 pid=0 nice=0 flags=0 form=-1 call=1 ret=0 errno=0 expected=0
+LINUX ATTRNICE TOPOLOGY: ordinary=1 uid=1000 same=30937 cross=44760 page=4096
+LINUX ATTRNICE DETAIL: ordinary=1 kind=0 pid=0 nice=ffffffff80000000 flags=0 form=0 call=1 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=1 kind=1 pid=1234567800000000 nice=ffffffff80000000 flags=0 form=0 call=1 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=1 kind=1 pid=ffffffff00000000 nice=ffffffff80000000 flags=0 form=0 call=2 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=1 kind=2 pid=0 nice=ffffffff80000000 flags=ffffffff00000000 form=0 call=1 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=1 kind=0 pid=0 nice=ffffffff80000000 flags=0 form=1 call=2 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=1 kind=1 pid=1234567800000000 nice=ffffffff80000000 flags=0 form=1 call=3 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=1 kind=1 pid=ffffffff00000000 nice=ffffffff80000000 flags=0 form=1 call=4 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=1 kind=2 pid=0 nice=ffffffff80000000 flags=ffffffff00000000 form=1 call=2 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=1 kind=0 pid=0 nice=ffffffff80000000 flags=0 form=2 call=3 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=1 kind=2 pid=0 nice=ffffffff80000000 flags=ffffffff00000000 form=2 call=3 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=1 kind=0 pid=0 nice=ffffffff80000000 flags=0 form=0 call=5 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=1 kind=2 pid=0 nice=ffffffff80000000 flags=ffffffff00000000 form=0 call=5 ret=0 errno=0 expected=1
+LINUX ATTRNICE DETAIL: ordinary=1 kind=3 pid=0 nice=1 flags=0 form=0 call=14 ret=0 errno=0 expected=0
+LINUX ATTRNICE DETAIL: ordinary=1 kind=3 pid=1234567800000000 nice=1 flags=0 form=0 call=15 ret=0 errno=0 expected=0
+LINUX ATTRNICE DETAIL: ordinary=1 kind=3 pid=8498 nice=1 flags=0 form=0 call=48 ret=0 errno=0 expected=0
+LINUX ATTRNICE CASES: ordinary=1 kind=0 calls=3456 failures=1080
+LINUX ATTRNICE CASES: ordinary=1 kind=1 calls=6912 failures=2160
+LINUX ATTRNICE CASES: ordinary=1 kind=2 calls=3456 failures=1080
+LINUX ATTRNICE CASES: ordinary=1 kind=3 calls=831 failures=387
+LINUX ATTRNICE FINAL: ordinary=1 kind=0 calls=3456 failures=1080
+LINUX ATTRNICE FINAL: ordinary=1 kind=1 calls=6912 failures=2160
+LINUX ATTRNICE FINAL: ordinary=1 kind=2 calls=3456 failures=1080
+LINUX ATTRNICE FINAL: ordinary=1 kind=3 calls=831 failures=387
+LINUX ATTRNICE FAIL: nice authorization, normalization or state
+QEMU: Terminated
+

@@ -1,0 +1,47 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "69977adb542fd4dc42f4796b3b11684684a57f0dd7f2b4208dad681ac1674d11",
+    "results": [
+        {
+            "name": "attrnice",
+            "source_sha256": "42f45edd6322c95037aa848404275527503570ab70929f9678c60db82701fb59",
+            "init_sha256": "cc88302a486072416ef3c9b193a008ed10d1b074f23d0ed032e586200e20afeb",
+            "iso_sha256": "8ed0fe39cf39588417634e6a295444e668bd1d4b0049e386784d6c479320bb34",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "2fa19edd469bdf4334ddce2adfc6e7ae167bf58792a4827be492ece28d295adb",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "schedabi",
+            "source_sha256": "de18a603b819a8534ec998e1229c6b6b5103bfe515bff8e81b81ee78b9c21d7d",
+            "init_sha256": "aaf0c1175a0b32bee276fc84f5619c7c468643a97337fb4ee44b45900b81af18",
+            "iso_sha256": "a5a0921cf8ef08921643e09484a36928b7547185f933c782aa7f5f44087b375a",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "rrabi",
+            "source_sha256": "1dbb6631fbff3080966eaabecb56c4efa37b53bb3df2979ad68da9be7e8b874e",
+            "init_sha256": "c4fa4490cfc1f9997ab8018831a242c1c4fdc5099bb6c59bbccceb1b88890f5a",
+            "iso_sha256": "e534b8658a22626dd5d2aeee97c85f7a3d3d23c4ee395ac5f553c55ec946fc9f",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "attrquery",
+            "source_sha256": "ece9c957e365646f3f37aefef75b5ff7540c58da876a1764eb67fff46b557c9b",
+            "init_sha256": "43da21bb9f97a38755442078b7396f5ff8924e01ea9fac6117fc5cf86ed6f770",
+            "iso_sha256": "2de2fcba9387917e4c4df1e223012b9fa66e5c3b619f4aa43a1982df8fed0291",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

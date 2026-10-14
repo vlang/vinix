@@ -1,0 +1,3 @@
+tests/linux-compat/attrnice-check.v:422: FAIL: fn main.main: assert false, 'attrnice assertions must execute'
+      message: attrnice assertions must execute
+V panic: Assertion failed...

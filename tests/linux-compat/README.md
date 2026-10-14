@@ -1487,3 +1487,26 @@ publishes width-oracle/compile/disk-space preparations, final receipts and
 independent lifetime review. Target/credential races, namespaces/security,
 hotplug/cpusets/large masks, actual migration/fairness and GNU/foreign paths
 remain separate; the three broad compatibility gates remain open.
+
+The `attrnice` case qualifies native `sched_setattr` nice normalization and
+admission for single-thread process leaders. OTHER/BATCH apply clamped nice
+values using target RLIMIT_NICE and effective CAP_SYS_NICE; UID0 alone has
+no privilege bypass, default limits are 0/0 and IDLE/FIFO/RR ignore nice.
+Root/UID1000 cohorts use six target classes, twelve nice values, four input
+forms, three self limits, capability off/on and upper-word controls, plus
+nonfair/legacy/layout/error-ordering/state checks: 29,310 per architecture.
+Original kernels fail 9,366; corrected kernels and identical ELFs on Linux
+6.12.51 pass. Genuine musl getpriority observes each live operation. A
+privileged broker restores every live target after either success or error;
+peer processes, pipes and guarded mappings have explicit cleanup. Both
+warmed 200-cycle cohorts retain flat storage. Run
+`--cases attrnice,runtime,schedabi,rrabi,attrquery,attrimport,affabi,fcntlabi`
+with a fresh state directory. `attrnice-reference.v` accepts the preceding
+reference controller arguments; compile `attrnice-check.v` without `-prod`
+and pass the retained evidence directory. [The report](../../docs/linux-posix-qualification.md#native-scheduling-attribute-nice-normalization-and-admission)
+binds exact cohort failures, source/C/ELF/compiler pins, production builds,
+storage, executing negative controls and independent lifetime review. Eight
+cases pass across primary/completion/recovery receipts; missing initial aggregates
+and the failed x86 descriptor ISO build remain explicit. Nice remains process-wide in Vinix; pthread nice, races, complete realtime/deadline/
+reset/clamp behavior and GNU/foreign paths remain separate. The three broad
+compatibility gates remain open.

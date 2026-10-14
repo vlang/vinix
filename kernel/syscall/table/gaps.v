@@ -52,7 +52,7 @@ fn sched_target_errno(pid int) u64 {
 	} else { u64(errno.esrch) }
 }
 
-// May the caller give this thread that priority? Root may do anything;
+// May the caller give this thread that priority? CAP_SYS_NICE grants it;
 // everybody else is held to RLIMIT_RTPRIO, and may not touch a thread outside
 // their own user.
 fn may_set_sched_params(target_tid int, policy int, priority int) bool {
@@ -69,7 +69,7 @@ fn may_set_sched_params(target_tid int, policy int, priority int) bool {
 		return false
 	}
 	if !proc.mac_peer_allowed(caller, owner) { return false }
-	if caller.euid == 0 { return true }
+	if proc.has_capability(caller, proc.cap_sys_nice) { return true }
 	if caller.euid != owner.euid && caller.euid != owner.uid {
 		return false
 	}
@@ -83,6 +83,24 @@ fn may_set_sched_params(target_tid int, policy int, priority int) bool {
 		return true
 	}
 	return proc.limit_allows(caller, proc.rlimit_rtprio, u64(priority))
+}
+
+// The target's nice limit authorizes fair-class priority increases. Keep
+// borrowed task/process pointers under the PID-table lock and return errno.
+fn sched_nice_permission(tid int, wanted int) u64 {
+	if tid <= 0 || tid >= proc.max_pid { return errno.esrch }
+	caller := proc.current_thread().process
+	proc.lock_table()
+	defer { proc.unlock_table() }
+	target := threads_by_tid[tid]
+	if target == unsafe { nil } || target.process == unsafe { nil } { return errno.esrch }
+	owner := target.process
+	if !proc.mac_peer_allowed(caller, owner) { return errno.eperm }
+	privileged := proc.has_capability(caller, proc.cap_sys_nice)
+	if !privileged && caller.euid != owner.euid && caller.euid != owner.uid { return errno.eperm }
+	if wanted < owner.nice && !privileged
+		&& !proc.limit_allows(owner, proc.rlimit_nice, u64(20 - wanted)) { return errno.eperm }
+	return 0
 }
 
 // The priority a policy takes, or none if that is not a priority it can have.
@@ -326,6 +344,9 @@ fn syscall_linux_sched_setattr(_ voidptr, raw_pid int, attr_ptr u64, flags u32) 
 	if !usercopy.copy_from_user(voidptr(&attr), attr_ptr, copy_size) {
 		return errno.err, errno.efault
 	}
+	// Linux normalizes sched_attr's signed nice value during import.
+	if attr.sched_nice < -20 { attr.sched_nice = -20 }
+	if attr.sched_nice > 19 { attr.sched_nice = 19 }
 	util_flags := attr.sched_flags & (sched_flag_util_min | sched_flag_util_max)
 	if int(i32(attr.sched_policy)) < 0 || (util_flags != 0 && size < sizeof(SchedAttr)) {
 		return errno.err, errno.einval
@@ -389,6 +410,10 @@ fn syscall_linux_sched_setattr(_ voidptr, raw_pid int, attr_ptr u64, flags u32) 
 		if !may_set_sched_params(tid, policy, checked) {
 			return errno.err, errno.eperm
 		}
+		if policy == proc.sched_other || policy == proc.sched_batch {
+			nice_error := sched_nice_permission(tid, int(attr.sched_nice))
+			if nice_error != 0 { return errno.err, nice_error }
+		}
 		params.priority = checked
 	}
 
@@ -396,16 +421,14 @@ fn syscall_linux_sched_setattr(_ voidptr, raw_pid int, attr_ptr u64, flags u32) 
 		return errno.err, errno.get()
 	}
 
-	// sched_attr carries nice alongside the policy, and a caller that has
-	// filled it in should not need a second call to have it take effect.
-	if policy != proc.sched_deadline && attr.sched_nice >= -20 && attr.sched_nice <= 19 {
+	// Only fair classes apply nice. Permission was checked before policy changes;
+	// accepted requests must apply the normalized value rather than ignore it.
+	if policy == proc.sched_other || policy == proc.sched_batch {
 		proc.lock_table()
 		target := threads_by_tid[tid]
 		if target != unsafe { nil } {
 			mut owner := target.process
-			if owner != unsafe { nil } && proc.mac_peer_allowed(proc.current_thread().process, owner)
-				&& (attr.sched_nice >= owner.nice
-				|| proc.current_thread().process.euid == 0) {
+			if owner != unsafe { nil } && proc.mac_peer_allowed(proc.current_thread().process, owner) {
 				owner.nice = int(attr.sched_nice)
 			}
 		}

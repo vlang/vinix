@@ -907,6 +907,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   and identical-ELF Linux; measure bitmap widths and retain placement/security/race/foreign gaps.
   See [the affinity receipts](docs/linux-posix-qualification.md#native-affinity-masks-argument-words-and-stable-peer-permissions).
 
+- [x] Normalize native sched_attr nice, enforce target RLIMIT_NICE and effective
+  CAP_SYS_NICE admission, preserve nonfair nice and default nice limits to zero.
+  Qualify 29,310 single-thread process-leader checks per architecture with Linux
+  references, real state/restoration, flat storage and independent lifetime review.
+  See [the bounded nice contract](docs/linux-posix-qualification.md#native-scheduling-attribute-nice-normalization-and-admission).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

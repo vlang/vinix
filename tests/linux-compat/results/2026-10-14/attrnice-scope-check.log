@@ -1,0 +1,1 @@
+arm/x86: complete generated C differs only in sched_setattr, may_set_sched_params, default_rlimits, scalar locked nice helper/prototype and exactly three existing proc loop identifier uses per architecture; other code unchanged

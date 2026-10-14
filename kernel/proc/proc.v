@@ -198,8 +198,10 @@ pub fn default_rlimits() [rlimit_nlimits]RLimit {
 	}
 	// No real-time priority without privilege, as on Linux: a process that
 	// could make itself SCHED_FIFO could keep a processor from everyone
-	// else. Root is not asked (may_set_sched_params).
+	// else. CAP_SYS_NICE authorizes privileged callers (may_set_sched_params).
 	limits[rlimit_rtprio] = RLimit{}
+	// Nice increases require explicit resource admission or CAP_SYS_NICE.
+	limits[rlimit_nice] = RLimit{}
 	return limits
 }
 

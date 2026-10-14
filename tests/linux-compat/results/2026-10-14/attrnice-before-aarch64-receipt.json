@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "2930f9dff3f55357d3bc047db6cb1fcc4b9704e1276eb8dc08da5b2f2dda8636",
+    "results": [
+        {
+            "name": "attrnice",
+            "source_sha256": "42f45edd6322c95037aa848404275527503570ab70929f9678c60db82701fb59",
+            "init_sha256": "cc88302a486072416ef3c9b193a008ed10d1b074f23d0ed032e586200e20afeb",
+            "iso_sha256": "81a04ea810d9a76db6442b740498acc028635e62cfe4cf36b981f4860c14ab22",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}
