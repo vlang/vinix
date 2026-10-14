@@ -4953,12 +4953,50 @@ native SDK/LLVM measurements, the original zero-capacity assertion trial and
 actual IPA probe/audit evidence are retained under
 `build/ios/fortnite/foreign-copy-checks`. Full iOS regression remains unpassed.
 
-Both audits resolve one more required MarketplaceKitWrapper import. The actual
-IPA now exits with status 1 at `_$ss11_StringGutsVN`, its required `_StringGuts`
-type metadata. Native data measurements show a distinct nominal descriptor
-with matching value-witness entries, size 16 and stride 16 as String; they are
-retained for the next implementation. Fortnite has not entered application
-code and remains unplayable.
+Both audits resolve one more required MarketplaceKitWrapper import. That cohort
+reached `_$ss11_StringGutsVN`, its required `_StringGuts` type metadata.
+
+`_StringGuts` now has independent canonical struct metadata, nominal descriptor
+and complete accessor exports (`VN`, `VMn`, `VMa`). Native measurements show
+size/stride 16, alignment 8, one field at offset zero and the same eight
+value-witness entries and extra-inhabitant flags as String. The V records share
+String's witness table while keeping distinct metadata and descriptor addresses.
+The [frozen Swift declaration](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/StringGuts.swift)
+contains one `_object` field. String protocol conformances remain attached to
+String; this does not add conformances for `_StringGuts`.
+
+The records and 24-byte ARM64 accessor occupy unused space in the existing
+two-page metadata arena. The accessor returns metadata/state Complete in x0/x1
+for direct and relative descriptor calls. Cache flushing extends through byte
+216 before RX/R sealing and publication. Repeated lookup adds no allocation,
+ARC or new arena lifetime; the existing drained teardown retires both types.
+The nominal descriptor has no Fields reflection record, matching the existing
+nonreflectable subset. Textual `_StringGuts` mangled names and `_StringObject`
+metadata remain separate work; existing bounded nominal accessor lookup works.
+
+The new fixture passes both ASan/UBSan hash modes and a Vinix ARM64 guest.
+Native comparisons cover nominal identity, complete accessor responses, all
+eight witnesses, balanced native/ObjC/inline/immortal copy/take ownership and
+single-payload enum tags through UINT32_MAX. Enum payloads respect eight-byte
+alignment, with page guards and prefix/padding canaries. V checks also cover
+eight concurrent lookup workers, distinct Array specializations for String and
+`_StringGuts`, typed tail destruction and reentrant assignment deallocation from
+another thread. Two runtime lifetimes drain their owners and metadata arenas.
+Generated host/guest C confirms fixed emission and sealing order.
+
+Ten fresh sanitizer runs and five guest suites pass across `_StringGuts`,
+String metadata, Array storage, mangled lookup and protocol witnesses. The
+dedicated public `build-swift-string-guts` target, full build, regression and
+Swift guest modes include the fixture. Thirteen final generated-C streams and
+executables, native SDK/LLVM measurements, retained fixture/audit correction
+trials and actual IPA probe/audit evidence are under
+`build/ios/fortnite/string-guts-checks`. Full iOS regression remains unpassed.
+
+Both audits resolve the required `_StringGuts` metadata import. The actual IPA
+now exits with status 1 at MarketplaceKitWrapper's required
+`_$ss13_StringObjectV10sharedUTF8SRys5UInt8VGvg` getter. Native getter/delegate
+measurements are retained for the next implementation. Fortnite has not entered
+application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -4967,10 +5005,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,460 | 700 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 144 | 32 | 23 |
-| All images | 2,263 | 735 | 120 |
+| MarketplaceKitWrapper | 145 | 31 | 23 |
+| All images | 2,264 | 734 | 120 |
 
-The C++/GLES/Text variant reports 2,276 resolved imports, 722 unresolved strong
+The C++/GLES/Text variant reports 2,277 resolved imports, 721 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

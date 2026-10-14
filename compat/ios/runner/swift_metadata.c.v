@@ -72,6 +72,33 @@ fn swift_string_enum_store(value u64, which_case u32, empty_cases u32, metadata 
 	}
 }
 
+// _StringGuts is a distinct frozen nominal with one _object field at zero.
+// Native witnesses match String's representation/ARC, so share that table,
+// while preserving nominal identity and an independent complete accessor.
+fn swift_string_guts_emit(code u64, data u64, witness u64, module_descriptor u64) {
+	metadata := data + 648
+	descriptor := data + 672
+	entry := code + 192
+	unsafe {
+		*(&u64(metadata - 8)) = witness
+		*(&u64(metadata)) = 0x200
+		*(&u64(metadata + 8)) = descriptor
+	}
+	write32(descriptor,0x51)
+	swift_protocol_relative(descriptor + 4,module_descriptor)
+	swift_protocol_relative(descriptor + 8,data + 704)
+	swift_protocol_relative(descriptor + 12,entry)
+	// No field reflection record, like the existing String descriptor.
+	write32(descriptor + 20,1)
+	write32(descriptor + 24,2)
+	C.memcpy(voidptr(data + 704),c'_StringGuts',12)
+	write32(entry,0x58000080)
+	write32(entry + 4,0xd2800001)
+	write32(entry + 8,0xd65f03c0)
+	write32(entry + 12,0xd503201f)
+	unsafe { *(&u64(entry + 16)) = metadata }
+}
+
 // One allocation keeps relative descriptor pointers within signed 32-bit
 // range even when host text and heap addresses are far apart. Its first page
 // contains a V-emitted ARM64 metadata accessor; its second contains read-only
@@ -127,7 +154,8 @@ fn swift_string_metadata() u64 {
 		C.memcpy(unsafe { voidptr(data + 216) }, c'String', 7)
 		swift_string_protocols_emit(base, data)
 		swift_raw_protocol_emit(data)
-		C.__builtin___clear_cache(arena, unsafe { voidptr(base + 152) })
+		swift_string_guts_emit(base,data,witness,module_descriptor)
+		C.__builtin___clear_cache(arena, unsafe { voidptr(base + 216) })
 		if C.mprotect(arena, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 			|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 			C.munmap(arena, usize(page * 2))
@@ -137,6 +165,8 @@ fn swift_string_metadata() u64 {
 	}
 	return ios_runtime.swift_metadata_arena + page + 16
 }
+
+fn swift_string_guts_metadata() u64 { return swift_string_metadata() - 16 + 648 }
 
 fn swift_metadata_stop() {
 	// Like ARC thunks, metadata is retired only after all workers/callbacks and

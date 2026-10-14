@@ -273,6 +273,9 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_$sSSN' { swift_string_metadata() }
 		'_$sSSMn' { read64(swift_string_metadata() + 8) }
 		'_$sSSMa' { swift_string_metadata(); ios_runtime.swift_metadata_arena }
+		'_$ss11_StringGutsVN' { swift_string_guts_metadata() }
+		'_$ss11_StringGutsVMn' { read64(swift_string_guts_metadata() + 8) }
+		'_$ss11_StringGutsVMa' { swift_string_guts_metadata(); ios_runtime.swift_metadata_arena + 192 }
 		'_$sSS19stringInterpolationSSs013DefaultStringB0V_tcfC' { u64(unsafe { voidptr(swift_string_interpolation) }) }
 		'_$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC' { u64(unsafe { voidptr(swift_string_literal) }) }
 		'_$sSS11utf8CStrings15ContiguousArrayVys4Int8VGvg' { u64(unsafe { voidptr(swift_string_utf8_cstring) }) }
