@@ -933,6 +933,10 @@ fn lookup_bound(_addr voidptr, addrlen u32) ?&UnixSocket {
 	if !fs.policy_check(target, proc.policy_socket | proc.policy_write) {
 		return none
 	}
+	// Pathname transports require write permission on the resolved inode,
+	// using effective credentials and the common DAC/MAC checks. Refuse before
+	// connect can change peers/backlogs or sendto can publish a datagram.
+	fs.check_access(target, fs.access_write, true)?
 	mut target_res := target.resource
 	if mut target_res is UnixSocket {
 		return target_res

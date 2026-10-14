@@ -109,6 +109,12 @@ Ordinary pathname opens of the live socket must return `ENXIO` after permission
 validation. The fixture covers three access modes with eight flag combinations,
 exclusive creation, directory-only lookup, symlink following and metadata-only
 symlink lookup, while preserving the listener and socket inode metadata.
+Pathname connections and named datagram sends must require write permission on
+the socket inode. Mode 0000, read-only and execute-only sockets refuse access;
+write-only sockets permit it. The extended cycles also check record sockets,
+empty receive queues after refused sends, retained datagram targets after a
+failed reconnect, connected traffic after chmod and abstract sockets under a
+restrictive umask. See [pathname permission evidence](socket-permissions.md).
 Two batches each run 32 cycles on each backend; every live slab class and the
 large-allocation count must match. A protected-directory bind must fail with
 `EACCES`. Root remounts the volume read-only, verifies that removed names stay

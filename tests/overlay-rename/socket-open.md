@@ -66,3 +66,6 @@ The Linux kernels and reference boot policy match the preceding
 [metadata qualification](socket-access.md). This qualifies pathname-open
 authorization and repeated clean storage operations; broader open flag/error
 precedence, crash recovery and full OCI/rootless/server acceptance remain open.
+
+The subsequent [pathname permission correction](socket-permissions.md) requires
+write access for connections and addressed datagrams, using an expanded fixture.

@@ -57,6 +57,7 @@ fn persistent_socket_cycle(base &char, backing &char, hold bool) {
 		mut address := &C.sockaddr_un(C.alloca(sizeof(C.sockaddr_un)))
 		socket_address(&target[0], address)
 		socket_metadata_operations(metadata, address)
+		socket_private_connections(client, listener, address)
 		delivered_metadata := pass_socket_metadata(metadata)
 		check(C.close(delivered_metadata) == 0, 464)
 		keepalive := &i32(C.alloca(sizeof(i32)))
@@ -66,7 +67,9 @@ fn persistent_socket_cycle(base &char, backing &char, hold bool) {
 		check(C.getsockopt(listener, C.SOL_SOCKET, C.SO_KEEPALIVE, keepalive, option_length) == 0
 			&& *keepalive == 0 && C.chmod(&target[0], 0o777) == 0, 473)
 		socket_path_opens(&target[0])
-		check(client >= 0 && C.vinix_overlay_connect(client, voidptr(address), u32(sizeof(C.sockaddr_un))) == 0, 407)
+		check(C.chmod(&target[0], 0o200) == 0 && client >= 0
+			&& C.vinix_overlay_connect(client, voidptr(address), u32(sizeof(C.sockaddr_un))) == 0
+			&& C.chmod(&target[0], 0o777) == 0, 407)
 		pending_metadata := C.open(&target[0], C.O_PATH)
 		check(pending_metadata >= 0, 465)
 		bad_socket_operation(C.accept(pending_metadata, nil, nil), 466)
@@ -77,6 +80,7 @@ fn persistent_socket_cycle(base &char, backing &char, hold bool) {
 			C.puts(c'OVERLAY SOCKET PATH CLOSE: PASS')
 			C.puts(c'OVERLAY SOCKET ACCESS: PASS')
 			C.puts(c'OVERLAY SOCKET OPEN: PASS')
+			C.puts(c'OVERLAY SOCKET PERMISSION: PASS')
 			C.fflush(nil)
 		}
 		path := C.open(&target[0], C.O_PATH)
@@ -102,6 +106,9 @@ fn persistent_socket_cycle(base &char, backing &char, hold bool) {
 			&& C.close(old_path) == 0 && C.close(path) == 0
 			&& C.close(replaced) == 0 && C.close(listener) == 0
 			&& C.close(accepted) == 0 && C.close(client) == 0, 413)
+		socket_record_permissions(base)
+		socket_datagram_permissions(base)
+		socket_abstract_permissions()
 	}
 }
 

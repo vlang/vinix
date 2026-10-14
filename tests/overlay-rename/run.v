@@ -67,6 +67,7 @@ fn main() {
 		'retention_fixture':   digest(state + '/sources/overlayfixture/retention.v')!
 		'sockets_fixture':     digest(state + '/sources/overlayfixture/sockets.v')!
 		'path_access_fixture': digest(state + '/sources/overlayfixture/path_access.v')!
+		'path_permission_fixture': digest(state + '/sources/overlayfixture/path_permissions.v')!
 		'abi_header':          digest(state + '/sources/overlayfixture/native-abi.h')!
 	}
 	disk := state + '/store.ext2'
@@ -159,7 +160,7 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 		expected << ['OVERLAY OPAQUE STORAGE FULL: PASS', 'OVERLAY STATFS: PASS']
 	}
 	if case_name == 'sockets' {
-		expected << ['OVERLAY PERSISTENT SOCKETS: PASS', 'OVERLAY SOCKET REMOUNT: PASS', 'OVERLAY SOCKET PATH CLOSE: PASS', 'OVERLAY SOCKET ACCESS: PASS']
+		expected << ['OVERLAY PERSISTENT SOCKETS: PASS', 'OVERLAY SOCKET REMOUNT: PASS', 'OVERLAY SOCKET PATH CLOSE: PASS', 'OVERLAY SOCKET ACCESS: PASS', 'OVERLAY SOCKET PERMISSION: PASS']
 	}
 	if case_name == 'socket-access' { expected << 'OVERLAY SOCKET REFERENCE: PASS' }
 	positive, negative := guesthost.verdict_policy(expected, ['FAIL: overlay'], false)

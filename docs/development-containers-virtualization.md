@@ -320,6 +320,11 @@ the persistent ext2/overlay workloads retain flat live allocations.
 The [pathname-open correction](../tests/overlay-rename/socket-open.md) prevents
 ordinary `open()` calls from acquiring a live socket transport, preserving
 permission/type errors and metadata-only access.
+The [pathname transport permission correction](../tests/overlay-rename/socket-permissions.md)
+requires write permission for UNIX connections and addressed datagrams. Native
+and identical Linux probes cover refusals without queue/peer changes, write-only
+sockets, record/datagram traffic and abstract lookup. Physical backing ACL
+snapshots for socket resources remain unsupported and unqualified.
 Crash consistency, full OCI/rootless-runtime acceptance and broader server-load
 qualification remain open. Full pins and native CI
 instructions are recorded in [the guest evidence](../tests/development/README.md).
