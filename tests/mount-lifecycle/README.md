@@ -41,6 +41,13 @@ select its individual cases.
 select its individual cases.
 `--case xattrs` selects extended-attribute attachment policy; `xp-0` through
 `xp-7` select its individual cases.
+`--case inode-flags` selects native inode-flag attachment policy; `ip-0` through
+`ip-7` select its individual cases. These cases are included in native `all`;
+the Linux `move-reference` suite excludes them.
+
+The [inode-flag checks](inode-flags-policy.md) exercise immutable and append-only
+updates through regular-file and directory descriptors, including unchanged
+values, read-only denials and existing capability admission.
 
 The [extended-attribute checks](xattr-policy.md) qualify set/remove and get/list
 forms, binary/empty values, symlink no-follow, inherited namespace descriptions
@@ -103,7 +110,7 @@ iterations, verifies capability denial and finishes with valid local operations.
 
 Use `--probe-state /path/to/prior-native-result` to reuse its probe ELF and
 generated C with a different kernel or case. The controller requires a matching
-architecture and identical current/copied hashes of all thirteen fixture files,
+architecture and identical current/copied hashes of all fourteen fixture files,
 verifies both artifact hashes against the prior receipt and checks the ELF
 architecture before boot.
 The prior result may be a failed control; its receipt hash is pinned in the new

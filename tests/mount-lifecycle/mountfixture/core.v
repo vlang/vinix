@@ -375,6 +375,8 @@ pub fn run() int {
 			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		xattr_case := if count == 4 && name[0] == `x` && name[1] == `p` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
+		inode_flags_case := if count == 4 && name[0] == `i` && name[1] == `p` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		check(C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'move') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'identities') == 0 || identity >= 0
@@ -388,7 +390,8 @@ pub fn run() int {
 			|| C.strcmp(selected, c'truncate') == 0 || truncate_case >= 0
 			|| C.strcmp(selected, c'metadata') == 0 || metadata_case >= 0
 			|| C.strcmp(selected, c'times') == 0 || timestamp_case >= 0
-			|| C.strcmp(selected, c'xattrs') == 0 || xattr_case >= 0, 4)
+			|| C.strcmp(selected, c'xattrs') == 0 || xattr_case >= 0
+			|| C.strcmp(selected, c'inode-flags') == 0 || inode_flags_case >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
@@ -428,6 +431,8 @@ pub fn run() int {
 		if C.strcmp(selected, c'xattrs') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { mount_xattr_cases(-1) }
 		if xattr_case >= 0 { mount_xattr_cases(xattr_case) }
+		if C.strcmp(selected, c'inode-flags') == 0 || C.strcmp(selected, c'all') == 0 { mount_flags_cases(-1) }
+		if inode_flags_case >= 0 { mount_flags_cases(inode_flags_case) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }

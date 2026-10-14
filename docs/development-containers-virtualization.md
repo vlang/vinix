@@ -452,7 +452,7 @@ directory's mount and existing target/resource pins; descriptor operations use
 the description's saved mount. Both architectures and same-ELF Linux checks
 cover actual mode/UID/GID changes, symlink no-follow behavior, retained read-only
 paths and UID/GID 1000 denial. Ownership, capabilities, MAC and attribute checks
-remain before mutation. Inode flags and other metadata paths
+remain before mutation. Other metadata paths
 still need complete attachment-policy coverage.
 The [timestamp checks](../tests/mount-lifecycle/timestamp-policy.md) extend that
 policy to `utimensat` and its descriptor/legacy forms. Path and empty-path cwd
@@ -470,6 +470,13 @@ architectures and same-ELF Linux checks cover set/remove, get/list, binary and
 empty values, symlink no-follow, detached/retired mounts and inherited fds after
 namespace copies with unchanged flags. Divergent inherited-fd remount policy,
 overlay/persistent-backend integration and concurrent mount changes remain open.
+The [inode-flag checks](../tests/mount-lifecycle/inode-flags-policy.md) extend
+the descriptor's saved route to `FS_IOC_SETFLAGS`, including authorized unchanged
+values. Native regular-file and directory probes cover separate bind policies,
+namespace copies, chroot/cwd, detached and retired mounts, and unprivileged
+denial. Existing capability/MAC/securelevel and overlay checks keep their order.
+The flag payloads are native-only; filesystem-backed Linux flag comparisons and
+error-order parity remain open.
 Mount reclamation, busy-reference accounting and full OCI acceptance remain open.
 The overlay-depth refusal measurements also exposed an event-record allocation per call.
 The separate [security event producer correction](../tests/overlay-rename/security-events.md)

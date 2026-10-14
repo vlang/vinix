@@ -16,6 +16,7 @@
 module fs
 
 import errno
+import lib
 import proc
 import resource
 import security
@@ -31,7 +32,7 @@ const fs_ioc_setflags = u64(0x40086602)
 // none for a resource that keeps no such flags, so syscall_ioctl falls
 // through to the file's own ioctl, which answers ENOTTY as Linux does for a
 // filesystem that does not support them.
-fn file_flags_ioctl(mut node VFSNode, request u64, argp voidptr) ?int {
+fn file_flags_ioctl(mut node VFSNode, request u64, argp voidptr, identity &lib.MountContext) ?int {
 	mut res := node.resource
 	security.mac_require(mut res, if request == fs_ioc_getflags { proc.mac_inspect } else { proc.mac_metadata })?
 	if !resource.can_have_attributes(mut res) {
@@ -65,7 +66,7 @@ fn file_flags_ioctl(mut node VFSNode, request u64, argp voidptr) ?int {
 		errno.set(errno.eperm)
 		return none
 	}
-	if read_only(node) {
+	if read_only_on_mount(node, identity) {
 		errno.set(errno.erofs)
 		return none
 	}
