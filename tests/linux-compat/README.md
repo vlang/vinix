@@ -1284,3 +1284,25 @@ Use `tests/linux-compat/accessflags-reference.v` with `--arch`, `--kernel`,
 launch failures and word-only pipe permission failures are preserved as
 diagnostics. See
 [receipts and limits](../../docs/linux-posix-qualification.md#native-faccessat2-flag-words-and-pipe-owners).
+
+The `pipeabi` case checks native pipe2 flag words and real errors as root and
+UID/GID1000. Four ordinary flag combinations, ten invalid lower words, five
+upper register patterns and eight output-pointer forms cover aligned and
+unaligned results, nil, inaccessible, readonly and page-crossing memory.
+Original/dup/CLOEXEC aliases check raw 64-bit F_GETFL, inode owners/identity,
+FD flags, nonblocking EAGAIN, byte transfers and EOF. Retained regular data,
+cursor, queued AB and the original 64 descriptor slots stay unchanged.
+Both baselines fail 3,904 of 4,186 native controls; fixed Vinix passes.
+The same musl ELF passes 3,546 ordinary-pipe/error controls on Linux6.12.51.
+The 640 extra native controls separately verify EOPNOTSUPP for unimplemented
+packet O_DIRECT and ENOPKG for notification O_EXCL. Linux deliberately skips
+that row; these errors do not establish packet/watch-queue support.
+Two 200-cycle finite pipe creation/alias/transfer/close and refusal cohorts
+keep all slabs and large pages flat. Run `tests/linux-compat/run` with
+`--arch ARCH --kernel-dir DIR --state-dir FRESH` and
+`--cases pipeabi,accessflags,access,open,runtime`; keep the state path compact
+for the QMP socket limit. Use `tests/linux-compat/pipeabi-reference.v` with
+`--arch`, `--kernel`, `--init` and a fresh `--state-dir` for the identical ELF
+on Linux. Descriptor exhaustion cleanup, concurrent publication/closure,
+limit/pointer precedence and F_SETFL packet mode require separate work. See
+[receipts and limits](../../docs/linux-posix-qualification.md#native-pipe2-flag-words-and-errors).

@@ -1,0 +1,9 @@
+Compiler output from the default V compiler:
+/Volumes/VinixOwnerQueryScratch/tmp/vinix-v-module-J09YgN/pipeabifixture/core.v:65:6: error: infix expr: cannot use `int` (right expression) as `voidptr`
+   63 |         value.page = u64(C.sysconf(C._SC_PAGESIZE)); if value.page < 4096 || value.page > 65536 { fatal() }
+   64 |         value.mapping = &u8(C.mmap(nil, usize(value.page * 3), C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+   65 |         if voidptr(value.mapping) == C.MAP_FAILED { fatal() }; C.memset(value.mapping, 0xa5, usize(value.page * 3))
+      |            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   66 |         if C.mprotect(value.mapping + value.page, usize(value.page), C.PROT_NONE) != 0 || C.mprotect(value.mapping + value.page * 2, usize(value.page), C.PROT_READ) != 0 { fatal() }
+   67 |         value.fds[0] = C.open(if ordinary { c'/tmp/pipeabi-u' } else { c'/tmp/pipeabi-r' }, C.O_CREAT | C.O_RDWR | C.O_CLOEXEC, 0o600)
+

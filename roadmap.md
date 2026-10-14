@@ -845,6 +845,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   retained state as root/UID1000 with flat storage on both architectures.
   See [the access receipts](docs/linux-posix-qualification.md#native-faccessat2-flag-words-and-pipe-owners).
 
+- [x] Decode native pipe2 flag words, reject unknown bits before pointers and
+  refuse unimplemented packet/notification modes; qualify ordinary pipe aliases,
+  transfers, errors and flat storage as root/UID1000 on both architectures.
+  See [the pipe receipts](docs/linux-posix-qualification.md#native-pipe2-flag-words-and-errors).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

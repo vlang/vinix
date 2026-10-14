@@ -5200,3 +5200,85 @@ baselines and word-only failures remain separately published diagnostics.
 Concurrent credential changes, filesystem UID/GID extensions, named FIFOs,
 restrictive policy, GNU/translated/ELF32 paths and the three broad section 15
 acceptance gates remain unqualified.
+
+## Native pipe2 flag words and errors
+
+The native checked pipe2 entry now decodes the lower 32 flag bits before
+pointer checks or allocation. Unknown bits return EINVAL even for nil or
+inaccessible outputs; upper register bits are ignored and cannot leak into
+F_GETFL. Ordinary O_NONBLOCK and O_CLOEXEC behavior is retained. The existing
+byte-stream pipe cannot provide O_DIRECT packets, so that mode returns
+EOPNOTSUPP. O_EXCL is Linux's O_NOTIFICATION_PIPE and returns ENOPKG because
+watch queues are absent. These native refusals publish unsupported dependencies;
+they do not qualify packet or notification semantics. Linux's accepted flags
+and validation order are defined in its
+[pipe implementation](https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux/+/b91872c56940950a6a0852e499d249c3091d4284/fs/pipe.c),
+and the [pipe manual](https://man7.org/linux/man-pages/man2/pipe.2.html)
+describes packet behavior and ENOPKG for unavailable watch queues.
+
+The `pipeabi` musl probe runs root and UID/GID1000 cohorts. Four ordinary
+flag combinations and five upper-register patterns exercise eight output
+forms: aligned, unaligned, nil, address one, a full-width bad address,
+PROT_NONE, readonly and a buffer crossing into PROT_NONE. Ten invalid lower
+words must return EINVAL without changing output canaries. Valid copy faults
+may copy a prefix; the probe does not require an untouched output on EFAULT.
+Successful aligned/unaligned results are memcpy'd into typed stack storage.
+An unexpected success for a bad destination is rejected before dereference.
+
+| Controls per root/UID cohort | Native calls | Baseline failures | Linux reference calls |
+| --- | ---: | ---: | ---: |
+| Ordinary flags, upper words and result-pointer errors | 160 | 32 | 160 |
+| Invalid lower flags, including fault outputs | 1,600 | 1,600 | 1,600 |
+| Native packet/notification refusals | 320 | 320 | 0 |
+| Retained alias metadata/flags, file bytes/cursor, queued AB and FD slots | 13 | 0 | 13 |
+
+Each architecture's baseline fails 3,904 of 4,186 native controls. Corrected
+Vinix kernels pass all native rows. The identical musl ELF passes 3,546
+controls on actual Linux6.12.51, deliberately skipping the native-only refusal
+row. Child CASES and supervisor FINAL rows agree exactly. Successful pipes
+retain original/dup/CLOEXEC handles on each end and check exact libc and raw
+64-bit F_GETFL, descriptor flags, FIFO0600 and creator owners, shared inode
+identity, EAGAIN, ABC transfers across aliases and EOF after every writer
+closes. Nine stable aliases preserve metadata/status flags and descriptor
+slots; inherited regular data/cursor and the stable pipe's queued AB survive.
+The UID cohort creates its retained regular file before dropping credentials;
+its inherited handle remains root-owned, while subsequently created pipes
+must be UID/GID1000-owned.
+
+Two warmed and settled 200-cycle cohorts per architecture repeatedly create,
+duplicate, transfer through and close ordinary pipes, plus validate scalar
+refusals. All 18 ARM/14 x86 slab classes and observed large pages stay exactly
+flat: 68/68 ARM and 177/177 x86 in both cohorts. This covers bounded creation
+and alias cleanup with available descriptors; it does not qualify exhaustion,
+concurrent publication or general process churn.
+
+Four completed production builds use detached sparse worktrees frozen at
+09d9bbd210cb89f082a6019d69e508199d9501b7. Erasing only the checked pipe2
+wrapper body/prototype makes the entire before/after generated C identical.
+Allocation, resource boxing, references and descriptor publication remain
+unchanged. The probe has twelve explicit allocas and no hidden heap/index
+helpers. Independent lifetime review covers synchronous stack/mapping borrows,
+all known pipe aliases and the parent/child count transfer. Both five-case
+profiles (pipeabi/accessflags/access/open/runtime), eight host test files and
+coverage checks pass. Allocation scans retain 662 ARM/658 x86 source files
+and 400/292 sites with identical existing allowance failures.
+
+The assertion-enabled audit rejects a passing capture presented as a failing
+baseline and verifies all hashes, source/C/ELF identities and receipts. Its
+64 frozen source inputs now include the dispatched pipe usercopy helper,
+which was missing from the prior inventory. The public inventory separately
+uses the committed publication parent plus this change, excluding unrelated
+dirty/staged edits. The prior self-contained f6358ec compiler, 15,146 input
+pins and recovery record are reused. Corrected preview, baseline and native
+fixture C are byte-identical; preflight/native/Linux ELFs match, and raw
+preflight C drift is empty. The first preview's MAP_FAILED V type-check error
+occurred before guest execution and is retained only as a diagnostic.
+
+- [AArch64 receipt](../tests/linux-compat/results/2026-10-14/pipeabi-after-aarch64.json), [Linux reference](../tests/linux-compat/results/2026-10-14/pipeabi-reference-aarch64.json), [evidence](../tests/linux-compat/results/2026-10-14/pipeabi-evidence-aarch64.json).
+- [x86-64 receipt](../tests/linux-compat/results/2026-10-14/pipeabi-after-x86_64.json), [Linux reference](../tests/linux-compat/results/2026-10-14/pipeabi-reference-x86_64.json), [evidence](../tests/linux-compat/results/2026-10-14/pipeabi-evidence-x86_64.json).
+- [Audit](../tests/linux-compat/results/2026-10-14/pipeabi-audit.v), [verdict](../tests/linux-compat/results/2026-10-14/pipeabi-audit.log), [independent review](../tests/linux-compat/results/2026-10-14/pipeabi-lifetime-review.md).
+
+Packet/watch queues, F_SETFL packet mode, partially constructed pipes under
+descriptor exhaustion, concurrent publication/close races, limit-versus-pointer
+precedence, concurrent credentials, physical exhaustion, named FIFOs,
+GNU/translated/ELF32 paths and the three broad section 15 gates remain open.

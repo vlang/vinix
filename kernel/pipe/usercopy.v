@@ -11,8 +11,19 @@ import lib
 import proc
 import usercopy
 import ioctl
+import resource
 
 pub fn syscall_pipe_checked(gpr_state voidptr, pipefds &i32, flags int) (u64, u64) {
+	// Linux's int flags occupy only the low register word. Validate before
+	// pointer checks or descriptor allocation so invalid flags always win.
+	open_flags := int(u32(flags))
+	if open_flags & ~(resource.o_nonblock | resource.o_cloexec | resource.o_direct | resource.o_excl) != 0 {
+		return errno.err, errno.einval
+	}
+	// O_EXCL is Linux's O_NOTIFICATION_PIPE; no watch queues are compiled in.
+	if open_flags & resource.o_excl != 0 { return errno.err, errno.enopkg }
+	// The ring is a byte stream, so it cannot promise O_DIRECT packet semantics.
+	if open_flags & resource.o_direct != 0 { return errno.err, errno.eopnotsupp }
 	if pipefds == unsafe { nil } {
 		return errno.err, errno.efault
 	}
@@ -20,7 +31,7 @@ pub fn syscall_pipe_checked(gpr_state voidptr, pipefds &i32, flags int) (u64, u6
 	// syscall_pipe fills both words before success, and neither it nor the
 	// checked user copy retains this caller's scratch beyond the call.
 	local := unsafe { &i32(C.vinix_stack_alloc(2 * sizeof(i32))) }
-	ret, code := syscall_pipe(gpr_state, local, flags)
+	ret, code := syscall_pipe(gpr_state, local, open_flags)
 	if code != 0 {
 		return ret, code
 	}

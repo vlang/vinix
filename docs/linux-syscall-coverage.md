@@ -724,6 +724,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/memory/virtual_amd64.v` | `483bb2e7ac7a1248c6f09e182a8f27b8a250f4b3e4aeba2642b4be300b00bb9d` |
 | `kernel/memory/virtual_arm64.v` | `71602c4c637ebfaad8b85d1af34ca9a3d4e1afd4ebf85fdb433fa992871693c0` |
 | `kernel/pipe/pipe.v` | `0eb36d158d556636588cb0a742f5dbb50bbc0bf1168b82b1dc0d5ec08a5a967d` |
+| `kernel/pipe/usercopy.v` | `d06b69c1d6f813f3f4fbfeb264e76184d44924cb2d04dd7810a9c988c56d4284` |
 | `kernel/proc/container.v` | `db3558d2cea2aeb8c5a483cd9cbade7ba37e2d9d13f5d3047874a9ce2319449a` |
 | `kernel/proc/kernel_budget.v` | `763ca9bea7d11825b8abc293e350a3afabe911bab8e718853626d52fd2201553` |
 | `kernel/proc/pidns.v` | `45b6d1038abd9f0e7fd63690f4466e6329e4ead34d3172a4076e70494ed39870` |
@@ -757,6 +758,6 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/userland/userland.v` | `1cceebb504d423ba7e6c7b91d1391deae12f2a8f9bd0edbe06183a2abb010bc8` |
 | `kernel/userland/userland_arm64.v` | `da6881ff21cf825b5c0e07804cd0f8209df2862557116c608498e668cb3870b9` |
 | `kernel/vmstorage/storage.v` | `df6ee1fc37aa7858401f19576d8f450278987acfc3f083f956e8e750174cea7d` |
-| `tools/linux-compat/coverage.v` | `4ceb584b16f54105ef4e4e2404fd49f0a02ba2d7e11246bde23aa8cb67e1930b` |
+| `tools/linux-compat/coverage.v` | `4fb6092f7dad93f14a8f10eb51ba587df3cd847ea91f30b0dd73dd28d923970e` |
 | `tools/linux-compat/reference/aarch64-syscall.h` | `7b20fe57bf92c6b3cf800d4f83998419e92e19a88ead2d57c89c5725e0cfb816` |
 | `tools/linux-compat/reference/x86_64-syscall.h` | `c29e9cb15ff393eda50c320a6d96bb1132191251f8e079148a0646165bb8cabd` |

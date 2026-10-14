@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "9c68813f3c9d03fe2703d2139ba57d5c681526a0ee972945814d6cd9167db7f1",
+    "results": [
+        {
+            "name": "pipeabi",
+            "source_sha256": "97a8a834119de69016bd8186717baf2fbaac43d37d949c10f58b6cf62165c7de",
+            "init_sha256": "bad77855f6efd4731ad1d66bf7c7569ac3d5fa647d5a13b03cbe9289d6a13ae0",
+            "iso_sha256": "fbf7ed46cd4d31b1c309ddc0462b85c36922c34eec811d0c98adbcfe50d643a7",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}
