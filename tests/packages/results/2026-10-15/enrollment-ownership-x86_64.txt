@@ -1,0 +1,2 @@
+PASS x86_64 packages-enrollment-ownership (40.6s)
+package-enrollment-ownership x86_64: 1 passed, 0 failed, 0 skipped

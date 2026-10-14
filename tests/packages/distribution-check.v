@@ -113,6 +113,10 @@ fn check() ! {
 			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/signature-decoding-memory', repository + '/tools/packages/pkgcore/repository_signature_test.v'])!
 		run(work + '/signature-decoding-memory', [])!
+		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/enrollment-ownership-memory', repository + '/tools/packages/pkgcore/enrollment_ownership_test.v'])!
+		run(work + '/enrollment-ownership-memory', [])!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgprotocol', work)!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
 			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/repository-configuration-memory',

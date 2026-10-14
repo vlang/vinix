@@ -1,0 +1,21 @@
+Paired warmed enrollment read/admission control. Baseline reproduces the original reads and verification from a0c557c0e; revised control calls the production owned reader. Same 2 MiB index input and bad or missing signature; four measured calls per case. Results/errors are retired in both. Fixture setup, transport and whole-service memory are excluded.
+
+Before:
+ENROLLMENT MEMORY case=bad-signature kept=2097570 allocations=4
+ENROLLMENT MEMORY case=bad-signature kept=2097570 allocations=4
+ENROLLMENT MEMORY case=bad-signature kept=2097570 allocations=4
+ENROLLMENT MEMORY case=bad-signature kept=2097570 allocations=4
+ENROLLMENT MEMORY case=missing-signature kept=2097297 allocations=2
+ENROLLMENT MEMORY case=missing-signature kept=2097297 allocations=2
+ENROLLMENT MEMORY case=missing-signature kept=2097297 allocations=2
+ENROLLMENT MEMORY case=missing-signature kept=2097297 allocations=2
+
+After:
+ENROLLMENT MEMORY case=bad-signature kept=0 allocations=0
+ENROLLMENT MEMORY case=bad-signature kept=0 allocations=0
+ENROLLMENT MEMORY case=bad-signature kept=0 allocations=0
+ENROLLMENT MEMORY case=bad-signature kept=0 allocations=0
+ENROLLMENT MEMORY case=missing-signature kept=0 allocations=0
+ENROLLMENT MEMORY case=missing-signature kept=0 allocations=0
+ENROLLMENT MEMORY case=missing-signature kept=0 allocations=0
+ENROLLMENT MEMORY case=missing-signature kept=0 allocations=0

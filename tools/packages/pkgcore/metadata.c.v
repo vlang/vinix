@@ -20,7 +20,8 @@ fn read_metadata_with(path string, options MetadataReadOptions) !string {
 	defer { C.close(fd) }
 	options.checkpoint('opened', path)!
 	mut info := C.stat{}
-	if C.fstat(fd, &info) != 0 || info.st_mode & 0o170000 != 0o100000
+	// fstat consumes this pointer synchronously; keep its scratch on the stack.
+	if C.fstat(fd, unsafe { &info }) != 0 || info.st_mode & 0o170000 != 0o100000
 		|| info.st_size < 0 || info.st_size > max_metadata {
 		return error('metadata must be a bounded regular file: ${path}')
 	}
@@ -39,7 +40,7 @@ fn read_metadata_with(path string, options MetadataReadOptions) !string {
 		done += int(count)
 	}
 	options.checkpoint('read', path)!
-	if done != expected || C.fstat(fd, &info) != 0 || info.st_size != expected {
+	if done != expected || C.fstat(fd, unsafe { &info }) != 0 || info.st_size != expected {
 		return error('metadata changed size while reading; restore a stable file and retry: ${path}')
 	}
 	return unsafe { tos(&u8(bytes.data), done).clone() }

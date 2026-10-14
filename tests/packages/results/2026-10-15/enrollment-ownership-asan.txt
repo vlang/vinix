@@ -1,0 +1,26 @@
+clang ASan/UBSan; detect_leaks=0; halt_on_error=1
+
+enrollment_ownership:
+ENROLLMENT OWNERSHIP admitted snapshot text and decoded index have independent lifetimes; publisher identity remains borrowed PASS
+ENROLLMENT OWNERSHIP 16 repeats of six large signature/authentication/read failures release all reader and input scratch PASS
+ENROLLMENT OWNERSHIP expired, misidentified and zero-sequence signed metadata refuse; restored offline acquisition retries normally PASS
+ENROLLMENT OWNERSHIP proposed configuration growth and syntax/curve refusal retire array scratch and preserve borrowed source fields PASS
+ENROLLMENT OWNERSHIP accepted reviews own independent fields; rejected review construction releases all clones and fingerprints PASS
+ENROLLMENT OWNERSHIP public failure/review/apply/revocation preserve read-only trust state, independent review fields and retained replay history PASS
+PASS
+
+metadata:
+PASS
+
+administration:
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository unreachable
+Updating trusted repository fixture
+Updating trusted repository fixture
+PASS

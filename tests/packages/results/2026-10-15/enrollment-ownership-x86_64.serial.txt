@@ -1,0 +1,38 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=30
+!>+ [11] ./sbin/init sz=210912
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/enrollment-ownership-core sz=1216216
+!>+ [15] ./usr/share/package-fixtures/enrollment-ownership-probe sz=1301464
+!>+ [16] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e88800
+initramfs: Done (16 entries)
+HWTEST START packages-enrollment-ownership
+ENROLLMENT OWNERSHIP admitted snapshot text and decoded index have independent lifetimes; publisher identity remains borrowed PASS
+ENROLLMENT OWNERSHIP 16 repeats of six large signature/authentication/read failures release all reader and input scratch PASS
+ENROLLMENT OWNERSHIP expired, misidentified and zero-sequence signed metadata refuse; restored offline acquisition retries normally PASS
+ENROLLMENT OWNERSHIP proposed configuration growth and syntax/curve refusal retire array scratch and preserve borrowed source fields PASS
+ENROLLMENT OWNERSHIP accepted reviews own independent fields; rejected review construction releases all clones and fingerprints PASS
+ENROLLMENT OWNERSHIP public failure/review/apply/revocation preserve read-only trust state, independent review fields and retained replay history PASS
+ENROLLMENT PROCESS enrollment-ownership-core PASS
+Updating trusted repository first
+Updating trusted repository second
+Installing Seed 1.0.0 (1/1) from first
+Downloading seed/asset (4 bytes)
+Activated package generation 1
+CACHE PREFLIGHT authenticated prefix overflow stops before later repository fetch; signature precedence, active cache/history/generation and recovery data preserved PASS
+CACHE PREFLIGHT signed service/CLI refresh rejects oversized cache before later acquisition/publication and accepts a bounded retry PASS
+ENROLLMENT PROCESS enrollment-ownership-probe PASS
+HWTEST PASS packages-enrollment-ownership

@@ -560,6 +560,11 @@ for a valid 64-byte hex representation. Oversized or malformed signatures cannot
 cause input-sized decoder allocations. Legacy whitespace, prefixes, hex case,
 odd leading-zero spelling and diagnostic precedence remain compatible; see
 [signature decoding qualification](../tests/packages/signature-decoding-check.md).
+Enrollment retires loaded index/signature text when reading or authentication
+fails. Read-only repository reviews retire temporary configurations and proposals
+while returning independently owned review fields. Metadata reads also keep
+their synchronous `stat` scratch on the stack. See
+[enrollment ownership qualification](../tests/packages/enrollment-ownership-check.md).
 Files/directories are flushed before
 publication; POSIX rename switches `current` atomically. The next state-changing transaction
 retires abandoned stages. A crash before activation exposes the old complete set;

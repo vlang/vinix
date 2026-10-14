@@ -1592,6 +1592,16 @@ the verifier still checks index size, publisher key, cryptographic signature,
 metadata identity and expiry in the same order. See
 [signature decoding qualification](../../tests/packages/signature-decoding-check.md).
 
+Enrollment transfers loaded signed text only after signature and metadata
+admission; every earlier failure retires those inputs. Temporary proposals own
+their array and cloned new publisher identity, while retained identities and
+policy borrow the current configuration. Read-only reviews retire these
+proposals and their decoded configuration after cloning the returned review
+fields. Rejected review construction retires its partial owned fields too.
+Metadata descriptor reads keep synchronous `stat` scratch on the stack.
+See [enrollment ownership qualification](../../tests/packages/enrollment-ownership-check.md)
+for failure/retry, ownership and persistent-trust checks.
+
 Configuration JSON preserves legacy omitted-field defaults, including partial
 policy objects. Present fields must have the declared JSON types; null values,
 unknown keys and duplicate keys (including escaped equivalent spellings) are
