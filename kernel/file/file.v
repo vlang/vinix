@@ -1549,8 +1549,17 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 		f_setown {
 			// A negative id names a process group.
 			id := int(i32(u32(arg)))
+			if id == -2147483648 {
+				fd.unref()
+				return errno.err, errno.einval
+			}
+			target := if id < 0 { -id } else { id }
+			if target != 0 && !proc.pid_number_exists(target) {
+				fd.unref()
+				return errno.err, errno.esrch
+			}
 			handle.owner_type = if id < 0 { f_owner_pgrp } else { f_owner_pid }
-			handle.owner_id = if id < 0 { -id } else { id }
+			handle.owner_id = target
 			fd.unref()
 		}
 		f_getown {
@@ -1572,6 +1581,10 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 				if owner[0] < f_owner_tid || owner[0] > f_owner_pgrp {
 					fd.unref()
 					return errno.err, errno.einval
+				}
+				if owner[1] != 0 && !proc.pid_number_exists(int(owner[1])) {
+					fd.unref()
+					return errno.err, errno.esrch
 				}
 				handle.owner_type = int(owner[0])
 				handle.owner_id = int(owner[1])

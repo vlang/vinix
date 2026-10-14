@@ -1204,3 +1204,13 @@ probe C/ELFs pass actual Linux 6.12.51. The dispatch wrapper already imports
 low32 scalar words, so this qualification adds no kernel change or bug claim.
 Actual SIGIO/queued-signal delivery and asynchronous readiness remain
 unqualified. See the [receipts and limits](../../docs/linux-posix-qualification.md#native-fcntl-signal-configuration).
+
+The `fcntlowner` case checks Linux owner command numbers and target errors
+with 7,190 native controls per architecture as root and UID/GID1000. Scalar
+and extended updates verify zero/live self targets, ESRCH for missing targets,
+INT_MIN EINVAL, kind/pointer/descriptor precedence, shared alias state and
+raw/libc getters. Upper words, O_PATH, reduced limits, replacement and real
+file/queue/cursor state are covered. Both baselines fail 2,736 controls; patched
+Vinix and the identical native ELF on actual Linux 6.12.51 pass. Two 200-cycle
+cohorts keep storage flat. Actual SIGIO and retained target identity are
+unqualified. See [receipts and limits](../../docs/linux-posix-qualification.md#native-fcntl-owner-commands-and-target-errors).

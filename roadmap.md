@@ -810,6 +810,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   limits/replacement, retained file/queue state and flat storage.
   See [the signal-control receipts](docs/linux-posix-qualification.md#native-fcntl-signal-configuration).
 
+- [x] Correct native F_SETOWN/F_GETOWN command mapping and reject invalid owner
+  targets with Linux errors before state changes; qualify raw/musl aliases,
+  getters, descriptor limits/replacement and flat storage on both architectures.
+  See [the owner-control receipts](docs/linux-posix-qualification.md#native-fcntl-owner-commands-and-target-errors).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

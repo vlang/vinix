@@ -189,6 +189,39 @@ fn global_id_in(viewer &Namespace, local int) int {
 	return viewer.ids[local] or { 0 }
 }
 
+// Linux find_vpid() recognizes any allocated PID number, regardless of the
+// owner's requested PID/TID/group kind. Groups and sessions keep their number
+// after their leader is reaped. Return only a scalar while holding pid_lock:
+// callers must not retain a process or thread from this existence check.
+pub fn pid_number_exists(local int) bool {
+	if local <= 0 || local >= max_pid {
+		return false
+	}
+	viewer := current_pid_namespace()
+	pid_lock.acquire()
+	defer {
+		pid_lock.release()
+	}
+	global := global_id_in(viewer, local)
+	if global > 0 && global < max_pid {
+		p := processes[global]
+		if p != unsafe { nil } && pid_in(p, viewer) == local {
+			return true
+		}
+		t := threads_by_tid[global]
+		if t != unsafe { nil } && tid_in(t, viewer) == local {
+			return true
+		}
+	}
+	for i := 1; i < max_pid; i++ {
+		p := processes[i]
+		if p != unsafe { nil } && (pgid_in(p, viewer) == local || sid_in(p, viewer) == local) {
+			return true
+		}
+	}
+	return false
+}
+
 // The process `viewer` calls `local`, or nil. The caller holds the table lock,
 // as for process_at().
 pub fn process_in(viewer &Namespace, local int) &Process {

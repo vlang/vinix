@@ -1,0 +1,109 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 25  248k   25 65536    0     0   114k      0  0:00:02 --:--:--  0:00:02  114k100  248k  100  248k    0     0   308k      0 --:--:-- --:--:-- --:--:--  308k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 14 2880k   14  415k    0     0   525k      0  0:00:05 --:--:--  0:00:05  524k 62 2880k   62 1807k    0     0  1038k      0  0:00:02  0:00:01  0:00:01 1038k100 2880k  100 2880k    0     0  1276k      0  0:00:02  0:00:02 --:--:-- 1276k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 24 22528   24  5615    0     0  13190      0  0:00:01 --:--:--  0:00:01 13180100 22528  100 22528    0     0  47266      0 --:--:-- --:--:-- --:--:-- 47228
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   346k      0 --:--:-- --:--:-- --:--:--  347k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  94413      0 --:--:-- --:--:-- --:--:-- 94407
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   214k      0 --:--:-- --:--:-- --:--:--  215k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/fcntlowner-20261014/qualified-before-x86/fcntlowner/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/fcntlowner-20261014/qualified-before-x86/fcntlowner/.vinix-amd64.iso.3r4C5Q'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 1287m free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/fcntlowner-20261014/qualified-before-x86/fcntlowner/iso-build/.iso-staging.OmaYww/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :  60.69% done
+ISO image produced: 13603 sectors
+Written to medium : 13603 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/fcntlowner-20261014/qualified-before-x86/fcntlowner/.vinix-amd64.iso.3r4C5Q' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd48b.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/fcntlowner-20261014/qualified-before-x86/fcntlowner/test.iso (27858944 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/fcntlowner-20261014/qualified-before-x86/fcntlowner
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=84672
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003803a000
+initramfs: Done (9 entries)
+LINUX FCNTLOWNER DETAIL: ordinary=1 kind=0 call=1 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=1 kind=0 call=2 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=1 kind=0 call=3 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=1 kind=2 call=1 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=1 kind=2 call=2 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=1 kind=2 call=3 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=1 kind=3 call=22 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=1 kind=3 call=23 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=1 kind=3 call=24 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=1 kind=4 call=8 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=1 kind=4 call=9 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=1 kind=4 call=10 ret=0 errno=0
+LINUX FCNTLOWNER CASES: ordinary=1 kind=0 calls=630 failures=630
+LINUX FCNTLOWNER CASES: ordinary=1 kind=1 calls=315 failures=0
+LINUX FCNTLOWNER CASES: ordinary=1 kind=2 calls=189 failures=126
+LINUX FCNTLOWNER CASES: ordinary=1 kind=3 calls=2106 failures=486
+LINUX FCNTLOWNER CASES: ordinary=1 kind=4 calls=355 failures=126
+LINUX FCNTLOWNER DETAIL: ordinary=0 kind=0 call=1 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=0 kind=0 call=2 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=0 kind=0 call=3 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=0 kind=2 call=1 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=0 kind=2 call=2 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=0 kind=2 call=3 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=0 kind=3 call=22 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=0 kind=3 call=23 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=0 kind=3 call=24 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=0 kind=4 call=8 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=0 kind=4 call=9 ret=0 errno=0
+LINUX FCNTLOWNER DETAIL: ordinary=0 kind=4 call=10 ret=0 errno=0
+LINUX FCNTLOWNER CASES: ordinary=0 kind=0 calls=630 failures=630
+LINUX FCNTLOWNER CASES: ordinary=0 kind=1 calls=315 failures=0
+LINUX FCNTLOWNER CASES: ordinary=0 kind=2 calls=189 failures=126
+LINUX FCNTLOWNER CASES: ordinary=0 kind=3 calls=2106 failures=486
+LINUX FCNTLOWNER CASES: ordinary=0 kind=4 calls=355 failures=126
+LINUX FCNTLOWNER FAIL: owner targets, alias state, errors, queues or retention
+QEMU: Terminated
+Missing verdicts: ['LINUX FCNTLOWNER: PASS']; failures: ['FAIL:', 'LINUX FCNTLOWNER FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/fcntlowner-20261014/qualified-before-x86/receipt.json

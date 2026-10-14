@@ -4810,3 +4810,66 @@ This qualifies signal configuration and exact error behavior. Actual SIGIO
 and queued-signal delivery, asynchronous readiness, ownership/security
 policy, concurrent mutation/close, GNU wrappers and translated/ELF32 paths
 remain unqualified. The three broad section 15 acceptance gates stay open.
+
+## Native fcntl owner commands and target errors
+
+Linux F_SETOWN is command 8 and F_GETOWN command 9. Vinix had these reversed:
+ordinary setters executed the getter. The command constants now match Linux;
+the existing native wrapper imports descriptor, command and scalar owner
+words from their low32 bits while extended owner pointers stay full width.
+F_SETOWN(INT_MIN) returns EINVAL before negation. Nonzero missing owner
+targets return ESRCH for scalar and extended setters, before any owner
+configuration changes. Zero clears ownership. Descriptor/O_PATH EBADF,
+extended-copy EFAULT and invalid-kind EINVAL retain Linux precedence.
+Compare the pinned [Linux implementation](https://github.com/gregkh/linux/blob/v6.12.51/fs/fcntl.c).
+
+The V probe performs 7,190 controls per architecture as root and UID/GID1000.
+Per credential counts are 630 ordinary raw scalar setters, 315 missing/O_PATH
+raw setters, 189 musl scalar setters, 2,106 extended setters and 355 getter,
+limit/replacement and shared-cursor controls. Six classes cover readonly/RDWR
+regular files, a directory, nonblocking pipe reader/writer and a UNIX stream
+endpoint. Original/dup/CLOEXEC aliases share description state; independent
+opens and the socket peer retain their own state. Live self PID/main TID and
+self group, zero, missing in-range/out-of-range numbers, signed32 extremes,
+invalid kinds and inaccessible full-width pointers exercise real errors.
+Raw F_GETOWN positive-PID checks vary upper descriptor/command and ignored
+argument words; musl getters also verify zero and negative group results.
+The probe restores owner settings between cases and checks owner kind/ID,
+signals, metadata, flags, actual shared cursors, complete file bytes and AB
+queues. Held 64/65 remain usable at NOFILE soft limits eight/zero; closed 66
+is reused for regular/socket descriptions before being closed again.
+
+Both unchanged baselines fail exactly 2,736 of these controls. Patched
+Vinix and actual Linux 6.12.51 pass the identical native musl source/C/ELF.
+Two 200-cycle cohorts after warmups and settling measure aliases, accepted
+owner updates and refused targets; all slab classes and large pages stay
+flat. The new existence helper holds pid_lock across namespace/table/group
+reads and returns only a scalar. It retains no target pointer and allocates
+nothing. Successful fixture paths close all descriptions and remove their
+file/directory; fatal setup/reset failures rely on process teardown.
+
+Four production builds, five candidate guest cases per architecture
+(fcntlowner/fcntlsig/fcntlabi/open/runtime), eight host test files and
+generated coverage checks pass. The source allocation inventory retains
+400 ARM/292 x86 sites and existing allowance refusals; this does not establish
+a globally passing allowance audit. The assertion-enabled maintained audit
+binds 63 frozen source inputs, compiler, generated C, kernels, probe/ISO,
+complete captures, builds and an independent lifetime review. Failing
+assertion and passing-as-baseline controls execute. Complete generated C
+matches outside exactly fcntl/PID-lookup bodies and prototypes plus the two
+verified owner-command defines; sixteen explicit probe allocas introduce
+no hidden heap/index helpers. Runtime evidence freezes committed parent
+6182c530e5bbb6fe7b1cca7db9e4b1c73cbd3106; the public inventory is separately
+generated from the committed publication parent plus this change.
+
+- [AArch64 receipt](../tests/linux-compat/results/2026-10-14/fcntlowner-after-aarch64.json), [capture](../tests/linux-compat/results/2026-10-14/fcntlowner-after-aarch64-native.log), [Linux reference](../tests/linux-compat/results/2026-10-14/fcntlowner-reference-aarch64.json), [evidence](../tests/linux-compat/results/2026-10-14/fcntlowner-evidence-aarch64.json).
+- [x86-64 receipt](../tests/linux-compat/results/2026-10-14/fcntlowner-after-x86_64.json), [capture](../tests/linux-compat/results/2026-10-14/fcntlowner-after-x86_64-native.log), [Linux reference](../tests/linux-compat/results/2026-10-14/fcntlowner-reference-x86_64.json), [evidence](../tests/linux-compat/results/2026-10-14/fcntlowner-evidence-x86_64.json).
+- [Audit](../tests/linux-compat/results/2026-10-14/fcntlowner-audit.v), [verdict](../tests/linux-compat/results/2026-10-14/fcntlowner-audit.log), [independent review](../tests/linux-compat/results/2026-10-14/fcntlowner-lifetime-review.md); baseline/build/allocation/host and negative-control logs sit beside them.
+
+This qualifies command mapping and the selected owner-update/refusal behavior.
+Actual SIGIO/queued notifications, retained PID identity after exit/recycling,
+PID-kind attachment getters, non-main-thread targets, leaderless groups,
+namespace owner getters and restrictive/concurrent policy remain unqualified.
+The helper accounts for caller namespaces and surviving group/session IDs,
+but those paths need their own regression receipts. GNU/translated/ELF32
+paths and the three broad section 15 acceptance gates stay open.

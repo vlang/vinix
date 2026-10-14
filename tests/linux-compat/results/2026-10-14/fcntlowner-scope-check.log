@@ -1,0 +1,2 @@
+arm: complete generated C identical outside fcntl/PID lookup units and two exact command defines; allocation-free PID lookup; SHA256=d2de8cd638842e564441e2a3b9578b98d747d075755ec8774f5b06892d7d5872
+x86: complete generated C identical outside fcntl/PID lookup units and two exact command defines; allocation-free PID lookup; SHA256=5f60f9c1e61929262c502cb0c768dd7c9eab04903e2c1621278d83e7ad1c3880
