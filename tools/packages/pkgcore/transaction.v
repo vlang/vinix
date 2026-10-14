@@ -118,15 +118,41 @@ fn next_generation(directory string) !u64 {
 }
 
 pub fn estimate_space(plan Plan, directory string) !u64 {
+	return estimate_space_from(plan, directory, '')
+}
+
+fn estimate_transaction_space(plan Plan, directory string, current State, operation string) !u64 {
+	if operation != 'remove' || current.generation == 0 { return estimate_space(plan, directory) }
+	number := current.generation.str()
+	retained := directory + '/generations/' + number + '/apps'
+	defer { unsafe { number.free(); retained.free() } }
+	return estimate_space_from(plan, directory, retained)
+}
+
+// Removal copies verified files from the active generation before consulting
+// the object cache. Budget a download only when neither source is usable.
+fn estimate_space_from(plan Plan, directory string, retained string) !u64 {
 	mut needed := u64(4 * 1024 * 1024)
 	mut cache := map[string]bool{}
+	defer { unsafe { cache.free() } }
 	for installed in plan.packages {
 		for file in installed.package.files {
 			// A block per file plus payload, directory entries and metadata.
+			if file.bytes > ~u64(0) - 8192 { return error('package disk requirement overflow') }
 			cost := file.bytes + 8192
 			if needed > ~u64(0) - cost { return error('package disk requirement overflow') }
 			needed += cost
-			if file.sha256 !in cache && !verified_file(directory + '/objects/' + file.sha256, file) {
+			if retained != '' {
+				path := retained + '/' + installed.package.id + '/' + file.path
+				valid := verified_file(path, file)
+				unsafe { path.free() }
+				if valid { continue }
+			}
+			if file.sha256 in cache { continue }
+			path := directory + '/objects/' + file.sha256
+			valid := verified_file(path, file)
+			unsafe { path.free() }
+			if !valid {
 				if needed > ~u64(0) - cost { return error('package cache requirement overflow') }
 				needed += cost
 				cache[file.sha256] = true
@@ -253,7 +279,7 @@ fn activate_plan_locked(config Config, directory string, current State, plan Pla
 	for name in os.ls(directory + '/generations')! {
 		if name.starts_with('.stage-') { os.rmdir_all(directory + '/generations/' + name)! }
 	}
-	disk_check(free_bytes(directory)!, estimate_space(plan, directory)!, config.policy.reserve_bytes)!
+	disk_check(free_bytes(directory)!, estimate_transaction_space(plan, directory, current, operation)!, config.policy.reserve_bytes)!
 	stage := directory + '/generations/.stage-' + generation.str()
 	owned_directory(stage, 0o700)!
 	os.mkdir_all(stage + '/apps')!

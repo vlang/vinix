@@ -1,0 +1,2 @@
+PASS aarch64 packages-removal-space (12.9s)
+package-removal-space aarch64: 1 passed, 0 failed, 0 skipped

@@ -1,0 +1,20 @@
+clang ASan/UBSan, detect_leaks=0, halt_on_error=1
+
+core-sanitize:
+REMOVAL SPACE active-generation verification, shared fallback objects, missing/corrupt/linked sources, acquisition isolation and overflow PASS
+PASS
+
+threshold-sanitize:
+Updating trusted repository fixture
+Installing keep 1.0.0 (1/2) from fixture
+Downloading keep/bin/one (4096 bytes)
+Installing remove 1.0.0 (2/2) from fixture
+Downloading remove/bin/one (25 bytes)
+Activated package generation 1
+REMOVAL SPACE review: needed=4218880, expected=4218880, reserve=4096
+Installing keep 1.0.0 (1/1) from fixture
+Installing keep 1.0.0 (1/1) from fixture
+Activated package generation 2
+REMOVAL SPACE reviewed offline removal: verified retained files, no object reacquisition, reserve/fallback checks, post-preflight tamper refusal, activation/registration/data PASS
+REMOVAL SPACE exact free-space threshold and one-byte-short refusal PASS
+PASS

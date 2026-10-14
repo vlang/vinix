@@ -1,0 +1,38 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=23
+!>+ [11] ./sbin/init sz=210832
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/removal-space-core sz=869568
+!>+ [15] ./usr/share/package-fixtures/removal-space-lifecycle sz=1303632
+!>+ [16] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e8a800
+initramfs: Done (16 entries)
+HWTEST START packages-removal-space
+REMOVAL SPACE active-generation verification, shared fallback objects, missing/corrupt/linked sources, acquisition isolation and overflow PASS
+REMOVAL PROCESS removal-space-core PASS
+Updating trusted repository fixture
+Installing keep 1.0.0 (1/2) from fixture
+Downloading keep/bin/one (4096 bytes)
+Installing remove 1.0.0 (2/2) from fixture
+Downloading remove/bin/one (25 bytes)
+Activated package generation 1
+REMOVAL SPACE review: needed=4218880, expected=4218880, reserve=4096
+Installing keep 1.0.0 (1/1) from fixture
+Installing keep 1.0.0 (1/1) from fixture
+Installing keep 1.0.0 (1/1) from fixture
+Activated package generation 2
+REMOVAL SPACE reviewed offline removal: verified retained files, no object reacquisition, reserve/fallback checks, post-preflight tamper refusal, activation/registration/data PASS
+REMOVAL PROCESS removal-space-lifecycle PASS
+HWTEST PASS packages-removal-space

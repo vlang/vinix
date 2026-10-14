@@ -154,7 +154,7 @@ fn review_plan(config Config, directory string, current State, operation string,
 	needed := if operation == 'rollback' || (current.requested == plan.requested && current.packages == plan.packages) {
 		u64(0)
 	} else {
-		estimate_space(plan, directory)!
+		estimate_transaction_space(plan, directory, current, operation)!
 	}
 	review := pkgprotocol.Review{
 		format:            1

@@ -1,0 +1,12 @@
+PASS baseline c155a47f3 reproduces an unnecessary 12288-byte cache allowance; final removal needs 4218880 bytes plus the unchanged reserve
+
+Expected assertion refusal from the previous implementation:
+Updating trusted repository fixture
+Installing keep 1.0.0 (1/2) from fixture
+Downloading keep/bin/one (4096 bytes)
+Installing remove 1.0.0 (2/2) from fixture
+Downloading remove/bin/one (25 bytes)
+Activated package generation 1
+REMOVAL SPACE review: needed=4231168, expected=4218880, reserve=4096
+/Users/alex/code/vinix/build/package-removal-space-work/baseline/fixture.v:84: FAIL: fn main.check: assert review.disk_needed == expected && review.disk_reserve == config.policy.reserve_bytes
+V panic: Assertion failed...

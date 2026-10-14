@@ -449,6 +449,12 @@ it differs from the preferred I/O size. Invalid zero units and multiplication
 overflow refuse the operation with a path-specific diagnostic. Offline exports,
 catalog assembly and release publishing use the same calculation. See
 [space calculation qualification](../tests/packages/space-check.md).
+Uninstall budgets retained files from their verified active-generation copies,
+so an absent or damaged object cache does not add a download that removal never
+needs. Both review and activation recheck this estimate; files that no longer
+verify require the normal cache/acquisition allowance. Staging space, overhead,
+the configured reserve and per-copy verification remain required. See
+[removal-space qualification](../tests/packages/removal-space-check.md).
 Files stream in 64 KiB blocks.
 Partial downloads persist as `objects/HASH.part`; retries resume and verify the
 complete hash. A damaged resumed prefix triggers one fresh download from the

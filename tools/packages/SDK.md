@@ -44,6 +44,15 @@ u64 multiplication overflow fail with the filesystem path in the diagnostic.
 Transactions, offline mirrors and publisher/catalog tools share this calculation.
 See [space qualification](../../tests/packages/space-check.md).
 
+Removal review and activation estimate downloads only for payloads without a
+verified active-generation source or verified cached object. They always budget
+the new staged generation, overhead and the configured reserve. Activation
+recomputes under the writer lock, then verifies each copied payload; corruption
+after review/preflight cannot authorize modified bytes. Install/upgrade/deploy
+and the public `estimate_space` retain their cache/acquisition accounting. Size
+and total arithmetic overflow is refused. See
+[removal-space checks](../../tests/packages/removal-space-check.md).
+
 ## Administrator package transport
 
 `vinix-package admin [--progress] [--offline] COMMAND ...` is the ordinary-account

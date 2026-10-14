@@ -81,6 +81,7 @@ fn check() ! {
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/appsdk', work)!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgadmin', work)!
 		run(v, ['-nocache', 'run', repository + '/tests/packages/space-check.v'])!
+		run(v, ['-nocache', 'run', repository + '/tests/packages/removal-space-check.v'])!
 		check_tests(v, ['-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts'], repository + '/tools/packages/pkglaunch', work)!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap', '-o', work + '/context-memory', repository + '/tests/packages/sdk-context-memory.v'])!
 		run(work + '/context-memory', [])!
