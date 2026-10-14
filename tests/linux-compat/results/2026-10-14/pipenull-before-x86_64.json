@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "0f7ad0de38168fefaa482d1765aa11fd2383797889c8a50f7b36f31d273992d7",
+    "results": [
+        {
+            "name": "pipenull",
+            "source_sha256": "2cc1789b47299720fffa60a5455939ba8843b33ed332c56dfd7ac354a5b88fea",
+            "init_sha256": "f8e6a86cda19507ec532ba9df0a831c76bcb213b525ee6114279e3561e4ffd10",
+            "iso_sha256": "b82ee8ee6ed4eef9aa2372cef97e38d12005709f50a303bf4181be18006ad2c5",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

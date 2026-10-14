@@ -5376,3 +5376,77 @@ growth, its budget refusal and physical exhaustion require separate tests.
 Concurrent prlimit/close, copy-before-publication and output-fault rollback
 races, nil-versus-limit precedence, packet/watch semantics, GNU/translated/
 ELF32 paths and the three broad section 15 gates remain open.
+
+## Native pipe2 null-output error precedence
+
+The native pipe2 wrapper now lets descriptor construction report errors before
+checking a nil output destination. Previously a special early nil check
+returned EFAULT even with zero or one free descriptor slot. Removing that
+check gives EMFILE when two slots are unavailable. With sufficient slots,
+the existing checked copy rejects nil and the existing cleanup closes both
+endpoints before returning EFAULT. Invalid flag validation stays first.
+Linux likewise constructs the endpoints and reserves two descriptor numbers
+before copying the output in its
+[pipe implementation](https://linux.googlesource.com/linux/kernel/git/torvalds/linux/+/aaed66fadba2d2de8fe0daa0aa3eac827d2076b9/fs/pipe.c).
+
+The `pipenull` musl probe runs root and UID/GID1000 cohorts at soft limits
+48 and 64, reopening zero through three nonadjacent holes in a filled table.
+Four ordinary flag combinations and five upper-register patterns test eight
+aligned, unaligned, inaccessible, readonly, cross-page, noncanonical and nil
+destinations. Descriptor state is inspected immediately, before cleanup or
+refilling the known holes. Writable successful pairs select the two lowest
+holes; original, dup and CLOEXEC aliases verify metadata, creator ownership,
+raw/libc status flags, descriptor flags, EAGAIN, ABC transfers and EOF.
+
+| Controls per credential cohort | Calls | Baseline failures |
+| --- | ---: | ---: |
+| Errors and successful pair behavior | 1,280 | 80 |
+| Immediate descriptor table state | 1,280 | 0 |
+| Applicable output canaries and restored filler aliases | 2,560 | 0 |
+| Retained aliases, data/cursor, queued AB and original slots | 13 | 0 |
+
+Both baselines fail exactly 160 of 10,266 controls per architecture: only
+the nil destination with fewer than two slots has the wrong errno. Corrected
+Vinix and actual Linux 6.12.51 pass all rows with the same final native ELF.
+Child CASES and parent FINAL counters agree. Refused pairs leave the table
+unchanged, and every query restores the filler vector. Retained regular
+bytes/cursor, nine aliases, metadata/flags, queued AB and all 64 original
+descriptor slots survive. Faulting copies may write a prefix; unchanged
+output assertions apply to EMFILE, not ordinary EFAULT.
+
+Two warmed and settled 200-cycle cohorts per architecture repeat nil
+EMFILE with zero/one free slots, a real pair with transfers/aliases/EOF
+with two slots, and both cross-page and nil EFAULT cleanup with three slots.
+All 18 ARM/14 x86 slab classes and observed large pages stay exactly flat:
+68/68 ARM and 177/177 x86 for both credentials. The final fixture adds
+the post-allocation nil cleanup call to the initial cohort; fresh p5
+profiles, previews and Linux references bind that strengthened source.
+
+Four production builds use detached worktrees at
+d44681e1a45cb23eacfa8c3b85ab4bcc8b7f014b. Complete generated C outside
+the checked wrapper body/prototype is byte-identical to baseline on both
+architectures. Private pair construction, table adoption, checked-copy
+helpers, ownership and destructors remain unchanged. Nil is rejected by
+the existing user-range guard before any pagemap operation. The wrapper
+keeps its existing synchronous two-i32 scratch; no allocation, observer or
+asynchronous borrow is added. Independent review covers both construction
+refusal and nil-copy cleanup, plus the final fixture stack/mapping lifetimes.
+
+All six final guest cases (pipenull/pipepair/pipeabi/access/open/runtime),
+eight host test files and 64-input inventories pass. Allocation scans retain
+400 ARM/292 x86 sites and unchanged existing allowance refusals. The probe
+has sixteen explicit allocas and no hidden heap/index helpers. Preview,
+baseline, candidate and preflight C/ELF comparisons pass; complete raw
+preflight C drift is empty. The assertion-enabled auditor rejects a passing
+capture supplied as the failing baseline and binds the completed receipts,
+review and reused f6358ec compiler with its 15,146 input pins.
+
+- [AArch64 receipt](../tests/linux-compat/results/2026-10-14/pipenull-after-aarch64.json), [Linux reference](../tests/linux-compat/results/2026-10-14/pipenull-reference-aarch64.json), [evidence](../tests/linux-compat/results/2026-10-14/pipenull-evidence-aarch64.json).
+- [x86-64 receipt](../tests/linux-compat/results/2026-10-14/pipenull-after-x86_64.json), [Linux reference](../tests/linux-compat/results/2026-10-14/pipenull-reference-x86_64.json), [evidence](../tests/linux-compat/results/2026-10-14/pipenull-evidence-x86_64.json).
+- [Audit](../tests/linux-compat/results/2026-10-14/pipenull-audit.v), [verdict](../tests/linux-compat/results/2026-10-14/pipenull-audit.log), [independent review](../tests/linux-compat/results/2026-10-14/pipenull-lifetime-review.md).
+
+These limits remain below the initial 1,024 descriptor slots. Growth and
+constructor-budget injection, concurrent prlimit/close, copy-before-
+publication and user-copy rollback races, legacy x86 pipe, GNU/translated/
+ELF32 paths and the three broad section 15 gates remain open. This change
+adds pressure retention qualification, without new desktop performance claims.

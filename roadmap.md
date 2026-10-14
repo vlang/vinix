@@ -855,6 +855,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   state under descriptor pressure, with flat storage on both architectures.
   See [the construction receipts](docs/linux-posix-qualification.md#native-pipe-construction-under-descriptor-pressure).
 
+- [x] Return native pipe2 descriptor-limit errors before nil-output faults;
+  qualify exact EMFILE/EFAULT precedence, untouched descriptor state, ordinary
+  transfers and flat pressure-cohort storage on both architectures.
+  See [the error receipts](docs/linux-posix-qualification.md#native-pipe2-null-output-error-precedence).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

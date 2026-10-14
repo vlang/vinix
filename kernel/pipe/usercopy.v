@@ -24,10 +24,8 @@ pub fn syscall_pipe_checked(gpr_state voidptr, pipefds &i32, flags int) (u64, u6
 	if open_flags & resource.o_excl != 0 { return errno.err, errno.enopkg }
 	// The ring is a byte stream, so it cannot promise O_DIRECT packet semantics.
 	if open_flags & resource.o_direct != 0 { return errno.err, errno.eopnotsupp }
-	if pipefds == unsafe { nil } {
-		return errno.err, errno.efault
-	}
-
+	// Descriptor exhaustion wins over every output fault, including nil.
+	// Let construction fail first, then use the checked copy for all pointers.
 	// syscall_pipe fills both words before success, and neither it nor the
 	// checked user copy retains this caller's scratch beyond the call.
 	local := unsafe { &i32(C.vinix_stack_alloc(2 * sizeof(i32))) }

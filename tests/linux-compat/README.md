@@ -1327,3 +1327,18 @@ table slots; growth, allocation-budget refusal and concurrent limit changes
 remain unqualified. User-copy publication/rollback races and nil-versus-limit
 precedence are separate. See
 [receipts and limits](../../docs/linux-posix-qualification.md#native-pipe-construction-under-descriptor-pressure).
+
+The `pipenull` case extends the pressure matrix with nil output pointers.
+Root/UID1000 cohorts at limits 48/64 check zero through three free slots,
+four ordinary flags, five upper words and eight destinations. Exact error
+precedence, immediate descriptor state, canaries/refill, real pair transfers
+and retained bank state pass 10,266 checks per architecture on corrected
+Vinix and same-ELF Linux 6.12.51. Baselines fail 160 nil-output errno checks.
+Two 200-cycle cohorts include nil EMFILE before slot installation and nil EFAULT
+cleanup after both slots are installed, plus successful pairs and cross-page
+faults; all slab/large-page storage remains flat. Run the suite with
+`--cases pipenull,pipepair,pipeabi,access,open,runtime` and use
+`pipenull-reference.v` for the matching native ELF on actual Linux.
+Growth/budget injection, concurrent limit/close and output-copy rollback
+races, legacy x86 pipe and GNU/foreign paths remain separate. See
+[receipts and limits](../../docs/linux-posix-qualification.md#native-pipe2-null-output-error-precedence).
