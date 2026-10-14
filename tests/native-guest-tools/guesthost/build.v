@@ -157,7 +157,7 @@ fn launch_at(_init string, archive string, state string, kernel_dir string, arch
 		share := os.dir(os.dir(qemu)) + '/share/qemu'
 		code := os.getenv_opt('VINIX_OVMF_CODE') or { share + '/edk2-aarch64-code.fd' }
 		variables := os.getenv_opt('VINIX_OVMF_VARS') or { share + '/edk2-arm-vars.fd' }
-		if !os.exists(state + '/efivars.fd') { os.cp(variables, state + '/efivars.fd')! }
+		if !os.exists(state + '/efivars.fd') { copy_firmware_variables(variables, state + '/efivars.fd')! }
 		mut accel := ['-accel', 'tcg', '-cpu', os.getenv_opt('VINIX_QEMU_CPU') or { 'max' }]
 		$if macos {
 			if os.getenv('USE_TCG') != '1' { accel = ['-accel', 'hvf', '-cpu', 'host'] }

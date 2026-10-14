@@ -42,6 +42,35 @@ configuration. Both paths use their own QMP socket and retain the original
 fixture sources and assertions. Existing Python import interfaces remain for
 other callers awaiting their complete native ports.
 
+ARM firmware variables are copied into a fresh inode with mode `0600`. The V
+copier preserves the complete byte content and logical file length while
+seeking over zero-filled 64 KiB chunks, then sizing the zero tail explicitly.
+This avoids allocating the template's padding on filesystems that support
+sparse files. Templates must be regular files; an existing destination or link
+is refused, and an I/O/size failure removes the partial image. Each guest can
+write its own variables without changing the template. Existing images remain
+available to repeated launchers.
+
+Run `v -path 'tests/native-guest-tools|tests/linuxkpi|build-support|@vlib|@vmodules'
+test tests/native-guest-tools/guesthost` for the host checks. They cover mixed
+chunk boundaries, empty/all-zero files and zero tails, private guest writes,
+permissions, existing-file/link refusal, invalid templates and partial cleanup
+after a real `RLIMIT_FSIZE` failure in an isolated child.
+
+On 2026-10-14 the 64 MiB QEMU ARM variables template had only twelve nonzero
+64 KiB chunks. A real ARM HVF boot of the full mount lifecycle suite passed with
+the sparse variables file, which used 768 KiB after boot. Before guest writes,
+the complete copied image matched template SHA-256
+`b3b855c5a80310168051164986855692d1bdb06e67619856177965cd87c6774f`;
+a private write then left that template unchanged. `firmware-exact.log` records
+this check and the helper source hash. `firmware-profile.log` records the dense
+and sparse post-boot image hashes, which differ after independent guest writes.
+Both logs are under `build/development17-20261013`, alongside the passing native
+receipt/serial log in `mount-firmware-arm-all-after-a` and host tests in
+`firmware-unit-b.log`.
+Logical size remains 64 MiB. This changes host storage allocation, not the guest
+firmware format; disk savings depend on filesystem sparse-file support.
+
 Fresh ARM, Rosetta x86 and ARM ASan/UBSan hosts pass the original twelve runner
 test methods, including all three forbidden userspace markers, a 200,000-byte
 final drain, late failure and unsettled-panic timeout. Additional native checks
