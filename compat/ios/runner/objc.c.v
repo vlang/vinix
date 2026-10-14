@@ -214,6 +214,9 @@ mut:
 	swift_dispatch_flags_retired bool // Reject resolution after quiescent metadata teardown.
 	swift_objc_bool_arena u64 // Sealed ObjectiveC.ObjCBool metadata/accessor pages.
 	swift_objc_bool_retired bool // Reject resolution after quiescent metadata teardown.
+	swift_nsobject_hashable_arena u64 // Sealed NSObject conformance patterns/adapters and separate RW generic caches.
+	swift_nsobject_hashable_tables map[u64]u64 // Canonical ObjC wrapper -> sealed Hashable/Equatable specialization page.
+	swift_nsobject_hashable_retired bool
 	swift_foundation_arena u64 // Sealed CVarArg calls and Foundation's concrete String conformance.
 	swift_void_arena u64 // Sealed empty-tuple full metadata and zero-size value witnesses.
 	swift_unknown_value_arena u64 // Sealed Builtin.UnknownObject value witnesses.
@@ -659,6 +662,7 @@ fn runtime_symbol(library string, symbol string) !u64 {
 	if library == '/usr/lib/swift/libswiftos.dylib' && symbol == '_$sSo13os_log_type_ta0A0E5errorABvgZ' { return u64(unsafe { voidptr(swift_os_log_error_type) }) }
 	if library == '/usr/lib/swift/libswift_Concurrency.dylib' { return swift_concurrency_symbol(symbol) }
 	if library == '/usr/lib/swift/libswiftObjectiveC.dylib' {
+		if address := swift_nsobject_hashable_symbol(symbol) { return address }
 		if address := swift_objc_bool_symbol(symbol) { return address }
 		return error('iOS: Swift Objective-C symbol is not implemented: ${symbol}')
 	}

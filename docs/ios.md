@@ -2344,7 +2344,7 @@ runtime cycles. These entries allocate no owner, cache or metadata arena;
 generated C verifies scalar signatures, masking and absence of allocation or
 ARC operations. Invalid Boolean byte patterns are not additional supported
 values. At this stage, `ObjCBool` metadata and `NSObject: Hashable` remained unsupported;
-ObjCBool metadata was implemented in the later step below.
+ObjCBool metadata and NSObject conformances were implemented in the later steps below.
 
 All forty-two programs rebuild and all twenty-four focused Swift ABI guest
 checks pass. The supplied Fortnite probe passes the conversions and next exits
@@ -5634,9 +5634,56 @@ and two drained/unmapped lifetimes. Thirteen C streams/executables and the
 joined probes, audits and native/IPA references are retained under
 `build/ios/fortnite/objc-bool-metadata-checks`; full iOS regression remains unpassed.
 
-The IPA startup probe gets past ObjCBool metadata and exits with status 1 at
-MarketplaceKitWrapper's required `NSObject: Hashable` conformance descriptor,
-`_$sSo8NSObjectCSH10ObjectiveCMc`, in `/usr/lib/swift/libswiftObjectiveC.dylib`.
+The next step implements the ObjectiveC overlay's NSObject Equatable/Hashable
+conformances in `swift_nsobject_hashable.c.v`, exporting exactly
+`_$sSo8NSObjectCSH10ObjectiveCMc` and `_$sSo8NSObjectCSQ10ObjectiveCMc`.
+The IPA has one required Hashable descriptor reference and one corresponding
+`swift_getWitnessTable` call. V/Mach-O/LLVM inspection retains that caller and
+V/native metadata lookup records distinct per-type tables with a shared
+inherited NSObject Equatable table. The installed ARM64 Mac witnesses send
+`hash` and `isEqual:` to borrowed Objective-C objects. Their hashValue getter
+returns the raw hash word; hash(into:) combines that word into Hasher, and
+rawHashValue uses the UInt64 seeded hashing entry. Local authenticated import
+stubs were followed to verify both hashing targets. This is a native Mac
+comparison and SDK reference, without claiming an iOS device comparison.
+
+Vinix emits private generic conformance patterns against its canonical core
+Hashable/Equatable protocols, with RX adapters, RO descriptors and separate
+zero-filled RW generic caches. Explicit witness lookup creates a sealed table
+page per canonical registered ObjC wrapper. Subclass Hashable tables inherit
+the base NSObject Equatable table, matching the native lookup. Class ancestry,
+wrapper identities, table identities and live owner registries are checked
+before reading foreign metadata or object storage. Native Swift class layouts,
+metaclasses, unknown/retired metadata, unregistered classes, foreign generic
+records, additional overlay methods and runtime-wide conformance discovery
+remain unsupported. Published Swift metadata already prevents dynamic class
+disposal. Cached borrowed descriptors, adapters and tables expire at stop.
+
+The witnesses call subclass overrides with no registry lock held, preserve
+borrowed owner counts and perform no wrapper allocation or ARC. Built-in
+Foundation values use the existing message/equality/hash backend. A false
+isEqual: result is honored even for identical references, and nil messaging
+reads no object storage. Swift's context and error registers are preserved.
+At quiescent shutdown, Array/Set specializations retire before these tables,
+then the core protocol metadata and ObjC wrappers retire.
+
+Ten fresh ASan/UBSan runs and five ARM64 Vinix suites pass across the new
+conformances, static witness lookup, generic hash forwarding, Hasher and
+ObjCBool metadata. The native/V fixture checks inherited subclass overrides,
+raw hash words including the sign bit, partial Hasher states, signed seeds,
+nonreflexive equality, nil messages, guarded reference/state spans, borrowed
+owner counts and preserved registers. Vinix additionally checks exact generic
+instantiation spans, protected unsupported rejection, unlocked worker reentry,
+typed Array ARC, Set metadata, eight concurrent initializers and two drained
+lifetimes with every table/code/data/cache page unmapped. Thirteen C streams
+and executables, native/IPA references, the original fixture-generation failure,
+the corrected fixture, the native import-target assumption and joined startup
+probes/audits are retained under `build/ios/fortnite/nsobject-hashable-checks`.
+Full iOS regression remains unpassed and published runners remain unchanged.
+
+The IPA startup probe gets past NSObject conformances and exits with status 1
+at MarketplaceKitWrapper's required MainActor.shared getter,
+`_$sScM6sharedScMvgZ`, in `/usr/lib/swift/libswift_Concurrency.dylib`.
 Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -5646,10 +5693,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,472 | 688 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 167 | 9 | 23 |
-| All images | 2,298 | 700 | 120 |
+| MarketplaceKitWrapper | 168 | 8 | 23 |
+| All images | 2,299 | 699 | 120 |
 
-The C++/GLES/Text variant reports 2,311 resolved imports, 687 unresolved strong
+The C++/GLES/Text variant reports 2,312 resolved imports, 686 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

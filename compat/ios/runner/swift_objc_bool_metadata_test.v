@@ -170,7 +170,7 @@ fn test_swift_objc_bool_nominal_metadata_and_witnesses() {
 			assert runtime_symbol(library,symbol[1..]) == none
 			for foreign in ["/usr/lib/swift/libswiftCore.dylib","/usr/lib/swift/libswiftFoundation.dylib","/usr/lib/libSystem.B.dylib"]! { assert runtime_symbol(foreign,symbol) == none }
 		}
-		for unsupported in ["_$s10ObjectiveC8ObjCBoolVSQAAMc","_$s10ObjectiveC8ObjCBoolVwst","_$sSo8NSObjectCSH10ObjectiveCMc"]! { assert runtime_symbol(library,unsupported) == none }
+		for unsupported in ["_$s10ObjectiveC8ObjCBoolVSQAAMc","_$s10ObjectiveC8ObjCBoolVwst","_$sSo8NSObjectCs7CVarArg10ObjectiveCMc"]! { assert runtime_symbol(library,unsupported) == none }
 		mut workers := []thread{cap:8};for _ in 0 .. 8 { workers << spawn bool_metadata_worker(api) };workers.wait();unsafe { workers.free() }
 		assert ios_runtime.swift_heap.len == 0 && ios_runtime.swift_buffers.len == 0 && ios_runtime.swift_arrays.len == 0 && ios_runtime.objects.len == 0 && ios_runtime.live == 0
 		arena := ios_runtime.swift_objc_bool_arena;objc_stop();assert ios_runtime.swift_objc_bool_arena == 0 && ios_runtime.swift_objc_bool_retired
