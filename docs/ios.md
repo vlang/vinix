@@ -5030,24 +5030,65 @@ IPA probe/audit evidence are under `build/ios/fortnite/shared-utf8-checks`.
 Generated C confirms the checked paths add no allocation or ARC and invoke
 the subclass after unlocking. Full iOS regression remains unpassed.
 
-Both audits resolve the required shared UTF-8 getter. The supplied IPA now
-exits with status 1 at MarketplaceKitWrapper's required
-`_$ss23_ContiguousArrayStorageCMn` nominal descriptor. Native descriptor
-measurements are retained for the next implementation; existing Vinix Array
-headers use a private descriptor rather than Swift class metadata. Fortnite
-has not entered application code and remains unplayable.
+Both audits resolve the required shared UTF-8 getter. That cohort reached
+MarketplaceKitWrapper's required `_$ss23_ContiguousArrayStorageCMn` descriptor.
+
+`_ContiguousArrayStorage` now has an independent canonical nominal declaration
+in the existing Array arena. Native measurements identify a unique generic
+class in module Swift, superclass `__ContiguousArrayStorageBase`, metadata
+bounds of 3 negative and 19 positive words, one immediate member, no immediate
+fields and one key `Element` parameter at metadata word 18. The V descriptor
+provides that identity, superclass type mangling, bounds and generic header.
+The [Swift descriptor ABI](https://github.com/swiftlang/swift/blob/main/include/swift/ABI/Metadata.h)
+allows nullable accessor and reflection pointers. This declaration omits those
+pointers, instantiation cache/pattern, overrides and native prespecializations;
+its flags advertise only the supported unique generic class context.
+
+Bounded mangled lookup now substitutes `Element` from either the canonical
+Array or storage-class context, including nested Array expressions. It compares
+context identities before reading arguments and leaves unused context/argument
+pointers unread for nongeneric expressions. Arbitrary contexts and generic
+descriptors supplied to the nongeneric accessor path are rejected. This is
+declaration and context support: `CMa`, storage-class instantiation, reflection
+and Objective-C inheritance remain unsupported. Existing Array owner headers
+retain their private descriptor and are not exposed as class metadata.
+
+The records occupy unused read-only space in the existing three-page Array
+arena and are emitted before sealing and publication. They add no allocation,
+map, executable code, ARC operation or teardown path. Native fixtures compare
+the descriptor layout, three native complete class specializations and generic
+context substitution at a protected argument boundary. V fixtures exercise
+eight readers, unknown contexts without pointer reads, nested Array results,
+private owner rejection and two drained/unmapped lifetimes. Mapping retirement
+uses `mprotect` failure on macOS and `mincore` failure in the guest.
+
+Ten fresh ASan/UBSan runs and five Vinix ARM64 guest suites pass across the
+storage declaration, Array values/storage, mangled lookup and heap ownership.
+The public `build-swift-array-class` target and full build/regression/Swift guest
+modes include the fixture. Thirteen final generated-C streams and executables,
+native SDK/LLVM measurements, retained compiler/C-string/retirement fixture
+trials and actual IPA probe/audit evidence are under
+`build/ios/fortnite/array-class-checks`. Generated C confirms fixed emission,
+sealing order and the context comparison before argument reads. Full iOS
+regression remains unpassed.
+
+The supplied IPA now exits with status 1 at MarketplaceKitWrapper's required
+`_$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF`, the generic equality function for
+RawRepresentable values with Equatable raw values. Its required import and
+native instructions are retained for the next implementation. Fortnite has
+not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,460 | 700 | 79 |
+| Fortnite executable | 1,461 | 699 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 146 | 30 | 23 |
-| All images | 2,265 | 733 | 120 |
+| MarketplaceKitWrapper | 147 | 29 | 23 |
+| All images | 2,267 | 731 | 120 |
 
-The C++/GLES/Text variant reports 2,278 resolved imports, 720 unresolved strong
+The C++/GLES/Text variant reports 2,280 resolved imports, 718 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

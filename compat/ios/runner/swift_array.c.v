@@ -136,6 +136,7 @@ fn swift_array_arena() u64 {
 	swift_protocol_relative(data + 272, base + 32)
 	write32(data + 280, 0x40000000) // Struct metadata kind, no extra/trailing patterns.
 	swift_protocol_relative(data + 284, data + 64)
+	swift_array_class_emit(data)
 	C.__builtin___clear_cache(arena, unsafe { voidptr(base + 48) })
 	if C.mprotect(arena, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
@@ -155,6 +156,7 @@ fn swift_array_symbol(symbol string) ?u64 {
 		'_$sSa28_allocateBufferUninitialized15minimumCapacitys06_ArrayB0VyxGSi_tFZ' { u64(unsafe { voidptr(swift_array_buffer_allocate) }) }
 		'_$sSaMa' { swift_array_arena() }
 		'_$sSaMn' { swift_array_arena() + u64(C.getpagesize()) + 160 }
+		'_$ss23_ContiguousArrayStorageCMn' { swift_array_class_descriptor() }
 		else { none }
 	}
 }

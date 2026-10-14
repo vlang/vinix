@@ -134,10 +134,12 @@ fn swift_mangled_lookup_checked(name u64, length u64, context u64, generic_args 
 		3 { metadata = swift_void_full_metadata() + 8 }
 		4 {
 			if context == 0 || generic_args == 0 { return 0 }
-			// Only Array's measured one-key-type generic context is supported.
+			// Array and its storage class each have one key type parameter. This
+			// substitutes Element; it does not instantiate storage-class metadata.
 			// Compare canonical descriptors before reading any context bytes.
 			if context == read64(swift_string_metadata() + 8) { return 0 }
-			if context != swift_array_arena() + u64(C.getpagesize()) + 160 {
+			array_context := swift_array_arena() + u64(C.getpagesize()) + 160
+			if context != array_context && context != array_context + 160 {
 				return error('iOS: unsupported Swift generic type context')
 			}
 			metadata = read64(generic_args)
