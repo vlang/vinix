@@ -5904,8 +5904,8 @@ through Swift's indirect result register x8. It reads no Self, metadata or
 witness argument. V emits this entry in the existing Foundation arena, which
 is published as RX code and RO data and retired by the existing drained
 shutdown. The getter adds no per-call allocation, ARC work or callback.
-Other CocoaError getters, Code metadata, constructors and conformances remain
-unsupported.
+Other CocoaError getters and constructors remain unsupported. Code metadata
+and the conformance lookup described below are now available.
 
 Native differential checks verify the eight-byte layout, native `rawValue`
 consumption of V-produced values, protected unused arguments and Self,
@@ -5925,22 +5925,63 @@ and the four joined, retired VM runs are retained under
 instruction/caller evidence and staging/inspector failures. Full iOS
 regression remains unpassed and published runners remain unchanged.
 
-The actual IPA launch now passes the getter binding and exits with status 1
-at `_$s10Foundation10CocoaErrorV4CodeVAA01_cD8ProtocolAAMc`, the required
-Code conformance to Foundation's `_ErrorCodeProtocol`. Fortnite has not
-entered application code and remains unplayable.
+The getter's IPA launch passed that binding and exited with status 1 at
+`_$s10Foundation10CocoaErrorV4CodeVAA01_cD8ProtocolAAMc`, the required
+Code conformance to Foundation's `_ErrorCodeProtocol`.
+
+The Foundation bridge now also provides complete nongeneric `CocoaError.Code`
+metadata and its canonical concrete `_ErrorCodeProtocol` witness lookup.
+Native Foundation/Swift/LLVM inspection on this Mac establishes an eight-byte
+POD value with integer equality, a four-word witness table and associated
+`CocoaError` metadata containing an owned NSError reference. V reuses the
+existing integer and ObjC value witnesses and seals code/data in two pages.
+The associated metadata supports reference copy/take/assignment/destruction;
+runtime shutdown drains owners before unmapping these pages. Descriptor
+identity checks reject retired conformance lookup before reading unmapped data.
+
+The wider associated `_BridgedStoredNSError` conformance remains unsupported:
+its CustomNSError, Objective-C bridging, Hashable, RawRepresentable and
+FixedWidthInteger witnesses require further implementation. Swift's tagged
+`FF 07` associated-conformance record contains a relative accessor function.
+V directs it to a checked rejecting entry, including when native Swift performs
+the lookup, instead of returning an incomplete witness table. Other CocoaError
+constructors, raw-value accessors, nominal reflection and stored-error exports
+remain unavailable. The actual IPA metadata import cell is `10dc981f8`; its
+callers at `100073a48` and `100073fcc` request complete metadata. The conformance
+cell at `10dc981f0` is loaded at `100073fd4` for `swift_getWitnessTable`.
+
+Twelve ASan/UBSan runs and six Vinix ARM64 guest suites pass across the new
+metadata/lookup, file-exists getter, witness lookup, metadata, unknown-object
+ownership and NSError value operations. The new fixture compares native POD8
+copy/take/assignment, optional payloads and equality, consumes V metadata with
+native Swift lookup and associated-type lookup, verifies NSError copy/destruction
+ownership, concurrent publication and two drained lifetimes, and checks that a
+native associated-conformance request reaches the explicit rejection. Fifteen
+final generated C streams/executables and four joined, retired QEMU phases are
+retained under `build/ios/fortnite/cocoa-error-protocol-checks`. The original
+host failure preserves the mistaken descriptor target and resulting data-page
+fault. A cancelled guest build is retained separately; all final programs were
+rebuilt after correcting the accessor. Full iOS regression remains unpassed and
+published runners remain unchanged.
+
+The actual IPA launch now resolves both new Code imports and exits with status 1
+at Foundation's required
+`_$s10Foundation11JSONDecoderC6decode_4fromxxm_AA4DataVtKSeRzlFTj`.
+Installed native Foundation instructions identify its class dispatch slot at
+metadata offset 320, with Self in x20. Fortnite has not entered application code
+and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,477 | 683 | 79 |
+| Fortnite executable | 1,479 | 681 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,312 | 686 | 120 |
+| All images | 2,314 | 684 | 120 |
 
-The C++/GLES/Text variant reports 2,325 resolved imports, 673 unresolved strong
+The C++/GLES/Text variant reports 2,327 resolved imports, 671 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

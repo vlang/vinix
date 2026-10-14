@@ -218,6 +218,9 @@ mut:
 	swift_nsobject_hashable_tables map[u64]u64 // Canonical ObjC wrapper -> sealed Hashable/Equatable specialization page.
 	swift_nsobject_hashable_retired bool
 	swift_foundation_arena u64 // Sealed CVarArg calls and Foundation's concrete String conformance.
+	swift_cocoa_error_arena u64 // Sealed Code metadata/conformance and deferred stored-error guard.
+	swift_cocoa_error_retired_arena u64 // Recognize retired descriptors before any unmapped read.
+	swift_cocoa_error_retired bool
 	swift_void_arena u64 // Sealed empty-tuple full metadata and zero-size value witnesses.
 	swift_unknown_value_arena u64 // Sealed Builtin.UnknownObject value witnesses.
 	swift_error_arena u64 // Sealed ObjC value witnesses and the concrete CFError: Error conformance.

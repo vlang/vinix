@@ -111,7 +111,7 @@ fn test_swift_cocoa_error_code() {
 		cocoa_code_mapping(entry, 12, true, true); cocoa_code_mapping(arena + u64(page), 96, true, false)
 		cocoa_code_cases(entry, probe, guard, u64(page), raw_reader)
 		mut workers := []thread{}; for _ in 0 .. 8 { workers << spawn cocoa_code_worker(entry, probe, guard) }; workers.wait()
-		for unsupported in ['_$s10Foundation10CocoaErrorV4CodeVMa', '_$s10Foundation10CocoaErrorV4CodeV8rawValueSivg',
+		for unsupported in ['_$s10Foundation10CocoaErrorV4CodeV8rawValueSivg',
 			'_$s10Foundation10CocoaErrorV19fileWriteOutOfSpaceAC4CodeVvgZ']! { if _ := swift_foundation_symbol(unsupported) { assert false } }
 		if _ := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$s10Foundation10CocoaErrorV19fileWriteFileExistsAC4CodeVvgZ') { assert false }
 		if _ := framework_symbol('/System/Library/Frameworks/UIKit.framework/UIKit', '_$s10Foundation10CocoaErrorV19fileWriteFileExistsAC4CodeVvgZ') { assert false }

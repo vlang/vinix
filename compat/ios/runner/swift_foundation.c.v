@@ -228,6 +228,7 @@ fn swift_nslog(first u64, second u64, arguments u64) { swift_nslog_checked(first
 fn swift_foundation_symbol(symbol string) !u64 {
 	$if !arm64 { return error('iOS: Swift Foundation requires ARM64') }
 	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired { return error('iOS: Swift Foundation outside runtime lifetime') }
+	if address := swift_cocoa_error_symbol(symbol) { return address }
 	return match symbol {
 		'_$s10Foundation5NSLogyySS_s7CVarArg_pdtF' { u64(voidptr(swift_nslog)) }
 		'_$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF' { u64(voidptr(swift_foundation_bridge)) }
@@ -240,6 +241,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 	}
 }
 fn swift_foundation_stop() {
+	swift_cocoa_error_stop()
 	if ios_runtime.swift_foundation_arena == 0 { return }
 	if C.munmap(unsafe { voidptr(ios_runtime.swift_foundation_arena) }, usize(C.getpagesize()) * 2) != 0 { panic('iOS: cannot retire Swift Foundation entries') }
 	ios_runtime.swift_foundation_arena = 0
