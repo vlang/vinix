@@ -294,7 +294,13 @@ the latest satisfiable closure. Dependencies cannot silently switch repositories
 
 Changes take an exclusive process-released filesystem lock. Before downloading,
 space is checked for the complete staged generation, missing cached payloads,
-filesystem overhead and the configured reserve. Files stream in 64 KiB blocks.
+filesystem overhead and the configured reserve. Available bytes use the
+filesystem's allocation unit (`statvfs.f_frsize`) with `f_bavail`, including when
+it differs from the preferred I/O size. Invalid zero units and multiplication
+overflow refuse the operation with a path-specific diagnostic. Offline exports,
+catalog assembly and release publishing use the same calculation. See
+[space calculation qualification](../tests/packages/space-check.md).
+Files stream in 64 KiB blocks.
 Partial downloads persist as `objects/HASH.part`; retries resume and verify the
 complete hash. A damaged resumed prefix triggers one fresh download from the
 same authenticated source with the same size/hash requirement. A second integrity

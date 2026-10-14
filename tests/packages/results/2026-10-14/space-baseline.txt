@@ -1,0 +1,35 @@
+Initial fixture against unchanged 3b100fc49 production sources, before the calculation change:
+large-io: available=196608 expected=12288 admissible=true expected=false
+/Users/alex/code/vinix/tests/packages/space-fixture.v:42: FAIL: fn main.expected_space: assert available == bytes && accepted == admissible
+V panic: Assertion failed...
+package space fixture failed with status 1
+
+Initial native count-width assumption (fixture calibration, after the production fix):
+large-io: available=12288 expected=12288 admissible=false expected=false
+small-io: available=196608 expected=196608 admissible=true expected=true
+byte-unit: available=4294967295 expected=18446744073709551615 admissible=false expected=true
+/Users/alex/code/vinix/tests/packages/space-fixture.v:42: FAIL: fn main.expected_space: assert available == bytes && accepted == admissible
+V panic: Assertion failed...
+package space fixture failed with status 1
+
+Darwin fsblkcnt_t is unsigned int. The fixture now derives its maximum with sizeof the actual C typedef; the u64 maximum product uses that native maximum and a matching allocation unit. Intermediate constant/cast attempts and generated C remain private and hashed.
+
+Initial local driver selection error:
+PASS native core assertions distribution
+PASS native core assertions review
+PASS native core assertions mirror
+deployment_mirror-build exited 1
+builder error: tools/packages/pkgcore/deployment_mirror_test.v doesn't exist
+
+
+The corrected followup uses deployment_test.v and passes.
+
+Final same calculation and refusal fixture:
+large-io: available=12288 expected=12288 admissible=false expected=false
+small-io: available=196608 expected=196608 admissible=true expected=true
+byte-unit: available=4294967295 expected=4294967295 admissible=true expected=true
+maximum: available=18446744073709551615 expected=18446744073709551615 admissible=true expected=true
+empty: available=0 expected=0 admissible=false expected=false
+equal-units: available=12288 expected=12288 admissible=true expected=true
+zero-io: available=12288 expected=12288 admissible=true expected=true
+Package space: allocation units, thresholds, zero availability, invalid units, overflow and syscall failure passed

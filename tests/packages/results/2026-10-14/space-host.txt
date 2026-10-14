@@ -1,0 +1,33 @@
+Pinned V 0.5.2 826e96f56ca12fcb8fd02dfd6edf1551008e62a8; V_MACOS_V3_NO_FALLBACK=1; native assertion builds use -nocache -no-skip-unused -gc none -manualfree. Seven distinct native core suites passed across two phases. The first driver stopped after three passes because it named an absent test file; the corrected followup completes the remaining suites and full signed CLI lifecycle.
+PASS native core assertions distribution
+PASS native core assertions review
+PASS native core assertions mirror
+PASS native core assertions deployment
+PASS native core assertions release
+PASS native core assertions catalog
+PASS native core assertions composition
+PASS full production free_bytes interposition fixture under ASan/UBSan
+PASS complete signed CLI lifecycle with real host statvfs
+
+Final native-header/interposed production calculation:
+large-io: available=12288 expected=12288 admissible=false expected=false
+small-io: available=196608 expected=196608 admissible=true expected=true
+byte-unit: available=4294967295 expected=4294967295 admissible=true expected=true
+maximum: available=18446744073709551615 expected=18446744073709551615 admissible=true expected=true
+empty: available=0 expected=0 admissible=false expected=false
+equal-units: available=12288 expected=12288 admissible=true expected=true
+zero-io: available=12288 expected=12288 admissible=true expected=true
+Package space: allocation units, thresholds, zero availability, invalid units, overflow and syscall failure passed
+
+Full signed CLI lifecycle:
+Package CLI: malformed publisher history refuses release without changing prior publication
+Package CLI: malformed locks refuse within two seconds, preserve state/cache/history and permit verified recovery
+Package CLI: ambiguous configuration refused without activation, cache or trust changes
+Package CLI: malformed retained history refuses replay after revocation and empty refresh
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed
+
+Maintained driver typecheck: exited 0.
+
+Maintained static target stages (no guest execution):
+PASS static service/session/Linux SDK runner staging and target-machine checks aarch64
+PASS static service/session/Linux SDK runner staging and target-machine checks x86_64

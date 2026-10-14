@@ -17,6 +17,7 @@ $if linux {
 
 struct C.statvfs {
 	f_bsize  usize
+	f_frsize usize
 	f_bavail usize
 }
 
@@ -248,9 +249,12 @@ pub fn free_bytes(path string) !u64 {
 	if C.statvfs(path.str, &usage) != 0 {
 		return error('cannot determine available disk space: ${path}')
 	}
-	block := u64(usage.f_bsize)
+	// Block counts use fundamental allocation units, not the preferred I/O
+	// transfer size. Those sizes can differ on the same mounted filesystem.
+	block := u64(usage.f_frsize)
 	available := u64(usage.f_bavail)
-	if block != 0 && available > ~u64(0) / block {
+	if block == 0 { return error('filesystem reports an invalid allocation unit: ${path}') }
+	if available > ~u64(0) / block {
 		return error('available disk space overflow: ${path}')
 	}
 	return block * available

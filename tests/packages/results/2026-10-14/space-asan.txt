@@ -1,0 +1,9 @@
+Final maintained controller --sanitize: clang ASan/UBSan; ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1; exited 0. No whole-service heap retention claim.
+large-io: available=12288 expected=12288 admissible=false expected=false
+small-io: available=196608 expected=196608 admissible=true expected=true
+byte-unit: available=4294967295 expected=4294967295 admissible=true expected=true
+maximum: available=18446744073709551615 expected=18446744073709551615 admissible=true expected=true
+empty: available=0 expected=0 admissible=false expected=false
+equal-units: available=12288 expected=12288 admissible=true expected=true
+zero-io: available=12288 expected=12288 admissible=true expected=true
+Package space: allocation units, thresholds, zero availability, invalid units, overflow and syscall failure passed

@@ -29,6 +29,12 @@ image can still report empty status without creating state. Invalid entries are
 retained for administrator recovery. See
 [coordination qualification](../../tests/packages/coordination-check.md).
 
+Disk preflight converts `statvfs.f_bavail` using its fundamental allocation size
+`f_frsize`, independently of the preferred I/O size. Zero allocation units and
+u64 multiplication overflow fail with the filesystem path in the diagnostic.
+Transactions, offline mirrors and publisher/catalog tools share this calculation.
+See [space qualification](../../tests/packages/space-check.md).
+
 ## Administrator package transport
 
 `vinix-package admin [--progress] [--offline] COMMAND ...` is the ordinary-account

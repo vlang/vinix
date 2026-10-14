@@ -54,6 +54,11 @@ holders with diagnostics. FIFO replacements cannot hang status, transactions or
 launch admission; restoring a sound lock/lease permits retry. See
 [coordination qualification](../../tests/packages/coordination-check.md).
 
+Space checks use filesystem allocation units and reject invalid or overflowing
+reports. The V [space qualification](../../tests/packages/space-check.md) covers
+differing I/O/allocation sizes through the production function; run
+`v run tests/packages/space-check.v` (`--sanitize` adds ASan/UBSan).
+
 Use `publish-release REPOSITORY_DIR ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY`
 to emit a complete signed consumer repository with atomic publication, dependency
 closure validation on each declared architecture and retained publisher sequence
