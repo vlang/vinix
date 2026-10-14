@@ -1297,6 +1297,11 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 	event.trigger(mut this.event, false)
 
 	print('unix accept: done\n')
+	// The new open description belongs to the accepting credentials. Peer
+	// credentials remain the identities captured when the connection formed.
+	process := proc.current_thread().process
+	connection_socket.stat.uid = process.euid
+	connection_socket.stat.gid = process.egid
 	return connection_socket.boxed()
 }
 
@@ -1832,6 +1837,8 @@ pub fn create(@type int) ?&UnixSocket {
 	// A socket by its file type too, as the other families' are: fstat(2)
 	// says so, and read(2) and write(2) keep its messages whole by it.
 	ret.stat.mode = stat.ifsock | 0o777
+	ret.stat.uid = process.euid
+	ret.stat.gid = process.egid
 	return ret
 }
 
@@ -1850,6 +1857,8 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	a.socktype = @type & sock_pub.sock_type_mask
 	a.status |= file.pollout
 	a.stat.mode = stat.ifsock | 0o777
+	a.stat.uid = process.euid
+	a.stat.gid = process.egid
 	b_charge := proc.reserve_kernel_for(proc.kernel_owner(), .socket, 8192) or { a.close_endpoint(); a.maybe_free(); return none }
 	mut b := &UnixSocket{
 		kernel_charge: b_charge
@@ -1863,6 +1872,8 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	b.socktype = @type & sock_pub.sock_type_mask
 	b.status |= file.pollout
 	b.stat.mode = stat.ifsock | 0o777
+	b.stat.uid = process.euid
+	b.stat.gid = process.egid
 
 	// The two ends were never joined up, so socketpair(2) handed back a pair
 	// that was not connected to anything: a write dereferenced a nil peer and a

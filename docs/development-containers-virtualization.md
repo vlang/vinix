@@ -325,6 +325,11 @@ requires write permission for UNIX connections and addressed datagrams. Native
 and identical Linux probes cover refusals without queue/peer changes, write-only
 sockets, record/datagram traffic and abstract lookup. Physical backing ACL
 snapshots for socket resources remain unsupported and unqualified.
+The [UNIX descriptor ownership correction](../tests/overlay-rename/socket-ownership.md)
+initializes unnamed/pair metadata from creator credentials and accepted metadata
+from the accepting account. Ordinary-account metadata changes and acceptance of
+an inherited root listener pass with preserved peer credentials on both native
+architectures and identical Linux probes.
 Crash consistency, full OCI/rootless-runtime acceptance and broader server-load
 qualification remain open. Full pins and native CI
 instructions are recorded in [the guest evidence](../tests/development/README.md).

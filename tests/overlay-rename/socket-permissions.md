@@ -69,3 +69,7 @@ forward permission snapshots to its physical backing resource, so inherited or
 named socket ACL support remains open. Broader credential/capability/MAC policy
 matrices, network namespace isolation, full OCI/rootless-runtime acceptance and
 complete server qualification also remain open.
+
+The subsequent [descriptor ownership correction](socket-ownership.md) extends
+the fixture with creator/acceptor metadata and inherited-listener checks. The
+hashes above identify the preceding pathname-permission qualification.

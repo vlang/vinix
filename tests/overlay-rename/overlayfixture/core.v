@@ -531,6 +531,7 @@ pub fn run() int {
 		if failure || disk || opaque || full || sockets { prepare_disk(opaque, full) }
 		if sockets { check(C.mkdir(c'/tmp/overlay-volume/protected', 0o700) == 0, 427) }
 		if access { owned_directory(c'/tmp/overlay-state/reference', 474) }
+		root_listener := if sockets || access { root_socket_listener() } else { -1 }
 		worker := C.fork()
 		check(worker >= 0, 87)
 		if worker == 0 {
@@ -543,6 +544,7 @@ pub fn run() int {
 			denied_device := if access { u64(0x103) } else { u64(0) }
 			check(C.mknod(c'/tmp/overlay-state/denied-device', u32(C.S_IFCHR | 0o600), denied_device) == -1
 				&& *C.__errno_location() == C.EPERM, 119)
+			if root_listener >= 0 { inherited_socket_owner(root_listener) }
 			if concurrent {
 				sample(0)
 				exercise(false)
@@ -565,6 +567,9 @@ pub fn run() int {
 		mut status := 0
 		check(C.waitpid(worker, &status, 0) == worker && C.WIFEXITED(status) != 0
 			&& C.WEXITSTATUS(status) == 0, 88)
+		if root_listener >= 0 {
+			check(C.unlink(c'/tmp/overlay-state/root-listener') == 0 && C.close(root_listener) == 0, 535)
+		}
 		if opaque { opaque_persistence() }
 		if full { opaque_full() }
 		if sockets { persistent_sockets_remount() }

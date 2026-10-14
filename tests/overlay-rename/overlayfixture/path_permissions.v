@@ -4,6 +4,77 @@ module overlayfixture
 #include <native-abi.h>
 
 fn C.umask(u32) u32
+fn C.fchmod(int, u32) int
+
+struct C.ucred {
+	pid i32
+	uid u32
+	gid u32
+}
+
+fn socket_owned_description(fd int, site int) {
+	unsafe {
+		mut st := C.stat{}
+		check(C.fstat(fd, &st) == 0, site)
+		changed := C.fchmod(fd, 0o600)
+		code := *C.__errno_location()
+		if st.st_uid != 1000 || st.st_gid != 1000 || changed != 0 {
+			C.printf(c'OVERLAY SOCKET OWNER: site=%d uid=%u gid=%u chmod=%d errno=%d\n',
+				site, st.st_uid, st.st_gid, changed, code)
+			C.fflush(nil)
+		}
+		check(st.st_uid == 1000 && st.st_gid == 1000 && st.st_mode & C.S_IFMT == C.S_IFSOCK && changed == 0, site)
+		check(C.fstat(fd, &st) == 0
+			&& st.st_uid == 1000 && st.st_gid == 1000 && st.st_mode & C.S_IFMT == C.S_IFSOCK
+			&& st.st_mode & 0o777 == 0o600, 522)
+	}
+}
+
+fn socket_owned_peer(fd int) {
+	unsafe {
+		mut credentials := &C.ucred(C.alloca(sizeof(C.ucred)))
+		length := &u32(C.alloca(sizeof(u32)))
+		*length = u32(sizeof(C.ucred))
+		check(C.getsockopt(fd, C.SOL_SOCKET, C.SO_PEERCRED, credentials, length) == 0
+			&& *length == sizeof(C.ucred) && credentials.pid > 0
+			&& credentials.uid == 1000 && credentials.gid == 1000, 523)
+	}
+}
+
+fn root_socket_listener() int {
+	unsafe {
+		listener := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0)
+		mut address := &C.sockaddr_un(C.alloca(sizeof(C.sockaddr_un)))
+		socket_address(c'/tmp/overlay-state/root-listener', address)
+		check(listener >= 0 && C.bind(listener, voidptr(address), u32(sizeof(C.sockaddr_un))) == 0
+			&& C.chmod(c'/tmp/overlay-state/root-listener', 0o666) == 0 && C.listen(listener, 1) == 0, 529)
+		return listener
+	}
+}
+
+fn inherited_socket_owner(listener int) {
+	unsafe {
+		client := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0)
+		socket_owned_description(client, 530)
+		mut address := &C.sockaddr_un(C.alloca(sizeof(C.sockaddr_un)))
+		socket_address(c'/tmp/overlay-state/root-listener', address)
+		check(C.vinix_overlay_connect(client, voidptr(address), u32(sizeof(C.sockaddr_un))) == 0, 531)
+		accepted := C.accept(listener, nil, nil)
+		socket_owned_description(accepted, 532)
+		socket_owned_peer(accepted)
+		mut credentials := &C.ucred(C.alloca(sizeof(C.ucred)))
+		length := &u32(C.alloca(sizeof(u32)))
+		*length = u32(sizeof(C.ucred))
+		check(C.getsockopt(client, C.SOL_SOCKET, C.SO_PEERCRED, credentials, length) == 0
+			&& *length == sizeof(C.ucred) && credentials.pid > 0
+			&& credentials.uid == 0 && credentials.gid == 0, 533)
+		mut byte := char(0)
+		check(C.write(client, c'I', 1) == 1 && C.read(accepted, &byte, 1) == 1
+			&& byte == char(`I`) && C.close(accepted) == 0 && C.close(client) == 0
+			&& C.close(listener) == 0, 534)
+		C.puts(c'OVERLAY SOCKET INHERITED OWNER: PASS')
+	}
+}
 
 fn refused_socket_target(result isize, site int) {
 	unsafe {
@@ -49,6 +120,8 @@ fn socket_record_permissions(base &char) {
 		check(C.chmod(&path[0], 0o200) == 0
 			&& C.vinix_overlay_connect(client, voidptr(address), u32(sizeof(C.sockaddr_un))) == 0, 493)
 		accepted := C.accept(listener, nil, nil)
+		socket_owned_description(accepted, 525)
+		socket_owned_peer(accepted)
 		mut byte := char(0)
 		check(accepted >= 0 && C.chmod(&path[0], 0) == 0
 			&& C.write(client, c'R', 1) == 1 && C.read(accepted, &byte, 1) == 1
@@ -124,10 +197,12 @@ fn socket_abstract_permissions() {
 		server := C.socket(C.AF_UNIX, C.SOCK_DGRAM, 0)
 		client := C.socket(C.AF_UNIX, C.SOCK_DGRAM, 0)
 		check(server >= 0 && client >= 0, 517)
+		socket_owned_description(server, 526)
 		old_mask := C.umask(0o777)
 		bound := C.bind(server, voidptr(address), u32(sizeof(C.sockaddr_un)))
 		C.umask(old_mask)
-		check(bound == 0 && C.vinix_overlay_connect(client, voidptr(address), u32(sizeof(C.sockaddr_un))) == 0
+		check(bound == 0 && C.fchmod(server, 0) == 0
+			&& C.vinix_overlay_connect(client, voidptr(address), u32(sizeof(C.sockaddr_un))) == 0
 			&& C.write(client, c'A', 1) == 1, 518)
 		receive_permission_byte(server, char(`A`), 519)
 		check(C.close(client) == 0 && C.close(server) == 0, 520)

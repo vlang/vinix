@@ -117,6 +117,10 @@ fn pass_socket_metadata(fd int) int {
 	unsafe {
 		pair := &i32(C.alloca(2 * sizeof(i32)))
 		check(C.socketpair(C.AF_UNIX, C.SOCK_STREAM, 0, pair) == 0, 457)
+		socket_owned_description(pair[0], 527)
+		socket_owned_description(pair[1], 528)
+		socket_owned_peer(pair[0])
+		socket_owned_peer(pair[1])
 		byte := &char(C.alloca(1))
 		*byte = char(`R`)
 		mut vector := &C.iovec(C.alloca(sizeof(C.iovec)))

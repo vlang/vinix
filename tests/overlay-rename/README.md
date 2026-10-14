@@ -115,6 +115,12 @@ write-only sockets permit it. The extended cycles also check record sockets,
 empty receive queues after refused sends, retained datagram targets after a
 failed reconnect, connected traffic after chmod and abstract sockets under a
 restrictive umask. See [pathname permission evidence](socket-permissions.md).
+Unnamed, paired, accepted and abstract UNIX descriptors must report the owning
+credentials and permit an ordinary creator's metadata changes. A worker accepts
+an inherited root listener after dropping to UID/GID 1000; the new descriptor
+belongs to the worker while captured peer credentials retain the root listener
+identity. Pair/accepted traffic and descriptor passing continue after mode
+changes. See [descriptor ownership evidence](socket-ownership.md).
 Two batches each run 32 cycles on each backend; every live slab class and the
 large-allocation count must match. A protected-directory bind must fail with
 `EACCES`. Root remounts the volume read-only, verifies that removed names stay

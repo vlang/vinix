@@ -54,6 +54,7 @@ fn persistent_socket_cycle(base &char, backing &char, hold bool) {
 		metadata := C.open(&target[0], C.O_PATH)
 		check(metadata >= 0 && C.fstat(metadata, &st) == 0 && st.st_nlink == 1, 433)
 		client := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0)
+		socket_owned_description(client, 521)
 		mut address := &C.sockaddr_un(C.alloca(sizeof(C.sockaddr_un)))
 		socket_address(&target[0], address)
 		socket_metadata_operations(metadata, address)
@@ -76,11 +77,14 @@ fn persistent_socket_cycle(base &char, backing &char, hold bool) {
 		bad_socket_operation(C.accept4(pending_metadata, nil, nil, C.SOCK_CLOEXEC), 471)
 		check(C.close(pending_metadata) == 0, 467)
 		accepted := C.accept(listener, nil, nil)
+		socket_owned_description(accepted, 524)
+		socket_owned_peer(accepted)
 		if hold {
 			C.puts(c'OVERLAY SOCKET PATH CLOSE: PASS')
 			C.puts(c'OVERLAY SOCKET ACCESS: PASS')
 			C.puts(c'OVERLAY SOCKET OPEN: PASS')
 			C.puts(c'OVERLAY SOCKET PERMISSION: PASS')
+			C.puts(c'OVERLAY SOCKET OWNER: PASS')
 			C.fflush(nil)
 		}
 		path := C.open(&target[0], C.O_PATH)
