@@ -1,0 +1,13 @@
+Baseline 89e35cea5 with the new late-state assertion. The old transaction activates changed staged state bytes; the regression exits 1. This is a deterministic generation admission check.
+
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 2
+GENERATION ADMISSION late-state refused=false current_changed=true
+tools/packages/pkgcore/generation_admission_test.v:55: fn test_generation_admission_refuses_late_state_change
+    assert refused

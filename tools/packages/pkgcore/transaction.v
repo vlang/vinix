@@ -352,18 +352,29 @@ fn activate_repair_plan_locked(config Config, directory string, current State, p
 	os.write_file(stage + '/state.json', encoded)!
 	os.chmod(stage + '/state.json', 0o644)!
 	sync_file(stage + '/state.json')!
+	options.checkpoint('prepared')
+	verify_generation_tree(stage, state, encoded, false)!
 	flush_tree(stage)!
 	options.checkpoint('staged')
+	verify_generation_tree(stage, state, encoded, true)!
 	if options.stop_before_activation {
 		// Preserve the unfinished stage as a process killed here would.
 		completed = true
 		return error('fixture interrupted before activation')
 	}
-	os.rename(stage, directory + '/generations/' + generation.str())!
+	number := generation.str()
+	published := directory + '/generations/' + number
+	defer { unsafe { number.free(); published.free() } }
+	publish_new_directory(stage, published, 'package generation')!
 	completed = true
 	sync_directory(directory + '/generations')!
 	options.checkpoint('published')
 	options.progress(pkgprotocol.Progress{ phase: 'activate' })
+	verify_generation_tree(published, state, encoded, true) or {
+		message := err.msg()
+		defer { unsafe { message.free(); err.free() } }
+		return error('package generation was not activated; retained for inspection at ${published}: ${message}; retry builds a new generation')
+	}
 	activate(directory, generation)!
 	options.checkpoint('activated')
 	println('Activated package generation ${generation}')
@@ -414,7 +425,18 @@ fn rollback_progress(config Config, directory string, expected string, report fn
 		check_review(expected, review_fingerprint(config, 'rollback', [], current,
 			Plan{ requested: old.requested, packages: old.packages }, old.generation, []))!
 	}
+	number := old.generation.str()
+	root := directory + '/generations/' + number
+	metadata := root + '/state.json'
+	defer { unsafe { number.free(); root.free(); metadata.free() } }
+	text := read_metadata(metadata)!
+	defer { unsafe { text.free() } }
+	captured := decode_persistent_state(text, config.architecture)!
+	defer { close_decoded_state(captured) }
+	if captured != old { return error('rollback generation metadata changed; inspect the retained generation and review again') }
+	verify_generation_tree(root, old, text, true)!
 	report(pkgprotocol.Progress{ phase: 'activate' })
+	verify_generation_tree(root, old, text, true)!
 	activate(directory, old.generation)!
 	println('Rolled back to generation ${old.generation}; application data was retained')
 	report(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 })

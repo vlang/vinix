@@ -1,0 +1,2 @@
+PASS aarch64 packages-generation-admission (112.5s)
+package-generation-admission aarch64: 1 passed, 0 failed, 0 skipped

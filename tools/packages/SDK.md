@@ -38,6 +38,16 @@ image can still report empty status without creating state. Invalid entries are
 retained for administrator recovery. See
 [coordination qualification](../../tests/packages/coordination-check.md).
 
+Transactions admit the complete generation before recursive flushing, before
+exclusive publication and after the final activation progress callback. Only
+declared payloads, generated launchers, exact state bytes and an empty read-only
+lease are allowed. Ordinary entries, ownership, single-link files and canonical
+final modes are required. Failed unpublished stages are removed. Published
+failures preserve the active pointer and report the retained generation path;
+retry builds a fresh generation. Rollback checks the same complete tree and
+captured state bytes after progress, preserving format-1 whitespace compatibility.
+See [generation admission qualification](../../tests/packages/generation-admission-check.md).
+
 Disk preflight converts `statvfs.f_bavail` using its fundamental allocation size
 `f_frsize`, independently of the preferred I/O size. Zero allocation units and
 u64 multiplication overflow fail with the filesystem path in the diagnostic.

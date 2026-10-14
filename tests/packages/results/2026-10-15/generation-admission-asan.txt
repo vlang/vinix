@@ -1,0 +1,305 @@
+Checker heap probe:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+GENERATION ADMISSION late-state refused=true current_changed=false
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Activated package generation 33
+Rolled back to generation 1; application data was retained
+GENERATION ADMISSION 90 prepared/staged/published/activate refusals preserve current state, history and outside data; no completion, clean unpublished stages, retained published failures and offline retry PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Installing Application 2.0.0 (1/1) from fixture
+Activated package generation 3
+GENERATION ADMISSION exclusive publication preserves raced destination and retries at a fresh identity PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 2
+Rolled back to generation 1; application data was retained
+GENERATION ADMISSION rollback refuses four late changes without switching current; captured whitespace-compatible metadata retries PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+GENERATION ADMISSION 128 valid and refused scans of 64-level trees retire descriptors under a 32-descriptor limit PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+GENERATION ADMISSION checker scratch zero retained allocations across 128 valid and five refused-path loops PASS
+
+clang ASan/UBSan; detect_leaks=0; halt_on_error=1
+
+generation_admission:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+GENERATION ADMISSION late-state refused=true current_changed=false
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Activated package generation 33
+Rolled back to generation 1; application data was retained
+GENERATION ADMISSION 90 prepared/staged/published/activate refusals preserve current state, history and outside data; no completion, clean unpublished stages, retained published failures and offline retry PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Installing Application 2.0.0 (1/1) from fixture
+Activated package generation 3
+GENERATION ADMISSION exclusive publication preserves raced destination and retries at a fresh identity PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 2
+Rolled back to generation 1; application data was retained
+GENERATION ADMISSION rollback refuses four late changes without switching current; captured whitespace-compatible metadata retries PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+GENERATION ADMISSION 128 valid and refused scans of 64-level trees retire descriptors under a 32-descriptor limit PASS
+PASS
+
+distribution:
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 2
+Rolled back to generation 1; application data was retained
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Rolled back to generation 3; application data was retained
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Updating trusted repository fixture
+PASS

@@ -582,6 +582,18 @@ a crash after it exposes the new complete set. Actual durability depends on the
 filesystem/device honoring flush and rename. No maintainer scripts or implicit
 user-data migrations run during activation.
 
+The service verifies the whole generation before recursive flushing, before
+exclusive publication and after the last activation progress callback. The tree
+must contain exactly its declared payloads, generated launchers, captured state
+bytes and an empty mode-0444 lease. Entries must be ordinary, owned by the service
+and have canonical final modes; files must have one link. Unexpected directories
+are refused without traversal. Publication cannot replace an existing generation.
+A refused unpublished stage is removed. A published generation that fails the
+final check is retained at the path printed in the diagnostic, with `current`
+unchanged; retry builds a new generation from verified sources/cache. Rollback
+also checks the complete tree and captured state bytes after progress. See
+[generation admission checks](../tests/packages/generation-admission-check.md).
+
 Rollback checks payloads and current organization/key policy before restoring
 the previous generation. Uninstall removes the app and unused dependencies from
 the active generation; explicitly installed dependencies remain roots. Packages
