@@ -635,6 +635,11 @@ stages. Stop package workers and application processes before repairing a lock
 or lease: replacing a file that is still held would separate its existing holders
 from new requests. Restore trusted state rather than bypassing the checks, then
 retry `verify`. See [coordination qualification](../tests/packages/coordination-check.md).
+Coordination files also require exactly one hard link and the captured named
+inode before and after locking. Writers acquire exclusion before changing lock
+permissions. Launch, collection and data purge share the lease checks; malformed
+obsolete leases stop collection preflight before any generation/cache removal.
+See [identity qualification](../tests/packages/coordination-identity-check.md).
 
 Personal data under `~/.local/share/vinix-apps/ID` survives uninstall/rollback.
 Launch captures the account home and each data-parent directory without following

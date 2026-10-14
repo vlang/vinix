@@ -1,0 +1,25 @@
+clang ASan/UBSan; detect_leaks=0; halt_on_error=1
+
+coordination:
+COORDINATION IDENTITY lock/writer refused=true preserved=true
+COORDINATION IDENTITY lock/reader refused=true preserved=true
+COORDINATION IDENTITY lock/status refused=true preserved=true
+COORDINATION IDENTITY generations/1/lease/lease refused=true preserved=true
+COORDINATION IDENTITY generations/1/lease/collection refused=true preserved=true
+COORDINATION IDENTITY generations/1/lease/purge refused=true preserved=true
+COORDINATION IDENTITY state reader/writer/status and launch/collection/purge refuse hard links before mutation; restored entries retry PASS
+COORDINATION IDENTITY captured locks reject replaced/unlinked names and captured-parent lease changes without mutating replacements; restored identities retry PASS
+COORDINATION IDENTITY malformed obsolete lease refuses collection before any generation/cache removal; restored lease permits collection PASS
+COORDINATION IDENTITY 128 repeats of six hard-link refusals retire descriptors under a 32-descriptor limit; busy writer preserves permissions and restored exclusion PASS
+Package coordination: malformed locks refuse promptly without changing special entries or link targets
+Package coordination: malformed and exclusively held generation leases refuse within the deadline
+Package coordination: fresh read-only status stays available; retained metadata without its lock refuses before parsing
+Package coordination: 128 valid and repeated malformed reader/writer/lease cycles preserve exclusion and recovery under a 32-descriptor limit
+PASS
+
+collection_limit:
+Package collection: 128 obsolete generations under RLIMIT_NOFILE=32; live lease preserved then retired
+PASS
+
+purge:
+PASS

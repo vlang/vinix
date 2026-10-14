@@ -1,0 +1,10 @@
+Baseline 3f3fe9847, pre-fix package coordination with the new hard-link assertion. A state lock linked to an external 0600 file is accepted and the writer changes that file to 0644. The regression exits 1. Existing malformed-entry and descriptor assertions still pass. The final expanded suite separately checks all six entry points, captured identity and recovery.
+
+COORDINATION IDENTITY lock/writer refused=false preserved=false
+tools/packages/pkgcore/coordination_test.v:70: fn test_hardlinked_coordination_files_refuse_before_permission_changes_or_locking
+    assert message.contains('hard link') && preserved, message
+        Message: 
+Package coordination: malformed locks refuse promptly without changing special entries or link targets
+Package coordination: malformed and exclusively held generation leases refuse within the deadline
+Package coordination: fresh read-only status stays available; retained metadata without its lock refuses before parsing
+Package coordination: 128 valid and repeated malformed reader/writer/lease cycles preserve exclusion and recovery under a 32-descriptor limit

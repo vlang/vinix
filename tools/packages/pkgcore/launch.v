@@ -158,13 +158,15 @@ fn generation_lease(directory string, architecture string, id string) !(State, i
 		return error('application is not installed: ${id}')
 	}
 	lease_path := directory + '/generations/' + state.generation.str() + '/lease'
+	defer { unsafe { lease_path.free() } }
 	lease := C.open(lease_path.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
 	if lease < 0 { return error('cannot open application generation lease; repair package state before retrying') }
-	check_coordination_file(lease, 'application generation lease') or { C.close(lease); return err }
+	check_coordination_file(lease, lease_path, 'application generation lease') or { C.close(lease); return err }
 	if C.flock(lease, C.LOCK_SH | C.LOCK_NB) != 0 {
 		C.close(lease)
 		return error('cannot hold application generation lease; another holder may be collecting it, retry after it finishes')
 	}
+	check_coordination_file(lease, lease_path, 'application generation lease') or { C.close(lease); return err }
 	admitted = true
 	return state, lease
 }

@@ -43,6 +43,7 @@ fn check_purge_generation(path string, id string, number u64) ! {
 		}
 		return error('cannot check application generation before purging data')
 	}
+	check_collection_lease(lease)!
 }
 
 fn purge_directory_info(fd int, uid u32, private_parent bool) !C.stat {

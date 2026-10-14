@@ -45,6 +45,7 @@ fn coordination_command(binary string, arguments []string) !Reply {
 }
 
 fn C.mkfifo(&char, u32) int
+fn C.link(&char, &char) int
 
 fn qualify_coordination_files(binary string, root string) ! {
 	store := pkgcore.state_directory(root)
@@ -63,13 +64,14 @@ fn qualify_coordination_files(binary string, root string) ! {
 	os.mkdir_all(sentinel)!
 	os.write_file(sentinel + '/keep', 'retained')!
 	defer { os.rmdir_all(sentinel) or {} }
-	for kind in ['fifo', 'directory', 'symlink', 'dangling', 'missing'] {
+	for kind in ['fifo', 'directory', 'symlink', 'dangling', 'missing', 'hardlink'] {
 		os.rename(path, saved)!
 		match kind {
 			'fifo' { assert C.mkfifo(path.str, 0o600) == 0 }
 			'directory' { os.mkdir(path)! }
 			'symlink' { os.symlink(outside, path)! }
 			'dangling' { os.symlink(outside + '-absent', path)! }
+			'hardlink' { assert C.link(outside.str, path.str) == 0 }
 			else {}
 		}
 		mut arguments := [['status'], ['--json', 'verify'], ['plan', 'install', 'app'], ['view'], ['policy'], ['repo-list'], ['repo-config'],
@@ -84,6 +86,7 @@ fn qualify_coordination_files(binary string, root string) ! {
 		for i, file in retained { assert pkgcore.hash_file(store + '/' + file)! == hashes[i] }
 		assert os.read_file(sentinel + '/keep')! == 'retained'
 		assert os.read_file(outside)! == 'preserved' && os.lstat(outside)!.mode & 0o777 == 0o600
+		if kind == 'hardlink' { println('Package CLI: hard-linked locks refuse all read/write commands before chmod and preserve trust, state, cache and recovery data') }
 		if kind == 'fifo' { assert os.lstat(path)!.mode & 0o777 == 0o600 }
 		if kind == 'directory' { os.rmdir(path)! }
 		else if os.exists(path) || os.is_link(path) { os.rm(path)! }

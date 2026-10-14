@@ -1507,6 +1507,15 @@ under the package lock. No observer enables an installation cancellation mode.
 Maintenance commands load configuration under the package writer lock; read-only
 review/plan/status/verification use its reader lock. The command's startup cannot
 retain an older policy or publisher after a completed administration change.
+
+State locks and generation leases require one hard link and the same named
+regular inode at admission and after acquiring the nonblocking lock. Writers
+change lock permissions only after exclusion. Collection and data purge recheck
+the lease relative to its captured generation directory; a shared or replaced
+lease refuses. Stop workers/applications before restoring trusted coordination
+files. These checks do not freeze later administrator namespace changes. See
+[coordination identity checks](../../tests/packages/coordination-identity-check.md).
+
 `verify`, including `--json verify`, checks all installed payloads before reporting
 success. Readers and launches return a busy-transaction diagnostic promptly.
 `--progress verify` uses the existing format-1 indeterminate `verify` frames:

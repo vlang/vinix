@@ -158,22 +158,28 @@ fn open_collection_generation(path string) !CollectionLease {
 	directory := C.open(path.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
 	if directory < 0 { return error('collection generation must be an ordinary directory') }
 	mut folder := C.stat{}
-	if C.fstat(directory, &folder) != 0 || u32(folder.st_mode) & 0o170000 != 0o040000 {
+	if C.fstat(directory, unsafe { &folder }) != 0 || u32(folder.st_mode) & 0o170000 != 0o040000 {
 		C.close(directory)
 		return error('cannot inspect collection generation')
 	}
 	// Nonblocking open prevents a malformed FIFO from hanging collection.
 	lease := C.openat(directory, c'lease', C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
 	if lease < 0 { C.close(directory); return error('cannot check generation lease before collection') }
-	mut info := C.stat{}
-	if C.fstat(lease, &info) != 0 || u32(info.st_mode) & 0o170000 != 0o100000 {
+	info := coordination_entry(lease, directory, c'lease', 'collection lease') or {
 		C.close(lease)
 		C.close(directory)
-		return error('collection lease must be an ordinary regular file')
+		return err
 	}
 	return CollectionLease{ directory: directory, lease: lease,
 		directory_device: u64(folder.st_dev), directory_inode: u64(folder.st_ino),
 		lease_device: u64(info.st_dev), lease_inode: u64(info.st_ino) }
+}
+
+fn check_collection_lease(lease CollectionLease) ! {
+	info := coordination_entry(lease.lease, lease.directory, c'lease', 'collection lease')!
+	if u64(info.st_dev) != lease.lease_device || u64(info.st_ino) != lease.lease_inode {
+		return error('collection lease changed during admission; retry after restoring package state')
+	}
 }
 
 // The caller holds the package writer lock, which excludes new launch admission.
@@ -204,6 +210,11 @@ fn collection_targets(directory string, current State) ![]CollectionTarget {
 			if code == C.EWOULDBLOCK || code == C.EAGAIN { continue }
 			return error('cannot lock generation lease before collection')
 		}
+		check_collection_lease(lease) or {
+			close_collection_lease(lease)
+			unsafe { path.free() }
+			return err
+		}
 		targets << CollectionTarget{ path: path, directory_device: lease.directory_device,
 			directory_inode: lease.directory_inode, lease_device: lease.lease_device, lease_inode: lease.lease_inode }
 		close_collection_lease(lease)
@@ -223,5 +234,6 @@ fn remove_collection_target(target CollectionTarget) ! {
 		if C.errno == C.EWOULDBLOCK || C.errno == C.EAGAIN { return }
 		return error('cannot lock generation lease for removal')
 	}
+	check_collection_lease(lease)!
 	os.rmdir_all(target.path)!
 }

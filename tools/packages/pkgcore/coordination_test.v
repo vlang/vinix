@@ -15,6 +15,7 @@ fn C.alarm(u32) u32
 fn C.mkfifo(&char, u32) int
 fn C.getrlimit(int, voidptr) int
 fn C.setrlimit(int, voidptr) int
+fn C.link(&char, &char) int
 
 struct CoordinationLimit { current u64 maximum u64 }
 
@@ -46,8 +47,138 @@ fn coordination_attempt(root string, operation string) ! {
 			state, lease := generation_lease(directory, 'aarch64', 'app')!
 			C.close(lease); close_decoded_state(state)
 		}
+		'collection' { lease := open_collection_generation(directory + '/generations/1')!; close_collection_lease(lease) }
+		'purge' { check_purge_generation(directory + '/generations/1', 'app', 1)! }
 		else { return error('unknown coordination probe') }
 	}
+}
+
+fn test_hardlinked_coordination_files_refuse_before_permission_changes_or_locking() {
+	for entry in ['lock', 'generations/1/lease'] {
+		work := coordination_fixture()!; defer { os.rmdir_all(work) or {} }
+		directory := state_directory(work)
+		path := directory + '/' + entry
+		outside := work + '/outside'
+		os.write_file(outside, 'preserved')!; os.chmod(outside, 0o600)!
+		os.rm(path)!; assert C.link(outside.str, path.str) == 0
+		operations := if entry == 'lock' { ['writer', 'reader', 'status'] } else { ['lease', 'collection', 'purge'] }
+		for operation in operations {
+			mut message := ''
+			coordination_attempt(work, operation) or { message = err.msg() }
+			preserved := os.read_file(outside)! == 'preserved' && os.lstat(outside)!.mode & 0o777 == 0o600
+			println('COORDINATION IDENTITY ' + entry + '/' + operation + ' refused=' + message.contains('hard link').str() + ' preserved=' + preserved.str())
+			assert message.contains('hard link') && preserved, message
+			assert os.readlink(directory + '/current')! == 'generations/1' && os.exists(path)
+		}
+		// Retire only the deliberate alias, leaving external data untouched.
+		os.rm(path)!; os.write_file(path, '')!; os.chmod(path, 0o644)!
+		for operation in operations { coordination_attempt(work, operation)! }
+	}
+	println('COORDINATION IDENTITY state reader/writer/status and launch/collection/purge refuse hard links before mutation; restored entries retry PASS')
+}
+
+fn test_coordination_capture_refuses_replaced_names_and_preserves_held_inode() {
+	work := coordination_fixture()!; defer { os.rmdir_all(work) or {} }
+	path := state_directory(work) + '/lock'
+	outside := work + '/outside'
+	os.write_file(outside, 'preserved')!
+	for kind in ['ordinary', 'symlink', 'fifo', 'directory', 'missing', 'unlinked'] {
+		fd := C.open(path.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
+		assert fd >= 0 && C.flock(fd, C.LOCK_SH | C.LOCK_NB) == 0
+		check_coordination_file(fd, path, 'test package lock')!
+		os.rename(path, path + '.saved')!
+		if kind == 'ordinary' { os.write_file(path, 'replacement')! }
+		else if kind == 'unlinked' { os.rm(path + '.saved')! }
+		else { coordination_special(path, kind, outside)! }
+		mut refused := false
+		check_coordination_file(fd, path, 'test package lock') or {
+			refused = err.msg().contains('changed during admission') || err.msg().contains('hard links')
+		}
+		assert refused && os.read_file(outside)! == 'preserved', kind
+		if kind == 'ordinary' { assert os.read_file(path)! == 'replacement' }
+		if os.exists(path) || os.is_link(path) {
+			if kind == 'directory' { os.rmdir(path)! } else { os.rm(path)! }
+		}
+		if kind == 'unlinked' { os.write_file(path, '')! }
+		else { os.rename(path + '.saved', path)!; check_coordination_file(fd, path, 'test package lock')! }
+		C.close(fd)
+		guard := acquire(state_directory(work))!; guard.release()
+	}
+	// Collection/purge rechecks resolve the lease relative to its captured parent.
+	directory := state_directory(work) + '/generations/1'
+	lease_path := directory + '/lease'
+	lease := open_collection_generation(directory)!
+	os.rename(lease_path, lease_path + '.saved')!; os.write_file(lease_path, '')!
+	mut refused := false
+	check_collection_lease(lease) or { refused = err.msg().contains('changed during admission') }
+	assert refused && os.exists(lease_path + '.saved')
+	os.rm(lease_path)!; os.rename(lease_path + '.saved', lease_path)!
+	check_collection_lease(lease)!; close_collection_lease(lease)
+	println('COORDINATION IDENTITY captured locks reject replaced/unlinked names and captured-parent lease changes without mutating replacements; restored identities retry PASS')
+}
+
+fn test_hardlinked_lease_collection_preflight_preserves_all_generations_and_cache() {
+	work := coordination_fixture()!; defer { os.rmdir_all(work) or {} }
+	directory := state_directory(work)
+	current := read_state(directory, 'aarch64')!; defer { close_decoded_state(current) }
+	for generation in [u64(2), 3] {
+		path := directory + '/generations/' + generation.str()
+		os.mkdir(path)!; os.write_file(path + '/lease', '')!
+		os.write_file(path + '/state.json', json2.encode(State{ ...current, generation: generation }))!
+	}
+	object := directory + '/objects/' + 'd'.repeat(64)
+	os.write_file(object, 'keep')!
+	outside := work + '/outside'
+	os.write_file(outside, 'preserved')!; os.chmod(outside, 0o600)!
+	path := directory + '/generations/3/lease'
+	os.rm(path)!; assert C.link(outside.str, path.str) == 0
+	mut refused := false
+	collect(Config{ architecture: 'aarch64' }, directory) or { refused = err.msg().contains('hard link') }
+	assert refused && os.ls(directory + '/generations')!.sorted() == ['1', '2', '3']
+	assert os.read_file(object)! == 'keep' && os.read_file(outside)! == 'preserved'
+	os.rm(path)!; os.write_file(path, '')!
+	collect(Config{ architecture: 'aarch64' }, directory)!
+	assert os.ls(directory + '/generations')! == ['1'] && !os.exists(object)
+	assert os.read_file(outside)! == 'preserved' && os.lstat(outside)!.mode & 0o777 == 0o600
+	println('COORDINATION IDENTITY malformed obsolete lease refuses collection before any generation/cache removal; restored lease permits collection PASS')
+}
+
+fn test_hardlinked_coordination_refusals_retire_descriptors_and_preserve_exclusion() {
+	work := coordination_fixture()!; defer { os.rmdir_all(work) or {} }
+	directory := state_directory(work)
+	outside := work + '/outside'
+	os.write_file(outside, 'preserved')!; os.chmod(outside, 0o600)!
+	for entry in ['lock', 'generations/1/lease'] {
+		os.rm(directory + '/' + entry)!
+		assert C.link(outside.str, (directory + '/' + entry).str) == 0
+	}
+	mut original := CoordinationLimit{}
+	assert C.getrlimit(C.RLIMIT_NOFILE, voidptr(&original)) == 0
+	limit := CoordinationLimit{ current: 32, maximum: original.maximum }
+	assert C.setrlimit(C.RLIMIT_NOFILE, voidptr(&limit)) == 0
+	defer { assert C.setrlimit(C.RLIMIT_NOFILE, voidptr(&original)) == 0 }
+	for _ in 0 .. 128 {
+		for operation in ['writer', 'reader', 'status', 'lease', 'collection', 'purge'] {
+			mut refused := false
+			coordination_attempt(work, operation) or {
+				message := err.msg(); refused = message.contains('hard link')
+				unsafe { message.free(); err.free() }
+			}
+			assert refused, operation
+		}
+	}
+	for entry in ['lock', 'generations/1/lease'] { os.rm(directory + '/' + entry)!; os.write_file(directory + '/' + entry, '')! }
+	reader := acquire_reader(directory)!
+	// A busy writer must not chmod a reader's captured inode before refusal.
+	os.chmod(directory + '/lock', 0o600)!
+	mut refused := false
+	acquire(directory) or { refused = err.msg().contains('another package transaction') }
+	assert refused && os.lstat(directory + '/lock')!.mode & 0o777 == 0o600
+	reader.release()
+	writer := acquire(directory)!; assert os.lstat(directory + '/lock')!.mode & 0o777 == 0o644; writer.release()
+	for operation in ['reader', 'writer', 'status', 'lease', 'collection', 'purge'] { coordination_attempt(work, operation)! }
+	assert os.read_file(outside)! == 'preserved' && os.lstat(outside)!.mode & 0o777 == 0o600
+	println('COORDINATION IDENTITY 128 repeats of six hard-link refusals retire descriptors under a 32-descriptor limit; busy writer preserves permissions and restored exclusion PASS')
 }
 
 // A broken blocking open/flock must fail this assertion instead of hanging the
