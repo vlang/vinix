@@ -1,0 +1,3 @@
+tests/linux-compat/attrclass-check.v:225: FAIL: fn main.failure: assert log.contains('LINUX ATTRCLASS DETAIL:'), 'attrclass baseline failure markers required'
+      message: attrclass baseline failure markers required
+V panic: Assertion failed...

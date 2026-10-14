@@ -1,0 +1,67 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=84560
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003800a000
+initramfs: Done (9 entries)
+LINUX ATTRCLASS TOPOLOGY: ordinary=0 uid=0 same=28960 cross=13749 page=4096
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=0 pid=0 size=30 flags=0 form=0 call=1081 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=1 pid=1234567800000000 size=30 flags=0 form=0 call=2161 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=1 pid=ffffffff00000000 size=30 flags=0 form=0 call=2162 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=2 pid=0 size=ffffffff00000030 flags=1234567800000000 form=0 call=1081 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=0 pid=0 size=30 flags=0 form=1 call=1082 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=1 pid=1234567800000000 size=30 flags=0 form=1 call=2163 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=1 pid=ffffffff00000000 size=30 flags=0 form=1 call=2164 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=2 pid=0 size=ffffffff00000030 flags=1234567800000000 form=1 call=1082 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=0 pid=0 size=30 flags=0 form=2 call=1083 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=2 pid=0 size=ffffffff00000030 flags=1234567800000000 form=2 call=1083 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=0 pid=0 size=31 flags=0 form=0 call=1084 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=2 pid=0 size=ffffffff00000031 flags=1234567800000000 form=0 call=1084 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=3 pid=0 size=30 flags=0 form=0 call=663 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=3 pid=1234567800000000 size=30 flags=0 form=0 call=664 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=3 pid=dc7e size=30 flags=0 form=0 call=743 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=3 pid=123456780000dc7e size=30 flags=0 form=0 call=744 ret=0 errno=0 expected=0
+LINUX ATTRCLASS CASES: ordinary=0 kind=0 calls=2520 failures=1152
+LINUX ATTRCLASS CASES: ordinary=0 kind=1 calls=5040 failures=2304
+LINUX ATTRCLASS CASES: ordinary=0 kind=2 calls=2520 failures=1152
+LINUX ATTRCLASS CASES: ordinary=0 kind=3 calls=1928 failures=16
+LINUX ATTRCLASS FINAL: ordinary=0 kind=0 calls=2520 failures=1152
+LINUX ATTRCLASS FINAL: ordinary=0 kind=1 calls=5040 failures=2304
+LINUX ATTRCLASS FINAL: ordinary=0 kind=2 calls=2520 failures=1152
+LINUX ATTRCLASS FINAL: ordinary=0 kind=3 calls=1928 failures=16
+LINUX ATTRCLASS TOPOLOGY: ordinary=1 uid=1000 same=44212 cross=18586 page=4096
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=0 pid=0 size=30 flags=0 form=0 call=1081 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=1 pid=1234567800000000 size=30 flags=0 form=0 call=2161 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=1 pid=ffffffff00000000 size=30 flags=0 form=0 call=2162 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=2 pid=0 size=ffffffff00000030 flags=1234567800000000 form=0 call=1081 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=0 pid=0 size=30 flags=0 form=1 call=1082 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=1 pid=1234567800000000 size=30 flags=0 form=1 call=2163 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=1 pid=ffffffff00000000 size=30 flags=0 form=1 call=2164 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=2 pid=0 size=ffffffff00000030 flags=1234567800000000 form=1 call=1082 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=0 pid=0 size=30 flags=0 form=2 call=1083 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=2 pid=0 size=ffffffff00000030 flags=1234567800000000 form=2 call=1083 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=0 pid=0 size=31 flags=0 form=0 call=1084 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=2 pid=0 size=ffffffff00000031 flags=1234567800000000 form=0 call=1084 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=3 pid=0 size=30 flags=0 form=0 call=663 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=3 pid=1234567800000000 size=30 flags=0 form=0 call=664 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=3 pid=7a92 size=30 flags=0 form=0 call=743 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=3 pid=1234567800007a92 size=30 flags=0 form=0 call=744 ret=0 errno=0 expected=0
+LINUX ATTRCLASS CASES: ordinary=1 kind=0 calls=2520 failures=1152
+LINUX ATTRCLASS CASES: ordinary=1 kind=1 calls=5040 failures=2304
+LINUX ATTRCLASS CASES: ordinary=1 kind=2 calls=2520 failures=1152
+LINUX ATTRCLASS CASES: ordinary=1 kind=3 calls=1928 failures=16
+LINUX ATTRCLASS FINAL: ordinary=1 kind=0 calls=2520 failures=1152
+LINUX ATTRCLASS FINAL: ordinary=1 kind=1 calls=5040 failures=2304
+LINUX ATTRCLASS FINAL: ordinary=1 kind=2 calls=2520 failures=1152
+LINUX ATTRCLASS FINAL: ordinary=1 kind=3 calls=1928 failures=16
+LINUX ATTRCLASS FAIL: class-specific query fields, errors or state
+QEMU: Terminated
+

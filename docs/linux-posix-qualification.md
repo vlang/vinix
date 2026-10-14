@@ -6553,3 +6553,111 @@ ARM CPU1 QoS blocker or the three broad section 15 gates.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/idleexit-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/idleexit-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/idleexit-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/idleexit-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/idleexit-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/idleexit-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/idleexit-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/idleexit-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/idleexit-check.v), [verdict](../tests/linux-compat/results/2026-10-15/idleexit-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-15/idleexit-lifetime-review.md).
+
+## Native realtime scheduling-attribute queries
+
+The 2026-10-15 qualification covers sched_getattr on stable single-thread
+process leaders in OTHER/BATCH/IDLE and FIFO/RR. Linux returns sched_nice zero
+for FIFO/RR, independently of the task's actual retained nice. Vinix originally
+copied process nice into that field for every class. The corrected initializer
+selects zero for FIFO/RR and retains existing values for the other tested classes.
+Policy, realtime priority, flags, output size and the underlying nice are unchanged.
+
+The retained [Linux v6.12 scheduler implementation](https://raw.githubusercontent.com/torvalds/linux/v6.12/kernel/sched/syscalls.c)
+initializes kattr, then get_params fills only sched_priority for realtime tasks;
+the other branch fills sched_nice. Its SHA-256 is
+`a9c89bc6e1eca2587f39518718aa0a53fd8ef646f16927a0252e5fa7f25b5804`.
+Actual supplied Linux 6.12.51 kernels execute the same final probe ELF as each
+native architecture. The probe uses genuine musl syscall and getpriority calls.
+Dedicated scheduling-wrapper ENOSYS behavior remains separately documented.
+
+Root and UID/GID1000 cohorts query with effective CAP_SYS_NICE disabled. Targets
+are PID0, self, a same-owner peer and a UID/GID1001 peer. A privileged parent
+broker establishes each real policy/priority/nice and verifies it before ACK.
+Seven configurations are OTHER/0, BATCH/0, IDLE/0, FIFO/1, FIFO/99, RR/1 and RR/99;
+nice values are -20/-1/0/1/19. Raw and genuine musl getpriority verify actual nice,
+including the legitimate -1 result with errno zero, before and after queries.
+
+| Cohort group | Controls per cohort | Contract |
+| --- | --- | --- |
+| 0 | 2,520 | Seven configurations, five actual nice values, four live targets, six sizes and three output forms |
+| 1 | 5,040 | The same queries with two distinct upper PID words |
+| 2 | 2,520 | The same queries with upper length/flag words |
+| 3 | 1,928 | 1,920 argument/error controls and eight default/final state observations |
+
+Each cohort performs 12,008 controls, or 24,016 per architecture. Group 3 uses
+OTHER/0, FIFO/1 and RR/99 at actual nice 19; live, absent, reaped and signed-negative
+targets; sizes 47/48/page+1/UINT_MAX, flags 0/1 and five output forms, with normal
+and upper PID words. Original cohorts each fail `1152/2304/1152/16`; the corrected
+and same-ELF Linux cohorts record zero. All CASES/FINAL keys, counts and outcomes
+are independently bound.
+
+| Architecture | Controls | Original failures | Corrected failures | Same-ELF Linux failures |
+| --- | --- | --- | --- | --- |
+| AArch64 | 24,016 | 9,248 | 0 | 0 |
+| x86-64 | 24,016 | 9,248 | 0 | 0 |
+
+Sizes 48/49/53/55/56/57 receive the exact known prefix, with advertised output size
+min(requested, 56). Aligned, unaligned and page-tail outputs retain their canaries.
+memcpy avoids unaligned Attr reads. Nice, policy, priority, flags, size and known
+non-configuration fields are exact. RT runtime/deadline/period stay zero.
+The supplied Linux fair slice and clamp default are configuration fields: fair
+runtime is outside this contract and the observed clamp default must be 0 or 1024.
+Native values remain exact. Native ARM pages are 16 KiB; x86/reference pages are 4 KiB.
+
+Signed-negative PID, NULL, reserved outer flags and invalid sizes return EINVAL
+before lookup. Missing/reaped targets return ESRCH before output faults. Valid
+read-only/inaccessible outputs return EFAULT; a crossing read-only page permits
+only the existing first 28 bytes to change before EFAULT. Other failed outputs and
+all outer/read-only guards remain unchanged. Every live query retains actual
+policy, priority and raw/musl nice; nonself queries retain self OTHER/0/nice 0.
+
+The scalar broker Message is 20 bytes, including an explicitly validated priority
+1..99 for FIFO/RR and 0 for other classes. Registered positive peer PIDs and nice
+-20..19 are checked. Canonical signed64 setpriority setup remains explicit; it
+does not qualify native signed32 setpriority words or admission/group semantics.
+Setup checks actual nice independently of the RT field under test; matrix output
+comparisons always check that field exactly. Message, Attr, parameters and Counts
+stay live through synchronous syscall/pipe operations; no pointer crosses a pipe.
+Peers close inherited broker handles, block until released, then are reaped.
+The mapping is unmapped before the cohort reports; counts transfer before reap.
+Disposable PR_SET_KEEPCAPS children do not establish whole process restoration.
+Final probe C has 25 explicit allocas and no heap/dynamic-array/fixed-index helpers.
+
+Both native cohorts warm 32 query cycles and run 200 cycles with retained FIFO/RR
+leaders at nonzero nice, upper words, guarded short/full outputs and real errors.
+The slab observer stays open through two snapshots separated by 13-second settling
+intervals. All 18 ARM/14 x86 slab classes stay flat, with 85/85 ARM and 216/216 x86
+large pages in both cohorts.
+These measurements qualify the repeated query path with retained tasks, excluding
+general process churn and whole-kernel allocation.
+
+Four fresh production builds use isolated worktrees at
+`7fcfd033b727496f6146c4c67ce47936abc265ab`. Entire generated C is byte-identical
+outside syscall_linux_sched_getattr, without compiler identifier normalization.
+The one scalar field initializer is the only source change. Existing borrowed
+owner/task pointers, stack Attr and usercopy remain unchanged, with one PID-table
+lock and two unchanged unlock paths. No allocation/free or pointer escape is added.
+Allocation diagnostics are byte-identical at 398 ARM/290 x86 sites, retaining the
+existing allowance refusals; this does not approve all kernel allocations.
+Eight host files and four frozen inventory checks pass.
+
+The eight corrected cases are attrclass/runtime/schedabi/rrabi/attrquery/attrnice/
+rtadmit/idleexit. The maintained V auditor rehashes compiler inputs, 64-source
+inventories, builds, source/C/ELF/ISO/kernel/serial and all actual receipts. Its
+false-assertion and passing-Linux-as-failing-original controls must actually exit 1
+without -prod. The bounded capture watcher records 18 distinct captures, hashes
+every retained regular file and rechecks them after retiring only unbound ISO
+staging and firmware variables. Independent lifetime/provenance review gates
+publication. Public dispatch fingerprints use committed-parent inputs plus the
+owned scalar fix; they do not upgrade this dated frozen-kernel qualification.
+
+Native nice remains process-wide, so worker-thread nice is outside this contract.
+Getter snapshots span separate lock intervals; target identity/credential/policy
+races, reset/deadline/utilization transitions, namespace/security configurations,
+glibc and translated/ELF32 paths remain unqualified. Fair scheduling/timing and
+the ARM CPU1 QoS blocker remain separate. The three broad section 15 gates stay open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/attrclass-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/attrclass-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/attrclass-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/attrclass-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/attrclass-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/attrclass-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/attrclass-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/attrclass-reference-x86_64-receipt.json).
+- [Maintained V audit](../tests/linux-compat/attrclass-check.v), [verdict](../tests/linux-compat/results/2026-10-15/attrclass-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-15/attrclass-lifetime-review.md).

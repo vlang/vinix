@@ -1549,3 +1549,21 @@ Broker setup uses canonical signed64 setpriority words; setpriority signed32/
 permission/group semantics and RT getattr nice remain separate gaps. Worker
 threads, races, security/reset/deadline/timing and GNU/foreign paths remain
 unqualified, and the three broad compatibility gates remain open.
+
+The `attrclass` case qualifies class-specific scheduling queries for stable
+single-thread leaders. FIFO/RR priorities 1/99 report sched_attr nice 0 despite
+retained actual nice -20/-1/0/1/19; OTHER/BATCH/IDLE report the actual nice.
+Root/UID1000 cohorts query without effective CAP_SYS_NICE, including same/cross-
+owner peers, guarded short/full/unaligned/page-tail outputs, upper argument words
+and real EINVAL/ESRCH/EFAULT behavior. Each architecture runs 24,016 controls;
+originals fail 9,248 and corrected Vinix plus identical ELFs on Linux 6.12.51 pass.
+Two warmed 200-cycle query cohorts retain flat slabs/pages. Run
+`--cases attrclass,runtime,schedabi,rrabi,attrquery,attrnice,rtadmit,idleexit`
+with a fresh state directory. `attrclass-reference.v` uses the preceding reference
+arguments; compile `attrclass-check.v` without `-prod` and supply the retained
+evidence area. [The report](../../docs/linux-posix-qualification.md#native-realtime-scheduling-attribute-queries)
+binds exact fields/errors/state, compiler/source/C/ELF/receipt hashes and independent
+lifetime review. Reference fair slice/clamp defaults remain configuration fields.
+Canonical signed64 broker setup is explicit; setpriority signed32/admission/group
+semantics, worker nice/races, deadline/reset/utilization/security and GNU/foreign
+paths remain separate. The three broad compatibility gates remain open.

@@ -925,6 +925,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   Linux, guarded inputs, actual state/restoration and flat storage; retain setup gaps.
   See [the idle scheduling contract](docs/linux-posix-qualification.md#native-idle-scheduling-exit-permissions).
 
+- [x] Return zero scheduling-attribute nice for FIFO/RR while retaining actual
+  task nice and ordinary/IDLE query values. Qualify 24,016 leader controls per
+  architecture against identical-ELF Linux, guarded prefixes, peer queries,
+  exact errors/state and flat repeated-query storage, with independent review.
+  See [the realtime query contract](docs/linux-posix-qualification.md#native-realtime-scheduling-attribute-queries).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -476,7 +476,12 @@ fn syscall_linux_sched_getattr(_ voidptr, raw_pid int, attr_ptr u64, size u32, f
 	mut attr := SchedAttr{
 		size: if size >= sizeof(SchedAttr) { u32(sizeof(SchedAttr)) } else { size }
 		sched_policy: u32(params.policy)
-		sched_nice: i32(nice)
+		// FIFO/RR carry realtime priority in this ABI field set; nice is zero.
+		sched_nice: if params.policy == proc.sched_fifo || params.policy == proc.sched_rr {
+			i32(0)
+		} else {
+			i32(nice)
+		}
 		sched_priority: u32(params.priority)
 		sched_runtime: params.dl_runtime
 		sched_deadline: params.dl_deadline

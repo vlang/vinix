@@ -1,0 +1,1 @@
+arm/x86: whole generated production C differs only in table__syscall_linux_sched_getattr; no compiler identifier normalization, new allocation/free or pointer escape; existing scalar params/owner nice, one PID-table lock and both unchanged unlock paths

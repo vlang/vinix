@@ -1,0 +1,3 @@
+tests/linux-compat/attrclass-check.v:350: FAIL: fn main.main: assert false, 'attrclass assertions must execute'
+      message: attrclass assertions must execute
+V panic: Assertion failed...

@@ -1,0 +1,124 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 45  248k   45  111k    0     0   170k      0  0:00:01 --:--:--  0:00:01  169k100  248k  100  248k    0     0   341k      0 --:--:-- --:--:-- --:--:--  340k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  1 2880k    1 52913    0     0  59825      0  0:00:49 --:--:--  0:00:49 59788 54 2880k   54 1583k    0     0   877k      0  0:00:03  0:00:01  0:00:02  877k100 2880k  100 2880k    0     0  1228k      0  0:00:02  0:00:02 --:--:-- 1228k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  33311      0 --:--:-- --:--:-- --:--:-- 33276
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   427k      0 --:--:-- --:--:-- --:--:--  427k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  95123      0 --:--:-- --:--:-- --:--:-- 94955
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 94  117k   94  111k    0     0   152k      0 --:--:-- --:--:-- --:--:--  152k100  117k  100  117k    0     0   161k      0 --:--:-- --:--:-- --:--:--  161k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/attrclass-20261015/states/p1-before-x86/attrclass/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/attrclass-20261015/states/p1-before-x86/attrclass/.vinix-amd64.iso.gaQnfs'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 5915m free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/attrclass-20261015/states/p1-before-x86/attrclass/iso-build/.iso-staging.gwJpXt/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13680 sectors
+Written to medium : 13680 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/attrclass-20261015/states/p1-before-x86/attrclass/.vinix-amd64.iso.gaQnfs' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd5bf.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/attrclass-20261015/states/p1-before-x86/attrclass/test.iso (28016640 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/attrclass-20261015/states/p1-before-x86/attrclass
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=84560
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003800a000
+initramfs: Done (9 entries)
+LINUX ATTRCLASS TOPOLOGY: ordinary=0 uid=0 same=28960 cross=13749 page=4096
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=0 pid=0 size=30 flags=0 form=0 call=1081 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=1 pid=1234567800000000 size=30 flags=0 form=0 call=2161 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=1 pid=ffffffff00000000 size=30 flags=0 form=0 call=2162 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=2 pid=0 size=ffffffff00000030 flags=1234567800000000 form=0 call=1081 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=0 pid=0 size=30 flags=0 form=1 call=1082 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=1 pid=1234567800000000 size=30 flags=0 form=1 call=2163 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=1 pid=ffffffff00000000 size=30 flags=0 form=1 call=2164 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=2 pid=0 size=ffffffff00000030 flags=1234567800000000 form=1 call=1082 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=0 pid=0 size=30 flags=0 form=2 call=1083 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=2 pid=0 size=ffffffff00000030 flags=1234567800000000 form=2 call=1083 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=0 pid=0 size=31 flags=0 form=0 call=1084 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=2 pid=0 size=ffffffff00000031 flags=1234567800000000 form=0 call=1084 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=3 pid=0 size=30 flags=0 form=0 call=663 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=3 pid=1234567800000000 size=30 flags=0 form=0 call=664 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=3 pid=dc7e size=30 flags=0 form=0 call=743 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=0 kind=3 pid=123456780000dc7e size=30 flags=0 form=0 call=744 ret=0 errno=0 expected=0
+LINUX ATTRCLASS CASES: ordinary=0 kind=0 calls=2520 failures=1152
+LINUX ATTRCLASS CASES: ordinary=0 kind=1 calls=5040 failures=2304
+LINUX ATTRCLASS CASES: ordinary=0 kind=2 calls=2520 failures=1152
+LINUX ATTRCLASS CASES: ordinary=0 kind=3 calls=1928 failures=16
+LINUX ATTRCLASS FINAL: ordinary=0 kind=0 calls=2520 failures=1152
+LINUX ATTRCLASS FINAL: ordinary=0 kind=1 calls=5040 failures=2304
+LINUX ATTRCLASS FINAL: ordinary=0 kind=2 calls=2520 failures=1152
+LINUX ATTRCLASS FINAL: ordinary=0 kind=3 calls=1928 failures=16
+LINUX ATTRCLASS TOPOLOGY: ordinary=1 uid=1000 same=44212 cross=18586 page=4096
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=0 pid=0 size=30 flags=0 form=0 call=1081 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=1 pid=1234567800000000 size=30 flags=0 form=0 call=2161 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=1 pid=ffffffff00000000 size=30 flags=0 form=0 call=2162 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=2 pid=0 size=ffffffff00000030 flags=1234567800000000 form=0 call=1081 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=0 pid=0 size=30 flags=0 form=1 call=1082 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=1 pid=1234567800000000 size=30 flags=0 form=1 call=2163 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=1 pid=ffffffff00000000 size=30 flags=0 form=1 call=2164 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=2 pid=0 size=ffffffff00000030 flags=1234567800000000 form=1 call=1082 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=0 pid=0 size=30 flags=0 form=2 call=1083 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=2 pid=0 size=ffffffff00000030 flags=1234567800000000 form=2 call=1083 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=0 pid=0 size=31 flags=0 form=0 call=1084 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=2 pid=0 size=ffffffff00000031 flags=1234567800000000 form=0 call=1084 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=3 pid=0 size=30 flags=0 form=0 call=663 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=3 pid=1234567800000000 size=30 flags=0 form=0 call=664 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=3 pid=7a92 size=30 flags=0 form=0 call=743 ret=0 errno=0 expected=0
+LINUX ATTRCLASS DETAIL: ordinary=1 kind=3 pid=1234567800007a92 size=30 flags=0 form=0 call=744 ret=0 errno=0 expected=0
+LINUX ATTRCLASS CASES: ordinary=1 kind=0 calls=2520 failures=1152
+LINUX ATTRCLASS CASES: ordinary=1 kind=1 calls=5040 failures=2304
+LINUX ATTRCLASS CASES: ordinary=1 kind=2 calls=2520 failures=1152
+LINUX ATTRCLASS CASES: ordinary=1 kind=3 calls=1928 failures=16
+LINUX ATTRCLASS FINAL: ordinary=1 kind=0 calls=2520 failures=1152
+LINUX ATTRCLASS FINAL: ordinary=1 kind=1 calls=5040 failures=2304
+LINUX ATTRCLASS FINAL: ordinary=1 kind=2 calls=2520 failures=1152
+LINUX ATTRCLASS FINAL: ordinary=1 kind=3 calls=1928 failures=16
+LINUX ATTRCLASS FAIL: class-specific query fields, errors or state
+QEMU: Terminated
+Missing verdicts: ['LINUX ATTRCLASS: PASS']; failures: ['FAIL:', 'LINUX ATTRCLASS FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/attrclass-20261015/states/p1-before-x86/receipt.json
