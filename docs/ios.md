@@ -4781,8 +4781,57 @@ remains unpassed.
 Both audits resolve two more required imports across the supplied images.
 The actual IPA now exits with status 1 before entry at MarketplaceKitWrapper's
 required typed `allocate(capacity:)` import,
-`_$sSp8allocate8capacitySpyxGSi_tFZ`. That entry remains unimplemented.
-Fortnite has not entered application code and remains unplayable.
+`_$sSp8allocate8capacitySpyxGSi_tFZ`. That entry was unimplemented at that
+stage; Fortnite had not entered application code.
+
+Typed `UnsafeMutablePointer.allocate(capacity:)` now resolves through a V
+adapter. Native SwiftCore disassembly records signed count in x0, Pointee
+metadata in x1 and the returned pointer in x0. It checks signed stride/count
+multiplication overflow, normalizes alignments at most 16 to the default
+manual-allocation path, and tail-calls `swift_slowAlloc`. The installed SDK
+and Swift's [pointer implementation](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/UnsafePointer.swift)
+specify uninitialized storage occupying `count * stride` bytes. Native type
+binding adds no runtime call in the measured body.
+
+The V adapter requires complete direct value layout metadata, including at
+zero capacity. It reads size, stride and alignment without calling any
+copy/take/destroy/tag witness, discovering descriptors or initializing values.
+Negative counts, missing/misaligned metadata tables, incomplete layouts,
+invalid size/stride/alignment and signed allocation-size overflow reject
+before allocation. The underlying raw allocator supplies one addressable
+byte for zero capacity and enforces at least 16-byte alignment, including
+zero-size element layouts. Storage has no private header, Swift owner or
+registry entry. Callers initialize elements, deinitialize owned values, then
+free the allocation separately.
+
+Ten fresh ASan/UBSan runs pass across typed allocation, pointer destruction,
+raw allocation, Collection and Array storage with normal/deterministic
+hashing. These five suites also pass in a fresh Vinix ARM64 guest. Native
+comparisons cover 60 Int/String/ObjC allocation/destruction/free lifecycles
+and 20 minimal caller-layout cases with padded, over-aligned and zero-size
+elements. Every unused witness points into protected memory. Checks write
+the full stride extent, cover zero capacity, preserve object ownership until
+explicit initialization, and observe four pointer deallocators and POSIX
+free interoperability on this platform. That interoperability is a measured
+native allocator property, not a portable Swift API guarantee. V checks also
+exercise rejected layouts/overflow, eight concurrent workers and two drained
+runtime lifetimes. Generated C verifies delegation to raw payload allocation
+without scratch allocation or registry locking, and borrowed static failures.
+
+The public dedicated `build-swift-pointer-alloc` target, full build,
+regression and Swift guest modes include the fixture. Thirteen fresh
+generated-C streams/executables, SDK/LLVM input pins, native measurements and
+actual IPA probe/audit evidence are retained under
+`build/ios/fortnite/pointer-alloc-checks`. An initial staging replacement
+rejected before fixture generation is recorded; corrected staging completed
+before the fresh cohort. Full iOS regression remains unpassed.
+
+Both import audits resolve one more required import. The actual IPA passes
+typed allocation linking and exits with status 1 before
+entry at MarketplaceKitWrapper's required raw-buffer `copyMemory(from:)`
+import, `_$sSw10copyMemory4fromySW_tF`. Its native disassembly is recorded for
+the next implementation. Fortnite has not entered application code and
+remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -4791,10 +4840,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,459 | 701 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 138 | 38 | 23 |
-| All images | 2,256 | 742 | 120 |
+| MarketplaceKitWrapper | 139 | 37 | 23 |
+| All images | 2,257 | 741 | 120 |
 
-The C++/GLES/Text variant reports 2,269 resolved imports, 729 unresolved strong
+The C++/GLES/Text variant reports 2,270 resolved imports, 728 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
