@@ -12,7 +12,7 @@ fn swift_object_type_query(owner u64) !SwiftObjectTypeQuery {
 	}
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
-	if swift_main_actor_is_singleton_locked(owner) {
+	if swift_main_actor_is_singleton_locked(owner) || swift_main_executor_is_singleton_locked(owner) {
 		return SwiftObjectTypeQuery{ metadata: read64(owner) }
 	}
 	if storage := ios_runtime.swift_heap[owner] {

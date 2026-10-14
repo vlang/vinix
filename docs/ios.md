@@ -5725,25 +5725,84 @@ output failure and corrected observer, and joined startup probes/audits are
 retained under `build/ios/fortnite/main-actor-checks`. Full iOS regression
 remains unpassed and published runners remain unchanged.
 
-The actual IPA startup probe now gets past MainActor.shared and its metadata
-accessor and exits with status 1 at the required MainActor Actor conformance,
-`_$sScMScAsMc`. The installed modern Mac runtime returns an executor object
-and witness pointer for its main executor; that native representation is
-retained for further implementation. MainActor Actor conformance and main
-executor scheduling remain explicitly unsupported. Fortnite has not entered
-application code and remains unplayable.
+The IPA startup probe at this stage got past MainActor.shared and its
+metadata accessor and exited with status 1 at the required MainActor Actor
+conformance, `_$sScMScAsMc`.
+
+The next step implements that conformance and a main serial executor in
+`swift_main_executor.c.v`. V/native inspection measures an unconditional
+Actor descriptor and two-word witness table, whose sole getter borrows Self
+and returns the main executor. The installed Mac runtime rejects legacy
+`1/0` main-executor tagging. Its current main executor is a seventeen-byte
+DispatchMainExecutor, with a `threaded` Bool at offset sixteen set to false,
+and inherited Executor/SerialExecutor witness tables. V/LLVM inspection
+retains the descriptors, all eight SerialExecutor requirement slots, native
+main-identity queries and actual IPA witness lookup/dispatcher callers.
+
+Vinix emits its own immutable executor reference, private nominal metadata,
+Actor/Executor/SerialExecutor descriptors and complete static witness tables.
+The Actor getter returns its canonical nonzero object/table pair without
+ARC or dereferencing borrowed metadata/Self; its serial asUnowned witness
+borrows the receiver. Enqueue witnesses route through the dispatch main
+queue, exclusive-context equality compares references, checkIsolated
+requires the main thread and the optional current-context default returns
+none. Native and unknown-object ARC/type lookup recognize this private
+immortal reference. Code, metadata, references and tables share the existing
+MainActor arena and expire only after tasks, callbacks and owned values drain.
+The concurrency library also exposes the main-executor identity query,
+enqueue primitive and MainActor executor getters.
+
+Supported jobs are actual registered tasks. Main enqueue consumes their
+existing execution reference, preserving caller ownership, and publishes the
+queue job atomically with the scheduler shutdown gate. Duplicate, started,
+foreign or stopped jobs are rejected before consumption. Main jobs execute
+on the main thread with current-task TLS and the existing completion/closure
+ownership. Their queued callback counts remain live until the call returns,
+even if completion frees the task/context. Runtime join releases its task
+mutex before draining queued Swift main work, preventing shutdown from
+waiting forever for a main-thread callback. The drain is requested only when
+Swift main jobs exist. A private execution marker preserves the measured
+public job/context layout; inherited priority is masked separately from it.
+Same-main and same-generic task switches are genuine tail continuations.
+Cross-executor parking/resumption, arbitrary non-task Job layouts, additional
+executor profiles and structured tasks remain explicitly unsupported.
+
+Twelve fresh ASan/UBSan runs and six ARM64 guest suites pass across the new
+conformance/main executor, MainActor metadata, task creation, task switching,
+actor dispatch and TaskPriority. The native/V comparison exercises real
+manual and deferred main jobs, the direct enqueue primitive and both
+inherited enqueue witnesses, plus an actual same-main tail continuation.
+It checks static witness lookup, borrowed getters, preserved x20/x21, exact
+executor layout, asUnowned, nil isolation, protected unused metadata, eight
+concurrent readers and repeated drained/unmapped lifetimes. Vinix also
+rejects invalid/unregistered jobs, duplicate enqueue, wrong queue execution
+and cross-executor suspension before changing ownership. Fifteen fresh C
+streams and executables, SDK/native/IPA observations, joined VM probes/audits
+and three original fixture trials are retained under
+`build/ios/fortnite/main-actor-witness-checks`. The trials record a native
+header name collision before execution, the unmeasured private-byte
+assumption, and a native shared-refcount sample that was invalid across
+concurrent identity queries. The corrected fixture retains a quiescent ARC
+comparison and all V immutable-header checks. Full iOS regression remains
+unpassed and published runners remain unchanged.
+
+The actual IPA startup probe now gets past MainActor's Actor conformance and
+exits with status 1 at MarketplaceKitWrapper's required Swift os.Logger
+logObject getter, `_$s2os6LoggerV9logObjectSo03OS_a1_C0Cvg`, from
+`/usr/lib/swift/libswiftos.dylib`. That native export is recorded without
+calling it. Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,474 | 686 | 79 |
+| Fortnite executable | 1,475 | 685 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 170 | 6 | 23 |
-| All images | 2,303 | 695 | 120 |
+| MarketplaceKitWrapper | 171 | 5 | 23 |
+| All images | 2,305 | 693 | 120 |
 
-The C++/GLES/Text variant reports 2,316 resolved imports, 682 unresolved strong
+The C++/GLES/Text variant reports 2,318 resolved imports, 680 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

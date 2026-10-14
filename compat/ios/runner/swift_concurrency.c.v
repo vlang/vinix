@@ -36,8 +36,17 @@ fn swift_concurrency_entry(offset u64) !u64 {
 }
 
 fn swift_concurrency_symbol(symbol string) !u64 {
-	if symbol in ['_$sScMMa','_$sScMMn','_$sScM6sharedScMvgZ'] {
+	if symbol in ['_$sScMMa','_$sScMMn','_$sScM6sharedScMvgZ','_$sScMScAsMc','_$sScMScAsWP',
+		'_$sScAMp','_$sScM15unownedExecutorScevg','_$sScM21sharedUnownedExecutorScevgZ','_swift_task_getMainExecutor'] {
 		return swift_main_actor_symbol(symbol)
+	}
+	if symbol == '_swift_task_isMainExecutor' {
+		swift_main_actor_arena()!
+		return u64(voidptr(swift_main_executor_is_main))
+	}
+	if symbol == '_swift_task_enqueueMainExecutor' {
+		swift_main_actor_arena()!
+		return u64(voidptr(swift_task_enqueue_main))
 	}
 	if symbol in ['_swift_task_create', '_swift_task_getCurrent', '_swift_job_run', '_swift_task_switch'] {
 		return swift_task_create_symbol(symbol)

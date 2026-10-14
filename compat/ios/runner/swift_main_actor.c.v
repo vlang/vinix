@@ -5,7 +5,7 @@ module main
 // actor instance. Native Swift initializes its two-word header once and ARC
 // leaves the measured 0x80000004ffffffff refcount word unchanged. Vinix seals
 // that header with the nominal metadata; no mutable cache or heap owner is
-// needed. Actor conformance/executor scheduling remains a separate ABI.
+// needed. Its Actor conformance borrows the canonical main serial executor.
 const swift_main_actor_immortal = u64(0x80000004ffffffff)
 
 fn swift_main_actor_arena() !u64 {
@@ -64,7 +64,8 @@ fn swift_main_actor_arena() !u64 {
 	swift_protocol_relative(module_descriptor + 8,data + 216)
 	C.memcpy(voidptr(data + 216),c'Swift',6)
 	C.memcpy(voidptr(data + 224),c'MainActor',10)
-	C.__builtin___clear_cache(arena,voidptr(base + 96))
+	swift_main_executor_emit(base,data,module_descriptor)
+	C.__builtin___clear_cache(arena,voidptr(base + 312))
 	if C.mprotect(arena,usize(page),C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(voidptr(data),usize(page),C.PROT_READ) != 0 {
 		if C.munmap(arena,usize(page * 2)) != 0 { panic('iOS: cannot retire unsealed MainActor metadata') }
@@ -88,6 +89,11 @@ fn swift_main_actor_symbol(symbol string) !u64 {
 		'_$sScMMa' { base }
 		'_$sScMMn' { base + u64(C.getpagesize()) + 128 }
 		'_$sScM6sharedScMvgZ' { base + 32 }
+		'_$sScMScAsMc' { base + u64(C.getpagesize()) + 400 }
+		'_$sScMScAsWP' { base + u64(C.getpagesize()) + 432 }
+		'_$sScAMp' { base + u64(C.getpagesize()) + 256 }
+		'_$sScM15unownedExecutorScevg', '_$sScM21sharedUnownedExecutorScevgZ',
+		'_swift_task_getMainExecutor' { base + 128 }
 		else { return error('iOS: unsupported MainActor symbol') }
 	}
 }

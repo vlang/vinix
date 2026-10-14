@@ -219,7 +219,7 @@ fn test_swift_task_priority() {
 		for text in ['ScPSg', 'SayScPSgG', 'ScPjunk', 'Sc']! {
 			if result := swift_mangled_lookup_checked(u64(text.str), u64(text.len), 0, 0) { assert result == 0, text }
 		}
-		for name in ['_$sScPSgMa', '_$sScPSQsMc', '_$sScMScAsMc']! {
+		for name in ['_$sScPSgMa', '_$sScPSQsMc', '_$sScMs11GlobalActorsMc']! {
 			if _ := runtime_symbol('/usr/lib/swift/libswift_Concurrency.dylib', name) { assert false }
 		}
 		assert ios_runtime.swift_task_priority_arena == 0 && ios_runtime.swift_array_arena == 0

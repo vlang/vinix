@@ -171,7 +171,7 @@ fn test_swift_main_actor() {
 		swift_release(storage.owner)
 		assert read64(owner + 8) == swift_main_actor_immortal
 		if _ := swift_heap_deallocate_checked(owner,16,7,false) { assert false }
-		for name in ['_$sScMScAsMc','_$sScM15unownedExecutorScevg','_swift_task_enqueueMainExecutor']! {
+		for name in ['_$sScMs11GlobalActorsMc','_$sScM7enqueueyyScJF','_swift_task_cancel']! {
 			if _ := runtime_symbol('/usr/lib/swift/libswift_Concurrency.dylib',name) { assert false }
 		}
 		if _ := runtime_symbol('/usr/lib/swift/libswiftCore.dylib','_$sScMMa') { assert false }

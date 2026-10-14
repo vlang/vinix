@@ -60,6 +60,15 @@ fn swift_tasks_join() {
 	mutex := unsafe { voidptr(ios_runtime.swift_task_sync) }
 	C.pthread_mutex_lock(mutex)
 	for ios_runtime.swift_task_jobs != 0 {
+		// Only Swift main jobs require a main-thread turn. Do not run unrelated
+		// main blocks merely because generic Swift workers are being joined.
+		if ios_runtime.swift_task_main_jobs != 0 && u64(C.pthread_self()) == ios_runtime.main_thread {
+			C.pthread_mutex_unlock(mutex)
+			ran := dispatch_main_drain()
+			C.pthread_mutex_lock(mutex)
+			if ios_runtime.swift_task_jobs == 0 { break }
+			if ran { continue }
+		}
 		if C.pthread_cond_wait(swift_task_sync_condition(), mutex) != 0 { panic('iOS: cannot join Swift tasks') }
 	}
 	C.pthread_mutex_unlock(mutex)
@@ -199,7 +208,7 @@ fn swift_task_create_checked(flags u64, options u64, metadata u64, descriptor u6
 	if current != 0 && swift_task_find_locked(current) == 0 { return error('iOS: unregistered current Swift task') }
 	mut priority := flags & 255
 	if priority == 0 {
-		if current != 0 && flags & 0xc00 != 0 { priority = unsafe { (&SwiftTaskState(current + 80)).flags >> 32 } }
+		if current != 0 && flags & 0xc00 != 0 { priority = unsafe { ((&SwiftTaskState(current + 80)).flags >> 32) & 255 } }
 		if priority == 0 { priority = 21 }
 		if priority == 33 && flags & 0xc00 != 0 { priority = 25 }
 	}
@@ -263,15 +272,24 @@ fn swift_task_create(flags u64, options u64, metadata u64, descriptor u64, closu
 }
 
 fn swift_task_run_checked(owner u64, identity u64, implementation u64) ! {
-	if identity != 0 || implementation != 0 { return error('iOS: custom Swift executors are not implemented') }
 	if ios_runtime == unsafe { nil } { return error('iOS: Swift task execution outside runtime lifetime') }
 	C.ios_objc_initialize_lock()
+	on_main := swift_main_executor_matches_locked(identity,implementation)
+	if (!on_main && (identity != 0 || implementation != 0))
+		|| (on_main && u64(C.pthread_self()) != ios_runtime.main_thread) {
+		C.ios_objc_initialize_unlock(); return error('iOS: invalid Swift executor or main job outside main thread')
+	}
 	if ios_runtime.swift_concurrency_retired || swift_task_find_locked(owner) == 0 {
 		C.ios_objc_initialize_unlock(); return error('iOS: unregistered Swift task execution')
 	}
 	mut state := unsafe { &SwiftTaskState(owner + 80) }
 	if state.phase > 1 { C.ios_objc_initialize_unlock(); return error('iOS: Swift task already started') }
+	queued_main := state.phase == 1 && state.flags & swift_task_on_main != 0
+	if state.phase == 1 && queued_main != on_main {
+		C.ios_objc_initialize_unlock(); return error('iOS: Swift queued job executor mismatch')
+	}
 	if state.phase == 0 { swift_task_job_count(1) }
+	if on_main { state.flags |= swift_task_on_main }
 	state.phase = 2
 	context := read64(owner + 64)
 	entry := read64(owner + 56)
@@ -283,7 +301,7 @@ fn swift_task_run_checked(owner u64, identity u64, implementation u64) ! {
 	// Completion may have released the last reference and freed owner/context.
 	unfinished := swift_task_current() != 0
 	if C.pthread_setspecific(ios_runtime.swift_task_key, unsafe { voidptr(previous) }) != 0 { panic('iOS: cannot restore current Swift task') }
-	swift_task_job_count(-1)
+	if queued_main { swift_task_main_job_count(-1) } else { swift_task_job_count(-1) }
 	if unfinished { return error('iOS: Swift task returned without completion; suspension is not implemented') }
 }
 fn swift_task_run(owner u64, identity u64, implementation u64) { swift_task_run_checked(owner, identity, implementation) or { panic(err) } }
@@ -372,12 +390,13 @@ fn swift_tasks_drain_checked() ! {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	mut jobs := u64(0)
+	mut main_jobs := u64(0)
 	if ios_runtime.swift_task_sync != 0 {
 		mutex := unsafe { voidptr(ios_runtime.swift_task_sync) }
-		C.pthread_mutex_lock(mutex); jobs = ios_runtime.swift_task_jobs; C.pthread_mutex_unlock(mutex)
+		C.pthread_mutex_lock(mutex); jobs = ios_runtime.swift_task_jobs; main_jobs = ios_runtime.swift_task_main_jobs; C.pthread_mutex_unlock(mutex)
 	}
 	if ios_runtime.swift_tasks != 0 || ios_runtime.swift_task_count != 0 || ios_runtime.swift_task_disposing != 0
-		|| swift_task_current() != 0 || jobs != 0 { return error('iOS: Swift tasks have not drained') }
+		|| swift_task_current() != 0 || jobs != 0 || main_jobs != 0 { return error('iOS: Swift tasks have not drained') }
 }
 fn swift_tasks_stop() {
 	swift_tasks_drain_checked() or { panic(err) }

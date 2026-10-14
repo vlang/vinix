@@ -238,6 +238,7 @@ mut:
 	swift_task_key_live bool
 	swift_task_sync u64 // Mutex/condition for queued and executing task callbacks.
 	swift_task_jobs u64 // Protected by the task synchronization mutex.
+	swift_task_main_jobs u64 // Queued main-executor callbacks, under the same mutex.
 	swift_hash_code u64 // Sealed generic Hashable forwarding entries, retired after callbacks drain.
 	swift_fatal_code u64 // Assertion argument capture and BRK, retired at quiescent teardown.
 	names        map[string]u64
