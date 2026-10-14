@@ -74,19 +74,23 @@ pub fn validate_repository(id string, url string, public_key string) ! {
 }
 
 
-pub fn (status &RepositoryStatus) validate() ! {
-	if status.format != 1 || status.architecture !in ['aarch64', 'x86_64']
-		|| status.repositories.len > 4096 || status.history.len > 4096 {
+fn validate_configured_repositories(format int, architecture string, repositories []Repository) ! {
+	if format != 1 || architecture !in ['aarch64', 'x86_64'] || repositories.len > 4096 {
 		return error('unsupported repository status')
 	}
-	for i, repository in status.repositories {
+	for i, repository in repositories {
 		validate_repository(repository.id, repository.url, repository.public_key)!
 		for j in 0 .. i {
-			if status.repositories[j].id == repository.id {
+			if repositories[j].id == repository.id {
 				return error('duplicate repository ID')
 			}
 		}
 	}
+}
+
+pub fn (status &RepositoryStatus) validate() ! {
+	validate_configured_repositories(status.format, status.architecture, status.repositories)!
+	if status.history.len > 4096 { return error('unsupported repository status') }
 	for i, floor in status.history {
 		if !identifier(floor.id) || !digest(floor.public_key) || !digest(floor.index_sha256)
 			|| floor.sequence == 0 {

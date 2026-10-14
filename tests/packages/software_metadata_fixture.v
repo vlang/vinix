@@ -66,9 +66,9 @@ fn check_software_metadata_memory() ! {
 			index_sha256: 'c'.repeat(64), sequence: 7, expires: 2000000000, package_count: 1 }
 		repository_text := json2.encode(repository)
 		repository_invalid := repository_text.replace('"remembered_sequence":0', '"remembered_sequence":null')
-		status := json2.encode(pkgprotocol.RepositoryStatus{ format: 1, architecture: 'aarch64', repositories: [pkgprotocol.Repository{
-			id: repository.id, url: repository.url, public_key: repository.public_key }], history: [] })
-		status_invalid := status.replace('"history":[]', '"history":[{"id":"partial"}]')
+		status := json2.encode(pkgprotocol.RepositoryConfiguration{ format: 1, scope: 'configuration', architecture: 'aarch64', repositories: [pkgprotocol.Repository{
+			id: repository.id, url: repository.url, public_key: repository.public_key }] })
+		status_invalid := status.replace('"scope":"configuration"', '"scope":null')
 		mut app := SoftwareApp{ output: []u8{cap: 8192} }
 		unsafe { app.output.flags |= .noslices }
 		app.initialize_repository_fields()

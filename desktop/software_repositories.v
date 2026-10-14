@@ -62,18 +62,18 @@ fn (mut a SoftwareApp) clear_repository_pages() {
 
 fn (mut a SoftwareApp) read_repositories() {
 	a.initialize_repository_fields()
-	a.start(['--json', 'repo-list'], true)
+	a.start(['--json', 'repo-config'], true)
 	if a.worker != unsafe { nil } {
 		a.repository_worker = .list
-		a.set_status('Reading configured repositories and retained sequence history…')
+		a.set_status('Reading configured repository identities…')
 	}
 }
 
 fn (mut a SoftwareApp) load_repositories() {
 	a.initialize_repository_fields()
-	status := pkgprotocol.decode_repositories(editor_bytes_text(a.output)) or {
+	status := pkgprotocol.decode_repository_configuration(editor_bytes_text(a.output)) or {
 		unsafe { err.free() }
-		a.set_status('Invalid repository status. Reload the list or check the package service.')
+		a.set_status('Invalid repository configuration response. Reload the list or check the package service.')
 		return
 	}
 	a.repository_status.close()
@@ -360,7 +360,7 @@ fn (mut a SoftwareApp) build_repositories(width int, height int) ui2.Element {
 	a.initialize_repository_fields()
 	mut children := frame_elements(64)
 	children << software_label('Software', 14, 8, 150, 28, false)
-	children << software_label('Repositories', 170, 8, width - 358, 28, false)
+	children << software_label('Configured repositories', 170, 8, width - 358, 28, false)
 	reviewing := a.repository_operation != ''
 	if !reviewing {
 		children << software_button('software.repository.back', 'Back to Software', width - 188, 8, 174)

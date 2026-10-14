@@ -1,0 +1,6 @@
+pkgcore ASan/UBSan (detect_leaks=0, halt_on_error=1):
+REPOSITORY CONFIG fresh/locked/corrupt configuration checks; damaged cache/history listing and reviewed revocation preserve maintenance failures PASS
+PASS
+pkgprotocol ASan/UBSan (detect_leaks=0, halt_on_error=1):
+REPOSITORY CONFIG protocol explicit scope, complete bounded metadata, legacy separation and owned close PASS
+PASS

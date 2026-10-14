@@ -1,0 +1,2 @@
+REPOSITORY CONFIG protocol explicit scope, complete bounded metadata, legacy separation and owned close PASS
+REPOSITORY CONFIG protocol 1000 valid/partial-invalid decode and retirement cycles retain zero tracked bytes PASS

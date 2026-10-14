@@ -87,7 +87,7 @@ mut:
 	service_path    string = '/usr/bin/vinix-package'
 	offline         bool
 	repository_mode bool
-	repository_status pkgprotocol.RepositoryStatus
+	repository_status pkgprotocol.RepositoryConfiguration
 	repository_selected int = -1
 	repository_scroll int
 	repository_focus int

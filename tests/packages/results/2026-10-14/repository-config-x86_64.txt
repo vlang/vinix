@@ -1,0 +1,2 @@
+PASS x86_64 packages-repository-config (6.6s)
+package-repository-config x86_64: 1 passed, 0 failed, 0 skipped

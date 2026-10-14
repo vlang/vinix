@@ -18,7 +18,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  install ID... | remove ID... | upgrade | rollback | gc | verify\n' +
 	'  plan install|remove|upgrade|deploy [ID...] | deploy MANIFEST.json\n' +
 	'  review install|remove|upgrade|deploy|rollback [ID...]\n' +
-	'  repo-list | repo-enroll ID URL PUBLIC_KEY_HEX | repo-revoke ID\n' +
+	'  repo-list | repo-config | repo-enroll ID URL PUBLIC_KEY_HEX | repo-revoke ID\n' +
 	'  repo-review enroll ID URL KEY | repo-review revoke ID\n' +
 	'  repo-apply REVIEW_FINGERPRINT enroll ID URL KEY | repo-apply REVIEW_FINGERPRINT revoke ID\n' +
 	'  apply REVIEW_FINGERPRINT OPERATION [ID...]\n' +
@@ -211,6 +211,19 @@ fn checked(arguments []string) !int {
 			} else {
 				pkgcore.revoke_repository_reviewed(root, repository.id, names[0])!
 				println('Repository revoked; installed payloads, personal data and trust history were retained.')
+			}
+		}
+		'repo-config' {
+			if names.len != 0 { return error('repo-config takes no arguments') }
+			configuration := pkgcore.repository_configuration(root)!
+			if as_json {
+				println(json2.encode(configuration))
+			} else {
+				println('Configured repositories; catalog and replay history have not been checked.')
+				for repository in configuration.repositories {
+					println('${repository.id} ${repository.url}\n  Publisher key: ${repository.public_key}')
+				}
+				if configuration.repositories.len == 0 { println('No repositories are configured.') }
 			}
 		}
 		'repo-list' {

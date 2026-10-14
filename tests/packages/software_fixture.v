@@ -1127,13 +1127,18 @@ fn repository_fixture_review(operation string, id string, url string, key string
 
 fn software_repository_service_fixture(args []string) !bool {
 	if args[1] == '--json' {
-		assert args[2..] == ['repo-list']
-		println(json2.encode(repository_fixture_status()!))
+		assert args[2..] == ['repo-config']
+		status := repository_fixture_status()!
+		println(json2.encode(pkgprotocol.RepositoryConfiguration{ format: 1, scope: 'configuration',
+			architecture: status.architecture, repositories: status.repositories }))
 		return true
 	}
 	if args[1] == 'repo-review' {
 		operation := args[2]
 		id := args[3]
+		if operation == 'enroll' && os.getenv('VINIX_SOFTWARE_REPOSITORY_BROKEN') == '1' {
+			eprintln('fixture: damaged replay history blocks enrollment; restore trusted metadata'); exit(34)
+		}
 		if id == 'bad-signature' { eprintln('fixture: repository signature verification failed'); exit(31) }
 		review := repository_fixture_review(operation, id,
 			if operation == 'enroll' { args[4] } else { '' },
@@ -1230,6 +1235,23 @@ fn check_repository_management() ! {
 	wait_for_software(mut app)
 	assert app.repository_status.repositories.len == 0 && app.status.contains('revoked')
 	assert repository_fixture_status()!.history.len == 1
+	// Configuration listing stays reachable while the service refuses damaged
+	// maintenance metadata. Enrollment remains blocked; revocation is reviewed.
+	os.write_file(path, json2.encode(pkgprotocol.RepositoryStatus{ ...repository_fixture_status()!, repositories: [
+		pkgprotocol.Repository{ id: 'fixture', url: repository_fixture_url, public_key: 'a'.repeat(64) }] }))!
+	os.setenv('VINIX_SOFTWARE_REPOSITORY_BROKEN', '1', true)
+	app.read_repositories(); wait_for_software(mut app)
+	assert app.repository_status.scope == 'configuration' && app.repository_status.repositories.len == 1
+	app.handle('software.row.0')!
+	app.begin_repository_review('enroll'); wait_for_software(mut app)
+	assert !app.repository_review_ready && app.status.contains('damaged replay history')
+	app.handle('software.repository.revoke')!; wait_for_software(mut app)
+	assert app.repository_review_ready && app.repository_review.operation == 'revoke'
+	app.handle('software.repository.confirm')!; wait_for_software(mut app)
+	assert app.repository_status.repositories.len == 0 && app.status.contains('revoked')
+	assert repository_fixture_status()!.history.len == 1
+	os.unsetenv('VINIX_SOFTWARE_REPOSITORY_BROKEN')
+	println('Software configured repositories: damaged metadata does not block reviewed revocation; enrollment remains refused PASS')
 	// Invalid input, invalid response and changed intent never enable confirmation.
 	for id in ['bad-signature', 'wrong-format', 'wrong-intent', 'stale'] {
 		software_repository_text(mut app.repository_id, id)

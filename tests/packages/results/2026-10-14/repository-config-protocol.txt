@@ -1,0 +1,1 @@
+REPOSITORY CONFIG protocol explicit scope, complete bounded metadata, legacy separation and owned close PASS

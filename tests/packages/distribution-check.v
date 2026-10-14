@@ -74,6 +74,10 @@ fn check() ! {
 			'-o', work + '/diagnostics-memory', repository + '/tools/packages/pkgcore/view_test.v'])!
 		run(work + '/diagnostics-memory', [])!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgprotocol', work)!
+		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/repository-configuration-memory',
+			repository + '/tools/packages/pkgprotocol/repository_configuration_test.v'])!
+		run(work + '/repository-configuration-memory', [])!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/appsdk', work)!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgadmin', work)!
 		run(v, ['-nocache', 'run', repository + '/tests/packages/space-check.v'])!

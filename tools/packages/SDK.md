@@ -1245,6 +1245,26 @@ Repositories contain `{id,url,public_key}`; history contains
 Listing takes a shared lock once a package store exists; an active writer gives
 a busy diagnostic. A fresh image can be listed without initializing its store.
 
+`--json repo-config` emits the separate
+`{format:1,scope:"configuration",architecture,repositories}` document. It reads
+only configured ID/URL/key identities under the package reader lock, without
+fetching or inspecting catalog/history. Configuration errors and unsafe/busy
+coordination still fail. It creates no package state on a fresh image. This
+read API allows Software to select and review revocation even when maintenance
+metadata is damaged; the existing `repo-list` contract remains unchanged.
+Plain-text output explicitly says catalog/history have not been checked.
+Neither result authorizes trust changes or proves that a repository is usable.
+
+`pkgprotocol.decode_repository_configuration` requires the explicit scope and
+all typed fields, validates up to 4096 unique repository identities, bounds the
+reply to 8 MiB and owns its returned text/arrays until `close()`. Unknown,
+duplicate/escaped duplicate, missing, null/coerced and incomplete fields are
+refused. Configuration and full-history documents cannot substitute for each
+other. Software requires this new read API from its paired package service;
+unavailable or malformed responses preserve the previous valid list. Reviewed
+revocation still reloads current configuration and uses the authenticated
+administration transport. See [configuration-list checks](../../tests/packages/repository-config-check.md).
+
 `repo-review enroll ID URL KEY` and `repo-review revoke ID` emit a read-only
 format-1 `RepositoryReview`: `operation`, `architecture`, `id`, `url`,
 `public_key`, `previous_url`, `previous_public_key`, `fingerprint`,

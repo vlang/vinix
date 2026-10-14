@@ -72,7 +72,7 @@ fn qualify_coordination_files(binary string, root string) ! {
 			'dangling' { os.symlink(outside + '-absent', path)! }
 			else {}
 		}
-		mut arguments := [['status'], ['--json', 'verify'], ['plan', 'install', 'app'], ['view'], ['policy'], ['repo-list'],
+		mut arguments := [['status'], ['--json', 'verify'], ['plan', 'install', 'app'], ['view'], ['policy'], ['repo-list'], ['repo-config'],
 			['policy-review', root + '/absent-policy.json'], ['repo-review', 'revoke', 'fixture']]
 		if kind != 'missing' { arguments << [['update'], ['install', 'app'], ['remove', 'app'], ['gc']] }
 		for args in arguments {
@@ -214,11 +214,62 @@ fn qualify_busy_configuration(binary string, root string) ! {
 		['mirror-deployment-apply', '0'.repeat(64), root + '/absent-mirror', root + '/absent-lock.json'],
 		['deployment-lock', 'app'], ['deployment-review', root + '/absent-deployment.json'],
 		['deployment-apply', '0'.repeat(64), root + '/absent-deployment.json'],
-		['policy'], ['policy-review', root + '/absent-policy.json'], ['policy-apply', '0'.repeat(64), root + '/absent-policy.json'],
+		['repo-config'], ['policy'], ['policy-review', root + '/absent-policy.json'], ['policy-apply', '0'.repeat(64), root + '/absent-policy.json'],
 	] {
 		reply := command(binary, ['--root', root, ...args])!
 		assert reply.code != 0 && reply.text.contains('another package transaction'), '${args}: ${reply.text}'
 	}
+}
+
+fn qualify_repository_configuration(binary string, root string) ! {
+	store := pkgcore.state_directory(root)
+	path := root + '/etc/vinix-packages/config.json'
+	configuration := os.read_file(path)!
+	config := pkgcore.load_config(root)!
+	cache := os.read_file(store + '/catalog.json')!
+	history := os.read_file(store + '/trust-history.json')!
+	current := os.readlink(store + '/current')!
+	state := os.read_file(store + '/' + current + '/state.json')!
+	objects := os.ls(store + '/objects')!.sorted()
+	defer {
+		guard := pkgcore.acquire(store) or { panic(err) }
+		os.write_file(path, configuration) or { panic(err) }
+		os.write_file(store + '/catalog.json', cache) or { panic(err) }
+		os.write_file(store + '/trust-history.json', history) or { panic(err) }
+		guard.release()
+	}
+	for broken in ['cache', 'history', 'both'] {
+		cached := if broken == 'history' { cache } else { '{broken catalog' }
+		retained := if broken == 'cache' { history } else { '{broken replay history' }
+		os.write_file(store + '/catalog.json', cached)!
+		os.write_file(store + '/trust-history.json', retained)!
+		mut listing := pkgprotocol.decode_repository_configuration(success(binary, ['--root', root, '--json', 'repo-config'])!)!
+		assert listing.scope == 'configuration' && listing.architecture == config.architecture
+		assert listing.repositories.len == config.repositories.len && listing.repositories[0].id == config.repositories[0].id
+		listing.close()
+		assert success(binary, ['--root', root, 'repo-config'])!.contains('have not been checked')
+		assert command(binary, ['--root', root, 'repo-config', 'extra'])!.code != 0
+		assert command(binary, ['--root', root, '--progress', 'repo-config'])!.code != 0
+		assert command(binary, ['--root', root, '--json', 'repo-list'])!.code != 0
+		repository := config.repositories[0]
+		assert command(binary, ['--root', root, 'repo-review', 'enroll', repository.id, repository.url, repository.public_key])!.code != 0
+		mut review := pkgprotocol.decode_repository_review(success(binary, ['--root', root, 'repo-review', 'revoke', repository.id])!)!
+		assert review.operation == 'revoke' && review.public_key == repository.public_key
+		if broken == 'both' {
+			success(binary, ['--root', root, 'repo-apply', review.fingerprint, 'revoke', repository.id])!
+			mut revoked := pkgprotocol.decode_repository_configuration(success(binary, ['--root', root, '--json', 'repo-config'])!)!
+			assert revoked.repositories.len == config.repositories.len - 1
+			revoked.close()
+			assert command(binary, ['--root', root, 'update'])!.code != 0
+		}
+		review.close()
+		assert os.read_file(store + '/catalog.json')! == cached
+		assert os.read_file(store + '/trust-history.json')! == retained
+		assert os.readlink(store + '/current')! == current
+		assert os.read_file(store + '/' + current + '/state.json')! == state
+		assert os.ls(store + '/objects')!.sorted() == objects
+	}
+	println('Package CLI: scoped repository configuration survives damaged cache/history; strict listing/enrollment/update still refuse; reviewed revocation preserves active state and recovery data')
 }
 
 fn qualify_configuration_schema(binary string, root string) ! {
@@ -495,6 +546,7 @@ fn qualify(binary string) ! {
 	installed := json2.decode[pkgcore.State](success(binary, [...root_args, 'status'])!)!
 	assert installed.generation == 1
 	assert installed.packages[0].package.id == 'app'
+	qualify_repository_configuration(binary, work + '/root')!
 	qualify_coordination_files(binary, work + '/root')!
 	qualify_metadata_files(binary, work + '/root')!
 	qualify_configuration_schema(binary, work + '/root')!

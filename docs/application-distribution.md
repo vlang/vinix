@@ -255,6 +255,12 @@ under the package lock, then retry; no state reset is needed. See
 `repo-revoke` requires no reachable repository or valid catalog/history. It
 revokes acquisition, rollback and subsequent launches from that publisher while
 retaining payloads, personal data and history for inspection and uninstall.
+Software lists configured identities through `repo-config`, so damaged cached
+metadata cannot prevent selecting a publisher for reviewed revocation. This
+read-only list checks configuration and coordination locks, without checking
+catalog authenticity or replay history. `repo-list`, enrollment and updates
+retain their verification requirements and still refuse damaged metadata. See
+[configuration-list qualification](../tests/packages/repository-config-check.md).
 A root administrator can still alter installed code or local sequence records;
 this is not hardware protected antirollback.
 
@@ -602,6 +608,9 @@ publisher/permission/license review, install/uninstall confirmation, repository
 refresh, update-all, rollback, launch, progress and recent failure output. A running
 mutation prevents normal window close. Mutations require administrator access;
 there is no setuid service or automatic privilege escalation.
+Its **Configured repositories** view remains available when cached indexes or
+replay history need repair. Revocation still requires review and administrator
+approval; the list does not repair metadata or enable acquisition.
 
 Select a package and choose **Package details…** to read its complete overview,
 description, repository/publisher key, permissions, license and diagnostics.
