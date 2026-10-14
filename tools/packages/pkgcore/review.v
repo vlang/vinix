@@ -13,9 +13,10 @@ struct ReviewIdentity {
 	current           State
 	plan              Plan
 	target_generation u64
+	repairs           []string @[omitempty]
 }
 
-fn review_fingerprint(config Config, operation string, names []string, current State, plan Plan, target u64) string {
+fn review_fingerprint(config Config, operation string, names []string, current State, plan Plan, target u64, repairs []string) string {
 	text := json2.encode(ReviewIdentity{
 		config:            config
 		operation:         operation
@@ -23,6 +24,7 @@ fn review_fingerprint(config Config, operation string, names []string, current S
 		current:           current
 		plan:              plan
 		target_generation: target
+		repairs:           repairs
 	})
 	bytes := text.bytes()
 	result := sha256.sum(bytes).hex()
@@ -126,11 +128,13 @@ fn review_operation_locked(config Config, directory string, operation string, na
 	} else {
 		operation_plan(config, directory, current, operation, names)!
 	}
-	return review_plan(config, directory, current, operation, names, plan, target,
-		review_fingerprint(config, operation, names, current, plan, target))
+	repairs := transaction_repairs(directory, current, plan, operation)
+	defer { close_transaction_repairs(repairs) }
+	return review_plan(config, directory, current, operation, names, plan, target, repairs,
+		review_fingerprint(config, operation, names, current, plan, target, repairs))
 }
 
-fn review_plan(config Config, directory string, current State, operation string, names []string, plan Plan, target u64, fingerprint string) !pkgprotocol.Review {
+fn review_plan(config Config, directory string, current State, operation string, names []string, plan Plan, target u64, repairs []string, fingerprint string) !pkgprotocol.Review {
 	mut rows := []pkgprotocol.ReviewPackage{}
 	for installed in plan.packages {
 		previous := current.packages.filter(it.package.id == installed.package.id)
@@ -138,7 +142,8 @@ fn review_plan(config Config, directory string, current State, operation string,
 		action := if previous.len == 0 {
 			'install'
 		} else if installed.package == previous[0].package
-			&& installed.repository == previous[0].repository && installed.public_key == previous[0].public_key {
+			&& installed.repository == previous[0].repository && installed.public_key == previous[0].public_key
+			&& installed.package.id !in repairs {
 			'keep'
 		} else {
 			'update'
@@ -151,7 +156,7 @@ fn review_plan(config Config, directory string, current State, operation string,
 		}
 	}
 	rows.sort(a.id < b.id)
-	needed := if operation == 'rollback' || (current.requested == plan.requested && current.packages == plan.packages) {
+	needed := if operation == 'rollback' || (current.requested == plan.requested && current.packages == plan.packages && repairs.len == 0) {
 		u64(0)
 	} else {
 		estimate_transaction_space(plan, directory, current, operation)!

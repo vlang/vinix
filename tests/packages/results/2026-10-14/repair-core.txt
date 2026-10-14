@@ -1,0 +1,5 @@
+PACKAGE REPAIR active payload hash/size/type, changed-target exclusion, sorted closure and removal/rollback isolation PASS
+
+Tracked heap run:
+PACKAGE REPAIR active payload hash/size/type, changed-target exclusion, sorted closure and removal/rollback isolation PASS
+PACKAGE REPAIR 128 healthy/damaged discovery and retirement cycles retain zero tracked bytes PASS

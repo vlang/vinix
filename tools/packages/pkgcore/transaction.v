@@ -254,17 +254,28 @@ pub fn transact(config Config, directory string, operation string, names []strin
 fn transact_locked(config Config, directory string, operation string, names []string, options TransactionOptions) !State {
 	current := read_state(directory, config.architecture)!
 	plan := operation_plan(config, directory, current, operation, names)!
+	repairs := transaction_repairs(directory, current, plan, operation)
+	defer { close_transaction_repairs(repairs) }
 	if options.expected_review != '' {
-		check_review(options.expected_review, review_fingerprint(config, operation, names, current, plan, 0))!
+		check_review(options.expected_review, review_fingerprint(config, operation, names, current, plan, 0, repairs))!
 	}
 	options.progress(pkgprotocol.Progress{ phase: 'resolve' })
-	return activate_plan_locked(config, directory, current, plan, operation, options)
+	return activate_repair_plan_locked(config, directory, current, plan, operation, repairs, options)
 }
 
 // Callers validate the complete plan and any review identity under the writer
 // lock before reaching this shared transactional activation boundary.
 fn activate_plan_locked(config Config, directory string, current State, plan Plan, operation string, options TransactionOptions) !State {
-	if current.requested == plan.requested && current.packages == plan.packages {
+	repairs := transaction_repairs(directory, current, plan, operation)
+	defer { close_transaction_repairs(repairs) }
+	return activate_repair_plan_locked(config, directory, current, plan, operation, repairs, options)
+}
+
+fn activate_repair_plan_locked(config Config, directory string, current State, plan Plan, operation string, repairs []string, options TransactionOptions) !State {
+	observed := transaction_repairs(directory, current, plan, operation)
+	defer { close_transaction_repairs(observed) }
+	if observed != repairs { return error('package review is stale: installed payload repair set changed; review again') }
+	if current.requested == plan.requested && current.packages == plan.packages && repairs.len == 0 {
 		options.progress(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 })
 		return current
 	}
@@ -385,7 +396,7 @@ fn rollback_progress(config Config, directory string, expected string, report fn
 	old := rollback_target(config, directory, current)!
 	if expected != '' {
 		check_review(expected, review_fingerprint(config, 'rollback', [], current,
-			Plan{ requested: old.requested, packages: old.packages }, old.generation))!
+			Plan{ requested: old.requested, packages: old.packages }, old.generation, []))!
 	}
 	report(pkgprotocol.Progress{ phase: 'activate' })
 	activate(directory, old.generation)!

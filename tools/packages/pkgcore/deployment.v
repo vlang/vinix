@@ -47,6 +47,7 @@ struct DeploymentIdentity {
 	current  State
 	document DeploymentLock
 	plan     Plan
+	repairs  []string @[omitempty]
 }
 
 // Digest every manifest field, including payload hashes, permissions, license,
@@ -150,8 +151,8 @@ fn deployment_plan(config Config, directory string, current State, document Depl
 	return plan
 }
 
-fn deployment_fingerprint(config Config, current State, document DeploymentLock, plan Plan) string {
-	text := json2.encode(DeploymentIdentity{ config: config, current: current, document: document, plan: plan })
+fn deployment_fingerprint(config Config, current State, document DeploymentLock, plan Plan, repairs []string) string {
+	text := json2.encode(DeploymentIdentity{ config: config, current: current, document: document, plan: plan, repairs: repairs })
 	bytes := text.bytes()
 	fingerprint := sha256.sum(bytes).hex()
 	unsafe { bytes.free(); text.free() }
@@ -186,8 +187,10 @@ pub fn (service Service) review_deployment(path string) !pkgprotocol.Review {
 	current := read_state(directory, config.architecture)!
 	document := read_deployment(path, config.architecture)!
 	plan := deployment_plan(config, directory, current, document)!
-	return review_plan(config, directory, current, 'deploy', document.packages, plan, 0,
-		deployment_fingerprint(config, current, document, plan))
+	repairs := transaction_repairs(directory, current, plan, 'deploy')
+	defer { close_transaction_repairs(repairs) }
+	return review_plan(config, directory, current, 'deploy', document.packages, plan, 0, repairs,
+		deployment_fingerprint(config, current, document, plan, repairs))
 }
 
 fn (service Service) deploy_document(path string, expected string) !State {
@@ -198,9 +201,11 @@ fn (service Service) deploy_document(path string, expected string) !State {
 	current := read_state(directory, config.architecture)!
 	document := read_deployment(path, config.architecture)!
 	plan := deployment_plan(config, directory, current, document)!
-	check_review(expected, deployment_fingerprint(config, current, document, plan))!
+	repairs := transaction_repairs(directory, current, plan, 'deploy')
+	defer { close_transaction_repairs(repairs) }
+	check_review(expected, deployment_fingerprint(config, current, document, plan, repairs))!
 	service.progress(pkgprotocol.Progress{ phase: 'resolve' })
-	return activate_plan_locked(config, directory, current, plan, 'deploy', TransactionOptions{ progress: service.progress })
+	return activate_repair_plan_locked(config, directory, current, plan, 'deploy', repairs, TransactionOptions{ progress: service.progress })
 }
 
 pub fn (service Service) deploy(path string) !State {

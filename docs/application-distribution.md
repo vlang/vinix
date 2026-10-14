@@ -463,6 +463,15 @@ needs. Both review and activation recheck this estimate; files that no longer
 verify require the normal cache/acquisition allowance. Staging space, overhead,
 the configured reserve and per-copy verification remain required. See
 [removal-space qualification](../tests/packages/removal-space-check.md).
+Install, upgrade and managed deployment also verify unchanged target payloads.
+Missing, corrupt or nonregular files require a fresh generation from verified
+cache or approved repository objects, even when versions stay the same. Software's
+**Repair / install** uses this path. Review shows affected packages as updates
+and includes staging/acquisition space. Confirmation binds the affected package
+set; restoration or different damage requires review again before cleanup or
+downloads. Healthy identical targets remain a no-op. Trust, policy, offline and
+hash checks still apply, personal data is retained, and rollback refuses damaged
+previous generations. See [repair qualification](../tests/packages/repair-check.md).
 Files stream in 64 KiB blocks.
 Partial downloads persist as `objects/HASH.part`; retries resume and verify the
 complete hash. A damaged resumed prefix triggers one fresh download from the

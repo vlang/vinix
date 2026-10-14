@@ -2,7 +2,6 @@
 module pkgcore
 
 import crypto.sha256
-import os
 
 struct HashReadOptions {
 	exact bool
@@ -38,7 +37,9 @@ fn hash_file_with(path string, options HashReadOptions) !string {
 	defer { C.close(fd) }
 	options.checkpoint('opened', path)!
 	mut info := C.stat{}
-	if C.fstat(fd, &info) != 0 || info.st_mode & 0o170000 != 0o100000 || info.st_size < 0 {
+	// These synchronous libc calls never retain the output pointer. Keep their
+	// scratch records on the stack in manual-free builds.
+	if C.fstat(fd, unsafe { &info }) != 0 || info.st_mode & 0o170000 != 0o100000 || info.st_size < 0 {
 		return error('payload must be a regular file: ${path}')
 	}
 	expected := u64(info.st_size)
@@ -49,11 +50,9 @@ fn hash_file_with(path string, options HashReadOptions) !string {
 	inode := u64(info.st_ino)
 	options.checkpoint('sized', path)!
 	digest := hash_opened(fd, expected, path, options)!
-	named := os.lstat(path) or {
-		unsafe { digest.free() }
-		return error('payload path changed while hashing: ${path}')
-	}
-	if named.mode & 0o170000 != 0o100000 || named.dev != device || named.inode != inode || named.size != expected {
+	mut named := C.stat{}
+	if C.lstat(path.str, unsafe { &named }) != 0 || named.st_mode & 0o170000 != 0o100000
+		|| u64(named.st_dev) != device || u64(named.st_ino) != inode || named.st_size < 0 || u64(named.st_size) != expected {
 		unsafe { digest.free() }
 		return error('payload path changed while hashing: ${path}')
 	}
@@ -91,7 +90,7 @@ fn hash_opened(fd int, expected u64, path string, options HashReadOptions) !stri
 	}
 	options.checkpoint('read', path)!
 	mut info := C.stat{}
-	if C.fstat(fd, &info) != 0 || info.st_mode & 0o170000 != 0o100000
+	if C.fstat(fd, unsafe { &info }) != 0 || info.st_mode & 0o170000 != 0o100000
 		|| info.st_size < 0 || u64(info.st_size) != expected {
 		return error('payload changed size while hashing: ${path}')
 	}

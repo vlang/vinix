@@ -1,0 +1,91 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=16
+!>+ [11] ./sbin/init sz=210912
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/repair-probe sz=1522432
+!>+ [15] ./usr/share/package-fixtures/repair-core sz=869528
+!>+ [16] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e88e00
+initramfs: Done (16 entries)
+HWTEST START packages-repair
+PACKAGE REPAIR active payload hash/size/type, changed-target exclusion, sorted closure and removal/rollback isolation PASS
+REPAIR PROCESS repair-core PASS
+Updating trusted repository trusted
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing assets 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing runtime 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing app 1.0.0 (1/3) from trusted
+Installing assets 1.0.0 (2/3) from trusted
+Installing runtime 1.0.0 (3/3) from trusted
+Activated package generation 2
+Activated package generation 3
+PACKAGE REPAIR install: same-version rewrite review, stale health refusal, trust/policy/source checks, offline activation, healthy no-op and damaged rollback refusal PASS
+Updating trusted repository trusted
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing assets 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing runtime 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing app 1.0.0 (1/3) from trusted
+Installing assets 1.0.0 (2/3) from trusted
+Installing runtime 1.0.0 (3/3) from trusted
+Activated package generation 2
+Activated package generation 3
+PACKAGE REPAIR upgrade: same-version rewrite review, stale health refusal, trust/policy/source checks, offline activation, healthy no-op and damaged rollback refusal PASS
+Updating trusted repository trusted
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing assets 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing runtime 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing app 1.0.0 (1/3) from trusted
+Installing assets 1.0.0 (2/3) from trusted
+Installing runtime 1.0.0 (3/3) from trusted
+Activated package generation 2
+Activated package generation 3
+PACKAGE REPAIR deploy-roots: same-version rewrite review, stale health refusal, trust/policy/source checks, offline activation, healthy no-op and damaged rollback refusal PASS
+Updating trusted repository trusted
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing assets 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing runtime 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing app 1.0.0 (1/3) from trusted
+Installing assets 1.0.0 (2/3) from trusted
+Installing runtime 1.0.0 (3/3) from trusted
+Activated package generation 2
+Activated package generation 3
+PACKAGE REPAIR deploy-lock: same-version rewrite review, stale health refusal, trust/policy/source checks, offline activation, healthy no-op and damaged rollback refusal PASS
+PACKAGE REPAIR signed install/upgrade/deployment, reviewed corruption recovery, preserved state/data and protocol compatibility PASS
+REPAIR PROCESS repair-probe PASS
+HWTEST PASS packages-repair

@@ -1552,7 +1552,8 @@ rechecks these under the writer lock before stage cleanup, acquisition or
 activation. File-specific and generic `review/apply deploy IDs` fingerprints are
 not interchangeable. Whitespace and root/record ordering do not change identity;
 changed lock floors, format, policy, state or selected metadata require review.
-An unchanged successful proposal can reuse its fingerprint. Apply progress is
+An unchanged successful proposal can reuse its fingerprint. Installed payload
+health also binds the fingerprint as described below. Apply progress is
 human text by default; `--progress` adds the bounded presentation events described
 above. Authorization remains administrator access.
 
@@ -1566,6 +1567,27 @@ No deployment changes trust/policy or refreshes implicitly. URLs are intentional
 unbound: approved signed mirrors work offline with the same publisher and lock,
 subject to normal expiry/replay checks and availability of every locked object.
 Rollback/data retention use the standard transaction contract.
+
+Install, upgrade and both deployment formats verify unchanged target payloads
+before treating a plan as a no-op. Missing, wrong-length, corrupt or nonregular
+files trigger a new generation using verified cache/approved repository objects.
+This is also Software's **Repair / install** behavior. Format-1 review uses the
+existing `update` row action for each affected package, including unchanged
+versions, and budgets the full transaction. It adds no protocol fields or actions.
+The opaque fingerprint binds sorted affected IDs; healthy fingerprints retain
+their previous shape. Apply checks health under the writer lock and again after
+the resolve observer, before cleanup/acquisition. A changed repair set requires a
+fresh review. Matching damage can reuse its prior review; successful repair makes
+that review stale. Healthy identical targets remain a no-op.
+
+Repair grants no repository authority, permissions or license exceptions and
+does not refresh catalogs implicitly. The normal signed source, space, cache,
+staging and activation checks still apply, including offline operation. Personal
+data remains outside the generation. Previous generations remain available for
+inspection, but rollback still refuses broken payloads. Payload health checks
+retain no scratch allocations under manual memory management; this does not
+claim whole-service allocation freedom. See
+[repair checks](../../tests/packages/repair-check.md).
 
 V clients use `Service.lock_deployment`, `Service.review_deployment`,
 `Service.apply_deployment`, `DeploymentLock`, `DeploymentPackage` and

@@ -1,0 +1,12 @@
+PASS baseline aa7569581 reproduces unchanged install reporting success with damaged installed payloads
+
+Previous implementation, isolated fixture data:
+Updating trusted repository trusted
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing assets 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing runtime 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+PACKAGE REPAIR BEFORE unchanged install reports success while installed application/runtime payloads remain damaged
