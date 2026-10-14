@@ -66,9 +66,15 @@ fn require_mount_destination(mut table MountTable, identity &lib.MountContext, b
 	return none
 }
 
-pub fn mount_flags(identity &lib.MountContext) u64 {
-	entry := namespace_mount(lib.mount_context_top(identity))
+// Targets that outlive a path walk need only its final attachment for policy.
+// Mount entries remain permanent, including detached and retired namespaces.
+fn attachment_flags(identity voidptr) u64 {
+	entry := namespace_mount(identity)
 	return if entry == unsafe { nil } { u64(0) } else { entry.flags }
+}
+
+pub fn mount_flags(identity &lib.MountContext) u64 {
+	return attachment_flags(lib.mount_context_top(identity))
 }
 
 // An explicit route selects one attachment even when bind aliases share the

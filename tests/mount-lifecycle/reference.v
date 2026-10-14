@@ -9,7 +9,8 @@ import os
 
 struct ReferenceReceipt {
 	architecture string
-	context string = 'Linux QEMU reference; same native musl probe ELF; portable mount lifecycle, pivot admission, teardown, alias, private-thread, bind policy, pathname truncation, mode/ownership and timestamp checks; networking disabled'
+	timeout_seconds int
+	context string = 'Linux QEMU reference; same native musl probe ELF; portable mount lifecycle, pivot admission, teardown, alias, private-thread, bind policy, pathname truncation, mode/ownership, timestamp and extended-attribute checks; networking disabled'
 	artifacts map[string]string
 	command []string
 	passed bool
@@ -38,11 +39,14 @@ fn run() ! {
 		hosttest.Option{ name: '--kernel', value: true },
 		hosttest.Option{ name: '--init', value: true },
 		hosttest.Option{ name: '--state-dir', value: true },
-	], [], 'Usage: reference.v --arch ARCH --kernel LINUX --init NATIVE-PROBE-ELF --state-dir FRESH-DIR')!
+		hosttest.Option{ name: '--timeout', value: true },
+	], [], 'Usage: reference.v --arch ARCH --kernel LINUX --init NATIVE-PROBE-ELF --state-dir FRESH-DIR [--timeout SECONDS]')!
 	for key in ['--arch', '--kernel', '--init', '--state-dir'] {
 		if !options.has(key) { return error('missing ' + key) }
 	}
 	arch := options.value('--arch', '')
+	timeout := options.integer('--timeout', 180)!
+	if timeout <= 0 { return error('timeout must be positive') }
 	state := os.abs_path(options.value('--state-dir', ''))
 	if os.exists(state) { return error('state must be fresh') }
 	probe := os.read_bytes(options.value('--init', ''))!
@@ -78,7 +82,7 @@ fn run() ! {
 		failures: ['MOUNT LIFECYCLE FAIL:', 'MOUNT REFERENCE FAIL:', 'Kernel panic']
 		settle: 1
 		log: state + '/live.log'
-	}, 180, true)!
+	}, timeout, true)!
 	valid := result.finished && result.passed && result.status == 0
 		&& result.text.contains('Linux version ') && result.text.contains('MOUNT MOVE CYCLES: PASS')
 		&& result.text.contains('MOUNT REPARENTED HOLDERS: PASS')
@@ -93,6 +97,7 @@ fn run() ! {
 		&& result.text.contains('MOUNT TRUNCATE: PASS')
 		&& result.text.contains('MOUNT METADATA: PASS')
 		&& result.text.contains('MOUNT TIMES: PASS')
+		&& result.text.contains('MOUNT XATTR: PASS')
 	mut cases_pass := true
 	for kind in 0 .. 7 { cases_pass = cases_pass && result.text.contains('MOUNT IDENTITY CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT ADMISSION CASE: ${kind} PASS') }
@@ -105,6 +110,7 @@ fn run() ! {
 	for kind in 0 .. 6 { cases_pass = cases_pass && result.text.contains('MOUNT TRUNCATE CASE: ${kind} PASS') }
 	for kind in 0 .. 7 { cases_pass = cases_pass && result.text.contains('MOUNT METADATA CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT TIMES CASE: ${kind} PASS') }
+	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT XATTR CASE: ${kind} PASS') }
 	artifacts := {
 		'kernel': digest(state + '/linux')!
 		'probe': digest(state + '/probe')!
@@ -117,7 +123,7 @@ fn run() ! {
 		'qemu': digest(command[0])!
 	}
 	os.write_file(state + '/receipt.json', json2.encode(ReferenceReceipt{
-		architecture: arch, artifacts: artifacts, command: command,
+		architecture: arch, timeout_seconds: timeout, artifacts: artifacts, command: command,
 		passed: valid && cases_pass, finished: result.finished, status: result.status
 	}, prettify: true) + '\n')!
 	if !valid || !cases_pass { return error('Linux mount reference failed: ' + state) }

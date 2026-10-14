@@ -95,9 +95,12 @@ Initial `linux-a` states preserve the probe's overly precise current-time
 comparison failure. The final probe accounts for the coarse inode clock;
 fresh `before-b` controls and `linux-b` references use that final ELF.
 
+The subsequent [extended-attribute checks](xattr-policy.md) extend attachment
+policy to set/remove and get/list routes, including retained and inherited fds.
+
 Both-`UTIME_OMIT` short-circuit semantics, invalid-times/flags error ordering,
 concurrent remount or namespace/cwd switching, anonymous-resource timestamps,
 overlay/disk persistence, allocation-flat loops and complete OCI/rootless
-acceptance remain outside this qualification. Xattrs, inode flags and other
+acceptance remain outside this qualification. Inode flags and other
 metadata operations still need attachment-policy coverage. Roadmap section 17
 remains in progress.

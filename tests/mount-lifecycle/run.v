@@ -22,10 +22,10 @@ fn main() {
 		hosttest.Option{ name: '--arch', value: true, choices: ['aarch64', 'x86_64'] },
 		hosttest.Option{ name: '--kernel-dir', value: true },
 		hosttest.Option{ name: '--state-dir', value: true },
-		hosttest.Option{ name: '--case', value: true, choices: ['flags', 'move', 'identities', 'id-0', 'id-1', 'id-2', 'id-3', 'id-4', 'id-5', 'id-6', 'admission', 'ad-0', 'ad-1', 'ad-2', 'ad-3', 'ad-4', 'ad-5', 'ad-6', 'ad-7', 'propagation', 'pr-0', 'pr-1', 'pr-2', 'pr-3', 'pr-4', 'pivot', 'pv-0', 'pv-1', 'pv-2', 'pv-3', 'pv-4', 'pv-5', 'pv-6', 'pivot-life', 'pl-0', 'pl-1', 'pl-2', 'pl-3', 'pivot-alias', 'pa-0', 'pa-1', 'pa-2', 'pa-3', 'pa-4', 'pivot-threads', 'pt-0', 'pt-1', 'pt-2', 'pt-3', 'pt-4', 'pt-5', 'pt-6', 'bind-policy', 'bp-0', 'bp-1', 'bp-2', 'bp-3', 'bp-4', 'truncate', 'tr-0', 'tr-1', 'tr-2', 'tr-3', 'tr-4', 'tr-5', 'metadata', 'mp-0', 'mp-1', 'mp-2', 'mp-3', 'mp-4', 'mp-5', 'mp-6', 'times', 'tp-0', 'tp-1', 'tp-2', 'tp-3', 'tp-4', 'tp-5', 'tp-6', 'tp-7', 'all'] },
+		hosttest.Option{ name: '--case', value: true, choices: ['flags', 'move', 'identities', 'id-0', 'id-1', 'id-2', 'id-3', 'id-4', 'id-5', 'id-6', 'admission', 'ad-0', 'ad-1', 'ad-2', 'ad-3', 'ad-4', 'ad-5', 'ad-6', 'ad-7', 'propagation', 'pr-0', 'pr-1', 'pr-2', 'pr-3', 'pr-4', 'pivot', 'pv-0', 'pv-1', 'pv-2', 'pv-3', 'pv-4', 'pv-5', 'pv-6', 'pivot-life', 'pl-0', 'pl-1', 'pl-2', 'pl-3', 'pivot-alias', 'pa-0', 'pa-1', 'pa-2', 'pa-3', 'pa-4', 'pivot-threads', 'pt-0', 'pt-1', 'pt-2', 'pt-3', 'pt-4', 'pt-5', 'pt-6', 'bind-policy', 'bp-0', 'bp-1', 'bp-2', 'bp-3', 'bp-4', 'truncate', 'tr-0', 'tr-1', 'tr-2', 'tr-3', 'tr-4', 'tr-5', 'metadata', 'mp-0', 'mp-1', 'mp-2', 'mp-3', 'mp-4', 'mp-5', 'mp-6', 'times', 'tp-0', 'tp-1', 'tp-2', 'tp-3', 'tp-4', 'tp-5', 'tp-6', 'tp-7', 'xattrs', 'xp-0', 'xp-1', 'xp-2', 'xp-3', 'xp-4', 'xp-5', 'xp-6', 'xp-7', 'all'] },
 		hosttest.Option{ name: '--timeout', value: true },
 		hosttest.Option{ name: '--probe-state', value: true },
-	], [], 'Usage: run.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case flags|move|identities|id-0..id-6|admission|ad-0..ad-7|propagation|pr-0..pr-4|pivot|pv-0..pv-6|pivot-life|pl-0..pl-3|pivot-alias|pa-0..pa-4|pivot-threads|pt-0..pt-6|bind-policy|bp-0..bp-4|truncate|tr-0..tr-5|metadata|mp-0..mp-6|times|tp-0..tp-7|all] [--timeout SECONDS] [--probe-state RECEIPT-DIR]')!
+	], [], 'Usage: run.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case flags|move|identities|id-0..id-6|admission|ad-0..ad-7|propagation|pr-0..pr-4|pivot|pv-0..pv-6|pivot-life|pl-0..pl-3|pivot-alias|pa-0..pa-4|pivot-threads|pt-0..pt-6|bind-policy|bp-0..bp-4|truncate|tr-0..tr-5|metadata|mp-0..mp-6|times|tp-0..tp-7|xattrs|xp-0..xp-7|all] [--timeout SECONDS] [--probe-state RECEIPT-DIR]')!
 	for key in ['--arch', '--kernel-dir', '--state-dir'] {
 		if !options.has(key) { eprintln('missing ' + key); exit(2) }
 	}
@@ -59,6 +59,7 @@ fn main() {
 		'truncate_fixture': digest(state + '/sources/mountfixture/truncate_policy.v')!
 		'metadata_fixture': digest(state + '/sources/mountfixture/metadata_policy.v')!
 		'times_fixture': digest(state + '/sources/mountfixture/timestamp_policy.v')!
+		'xattr_fixture': digest(state + '/sources/mountfixture/xattr_policy.v')!
 		'controller': digest(@FILE)!
 	}
 	if probe_state != '' { inputs['probe_receipt'] = digest(os.abs_path(probe_state) + '/receipt.json')! }
@@ -77,7 +78,7 @@ fn fixture_init(state string, arch string, probe_state string) !string {
 	prior := os.abs_path(probe_state)
 	receipt := json2.decode[Receipt](os.read_file(prior + '/receipt.json')!)!
 	if receipt.architecture != arch { return error('cached probe architecture differs') }
-	for key, file in {'fixture': 'sources/mountfixture/core.v', 'identities_fixture': 'sources/mountfixture/identities.v', 'admission_fixture': 'sources/mountfixture/admission.v', 'propagation_fixture': 'sources/mountfixture/propagation.v', 'pivot_fixture': 'sources/mountfixture/pivot.v', 'pivot_lifecycle_fixture': 'sources/mountfixture/pivot_lifecycle.v', 'pivot_alias_fixture': 'sources/mountfixture/pivot_aliases.v', 'pivot_thread_fixture': 'sources/mountfixture/pivot_threads.v', 'bind_policy_fixture': 'sources/mountfixture/bind_policy.v', 'truncate_fixture': 'sources/mountfixture/truncate_policy.v', 'metadata_fixture': 'sources/mountfixture/metadata_policy.v', 'times_fixture': 'sources/mountfixture/timestamp_policy.v'} {
+	for key, file in {'fixture': 'sources/mountfixture/core.v', 'identities_fixture': 'sources/mountfixture/identities.v', 'admission_fixture': 'sources/mountfixture/admission.v', 'propagation_fixture': 'sources/mountfixture/propagation.v', 'pivot_fixture': 'sources/mountfixture/pivot.v', 'pivot_lifecycle_fixture': 'sources/mountfixture/pivot_lifecycle.v', 'pivot_alias_fixture': 'sources/mountfixture/pivot_aliases.v', 'pivot_thread_fixture': 'sources/mountfixture/pivot_threads.v', 'bind_policy_fixture': 'sources/mountfixture/bind_policy.v', 'truncate_fixture': 'sources/mountfixture/truncate_policy.v', 'metadata_fixture': 'sources/mountfixture/metadata_policy.v', 'times_fixture': 'sources/mountfixture/timestamp_policy.v', 'xattr_fixture': 'sources/mountfixture/xattr_policy.v'} {
 		if receipt.inputs[key] != digest(prior + '/' + file)! || receipt.inputs[key] != digest(state + '/' + file)! {
 			return error('cached probe source differs: ' + file)
 		}
@@ -167,6 +168,12 @@ fn run_guest(state string, arch string, selected string, timeout int, probe_stat
 		for kind in 0 .. 8 { expected << 'MOUNT TIMES CASE: ${kind} PASS' }
 	} else if selected.starts_with('tp-') {
 		expected << ['MOUNT TIMES: PASS', 'MOUNT TIMES CASE: ' + selected.all_after('tp-') + ' PASS']
+	}
+	if selected in ['xattrs', 'all'] {
+		expected << 'MOUNT XATTR: PASS'
+		for kind in 0 .. 8 { expected << 'MOUNT XATTR CASE: ${kind} PASS' }
+	} else if selected.starts_with('xp-') {
+		expected << ['MOUNT XATTR: PASS', 'MOUNT XATTR CASE: ' + selected.all_after('xp-') + ' PASS']
 	}
 	positive, negative := guesthost.verdict_policy(expected, ['MOUNT LIFECYCLE FAIL:'], false)
 	return guesthost.boot(configured.command, configured.env, state, positive, negative, timeout, true)!

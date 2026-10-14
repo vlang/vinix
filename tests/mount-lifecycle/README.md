@@ -39,6 +39,12 @@ select its individual cases.
 `mp-6` select its individual cases.
 `--case times` selects timestamp attachment policy; `tp-0` through `tp-7`
 select its individual cases.
+`--case xattrs` selects extended-attribute attachment policy; `xp-0` through
+`xp-7` select its individual cases.
+
+The [extended-attribute checks](xattr-policy.md) qualify set/remove and get/list
+forms, binary/empty values, symlink no-follow, inherited namespace descriptions
+and unprivileged denial through writable/read-only aliases.
 
 The [timestamp checks](timestamp-policy.md) qualify explicit and current times,
 one omitted timestamp, symlink no-follow, descriptor and empty-path updates,
@@ -97,7 +103,7 @@ iterations, verifies capability denial and finishes with valid local operations.
 
 Use `--probe-state /path/to/prior-native-result` to reuse its probe ELF and
 generated C with a different kernel or case. The controller requires a matching
-architecture and identical current/copied hashes of all twelve fixture files,
+architecture and identical current/copied hashes of all thirteen fixture files,
 verifies both artifact hashes against the prior receipt and checks the ELF
 architecture before boot.
 The prior result may be a failed control; its receipt hash is pinned in the new
@@ -146,8 +152,8 @@ selected. It runs the portable cycle, type, namespace, holder, all seven
 identity checks, all eight admission cases, all five propagation validation
 cases, all seven pivot admission cases, all four pivot lifecycle cases and
 all five pivot alias cases, all seven private-thread cases, all five bind-policy
-cases, all six pathname truncation cases, all seven mode/ownership cases and
-all eight timestamp cases. Vinix's cursor
+cases, all six pathname truncation cases, all seven mode/ownership cases,
+all eight timestamp cases and all eight extended-attribute cases. Vinix's cursor
 limit and unsupported unmount modes are excluded. Supply a matching Linux kernel and
 the ELF preserved by a native run:
 
@@ -156,6 +162,9 @@ V_C_ERROR_BUG_REPORT_DISABLED=1 build-support/run-v-tool.sh \
   tests/mount-lifecycle/reference.v --arch aarch64 --kernel /path/to/linux-arm64 \
   --init /path/to/native-arm-result/init --state-dir /path/to/fresh-linux-result
 ```
+
+The reference defaults to a 180-second timeout. Use `--timeout 600` for the full
+suite on slower emulated hosts; the receipt records the chosen timeout.
 
 Use `--arch x86_64` and matching artifacts for x86. The reference receipt pins
 the shared ELF, Linux kernel, launcher source/C/ELF, archive, QEMU and serial log.

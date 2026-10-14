@@ -11,6 +11,7 @@
 module fs
 
 import kbudget
+import lib
 import errno
 import file
 import proc
@@ -59,6 +60,9 @@ mut:
 	// A pathname owns the origin and node until its complete syscall returns.
 	// FD targets use their existing descriptor pin and never project a transport.
 	owned_path PathTarget
+	// The final attachment is permanent, independent of the walk's stack
+	// cursor or an FD's lifetime. Overlay target copies preserve this route.
+	attachment voidptr
 }
 
 // `access` is what the call asks of the file, for pledge(2) and unveil(2).
@@ -71,8 +75,9 @@ fn xattr_target_by_path(_path charptr, follow bool, access u32) ?XAttrTarget {
 		errno.set(errno.enoent)
 		return none
 	}
-	parent := get_parent_dir(at_fdcwd, path)?
-	held := retain_path_target(parent, path, follow)?
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	parent := parent_and_mount_for(at_fdcwd, path, identity)?
+	held := retain_path_target_on_mount(parent, path, follow, identity)?
 	mut transferred := false
 	defer {
 		if !transferred {
@@ -91,6 +96,7 @@ fn xattr_target_by_path(_path charptr, follow bool, access u32) ?XAttrTarget {
 		node: held.node
 		res: backing
 		owned_path: held
+		attachment: lib.mount_context_top(identity)
 	}
 }
 
@@ -98,6 +104,7 @@ fn xattr_target_of_fd(fd &file.FD) XAttrTarget {
 	return XAttrTarget{
 		node: unsafe { &VFSNode(fd.handle.node) }
 		res:  fd.handle.resource
+		attachment: lib.mount_context_top(&fd.handle.mount)
 	}
 }
 
@@ -172,6 +179,7 @@ fn xattr_target_to_change(target XAttrTarget, name string) ?XAttrTarget {
 		node: target.node
 		res: backing
 		owned_path: target.owned_path
+		attachment: target.attachment
 	}
 }
 
@@ -187,7 +195,8 @@ fn xattr_changed(target XAttrTarget) {
 fn xattr_may_change(target XAttrTarget, name string, removing bool) ? {
 	mut mandatory_res := target.res
 	security.mac_require(mut mandatory_res, proc.mac_metadata)?
-	if target.node != unsafe { nil } && read_only(target.node) {
+	if target.node != unsafe { nil }
+		&& (target.node.read_only || attachment_flags(target.attachment) & ms_rdonly != 0) {
 		errno.set(errno.erofs)
 		return none
 	}
