@@ -1238,6 +1238,12 @@ pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, requested_fl
 	if read_only(node) && ((flags & 3) != 0 || flags & resource.o_trunc != 0) {
 		return errno.err, errno.erofs
 	}
+	// A socket pathname grants metadata access through O_PATH, never a new
+	// transport description. Validate permissions first, then refuse before
+	// resource.open_resource or FD creation can acquire the live endpoint.
+	if flags & resource.o_path == 0 && node.resource.stat.mode & stat.ifmt == stat.ifsock {
+		return errno.err, errno.enxio
+	}
 	// An immutable file refuses to open for writing; an append-only one only
 	// in append mode, and never to be truncated.
 	if stat.isreg(node.resource.stat.mode) && flags & resource.o_path == 0 {

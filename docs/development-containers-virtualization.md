@@ -317,6 +317,9 @@ state. Native tests cover 16 operations, untouched outputs and pending
 connections, and permitted `SCM_RIGHTS` transfer after the sending descriptor
 closes. Both architectures pass the same probe binary in Linux reference guests;
 the persistent ext2/overlay workloads retain flat live allocations.
+The [pathname-open correction](../tests/overlay-rename/socket-open.md) prevents
+ordinary `open()` calls from acquiring a live socket transport, preserving
+permission/type errors and metadata-only access.
 Crash consistency, full OCI/rootless-runtime acceptance and broader server-load
 qualification remain open. Full pins and native CI
 instructions are recorded in [the guest evidence](../tests/development/README.md).

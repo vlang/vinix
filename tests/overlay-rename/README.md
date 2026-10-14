@@ -105,6 +105,10 @@ Metadata descriptions must also refuse all 16 tested socket operations with
 `EBADF`, preserve output buffers and pending connections, and remain transferable
 as `SCM_RIGHTS` payloads after the original descriptor closes. The listener's
 pathname has mode 0000 during these metadata checks.
+Ordinary pathname opens of the live socket must return `ENXIO` after permission
+validation. The fixture covers three access modes with eight flag combinations,
+exclusive creation, directory-only lookup, symlink following and metadata-only
+symlink lookup, while preserving the listener and socket inode metadata.
 Two batches each run 32 cycles on each backend; every live slab class and the
 large-allocation count must match. A protected-directory bind must fail with
 `EACCES`. Root remounts the volume read-only, verifies that removed names stay
@@ -133,6 +137,7 @@ pins the shared probe, Linux kernel, launcher source/C/ELF, cpio, QEMU and seria
 output. This case checks denied creation of a real device (1:3); disk cases
 retain Vinix's separate refusal of user-created 0/0 whiteouts. See
 [socket metadata authorization evidence](socket-access.md).
+The expanded probe also checks [ordinary socket pathname opens](socket-open.md).
 
 [Durable whiteout evidence and limits](whiteouts.md) and
 [persistent directory opacity](opacity.md) record the current storage

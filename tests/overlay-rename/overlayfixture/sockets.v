@@ -50,6 +50,7 @@ fn persistent_socket_cycle(base &char, backing &char, hold bool) {
 		mut st := C.stat{}
 		check(C.fstat(old_path, &st) == 0 && st.st_nlink == 0, 406)
 		check(C.chmod(&target[0], 0) == 0, 472)
+		socket_private_opens(&target[0])
 		metadata := C.open(&target[0], C.O_PATH)
 		check(metadata >= 0 && C.fstat(metadata, &st) == 0 && st.st_nlink == 1, 433)
 		client := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0)
@@ -64,6 +65,7 @@ fn persistent_socket_cycle(base &char, backing &char, hold bool) {
 		*option_length = u32(sizeof(i32))
 		check(C.getsockopt(listener, C.SOL_SOCKET, C.SO_KEEPALIVE, keepalive, option_length) == 0
 			&& *keepalive == 0 && C.chmod(&target[0], 0o777) == 0, 473)
+		socket_path_opens(&target[0])
 		check(client >= 0 && C.vinix_overlay_connect(client, voidptr(address), u32(sizeof(C.sockaddr_un))) == 0, 407)
 		pending_metadata := C.open(&target[0], C.O_PATH)
 		check(pending_metadata >= 0, 465)
@@ -74,6 +76,7 @@ fn persistent_socket_cycle(base &char, backing &char, hold bool) {
 		if hold {
 			C.puts(c'OVERLAY SOCKET PATH CLOSE: PASS')
 			C.puts(c'OVERLAY SOCKET ACCESS: PASS')
+			C.puts(c'OVERLAY SOCKET OPEN: PASS')
 			C.fflush(nil)
 		}
 		path := C.open(&target[0], C.O_PATH)

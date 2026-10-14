@@ -77,3 +77,7 @@ See [the controller instructions](README.md) to repeat the checks. The Linux
 reference qualifies these socket semantics only; it does not measure Vinix
 retention. Broader syscall error precedence, power-loss recovery, tracing,
 rootless OCI runtime acceptance and complete server qualification remain open.
+
+The subsequent [ordinary pathname-open correction](socket-open.md) extends the
+same probe. The fixture hashes above identify this metadata-authorization
+qualification; the linked page records the expanded fixture and newer kernels.

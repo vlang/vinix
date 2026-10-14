@@ -146,3 +146,54 @@ fn pass_socket_metadata(fd int) int {
 		return int(received)
 	}
 }
+
+fn refused_socket_open(path &char, flags int, expected int, site int) {
+	unsafe {
+		result := C.open(path, flags, 0o600)
+		code := *C.__errno_location()
+		if result != -1 || code != expected {
+			C.printf(c'OVERLAY SOCKET OPEN: site=%d flags=%x result=%d errno=%d expected=%d\n',
+				site, flags, result, code, expected)
+			C.fflush(nil)
+		}
+		check(result == -1 && code == expected, site)
+	}
+}
+
+fn socket_private_opens(path &char) {
+	unsafe {
+		for access_mode in [i32(C.O_RDONLY), i32(C.O_WRONLY), i32(C.O_RDWR)]! {
+			refused_socket_open(path, int(access_mode), C.EACCES, 475)
+		}
+	}
+}
+
+// A pathname identifies a socket inode, but ordinary open cannot acquire its
+// transport. Keep earlier path/type/permission errors and O_PATH metadata.
+fn socket_path_opens(path &char) {
+	unsafe {
+		mut before := C.stat{}
+		mut after := C.stat{}
+		check(C.lstat(path, &before) == 0 && before.st_mode & C.S_IFMT == C.S_IFSOCK, 476)
+		for access_mode in [i32(C.O_RDONLY), i32(C.O_WRONLY), i32(C.O_RDWR)]! {
+			for status in [i32(0), i32(C.O_NONBLOCK), i32(C.O_APPEND), i32(C.O_TRUNC),
+				i32(C.O_CREAT), i32(C.O_SYNC), i32(C.O_CLOEXEC), i32(C.O_NOFOLLOW)]! {
+				refused_socket_open(path, int(access_mode | status), C.ENXIO, 477)
+			}
+		}
+		refused_socket_open(path, C.O_RDONLY | C.O_CREAT | C.O_EXCL, C.EEXIST, 478)
+		refused_socket_open(path, C.O_RDONLY | C.O_DIRECTORY, C.ENOTDIR, 479)
+		mut link := [128]char{}
+		check(C.snprintf(&link[0], 128, c'%s-link', path) > 0
+			&& C.symlink(path, &link[0]) == 0, 480)
+		refused_socket_open(&link[0], C.O_RDONLY, C.ENXIO, 481)
+		refused_socket_open(&link[0], C.O_RDONLY | C.O_NOFOLLOW, C.ELOOP, 482)
+		metadata := C.open(&link[0], C.O_PATH | C.O_NOFOLLOW | C.O_CLOEXEC)
+		check(metadata >= 0 && C.fstat(metadata, &after) == 0
+			&& after.st_mode & C.S_IFMT == C.S_IFLNK && C.close(metadata) == 0
+			&& C.unlink(&link[0]) == 0, 483)
+		check(C.lstat(path, &after) == 0 && after.st_ino == before.st_ino
+			&& after.st_mode == before.st_mode && after.st_nlink == before.st_nlink
+			&& after.st_uid == before.st_uid && after.st_gid == before.st_gid, 484)
+	}
+}
