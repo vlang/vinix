@@ -5037,3 +5037,86 @@ concurrent detach after a positive check, leader-only exit, general process-root
 cache invalidation, deeper namespaces, retained-tree reclamation/churn and
 GNU/translated/ELF32 paths remain unqualified. The three broad section 15
 acceptance gates stay open.
+
+## Cached procfs process-root invalidation
+
+An already-cached numeric `/proc/PID` child now checks process registration
+before lookup continues. Reaped process paths return ENOENT through stat,
+status and directory leaves. Registered live processes and WNOWAIT zombies
+remain reachable. The check is restricted to actual proc roots or mounted PID
+views, numeric names and process-directory resources; static entries and
+dot/dotdot lookups cannot accidentally remove a parent process directory.
+
+The `procpid` native musl fixture runs root and UID/GID1000 in both the initial
+and a one-level PID namespace. Three mounts and five libc/raw open/openat forms
+exercise native high argument words and original/dup/CLOEXEC root handles.
+Each cohort reports the same six rows through local CASES output and the
+supervisor's pipe-transferred FINAL output.
+
+| Controls per cohort | Calls | Baseline failures |
+| --- | ---: | ---: |
+| Self and two live children, three leaf types | 135 | 0 |
+| WNOWAIT zombie child | 45 | 0 |
+| Reaped child, two successive cached-path sweeps | 90 | 90 |
+| Surviving child/self and dot/dotdot/self/thread-self/sys/version | 180 | 0 |
+| Missing PID zero and maximum positive signed32 PID | 90 | 0 |
+| Retained root/child alias metadata and descriptor flags | 108 | 0 |
+
+Both unchanged baselines fail exactly 360 of 2,592 controls per architecture.
+Fixed Vinix and actual Linux 6.12.51 pass every control using the same native
+musl ELF bytes. Both children are forked before any threading; private pipe
+protocols release each child, WNOWAIT observes successful exit, and waitpid
+reaps it. An independent kill-zero ESRCH query precedes the missing-path
+checks. No procfs lookup or directory listing polls the retired PID before
+those checks. Nine root and eighteen child stat/directory descriptors preserve
+dev/ino/mode and descriptor flags before exit, during zombie lifetime, after
+reap and after the surviving child is reaped. Detached nlink values, file
+contents and relative lookup through retired directory handles are separate.
+
+The existing scalar `task_attached(pid, pid)` predicate holds pid_lock and
+returns only a bool. No process/thread/namespace pointer escapes; the lock is
+released before the existing directory-removal helper runs under procfs_lock.
+The retained node/resource lifetime is unchanged, including at zero refcount.
+No field, allocation, pin or reclamation path is added. Complete production
+generated C on each architecture differs only in the single lookup body and
+its prototype. Independent review also checks the unchanged removal/unref
+bodies and the synchronous fixture frame borrows. Normal fixture completion
+reaps both children and closes all 27 aliases; child branches use _exit before
+returning through copied parent frames.
+
+Four warmed and settled 200-cycle cohorts per architecture repeatedly open
+missing/live process paths and create/close root aliases. All 18 ARM and 14 x86
+slab classes remain exactly flat. Large pages stay at 74/74 for initial ARM
+views and 80/80 for namespace views; x86 stays at 188/188 and 199/199. These are
+lookup/alias measurements over finite existing trees, not process/mount churn
+or whole-tree reclamation measurements. Four production builds, five candidate
+guest cases (procpid/proctask/procself/open/runtime), eight host test files and
+coverage checks pass. Allocation inventory remains 661 ARM/657 x86 copied
+source files and 400/292 sites, with unchanged existing allowance refusals.
+The fixture has 19 explicit allocas and no hidden heap/index helpers.
+
+The assertion-enabled audit executes deliberate assertion failures and rejects
+a passing log presented as a failing baseline. It binds 63 frozen kernel inputs, whole C, kernels, native
+probes, ISOs, captures, builds and independent review. Separate preflight,
+preview and executed native C/ELF bytes match exactly; raw C comparison logs
+are empty without normalization. The prior self-contained f6358ec compiler
+and its 15,146 source/GC/TCC pins and published recovery record are reused;
+this change does not claim another compiler recovery. Runtime evidence freezes
+parent a51d6a215d91fe47b84e1d544487f7e62ec1e759. The public dispatch inventory
+is generated separately from the committed publication parent plus this fix,
+excluding other sessions' dirty sources. Qualification artifacts reside in
+durable private storage and published receipts pin their hashes.
+
+The first host compilation failed because slab logging omitted a printf
+argument. Those completed diagnostic receipts and captures remain published,
+with empty probe/ISO hashes and no guest execution; they are distinct from the
+fresh semantic baseline runs above.
+
+- [AArch64 receipt](../tests/linux-compat/results/2026-10-14/procpid-after-aarch64.json), [capture](../tests/linux-compat/results/2026-10-14/procpid-after-aarch64-native.log), [Linux reference](../tests/linux-compat/results/2026-10-14/procpid-reference-aarch64.json), [evidence](../tests/linux-compat/results/2026-10-14/procpid-evidence-aarch64.json).
+- [x86-64 receipt](../tests/linux-compat/results/2026-10-14/procpid-after-x86_64.json), [capture](../tests/linux-compat/results/2026-10-14/procpid-after-x86_64-native.log), [Linux reference](../tests/linux-compat/results/2026-10-14/procpid-reference-x86_64.json), [evidence](../tests/linux-compat/results/2026-10-14/procpid-evidence-x86_64.json).
+- [Audit](../tests/linux-compat/results/2026-10-14/procpid-audit.v), [verdict](../tests/linux-compat/results/2026-10-14/procpid-audit.log), [independent review](../tests/linux-compat/results/2026-10-14/procpid-lifetime-review.md); diagnostic/build/allocation/host and negative-control logs sit beside them.
+
+PID reuse and generation identity, exact concurrent reap after a positive
+check, inherited retired-directory lookup or file contents, deeper namespace
+and mount teardown, retained-tree reclamation/churn, GNU/translated/ELF32
+paths and the three broad section 15 acceptance gates remain unqualified.

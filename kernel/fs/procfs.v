@@ -1547,14 +1547,28 @@ fn procfs_refresh_named_locked(node &VFSNode, name string) {
 // Called for every name looked up in a procfs directory. The descriptor and
 // namespace directories, and a process' exe, cwd and root links, change under
 // a process that is already listed, so they are brought up to date on each
-// lookup. A cached task is validated on its own: a bulk thread-list snapshot
-// can temporarily omit live siblings while the list lock is busy.
+// lookup. Cached process roots are checked against registration. A cached task
+// is validated on its own: a bulk thread-list snapshot can temporarily omit
+// live siblings while the list lock is busy.
 fn procfs_lookup_refresh_locked(node &VFSNode, name string) {
 	if unsafe { procfs_root == 0 } || node == unsafe { nil } || node.resource == unsafe { nil }
 		|| node.children == unsafe { nil } || !is_procfs_resource(node.resource) {
 		return
 	}
 	directory := unsafe { &ProcFSResource(node.resource) }
+	if directory.pid == 0 && (voidptr(node) == voidptr(procfs_root)
+		|| directory.view != unsafe { nil }) && name.len > 0 && name[0] >= `0`
+		&& name[0] <= `9` && name in node.children {
+		child := unsafe { node.children[name] }
+		if child != unsafe { nil } && is_procfs_resource(child.resource) {
+			process := unsafe { &ProcFSResource(child.resource) }
+			if process.kind == .directory && process.pid > 0 && process.tid == 0
+				&& !proc.task_attached(process.pid, process.pid) {
+				drop_procfs_directory(mut unsafe { node }, child)
+			}
+		}
+		return
+	}
 	if directory.pid != 0 && directory.tid == 0 && node.name == 'task'
 		&& name in node.children {
 		child := unsafe { node.children[name] }

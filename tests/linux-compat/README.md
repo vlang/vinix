@@ -1247,3 +1247,24 @@ and `--cases proctask,ownerquery,procself,open,runtime`; use
 `tests/linux-compat/proctask-reference.v` with `--kernel`, `--init`, `--arch`
 and a fresh `--state-dir` to run the identical probe on Linux. See
 [receipts and limits](../../docs/linux-posix-qualification.md#cached-procfs-task-path-invalidation).
+
+The `procpid` case qualifies cached numeric procfs process-root opens with
+2,592 native controls per architecture as root and UID/GID1000 in initial and
+one-level PID namespaces. Three mounts, stat/status/directory leaves and five
+libc/raw open/openat forms cover high argument words and original/dup/CLOEXEC
+root handles. Live and WNOWAIT zombie children remain visible; after waitpid
+and an independent kill-zero ESRCH observation, repeated cached paths return
+ENOENT without procfs polling. Surviving children, self and static/dot entries
+remain reachable. Twenty-seven retained root/child aliases preserve metadata
+and descriptor flags. Both baselines fail 360 controls; fixed Vinix and actual
+same-ELF Linux 6.12.51 pass. Four 200-cycle lookup/alias cohorts keep storage
+flat; this does not measure process/mount churn or tree reclamation. PID reuse,
+concurrent reap after a positive check, inherited retired-directory lookup and
+retired file contents require separate qualification.
+Run `tests/linux-compat/run` with `--arch ARCH --kernel-dir DIR --state-dir FRESH`
+and `--cases procpid,proctask,procself,open,runtime`; use
+`tests/linux-compat/procpid-reference.v` with `--kernel`, `--init`, `--arch`
+and a fresh `--state-dir` for the identical Linux probe. Superseded host build
+failures have empty probe/ISO hashes and are published separately from the
+actual semantic baselines. See
+[receipts and limits](../../docs/linux-posix-qualification.md#cached-procfs-process-root-invalidation).

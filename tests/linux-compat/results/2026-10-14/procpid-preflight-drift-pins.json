@@ -1,0 +1,10 @@
+{
+    "aarch64_drift": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "aarch64_elf": "5079f2675fd725c4ae05891dbdd42617fe534660a26ac87a6ca20179cd7c479a",
+    "aarch64_native_c": "e8bfab01df0eaaf6c753215a7ea651cdb6b3486f652a79cdc0b5f2ab91c271ec",
+    "aarch64_preflight_c": "e8bfab01df0eaaf6c753215a7ea651cdb6b3486f652a79cdc0b5f2ab91c271ec",
+    "x86_64_drift": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "x86_64_elf": "35a1ef7e62fc82f259a0bf3d3e6dcee715de103223c74648714a01882cbccb6e",
+    "x86_64_native_c": "e8bfab01df0eaaf6c753215a7ea651cdb6b3486f652a79cdc0b5f2ab91c271ec",
+    "x86_64_preflight_c": "e8bfab01df0eaaf6c753215a7ea651cdb6b3486f652a79cdc0b5f2ab91c271ec"
+}

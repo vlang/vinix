@@ -1,0 +1,14 @@
+{
+    "architecture": "aarch64",
+    "context": "Superseded host compilation failure: slab logging omitted a printf argument. No probe ELF, ISO or guest execution existed. Exit 1 and empty init/ISO hashes are build diagnostics, not the semantic baseline. The corrected fresh probes and semantic baselines are published separately.",
+    "base_commit": "a51d6a215d91fe47b84e1d544487f7e62ec1e759",
+    "artifacts": {
+        "aggregate": "329b64dc97fa2a123457ff302d696bb45ee68a798595c01dbc09dedb972eb553",
+        "c": "9b6a4baaabe071f47ec96a4a5109447844a4973f33e4fd3b42fc97eae6c2b50f",
+        "preflight_c": "9b6a4baaabe071f47ec96a4a5109447844a4973f33e4fd3b42fc97eae6c2b50f",
+        "receipt": "708436718c90d954a608a4e615cfebce57cabdb474cb39072c68d7e984248b71",
+        "serial_c": "c49ac2e66ea0cd147fbe54a25564b5af26363f8905a8217ad65303d563093cd2",
+        "source": "b268c704f2a5d2e268137a121d359014cf68e1dbcc4909578549dde8954f5d0a"
+    },
+    "source_inputs": {}
+}

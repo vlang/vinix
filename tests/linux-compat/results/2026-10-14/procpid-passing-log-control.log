@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-14/procpid-audit.v:87: FAIL: fn main.failure: assert log.contains('LINUX PROCPID DETAIL:'), 'procpid baseline failure markers required';
+      message: procpid baseline failure markers required
+V panic: Assertion failed...

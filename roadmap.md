@@ -835,6 +835,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   repeated lookup storage on both architectures. See
   [the task-path receipts](docs/linux-posix-qualification.md#cached-procfs-task-path-invalidation).
 
+- [x] Invalidate cached numeric procfs process roots after reap while keeping
+  live/zombie and static/dot paths reachable; qualify aliases, one-level PID
+  views, exact errors and flat repeated lookup storage on both architectures.
+  See [the process-root receipts](docs/linux-posix-qualification.md#cached-procfs-process-root-invalidation).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
