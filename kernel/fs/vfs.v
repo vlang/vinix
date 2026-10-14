@@ -819,7 +819,12 @@ fn internal_create_resolved_locked(parent &VFSNode, name string, mode u32, acces
 
 	if unsafe { parent_of_tgt_node == 0 } { return none }
 
-	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
+	// Retained directory descriptions keep their policy after lazy unmount or
+	// namespace retirement, when the inode has no active mount in this table.
+	if read_only(parent_of_tgt_node) || mount_flags(identity) & ms_rdonly != 0 {
+		errno.set(errno.erofs)
+		return none
+	}
 	if !attr_allows_dir_add(parent_of_tgt_node) { return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	require_linked(parent_of_tgt_node)?
@@ -1235,7 +1240,8 @@ pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, requested_fl
 		return errno.err, errno.eisdir
 	}
 
-	if read_only(node) && ((flags & 3) != 0 || flags & resource.o_trunc != 0) {
+	if (read_only(node) || mount_flags(open_mount) & ms_rdonly != 0)
+		&& ((flags & 3) != 0 || flags & resource.o_trunc != 0) {
 		return errno.err, errno.erofs
 	}
 	// A socket pathname grants metadata access through O_PATH, never a new
