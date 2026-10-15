@@ -24,6 +24,17 @@ fn C.poll(&C.pollfd, usize, i32) i32
 fn C.mkdir(&char, u32) i32
 fn C.strlen(&char) usize
 
+fn service_socket_path() [108]char {
+	unsafe {
+		mut path := [108]char{}
+		runtime := C.getenv(c'VINIX_SESSION_RUNTIME')
+		check(runtime != nil, 485)
+		n := C.snprintf(&path[0], path.len, c'%s/vinix-session.%u/broker', runtime, C.getuid())
+		check(n > 0 && n < path.len, 486)
+		return path
+	}
+}
+
 fn service_hex(source &char, length int, mut target [8192]char) int {
 	unsafe {
 		check(length >= 0 && length * 2 < target.len, 450)
@@ -76,8 +87,7 @@ fn service_request(fields [4]&char, count int, denied bool) [4096]char {
 		fd := C.socket(C.AF_UNIX, C.SOCK_STREAM | C.SOCK_CLOEXEC | C.SOCK_NONBLOCK, 0)
 		check(fd >= 0, 457)
 		mut address := C.sockaddr_un{sun_family: u16(C.AF_UNIX)}
-		path := &char(c'/home/developer/service-runtime/vinix-session.1000/broker')
-		for i in 0 .. int(C.strlen(path)) { address.sun_path[i] = path[i] }
+		address.sun_path = service_socket_path()
 		check(C.connect(fd, voidptr(&address), u32(sizeof(C.sockaddr_un))) == 0, 458)
 		mut header := [char(used), char(used >> 8), char(used >> 16), char(used >> 24)]!
 		service_transfer(fd, &header[0], 4, true)
@@ -146,7 +156,8 @@ fn service_broker() i32 {
 		}
 		deadline := job_clock() + 10000000000
 		mut st := C.stat{}
-		for C.stat(c'/home/developer/service-runtime/vinix-session.1000/broker', &st) != 0 {
+		path := service_socket_path()
+		for C.stat(&path[0], &st) != 0 {
 			if job_clock() >= deadline { emit_command_log(c'/home/developer/service-broker.log') }
 			check(C.kill(pid, 0) == 0 && job_clock() < deadline, 467)
 			C.usleep(10000)

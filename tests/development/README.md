@@ -56,9 +56,62 @@ plan hash, account, exact attempt/run counts and next-due interval. It also
 requires distinct guardian/watcher identities, bounded stops and byte-exact
 enabled/disabled/removed service registry records through the maintained
 importer. Credential bytes must never reach the serial transcript or broker
-log. Persistent-home cold boot and graphical interaction remain separate gates.
+log. The persistent-home cold-boot gate below is separate from graphical
+interaction and a complete installed-system boot/login workflow.
 
-On 15 October 2026 this optional gate and the full base workflow passed on
+To exercise the scheduler across three fresh QEMU processes with one private
+64 MiB ext2 home, run the maintained V controller:
+
+```
+v -enable-globals -gc none -cc cc run tests/native-guest-tools/service-cold-boot-main.v \
+  aarch64 /path/to/kernel /path/to/staged-tools /path/to/native/vinix-desktop /path/to/new-state
+```
+
+Use `x86_64` for the other architecture. This gate needs `mke2fs` and `e2fsck`;
+`VINIX_MKE2FS` and `VINIX_E2FSCK` may select their executable paths. It uses the
+same native fixture/compiler settings as `run-guest`, including
+`VINIX_AARCH64_SYSROOT` when needed. Each boot receives a new initramfs and QEMU
+process; only `home.ext2` is reused. Runtime IPC lives on volatile `/run`, as in
+an installed session. Kernel, fixture, scheduler, broker, formatter/checker and
+each ISO are pinned in the receipt. The controller owns the new output directory
+and disk and refuses an existing output directory.
+
+The first boot installs and enables the scheduler, executes a credential-bearing
+job and shuts down the broker during that job. The second and third boots read
+the exact previous state before launching the broker; the saved enabled service
+must start without another import or Start request. Each boot retires all four
+observed processes and records exactly one additional interrupted attempt. The
+third boot stops and removes the service. The host checks every receipt, exact
+cross-boot state equality, service registry contents and disk hash continuity,
+then requires `e2fsck -f -n` to succeed without changing the image after each
+unmount. Payload credential output must stay out of all serial/broker logs.
+
+This is a **quiescent shutdown** gate: PID 1 allows seven seconds after account
+process retirement for the tested kernel's five-second removed-resource grace
+period and writeback worker before sync/unmount. An initial immediate-unmount
+run left orphaned inode/block allocations. Moving the broker socket onto ext2
+also left one unlinked socket inode even after the grace period. Those controls
+remain failing evidence; draining deferred cleanup at immediate unmount and
+reclaiming persistent ext2 socket inodes remain kernel gaps. This gate does not
+qualify power-loss recovery, sockets on persistent volumes, graphical interaction
+or a complete installed root/login/session startup.
+
+On 15 October 2026 the cold-boot gate passed all three boots on ARM64 HVF and
+x86-64 TCG, with eight validated native receipts per architecture and six clean
+read-only filesystem checks. Evidence is retained under
+`build/development-service-cold-20261015/guest-arm-d` and `guest-x86-d`.
+Job/service retirement took 120/120/138 ms on ARM64 and 381/300/245 ms on x86,
+before the separate seven-second filesystem quiescence. Both receipt-validation
+host test files pass. The shared fixture's existing ARM64 broker/account/job/
+build gate also passes all 18 receipts in `base-arm` beside those runs.
+The audit revalidates executable/kernel pins, native receipts, exact state and
+disk continuity, filesystem logs and the final disk hash. The failed
+immediate-unmount control remains in `guest-x86-b`; `guest-arm-c` and
+`guest-x86-c` retain the persistent-socket failures after quiescence. No repair
+was applied to any test disk. The runs reuse the isolated kernels, static
+schedulers and native brokers recorded above and below.
+
+On 15 October 2026 the earlier broker-restart gate and full base workflow passed on
 ARM64 HVF and x86-64 TCG with 18 receipts each. Evidence remains under
 `build/development-service-lifecycle-20261015/guest-arm-current` and
 `guest-x86-current`. Their receipts pin the copied kernels, V fixtures, four
@@ -830,6 +883,7 @@ it does not run native compiler projects without an x86 SDK.
 
 This qualifies the tested per-account job workflows in Vinix guests, including
 the native watcher, signal, deadline and interruption checks recorded above.
-The optional native Services broker lifecycle is covered above. Graphical
-service control, persistent-home cold boot, broader server/SSH/CI projects and
-complete self-hosted builds remain open acceptance work.
+The optional native Services broker lifecycle and quiescent persistent-home
+cold boots are covered above. Graphical service control, complete installed
+boot/login, immediate-unmount cleanup, persistent socket reclamation, broader
+server/SSH/CI projects and complete self-hosted builds remain open acceptance work.

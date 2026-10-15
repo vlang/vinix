@@ -46,7 +46,9 @@ supported Linux service subset; full systemd qualification remains separate.
 Session persistence uses the existing service manager. Native qualification
 checks disabled import, authorized Start/Stop, active-job retirement, enabled
 restoration after broker shutdown and removal across another broker restart.
-Persistent-home cold boot and graphical interaction retain separate gates.
+Quiescent persistent-home cold boots have a separate native gate. Complete
+installed boot/login, immediate-unmount cleanup and graphical interaction
+remain separate acceptance work.
 A job left in flight after abrupt runner loss retains its owner acknowledgement
 requirement across service restarts.
 
@@ -203,5 +205,15 @@ native runs retain 18 independently validated receipts in
 restoration retired all observed processes in 125/212/120 ms on ARM64 and
 394/498/463 ms on x86-64. Unauthorized import and control from an ordinary child
 were denied without configuration changes; removed services stayed absent on
-broker restart. These are headless broker checks; persistent-home cold boot and
-graphical Services interaction remain open.
+broker restart. These are headless broker checks; graphical Services interaction
+remains open.
+
+The [persistent-home cold-boot gate](../../tests/development/README.md) also
+passed on both architectures on 15 October 2026. Three new QEMU processes reuse
+one ext2 home, with runtime IPC on volatile `/run`; later boots must restore
+the exact saved state and start the enabled watcher without another import or
+Start request. Each architecture passed eight receipts and three read-only
+filesystem checks. The gate allows seven seconds for deferred resource cleanup
+before sync/unmount. Immediate-unmount orphan cleanup and socket inode
+reclamation on persistent ext2 remain unresolved and retain failing controls.
+This does not qualify power-loss recovery or complete installed boot/login.
