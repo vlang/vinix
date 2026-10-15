@@ -16,6 +16,9 @@ pub fn set_process_group(pid int, pgid int) (u64, u64) {
 	lock_table()
 	defer { unlock_table() }
 	mut target := if pid == 0 { caller } else { process_in(caller.numbered_in, pid) }
+	if target == unsafe { nil } && task_process_in(caller.numbered_in, pid) != unsafe { nil } {
+		return errno.err, errno.einval
+	}
 	if target == unsafe { nil } || target.exiting { return errno.err, errno.esrch }
 	if !mac_peer_allowed(caller, target) { return errno.err, errno.eperm }
 	if voidptr(target) != voidptr(caller) && target.ppid != caller.pid { return errno.err, errno.esrch }
@@ -49,7 +52,7 @@ pub fn get_process_group(pid int) (u64, u64) {
 	caller := current_thread().process
 	lock_table()
 	defer { unlock_table() }
-	target := if pid == 0 { caller } else { process_in(caller.numbered_in, pid) }
+	target := if pid == 0 { caller } else { task_process_in(caller.numbered_in, pid) }
 	if target == unsafe { nil } { return errno.err, errno.esrch }
 	if !mac_peer_allowed(caller, target) { return errno.err, errno.eperm }
 	return u64(pgid_in(target, caller.numbered_in)), 0
@@ -81,7 +84,7 @@ pub fn get_process_session(pid int) (u64, u64) {
 	caller := current_thread().process
 	lock_table()
 	defer { unlock_table() }
-	target := if pid == 0 { caller } else { process_in(caller.numbered_in, pid) }
+	target := if pid == 0 { caller } else { task_process_in(caller.numbered_in, pid) }
 	if target == unsafe { nil } { return errno.err, errno.esrch }
 	if !mac_peer_allowed(caller, target) { return errno.err, errno.eperm }
 	return u64(sid_in(target, caller.numbered_in)), 0

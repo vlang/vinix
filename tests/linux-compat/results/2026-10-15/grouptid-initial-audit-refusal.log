@@ -1,0 +1,4 @@
+tests/linux-compat/grouptid-check.v:89: FAIL: fn main.sdk_and_primary: assert sdk.len == 2016
+   left value: sdk.len = 2014
+  right value: 2016
+V panic: Assertion failed...

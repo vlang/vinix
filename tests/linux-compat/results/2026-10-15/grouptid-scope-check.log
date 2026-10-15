@@ -1,0 +1,1 @@
+arm/x86: complete production C differs only in three group/session helpers and one task lookup; owner read once and registered before namespace validation; table lock spans lookup and use; no added allocation/pin/free and no compiler normalization

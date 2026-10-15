@@ -1666,3 +1666,14 @@ failures, native/reference results, whole-C scope, compiler/SDK/inventory pins,
 real diagnostic refusals and executing audit controls. The initial Linux setup
 refusal is retained; a PID1 group/session of zero is valid. See the
 [group/session report](../../docs/linux-posix-qualification.md#native-process-group-and-session-argument-words).
+
+The `grouptid` case qualifies live/retired worker getpgid/getsid lookup, exact
+setpgid nonleader EINVAL, real child group changes and worker callers. Root
+and UID/GID1000 in initial and one-level PID namespaces run 14,464 controls
+per architecture plus four warmed 200-cycle storage cohorts. Seven raw word
+forms and genuine musl calls share the same oracle as Linux. Supply the native
+ELF to `grouptid-reference.v`; build `grouptid-check.v` without `-prod` and
+pass the retained evidence area to verify original failures, native/reference
+results, exact whole-C scope, SDK/compiler/input pins, independent lifetime
+review and executing audit controls. See the
+[worker lookup report](../../docs/linux-posix-qualification.md#native-worker-process-group-and-session-lookup).

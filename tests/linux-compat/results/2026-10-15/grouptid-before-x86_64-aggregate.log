@@ -1,0 +1,198 @@
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-before-x86/grouptid/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-before-x86/grouptid/.vinix-amd64.iso.zQXc0z'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 40.7g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-before-x86/grouptid/iso-build/.iso-staging.2mRw85/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13693 sectors
+Written to medium : 13693 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-before-x86/grouptid/.vinix-amd64.iso.zQXc0z' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd5f3.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-before-x86/grouptid/test.iso (28043264 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-before-x86/grouptid
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=81464
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91400
+initramfs: Done (9 entries)
+LINUX GROUPTID TOPOLOGY: ordinary=0 namespace=0 uid=0 self=34643 first=64615 second=15811 child=34565 child_tid=51702
+LINUX GROUPTID DETAIL: ordinary=0 kind=0 pid=64615 group=0 pform=0 gform=0 actual=-1/3 expected=34643/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=0 pid=64615 group=0 pform=1 gform=0 actual=-1/3 expected=34643/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=0 pid=64615 group=0 pform=2 gform=0 actual=-1/3 expected=34643/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=0 pid=64615 group=0 pform=3 gform=0 actual=-1/3 expected=34643/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=0 pid=64615 group=0 pform=4 gform=0 actual=-1/3 expected=34643/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=0 pid=64615 group=0 pform=5 gform=0 actual=-1/3 expected=34643/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=1 pid=64615 group=0 pform=0 gform=0 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=0 kind=1 pid=64615 group=0 pform=0 gform=1 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=0 kind=1 pid=64615 group=0 pform=0 gform=2 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=0 kind=1 pid=64615 group=0 pform=0 gform=3 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=0 kind=1 pid=64615 group=0 pform=0 gform=4 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=0 kind=1 pid=64615 group=0 pform=0 gform=5 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=0 kind=3 pid=51702 group=0 pform=0 gform=0 actual=-1/3 expected=34565/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=3 pid=51702 group=0 pform=1 gform=0 actual=-1/3 expected=34565/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=3 pid=51702 group=0 pform=2 gform=0 actual=-1/3 expected=34565/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=3 pid=51702 group=0 pform=3 gform=0 actual=-1/3 expected=34565/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=3 pid=51702 group=0 pform=4 gform=0 actual=-1/3 expected=34565/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=3 pid=51702 group=0 pform=5 gform=0 actual=-1/3 expected=34565/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=5 pid=15811 group=0 pform=0 gform=0 actual=-1/3 expected=34643/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=5 pid=15811 group=1 pform=0 gform=0 actual=-1/3 expected=34643/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=5 pid=15811 group=0 pform=0 gform=7 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=0 kind=5 pid=15811 group=0 pform=1 gform=0 actual=-1/3 expected=34643/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=5 pid=15811 group=1 pform=1 gform=0 actual=-1/3 expected=34643/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=5 pid=15811 group=0 pform=1 gform=6 actual=-1/3 expected=-1/22
+LINUX GROUPTID CASES: ordinary=0 namespace=0 kind=0 calls=96 failures=48
+LINUX GROUPTID CASES: ordinary=0 namespace=0 kind=1 calls=960 failures=768
+LINUX GROUPTID CASES: ordinary=0 namespace=0 kind=2 calls=128 failures=0
+LINUX GROUPTID CASES: ordinary=0 namespace=0 kind=3 calls=2048 failures=2048
+LINUX GROUPTID CASES: ordinary=0 namespace=0 kind=4 calls=336 failures=0
+LINUX GROUPTID CASES: ordinary=0 namespace=0 kind=5 calls=48 failures=24
+LINUX GROUPTID FINAL: ordinary=0 namespace=0 kind=0 calls=96 failures=48
+LINUX GROUPTID FINAL: ordinary=0 namespace=0 kind=1 calls=960 failures=768
+LINUX GROUPTID FINAL: ordinary=0 namespace=0 kind=2 calls=128 failures=0
+LINUX GROUPTID FINAL: ordinary=0 namespace=0 kind=3 calls=2048 failures=2048
+LINUX GROUPTID FINAL: ordinary=0 namespace=0 kind=4 calls=336 failures=0
+LINUX GROUPTID FINAL: ordinary=0 namespace=0 kind=5 calls=48 failures=24
+LINUX GROUPTID TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=28768 first=23843 second=9522 child=31198 child_tid=21888
+LINUX GROUPTID DETAIL: ordinary=1 kind=0 pid=23843 group=0 pform=0 gform=0 actual=-1/3 expected=28768/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=0 pid=23843 group=0 pform=1 gform=0 actual=-1/3 expected=28768/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=0 pid=23843 group=0 pform=2 gform=0 actual=-1/3 expected=28768/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=0 pid=23843 group=0 pform=3 gform=0 actual=-1/3 expected=28768/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=0 pid=23843 group=0 pform=4 gform=0 actual=-1/3 expected=28768/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=0 pid=23843 group=0 pform=5 gform=0 actual=-1/3 expected=28768/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=1 pid=23843 group=0 pform=0 gform=0 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=1 kind=1 pid=23843 group=0 pform=0 gform=1 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=1 kind=1 pid=23843 group=0 pform=0 gform=2 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=1 kind=1 pid=23843 group=0 pform=0 gform=3 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=1 kind=1 pid=23843 group=0 pform=0 gform=4 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=1 kind=1 pid=23843 group=0 pform=0 gform=5 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=1 kind=3 pid=21888 group=0 pform=0 gform=0 actual=-1/3 expected=31198/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=3 pid=21888 group=0 pform=1 gform=0 actual=-1/3 expected=31198/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=3 pid=21888 group=0 pform=2 gform=0 actual=-1/3 expected=31198/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=3 pid=21888 group=0 pform=3 gform=0 actual=-1/3 expected=31198/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=3 pid=21888 group=0 pform=4 gform=0 actual=-1/3 expected=31198/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=3 pid=21888 group=0 pform=5 gform=0 actual=-1/3 expected=31198/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=5 pid=9522 group=0 pform=0 gform=0 actual=-1/3 expected=28768/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=5 pid=9522 group=1 pform=0 gform=0 actual=-1/3 expected=28768/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=5 pid=9522 group=0 pform=0 gform=7 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=1 kind=5 pid=9522 group=0 pform=1 gform=0 actual=-1/3 expected=28768/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=5 pid=9522 group=1 pform=1 gform=0 actual=-1/3 expected=28768/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=5 pid=9522 group=0 pform=1 gform=6 actual=-1/3 expected=-1/22
+LINUX GROUPTID CASES: ordinary=1 namespace=0 kind=0 calls=96 failures=48
+LINUX GROUPTID CASES: ordinary=1 namespace=0 kind=1 calls=960 failures=768
+LINUX GROUPTID CASES: ordinary=1 namespace=0 kind=2 calls=128 failures=0
+LINUX GROUPTID CASES: ordinary=1 namespace=0 kind=3 calls=2048 failures=2048
+LINUX GROUPTID CASES: ordinary=1 namespace=0 kind=4 calls=336 failures=0
+LINUX GROUPTID CASES: ordinary=1 namespace=0 kind=5 calls=48 failures=24
+LINUX GROUPTID FINAL: ordinary=1 namespace=0 kind=0 calls=96 failures=48
+LINUX GROUPTID FINAL: ordinary=1 namespace=0 kind=1 calls=960 failures=768
+LINUX GROUPTID FINAL: ordinary=1 namespace=0 kind=2 calls=128 failures=0
+LINUX GROUPTID FINAL: ordinary=1 namespace=0 kind=3 calls=2048 failures=2048
+LINUX GROUPTID FINAL: ordinary=1 namespace=0 kind=4 calls=336 failures=0
+LINUX GROUPTID FINAL: ordinary=1 namespace=0 kind=5 calls=48 failures=24
+LINUX GROUPTID TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 first=5 second=6 child=3 child_tid=4
+LINUX GROUPTID DETAIL: ordinary=0 kind=0 pid=5 group=0 pform=0 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=0 pid=5 group=0 pform=1 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=0 pid=5 group=0 pform=2 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=0 pid=5 group=0 pform=3 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=0 pid=5 group=0 pform=4 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=0 pid=5 group=0 pform=5 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=1 pid=5 group=0 pform=0 gform=0 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=0 kind=1 pid=5 group=0 pform=0 gform=1 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=0 kind=1 pid=5 group=0 pform=0 gform=2 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=0 kind=1 pid=5 group=0 pform=0 gform=3 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=0 kind=1 pid=5 group=0 pform=0 gform=4 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=0 kind=1 pid=5 group=0 pform=0 gform=5 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=0 kind=3 pid=4 group=0 pform=0 gform=0 actual=-1/3 expected=3/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=3 pid=4 group=0 pform=1 gform=0 actual=-1/3 expected=3/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=3 pid=4 group=0 pform=2 gform=0 actual=-1/3 expected=3/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=3 pid=4 group=0 pform=3 gform=0 actual=-1/3 expected=3/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=3 pid=4 group=0 pform=4 gform=0 actual=-1/3 expected=3/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=3 pid=4 group=0 pform=5 gform=0 actual=-1/3 expected=3/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=5 pid=6 group=0 pform=0 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=5 pid=6 group=1 pform=0 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=5 pid=6 group=0 pform=0 gform=7 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=0 kind=5 pid=6 group=0 pform=1 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=5 pid=6 group=1 pform=1 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=0 kind=5 pid=6 group=0 pform=1 gform=6 actual=-1/3 expected=-1/22
+LINUX GROUPTID CASES: ordinary=0 namespace=1 kind=0 calls=96 failures=48
+LINUX GROUPTID CASES: ordinary=0 namespace=1 kind=1 calls=960 failures=768
+LINUX GROUPTID CASES: ordinary=0 namespace=1 kind=2 calls=128 failures=0
+LINUX GROUPTID CASES: ordinary=0 namespace=1 kind=3 calls=2048 failures=2048
+LINUX GROUPTID CASES: ordinary=0 namespace=1 kind=4 calls=336 failures=0
+LINUX GROUPTID CASES: ordinary=0 namespace=1 kind=5 calls=48 failures=24
+LINUX GROUPTID FINAL: ordinary=0 namespace=1 kind=0 calls=96 failures=48
+LINUX GROUPTID FINAL: ordinary=0 namespace=1 kind=1 calls=960 failures=768
+LINUX GROUPTID FINAL: ordinary=0 namespace=1 kind=2 calls=128 failures=0
+LINUX GROUPTID FINAL: ordinary=0 namespace=1 kind=3 calls=2048 failures=2048
+LINUX GROUPTID FINAL: ordinary=0 namespace=1 kind=4 calls=336 failures=0
+LINUX GROUPTID FINAL: ordinary=0 namespace=1 kind=5 calls=48 failures=24
+LINUX GROUPTID TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 first=5 second=6 child=3 child_tid=4
+LINUX GROUPTID DETAIL: ordinary=1 kind=0 pid=5 group=0 pform=0 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=0 pid=5 group=0 pform=1 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=0 pid=5 group=0 pform=2 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=0 pid=5 group=0 pform=3 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=0 pid=5 group=0 pform=4 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=0 pid=5 group=0 pform=5 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=1 pid=5 group=0 pform=0 gform=0 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=1 kind=1 pid=5 group=0 pform=0 gform=1 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=1 kind=1 pid=5 group=0 pform=0 gform=2 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=1 kind=1 pid=5 group=0 pform=0 gform=3 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=1 kind=1 pid=5 group=0 pform=0 gform=4 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=1 kind=1 pid=5 group=0 pform=0 gform=5 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=1 kind=3 pid=4 group=0 pform=0 gform=0 actual=-1/3 expected=3/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=3 pid=4 group=0 pform=1 gform=0 actual=-1/3 expected=3/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=3 pid=4 group=0 pform=2 gform=0 actual=-1/3 expected=3/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=3 pid=4 group=0 pform=3 gform=0 actual=-1/3 expected=3/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=3 pid=4 group=0 pform=4 gform=0 actual=-1/3 expected=3/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=3 pid=4 group=0 pform=5 gform=0 actual=-1/3 expected=3/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=5 pid=6 group=0 pform=0 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=5 pid=6 group=1 pform=0 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=5 pid=6 group=0 pform=0 gform=7 actual=-1/3 expected=-1/22
+LINUX GROUPTID DETAIL: ordinary=1 kind=5 pid=6 group=0 pform=1 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=5 pid=6 group=1 pform=1 gform=0 actual=-1/3 expected=2/0
+LINUX GROUPTID DETAIL: ordinary=1 kind=5 pid=6 group=0 pform=1 gform=6 actual=-1/3 expected=-1/22
+LINUX GROUPTID CASES: ordinary=1 namespace=1 kind=0 calls=96 failures=48
+LINUX GROUPTID CASES: ordinary=1 namespace=1 kind=1 calls=960 failures=768
+LINUX GROUPTID CASES: ordinary=1 namespace=1 kind=2 calls=128 failures=0
+LINUX GROUPTID CASES: ordinary=1 namespace=1 kind=3 calls=2048 failures=2048
+LINUX GROUPTID CASES: ordinary=1 namespace=1 kind=4 calls=336 failures=0
+LINUX GROUPTID CASES: ordinary=1 namespace=1 kind=5 calls=48 failures=24
+LINUX GROUPTID FINAL: ordinary=1 namespace=1 kind=0 calls=96 failures=48
+LINUX GROUPTID FINAL: ordinary=1 namespace=1 kind=1 calls=960 failures=768
+LINUX GROUPTID FINAL: ordinary=1 namespace=1 kind=2 calls=128 failures=0
+LINUX GROUPTID FINAL: ordinary=1 namespace=1 kind=3 calls=2048 failures=2048
+LINUX GROUPTID FINAL: ordinary=1 namespace=1 kind=4 calls=336 failures=0
+LINUX GROUPTID FINAL: ordinary=1 namespace=1 kind=5 calls=48 failures=24
+LINUX GROUPTID FAIL: live/retired task group/session lookup, setter refusals or retained state
+QEMU: Terminated
+Missing verdicts: ['LINUX GROUPTID: PASS']; failures: ['FAIL:', 'LINUX GROUPTID FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-before-x86/receipt.json

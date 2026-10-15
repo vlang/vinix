@@ -977,6 +977,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   retained sessions, zombie/reaped queries and flat repeated-call storage. See
   [the group/session receipts](docs/linux-posix-qualification.md#native-process-group-and-session-argument-words).
 
+- [x] Resolve live worker TIDs in native getpgid/getsid and reject nonleader
+  setpgid targets with EINVAL; qualify independently retired TID errors, actual
+  child group changes and worker callers as root/UID1000 in initial and one-level
+  PID namespaces on both architectures, with flat storage and lifetime review.
+  See [the task-lookup receipts](docs/linux-posix-qualification.md#native-worker-process-group-and-session-lookup).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

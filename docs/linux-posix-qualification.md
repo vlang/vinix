@@ -7338,3 +7338,83 @@ remain open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/groupabi-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/groupabi-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/groupabi-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/groupabi-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/groupabi-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/groupabi-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/groupabi-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/groupabi-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/groupabi-check.v), [verdict](../tests/linux-compat/results/2026-10-15/groupabi-audit.log), [SDK inputs](../tests/linux-compat/results/2026-10-15/groupabi-sdk-inputs.json), [diagnostic pins](../tests/linux-compat/results/2026-10-15/groupabi-diagnostic-inputs.json), [initial link refusal](../tests/linux-compat/results/2026-10-15/groupabi-initial-link-refusal.log), [Linux setup refusal](../tests/linux-compat/results/2026-10-15/groupabi-exploratory-reference.log).
+
+## Native worker process group and session lookup
+
+`getpgid` and `getsid` now accept live nonleader TIDs and report their owning
+process's group and session. `setpgid` rejects a live nonleader with `EINVAL`
+before parent/session/group eligibility checks. Once independently observed
+as retired, that TID returns `ESRCH`; negative groups still take `EINVAL`
+precedence. Leader lookup remains first, preserving zombie query behavior.
+The ordering follows Linux v6.12's
+[task lookup and group/session syscalls](https://github.com/torvalds/linux/blob/v6.12/kernel/sys.c).
+
+The new helper borrows a thread and its owner only while the caller retains
+the existing process-table lock. It snapshots the owner once, requires that
+owner to remain registered and validates namespace visibility against that
+snapshot. Exit and exec can switch a thread to the kernel process before
+removing its TID; the registration guard rejects that detached identity.
+An independent lifetime review found this window in the initial patch and
+confirmed the revised guard. No allocation, pin, free or new lock ordering is
+introduced. Whole production C differs only in the three group/session helpers
+and the new lookup's declaration and body, without identifier normalization.
+Existing orphan-change storage and group mutation/notification are retained.
+
+The `grouptid` probe runs 14,464 controls per architecture across four cohorts:
+root and UID/GID1000 in the initial and one-level PID namespaces. Each cohort
+creates a private session, a held child with its own worker, and two caller
+workers. Signal-zero probes independently establish the caller workers' live
+and retired boundaries. A release pipe keeps the child and its worker alive
+during the matrix. On release, the child joins its worker, exits and is reaped.
+Workers publish their TIDs
+with release/acquire atomics; one runs calls itself while the leader is idle.
+
+| Calls per cohort | Original failures per cohort | Controls |
+| --- | --- | --- |
+| 96 | 48 | Group/session queries of zero, caller leader, both workers, child leader and child worker. |
+| 960 | 768 | Three live workers with zero, caller, child, missing and negative group arguments; exact `EINVAL` and unchanged leader state. |
+| 128 | 0 | Real child assignments to its own group through zero and back to the caller's group. |
+| 2,048 | 2,048 | Child-worker group/session queries after every successful assignment. |
+| 336 | 0 | Independently retired-worker queries and setters, including missing groups and negative-group precedence. |
+| 48 | 24 | Calls from a worker: zero and own-TID queries, process-wide zero setter behavior, and own-TID setter refusal. |
+
+Seven raw register-word forms and genuine musl calls exercise the existing
+signed32 import; setter words vary independently. Leader-issued calls check
+retained group/session state, and child-worker queries follow actual changes to
+its process's group. All worker and child resources are joined/reaped before
+the cohort reports completion. Original kernels fail exactly 11,552 controls
+per architecture. Corrected kernels and the identical native probe ELFs on
+Linux 6.12.51 pass every control on both architectures.
+
+Four warmed 200-cycle cohorts repeat live/retired queries and live-worker
+setter refusals. A preopened `/proc/slabinfo` observer compares every live class
+and big-page count after settling; all remain flat. AArch64 has 18 live classes
+and 73/73 big pages initially, 85/85 in the PID namespace. x86-64 has 14
+classes and 179/179 initially, 201/201 in the namespace, in both credential
+cohorts. Thread creation and exit are outside the measured interval. The probe
+C uses four explicit stack allocas and no allocation, dynamic-array or
+fixed-index helper calls.
+
+Four completed production builds qualify original and corrected kernels. Native
+runtime and `groupabi` regressions pass on both architectures. Eight host test
+files pass. Allocation diagnostics remain byte-identical, including existing
+allowance-file refusals. The audit verifies 66 semantic input fingerprints,
+15,146 compiler inputs, all 2,014 copied SDK inputs, fresh ARM compiler-command
+receipts, source/C/ELF/ISO/kernel identities, Linux references and 84 retained
+regular files across eight native qualification profiles. False-assertion and
+passing-Linux-as-original controls execute without `-prod`.
+
+The first audit stopped before qualification because its SDK count assertion
+incorrectly specified 2,016 files. A complete walk and byte comparison found
+exactly the 2,014 regular files in the copied, previously pinned manifest.
+The corrected audit verifies that complete set and retains the original
+[audit refusal](../tests/linux-compat/results/2026-10-15/grouptid-initial-audit-refusal.log).
+
+Concurrent exit/exec/credential changes, leader-only exit, zombie setters,
+namespace nesting and cross-namespace observers, PID reuse, terminal/job-control
+signals, GNU libc and translated/ELF32 paths remain unqualified. The three broad
+section 15 gates remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/grouptid-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/grouptid-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/grouptid-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/grouptid-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/grouptid-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/grouptid-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/grouptid-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/grouptid-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/grouptid-check.v), [verdict](../tests/linux-compat/results/2026-10-15/grouptid-audit.log), [SDK inputs](../tests/linux-compat/results/2026-10-15/grouptid-sdk-inputs.json), [lifetime review](../tests/linux-compat/results/2026-10-15/grouptid-lifetime-review.txt).

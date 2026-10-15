@@ -1,0 +1,5 @@
+Independent review: /root/grouptid_lifetime_review, 2026-10-15.
+Scope: kernel/proc/pidns.v task_process_in and kernel/proc/job_groups.v callers.
+Initial finding: exit_process and nonleader exec change Thread.process to kernel_process before removing the TID, without pid_lock. Returning t.process directly could expose kernel identity for a dying user task.
+Applied mitigation: snapshot owner once; require process_at(owner.pid)==owner; validate namespace and t.ns_tid against that same snapshot; return owner without rereading t.process. Detached kernel_process has PID0 and is rejected.
+Final review: all three callers retain pid_lock through final use. Thread removal and process reclamation remain serialized by that lock. No pointer escapes, allocation, pin, free or new lock ordering. Leader-first lookup preserves zombie identity. No remaining lifetime/identity-guard issue found in the diff. Concurrent exit/exec timing semantics remain outside this narrow review.

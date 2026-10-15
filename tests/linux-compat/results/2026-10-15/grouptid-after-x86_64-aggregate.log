@@ -1,0 +1,312 @@
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/grouptid/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/grouptid/.vinix-amd64.iso.LbeMOj'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 38.5g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/grouptid/iso-build/.iso-staging.CxW8lM/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13703 sectors
+Written to medium : 13703 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/grouptid/.vinix-amd64.iso.LbeMOj' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd61b.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/grouptid/test.iso (28063744 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/grouptid
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=81464
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91400
+initramfs: Done (9 entries)
+LINUX GROUPTID TOPOLOGY: ordinary=0 namespace=0 uid=0 self=19547 first=64459 second=34476 child=9952 child_tid=45373
+LINUX GROUPTID SLAB: ordinary=0 namespace=0 size=16 live=1624/1624 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=0 size=32 live=2877/2877 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=0 size=48 live=332/332 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=0 size=64 live=162/162 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=0 size=96 live=23/23 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=0 size=128 live=19/19 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=0 size=192 live=382/382 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=0 size=256 live=786/786 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=0 size=384 live=548/548 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=0 size=512 live=495/495 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=0 size=768 live=18/18 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=0 size=1024 live=13/13 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=0 size=1536 live=17/17 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=0 size=2048 live=0/0 cycles=200
+LINUX GROUPTID STORAGE: ordinary=0 namespace=0 cycles=200 big_pages=179/179 PASS
+LINUX GROUPTID CASES: ordinary=0 namespace=0 kind=0 calls=96 failures=0
+LINUX GROUPTID CASES: ordinary=0 namespace=0 kind=1 calls=960 failures=0
+LINUX GROUPTID CASES: ordinary=0 namespace=0 kind=2 calls=128 failures=0
+LINUX GROUPTID CASES: ordinary=0 namespace=0 kind=3 calls=2048 failures=0
+LINUX GROUPTID CASES: ordinary=0 namespace=0 kind=4 calls=336 failures=0
+LINUX GROUPTID CASES: ordinary=0 namespace=0 kind=5 calls=48 failures=0
+LINUX GROUPTID FINAL: ordinary=0 namespace=0 kind=0 calls=96 failures=0
+LINUX GROUPTID FINAL: ordinary=0 namespace=0 kind=1 calls=960 failures=0
+LINUX GROUPTID FINAL: ordinary=0 namespace=0 kind=2 calls=128 failures=0
+LINUX GROUPTID FINAL: ordinary=0 namespace=0 kind=3 calls=2048 failures=0
+LINUX GROUPTID FINAL: ordinary=0 namespace=0 kind=4 calls=336 failures=0
+LINUX GROUPTID FINAL: ordinary=0 namespace=0 kind=5 calls=48 failures=0
+LINUX GROUPTID TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=63042 first=13023 second=11241 child=42853 child_tid=19667
+LINUX GROUPTID SLAB: ordinary=1 namespace=0 size=16 live=1624/1624 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=0 size=32 live=2877/2877 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=0 size=48 live=332/332 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=0 size=64 live=162/162 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=0 size=96 live=23/23 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=0 size=128 live=19/19 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=0 size=192 live=382/382 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=0 size=256 live=786/786 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=0 size=384 live=548/548 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=0 size=512 live=495/495 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=0 size=768 live=18/18 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=0 size=1024 live=13/13 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=0 size=1536 live=17/17 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=0 size=2048 live=0/0 cycles=200
+LINUX GROUPTID STORAGE: ordinary=1 namespace=0 cycles=200 big_pages=179/179 PASS
+LINUX GROUPTID CASES: ordinary=1 namespace=0 kind=0 calls=96 failures=0
+LINUX GROUPTID CASES: ordinary=1 namespace=0 kind=1 calls=960 failures=0
+LINUX GROUPTID CASES: ordinary=1 namespace=0 kind=2 calls=128 failures=0
+LINUX GROUPTID CASES: ordinary=1 namespace=0 kind=3 calls=2048 failures=0
+LINUX GROUPTID CASES: ordinary=1 namespace=0 kind=4 calls=336 failures=0
+LINUX GROUPTID CASES: ordinary=1 namespace=0 kind=5 calls=48 failures=0
+LINUX GROUPTID FINAL: ordinary=1 namespace=0 kind=0 calls=96 failures=0
+LINUX GROUPTID FINAL: ordinary=1 namespace=0 kind=1 calls=960 failures=0
+LINUX GROUPTID FINAL: ordinary=1 namespace=0 kind=2 calls=128 failures=0
+LINUX GROUPTID FINAL: ordinary=1 namespace=0 kind=3 calls=2048 failures=0
+LINUX GROUPTID FINAL: ordinary=1 namespace=0 kind=4 calls=336 failures=0
+LINUX GROUPTID FINAL: ordinary=1 namespace=0 kind=5 calls=48 failures=0
+LINUX GROUPTID TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 first=5 second=6 child=3 child_tid=4
+LINUX GROUPTID SLAB: ordinary=0 namespace=1 size=16 live=1629/1629 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=1 size=32 live=2877/2877 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=1 size=48 live=344/344 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=1 size=64 live=172/172 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=1 size=96 live=23/23 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=1 size=128 live=20/20 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=1 size=192 live=390/390 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=1 size=256 live=786/786 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=1 size=384 live=550/550 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=1 size=512 live=495/495 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=1 size=768 live=26/26 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=1 size=1024 live=13/13 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=1 size=1536 live=17/17 cycles=200
+LINUX GROUPTID SLAB: ordinary=0 namespace=1 size=2048 live=0/0 cycles=200
+LINUX GROUPTID STORAGE: ordinary=0 namespace=1 cycles=200 big_pages=201/201 PASS
+LINUX GROUPTID CASES: ordinary=0 namespace=1 kind=0 calls=96 failures=0
+LINUX GROUPTID CASES: ordinary=0 namespace=1 kind=1 calls=960 failures=0
+LINUX GROUPTID CASES: ordinary=0 namespace=1 kind=2 calls=128 failures=0
+LINUX GROUPTID CASES: ordinary=0 namespace=1 kind=3 calls=2048 failures=0
+LINUX GROUPTID CASES: ordinary=0 namespace=1 kind=4 calls=336 failures=0
+LINUX GROUPTID CASES: ordinary=0 namespace=1 kind=5 calls=48 failures=0
+LINUX GROUPTID FINAL: ordinary=0 namespace=1 kind=0 calls=96 failures=0
+LINUX GROUPTID FINAL: ordinary=0 namespace=1 kind=1 calls=960 failures=0
+LINUX GROUPTID FINAL: ordinary=0 namespace=1 kind=2 calls=128 failures=0
+LINUX GROUPTID FINAL: ordinary=0 namespace=1 kind=3 calls=2048 failures=0
+LINUX GROUPTID FINAL: ordinary=0 namespace=1 kind=4 calls=336 failures=0
+LINUX GROUPTID FINAL: ordinary=0 namespace=1 kind=5 calls=48 failures=0
+LINUX GROUPTID TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 first=5 second=6 child=3 child_tid=4
+LINUX GROUPTID SLAB: ordinary=1 namespace=1 size=16 live=1629/1629 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=1 size=32 live=2877/2877 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=1 size=48 live=344/344 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=1 size=64 live=174/174 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=1 size=96 live=23/23 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=1 size=128 live=21/21 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=1 size=192 live=392/392 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=1 size=256 live=786/786 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=1 size=384 live=550/550 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=1 size=512 live=495/495 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=1 size=768 live=26/26 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=1 size=1024 live=13/13 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=1 size=1536 live=17/17 cycles=200
+LINUX GROUPTID SLAB: ordinary=1 namespace=1 size=2048 live=0/0 cycles=200
+LINUX GROUPTID STORAGE: ordinary=1 namespace=1 cycles=200 big_pages=201/201 PASS
+LINUX GROUPTID CASES: ordinary=1 namespace=1 kind=0 calls=96 failures=0
+LINUX GROUPTID CASES: ordinary=1 namespace=1 kind=1 calls=960 failures=0
+LINUX GROUPTID CASES: ordinary=1 namespace=1 kind=2 calls=128 failures=0
+LINUX GROUPTID CASES: ordinary=1 namespace=1 kind=3 calls=2048 failures=0
+LINUX GROUPTID CASES: ordinary=1 namespace=1 kind=4 calls=336 failures=0
+LINUX GROUPTID CASES: ordinary=1 namespace=1 kind=5 calls=48 failures=0
+LINUX GROUPTID FINAL: ordinary=1 namespace=1 kind=0 calls=96 failures=0
+LINUX GROUPTID FINAL: ordinary=1 namespace=1 kind=1 calls=960 failures=0
+LINUX GROUPTID FINAL: ordinary=1 namespace=1 kind=2 calls=128 failures=0
+LINUX GROUPTID FINAL: ordinary=1 namespace=1 kind=3 calls=2048 failures=0
+LINUX GROUPTID FINAL: ordinary=1 namespace=1 kind=4 calls=336 failures=0
+LINUX GROUPTID FINAL: ordinary=1 namespace=1 kind=5 calls=48 failures=0
+LINUX GROUPTID: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/runtime/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/runtime/.vinix-amd64.iso.ecSCMJ'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 37.1g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/runtime/iso-build/.iso-staging.t43O9z/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13686 sectors
+Written to medium : 13686 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/runtime/.vinix-amd64.iso.ecSCMJ' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd5d7.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/runtime/test.iso (28028928 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/runtime
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=46592
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91a00
+initramfs: Done (9 entries)
+LINUX RUNTIME page_size=4096 pointer_bits=64
+LINUX RUNTIME PASS: atomics SIMD TLS
+LINUX RUNTIME PASS: JIT page sizes
+LINUX RUNTIME PASS: wide offsets time64
+LINUX RUNTIME: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/groupabi/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/groupabi/.vinix-amd64.iso.Ck7VNt'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 37.3g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/groupabi/iso-build/.iso-staging.yE4emO/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13701 sectors
+Written to medium : 13701 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/groupabi/.vinix-amd64.iso.Ck7VNt' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd613.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/groupabi/test.iso (28059648 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/grouptid-20261015/states/p1-after-x86/groupabi
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=75784
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX GROUPABI TOPOLOGY: ordinary=0 uid=0 self=54778 sid=54778 leader=12035 member=56187 outsider=1 dead=31130 outsider_group=1 outsider_session=1
+LINUX GROUPABI SLAB: ordinary=0 size=16 live=1627/1627 cycles=200
+LINUX GROUPABI SLAB: ordinary=0 size=32 live=2878/2878 cycles=200
+LINUX GROUPABI SLAB: ordinary=0 size=48 live=335/335 cycles=200
+LINUX GROUPABI SLAB: ordinary=0 size=64 live=171/171 cycles=200
+LINUX GROUPABI SLAB: ordinary=0 size=96 live=20/20 cycles=200
+LINUX GROUPABI SLAB: ordinary=0 size=128 live=19/19 cycles=200
+LINUX GROUPABI SLAB: ordinary=0 size=192 live=380/380 cycles=200
+LINUX GROUPABI SLAB: ordinary=0 size=256 live=786/786 cycles=200
+LINUX GROUPABI SLAB: ordinary=0 size=384 live=550/550 cycles=200
+LINUX GROUPABI SLAB: ordinary=0 size=512 live=496/496 cycles=200
+LINUX GROUPABI SLAB: ordinary=0 size=768 live=20/20 cycles=200
+LINUX GROUPABI SLAB: ordinary=0 size=1024 live=13/13 cycles=200
+LINUX GROUPABI SLAB: ordinary=0 size=1536 live=19/19 cycles=200
+LINUX GROUPABI SLAB: ordinary=0 size=2048 live=0/0 cycles=200
+LINUX GROUPABI STORAGE: ordinary=0 cycles=200 big_pages=182/182 PASS
+LINUX GROUPABI CASES: ordinary=0 kind=0 calls=160 failures=0
+LINUX GROUPABI CASES: ordinary=0 kind=1 calls=192 failures=0
+LINUX GROUPABI CASES: ordinary=0 kind=2 calls=2496 failures=0
+LINUX GROUPABI CASES: ordinary=0 kind=3 calls=32 failures=0
+LINUX GROUPABI FINAL: ordinary=0 kind=0 calls=160 failures=0
+LINUX GROUPABI FINAL: ordinary=0 kind=1 calls=192 failures=0
+LINUX GROUPABI FINAL: ordinary=0 kind=2 calls=2496 failures=0
+LINUX GROUPABI FINAL: ordinary=0 kind=3 calls=32 failures=0
+LINUX GROUPABI TOPOLOGY: ordinary=1 uid=1000 self=33624 sid=33624 leader=40765 member=44661 outsider=1 dead=30250 outsider_group=1 outsider_session=1
+LINUX GROUPABI SLAB: ordinary=1 size=16 live=1627/1627 cycles=200
+LINUX GROUPABI SLAB: ordinary=1 size=32 live=2878/2878 cycles=200
+LINUX GROUPABI SLAB: ordinary=1 size=48 live=336/336 cycles=200
+LINUX GROUPABI SLAB: ordinary=1 size=64 live=171/171 cycles=200
+LINUX GROUPABI SLAB: ordinary=1 size=96 live=20/20 cycles=200
+LINUX GROUPABI SLAB: ordinary=1 size=128 live=19/19 cycles=200
+LINUX GROUPABI SLAB: ordinary=1 size=192 live=380/380 cycles=200
+LINUX GROUPABI SLAB: ordinary=1 size=256 live=786/786 cycles=200
+LINUX GROUPABI SLAB: ordinary=1 size=384 live=550/550 cycles=200
+LINUX GROUPABI SLAB: ordinary=1 size=512 live=496/496 cycles=200
+LINUX GROUPABI SLAB: ordinary=1 size=768 live=20/20 cycles=200
+LINUX GROUPABI SLAB: ordinary=1 size=1024 live=13/13 cycles=200
+LINUX GROUPABI SLAB: ordinary=1 size=1536 live=19/19 cycles=200
+LINUX GROUPABI SLAB: ordinary=1 size=2048 live=0/0 cycles=200
+LINUX GROUPABI STORAGE: ordinary=1 cycles=200 big_pages=182/182 PASS
+LINUX GROUPABI CASES: ordinary=1 kind=0 calls=160 failures=0
+LINUX GROUPABI CASES: ordinary=1 kind=1 calls=192 failures=0
+LINUX GROUPABI CASES: ordinary=1 kind=2 calls=2496 failures=0
+LINUX GROUPABI CASES: ordinary=1 kind=3 calls=32 failures=0
+LINUX GROUPABI FINAL: ordinary=1 kind=0 calls=160 failures=0
+LINUX GROUPABI FINAL: ordinary=1 kind=1 calls=192 failures=0
+LINUX GROUPABI FINAL: ordinary=1 kind=2 calls=2496 failures=0
+LINUX GROUPABI FINAL: ordinary=1 kind=3 calls=32 failures=0
+LINUX GROUPABI: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+Linux compatibility guest suite: PASS

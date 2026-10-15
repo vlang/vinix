@@ -273,6 +273,26 @@ pub fn process_in(viewer &Namespace, local int) &Process {
 	return p
 }
 
+// Group/session queries accept a live task ID as well as a process leader.
+// The caller holds the table lock through use of the returned process. Keep
+// leader lookup first so its identity remains queryable through zombie life.
+fn task_process_in(viewer &Namespace, local int) &Process {
+	p := process_in(viewer, local)
+	if p != unsafe { nil } { return p }
+	global := global_id_in(viewer, local)
+	if global <= 0 || global >= max_pid { return unsafe { nil } }
+	t := threads_by_tid[global]
+	if t == unsafe { nil } { return unsafe { nil } }
+	// Exit/exec can detach a user thread onto kernel_process before removing
+	// its TID. Snapshot the owner once; never expose that detached identity.
+	owner := t.process
+	if owner == unsafe { nil } || process_at(owner.pid) != owner { return unsafe { nil } }
+	if numbers_own(viewer) && (voidptr(owner.numbered_in) != voidptr(viewer) || t.ns_tid != local) {
+		return unsafe { nil }
+	}
+	return owner
+}
+
 // The kernel's id for the process `viewer` calls `local`, or 0.
 pub fn pid_from(viewer &Namespace, local int) int {
 	lock_table()
