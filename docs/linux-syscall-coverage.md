@@ -756,7 +756,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/userland/cred.v` | `4c0b15cdc1445213cb077f3ec25e80bc300b0808be038f0689838587153c3575` |
 | `kernel/userland/exit.v` | `f7788611aed2a790a60cde0789b089c5771a3dcd91c086cb1ee01932216ea635` |
 | `kernel/userland/linux_signal_amd64.v` | `cd84d3265e38cd99189a1c0c27f30b5db6c01f7dd23208daef1bdbcd51f37077` |
-| `kernel/userland/linux_task.v` | `37dd952a69aab6abf3509714c248d6d1fa340e678e334a4f2b472f7bd97b1f68` |
+| `kernel/userland/linux_task.v` | `8e82520d7550fdd8441f5f1d971185f874aa0166e8b334e54526917a586691ac` |
 | `kernel/userland/seccomp_signal.v` | `b6fb6b23e10c8663d88b6d3fd6794eae1d906e162797b0c298e9bc674182f1f4` |
 | `kernel/userland/userland.v` | `5f469554fcdcb8372091dab30fdd2829a7996da2c66bf2c6d7ec2190490faa7a` |
 | `kernel/userland/userland_arm64.v` | `f86f19d0f1fed3fc5d1c1350559ded02812cd78846a5c61cf76c68d9868d8544` |

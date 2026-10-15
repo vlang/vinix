@@ -1,0 +1,256 @@
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x765c8000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x765c8000 to 0xffffffff80000000, length: 0x2f0000
+vmm: Kernel: Mapping 0x768b8000 to 0xffffffff802f0000, length: 0x2c000
+vmm: Kernel: Mapping 0x768e4000 to 0xffffffff8031c000, length: 0x15e6000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x765c8000 +0x31c000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff000076596000
+initramfs: Size:    127488
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=121008
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff0000765b4e00
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212100
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=0 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=1 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=2 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=3 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=4 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=5 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=6 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=7 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=8 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=9 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=10 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=11 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=12 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=13 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=14 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT TOPOLOGY: ordinary=0 namespace=0 self=50129 child=53221 worker=63790 uid=0 leader_alive=1 observed_ESRCH=1 queued=3 private=1 neighbor=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=15 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=16 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=17 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=18 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=19 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=20 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=21 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=22 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=23 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=24 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=25 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=26 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=27 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=28 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=29 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=30 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=31 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=32 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=33 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=34 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=35 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=36 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=37 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=38 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=39 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=40 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=41 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=42 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=43 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=44 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=45 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=46 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=47 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=48 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=49 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=50 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=51 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=52 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=53 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=54 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=55 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=56 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=57 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=58 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=59 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=60 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=61 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=62 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=63 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=64 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=65 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=66 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=67 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=68 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=69 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=70 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=71 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=72 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=73 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=74 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=75 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=76 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=77 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=78 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=79 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=80 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=81 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=82 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=83 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=84 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=85 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=86 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=87 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=88 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=89 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=90 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=91 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=92 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=93 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=94 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=95 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT COHORT: ordinary=0 namespace=0 self=50129 uid=0 page=16384 raw=96 classes=6 access_checks=192 measured_shared=3
+random: reseeded from 26877 events, 0 hardware words
+live 197 dropped 0
+96 16 ffffffff8021a4e4 ffffffff8024d4fc ffffffff801c2820 ffffffff80022180 ffffffff80247344 ffffffff80275a78 ffffffff802ec078 0 0 0
+96 16 ffffffff8021a4e4 ffffffff8024d4fc ffffffff802dfab8 ffffffff80020abc ffffffff80247344 ffffffff80275a78 ffffffff802ec078 0 0 0
+
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=16 live=1092/1284 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=32 live=88/88 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=48 live=57/57 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=64 live=105/105 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=96 live=17/17 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=128 live=5/5 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=192 live=333/333 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=256 live=628/628 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=384 live=439/439 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=512 live=392/392 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=768 live=20/20 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=1024 live=4/4 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=1536 live=13/13 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=2048 live=0/0 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=2688 live=0/0 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=4048 live=0/0 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=5392 live=0/0 cycles=600
+LINUX TIDFAULT SLAB: ordinary=0 namespace=0 size=8096 live=0/0 cycles=600
+LINUX TIDFAULT STORAGE: ordinary=0 namespace=0 cycles=600 big_pages=63/63 FAIL
+LINUX TIDFAULT CASES: ordinary=0 namespace=0 kind=0 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=0 namespace=0 kind=1 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=0 namespace=0 kind=2 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=0 namespace=0 kind=3 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=0 namespace=0 kind=4 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=0 namespace=0 kind=5 calls=16 failures=0
+LINUX TIDFAULT TRACK: DONE
+QEMU: Terminated
+

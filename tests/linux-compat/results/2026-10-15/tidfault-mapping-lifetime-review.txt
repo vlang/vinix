@@ -1,0 +1,11 @@
+Review: /root/tidfault_mapping_lifetime_review, 2026-10-15
+
+PASS for the two synchronous stack interface receivers in
+resource.reserve_shared_mapping and resource.lazy_shared_mapping.
+Only TmpFSResource implements either capability. Dispatch extracts _object,
+calls the concrete method and returns bool; it retains no interface pointer.
+The reservation callback holds the existing resource lock and calls paging
+helpers synchronously; the lazy callback returns true. Any persistent backing
+storage belongs to the existing TmpFSResource. A blocked lock acquisition keeps
+the wrapper frame alive. No free, refcount or backing-page ownership changes.
+Verify generated C removes the two receiver memdup calls and rerun measurements.

@@ -1858,3 +1858,26 @@ owner/worker/observer cleanup with one shared waiter per trial.
 `tidwake-check.v` without `-prod` to verify original failures, final results,
 whole-C scope, retained refusals, SDK/compiler/inventory pins and executing
 negative controls. See [the TID exit report](../../docs/linux-posix-qualification.md#native-clear-child-tid-selective-exit-wakes) for the raw-exit workflow and qualification limits.
+
+The `tidfault` case checks clear-child-tid notification after a failed zero
+store: readable MAP_SHARED direct/alias addresses still wake one waiter;
+PROT_NONE, unmapped and read-only private anonymous addresses retain their
+queues. Its 384 controls per architecture establish one/three shared waiters
+before changing access, verify actual process_vm read/write results, retire
+the raw worker while its leader lives, restore access and count every remaining
+waiter. Private/neighbor queues and complete two-page parent/conductor canaries
+must survive. Four warmed 200-trial cleanup cohorts keep three shared waiters
+per trial. Use `--cases tidfault --timeout 1500` with a fresh state directory.
+`tidfault-reference.v` boots the unchanged ELF on Linux; compile
+`tidfault-check.v` without `-prod` to audit original failures, final results,
+exact whole-C scope, SDK/compiler/inventory pins and executing negative controls.
+See [the fault-notification report](../../docs/linux-posix-qualification.md#native-clear-child-tid-store-fault-notifications)
+for the raw-exit workflow and remaining limits.
+
+The supplementary `tidfault-perf-check.v` auditor checks completed operation,
+churn/cache and idle/apps/drag logs from the desktop performance harness against
+its saved JSON and the same corrected ARM kernel. Compile without `-prod`,
+adding `tests/desktop-perf` to V's module path. It retains the strict auditor's
+actual refusal and explicitly reports the single observed EXT2 rename retention
+finding; its evidence-integrity pass leaves general retention qualification
+open. Desktop/application lifecycle qualification remains separate.

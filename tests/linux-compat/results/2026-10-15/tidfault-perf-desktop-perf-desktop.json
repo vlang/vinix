@@ -1,0 +1,47 @@
+[
+  {
+    "variant": "new",
+    "scenario": "idle",
+    "round": 1,
+    "seconds": "5.0",
+    "processes": "4",
+    "desktop_cpu": "0.21",
+    "apps_cpu": "0.20",
+    "total_cpu": "0.41",
+    "desktop_mb": "40.1",
+    "apps_mb": "40.6",
+    "total_mb": "80.7",
+    "system_used_mb": "348.9",
+    "physical_mb": "127.1"
+  },
+  {
+    "variant": "new",
+    "scenario": "apps",
+    "round": 1,
+    "seconds": "5.0",
+    "processes": "9",
+    "desktop_cpu": "0.49",
+    "apps_cpu": "0.36",
+    "total_cpu": "0.85",
+    "desktop_mb": "43.8",
+    "apps_mb": "134.0",
+    "total_mb": "177.8",
+    "system_used_mb": "492.8",
+    "physical_mb": "245.4"
+  },
+  {
+    "variant": "new",
+    "scenario": "drag",
+    "round": 1,
+    "seconds": "5.0",
+    "processes": "9",
+    "desktop_cpu": "1.53",
+    "apps_cpu": "0.41",
+    "total_cpu": "1.93",
+    "desktop_mb": "43.9",
+    "apps_mb": "134.0",
+    "total_mb": "177.9",
+    "system_used_mb": "483.6",
+    "physical_mb": "235.8"
+  }
+]

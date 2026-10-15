@@ -12,6 +12,7 @@ import event
 import event.eventstruct
 import futex
 import katomic
+import memory.mmap
 import proc
 import usercopy
 
@@ -212,7 +213,11 @@ fn clear_child_tid(mut t proc.Thread) {
 
 	zero := u32(0)
 	if !usercopy.copy_to_user(address, voidptr(&zero), sizeof(u32)) {
-		return
+		// Linux still tries the shared wake after a failed store. A readable
+		// shared mapping can supply its key; a read-only private anonymous
+		// word cannot. Keep inaccessible or absent mappings out of the wake.
+		if !mmap.is_shared_address(t.process.pagemap, address) { return }
+		usercopy.read_u32(address) or { return }
 	}
 
 	// Linux's exit notification selects one shared-key waiter. Other waiters

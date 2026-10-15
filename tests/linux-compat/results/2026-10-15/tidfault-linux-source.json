@@ -1,0 +1,5 @@
+{
+    "core": "cf4b088c8b18e5d3cc9d33d52cd38326f5ff7ca1d23a979c6a0e3b5261b8e40e https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux/+/refs/tags/v6.12/kernel/futex/core.c?format=TEXT",
+    "fork": "90342b5b1d7708052564b95a8855a19b3925fe0d1c3f018b472dc66045328433 https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux/+/refs/tags/v6.12/kernel/fork.c?format=TEXT",
+    "waitwake": "f756076b20c0ad996a9c6f86702de05ffa3f942a7ff20ec8ef73ec213ef156f7 https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux/+/refs/tags/v6.12/kernel/futex/waitwake.c?format=TEXT"
+}

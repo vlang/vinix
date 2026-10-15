@@ -1,0 +1,3 @@
+tests/linux-compat/tidfault-check.v:125: FAIL: fn main.failure: assert log.contains('LINUX TIDFAULT DETAIL:'), 'tidfault baseline failure markers required'
+      message: tidfault baseline failure markers required
+V panic: Assertion failed...

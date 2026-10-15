@@ -8834,3 +8834,145 @@ clone child_tid flag combinations, exec/forced sibling exit, concurrent mapping
 or registration changes, GNU libc and foreign/translated paths remain separate.
 The broad libc, installation/sandbox/portal and translated/32-bit roadmap gates
 remain open.
+
+## Native clear-child-tid store-fault notifications
+
+The 2026-10-15 `tidfault` qualification preserves the single shared-key exit
+notification when clearing the registered TID fails on a readable MAP_SHARED
+word. Linux's [mm_release](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c#L1523)
+attempts FUTEX_WAKE(1) even after put_user fails. The
+[wake path](https://github.com/torvalds/linux/blob/v6.12/kernel/futex/waitwake.c)
+requests a FUTEX_READ key; [key lookup](https://github.com/torvalds/linux/blob/v6.12/kernel/futex/core.c)
+can fall back to readable shared pages but rejects read-only anonymous pages.
+The three complete tagged sources, base64 downloads, exact URLs and SHA-256
+values remain pinned in the evidence area.
+
+The frozen base is `c39a5ef38d7652f276619cf9073970ca1969e342`.
+Each native architecture runs 384 controls in four root/UID1000 and
+initial/one-level PID namespace cohorts. Each class has sixteen controls per
+cohort: four initial words (zero, all ones, a distinct sentinel and the actual
+owner TID), two aligned offsets including the native page's last four bytes,
+and one/three shared waiters.
+
+| Registered address after queue admission | Expected store / wake | Original failures per cohort |
+| --- | --- | ---: |
+| Read-only shared memfd mapping | unchanged / one | 16 |
+| Read-only alias of the shared memfd mapping | unchanged / one | 16 |
+| Writable shared mapping | exactly four zero bytes / one | 0 |
+| PROT_NONE shared mapping | unchanged / none | 0 |
+| Unmapped shared registration address | unchanged / none | 0 |
+| Read-only private anonymous replacement | unchanged / none | 0 |
+
+A conductor process keeps its leader alive while a raw worker registers the
+address and waits on a pipe. Positive CMP_REQUEUE counts prove entry of all
+shared waiters, one private-key waiter and one neighboring-word waiter before
+the conductor changes protection or removes the registered mapping. Independent
+self process_vm read/write calls then verify the actual access state: one-byte
+reads succeed on readable mappings, only the writable class permits a write,
+and every forbidden access reports EFAULT. Local guards and the complete mapped
+data detect unintended changes; a permitted write repeats the byte just read.
+
+After worker release, tgkill(..., 0) must report ESRCH for the worker while its
+leader remains live. Only then does the conductor restore access or remap the
+original shared page, and drain the already admitted queues. Active writable
+and readable shared registrations leave exactly zero/two shared waiters;
+inaccessible and private read-only registrations leave all one/three. Private
+and neighboring queues each retain their own waiter. Empty park queues and
+successful observer joins account for every waiter.
+
+Both conductor aliases are checked against complete two-native-page expected
+images. After conductor exit and reap, the parent independently checks both
+original shared aliases, including the untouched backing of the private
+anonymous replacement. The worker deliberately uses raw exit after replacing
+musl's clear-tid registration; it does not run libc teardown and is not joined
+through musl. Its stack and thread metadata stay inside the disposable conductor
+image until leader exit. All observer threads use ordinary musl joins.
+
+Both originals fail exactly 128 controls. Corrected kernels and the identical
+probe ELFs on Linux 6.12.51 have zero failures. Native ARM uses 16KiB pages;
+x86 and both Linux references use 4KiB pages.
+
+Four corrected cleanup cohorts per architecture warm 96 trials spanning all
+six classes, initial words and both offsets, settle for thirteen seconds,
+run 200 complete trials and settle again. Every measured
+trial keeps three shared observers, so successful notifications leave two
+waiters to drain. Measurements include conductor fork, worker/observer creation,
+registration, admission, protection/unmap/restore, access probes, worker exit,
+retirement checks, queue drain, joins, two-page comparisons, map/FD cleanup and
+conductor exit/reap. The parent's two aliases and memfd intentionally remain
+open throughout. All live slab classes and big-heap page totals stay flat;
+the raw logs retain exact values. General physical user-page and page-cache
+retention are outside this measurement.
+
+Six fresh isolated production builds bind originals, the first correction and
+the final correction. Exact whole-C comparison confines the first correction
+to the failed-store branch's shared-mapping and readability checks. The final
+correction also replaces two shared-mapping capability receiver boxes with
+explicit stack receivers. The successful store path, pointer retirement,
+existing single wake, locks, ownership and releases are unchanged. There is no
+new free, pin, escaped local or generated-C normalization. Probe C has fourteen
+explicit stack allocas and no dynamic allocation or fixed-index helper. The
+compiler preflight passes before guest execution and its C matches the final
+original ARM input.
+
+The first correction passes all semantic checks but its cleanup test refuses
+both architectures: each 200-trial cohort retains 64 objects in the 16-byte
+class. All larger classes and big-heap totals remain equal. A separate tracking
+kernel identifies two sites after 600 trials: 96 receiver boxes each in
+resource.reserve_shared_mapping and resource.lazy_shared_mapping. The shared
+remap control exposes these existing per-mapping allocations. Their generated
+C calls memdup even though the source has no explicit allocation. Explicit
+borrowed stack receivers remove both copies. A separate
+[lifetime review](../tests/linux-compat/results/2026-10-15/tidfault-mapping-lifetime-review.txt)
+confirms synchronous callbacks that retain no interface pointer. Final cleanup
+measurements are flat without changing the workload. The first failed runs,
+their 84 captured case files and the named allocation chains remain pinned.
+
+The first allocation-tracking setup calls setsid from PID1 and is refused with
+EPERM before measuring a cohort. Its exact source/C/ELF and refusal remain
+retained. The corrected diagnostic forks a coordinator before qualification;
+this setup refusal is separate from the observed retained allocations.
+
+The same corrected ARM kernel also runs the desktop performance harness with
+an existing cached desktop/image in a 12GiB guest. Idle, application-launch and
+window-drag smoke checks pass. Its 36 warmed 200-operation tmpfs/EXT2 retention
+cohorts expose one unresolved observation: the EXT2 rename cohort retains one
+256-byte object. This is separate from the two identified mapping receiver
+sites and does not establish the cause or reproducibility of that observation.
+All four warmed 300-execution churn cohorts (true, sleep, curl and BusyBox awk)
+report zero retained bytes, with no changed slab/big-heap row; cache costs are
+reported separately.
+
+The strict general-retention auditor refuses the run. Its original source,
+binary and actual refusal are retained; the supplementary evidence explicitly
+sets `general_retention_flat` to false and enumerates the positive row.
+The targeted clear-tid cleanup cohorts remain flat on both architectures.
+See the [supplementary evidence](../tests/linux-compat/results/2026-10-15/tidfault-performance-evidence.json)
+and [retention refusal](../tests/linux-compat/results/2026-10-15/tidfault-performance-retention-refusal.log).
+These desktop checks do not qualify x86 desktop behavior or installation,
+save/update, portal and sandbox workflows.
+
+Both corrected architectures also pass runtime and tidwake regressions. Eight
+host test files pass; allocation diagnostics remain byte-identical, including
+existing allowance refusals. The auditor binds 67 dispatch inventory inputs,
+2,014 private SDK files, 15,146 compiler pins, fifteen final ARM compiler-command
+receipts and all 84 retained regular files across eight final native case profiles.
+Compile it without `-prod`: false-assertion and passing-Linux-as-original
+negative controls must execute and fail.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-15/tidfault-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-15/tidfault-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-15/tidfault-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-15/tidfault-diagnostic-pins.json).
+Raw original/corrected/Linux, build, regression and scanner logs accompany the
+receipts. The maintained auditor is `tests/linux-compat/tidfault-check.v`.
+The supplementary report is checked by `tests/linux-compat/tidfault-perf-check.v`;
+its first compiler preflight is refused because the report module's strtod
+call needs an explicit stdlib.h include. The refusal, original source and
+corrected compiler output remain pinned.
+
+Private-file and anonymous shared backings, unaligned/cross-page stores,
+last-address-space-user behavior, clone child_tid flags, exec/forced sibling
+exit, concurrent mapping/registration changes, GNU libc and foreign/translated
+paths remain separate. The broad libc, installation/sandbox/portal and
+translated/32-bit roadmap gates remain open.

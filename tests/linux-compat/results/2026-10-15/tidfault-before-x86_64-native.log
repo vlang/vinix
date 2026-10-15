@@ -1,0 +1,481 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=85672
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037fec400
+initramfs: Done (9 entries)
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=0 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=0 namespace=0 kind=0 index=0 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=1 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=0 namespace=0 kind=0 index=1 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=2 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=0 namespace=0 kind=0 index=2 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=3 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=4 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=5 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=6 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=7 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=8 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=9 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=10 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=11 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=12 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=13 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=14 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT TOPOLOGY: ordinary=0 namespace=0 self=62672 child=9384 worker=23941 uid=0 leader_alive=1 observed_ESRCH=1 queued=3 private=1 neighbor=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=0 index=15 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=16 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=0 namespace=0 kind=1 index=16 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=17 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=0 namespace=0 kind=1 index=17 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=18 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=0 namespace=0 kind=1 index=18 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=19 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=20 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=21 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=22 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=23 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=24 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=25 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=26 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=27 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=28 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=29 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=30 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=1 index=31 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=32 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=33 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=34 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=35 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=36 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=37 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=38 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=39 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=40 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=41 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=42 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=43 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=44 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=45 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=46 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=2 index=47 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=48 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=49 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=50 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=51 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=52 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=53 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=54 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=55 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=56 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=57 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=58 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=59 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=60 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=61 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=62 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=3 index=63 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=64 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=65 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=66 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=67 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=68 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=69 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=70 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=71 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=72 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=73 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=74 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=75 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=76 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=77 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=78 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=4 index=79 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=80 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=81 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=82 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=83 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=84 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=85 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=86 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=87 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=88 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=89 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=90 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=91 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=92 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=93 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=94 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=0 kind=5 index=95 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT COHORT: ordinary=0 namespace=0 self=62672 uid=0 page=4096 raw=96 classes=6 access_checks=192 measured_shared=3
+LINUX TIDFAULT CASES: ordinary=0 namespace=0 kind=0 calls=16 failures=16
+LINUX TIDFAULT CASES: ordinary=0 namespace=0 kind=1 calls=16 failures=16
+LINUX TIDFAULT CASES: ordinary=0 namespace=0 kind=2 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=0 namespace=0 kind=3 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=0 namespace=0 kind=4 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=0 namespace=0 kind=5 calls=16 failures=0
+LINUX TIDFAULT FINAL: ordinary=0 namespace=0 kind=0 calls=16 failures=16
+LINUX TIDFAULT FINAL: ordinary=0 namespace=0 kind=1 calls=16 failures=16
+LINUX TIDFAULT FINAL: ordinary=0 namespace=0 kind=2 calls=16 failures=0
+LINUX TIDFAULT FINAL: ordinary=0 namespace=0 kind=3 calls=16 failures=0
+LINUX TIDFAULT FINAL: ordinary=0 namespace=0 kind=4 calls=16 failures=0
+LINUX TIDFAULT FINAL: ordinary=0 namespace=0 kind=5 calls=16 failures=0
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=0 index=0 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=1 namespace=0 kind=0 index=0 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=0 index=1 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=1 namespace=0 kind=0 index=1 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=0 index=2 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=1 namespace=0 kind=0 index=2 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=0 index=3 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=0 index=4 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=0 index=5 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=0 index=6 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=0 index=7 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=0 index=8 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=0 index=9 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=0 index=10 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=0 index=11 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=0 index=12 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=0 index=13 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=0 index=14 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT TOPOLOGY: ordinary=1 namespace=0 self=16900 child=43756 worker=32877 uid=1000 leader_alive=1 observed_ESRCH=1 queued=3 private=1 neighbor=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=0 index=15 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=1 index=16 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=1 namespace=0 kind=1 index=16 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=1 index=17 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=1 namespace=0 kind=1 index=17 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=1 index=18 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=1 namespace=0 kind=1 index=18 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=1 index=19 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=1 index=20 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=1 index=21 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=1 index=22 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=1 index=23 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=1 index=24 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=1 index=25 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=1 index=26 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=1 index=27 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=1 index=28 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=1 index=29 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=1 index=30 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=1 index=31 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=2 index=32 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=2 index=33 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=2 index=34 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=2 index=35 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=2 index=36 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=2 index=37 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=2 index=38 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=2 index=39 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=2 index=40 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=2 index=41 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=2 index=42 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=2 index=43 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=2 index=44 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=2 index=45 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=2 index=46 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=2 index=47 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=3 index=48 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=3 index=49 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=3 index=50 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=3 index=51 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=3 index=52 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=3 index=53 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=3 index=54 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=3 index=55 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=3 index=56 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=3 index=57 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=3 index=58 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=3 index=59 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=3 index=60 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=3 index=61 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=3 index=62 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=3 index=63 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=4 index=64 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=4 index=65 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=4 index=66 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=4 index=67 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=4 index=68 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=4 index=69 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=4 index=70 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=4 index=71 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=4 index=72 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=4 index=73 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=4 index=74 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=4 index=75 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=4 index=76 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=4 index=77 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=4 index=78 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=4 index=79 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=5 index=80 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=5 index=81 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=5 index=82 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=5 index=83 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=5 index=84 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=5 index=85 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=5 index=86 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=5 index=87 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=5 index=88 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=5 index=89 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=5 index=90 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=5 index=91 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=5 index=92 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=5 index=93 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=5 index=94 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=0 kind=5 index=95 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT COHORT: ordinary=1 namespace=0 self=16900 uid=1000 page=4096 raw=96 classes=6 access_checks=192 measured_shared=3
+LINUX TIDFAULT CASES: ordinary=1 namespace=0 kind=0 calls=16 failures=16
+LINUX TIDFAULT CASES: ordinary=1 namespace=0 kind=1 calls=16 failures=16
+LINUX TIDFAULT CASES: ordinary=1 namespace=0 kind=2 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=1 namespace=0 kind=3 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=1 namespace=0 kind=4 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=1 namespace=0 kind=5 calls=16 failures=0
+LINUX TIDFAULT FINAL: ordinary=1 namespace=0 kind=0 calls=16 failures=16
+LINUX TIDFAULT FINAL: ordinary=1 namespace=0 kind=1 calls=16 failures=16
+LINUX TIDFAULT FINAL: ordinary=1 namespace=0 kind=2 calls=16 failures=0
+LINUX TIDFAULT FINAL: ordinary=1 namespace=0 kind=3 calls=16 failures=0
+LINUX TIDFAULT FINAL: ordinary=1 namespace=0 kind=4 calls=16 failures=0
+LINUX TIDFAULT FINAL: ordinary=1 namespace=0 kind=5 calls=16 failures=0
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=0 index=0 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=0 namespace=1 kind=0 index=0 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=0 index=1 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=0 namespace=1 kind=0 index=1 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=0 index=2 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=0 namespace=1 kind=0 index=2 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=0 index=3 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=0 index=4 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=0 index=5 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=0 index=6 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=0 index=7 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=0 index=8 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=0 index=9 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=0 index=10 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=0 index=11 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=0 index=12 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=0 index=13 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=0 index=14 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT TOPOLOGY: ordinary=0 namespace=1 self=2 child=92 worker=93 uid=0 leader_alive=1 observed_ESRCH=1 queued=3 private=1 neighbor=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=0 index=15 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=1 index=16 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=0 namespace=1 kind=1 index=16 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=1 index=17 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=0 namespace=1 kind=1 index=17 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=1 index=18 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=0 namespace=1 kind=1 index=18 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=1 index=19 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=1 index=20 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=1 index=21 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=1 index=22 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=1 index=23 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=1 index=24 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=1 index=25 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=1 index=26 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=1 index=27 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=1 index=28 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=1 index=29 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=1 index=30 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=1 index=31 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=2 index=32 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=2 index=33 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=2 index=34 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=2 index=35 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=2 index=36 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=2 index=37 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=2 index=38 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=2 index=39 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=2 index=40 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=2 index=41 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=2 index=42 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=2 index=43 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=2 index=44 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=2 index=45 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=2 index=46 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=2 index=47 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=3 index=48 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=3 index=49 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=3 index=50 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=3 index=51 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=3 index=52 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=3 index=53 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=3 index=54 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=3 index=55 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=3 index=56 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=3 index=57 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=3 index=58 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=3 index=59 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=3 index=60 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=3 index=61 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=3 index=62 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=3 index=63 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=4 index=64 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=4 index=65 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=4 index=66 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=4 index=67 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=4 index=68 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=4 index=69 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=4 index=70 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=4 index=71 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=4 index=72 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=4 index=73 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=4 index=74 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=4 index=75 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=4 index=76 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=4 index=77 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=4 index=78 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=4 index=79 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=5 index=80 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=5 index=81 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=5 index=82 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=5 index=83 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=5 index=84 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=5 index=85 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=5 index=86 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=5 index=87 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=5 index=88 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=5 index=89 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=5 index=90 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=5 index=91 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=5 index=92 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=5 index=93 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=5 index=94 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=0 namespace=1 kind=5 index=95 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT COHORT: ordinary=0 namespace=1 self=2 uid=0 page=4096 raw=96 classes=6 access_checks=192 measured_shared=3
+LINUX TIDFAULT CASES: ordinary=0 namespace=1 kind=0 calls=16 failures=16
+LINUX TIDFAULT CASES: ordinary=0 namespace=1 kind=1 calls=16 failures=16
+LINUX TIDFAULT CASES: ordinary=0 namespace=1 kind=2 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=0 namespace=1 kind=3 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=0 namespace=1 kind=4 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=0 namespace=1 kind=5 calls=16 failures=0
+LINUX TIDFAULT FINAL: ordinary=0 namespace=1 kind=0 calls=16 failures=16
+LINUX TIDFAULT FINAL: ordinary=0 namespace=1 kind=1 calls=16 failures=16
+LINUX TIDFAULT FINAL: ordinary=0 namespace=1 kind=2 calls=16 failures=0
+LINUX TIDFAULT FINAL: ordinary=0 namespace=1 kind=3 calls=16 failures=0
+LINUX TIDFAULT FINAL: ordinary=0 namespace=1 kind=4 calls=16 failures=0
+LINUX TIDFAULT FINAL: ordinary=0 namespace=1 kind=5 calls=16 failures=0
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=0 index=0 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=1 namespace=1 kind=0 index=0 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=0 index=1 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=1 namespace=1 kind=0 index=1 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=0 index=2 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=1 namespace=1 kind=0 index=2 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=0 index=3 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=0 index=4 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=0 index=5 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=0 index=6 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=0 index=7 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=0 index=8 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=0 index=9 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=0 index=10 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=0 index=11 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=0 index=12 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=0 index=13 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=0 index=14 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT TOPOLOGY: ordinary=1 namespace=1 self=2 child=92 worker=93 uid=1000 leader_alive=1 observed_ESRCH=1 queued=3 private=1 neighbor=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=0 index=15 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=1 index=16 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=1 namespace=1 kind=1 index=16 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=1 index=17 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=1 namespace=1 kind=1 index=17 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=1 index=18 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT DETAIL: ordinary=1 namespace=1 kind=1 index=18 remaining=1 expected=0 changed=0
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=1 index=19 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=1 index=20 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=1 index=21 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=1 index=22 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=1 index=23 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=1 index=24 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=1 index=25 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=1 index=26 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=1 index=27 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=1 index=28 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=1 index=29 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=1 index=30 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=1 index=31 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=2 index=32 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=2 index=33 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=2 index=34 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=2 index=35 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=2 index=36 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=2 index=37 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=2 index=38 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=2 index=39 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=2 index=40 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=2 index=41 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=2 index=42 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=2 index=43 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=2 index=44 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=2 index=45 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=2 index=46 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=2 index=47 read=1/0 write=1/0 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=3 index=48 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=3 index=49 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=3 index=50 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=3 index=51 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=3 index=52 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=3 index=53 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=3 index=54 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=3 index=55 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=3 index=56 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=3 index=57 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=3 index=58 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=3 index=59 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=3 index=60 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=3 index=61 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=3 index=62 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=3 index=63 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=4 index=64 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=4 index=65 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=4 index=66 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=4 index=67 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=4 index=68 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=4 index=69 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=4 index=70 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=4 index=71 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=4 index=72 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=4 index=73 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=4 index=74 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=4 index=75 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=4 index=76 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=4 index=77 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=4 index=78 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=4 index=79 read=-1/14 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=5 index=80 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=5 index=81 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=5 index=82 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=5 index=83 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=5 index=84 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=5 index=85 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=5 index=86 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=5 index=87 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=5 index=88 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=5 index=89 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=5 index=90 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=5 index=91 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=5 index=92 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=5 index=93 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=5 index=94 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT ACCESS: ordinary=1 namespace=1 kind=5 index=95 read=1/0 write=-1/14 guarded=1
+LINUX TIDFAULT COHORT: ordinary=1 namespace=1 self=2 uid=1000 page=4096 raw=96 classes=6 access_checks=192 measured_shared=3
+LINUX TIDFAULT CASES: ordinary=1 namespace=1 kind=0 calls=16 failures=16
+LINUX TIDFAULT CASES: ordinary=1 namespace=1 kind=1 calls=16 failures=16
+LINUX TIDFAULT CASES: ordinary=1 namespace=1 kind=2 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=1 namespace=1 kind=3 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=1 namespace=1 kind=4 calls=16 failures=0
+LINUX TIDFAULT CASES: ordinary=1 namespace=1 kind=5 calls=16 failures=0
+LINUX TIDFAULT FINAL: ordinary=1 namespace=1 kind=0 calls=16 failures=16
+LINUX TIDFAULT FINAL: ordinary=1 namespace=1 kind=1 calls=16 failures=16
+LINUX TIDFAULT FINAL: ordinary=1 namespace=1 kind=2 calls=16 failures=0
+LINUX TIDFAULT FINAL: ordinary=1 namespace=1 kind=3 calls=16 failures=0
+LINUX TIDFAULT FINAL: ordinary=1 namespace=1 kind=4 calls=16 failures=0
+LINUX TIDFAULT FINAL: ordinary=1 namespace=1 kind=5 calls=16 failures=0
+LINUX TIDFAULT FAIL: clear-child-tid store-fault notification, permissions, queue counts or retained storage
+QEMU: Terminated
+

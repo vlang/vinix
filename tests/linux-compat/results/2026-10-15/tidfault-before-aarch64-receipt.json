@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "9aaa5b181d83394d2e42f9aacf30db692c5ee4376a3ea5b2243c37958a7b4556",
+    "results": [
+        {
+            "name": "tidfault",
+            "source_sha256": "99dfb1f0c48f1e417915a84183a428b89298a17d2b4e70bc0b66d7ddbdaf433b",
+            "init_sha256": "690378306ca58035df978cb4b3186febc9b8214aeb3f26410b73e5d0a28e43e5",
+            "iso_sha256": "c6e48d9787ed0c0f914764a4d789be06738bbc1e4073a991c6c16e6f87a9dbbd",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

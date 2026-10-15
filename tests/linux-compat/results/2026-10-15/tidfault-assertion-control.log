@@ -1,0 +1,3 @@
+tests/linux-compat/tidfault-check.v:222: FAIL: fn main.main: assert false, 'tidfault assertions must execute'
+      message: tidfault assertions must execute
+V panic: Assertion failed...

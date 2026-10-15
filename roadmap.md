@@ -1061,6 +1061,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   in both PID namespace views, with identical-ELF Linux controls.
   See [the TID exit receipts](docs/linux-posix-qualification.md#native-clear-child-tid-selective-exit-wakes).
 
+- [x] Preserve one shared clear-child-tid wake when its zero store faults on
+  a readable MAP_SHARED word; retain inaccessible/unmapped and read-only private
+  anonymous queues. Qualify real access faults, guarded data, admitted waiters
+  and flat three-waiter cleanup in both credential/PID namespace views.
+  See [the TID fault receipts](docs/linux-posix-qualification.md#native-clear-child-tid-store-fault-notifications).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
