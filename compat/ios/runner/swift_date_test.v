@@ -30,6 +30,33 @@ type SwiftDateLookup = fn (u64, u64, u64, u64, u64) u64
 type DateEncodingProbe = fn (u64, u64, u64, &u64)
 type DateEncodingSign = fn (u64, u64) u64
 type DateEncodingTable = fn (u64, u64, u64) u64
+type DateEqualWitnessProbe = fn (u64, u64, u64, u64, u64, u64, &u64)
+
+fn swift_date_equatable_dispatch(entry u64, metadata u64, table u64, code u64, guard u64) {
+	probe := unsafe { DateEqualWitnessProbe(voidptr(code + 640)) }
+	values := [u64(0), 0x8000000000000000, 1, 0x3ff0000000000000, 0xc22d63c8c5000000,
+		0x7ff0000000000000, 0x7ff8000000000042, 0x7ff0000000000042]!
+	for left in values {
+		for right in values {
+			mut output := [u64(0xcafe), u64(-1), 0, 0, 0xbeef]!
+			probe(entry, u64(unsafe { &left }), u64(unsafe { &right }), metadata, table, guard, unsafe { &output[1] })
+			assert output == [u64(0xcafe), u64(unsafe { *(&f64(&left)) == *(&f64(&right)) }), guard, 0x5021, 0xbeef]!
+		}
+	}
+}
+
+fn swift_date_equatable_publish(framework bool) u64 {
+	library := if framework { '/System/Library/Frameworks/Foundation.framework/Foundation' } else { '/usr/lib/swift/libswiftFoundation.dylib' }
+	mut table := u64(0)
+	for _ in 0 .. 128 {
+		conformance := runtime_symbol(library, '_$s10Foundation4DateVSQAAMc') or { panic(err) }
+		accessor := runtime_symbol(library, '_$s10Foundation4DateVMa') or { panic(err) }
+		response := unsafe { SwiftDateAccess(voidptr(accessor))(0xff) }
+		table = swift_witness_table(conformance, response.metadata, 0)
+		assert read64(table) == conformance && response.state == 0
+	}
+	return table
+}
 
 struct DateEncodingScenario {
 	metadata u64
@@ -604,11 +631,20 @@ fn test_swift_date() {
 		0xd28a0435, 0xd63f0200, 0xa9000660, 0xa9015674, 0xa94153f3, 0xa9425bf5, 0xa8c37bfd, 0xd65f03c0]! {
 		write32(code + 544 + u64(i * 4), op)
 	}
-	C.__builtin___clear_cache(unsafe { voidptr(code) }, unsafe { voidptr(code + 600) })
+	// Generic Equatable.== receives two borrowed values plus their concrete
+	// metadata/table in x2/x3. Keep x8 protected and capture Swift context.
+	for i, op in [u32(0xa9bd7bfd), 0xa90153f3, 0xa9025bf5, 0xaa0003f0, 0xaa0603f3,
+		0xaa0503f4, 0xaa0503e8, 0xaa0103e0, 0xaa0203e1, 0xaa0303e2, 0xaa0403e3,
+		0xd28a0435, 0xd63f0200, 0xf9000260, 0xa900d674, 0xa94153f3, 0xa9425bf5, 0xa8c37bfd,
+		0xd65f03c0]! {
+		write32(code + 640 + u64(i * 4), op)
+	}
+	C.__builtin___clear_cache(unsafe { voidptr(code) }, unsafe { voidptr(code + 716) })
 	assert C.mprotect(unsafe { voidptr(code) }, page, C.PROT_READ | C.PROT_EXEC) == 0
 	probe := unsafe { SwiftDateProbe(voidptr(code)) }
 	mut interval_reader := u64(0)
 	mut native_equal := u64(0)
+	mut native_equal_witness := u64(0)
 	mut clock := u64(unsafe { voidptr(cf_absolute_time) })
 	$if macos {
 		foundation := C.dlopen(c'/System/Library/Frameworks/Foundation.framework/Foundation', C.RTLD_NOW)
@@ -646,6 +682,15 @@ fn test_swift_date() {
 		encoding_table := table_lookup(encoding_conformance, metadata, 0)
 		assert encoding_table != 0 && read64(encoding_table) == encoding_conformance
 		date_encoding_suite(encoding_entry, read64(encoding_table + 8) & 0x0000ffffffffffff, true)
+		equal_conformance := u64(C.dlsym(foundation, c'$s10Foundation4DateVSQAAMc'))
+		assert equal_conformance != 0 && equal_conformance == u64(C.dlsym(overlay, c'$s10Foundation4DateVSQAAMc'))
+		equal_table := table_lookup(equal_conformance, metadata, 0)
+		assert equal_table != 0 && read64(equal_table) == equal_conformance
+		native_equal_witness = read64(equal_table + 8) & 0x0000ffffffffffff
+		swift_date_equal_cases(native_equal_witness, native_equal, code, guard)
+		equal_dispatch := u64(C.dlsym(core, c'$sSQ2eeoiySbx_xtFZTj'))
+		assert equal_dispatch != 0
+		swift_date_equatable_dispatch(equal_dispatch, metadata, equal_table, code, guard)
 		swift_date_cases(entry, probe, guard, u64(page), interval_reader)
 		swift_date_intervals(interval_reader, 0, code, guard)
 		swift_date_equal_cases(native_equal, 0, code, guard)
@@ -660,7 +705,7 @@ fn test_swift_date() {
 		}
 		value_workers.wait()
 		unsafe { value_workers.free() }
-		println('IOS-SWIFT-DATE-NATIVE: Date Encodable/public encoding, borrowed inline/boxed Encoder, owned inline container, exact Double bits, success/error cleanup and context, concurrent calls; nominal POD8 metadata/witnesses, enums, symbolic lookup, distantPast, intervals/equality and fresh Date() measured')
+		println('IOS-SWIFT-DATE-NATIVE: instantiated Date Equatable witness, guarded IEEE equality/aliases and generic dispatch; Encodable/public encoding, borrowed inline/boxed Encoder, owned inline container and success/error cleanup; nominal POD8 metadata, enums, symbolic lookup, distantPast, intervals and Date() measured')
 	}
 	if _ := swift_foundation_symbol('_$s10Foundation4DateV11distantPastACvgZ') {
 		assert false
@@ -668,6 +713,12 @@ fn test_swift_date() {
 	for _ in 0 .. 2 {
 		objc_start()
 		baseline := ios_runtime.live
+		mut equal_publishers := []thread u64{}
+		for i in 0 .. 8 { equal_publishers << spawn swift_date_equatable_publish(i % 2 == 0) }
+		equal_tables := equal_publishers.wait()
+		equal_table := equal_tables[0]
+		for candidate in equal_tables { assert candidate == equal_table }
+		unsafe { equal_publishers.free(); equal_tables.free() }
 		mut metadata_workers := []thread u64{}
 		for i in 0 .. 8 { metadata_workers << spawn swift_date_metadata_publish(i % 2 == 0) }
 		metadata_results := metadata_workers.wait()
@@ -678,6 +729,15 @@ fn test_swift_date() {
 		descriptor := swift_foundation_symbol('_$s10Foundation4DateVMn') or { panic(err) }
 		assert swift_date_metadata_cases(accessor, descriptor, code, false) == metadata
 		assert metadata != swift_integer_metadata() && metadata != swift_string_metadata()
+		equal_conformance := swift_foundation_symbol('_$s10Foundation4DateVSQAAMc') or { panic(err) }
+		assert equal_table == swift_witness_table(equal_conformance, metadata, 0)
+		assert read64(equal_table) == equal_conformance && swift_date_relative(equal_conformance + 4) == descriptor
+		assert read32(equal_conformance + 12) == 0
+		assert swift_date_relative(equal_conformance) == runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sSQMp') or { panic(err) }
+		swift_date_mapping(equal_conformance, 32, true, false)
+		swift_date_equal_cases(read64(equal_table + 8), native_equal_witness, code, guard)
+		equal_dispatch := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sSQ2eeoiySbx_xtFZTj') or { panic(err) }
+		swift_date_equatable_dispatch(equal_dispatch, metadata, equal_table, code, guard)
 		swift_date_witness_cases(metadata, guard)
 		swift_date_symbolic(unsafe { SwiftDateLookup(voidptr(swift_mangled_state_lookup)) }, descriptor, metadata)
 		encoding_conformance := runtime_symbol('/System/Library/Frameworks/Foundation.framework/Foundation', '_$s10Foundation4DateVSEAAMc') or { panic(err) }
@@ -711,6 +771,7 @@ fn test_swift_date() {
 			assert accessor == runtime_symbol(library, '_$s10Foundation4DateVMa') or { panic(err) }
 			assert descriptor == runtime_symbol(library, '_$s10Foundation4DateVMn') or { panic(err) }
 			assert encoding_conformance == runtime_symbol(library, '_$s10Foundation4DateVSEAAMc') or { panic(err) }
+			assert equal_conformance == runtime_symbol(library, '_$s10Foundation4DateVSQAAMc') or { panic(err) }
 			assert encoding_entry == runtime_symbol(library, '_$s10Foundation4DateV6encode2toys7Encoder_p_tKF') or { panic(err) }
 			assert equal == runtime_symbol(library, '_$s10Foundation4DateV2eeoiySbAC_ACtFZ') or { panic(err) }
 			assert now == runtime_symbol(library, '_$s10Foundation4DateVACycfC') or { panic(err) }
@@ -731,7 +792,7 @@ fn test_swift_date() {
 		mut workers := []thread{}
 		for _ in 0 .. 8 { workers << spawn swift_date_worker(entry, probe, guard) }
 		workers.wait()
-		for unsupported in ['_$s10Foundation4DateVN', '_$s10Foundation4DateVSeAAMc', '_$s10Foundation4DateVSQAAMc',
+		for unsupported in ['_$s10Foundation4DateVN', '_$s10Foundation4DateVSeAAMc', '_$s10Foundation4DateVSHAAMc',
 			'_$s10Foundation4DateV13distantFutureACvgZ']! {
 			if _ := swift_foundation_symbol(unsupported) {
 				assert false
@@ -743,7 +804,7 @@ fn test_swift_date() {
 		if _ := framework_symbol('/System/Library/Frameworks/UIKit.framework/UIKit', '_$s10Foundation4DateV11distantPastACvgZ') {
 			assert false
 		}
-		for name in ['_$s10Foundation4DateVSEAAMc', '_$s10Foundation4DateV6encode2toys7Encoder_p_tKF', '_$s10Foundation4DateVMa', '_$s10Foundation4DateVMn', '_$s10Foundation4DateV2eeoiySbAC_ACtFZ', '_$s10Foundation4DateVACycfC']! {
+		for name in ['_$s10Foundation4DateVSQAAMc', '_$s10Foundation4DateVSEAAMc', '_$s10Foundation4DateV6encode2toys7Encoder_p_tKF', '_$s10Foundation4DateVMa', '_$s10Foundation4DateVMn', '_$s10Foundation4DateV2eeoiySbAC_ACtFZ', '_$s10Foundation4DateVACycfC']! {
 			if _ := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', name) {
 				assert false
 			}
@@ -758,12 +819,12 @@ fn test_swift_date() {
 		if _ := swift_foundation_symbol('_$s10Foundation4DateV11distantPastACvgZ') {
 			assert false
 		}
-		for name in ['_$s10Foundation4DateVSEAAMc', '_$s10Foundation4DateV6encode2toys7Encoder_p_tKF', '_$s10Foundation4DateVMa', '_$s10Foundation4DateVMn', '_$s10Foundation4DateV2eeoiySbAC_ACtFZ', '_$s10Foundation4DateVACycfC']! {
+		for name in ['_$s10Foundation4DateVSQAAMc', '_$s10Foundation4DateVSEAAMc', '_$s10Foundation4DateV6encode2toys7Encoder_p_tKF', '_$s10Foundation4DateVMa', '_$s10Foundation4DateVMn', '_$s10Foundation4DateV2eeoiySbAC_ACtFZ', '_$s10Foundation4DateVACycfC']! {
 			if _ := swift_foundation_symbol(name) {
 				assert false
 			}
 		}
 	}
 	assert C.munmap(unsafe { voidptr(code) }, page) == 0 && C.munmap(unsafe { voidptr(guard) }, page * 3) == 0
-	println('IOS-SWIFT-DATE: concrete Encodable conformance and protocol, public encoding via borrowed inline/boxed Encoder and owned inline container, native Double bits, success/error cleanup and concurrency; nominal POD8 metadata, enum tags, symbolic lookup, distantPast, intervals/equality and Date(), scoped exports and two drained/unmapped lifetimes')
+	println('IOS-SWIFT-DATE: concrete Equatable table/canonical protocol, native IEEE witness equality/aliases, generic dispatch and eight-worker publication; Encodable/public encoding and error cleanup, nominal POD8 metadata, enums, symbolic lookup, distantPast, intervals/Date(), scoped exports and two drained/unmapped lifetimes')
 }

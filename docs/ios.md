@@ -6606,22 +6606,41 @@ byte into a private SDK, with five empty musl compatibility archives pinned
 for implicit C++ link dependencies. Full iOS regression remains unpassed;
 published runners remain unchanged.
 
-The current IPA probe resolves Date's Encodable conformance, then exits with
-status 1 at `_$s10Foundation4DateVSQAAMc` (the Date Equatable conformance).
-Equatable and Decodable conformances remain unsupported. Fortnite has not
-entered application code and remains unplayable.
+The following milestone supplies Date's Equatable conformance in V. Its sealed
+concrete table points to the existing Date floating comparison entry and the
+canonical Swift Equatable protocol. Native's instantiated witness and public
+operator have identical five-instruction bodies: two borrowed Double loads,
+floating comparison and a canonical Bool return. Signed zeros compare equal;
+quiet/signaling NaNs compare unequal, including aliases. This table needs no
+new call path, ARC work, per-call allocation or resilient witness factory.
+
+Tests compare 1,024 witness pair/guard placements per runtime plus aliases,
+64 generic Equatable dispatch pairs, protected unused metadata/x8, canonical
+Bool/context returns, eight-worker conformance publication, Foundation aliases
+and two drained, unmapped runtime lifetimes. Eight ASan/UBSan runs and four
+ARM64 suites pass for Date, Data writing, Base64 and reference snapshots.
+Eleven final C streams/programs and four joined, retired VM phases are retained
+under `build/ios/fortnite/date-equality-checks`, with native witness disassembly,
+required IPA conformance/address consumers and inspection of the next native
+Decodable dependency. The builds reuse the previous milestone's verified private
+SDK. Full iOS regression remains unpassed; published runners remain unchanged.
+
+The current IPA probe resolves Date's Equatable conformance, then exits with
+status 1 at `_$s10Foundation4DateVSeAAMc` (the Date Decodable conformance).
+Decodable remains unsupported. Fortnite has not entered application code and
+remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,516 | 644 | 79 |
+| Fortnite executable | 1,517 | 643 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,351 | 647 | 120 |
+| All images | 2,352 | 646 | 120 |
 
-The C++/GLES/Text variant reports 2,364 resolved imports, 634 unresolved strong
+The C++/GLES/Text variant reports 2,365 resolved imports, 633 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

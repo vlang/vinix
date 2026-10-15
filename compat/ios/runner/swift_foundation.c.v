@@ -288,6 +288,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 	if address := swift_json_decoder_symbol(symbol) { return address }
 	if address := swift_json_date_symbol(symbol) { return address }
 	return match symbol {
+		'_$s10Foundation4DateVSQAAMc' { swift_foundation_arena() + u64(C.getpagesize()) + 688 }
 		'_$s10Foundation4DateVSEAAMc' { swift_foundation_arena() + u64(C.getpagesize()) + 608 }
 		'_$s10Foundation4DateV6encode2toys7Encoder_p_tKF' { swift_foundation_arena() + 1360 }
 		'_$s10Foundation4DateVMa' { swift_foundation_arena() + 1312 }

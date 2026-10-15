@@ -96,4 +96,13 @@ fn swift_date_emit(code u64, data u64) {
 	write32(witness + 80, 0x02000007) // Native inline POD flags, alignment eight.
 	write32(witness + 84, 0) // Every Double bit pattern is a valid payload.
 	swift_date_encoding_emit(code, data)
+	// Native Equatable's witness is identical to Date's borrowed floating
+	// equality entry. Publish a concrete table rather than Apple's resilient
+	// witness factory, retaining the canonical Swift Equatable identity.
+	conformance := data + 688
+	table := data + 704
+	swift_protocol_relative(conformance, swift_integer_metadata() - 16 + 432)
+	swift_protocol_relative(conformance + 4, descriptor)
+	swift_protocol_relative(conformance + 8, table)
+	unsafe { *(&u64(table)) = conformance; *(&u64(table + 8)) = code + 1216 }
 }
