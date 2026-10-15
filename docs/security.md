@@ -41,6 +41,39 @@ The desktop compositor has a separate selector boundary for pointer actions. It 
 
 The compositor has narrow, explicit bridges to the Files context menu and Capture service. Other application selectors do not trigger desktop commands. This boundary applies to desktop UI actions; it does not mediate arbitrary system calls or provide per-process capabilities.
 
+## Session selector filters
+
+The session broker uses a pure V [constant selector registry](../desktop/sessioncore/selectors.v),
+adapting SBP's domain locks and layered deny filters. Its application and
+compositor domains are fixed at compilation: requests cannot register, replace,
+unregister or retrieve handlers. Unknown names, wildcard names and invalid
+argument counts are rejected. Existing wire command names remain compatible;
+canonical `application/...` and `compositor/...` names identify domain and
+clipboard policy denials in broker diagnostics without logging arguments.
+
+Every request passes the global same-account peer identity check, the domain's
+compositor requirement when applicable, and current selector-specific privacy
+checks before argument values are decoded or handlers run. A more specific
+filter cannot override a denial. The broker supplies caller identity from kernel
+peer credentials and its own compositor lease; UID 0 has no special bypass.
+Queued application actions still require the compositor's existing gesture and
+Settings ownership checks when consumed. Attaching a compositor still requires
+that an existing compositor has exited or is the caller itself.
+
+Disabling application clipboard access blocks offers, requests, grant retrieval,
+grant creation, promotion and reads, including reads using an already issued
+token. A successful `policy.set` also clears offers, clipboard contents, history
+and grants when access is disabled; enabling it again does not restore old
+tokens. Disabling history alone clears retained history while preserving the
+current copy. These checks protect the broker API; they do not add general IPC
+mediation or isolate arbitrary code running inside the broker process.
+
+Run `V=/path/to/v v run desktop/tools/test-session-selectors.v` for the selector
+rules and allocation checks. The latter measures 1,000 iterations through
+successful lookup and every denial layer with `-gc none -manualfree` and heap
+tracking. The session integration suite also checks denial before decoding and
+clipboard token revocation through the real broker socket.
+
 ## Authenticated UEFI images
 
 [`tools/verified-boot`](../tools/verified-boot/README.md) builds a Limine 12.8

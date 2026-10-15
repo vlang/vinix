@@ -282,8 +282,13 @@ fn session_peer(fd int) ?SessionCredentials {
 
 fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !string {
 	f := sessioncore.fields(request)!
-	if f.count == 4 && f.values[0] == 'clipboard.offer' {
-		if !daemon.policy.clipboard_apps { return error('clipboard access disabled') }
+	operation := sessioncore.authorize_session(f.values[0], f.count, sessioncore.SessionCaller{
+		pid: peer.pid
+		uid: peer.uid
+		session_uid: C.getuid()
+		compositor_pid: daemon.compositor
+	}, &daemon.policy)!
+	if operation == .clipboard_offer {
 		kind := unsafe { sessioncore.DataKind(sessioncore.number(f.values[1], 0, 3)!) }
 		sensitive := sessioncore.number(f.values[2], 0, 1)! == 1
 		data := sessioncore.decode_data(f.values[3])!
@@ -319,9 +324,8 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 	defer { unsafe { free(message) } }
 	message.fields[0].set(f.values[0])!
 	for i in 1 .. f.count { message.fields[i] = sessioncore.unfield(f.values[i])! }
-	command := message.fields[0].str()
-	if command == 'ping' && f.count == 1 { return 'ok' }
-	if command == 'clipboard.read' && f.count == 2 {
+	if operation == .ping { return 'ok' }
+	if operation == .clipboard_read {
 		token := u64(sessioncore.number(message.fields[1].str(), 1, 9223372036854775807)!)
 		clip := &daemon.exchange.current
 		daemon.exchange.consume(token, peer.uid, clip.owner_pid, peer.pid, clip.kind, monotonic_millis())!
@@ -332,7 +336,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		w.field(clip.data())
 		return w.finish()
 	}
-	if command == 'clipboard.request' && f.count == 1 {
+	if operation == .clipboard_request {
 		if daemon.queue_count == daemon.queue.len { return error('action queue full') }
 		message.fields[0].set('action')!
 		message.fields[1].set('clipboard.request')!
@@ -341,7 +345,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		daemon.queue_count++
 		return 'ok'
 	}
-	if command == 'exchange.take' && f.count == 1 {
+	if operation == .exchange_take {
 		for i in 0 .. sessioncore.grant_limit {
 			g := daemon.exchange.grants[i]
 			if g.target_pid == peer.pid && !g.consumed && g.expires > monotonic_millis() {
@@ -353,14 +357,14 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		}
 		return 'empty'
 	}
-	if command == 'policy' && f.count == 1 { return daemon.policy.encode() }
-	if command == 'time.offset' && f.count == 1 {
+	if operation == .policy { return daemon.policy.encode() }
+	if operation == .time_offset {
 		return (daemon.policy.timezone_minutes * 60).str()
 	}
-	if command == 'settings.status' && f.count == 2 {
+	if operation == .settings_status {
 		return daemon.settings_status(message.fields[1].str())
 	}
-	if command == 'dialog.open' && f.count == 7 {
+	if operation == .dialog_open {
 		if !sessioncore.identifier(message.fields[1].str()) || !message.fields[4].str().starts_with('/') {
 			return error('invalid dialog request')
 		}
@@ -384,7 +388,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		daemon.queue_count++
 		return 'ok'
 	}
-	if command == 'dialog.take' && f.count == 2 {
+	if operation == .dialog_take {
 		for i in 0 .. daemon.dialogs.len {
 			ticket := daemon.dialogs[i]
 			if ticket.pid != peer.pid || ticket.key != message.fields[1] { continue }
@@ -398,7 +402,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		}
 		return 'cancelled'
 	}
-	if command == 'services' && f.count == 1 {
+	if operation == .services {
 		mut w := sessioncore.Writer{}
 		w.add('vinix-service-status\t1\n')
 		for i in 0 .. daemon.supervisor.count {
@@ -415,7 +419,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		}
 		return w.finish()
 	}
-	if command == 'attach' && f.count == 1 {
+	if operation == .attach {
 		// Only an existing compositor may replace its own lease while alive.
 		if daemon.compositor != 0 && daemon.compositor != peer.pid && C.kill(daemon.compositor, 0) == 0 {
 			return error('compositor already attached')
@@ -423,7 +427,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		daemon.compositor = peer.pid
 		return 'ok'
 	}
-	if command == 'notify' && f.count == 7 {
+	if operation == .notify {
 		owner := 'pid.${peer.pid}'
 		defer { unsafe { owner.free() } }
 		epoch, _ := desktop_realtime()
@@ -431,7 +435,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		daemon.changed = true
 		return 'ok'
 	}
-	if command == 'alarm' && f.count == 5 {
+	if operation == .alarm {
 		owner := 'pid.${peer.pid}'
 		defer { unsafe { owner.free() } }
 		delay := sessioncore.number(message.fields[3].str(), 1, 31536000)!
@@ -441,26 +445,23 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		daemon.changed = true
 		return 'ok'
 	}
-	if command == 'alarm.cancel' && f.count == 2 {
+	if operation == .alarm_cancel {
 		owner := 'pid.${peer.pid}'
 		defer { unsafe { owner.free() } }
 		_ = daemon.notifications.cancel(owner, message.fields[1].str())
 		daemon.changed = true
 		return 'ok'
 	}
-	if command == 'action' && f.count >= 2 {
+	if operation == .action {
 		if daemon.queue_count == daemon.queue.len { return error('session action queue full') }
 		daemon.queue[daemon.queue_count] = *message
 		daemon.queue_count++
 		return 'ok'
 	}
-	if command == 'history' && f.count == 1 && peer.pid == daemon.compositor {
+	if operation == .history {
 		return daemon.notifications.encode()
 	}
-	if peer.pid != daemon.compositor {
-		return error('operation requires a user gesture in the compositor')
-	}
-	if command == 'clipboard.promote' && f.count == 2 {
+	if operation == .clipboard_promote {
 		pid := int(sessioncore.number(message.fields[1].str(), 1, 2147483647)!)
 		for i in 0 .. daemon.offers.len {
 			c := &daemon.offers[i]
@@ -472,7 +473,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		}
 		return error('clipboard offer expired')
 	}
-	if command == 'clipboard.snapshot' && f.count == 1 {
+	if operation == .clipboard_snapshot {
 		if daemon.exchange.current.len == 0 { return 'empty' }
 		c := &daemon.exchange.current
 		mut w := sessioncore.Writer{}
@@ -486,12 +487,12 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		w.number(c.owner_pid)
 		return w.finish()
 	}
-	if command == 'clipboard.clear' && f.count == 1 {
+	if operation == .clipboard_clear {
 		daemon.exchange.clear()
 		daemon.offers = [8]sessioncore.Clip{}
 		return 'ok'
 	}
-	if command == 'exchange.grant' && f.count == 2 {
+	if operation == .exchange_grant {
 		if !daemon.policy.clipboard_apps || daemon.exchange.current.len == 0 {
 			return error('clipboard access disabled')
 		}
@@ -503,7 +504,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		w.number(i64(token))
 		return w.finish()
 	}
-	if command == 'dialog.result' && f.count == 4 {
+	if operation == .dialog_result {
 		pid := int(sessioncore.number(message.fields[1].str(), 1, 2147483647)!)
 		for i in 0 .. daemon.dialogs.len {
 			if daemon.dialogs[i].pid != pid || daemon.dialogs[i].key != message.fields[2] {
@@ -519,14 +520,14 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		}
 		return error('dialog request expired')
 	}
-	if command == 'settings.set' && f.count >= 2 {
+	if operation == .settings_set {
 		daemon.settings_apply(*message) or {
 			daemon.settings_result.set(err.msg()) or {}
 			return err
 		}
 		return 'ok'
 	}
-	if command == 'policy.set' && f.count == 2 {
+	if operation == .policy_set {
 		new_policy := sessioncore.decode_policy(message.fields[1].str())!
 		path := '${daemon.home}/.vinix-shell-policy'
 		record := new_policy.encode()
@@ -538,9 +539,19 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		}
 		sessioncore.save(path, record)!
 		daemon.policy = new_policy
+		// Revocation removes issued grants as well as refusing new requests, so
+		// re-enabling access cannot resurrect a token from the previous policy.
+		if !new_policy.clipboard_apps {
+			daemon.exchange.clear()
+			daemon.offers = [8]sessioncore.Clip{}
+		} else if !new_policy.clipboard_history {
+			daemon.exchange.history = [sessioncore.clipboard_history_limit]sessioncore.Clip{}
+			daemon.exchange.count = 0
+		}
+		daemon.exchange.history_enabled = new_policy.clipboard_history
 		return 'ok'
 	}
-	if command == 'take' && f.count == 1 {
+	if operation == .take {
 		if daemon.queue_count == 0 { return 'empty' }
 		a := unsafe { &daemon.queue[0] }
 		mut w := &sessioncore.Writer{}
@@ -558,7 +569,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		daemon.queue_count--
 		return reply
 	}
-	if command == 'quiet' && f.count == 3 {
+	if operation == .quiet {
 		daemon.notifications.mode = unsafe { sessioncore.Focus(sessioncore.number(message.fields[1].str(), 0, 2)!) }
 		duration := sessioncore.number(message.fields[2].str(), 0, 86400)!
 		epoch, _ := desktop_realtime()
@@ -566,18 +577,18 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		daemon.changed = true
 		return 'ok'
 	}
-	if command == 'dismiss' && f.count == 2 {
+	if operation == .dismiss {
 		_ = daemon.notifications.dismiss(sessioncore.number(message.fields[1].str(), 1, 9223372036854775806)!)
 		daemon.changed = true
 		return 'ok'
 	}
-	if command == 'alarm.remove' && f.count == 2 {
+	if operation == .alarm_remove {
 		i := int(sessioncore.number(message.fields[1].str(), 0, daemon.notifications.alarm_count - 1)!)
 		daemon.notifications.alarms[i].active = false
 		daemon.changed = true
 		return 'ok'
 	}
-	if command == 'service.import' && f.count == 4 {
+	if operation == .service_import {
 		if daemon.stop { return error('session is shutting down') }
 		name := message.fields[1].str()
 		path := message.fields[2].str()
@@ -602,7 +613,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		daemon.supervisor = candidate
 		return 'ok'
 	}
-	if command == 'service.remove' && f.count == 2 {
+	if operation == .service_remove {
 		mut index := -1
 		for i in 0 .. daemon.supervisor.count {
 			if daemon.supervisor.services[i].name.str() == message.fields[1].str() { index = i; break }
@@ -636,7 +647,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		daemon.service_leases[daemon.supervisor.count] = 0
 		return 'ok'
 	}
-	if command == 'service.enable' && f.count == 3 {
+	if operation == .service_enable {
 		index := int(sessioncore.number(message.fields[1].str(), 0, daemon.supervisor.count - 1)!)
 		previous := daemon.supervisor.services[index].enabled
 		daemon.supervisor.enable(index, sessioncore.number(message.fields[2].str(), 0, 1)! != 0)!
@@ -646,7 +657,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		}
 		return 'ok'
 	}
-	if command == 'shutdown' && f.count == 1 {
+	if operation == .shutdown {
 		daemon.stop = true
 		daemon.supervisor.stopping = true
 		daemon.stop_deadline = monotonic_millis() + 30000
