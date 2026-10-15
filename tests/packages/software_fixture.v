@@ -367,6 +367,7 @@ fn main() {
 	if os.args.len == 2 && os.args[1] == 'snapshot-export-memory' { check_software_snapshot_export_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'mirror-navigation-memory' { check_software_mirror_navigation_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'deployment-navigation-memory' { check_software_deployment_navigation_memory() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'repository-navigation-memory' { check_software_repository_navigation_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'admin-memory' { check_software_admin_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'window-memory' { check_window_broker_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'data-memory' { check_software_data_memory() or { panic(err) }; return }
@@ -383,6 +384,7 @@ fn main() {
 	// This same executable is a literal-argv service fixture for asynchronous
 	// view/run transitions. It deliberately returns useful launch diagnostics.
 	if args.len > 1 {
+		if software_repository_navigation_service_fixture(args) or { panic(err) } { return }
 		if software_deployment_navigation_service_fixture(args) or { panic(err) } { return }
 		if software_audit_search_service_fixture(args) { return }
 		if software_mirror_navigation_service_fixture(args) or { panic(err) } { return }
@@ -576,6 +578,7 @@ fn main() {
 	check_package_review()
 	check_resolved_updates() or { panic(err) }
 	check_repository_management() or { panic(err) }
+	check_software_repository_navigation() or { panic(err) }
 	check_software_progress() or { panic(err) }
 	check_software_verify() or { panic(err) }
 	check_software_repair() or { panic(err) }

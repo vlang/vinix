@@ -1,0 +1,8 @@
+The initial functional fixture and both desktop architecture typechecks passed. The first repository allocation run retained 1331 bytes: the final successfully decoded configuration was still live at the sample. The fixture now explicitly closes that current list and clears the live status before sampling complete lifecycle retirement. No production allocation change was needed. Final focused, maintained-driver, sanitizer and zero-byte results supersede this initial sampling error. This does not measure whole-service or worker-process allocation freedom.
+
+Initial allocation output:
+/Users/alex/code/vinix/build/package-repository-navigation-work/software-ui/software_repository_navigation_fixture.v:198: FAIL: fn main.check_software_repository_navigation_memory: assert kept == 0, 'repository navigation retained ${kept} bytes'
+   left value: kept = 1331
+  right value: 0
+      message: repository navigation retained 1331 bytes
+V panic: Assertion failed...

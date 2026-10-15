@@ -180,6 +180,11 @@ the source filename retained for a fresh review. Small windows keep navigation,
 status, progress and failure access; approved transactions keep running until
 completion. See [qualification](../../tests/packages/software-deployment-navigation-check.md).
 
+Repository lists and trust reviews support Stop/Cancel/Escape, retaining entered
+identity fields and the previous valid list for retry. Compact views keep
+navigation and diagnostics; approved trust changes and catalog refreshes remain
+protected. See [qualification](../../tests/packages/software-repository-navigation-check.md).
+
 Configuration reads reject ambiguous keys, null values and incorrect field
 types while preserving legacy defaults for omitted fields. Policy typos fail
 before acquisition, cleanup or activation; correcting the configuration permits

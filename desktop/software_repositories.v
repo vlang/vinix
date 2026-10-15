@@ -299,6 +299,7 @@ fn (mut a SoftwareApp) handle_repositories(event_id string) {
 }
 
 fn (mut a SoftwareApp) repository_key_input(input string) {
+	if input == '\x1b' && a.repository_read_running() { a.stop_repository_read(); return }
 	if a.worker != unsafe { nil } { return }
 	if a.repository_operation != '' {
 		if input == '\x1b' { a.handle_repositories('software.repository.cancel') }
@@ -316,7 +317,9 @@ fn (mut a SoftwareApp) repository_key_input(input string) {
 			return
 		}
 		'\x1b' {
+			if a.repository_focus == 0 { a.handle_repositories('software.repository.back'); return }
 			a.repository_focus = 0
+			a.select_all = false
 			return
 		}
 		'\r', '\n' {
@@ -362,7 +365,7 @@ fn (mut a SoftwareApp) build_repositories(width int, height int) ui2.Element {
 	children << software_label('Software', 14, 8, 150, 28, false)
 	children << software_label('Configured repositories', 170, 8, width - 358, 28, false)
 	reviewing := a.repository_operation != ''
-	if !reviewing {
+	if !reviewing && a.worker == unsafe { nil } {
 		children << software_button('software.repository.back', 'Back to Software', width - 188, 8, 174)
 		children << software_button('software.repository.reload', 'Reload list', 14, 46, 150)
 		children << software_button('software.repository.new', 'New repository', 176, 46, 150)
@@ -382,8 +385,10 @@ fn (mut a SoftwareApp) build_repositories(width int, height int) ui2.Element {
 		children << software_label('Publisher public key (lowercase hexadecimal)', 274, 218, width - 288, 22, false)
 		children << console_field('software.repository.key', editor_bytes_text(a.repository_key), 274, 244, width - 288, a.repository_focus == 3)
 		children << software_label('Obtain the publisher key through a trusted channel. Compare it during review; the repository cannot choose its own key.', 274, 292, width - 288, 72, false)
-		children << software_button('software.repository.enroll', 'Review trust', 274, height - 176, 150)
-		children << software_button('software.repository.revoke', 'Review revocation', 436, height - 176, 174)
+		if a.worker == unsafe { nil } {
+			children << software_button('software.repository.enroll', 'Review trust', 274, height - 176, 150)
+			children << software_button('software.repository.revoke', 'Review revocation', 436, height - 176, 174)
+		}
 	} else if a.repository_review_ready {
 		review := a.repository_review
 		children << software_label('Repository: ${review.id}', 274, 90, width - 288, 60, true)
@@ -410,7 +415,9 @@ fn (mut a SoftwareApp) build_repositories(width int, height int) ui2.Element {
 			children << software_label('Review every URL part to enable confirmation.', 14, 46, width - 28, 28, false)
 		}
 	}
-	if reviewing {
+	if a.repository_read_running() {
+		children << software_button('software.repository.stop', if a.repository_worker == .review { 'Stop review' } else { 'Stop reading' }, width - 174, height - 138, 160)
+	} else if reviewing && a.worker == unsafe { nil } {
 		children << software_button('software.repository.cancel', 'Cancel', width - 174, height - 138, 160)
 	}
 	if a.progress_seen { children << a.progress_bar(width, height) }

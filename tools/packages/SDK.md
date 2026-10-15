@@ -1363,6 +1363,18 @@ an opaque freshness check and grants no administrator authority. After successfu
 enrollment call `update` to load the combined catalog; a refresh failure does not
 undo the trust change. Revocation retains payloads, personal data and history.
 
+Software can stop the read-only `repo-config` and `repo-review` workers with
+Stop, Cancel or Escape before publication. It kills and reaps the child,
+discards partial or complete-but-unaccepted output and retires any trust
+proposal/fingerprint. The previous valid list and literal entered ID/URL/key
+survive for retry. Enrollment, revocation and their following authenticated
+catalog refresh cannot be stopped through these controls and retain their
+normal close guard. The subsequent configuration listing is read-only again.
+Compact windows retain Back/Stop/Cancel, status, progress and failure access;
+they expose no confirmation and preserve URL paging/review state across resize.
+An idle Escape blurs the editor first, then returns to Software. See
+[navigation checks](../../tests/packages/software-repository-navigation-check.md).
+
 The lightweight [`pkgprotocol` repository module](pkgprotocol/repositories.v)
 provides bounded `decode_repositories`, `decode_repository_review`, input/response
 validation and explicit `close()` methods for consumers with manual memory

@@ -767,6 +767,10 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		a.stop_deployment_review()
 		return
 	}
+	if a.repository_read_running() && event_id in ['software.repository.stop', 'software.repository.cancel']! {
+		a.stop_repository_read()
+		return
+	}
 	if event_id.starts_with(packagecore.request_prefix) {
 		if a.policy_mode { a.set_status('Return to the catalog before opening an application.'); return }
 		if a.data_mode { a.set_status('Return to the catalog before opening an application.'); return }
@@ -1099,6 +1103,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.health_mode && (width < 640 || height < 610) { return a.build_health_compact(width, height) }
 	if a.cleanup_mode && (width < 640 || height < 610) { return a.build_cleanup_compact(width, height) }
 	if a.deployment_mode && (width < 640 || height < 610) { return a.build_deployment_compact(width, height) }
+	if a.repository_mode && (width < 640 || height < 610) { return a.build_repositories_compact(width, height) }
 	if width < 640 || height < 610 {
 		mut compact := frame_elements(2)
 		compact << software_label('Software', 14, 8, width - 28, 28, false)

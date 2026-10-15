@@ -936,6 +936,16 @@ Its **Configured repositories** view remains available when cached indexes or
 replay history need repair. Revocation still requires review and administrator
 approval; the list does not repair metadata or enable acquisition.
 
+The repository screen keeps Back, Stop, Cancel, status, progress and failure
+access in small windows. Stop or Escape can cancel a pending configuration list
+or trust review, reap the child and discard unaccepted output while preserving
+the previous valid list and entered ID, URL and key. Review cancellation also
+retires the proposal and fingerprint. Retry obtains a fresh review; compact
+views never expose trust confirmation or bypass the complete URL review.
+Approved enrollment, revocation and authenticated catalog refresh keep running
+until they finish. A refresh failure still reports that trust was saved. See
+[repository navigation checks](../tests/packages/software-repository-navigation-check.md).
+
 Select a package and choose **Package details…** to read its complete overview,
 description, repository/publisher key, permissions, license and diagnostics.
 Each section has **Previous**/**Next** pages, including long UTF-8 text. Control

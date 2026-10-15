@@ -233,6 +233,8 @@ fn check() ! {
 	os.cp(repository + '/tests/packages/software_details_fixture.v', work + '/software/details_fixture.v')!
 	os.cp(repository + '/tests/packages/software_view_fixture.v', work + '/software/view_fixture.v')!
 	os.cp(repository + '/desktop/software_repositories.v', work + '/software/software_repositories.v')!
+	os.cp(repository + '/desktop/software_repository_navigation.v', work + '/software/software_repository_navigation.v')!
+	os.cp(repository + '/tests/packages/software_repository_navigation_fixture.v', work + '/software/repository_navigation_fixture.v')!
 	os.cp(repository + '/desktop/software_progress.v', work + '/software/software_progress.v')!
 	os.cp(repository + '/desktop/software_failure.v', work + '/software/software_failure.v')!
 	os.cp(repository + '/tests/packages/software_failure_fixture.v', work + '/software/failure_fixture.v')!
@@ -290,6 +292,7 @@ fn check() ! {
 	run(work + '/window-broker-memory', ['snapshot-export-memory'])!
 	run(work + '/window-broker-memory', ['mirror-navigation-memory'])!
 	run(work + '/window-broker-memory', ['deployment-navigation-memory'])!
+	run(work + '/window-broker-memory', ['repository-navigation-memory'])!
 	if '--cross' in os.args {
 		run(v, [...helper_flags, '-o', work + '/package-stage', repository + '/tools/packages/stage.v'])!
 		for architecture in ['aarch64', 'x86_64'] {
