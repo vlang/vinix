@@ -435,8 +435,9 @@ read-only/writable aliases of the same inode. Explicit path routes select the
 attachment while backend read-only state and existing authorization still
 apply. Retained fds, copied namespaces, chroot/cwd aliases and private thread
 views pass on both architectures and the same-ELF Linux reference. Internal
-inode-only creators keep their conservative fallback; metadata, hard links,
-rename and descriptor truncation still need complete route-based policy.
+inode-only creators keep their conservative fallback. The subsequent checks
+extend coverage to metadata and hard links; rename, descriptor truncation and
+broader policy combinations still need qualification.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,
@@ -484,7 +485,7 @@ the stored link target remains literal. Native and same-ELF Linux probes cover
 both bind-policy directions, copied namespaces, root/cwd aliases, parent
 symlinks, detached and retired descriptions, and UID/GID 1000 denial. Internal
 kernel callers keep their conservative fallback. Persistent backend integration,
-concurrent mount changes and the remaining link/rename paths remain open.
+concurrent mount changes and the remaining link/rename qualification remain open.
 The [removal checks](../tests/mount-lifecycle/unlink-policy.md) extend attachment
 policy to `unlinkat` and its `AT_REMOVEDIR` form. Both native architectures and
 same-ELF Linux probes cover regular files, symlinks and empty directories through
@@ -494,6 +495,16 @@ preserves held descriptions and symlink targets. Existing authorization,
 backend failure handling, orphan pins and grace-period cleanup are unchanged.
 Broader backend integration, error ordering and concurrent mount changes remain
 outside this qualification.
+The [hard-link checks](../tests/mount-lifecycle/link-policy.md) preserve both
+`linkat` routes, resolve followed source symlinks before comparing mounts, and
+require a writable destination attachment. Separate bind mounts and inherited
+versus newly copied namespace mounts return `EXDEV` even when they share a
+backing filesystem. Both native architectures and same-ELF Linux probes cover
+regular sources, followed source symlinks, detached/retired routes, link counts,
+UID/GID 1000 directory denial and protected-hardlink refusal. Existing MAC,
+attribute, budget and backend checks remain. Internal inode-only links,
+non-followed symlink backend behavior, `AT_EMPTY_PATH`, wider error ordering,
+concurrent changes and persistent/overlay integration remain unqualified.
 Mount reclamation, busy-reference accounting and full OCI acceptance remain open.
 The overlay-depth refusal measurements also exposed an event-record allocation per call.
 The separate [security event producer correction](../tests/overlay-rename/security-events.md)

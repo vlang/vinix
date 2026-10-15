@@ -16,6 +16,7 @@ module mountfixture
 struct C.stat {
 	st_dev u64
 	st_ino u64
+	st_nlink u64
 	st_size i64
 	st_mode u32
 	st_uid u32
@@ -381,6 +382,8 @@ pub fn run() int {
 			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		unlink_case := if count == 4 && name[0] == `u` && name[1] == `p` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
+		link_case := if count == 4 && name[0] == `l` && name[1] == `p` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		check(C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'move') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'identities') == 0 || identity >= 0
@@ -397,7 +400,8 @@ pub fn run() int {
 			|| C.strcmp(selected, c'xattrs') == 0 || xattr_case >= 0
 			|| C.strcmp(selected, c'inode-flags') == 0 || inode_flags_case >= 0
 			|| C.strcmp(selected, c'symlinks') == 0 || symlink_case >= 0
-			|| C.strcmp(selected, c'unlinks') == 0 || unlink_case >= 0, 4)
+			|| C.strcmp(selected, c'unlinks') == 0 || unlink_case >= 0
+			|| C.strcmp(selected, c'links') == 0 || link_case >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
@@ -445,6 +449,9 @@ pub fn run() int {
 		if C.strcmp(selected, c'unlinks') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { mount_unlink_cases(-1) }
 		if unlink_case >= 0 { mount_unlink_cases(unlink_case) }
+		if C.strcmp(selected, c'links') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { mount_link_cases(-1) }
+		if link_case >= 0 { mount_link_cases(link_case) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }

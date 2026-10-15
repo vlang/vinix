@@ -1781,16 +1781,26 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	}
 	if newpath.len == 0 { return errno.err, errno.enoent }
 
-	oldbase := get_parent_dir(olddirfd, oldpath) or { return errno.err, errno.get() }
-	newbase := get_parent_dir(newdirfd, newpath) or { return errno.err, errno.get() }
+	old_identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	new_identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	oldbase := parent_and_mount_for(olddirfd, oldpath, old_identity) or { return errno.err, errno.get() }
+	newbase := parent_and_mount_for(newdirfd, newpath, new_identity) or { return errno.err, errno.get() }
 	vfs_lock.acquire()
 	defer { vfs_lock.release() }
-	oldparent, found_old_node, _ := walk_path(oldbase, oldpath, 0, true)
-	// A view into `newpath`, copied below for the node that keeps it.
-	mut newparent, found_new_node, basename := walk_path(newbase, newpath, 0, true)
+	oldparent, found_old_node, _ := walk_path_on_mount(oldbase, oldpath, 0, true, old_identity)
 	if unsafe { oldparent == nil } || unsafe { found_old_node == nil } {
 		return errno.err, errno.enoent
 	}
+	// Follow the source with its original route before comparing mounts.
+	// Its final parent can belong to a different attachment or filesystem.
+	mut old_node := if flags & at_symlink_follow != 0 {
+		reduce_node_on_mount(found_old_node, true, 0, true, old_identity)
+	} else {
+		found_old_node
+	}
+	if old_node == unsafe { nil } { return errno.err, errno.get() }
+	// A view into `newpath`, copied below for the node that keeps it.
+	mut newparent, found_new_node, basename := walk_path_on_mount(newbase, newpath, 0, true, new_identity)
 	if unsafe { newparent == nil } {
 		return errno.err, errno.enoent
 	}
@@ -1799,16 +1809,15 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 		return errno.err, errno.eexist
 	}
 
-	// Old and new must be on the same filesystem
-	if !same_filesystem(oldparent, newparent) {
+	// Destination admission precedes linking permissions, as it does for
+	// creation. Distinct bind or namespace-copy mounts are distinct even
+	// when their inodes share a backing filesystem.
+	if read_only_on_mount(newparent, new_identity) { return errno.err, errno.erofs }
+	if lib.mount_context_top(old_identity) != lib.mount_context_top(new_identity)
+		|| !same_filesystem(old_node, newparent) {
 		return errno.err, errno.exdev
 	}
-
-	mut old_node := if flags & at_symlink_follow != 0 {
-		reduce_node(found_old_node, true)
-	} else {
-		found_old_node
-	}
+	if old_node.read_only { return errno.err, errno.erofs }
 	if managed_volume_node(old_node) { return errno.err, errno.ebusy }
 	if stat.isdir(old_node.resource.stat.mode) {
 		return errno.err, errno.eperm
@@ -1820,7 +1829,6 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	}
 	check_access(newparent, access_write | access_exec, true) or { return errno.err, errno.get() }
 
-	if read_only(newparent) || read_only(old_node) { return errno.err, errno.erofs }
 	// An immutable or append-only file gets no new name, and none is made in
 	// an immutable directory, as Linux's vfs_link refuses both.
 	if !attr_allows_dir_add(newparent)

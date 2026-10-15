@@ -50,6 +50,13 @@ through `sp-7` select its individual cases. Native `all` and Linux
 `--case unlinks` selects file, symlink and empty-directory removal policy;
 `up-0` through `up-7` select its individual cases. Native `all` and Linux
 `move-reference` include them.
+`--case links` selects hard-link source and destination attachment policy;
+`lp-0` through `lp-9` select its individual cases. Native `all` and Linux
+`move-reference` include them.
+
+The [hard-link checks](link-policy.md) cover regular sources and followed source
+symlinks, exact mount boundaries, link counts, protected-hardlink policy and
+directory permissions through live, detached, retired and copied mount routes.
 
 The [removal checks](unlink-policy.md) enforce attachment policy and directory
 permissions while preserving held descriptions, symlink targets and denied
@@ -124,7 +131,7 @@ iterations, verifies capability denial and finishes with valid local operations.
 
 Use `--probe-state /path/to/prior-native-result` to reuse its probe ELF and
 generated C with a different kernel or case. The controller requires a matching
-architecture and identical current/copied hashes of all sixteen fixture files,
+architecture and identical current/copied hashes of all seventeen fixture files,
 verifies both artifact hashes against the prior receipt and checks the ELF
 architecture before boot.
 The prior result may be a failed control; its receipt hash is pinned in the new
@@ -174,7 +181,8 @@ identity checks, all eight admission cases, all five propagation validation
 cases, all seven pivot admission cases, all four pivot lifecycle cases and
 all five pivot alias cases, all seven private-thread cases, all five bind-policy
 cases, all six pathname truncation cases, all seven mode/ownership cases,
-all eight timestamp cases and all eight extended-attribute cases. Vinix's cursor
+all eight timestamp cases, all eight extended-attribute cases, all eight symlink
+creation cases, all eight removal cases and all ten hard-link cases. Vinix's cursor
 limit and unsupported unmount modes are excluded. Supply a matching Linux kernel and
 the ELF preserved by a native run:
 
@@ -186,6 +194,8 @@ V_C_ERROR_BUG_REPORT_DISABLED=1 build-support/run-v-tool.sh \
 
 The reference defaults to a 180-second timeout. Use `--timeout 600` for the full
 suite on slower emulated hosts; the receipt records the chosen timeout.
+The hard-link group enables and reads back `fs.protected_hardlinks=1` inside
+the owned Linux VM, matching Vinix's existing protection of foreign files.
 
 Use `--arch x86_64` and matching artifacts for x86. The reference receipt pins
 the shared ELF, Linux kernel, launcher source/C/ELF, archive, QEMU and serial log.
