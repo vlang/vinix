@@ -130,19 +130,51 @@ fn (mut a SoftwareApp) handle_deployment_snapshot(event_id string) {
 }
 
 fn (mut a SoftwareApp) snapshot_key_input(input string) {
-	if input == '\x1b' { a.handle_deployment_snapshot('software.snapshot.back'); return }
+	if a.worker != unsafe { nil } { return }
+	if input == '\x1b' {
+		if !a.snapshot_ready && a.focus {
+			a.focus = false; a.select_all = false
+		} else { a.handle_deployment_snapshot('software.snapshot.back') }
+		return
+	}
 	if !a.snapshot_ready { a.deployment_key_input(input) }
 }
 
+fn (mut a SoftwareApp) snapshot_paste_input(input string) {
+	if a.worker != unsafe { nil } || a.snapshot_ready || !a.focus { return }
+	// Pasted controls are filename data, never navigation or editing commands.
+	// Refuse the entire paste so filtering cannot silently choose another file.
+	if !software_deployment_text_valid(input) {
+		a.set_status('The deployment file path contains control characters or invalid UTF-8. The field was kept intact.')
+		return
+	}
+	a.deployment_key_input(input)
+}
+
+fn (a &SoftwareApp) build_snapshot_compact(width int, height int) ui2.Element {
+	mut children := frame_elements(6)
+	children << software_label('Save installed · enlarge for details', 14, 8, width - 28, 28, false)
+	button_width := if width > 202 { 174 } else { width - 28 }
+	available := a.failure_pages.len > 0 && a.worker == unsafe { nil }
+	if a.worker == unsafe { nil } {
+		children << software_button('software.snapshot.back', 'Back to deployment', 14, 46, button_width)
+	} else {
+		children << software_label('Wait for saving to finish.', 14, 46, width - 28, 28, false)
+	}
+	if available { children << software_button('software.failure', 'Failure details', 14, 84, button_width) }
+	y := if height > 230 { height - 98 } else if available { 122 } else { 84 }
+	children << software_label(a.status, 14, y, width - 28, if height > y + 8 { height - y - 8 } else { 1 }, false)
+	return ui2.screen(app_surface, children)
+}
+
 fn (mut a SoftwareApp) build_deployment_snapshot(width int, height int) ui2.Element {
+	if width < 640 || height < 610 { return a.build_snapshot_compact(width, height) }
 	mut children := frame_elements(14)
 	children << software_label('Save installed deployment', 14, 8, width - 28, 28, false)
 	if a.worker == unsafe { nil } {
 		children << software_button('software.snapshot.back', 'Back to deployment', 14, 46, if width > 202 { 188 } else { width - 28 })
 	}
-	if width < 640 || height < 610 {
-		children << software_label('Enlarge this window to choose a filename or inspect the save receipt.', 14, 88, width - 28, 60, false)
-	} else if a.snapshot_ready {
+	if a.snapshot_ready {
 		if a.details_page >= 0 && a.details_page < a.details_pages.len {
 			children << ui2.label('', a.details_pages[a.details_page].text, ui2.rect(14, 94, f64(width - 28), f64(height - 300)),
 				ui2.TextStyle{ color: body_text, size: 12, lines: 14 })

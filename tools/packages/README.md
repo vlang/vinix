@@ -155,6 +155,12 @@ using the captured filename. A pending write blocks Back and window closing;
 failure details preserve diagnostics even when publication already occurred.
 See [Software qualification](../../tests/packages/software-deployment-save-check.md).
 
+The save form refuses pasted controls without executing editing or navigation
+commands. Escape first leaves a focused filename field, then returns to
+Deployment. Compact windows retain status and failure access without discarding
+drafts or receipt paging. Partial and complete receipts cannot release an active
+writer's navigation/close guard. See [navigation checks](../../tests/packages/software-snapshot-navigation-check.md).
+
 The saved receipt's **Export offline…** action opens a locked export for the
 captured filename and digest, with an empty new-destination field. It checks that
 the source still matches, authenticates the exact package/runtime set, and

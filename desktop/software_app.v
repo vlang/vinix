@@ -1065,7 +1065,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.window_mode { a.window_paste_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
 	if a.failure_mode { return }
-	if a.snapshot_mode { a.snapshot_key_input(input); return }
+	if a.snapshot_mode { a.snapshot_paste_input(input); return }
 	if a.audit_mode { a.audit_paste_input(input); return }
 	if a.details_mode { return }
 	if a.health_mode { a.health_paste_input(input); return }

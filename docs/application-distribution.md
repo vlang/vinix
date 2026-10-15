@@ -738,6 +738,13 @@ confirmation. Failure details retain storage diagnostics, including failures
 after publication. Inspect the destination before retrying if saving may already
 have created it. See [Software save qualification](../tests/packages/software-deployment-save-check.md).
 
+In the save form, Escape leaves a focused filename field before a second Escape
+returns to Deployment. Pasted control characters and invalid UTF-8 are refused
+as a whole, preserving the filename and selection. Small windows retain Back,
+status and failure access; enlarging restores the draft or receipt detail page.
+Saving still blocks navigation until the service exits, including after a
+complete receipt arrives. See [save navigation checks](../tests/packages/software-snapshot-navigation-check.md).
+
 Choose **Export offline…** on a nonempty saved receipt to prepare portable media
 for that exact deployment. The source filename and saved digest stay fixed;
 choose a new export directory, then review the full paths, publishers,

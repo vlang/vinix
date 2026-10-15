@@ -29,11 +29,109 @@ fn software_snapshot_service_fixture(args []string) bool {
 	if path == '/partial-save.json' { print(text[..text.len / 2]); return true }
 	if path == '/failed-save.json' { print(text); exit(23) }
 	print(text[..17]); flush_stdout()
+	if path == '/partial-barrier-save.json' {
+		mut release := u8(0); assert C.read(0, &release, 1) == 1
+	}
 	time.sleep(if path == '/slow-save.json' { 80 * time.millisecond } else { time.millisecond })
-	print(text[17..]); return true
+	print(text[17..]); flush_stdout()
+	if path in ['/complete-barrier-save.json', '/late-failed-save.json']! {
+		mut release := u8(0); assert C.read(0, &release, 1) == 1
+		if path == '/late-failed-save.json' { eprintln('Saved, but directory flush failed. Inspect the destination before retrying.'); exit(24) }
+	}
+	return true
+}
+
+fn check_software_snapshot_navigation() ! {
+	mut app := SoftwareApp{ service_path: os.executable(), administration_required: true,
+		output: []u8{cap: 8192}, query: 'kept query'.bytes(), selected: 5, filter: 1 }
+	defer { app.close_app() }
+	app.handle('software.deployment')!; app.handle('software.deployment.snapshot')!
+	app.paste_input(software_snapshot_fixture_path); app.key_input('\x01')
+	for input in ['\x1b', '\x01', '\x08', '\x7f', '\r', '\n', 'bad\x00path', '/bad\xc2\x85path', '\xff']! {
+		app.paste_input(input)
+		assert app.snapshot_mode && app.focus && app.select_all
+		assert editor_bytes_text(app.deployment_path) == software_snapshot_fixture_path
+		assert app.worker == unsafe { nil } && app.status.contains('field was kept intact')
+	}
+	app.paste_input('x'.repeat(4097))
+	assert app.select_all && editor_bytes_text(app.deployment_path) == software_snapshot_fixture_path
+	app.key_input('\x1b')
+	assert app.snapshot_mode && !app.focus && !app.select_all
+	app.paste_input('\x1b'); app.paste_input('/ignored.json'); app.key_input('ignored')
+	assert app.snapshot_mode && editor_bytes_text(app.deployment_path) == software_snapshot_fixture_path
+	for size in [ui2.rect(0, 0, 320, 240), ui2.rect(0, 0, 640, 610)]! {
+		tree := app.build(size)!
+		assert tree.children.any(it.id == 'software.snapshot.back') && tree.children.any(it.text == app.status)
+		assert tree.children.any(it.id == 'software.deployment.path') == (size.width >= 640)
+		assert editor_bytes_text(app.deployment_path) == software_snapshot_fixture_path && !app.focus
+		free_window_tree(tree)
+	}
+	app.handle('software.deployment.path')!; app.key_input('\x01'); app.paste_input('/new é🚀; $literal.json')
+	assert editor_bytes_text(app.deployment_path) == '/new é🚀; $literal.json' && !app.select_all
+	app.key_input('\x7f'); assert editor_bytes_text(app.deployment_path) == '/new é🚀; $literal.jso'
+	app.key_input('\r'); assert app.snapshot_mode && !app.focus
+	app.key_input('\x1b'); assert !app.snapshot_mode && app.deployment_mode
+	app.handle('software.deployment.snapshot')!; assert app.deployment_path.len == 0 && app.focus
+	app.key_input('\x1b'); assert app.snapshot_mode && !app.focus
+	app.key_input('\x1b'); assert !app.snapshot_mode
+	for path in ['/partial-barrier-save.json', '/complete-barrier-save.json', '/late-failed-save.json']! {
+		app.handle('software.deployment.snapshot')!; app.paste_input(path); app.handle('software.snapshot.save')!
+		expected := json2.encode(software_snapshot_fixture_receipt(path))
+		for _ in 0 .. 5000 {
+			app.poll()
+			if app.output.len == (if path == '/partial-barrier-save.json' { 17 } else { expected.len }) { break }
+			time.sleep(time.millisecond)
+		}
+		assert app.worker != unsafe { nil } && app.worker.is_alive()
+		assert app.output.len == (if path == '/partial-barrier-save.json' { 17 } else { expected.len })
+		unsafe { expected.free() }
+		pid := app.worker.pid
+		assert app.worker_snapshot && app.worker_view && !app.snapshot_ready && app.details_pages.len == 0
+		assert app.worker.args == ['--json', 'deployment-snapshot-save', path] && !app.admin_prompt
+		assert !app.prepare_close()
+		for event in ['software.snapshot.back', 'software.snapshot.another', 'software.snapshot.save', 'software.snapshot.audit',
+			'software.snapshot.review', 'software.snapshot.export', 'software.deployment.path', 'software.deployment.stop',
+			'software.cancel', 'software.verify.stop', 'software.failure']! { app.handle(event)! }
+		for input in ['\x1b', '\r', '\x01', '\x08', '/changed.json']! { app.key_input(input); app.paste_input(input) }
+		assert app.worker.pid == pid && app.worker.is_alive() && app.snapshot_mode && !app.snapshot_ready
+		assert app.snapshot_pending == path && editor_bytes_text(app.deployment_path) == path && !app.focus && !app.select_all
+		for size in [ui2.rect(0, 0, 320, 240), ui2.rect(0, 0, 900, 660)]! {
+			tree := app.build(size)!
+			assert tree.children.any(it.text == app.status)
+			assert !tree.children.any(it.id in ['software.snapshot.back', 'software.snapshot.save', 'software.snapshot.audit', 'software.snapshot.review', 'software.snapshot.export', 'software.failure'])
+			if size.width < 640 { assert tree.children.any(it.text == 'Wait for saving to finish.') }
+			free_window_tree(tree)
+		}
+		app.worker.stdin_write('x'); wait_for_software(mut app)
+		assert app.prepare_close() && !app.worker_snapshot
+		if path == '/late-failed-save.json' {
+			assert !app.snapshot_ready && app.details_pages.len == 0 && app.failure_pages.len > 0
+			assert app.status.contains('Inspect the destination')
+			compact := app.build(ui2.rect(0, 0, 320, 240))!
+			assert compact.children.any(it.id == 'software.failure') && compact.children.any(it.text == app.status)
+			for element in compact.children { assert element.frame.y + element.frame.height <= 240 }
+			free_window_tree(compact)
+			app.handle('software.failure')!; app.key_input('\x1b'); assert app.snapshot_mode && !app.failure_mode
+		} else {
+			assert app.snapshot_ready && app.snapshot_saved.destination == path
+			app.handle('software.snapshot.next')!; page := app.details_page
+			app.paste_input('\x1b'); app.paste_input('/must-not-edit.json')
+			assert app.snapshot_mode && app.snapshot_saved.destination == path
+			compact := app.build(ui2.rect(0, 0, 320, 240))!
+			assert compact.children.any(it.id == 'software.snapshot.back') && compact.children.any(it.text == app.status)
+			assert !compact.children.any(it.id == 'software.snapshot.review' || it.id == 'software.snapshot.export')
+			free_window_tree(compact)
+			full := app.build(ui2.rect(0, 0, 900, 660))!; free_window_tree(full)
+			assert app.details_page == page && app.snapshot_pending == path
+		}
+		app.key_input('\x1b'); assert !app.snapshot_mode && app.deployment_mode
+	}
+	assert app.query.bytestr() == 'kept query' && app.selected == 5 && app.filter == 1
+	println('Software save navigation: literal paste/control refusal, focus-first Escape, full/compact status/failure, frozen receipt paging, partial/complete-before-exit writer guards and late failure PASS')
 }
 
 fn check_software_snapshot() ! {
+	check_software_snapshot_navigation()!
 	mut app := SoftwareApp{ service_path: os.executable(), administration_required: true,
 		output: []u8{cap: 8192}, query: []u8{cap: 256}, selected: 5, filter: 1 }
 	defer { app.close_app() }
@@ -136,12 +234,23 @@ fn check_software_snapshot_memory() ! {
 			if warmup == 1 { C.vinix_heap_begin() }
 			for _ in 0 .. 1000 {
 				app.begin_deployment_snapshot()
+				app.paste_input(software_snapshot_fixture_path); app.key_input('\x01')
+				for input in ['\x1b', '\x01', '\x08', '\x7f', '\r', '\n', '/bad\xc2\x85path', '\xff']! {
+					app.paste_input(input); assert app.focus && app.select_all && app.snapshot_mode
+					assert editor_bytes_text(app.deployment_path) == software_snapshot_fixture_path
+				}
+				app.key_input('\x1b'); assert app.snapshot_mode && !app.focus && !app.select_all
+				app.paste_input('\x1b'); assert app.snapshot_mode
+				free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
 				app.snapshot_pending = software_snapshot_fixture_path.clone()
 				app.output.clear(); for byte in text { app.output << byte }
 				assert app.load_deployment_snapshot()
 				tree := app.build(ui2.rect(0, 0, 900, 660))!
 				free_window_tree(tree)
 				app.handle_deployment_snapshot('software.snapshot.next')
+				page := app.details_page
+				free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
+				assert app.details_page == page
 				app.handle_deployment_snapshot('software.snapshot.previous')
 				app.handle_deployment_snapshot('software.snapshot.back')
 				// Invalid receipts also release any partially owned metadata.
@@ -153,6 +262,6 @@ fn check_software_snapshot_memory() ! {
 		}
 		app.set_status('')
 		kept := C.vinix_heap_end(); assert kept == 0, 'deployment save UI retained ${kept} bytes'
-		println('Software deployment saving: 1000 complete receipt, detail, render, paging, mismatch and retirement cycles retain zero tracked bytes')
+		println('Software deployment saving: 1000 literal paste/control refusal/blur/full/compact/receipt/paging/mismatch/retirement cycles retain zero tracked bytes')
 	}
 }
