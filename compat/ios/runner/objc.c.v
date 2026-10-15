@@ -265,6 +265,7 @@ mut:
 	pool_key u64
 	pool_sequence i64 = 2 // Globally distinct opaque tokens for this runtime lifetime.
 	thread_key u64
+	uncaught_exception_handler u64 // Borrowed process-wide C callback, cleared before image unmapping.
 	foundation_main_thread u64
 	foundation_multithreaded bool
 	foundation_thread_count int
@@ -688,6 +689,7 @@ fn objc_stop() {
 	}
 	// V's []string.free() also frees the owned strings.
 	unsafe { ios_runtime.selectors.free(); ios_runtime.selector_names.free() }
+	ns_uncaught_handler_stop()
 }
 
 @[export: 'ios_format_double']

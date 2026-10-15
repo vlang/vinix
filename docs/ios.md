@@ -7230,8 +7230,38 @@ inspection checks the allocation-free query paths and explicit metadata/name/
 array retirement. Published runners remain unchanged; the full iOS regression
 remains unpassed.
 
-The current IPA probe links past protocol lookup and exits with status 1 at
-`_NSSetUncaughtExceptionHandler`. Fortnite has not entered application code and
+The protocol-lookup IPA probe links past protocol discovery and exits with
+status 1 at `_NSSetUncaughtExceptionHandler`.
+
+V now supplies Foundation's `NSSetUncaughtExceptionHandler` and
+`NSGetUncaughtExceptionHandler`. Native comparison verifies a nullable,
+borrowed C function pointer shared by all threads: replacement and clearing on
+one thread are immediately visible on another, and thread exit leaves the
+registration intact. Both native exports tail-call the same helper with
+different numeric arguments; direct cross-thread measurements establish the
+storage scope. Fortnite registers an application function in x0 at
+`0x1000a9284`.
+
+The runtime serializes reads and writes with its recursive runtime lock, stores
+the opaque address without dereferencing or retaining it, and clears it after
+workers and teardown callbacks drain, before application images are unmapped.
+These entries implement handler registration and retrieval. Objective-C
+throwing and exception unwinding through Mach-O frames remain unsupported.
+
+Eight normal/deterministic host sanitizer runs and four ARM64 guest suites pass:
+handler registration, protocol lookup, NSThread and autorelease pools. The
+handler fixture compares native and private behavior, including protected
+pointer values, unused C argument registers, preserved callee contexts,
+cross-thread replacement/clear, registration surviving worker exit, 1024
+contended updates and two clean runtime lifetimes. The eleven generated C
+streams and executables, actual IPA consumer, native measurements, pinned
+inputs and four retired VM phases are retained under
+`build/ios/fortnite/uncaught-handler-checks`. Generated C inspection checks
+allocation-free registration/retrieval and explicit callback retirement.
+Published runners remain unchanged; the full iOS regression remains unpassed.
+
+The current IPA probe links past handler registration and exits with status 1
+at `_NSStringFromProtocol`. Fortnite has not entered application code and
 remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -7239,12 +7269,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,545 | 615 | 79 |
+| Fortnite executable | 1,546 | 614 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,380 | 618 | 120 |
+| All images | 2,381 | 617 | 120 |
 
-The C++/GLES/Text variant reports 2,393 resolved imports, 605 unresolved strong
+The C++/GLES/Text variant reports 2,394 resolved imports, 604 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
