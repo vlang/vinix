@@ -155,11 +155,20 @@ fn service_broker() i32 {
 			C._exit(127)
 		}
 		deadline := job_clock() + 10000000000
-		mut st := C.stat{}
-		path := service_socket_path()
-		for C.stat(&path[0], &st) != 0 {
-			if job_clock() >= deadline { emit_command_log(c'/home/developer/service-broker.log') }
-			check(C.kill(pid, 0) == 0 && job_clock() < deadline, 467)
+		mut address := C.sockaddr_un{sun_family: u16(C.AF_UNIX)}
+		address.sun_path = service_socket_path()
+		for {
+			// bind publishes the pathname before listen admits connections.
+			// Probe the listener, then send the authenticated ping below.
+			fd := C.socket(C.AF_UNIX, C.SOCK_STREAM | C.SOCK_CLOEXEC | C.SOCK_NONBLOCK, 0)
+			check(fd >= 0, 457)
+			connected := C.connect(fd, voidptr(&address), u32(sizeof(C.sockaddr_un))) == 0
+			failure := *C.__errno_location()
+			check(C.close(fd) == 0, 460)
+			if connected { break }
+			retry := failure == C.ENOENT || failure == C.ECONNREFUSED
+			if !retry || job_clock() >= deadline { emit_command_log(c'/home/developer/service-broker.log') }
+			check(retry && C.kill(pid, 0) == 0 && job_clock() < deadline, 467)
 			C.usleep(10000)
 		}
 		service_call(c'ping', nil, nil)

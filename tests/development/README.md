@@ -101,6 +101,17 @@ missing or mismatched shutdown evidence. Schema 2 controller receipts retain
 those options and eleven native records across the three boots. Payload
 credential output must stay out of all serial/broker logs.
 
+The broker startup gate probes a connection before sending its authenticated
+ping. A socket pathname can become visible between `bind` and `listen`; missing
+paths and refused connections retry within ten seconds while the broker stays
+alive. Other connection errors still fail the gate, and every probe FD closes.
+The retained `build/development-unmount-exec-20261015/cold-x86` run fails at
+connection site 458 with `ECONNREFUSED` on its second boot, before unmount.
+With the listener check, `cold-arm-b` and `cold-x86-b` each pass three persistent
+boots, eleven validated native receipts and three clean read-only filesystem
+checks. `readiness-audit.log` verifies the receipts, disk hashes and generated
+fixture C; the fixture source is retained in `source-pins.json`.
+
 This is a **quiescent shutdown** gate: PID 1 defaults to 13 seconds after account
 process retirement before sync/unmount, matching the kernel retention harness.
 The tested kernel's socket pathname release and the endpoint's retained filesystem
