@@ -519,7 +519,16 @@ the actual attachment selected by its loader. Namespace copies and bind aliases
 remain distinct; unlink and close-on-exec do not release a running image, while
 executable replacement and completed process teardown do. This borrows the
 existing executable snapshot without adding ownership or allocation. Concurrent
-image publication and arbitrary executable mappings remain open.
+image publication and complete mapping ownership remain open.
+The [file-mapping unmount checks](../tests/mount-lifecycle/unmount-mappings.md)
+also inspect published address spaces for mappings that retain a file
+description's actual mount, including read-only, private writable and executable
+views after descriptor closure. Split ranges and fork retain that busy state;
+unmapping the final view or completing process teardown releases it. Copied
+namespace mounts, sibling bind aliases and anonymous mappings remain independent.
+The scan borrows ranges under their page-map lock and allocates nothing. New
+mapping publication, detached address spaces still being destroyed and other
+in-flight descriptions still need complete admission and ownership accounting.
 The [attachment identity checks](../tests/mount-lifecycle/identities.md) qualify
 unmount, remount and move refusal through detached/foreign mount descriptors
 and cwd, while valid local operations remain available. Retained read-only
