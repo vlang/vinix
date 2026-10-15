@@ -754,7 +754,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 	if a.snapshot_mode { a.handle_deployment_snapshot(event_id); return }
 	if a.audit_mode { a.handle_deployment_audit(event_id); return }
 	if a.health_mode {
-		if event_id == 'software.health.stop' { a.stop_health() }
+		if event_id in ['software.health.stop', 'software.cancel']! { a.stop_health() }
 		else if a.worker == unsafe { nil } { a.handle_health(event_id) }
 		return
 	}

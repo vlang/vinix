@@ -1716,6 +1716,15 @@ worker, discards partial results and leaves Reload available; compact windows
 also offer Stop. Closing the window uses the same read-only worker retirement.
 See [progress/cancellation checks](../../tests/packages/health-progress-check.md).
 
+Software also accepts Cancel for the pending health read. Stop clears buffered
+stdout, pending stderr, errors, package counts, report pages and truncation
+state; the query/filter and prior diagnostics remain for a fresh Reload.
+Compact views expose Reload, status/progress, failure access and the generation
+summary when space permits, while retaining selection and detail paging across
+resizes. A complete progress frame shows a waiting status until process exit;
+the existing strict report/count/progress/exit admission remains unchanged. See
+[health navigation checks](../../tests/packages/software-health-navigation-check.md).
+
 On a fresh image, status/verification do not initialize package state. Direct
 administrator edits to configuration must honor the same lock or quiesce package
 operations; arbitrary root filesystem writes are outside this contract.

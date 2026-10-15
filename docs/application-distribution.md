@@ -533,6 +533,14 @@ JSON on stdout and progress on stderr. Software drains both channels through
 exit and refuses incomplete or inconsistent responses and late diagnostics. See
 [progress/cancellation qualification](../tests/packages/health-progress-check.md).
 
+Compact Health reports also retain Reload, current status, progress, failure
+access and the generation summary when space permits. Resizing preserves search,
+filter, selection and the current detail page. Cancel joins Stop inspection and
+Escape for pending reads; all discard unaccepted report/progress bytes and leave
+a fresh Reload available. Completed checks show a waiting status until service
+exit, before the existing report/count/exit checks can accept a result. See
+[health navigation checks](../tests/packages/software-health-navigation-check.md).
+
 Installation health also checks payload modes (0755 for executables, 0644 for
 other files) and the exact generated desktop launcher/MIME contents at mode 0644.
 Verify, rollback and ordinary launch enforce these checks before execution.

@@ -63,6 +63,12 @@ unchanged JSON on stdout with live progress on stderr. A complete report still
 requires a successful process exit. See
 [progress/cancellation qualification](../../tests/packages/health-progress-check.md).
 
+Compact Health reports retain Reload, status, progress, failure access and the
+generation summary when space permits. Resizing preserves the search, filter,
+selection and detail page. Cancel, Stop inspection and Escape discard an
+unaccepted scan and permit a fresh read. Completed checks remain provisional
+until service exit. See [navigation checks](../../tests/packages/software-health-navigation-check.md).
+
 Launcher verification now captures and rechecks the generation’s `share` and
 `applications` directories, so identical files reached through aliased or unsafe
 parents fail integrity checks. Health identifies the affected apps; reviewed

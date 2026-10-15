@@ -73,6 +73,8 @@ fn (mut a SoftwareApp) health_progress_line(line string) {
 	if event.phase == 'verify' {
 		text := if event.package == '' { 'Inspecting installed software…'.clone() } else { 'Inspecting ' + event.package + '…' }
 		a.set_status(text); unsafe { text.free() }
+	} else {
+		a.set_status('Inspection checks finished; waiting for the service to exit.')
 	}
 }
 
@@ -115,6 +117,7 @@ fn (mut a SoftwareApp) stop_health() {
 	if a.worker.is_alive() { a.worker.signal_kill(); a.worker.wait() }
 	a.retire_worker()
 	a.clear_health_report(); a.clear_progress(); a.output.clear()
+	a.output_truncated = false
 	a.worker_health = false
 	a.set_status('Inspection stopped. No report was accepted. Reload to inspect installed software again.')
 }
@@ -284,15 +287,31 @@ fn (mut a SoftwareApp) handle_health(event_id string) {
 }
 
 fn (mut a SoftwareApp) build_health_compact(width int, height int) ui2.Element {
-	mut children := frame_elements(3)
+	mut children := frame_elements(9)
 	content_width := if width > 28 { width - 28 } else { 1 }
+	button_width := if width >= 320 { 140 } else if content_width >= 174 { 174 } else { content_width }
+	children << software_label('Health report · enlarge for details', 14, 8, content_width, 28, false)
+	mut next_y := 84
 	if a.worker == unsafe { nil } {
-		children << software_button('software.health.back', 'Back to packages', 14, 8, if content_width >= 160 { 160 } else { content_width })
+		children << software_button('software.health.back', 'Back to packages', 14, 46, button_width)
+		children << software_button('software.health.reload', 'Reload report', if width >= 320 { 166 } else { 14 },
+			if width >= 320 { 46 } else { next_y }, button_width)
+		if width < 320 { next_y += 38 }
 	} else {
-		children << software_button('software.health.stop', 'Stop inspection', 14, 8, if content_width >= 160 { 160 } else { content_width })
+		children << software_button('software.health.stop', 'Stop inspection', 14, 46, button_width)
 	}
-	children << software_label('Installed software health', 14, 46, content_width, 28, false)
-	children << software_label('Enlarge this window to search the report and view package diagnostics.', 14, 80, content_width, if height > 140 { 60 } else { 28 }, false)
+	if a.failure_pages.len > 0 && a.worker == unsafe { nil } {
+		children << software_button('software.failure', 'Failure details', 14, next_y, button_width)
+		next_y += 38
+	}
+	if a.health_ready && next_y + 100 <= height {
+		children << software_label(a.health_summary, 14, next_y, content_width, 36, false)
+		next_y += 44
+	}
+	progress := a.worker != unsafe { nil } && a.progress_seen && height >= 240 && next_y <= height - 110
+	if progress { children << a.progress_bar(width, height) }
+	y := if height - 98 > next_y { height - if progress { 88 } else { 98 } } else { next_y }
+	children << software_label(a.status, 14, y, content_width, if height > y + 8 { height - y - 8 } else { 1 }, false)
 	return ui2.screen(app_surface, children)
 }
 
