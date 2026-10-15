@@ -88,3 +88,39 @@ fn swift_data_reference_destroy(value u64, _metadata u64) {
 		else { panic('iOS: large-range Swift Data destruction is not implemented') }
 	}
 }
+
+fn swift_data_bytes_checked(first u64, second u64, scratch u64) !SwiftStringBytes {
+	match second >> 62 {
+		3 { return SwiftStringBytes{} }
+		0 {
+			count := (second >> 48) & 0xff
+			if count > 14 { return error('iOS: invalid inline Swift Data length') }
+			unsafe { *(&SwiftDataWords(scratch)) = SwiftDataWords{ first: first, second: second } }
+			return SwiftStringBytes{ address: scratch, count: count }
+		}
+		1 {
+			start := i64(i32(u32(first)))
+			end := i64(i32(u32(first >> 32)))
+			if start == end { return SwiftStringBytes{} }
+			if start < 0 || end < start { return error('iOS: invalid Swift Data slice range') }
+			owner := second & u64(0x3fffffffffffffff)
+			C.ios_objc_initialize_lock()
+			defer { C.ios_objc_initialize_unlock() }
+			storage := ios_runtime.swift_heap[owner] or {
+				return error('iOS: Swift Data requires registered snapshot storage')
+			}
+			if storage.deiniting || storage.size != 65 || storage.mask != 7
+				|| ios_runtime.swift_foundation_arena == 0
+				|| storage.metadata != ios_runtime.swift_foundation_arena + u64(C.getpagesize()) + 400
+				|| read64(owner) != storage.metadata || read64(owner + 24) > 16777216
+				|| u64(end) > read64(owner + 24) || read64(owner + 16) == 0
+				|| read64(owner + 32) != 0 || read64(owner + 40) != 0 || read64(owner + 56) != 0 {
+				return error('iOS: unsupported Swift Data snapshot layout or range')
+			}
+			// Swift borrows Data throughout the call. Its caller keeps this byte
+			// span alive; no retain, mutation or guest callback is needed here.
+			return SwiftStringBytes{ address: read64(owner + 16) + u64(start), count: u64(end - start) }
+		}
+		else { return error('iOS: large-range Swift Data byte access is not implemented') }
+	}
+}

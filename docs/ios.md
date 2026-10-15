@@ -6469,22 +6469,56 @@ native nil/storage inspection. Earlier assertions that assumed one native
 storage layout are retained as failed trials. Full iOS regression remains
 unpassed; published runners remain unchanged.
 
-The current IPA probe resolves optional NSData conversion, then exits with
-status 1 at `_$s10Foundation4DataV5write2to7optionsyAA3URLV_So20NSDataWritingOptionsVtKF`
-(`Data.write(to:options:)`). Fortnite has not entered application code and
-remains unplayable.
+The next milestone implements
+`_$s10Foundation4DataV5write2to7optionsyAA3URLV_So20NSDataWritingOptionsVtKF`
+(`Data.write(to:options:)`) in V. The actual IPA caller selects atomic writing.
+The entry borrows URL through x0, options through x1 and Data through x2/x3;
+it returns nil or one owned Error through Swift's x21 channel. It uses the
+existing URL-to-NSURL witness bridge and registered Data snapshots, including
+empty, inline and bounded slices up to 16 MiB. General Swift URL construction
+and Data metadata/value witnesses remain separate unsupported profiles.
+
+Options 0, 1 and 2 perform direct truncation, atomic replacement and exclusive
+creation respectively. Atomic writes exclusively create a random temporary
+file beside the destination, complete the write, close it and rename it into
+place. Failure closes the descriptor and removes the temporary file. Ordinary
+existing files preserve POSIX permission bits. Direct writes follow links;
+atomic writes replace the link and leave other references to its target
+unchanged. Native replacement attributes differ between APFS and HFS+, so
+filesystem-specific link attributes, extended attributes, ACLs and file
+protection are outside this profile. Protection/unknown options and the
+invalid atomic-plus-exclusive combination fail explicitly. Paths retain the
+existing 1,023-byte file URL bound. Unsupported special files fail instead of
+opening a potentially blocking device or pipe.
+
+Filesystem failures return owned Cocoa NSError values with the POSIX cause,
+path and NSURL; non-file URLs return Cocoa code 518 with empty userInfo. The
+tests compare native behavior, borrowed storage reference counts, guarded URL
+and witness spans, unused x8 and preserved context, independent error ARC,
+replacement inode/mode, links, slices, concurrent complete atomic writes and
+two drained runtimes with no live objects and unmapped code pages. Eight
+ASan/UBSan runs and four ARM64 suites pass for writing, Base64, bridging and
+reference snapshots. Eleven final C streams/programs and four joined,
+retired VM phases are retained under `build/ios/fortnite/data-write-checks`,
+with native APFS/HFS+ measurements and actual IPA consumers. Failed fixture
+and native attribute assumptions are retained as trials. Full iOS regression
+remains unpassed; published runners remain unchanged.
+
+The current IPA probe resolves Data writing, then exits with status 1 at
+`_$s10Foundation4DateV11distantPastACvgZ` (`Date.distantPast`). Fortnite has
+not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,506 | 654 | 79 |
+| Fortnite executable | 1,507 | 653 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,341 | 657 | 120 |
+| All images | 2,342 | 656 | 120 |
 
-The C++/GLES/Text variant reports 2,354 resolved imports, 644 unresolved strong
+The C++/GLES/Text variant reports 2,355 resolved imports, 643 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

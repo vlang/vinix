@@ -118,6 +118,7 @@ fn swift_foundation_arena() u64 {
 	swift_url_path_emit(base + 672, true)
 	swift_url_metadata_emit(base, data)
 	swift_data_emit(base, data)
+	swift_data_write_emit(base)
 	// A concrete specialization of Foundation's retroactive String conformance.
 	// The installed descriptor uses a generic witness cache; this implementation
 	// supplies its already-specialized table, accepted by normal witness lookup.
@@ -136,7 +137,7 @@ fn swift_foundation_arena() u64 {
 	// destructiveInjectEnumTag witness. Native formatted(DateFormatter) is
 	// payload case zero; this does not construct an encoder or format a date.
 	write32(data + 96, 0)
-	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 984) })
+	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 1108) })
 	if C.mprotect(unsafe { voidptr(base) }, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(unsafe { voidptr(base) }, usize(page * 2)); panic('iOS: cannot seal Swift Foundation entries')
@@ -286,6 +287,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 	if address := swift_json_decoder_symbol(symbol) { return address }
 	if address := swift_json_date_symbol(symbol) { return address }
 	return match symbol {
+		'_$s10Foundation4DataV5write2to7optionsyAA3URLV_So20NSDataWritingOptionsVtKF' { swift_foundation_arena() + 1024 }
 		'_$s10Foundation4DataV36_unconditionallyBridgeFromObjectiveCyACSo6NSDataCSgFZ' { u64(unsafe { voidptr(swift_data_unbridge) }) }
 		'_$s10Foundation4DataV19base64EncodedString7optionsSSSo27NSDataBase64EncodingOptionsV_tF' { u64(unsafe { voidptr(swift_data_base64) }) }
 		'_$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF' { u64(unsafe { voidptr(swift_data_bridge) }) }

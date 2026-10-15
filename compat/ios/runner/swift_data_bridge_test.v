@@ -414,7 +414,7 @@ fn test_swift_data_bridge() {
 				assert false
 			}
 		}
-		if _ := swift_foundation_symbol('_$s10Foundation4DataV5write2to7optionsyAA3URLV_So20NSDataWritingOptionsVtKF') {
+		if _ := swift_foundation_symbol('_$s10Foundation3URLV36_unconditionallyBridgeFromObjectiveCyACSo5NSURLCSgFZ') {
 			assert false
 		}
 		objc_stop()
