@@ -1163,6 +1163,10 @@ fn unmount(parent &VFSNode, target string, flags u64) ? {
 		}
 	}
 	table.lock.release()
+	if unmount_paths_in_use(entry) {
+		errno.set(errno.ebusy)
+		return none
+	}
 	begin_mount_unmount(mut entry)?
 	mut completed := false
 	defer { if !completed { cancel_mount_unmount(mut entry) } }

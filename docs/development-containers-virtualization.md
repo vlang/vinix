@@ -503,7 +503,16 @@ under the same lock before backend shutdown and reopens on failure; successful
 ordinary detach keeps it closed before any later copy-up/truncation. Bind aliases
 and namespace copies retain their distinct writer ownership, and lazy detach
 keeps its existing writable-route behavior. Read-only descriptions/mappings,
-executable mappings and cwd/root busy accounting remain open.
+executable mappings and concurrent cwd/root publication remain open.
+The [retained-directory unmount checks](../tests/mount-lifecycle/unmount-paths.md)
+now refuse ordinary detach while existing shared process or private thread
+cwd/root routes select the attachment. Copied namespaces resolve saved IDs to
+their own mounts; a foreign route absent from that table retains its original
+attachment. Bind aliases remain distinct, and published zombies do not retain
+the busy state. Nested locks are tried without waiting under the process table
+lock, with conservative refusal on contention. Concurrent directory publication,
+read-only descriptions/mappings and executable mappings still need complete
+mount-reference admission and ownership accounting.
 The [attachment identity checks](../tests/mount-lifecycle/identities.md) qualify
 unmount, remount and move refusal through detached/foreign mount descriptors
 and cwd, while valid local operations remain available. Retained read-only

@@ -232,3 +232,7 @@ The [writable-description checks](../../tests/mount-lifecycle/unmount-writers.md
 also cover ordinary unmount's existing regular-file writer pins. Cold-boot
 retries require a fresh writable open and write after each ext2 refusal,
 checking that backend failure restores admission for subsequent work.
+The [retained-directory checks](../../tests/mount-lifecycle/unmount-paths.md)
+also refuse ordinary detach while existing process or private thread cwd/root
+routes use the attachment. Completed process teardown releases that busy state;
+concurrent directory publication remains outside this qualification.

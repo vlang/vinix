@@ -166,6 +166,9 @@ The cold-boot fixture also opens and writes a linked probe file after every
 ext2 `EBUSY` refusal, requiring failed backend shutdown to reopen writer
 admission before the next retry. Read-only descriptions/mappings and cwd/root
 busy accounting remain outside this gate.
+Separate [cwd/root checks](../mount-lifecycle/unmount-paths.md) qualify ordinary
+unmount refusal for existing shared process and private thread directory routes,
+including release by zombies. Concurrent directory publication remains open.
 
 The immediate-attempt gate uses `persistent 0 30` and the new isolated kernels.
 An ARM64 control with the preceding kernel reports success on its first attempt,
