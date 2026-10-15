@@ -66,6 +66,7 @@ fn (mut a SoftwareApp) prepare_deployment_snapshot_details() {
 		unsafe { number.free() }
 	}
 	unsafe { total.free() }
+	a.prepare_report_reader()
 }
 
 fn (mut a SoftwareApp) load_deployment_snapshot() bool {
@@ -153,7 +154,7 @@ fn (mut a SoftwareApp) snapshot_paste_input(input string) {
 
 fn (a &SoftwareApp) build_snapshot_compact(width int, height int) ui2.Element {
 	mut children := frame_elements(6)
-	children << software_label('Save installed · enlarge for details', 14, 8, width - 28, 28, false)
+	children << software_label(if a.snapshot_ready { 'Installed deployment saved' } else { 'Save installed · enlarge for details' }, 14, 8, width - 28, 28, false)
 	button_width := if width > 202 { 174 } else { width - 28 }
 	available := a.failure_pages.len > 0 && a.worker == unsafe { nil }
 	if a.worker == unsafe { nil } {
@@ -161,8 +162,14 @@ fn (a &SoftwareApp) build_snapshot_compact(width int, height int) ui2.Element {
 	} else {
 		children << software_label('Wait for saving to finish.', 14, 46, width - 28, 28, false)
 	}
-	if available { children << software_button('software.failure', 'Failure details', 14, 84, button_width) }
-	y := if height > 230 { height - 98 } else if available { 122 } else { 84 }
+	mut next_y := 84
+	if a.worker == unsafe { nil } && a.snapshot_ready && height >= 220 {
+		children << software_button('software.report.read', 'Read receipt', 14, next_y, button_width)
+		next_y += 38
+	}
+	if available { children << software_button('software.failure', 'Failure details', 14, next_y, button_width); next_y += 38 }
+	preferred_y := if height > 230 { height - 98 } else { next_y }
+	y := if preferred_y > next_y { preferred_y } else { next_y }
 	children << software_label(a.status, 14, y, width - 28, if height > y + 8 { height - y - 8 } else { 1 }, false)
 	return ui2.screen(app_surface, children)
 }

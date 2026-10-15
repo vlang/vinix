@@ -66,6 +66,8 @@ fn check_software_audit() ! {
 	assert app.audit_ready && !app.audit_snapshot.matches && app.audit_snapshot.rows.len == 31
 	assert app.audit_path == software_audit_fixture_path && app.failure_pages.len == 0
 	assert app.audit_summary.contains('3 differences') && app.details_pages.len >= 2
+	check_software_report_reader(mut app)!
+	check_report_return_selection(mut app)!
 	mut facts := app.details_pages.map(it.text).join('\n').replace('\n  ', '')
 	assert facts.contains('Changed field: public_key') && facts.contains('below the lock minimum') && facts.contains('SHA-256')
 	unsafe { facts.free() }
@@ -95,6 +97,7 @@ fn check_software_audit() ! {
 		wait_for_software(mut app)
 		if path in ['/match-audit.json', '/empty-audit.json'] {
 			assert app.audit_ready && app.audit_snapshot.matches
+			check_software_report_reader(mut app)!
 		} else {
 			assert !app.audit_ready && app.audit_snapshot.rows.len == 0 && app.failure_pages.len > 0
 			if path == '/wrong-exit-audit.json' { assert app.status.contains('disagrees') }
@@ -111,6 +114,7 @@ fn check_software_audit() ! {
 	app.handle('software.deployment.audit')!
 	for _ in 0 .. 100 { app.poll(); if app.output.len > 0 { break }; time.sleep(time.millisecond) }
 	assert app.worker != unsafe { nil } && !app.audit_ready
+	app.handle('software.report.read')!; assert !app.report_reader_mode
 	compact := app.build(ui2.rect(0, 0, 480, 340))!
 	assert compact.children.any(it.id == 'software.audit.stop')
 	app.handle('software.audit.review')!; assert app.worker_audit && app.review == ''
@@ -132,6 +136,7 @@ fn check_software_audit_memory() ! {
 				app.audit_mode = true; app.audit_path = software_audit_fixture_path.clone()
 				app.output.clear(); for byte in text { app.output << byte }
 				assert app.load_deployment_audit(3)
+				report_reader_cycle(mut app)!
 				tree := app.build(ui2.rect(0, 0, 900, 660))!
 				free_window_tree(tree)
 				app.handle_deployment_audit('software.audit.next')
@@ -143,5 +148,6 @@ fn check_software_audit_memory() ! {
 		app.set_status('')
 		kept := C.vinix_heap_end(); assert kept == 0, 'deployment audit UI retained ${kept} bytes'
 		println('Software deployment audit: 1000 complete decode, detail, render, paging and retirement cycles retain zero tracked bytes')
+		println('Software report reader: 1000 decode/short-pages/package-steps/resize/back/cache-retirement cycles retain zero tracked bytes')
 	}
 }

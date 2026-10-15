@@ -113,6 +113,7 @@ fn check_software_health_navigation() ! {
 				app.handle(event)!
 			}
 			app.paste_input('\x1b'); app.key_input('must not edit')
+			app.handle('software.report.read')!; assert !app.report_reader_mode
 			assert app.worker.pid == pid && app.worker.is_alive() && app.launch_request == ''
 			if action == 'escape' { app.key_input('\x1b') } else { app.handle(action)! }
 			assert app.worker == unsafe { nil } && C.kill(pid, 0) != 0 && !app.worker_health && !app.poll()
@@ -162,7 +163,12 @@ fn check_software_health_navigation() ! {
 			assert element.frame.y >= 0 && element.frame.y + element.frame.height <= size.height
 		}
 		free_window_tree(tree)
-		assert app.health_selected == selected && app.health_scroll == scroll && app.details_page == page
+		assert app.health_selected == selected && app.details_page == page
+		if size.width < 640 { assert app.health_scroll == scroll }
+		else {
+			position := app.health_matching.index(selected)
+			assert position >= app.health_scroll && position < app.health_scroll + app.page_rows
+		}
 		assert app.health_focus && app.health_select_all && app.health_query.len == 0 && !app.health_issues_only
 	}
 	app.key_input('\x1b'); assert app.health_mode && !app.health_focus && !app.health_select_all
@@ -213,8 +219,10 @@ fn check_health_filters(mut app SoftwareApp) ! {
 	assert editor_bytes_text(app.health_query) == 'app-02' && app.health_issues_only
 	wait_for_software(mut app)
 	assert app.health_matching == [2] && app.health_selected == 2 && app.health_summary.contains('32 packages inspected')
+	check_software_report_reader(mut app)!
 	health_fixture_query(mut app, 'no such package')!
 	assert app.health_matching.len == 0 && app.health_selected == -1 && app.details_pages.len == 0
+	app.handle('software.report.read')!; assert !app.report_reader_mode
 	assert app.health_results == 'Showing 0 of 32' && app.health_summary.contains('3 with issues')
 	empty := app.build(ui2.rect(0, 0, 640, 610))!
 	assert empty.children.any(it.text == 'No packages match this search and filter.')
@@ -268,6 +276,8 @@ fn check_software_health() ! {
 	assert 'Architecture: aarch64' in details_fixture_values(&app, 0)
 	assert 'Diagnostic: ' + 'A complete diagnostic é🚀 '.repeat(10) in details_fixture_values(&app, 0)
 	assert app.details_pages.len > 1 && !app.details_mode
+	check_software_report_reader(mut app)!
+	check_report_return_selection(mut app)!
 	for _ in 0 .. app.details_pages.len + 2 { app.handle('software.health.next')! }
 	assert app.details_page == app.details_pages.len - 1
 	health := app.build(ui2.rect(0, 0, 640, 610))!
@@ -415,6 +425,7 @@ fn check_software_health_memory() ! {
 			for _ in 0 .. 1000 {
 				app.health_mode = true; app.load_health()
 				assert app.health_ready && app.health_matching[0] == 1
+				report_reader_cycle(mut app)!
 				software_search_paste_cycle(mut app)
 				free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!)
 				app.handle_health('software.row.1')

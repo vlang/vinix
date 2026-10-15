@@ -143,6 +143,17 @@ fn software_health_matches(row pkgprotocol.PackageHealth, query string) bool {
 	return false
 }
 
+fn (mut a SoftwareApp) keep_health_selection_visible() {
+	a.health_scroll = 0
+	for position, index in a.health_matching {
+		if index == a.health_selected {
+			size := if a.page_rows > 0 { a.page_rows } else { 1 }
+			a.health_scroll = position / size * size
+			break
+		}
+	}
+}
+
 fn (mut a SoftwareApp) filter_health() {
 	a.health_matching.clear()
 	unsafe { a.health_matching.flags |= .noslices }
@@ -159,14 +170,7 @@ fn (mut a SoftwareApp) filter_health() {
 	if a.health_selected !in a.health_matching {
 		a.health_selected = if a.health_matching.len == 0 { -1 } else { a.health_matching[0] }
 	}
-	a.health_scroll = 0
-	for position, index in a.health_matching {
-		if index == a.health_selected {
-			size := if a.page_rows > 0 { a.page_rows } else { 1 }
-			a.health_scroll = position / size * size
-			break
-		}
-	}
+	a.keep_health_selection_visible()
 	if previous != a.health_selected { a.prepare_health_details() }
 	visible := a.health_matching.len.str()
 	total := a.health_snapshot.rows.len.str()
@@ -224,6 +228,7 @@ fn (mut a SoftwareApp) prepare_health_details() {
 		unsafe { number.free() }
 	}
 	unsafe { total.free() }
+	a.prepare_report_reader()
 }
 
 fn (mut a SoftwareApp) load_health() bool {
@@ -292,7 +297,7 @@ fn (mut a SoftwareApp) build_health_compact(width int, height int) ui2.Element {
 	mut children := frame_elements(9)
 	content_width := if width > 28 { width - 28 } else { 1 }
 	button_width := if width >= 320 { 140 } else if content_width >= 174 { 174 } else { content_width }
-	children << software_label('Health report · enlarge for details', 14, 8, content_width, 28, false)
+	children << software_label(if a.health_ready { 'Health report' } else { 'Health report · enlarge for details' }, 14, 8, content_width, 28, false)
 	mut next_y := 84
 	if a.worker == unsafe { nil } {
 		children << software_button('software.health.back', 'Back to packages', 14, 46, button_width)
@@ -302,8 +307,15 @@ fn (mut a SoftwareApp) build_health_compact(width int, height int) ui2.Element {
 	} else {
 		children << software_button('software.health.stop', 'Stop inspection', 14, 46, button_width)
 	}
-	if a.failure_pages.len > 0 && a.worker == unsafe { nil } {
-		children << software_button('software.failure', 'Failure details', 14, next_y, button_width)
+	reading := a.worker == unsafe { nil } && a.health_ready && a.details_pages.len > 0 && height >= 220
+	failed := a.failure_pages.len > 0 && a.worker == unsafe { nil }
+	if reading {
+		children << software_button('software.report.read', 'Read report', 14, next_y, if failed { (width - 42) / 2 } else { button_width })
+		if !failed { next_y += 38 }
+	}
+	if failed {
+		children << software_button('software.failure', if reading && width < 240 { 'Failure' } else { 'Failure details' },
+			if reading { (width + 14) / 2 } else { 14 }, next_y, if reading { (width - 42) / 2 } else { button_width })
 		next_y += 38
 	}
 	if a.health_ready && next_y + 100 <= height {

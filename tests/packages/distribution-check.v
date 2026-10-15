@@ -230,6 +230,7 @@ fn check() ! {
 	os.cp(repository + '/desktop/software_package_navigation.v', work + '/software/software_package_navigation.v')!
 	os.cp(repository + '/tests/packages/software_package_navigation_fixture.v', work + '/software/package_navigation_fixture.v')!
 	os.cp(repository + '/desktop/software_details.v', work + '/software/software_details.v')!
+	os.cp(repository + '/desktop/software_report_reader.v', work + '/software/software_report_reader.v')!
 	os.cp(repository + '/desktop/software_health.v', work + '/software/software_health.v')!
 	os.cp(repository + '/desktop/software_cleanup.v', work + '/software/software_cleanup.v')!
 	os.cp(repository + '/desktop/software_cleanup_navigation.v', work + '/software/software_cleanup_navigation.v')!
@@ -237,6 +238,7 @@ fn check() ! {
 	os.cp(repository + '/tests/packages/software_cleanup_fixture.v', work + '/software/cleanup_fixture.v')!
 	os.cp(repository + '/tests/packages/software_health_fixture.v', work + '/software/health_fixture.v')!
 	os.cp(repository + '/tests/packages/software_details_fixture.v', work + '/software/details_fixture.v')!
+	os.cp(repository + '/tests/packages/software_report_reader_fixture.v', work + '/software/report_reader_fixture.v')!
 	os.cp(repository + '/tests/packages/software_view_fixture.v', work + '/software/view_fixture.v')!
 	os.cp(repository + '/desktop/software_repositories.v', work + '/software/software_repositories.v')!
 	os.cp(repository + '/desktop/software_repository_navigation.v', work + '/software/software_repository_navigation.v')!

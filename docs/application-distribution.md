@@ -1015,6 +1015,21 @@ Keyboard deletion still clears fields; Enter can commit an explicitly cleared
 native input as an empty protocol-2 text event. See
 [empty clipboard checks](../tests/packages/software-empty-paste-check.md).
 
+Compact health reports, deployment checks and saved-deployment receipts expose
+**Read report** or **Read receipt** after a complete result has loaded. Their
+shared reader shows complete provenance, integrity diagnostics, drift fields,
+filenames, hashes and saved metadata limitations in short UTF-8 pages at 180×220
+or larger. **Prev item**/**Next item**, Up/Down and Tab/Shift-Tab select packages
+within the report's current search/filter projection. Left/Right and Page keys
+turn pages; full-size views show the corresponding canonical page. Empty audit
+results retain their source/summary disclosure, and empty saved deployments
+retain their receipt; an empty health search has no selected package to read.
+Resizing keeps the short-page anchor; tiny windows retain Back. Back or Escape
+returns to the report with its query, filters and captured source/digest intact.
+Repair, reconciliation, saving and offline export remain on their existing
+screens. Pending reads and saves retain their lifecycle guards. See
+[compact report qualification](../tests/packages/software-report-reader-check.md).
+
 Pending install, uninstall, update, repair and rollback reviews support
 **Stop review**, Cancel and Escape before changes start. Stopping reaps the
 read-only worker and discards its proposal, fingerprint and unaccepted output;

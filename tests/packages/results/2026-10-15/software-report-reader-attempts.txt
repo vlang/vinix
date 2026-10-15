@@ -1,0 +1,14 @@
+All 35 final focused compile/run checks passed. The initial UI compile refused an invalid while keyword in the new V fixture; no functional or allocation test ran. It was corrected to V for syntax without changing assertions or production code. The initial compiler log, source and note are retained and pinned. Native font metrics and both desktop architecture typechecks had already passed and production code stayed unchanged. The independent maintained driver passed with explicit staging of the shared module and fixture, all twenty-five allocation modes and font metrics. Compiler invocations use -nocache, V_MACOS_V3_NO_FALLBACK=1 and V_C_ERROR_BUG_REPORT_DISABLED=1. ASan/UBSan uses ASAN_OPTIONS=detect_leaks=0 and UBSAN_OPTIONS=halt_on_error=1. No production assertion, admission rule or authorization was relaxed. No guest graphical or broader release acceptance is claimed.
+
+The initial shared reader passed the complete focused suite before selection
+review. A dedicated real-size regression then reproduced a hidden health row
+when returning from a large list through the reader to a smaller full report.
+The selected row now reanchors only when the visible row count changes,
+matching audit behavior and preserving same-size deliberate paging. An older
+fixture required fixed raw scroll offsets even across full-size changes; its
+full-size expectation now requires the unchanged selected row/page to stay
+visible. Compact scroll invariance and explicit paging checks remain. The
+regression, older-expectation failure logs, original sources and successful
+pre-fix binaries/logs are retained and pinned. The final focused suite,
+independent driver and both desktop typechecks were rerun after this fix.
+

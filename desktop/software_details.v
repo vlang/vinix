@@ -27,6 +27,7 @@ fn (mut a SoftwareApp) clear_details() {
 	a.details_compact_pages = []SoftwareFailurePage{}
 	a.details_compact_page = 0; a.details_compact_mode = false
 	a.details_mode = false; a.details_review = false
+	a.report_reader_mode = false
 	a.details_section = 0; a.details_page = 0
 	for index in 0 .. 6 { a.details_starts[index] = -1 }
 }

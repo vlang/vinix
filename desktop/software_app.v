@@ -50,6 +50,7 @@ mut:
 	review_scroll   int
 	review_summary  string
 	details_mode    bool
+	report_reader_mode bool
 	details_review  bool
 	details_pages   []SoftwareDetailsPage
 	details_compact_pages []SoftwareFailurePage
@@ -780,6 +781,8 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 	if a.failure_mode { a.handle_failure(event_id); return }
 	if a.details_mode { a.handle_details(event_id); return }
 	if a.policy_mode && a.policy_reader_mode { a.handle_policy_reader(event_id); return }
+	if a.report_reader_mode { a.handle_report_reader(event_id); return }
+	if event_id == 'software.report.read' { a.open_report_reader(); return }
 	if event_id == 'software.failure' {
 		if a.worker == unsafe { nil } && a.failure_pages.len > 0 { a.failure_mode = true; a.focus = false }
 		return
@@ -1057,6 +1060,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.window_mode { a.window_key_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
 	if a.failure_mode { a.failure_key_input(input); return }
+	if a.report_reader_mode { a.report_reader_key_input(input); return }
 	if a.snapshot_mode { a.snapshot_key_input(input); return }
 	if a.audit_mode { a.audit_key_input(input); return }
 	if a.details_mode { a.details_key_input(input); return }
@@ -1094,6 +1098,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.window_mode { a.window_paste_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
 	if a.failure_mode { return }
+	if a.report_reader_mode { return }
 	if a.snapshot_mode { a.snapshot_paste_input(input); return }
 	if a.audit_mode { a.audit_paste_input(input); return }
 	if a.details_mode { return }
@@ -1203,6 +1208,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	height := int(size.height)
 	if a.details_mode { return a.build_details(width, height) }
 	if a.policy_mode && a.policy_reader_mode { return a.build_policy_reader(width, height) }
+	if a.report_reader_mode { return a.build_report_reader(width, height) }
 	if a.snapshot_mode { return a.build_deployment_snapshot(width, height) }
 	if a.mirror_mode && (width < 640 || height < 610) { return a.build_mirror_compact(width, height) }
 	if a.audit_mode && (width < 640 || height < 610) { return a.build_deployment_audit_compact(width, height) }
@@ -1222,8 +1228,10 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		return ui2.screen(app_surface, compact)
 	}
 	if !a.audit_mode {
+		previous_size := a.page_rows
 		a.page_rows = if height > 400 { (height - if a.review != '' { 274 } else if a.health_mode { 348 } else { 310 }) / 30 } else { 5 }
 		if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
+		if a.health_mode && a.page_rows != previous_size { a.keep_health_selection_visible() }
 	}
 	if a.audit_mode { return a.build_deployment_audit(width, height) }
 	if a.health_mode { return a.build_health(width, height) }

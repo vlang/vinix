@@ -85,6 +85,14 @@ topics. Back or Escape returns to the same policy or frozen review. Resizing
 retains the short-page anchor; tiny windows retain Back. See
 [policy reader checks](../../tests/packages/software-policy-reader-check.md).
 
+Compact health reports, deployment checks and saved-deployment receipts offer
+**Read report** or **Read receipt** for their loaded metadata. The shared reader
+shows complete short UTF-8 pages; item controls and Up/Down/Tab/Shift-Tab walk
+the current filtered package results. Left/Right and Page keys turn pages.
+Back or Escape returns with the report, query and source/digest intact. Resizing
+retains the short-page anchor, and tiny windows retain Back. See
+[report reader checks](../../tests/packages/software-report-reader-check.md).
+
 **Verify installed** supports Stop/Cancel/Escape in full and compact windows.
 Stopping retires unaccepted progress/output and keeps the catalog for retry.
 Completion and human success output wait for successful worker exit; late

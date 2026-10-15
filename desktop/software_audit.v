@@ -74,6 +74,7 @@ fn (mut a SoftwareApp) prepare_deployment_audit_details() {
 		unsafe { number.free() }
 	}
 	unsafe { total.free() }
+	a.prepare_report_reader()
 }
 
 fn (mut a SoftwareApp) load_deployment_audit(code int) bool {
@@ -177,7 +178,11 @@ fn (mut a SoftwareApp) build_deployment_audit_compact(width int, height int) ui2
 		if a.worker == unsafe { nil } { 'Back to deployment' } else { 'Stop check' }, 14, 8, if width > 188 { 174 } else { width - 28 })
 	children << software_label('Installed deployment check', 14, 46, width - 28, 28, false)
 	if a.audit_ready { children << software_label(a.audit_results, 14, 80, width - 28, 28, false) }
-	children << software_label('Enlarge this window to search packages, filter differences and inspect deployment details.', 14, if a.audit_ready { 114 } else { 80 }, width - 28, if height > 180 { 60 } else { 28 }, false)
+	reading := a.worker == unsafe { nil } && a.audit_ready && a.details_pages.len > 0 && height >= 220
+	if reading { children << software_button('software.report.read', 'Read report', 14, 114, if width > 188 { 174 } else { width - 28 }) }
+	y := if reading { 152 } else if a.audit_ready { 114 } else { 80 }
+	children << software_label(if reading { 'Enlarge to search or filter packages.' } else { 'Enlarge this window to search packages, filter differences and inspect deployment details.' },
+		14, y, width - 28, if reading { height - y - 8 } else if height > 180 { 60 } else { 28 }, false)
 	return ui2.screen(app_surface, children)
 }
 

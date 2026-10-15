@@ -78,6 +78,7 @@ fn check_software_audit_search() ! {
 	assert resized_position >= app.audit_scroll && resized_position < app.audit_scroll + app.page_rows
 	app.handle('software.audit.differences')!
 	assert app.audit_differences_only && app.audit_matching == [2, 32, 63] && app.audit_selected == 2
+	check_software_report_reader(mut app)!
 	app.handle('software.row.1')!; assert app.audit_selected == 32
 	app.handle('software.audit.next')!; assert app.details_page == 1
 	audit_fixture_query(mut app, 'PUBLIC_KEY')!
@@ -117,6 +118,7 @@ fn check_software_audit_search() ! {
 	app.key_input('unfocused'); app.paste_input('unfocused'); assert app.audit_query.len == 254
 	audit_fixture_query(mut app, 'no such package')!
 	assert app.audit_matching.len == 0 && app.audit_selected == -1 && app.audit_results == 'Showing 0 of 64'
+	check_software_report_reader(mut app)!
 	facts := app.details_pages.map(it.text).join('\n').replace('\n  ', '')
 	assert facts.contains('Captured lock SHA-256:') && !facts.contains('Package: ')
 	unsafe { facts.free() }
@@ -170,6 +172,7 @@ fn check_software_audit_search_memory() ! {
 				app.audit_mode = true; app.audit_path = software_audit_fixture_path.clone()
 				app.output.clear(); for byte in text { app.output << byte }
 				assert app.load_deployment_audit(3)
+				report_reader_cycle(mut app)!
 				software_search_paste_cycle(mut app)
 				free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!)
 				for query in ['APP-10037', '', 'PUBLIC_KEY', 'no matching package', 'é🚀']! {

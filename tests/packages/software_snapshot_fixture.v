@@ -90,6 +90,7 @@ fn check_software_snapshot_navigation() ! {
 		assert app.worker_snapshot && app.worker_view && !app.snapshot_ready && app.details_pages.len == 0
 		assert app.worker.args == ['--json', 'deployment-snapshot-save', path] && !app.admin_prompt
 		assert !app.prepare_close()
+		app.handle('software.report.read')!; assert !app.report_reader_mode
 		for event in ['software.snapshot.back', 'software.snapshot.another', 'software.snapshot.save', 'software.snapshot.audit',
 			'software.snapshot.review', 'software.snapshot.export', 'software.deployment.path', 'software.deployment.stop',
 			'software.cancel', 'software.verify.stop', 'software.failure']! { app.handle(event)! }
@@ -161,6 +162,7 @@ fn check_software_snapshot() ! {
 	wait_for_software(mut app)
 	assert app.snapshot_ready && app.snapshot_saved.destination == software_snapshot_fixture_path
 	assert app.snapshot_saved.generation == 7 && app.snapshot_saved.roots == 2 && app.snapshot_saved.packages == 5
+	check_software_report_reader(mut app)!
 	assert app.prepare_close() && app.failure_pages.len == 0
 	facts := app.details_pages.map(it.text).join('\n').replace('\n  ', '')
 	assert facts.contains(software_snapshot_fixture_path) && facts.contains('d'.repeat(64)) && facts.contains('Installed generation: 7')
@@ -179,6 +181,7 @@ fn check_software_snapshot() ! {
 		app.handle('software.deployment.snapshot')!
 		app.paste_input(path); app.handle('software.snapshot.save')!; wait_for_software(mut app)
 		assert app.snapshot_ready
+		check_software_report_reader(mut app)!
 		if path == '/empty-save.json' { assert app.snapshot_saved.packages == 0 && app.snapshot_saved.generation == 0 }
 		else { assert app.snapshot_saved.architecture == 'x86_64' }
 		if path == '/x86-save.json' {
@@ -246,6 +249,7 @@ fn check_software_snapshot_memory() ! {
 				app.snapshot_pending = software_snapshot_fixture_path.clone()
 				app.output.clear(); for byte in text { app.output << byte }
 				assert app.load_deployment_snapshot()
+				report_reader_cycle(mut app)!
 				tree := app.build(ui2.rect(0, 0, 900, 660))!
 				free_window_tree(tree)
 				app.handle_deployment_snapshot('software.snapshot.next')
