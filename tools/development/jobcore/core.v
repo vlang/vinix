@@ -109,7 +109,10 @@ fn validate(plan Plan) ! {
 pub fn private_file(path string, limit int) !string {
 	devcore.check_account()!
 	if limit < 1 || limit > 1024 * 1024 { return error('invalid private file limit') }
-	fd := unsafe { C.open(path.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW) }
+	// Opening a FIFO for reading can wait for a writer before fstat gets a
+	// chance to reject it. Nonblocking open preserves descriptor-based checks
+	// without letting an invalid credential/plan/state path stall the runner.
+	fd := unsafe { C.open(path.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK) }
 	if fd < 0 { return error('cannot open private file: ${path}') }
 	defer { C.close(fd) }
 	mut st := C.stat{}

@@ -13,6 +13,13 @@ reproduced both former execution gaps; all seven build/qualification/scheduler
 test files pass. These checks strengthen the existing reproducible tooling and
 do not complete the installed-system self-hosting gate.
 
+The scheduler's private-file checks now open without waiting for FIFO writers,
+so invalid credential or stored plan/state paths cannot block before descriptor
+validation. Public CLI tests verify prompt refusal, preserved FIFOs, failed
+attempt accounting and successful credential rotation. The three host scheduler
+test files and both static Linux architecture builds pass; native FIFO
+qualification remains open.
+
 | Requirement | Available implementation | Remaining acceptance / implementation |
 | --- | --- | --- |
 | Installed-system self-hosting | [V build plans](../tools/development/README.md) pin prepared source/tool/SDK inputs, build in a private copy, enforce deadlines and record output hashes. Native kernel, utility, init and package-CLI recipes are documented. [Guest runner checks](../tests/development/README.md) qualify UID 1000 source/link copying, epoch/environment control, matching artifacts and changed-input refusal on both architectures. AArch64 rebuilds the V C-backend compiler in two fresh workspaces, then uses each rebuilt compiler for the four `util-vinix` utilities, `init` and the package CLI from immutable committed sources. It executes the tools, packs the compiled `lscpu` and signs a consumer release. Generated-C/compiler/executable/payload/manifest/index/signature hashes match; the controller independently verifies the signature and payload metadata with full SDK/V/runtime pins. | Complete native kernel/desktop/dependency recipes, init boot/login qualification and the remaining userland/package workflows; rebuild all four requested layers inside an installed system on both architectures. Basic runner checks use a prebuilt V payload; AArch64 compiler/utility/init/package checks use native compilation. No full self-hosted rebuild was run here. |

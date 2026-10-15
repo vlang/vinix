@@ -72,6 +72,12 @@ passed as environment variables only to the selected job. The scheduler omits
 them from receipts and discards child stdout/stderr; a job can explicitly write
 its own results. Unselected inherited environment variables are omitted.
 
+Private files are opened without waiting for a FIFO writer, then checked through
+the opened descriptor before any read. A FIFO credential fails the reserved
+attempt without launching the job or leaving it in flight. A FIFO at a stored
+plan or state path promptly refuses inspection and execution. These refusals
+preserve the path for inspection; they do not replace it or read pipe content.
+
 The runner publishes an in-flight receipt before starting each job. If it is
 killed before recording completion, the job remains blocked on subsequent ticks.
 After checking that the interrupted job and its descendants have stopped, its
@@ -125,3 +131,14 @@ existing output without changing its sentinel. The controller checked all
 Host nested CLI cancellation tests retired a compiler and descendant that
 ignored TERM under both INT and TERM. These checks qualify the local reference
 pipeline; service boot, remote CI, deployment and broader workflows remain open.
+
+On 15 October 2026 a host regression reproduced a FIFO credential blocking
+before the job's execution deadline was installed. Nonblocking open now reaches
+the existing regular-file/owner/mode check immediately. The public CLI tests
+cover credential, stored-plan and stored-state FIFOs without writers, retained
+FIFO inodes, failed-attempt accounting, absence of job output and successful
+execution after rotating back to a private regular credential. All three host
+scheduler test files passed with V `be2eb40`. Static Linux ELF64 builds also
+passed for ARM64 and x86-64, with checked machine IDs and source/compiler/binary
+pins in `/tmp/vinix-jobs-fifo-8042`. This is host and build evidence; the new
+FIFO cases have not been run inside Vinix.
