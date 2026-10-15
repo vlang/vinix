@@ -211,6 +211,16 @@ fn clear_child_tid(mut t proc.Thread) {
 	}
 	t.clear_child_tid = 0
 
+	// A shared backing can outlive this map in unrelated processes. Linux
+	// leaves their word and queues alone when this is the map's last user.
+	// Other threads share our Process owner; non-thread CLONE_VM children
+	// contribute separate pagemap owners. Inspection pins are not users.
+	mut process := t.process
+	process.threads_lock.acquire()
+	other_threads := process.threads.len > 1
+	process.threads_lock.release()
+	if !other_threads && katomic.load(&process.pagemap.owners) == 1 { return }
+
 	zero := u32(0)
 	if !usercopy.copy_to_user(address, voidptr(&zero), sizeof(u32)) {
 		// Linux still tries the shared wake after a failed store. A readable

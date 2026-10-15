@@ -1067,6 +1067,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   and flat three-waiter cleanup in both credential/PID namespace views.
   See [the TID fault receipts](docs/linux-posix-qualification.md#native-clear-child-tid-store-fault-notifications).
 
+- [x] Suppress clear-child-tid stores and wakes for stable last-map-user exits,
+  preserving one-waiter notification with a surviving thread or CLONE_VM
+  process; qualify replacement/read-only aliases, queue isolation and cleanup
+  on both native architectures against the identical ELF on Linux.
+  See [the last-user receipts](docs/linux-posix-qualification.md#native-clear-child-tid-last-address-space-user).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

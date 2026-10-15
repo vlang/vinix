@@ -1,0 +1,10 @@
+Completed /Users/alex/.cache/vinix-linux-compat/tidlast-20261016/states/before-arm/tidlast: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/tidlast-20261016/states/before-x86/tidlast: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/tidlast-20261016/states/after-arm/tidlast: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/tidlast-20261016/states/after-arm/runtime: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/tidlast-20261016/states/after-x86/tidlast: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/tidlast-20261016/states/after-arm/tidwake: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/tidlast-20261016/states/after-x86/runtime: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/tidlast-20261016/states/after-arm/tidfault: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/tidlast-20261016/states/after-x86/tidwake: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/tidlast-20261016/states/after-x86/tidfault: captured files byte-identical; disposable boot staging retired

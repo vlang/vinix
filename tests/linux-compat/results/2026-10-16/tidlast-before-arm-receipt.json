@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "307991b12bab6d2255a9e3af2efbff2a155d1e62be0fdacd5fb31acdc7e1339e",
+    "results": [
+        {
+            "name": "tidlast",
+            "source_sha256": "53eb6bab588a42b11fd4e8eb3756a741f40ac42d17396b4bb7e5a5c2e616082b",
+            "init_sha256": "ebf6b83d389d274f1a4c19a865dc8ea1db73b08bdd2e6631c8596aa4e7a6da19",
+            "iso_sha256": "f2911821683047b85cb3855708cb1a730cd2b56bc1434efd2ba35ace1602149d",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

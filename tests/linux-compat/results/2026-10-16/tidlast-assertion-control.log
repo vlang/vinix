@@ -1,0 +1,3 @@
+tests/linux-compat/tidlast-check.v:353: FAIL: fn main.main: assert false, 'tidlast assertions must execute'
+      message: tidlast assertions must execute
+V panic: Assertion failed...

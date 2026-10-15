@@ -1,0 +1,39 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "cf87a872adaa61ee4f886de123736ae6d92563f61b97e29e454359908abbafa3",
+    "results": [
+        {
+            "name": "tidlast",
+            "source_sha256": "53eb6bab588a42b11fd4e8eb3756a741f40ac42d17396b4bb7e5a5c2e616082b",
+            "init_sha256": "ebf6b83d389d274f1a4c19a865dc8ea1db73b08bdd2e6631c8596aa4e7a6da19",
+            "iso_sha256": "8d344cf099a8b32f71f894700ff8010f40afb8d1157454d0c138c0002ab43e47",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "5d06c51b5ded2d2836e5ab383d1ebf5d6a7975236054076ea3402929e0b315ed",
+            "iso_sha256": "a3d88ff86445791022fb6c675030d3ea9a4957a92d55d92dd555f4daf27d36bb",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "tidwake",
+            "source_sha256": "3ed6b518d6e920d4e2e2bd42a793414efa846e910e213c68925b00ff588b672a",
+            "init_sha256": "670a7f54ec3427cf1de422d048a21558f900021ee8f237b8ced5e1bf66fae805",
+            "iso_sha256": "ecb6baaef60f4efe69a1f94b36a64391972304babf95a66dec26ac3159e51199",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "tidfault",
+            "source_sha256": "99dfb1f0c48f1e417915a84183a428b89298a17d2b4e70bc0b66d7ddbdaf433b",
+            "init_sha256": "690378306ca58035df978cb4b3186febc9b8214aeb3f26410b73e5d0a28e43e5",
+            "iso_sha256": "d38f1d99aabbe7bc384568adaa226a6223f43df268aa6d67ca87ca47ccc6b0ca",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

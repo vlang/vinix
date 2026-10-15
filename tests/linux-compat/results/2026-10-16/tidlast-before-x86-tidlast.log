@@ -1,0 +1,141 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=85760
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037fee400
+initramfs: Done (9 entries)
+LINUX TIDLAST DETAIL: ordinary=0 namespace=0 kind=0 index=0 remaining=2 expected=3 changed=0
+LINUX TIDLAST DETAIL: ordinary=0 namespace=0 kind=0 index=1 remaining=2 expected=3 changed=1
+LINUX TIDLAST DETAIL: ordinary=0 namespace=0 kind=0 index=2 remaining=2 expected=3 changed=1
+LINUX TIDLAST TOPOLOGY: ordinary=0 namespace=0 kind=0 self=3571 child=26049 owner_pid=26049 owner_tid=26049 uid=0 peers=0 queued=3 private=1 abandoned=1
+LINUX TIDLAST DETAIL: ordinary=0 namespace=0 kind=1 index=16 remaining=2 expected=3 changed=0
+LINUX TIDLAST DETAIL: ordinary=0 namespace=0 kind=1 index=17 remaining=2 expected=3 changed=1
+LINUX TIDLAST DETAIL: ordinary=0 namespace=0 kind=1 index=18 remaining=2 expected=3 changed=1
+LINUX TIDLAST TOPOLOGY: ordinary=0 namespace=0 kind=1 self=3571 child=28804 owner_pid=28804 owner_tid=28804 uid=0 peers=0 queued=3 private=1 abandoned=1
+LINUX TIDLAST DETAIL: ordinary=0 namespace=0 kind=2 index=32 remaining=2 expected=3 changed=0
+LINUX TIDLAST DETAIL: ordinary=0 namespace=0 kind=2 index=33 remaining=2 expected=3 changed=1
+LINUX TIDLAST DETAIL: ordinary=0 namespace=0 kind=2 index=34 remaining=2 expected=3 changed=1
+LINUX TIDLAST TOPOLOGY: ordinary=0 namespace=0 kind=2 self=3571 child=42800 owner_pid=42800 owner_tid=42800 uid=0 peers=0 queued=3 private=1 abandoned=1
+LINUX TIDLAST DETAIL: ordinary=0 namespace=0 kind=3 index=48 remaining=2 expected=3 changed=0
+LINUX TIDLAST DETAIL: ordinary=0 namespace=0 kind=3 index=49 remaining=2 expected=3 changed=1
+LINUX TIDLAST DETAIL: ordinary=0 namespace=0 kind=3 index=50 remaining=2 expected=3 changed=1
+LINUX TIDLAST TOPOLOGY: ordinary=0 namespace=0 kind=3 self=3571 child=24536 owner_pid=24536 owner_tid=24536 uid=0 peers=0 queued=3 private=1 abandoned=1
+LINUX TIDLAST TOPOLOGY: ordinary=0 namespace=0 kind=4 self=3571 child=29687 owner_pid=29687 owner_tid=12082 uid=0 peers=1 queued=3 private=1 abandoned=1
+LINUX TIDLAST TOPOLOGY: ordinary=0 namespace=0 kind=5 self=3571 child=8584 owner_pid=36018 owner_tid=36018 uid=0 peers=1 queued=3 private=1 abandoned=1
+LINUX TIDLAST COHORT: ordinary=0 namespace=0 self=3571 uid=0 page=4096 raw=96 classes=6 shared=3 last_user_classes=4
+LINUX TIDLAST CASES: ordinary=0 namespace=0 kind=0 calls=16 failures=16
+LINUX TIDLAST CASES: ordinary=0 namespace=0 kind=1 calls=16 failures=16
+LINUX TIDLAST CASES: ordinary=0 namespace=0 kind=2 calls=16 failures=16
+LINUX TIDLAST CASES: ordinary=0 namespace=0 kind=3 calls=16 failures=16
+LINUX TIDLAST CASES: ordinary=0 namespace=0 kind=4 calls=16 failures=0
+LINUX TIDLAST CASES: ordinary=0 namespace=0 kind=5 calls=16 failures=0
+LINUX TIDLAST FINAL: ordinary=0 namespace=0 kind=0 calls=16 failures=16
+LINUX TIDLAST FINAL: ordinary=0 namespace=0 kind=1 calls=16 failures=16
+LINUX TIDLAST FINAL: ordinary=0 namespace=0 kind=2 calls=16 failures=16
+LINUX TIDLAST FINAL: ordinary=0 namespace=0 kind=3 calls=16 failures=16
+LINUX TIDLAST FINAL: ordinary=0 namespace=0 kind=4 calls=16 failures=0
+LINUX TIDLAST FINAL: ordinary=0 namespace=0 kind=5 calls=16 failures=0
+LINUX TIDLAST DETAIL: ordinary=1 namespace=0 kind=0 index=0 remaining=2 expected=3 changed=0
+LINUX TIDLAST DETAIL: ordinary=1 namespace=0 kind=0 index=1 remaining=2 expected=3 changed=1
+LINUX TIDLAST DETAIL: ordinary=1 namespace=0 kind=0 index=2 remaining=2 expected=3 changed=1
+LINUX TIDLAST TOPOLOGY: ordinary=1 namespace=0 kind=0 self=9570 child=3473 owner_pid=3473 owner_tid=3473 uid=1000 peers=0 queued=3 private=1 abandoned=1
+LINUX TIDLAST DETAIL: ordinary=1 namespace=0 kind=1 index=16 remaining=2 expected=3 changed=0
+LINUX TIDLAST DETAIL: ordinary=1 namespace=0 kind=1 index=17 remaining=2 expected=3 changed=1
+LINUX TIDLAST DETAIL: ordinary=1 namespace=0 kind=1 index=18 remaining=2 expected=3 changed=1
+LINUX TIDLAST TOPOLOGY: ordinary=1 namespace=0 kind=1 self=9570 child=62327 owner_pid=62327 owner_tid=62327 uid=1000 peers=0 queued=3 private=1 abandoned=1
+LINUX TIDLAST DETAIL: ordinary=1 namespace=0 kind=2 index=32 remaining=2 expected=3 changed=0
+LINUX TIDLAST DETAIL: ordinary=1 namespace=0 kind=2 index=33 remaining=2 expected=3 changed=1
+LINUX TIDLAST DETAIL: ordinary=1 namespace=0 kind=2 index=34 remaining=2 expected=3 changed=1
+LINUX TIDLAST TOPOLOGY: ordinary=1 namespace=0 kind=2 self=9570 child=4540 owner_pid=4540 owner_tid=4540 uid=1000 peers=0 queued=3 private=1 abandoned=1
+LINUX TIDLAST DETAIL: ordinary=1 namespace=0 kind=3 index=48 remaining=2 expected=3 changed=0
+LINUX TIDLAST DETAIL: ordinary=1 namespace=0 kind=3 index=49 remaining=2 expected=3 changed=1
+LINUX TIDLAST DETAIL: ordinary=1 namespace=0 kind=3 index=50 remaining=2 expected=3 changed=1
+LINUX TIDLAST TOPOLOGY: ordinary=1 namespace=0 kind=3 self=9570 child=6329 owner_pid=6329 owner_tid=6329 uid=1000 peers=0 queued=3 private=1 abandoned=1
+LINUX TIDLAST TOPOLOGY: ordinary=1 namespace=0 kind=4 self=9570 child=43212 owner_pid=43212 owner_tid=34424 uid=1000 peers=1 queued=3 private=1 abandoned=1
+LINUX TIDLAST TOPOLOGY: ordinary=1 namespace=0 kind=5 self=9570 child=20288 owner_pid=50577 owner_tid=50577 uid=1000 peers=1 queued=3 private=1 abandoned=1
+LINUX TIDLAST COHORT: ordinary=1 namespace=0 self=9570 uid=1000 page=4096 raw=96 classes=6 shared=3 last_user_classes=4
+LINUX TIDLAST CASES: ordinary=1 namespace=0 kind=0 calls=16 failures=16
+LINUX TIDLAST CASES: ordinary=1 namespace=0 kind=1 calls=16 failures=16
+LINUX TIDLAST CASES: ordinary=1 namespace=0 kind=2 calls=16 failures=16
+LINUX TIDLAST CASES: ordinary=1 namespace=0 kind=3 calls=16 failures=16
+LINUX TIDLAST CASES: ordinary=1 namespace=0 kind=4 calls=16 failures=0
+LINUX TIDLAST CASES: ordinary=1 namespace=0 kind=5 calls=16 failures=0
+LINUX TIDLAST FINAL: ordinary=1 namespace=0 kind=0 calls=16 failures=16
+LINUX TIDLAST FINAL: ordinary=1 namespace=0 kind=1 calls=16 failures=16
+LINUX TIDLAST FINAL: ordinary=1 namespace=0 kind=2 calls=16 failures=16
+LINUX TIDLAST FINAL: ordinary=1 namespace=0 kind=3 calls=16 failures=16
+LINUX TIDLAST FINAL: ordinary=1 namespace=0 kind=4 calls=16 failures=0
+LINUX TIDLAST FINAL: ordinary=1 namespace=0 kind=5 calls=16 failures=0
+LINUX TIDLAST DETAIL: ordinary=0 namespace=1 kind=0 index=0 remaining=2 expected=3 changed=0
+LINUX TIDLAST DETAIL: ordinary=0 namespace=1 kind=0 index=1 remaining=2 expected=3 changed=1
+LINUX TIDLAST DETAIL: ordinary=0 namespace=1 kind=0 index=2 remaining=2 expected=3 changed=1
+LINUX TIDLAST TOPOLOGY: ordinary=0 namespace=1 kind=0 self=2 child=93 owner_pid=93 owner_tid=93 uid=0 peers=0 queued=3 private=1 abandoned=1
+LINUX TIDLAST DETAIL: ordinary=0 namespace=1 kind=1 index=16 remaining=2 expected=3 changed=0
+LINUX TIDLAST DETAIL: ordinary=0 namespace=1 kind=1 index=17 remaining=2 expected=3 changed=1
+LINUX TIDLAST DETAIL: ordinary=0 namespace=1 kind=1 index=18 remaining=2 expected=3 changed=1
+LINUX TIDLAST TOPOLOGY: ordinary=0 namespace=1 kind=1 self=2 child=189 owner_pid=189 owner_tid=189 uid=0 peers=0 queued=3 private=1 abandoned=1
+LINUX TIDLAST DETAIL: ordinary=0 namespace=1 kind=2 index=32 remaining=2 expected=3 changed=0
+LINUX TIDLAST DETAIL: ordinary=0 namespace=1 kind=2 index=33 remaining=2 expected=3 changed=1
+LINUX TIDLAST DETAIL: ordinary=0 namespace=1 kind=2 index=34 remaining=2 expected=3 changed=1
+LINUX TIDLAST TOPOLOGY: ordinary=0 namespace=1 kind=2 self=2 child=300 owner_pid=300 owner_tid=300 uid=0 peers=0 queued=3 private=1 abandoned=1
+LINUX TIDLAST DETAIL: ordinary=0 namespace=1 kind=3 index=48 remaining=2 expected=3 changed=0
+LINUX TIDLAST DETAIL: ordinary=0 namespace=1 kind=3 index=49 remaining=2 expected=3 changed=1
+LINUX TIDLAST DETAIL: ordinary=0 namespace=1 kind=3 index=50 remaining=2 expected=3 changed=1
+LINUX TIDLAST TOPOLOGY: ordinary=0 namespace=1 kind=3 self=2 child=412 owner_pid=412 owner_tid=412 uid=0 peers=0 queued=3 private=1 abandoned=1
+LINUX TIDLAST TOPOLOGY: ordinary=0 namespace=1 kind=4 self=2 child=524 owner_pid=524 owner_tid=525 uid=0 peers=1 queued=3 private=1 abandoned=1
+LINUX TIDLAST TOPOLOGY: ordinary=0 namespace=1 kind=5 self=2 child=636 owner_pid=637 owner_tid=637 uid=0 peers=1 queued=3 private=1 abandoned=1
+LINUX TIDLAST COHORT: ordinary=0 namespace=1 self=2 uid=0 page=4096 raw=96 classes=6 shared=3 last_user_classes=4
+LINUX TIDLAST CASES: ordinary=0 namespace=1 kind=0 calls=16 failures=16
+LINUX TIDLAST CASES: ordinary=0 namespace=1 kind=1 calls=16 failures=16
+LINUX TIDLAST CASES: ordinary=0 namespace=1 kind=2 calls=16 failures=16
+LINUX TIDLAST CASES: ordinary=0 namespace=1 kind=3 calls=16 failures=16
+LINUX TIDLAST CASES: ordinary=0 namespace=1 kind=4 calls=16 failures=0
+LINUX TIDLAST CASES: ordinary=0 namespace=1 kind=5 calls=16 failures=0
+LINUX TIDLAST FINAL: ordinary=0 namespace=1 kind=0 calls=16 failures=16
+LINUX TIDLAST FINAL: ordinary=0 namespace=1 kind=1 calls=16 failures=16
+LINUX TIDLAST FINAL: ordinary=0 namespace=1 kind=2 calls=16 failures=16
+LINUX TIDLAST FINAL: ordinary=0 namespace=1 kind=3 calls=16 failures=16
+LINUX TIDLAST FINAL: ordinary=0 namespace=1 kind=4 calls=16 failures=0
+LINUX TIDLAST FINAL: ordinary=0 namespace=1 kind=5 calls=16 failures=0
+LINUX TIDLAST DETAIL: ordinary=1 namespace=1 kind=0 index=0 remaining=2 expected=3 changed=0
+LINUX TIDLAST DETAIL: ordinary=1 namespace=1 kind=0 index=1 remaining=2 expected=3 changed=1
+LINUX TIDLAST DETAIL: ordinary=1 namespace=1 kind=0 index=2 remaining=2 expected=3 changed=1
+LINUX TIDLAST TOPOLOGY: ordinary=1 namespace=1 kind=0 self=2 child=93 owner_pid=93 owner_tid=93 uid=1000 peers=0 queued=3 private=1 abandoned=1
+LINUX TIDLAST DETAIL: ordinary=1 namespace=1 kind=1 index=16 remaining=2 expected=3 changed=0
+LINUX TIDLAST DETAIL: ordinary=1 namespace=1 kind=1 index=17 remaining=2 expected=3 changed=1
+LINUX TIDLAST DETAIL: ordinary=1 namespace=1 kind=1 index=18 remaining=2 expected=3 changed=1
+LINUX TIDLAST TOPOLOGY: ordinary=1 namespace=1 kind=1 self=2 child=189 owner_pid=189 owner_tid=189 uid=1000 peers=0 queued=3 private=1 abandoned=1
+LINUX TIDLAST DETAIL: ordinary=1 namespace=1 kind=2 index=32 remaining=2 expected=3 changed=0
+LINUX TIDLAST DETAIL: ordinary=1 namespace=1 kind=2 index=33 remaining=2 expected=3 changed=1
+LINUX TIDLAST DETAIL: ordinary=1 namespace=1 kind=2 index=34 remaining=2 expected=3 changed=1
+LINUX TIDLAST TOPOLOGY: ordinary=1 namespace=1 kind=2 self=2 child=300 owner_pid=300 owner_tid=300 uid=1000 peers=0 queued=3 private=1 abandoned=1
+LINUX TIDLAST DETAIL: ordinary=1 namespace=1 kind=3 index=48 remaining=2 expected=3 changed=0
+LINUX TIDLAST DETAIL: ordinary=1 namespace=1 kind=3 index=49 remaining=2 expected=3 changed=1
+LINUX TIDLAST DETAIL: ordinary=1 namespace=1 kind=3 index=50 remaining=2 expected=3 changed=1
+LINUX TIDLAST TOPOLOGY: ordinary=1 namespace=1 kind=3 self=2 child=412 owner_pid=412 owner_tid=412 uid=1000 peers=0 queued=3 private=1 abandoned=1
+LINUX TIDLAST TOPOLOGY: ordinary=1 namespace=1 kind=4 self=2 child=524 owner_pid=524 owner_tid=525 uid=1000 peers=1 queued=3 private=1 abandoned=1
+LINUX TIDLAST TOPOLOGY: ordinary=1 namespace=1 kind=5 self=2 child=636 owner_pid=637 owner_tid=637 uid=1000 peers=1 queued=3 private=1 abandoned=1
+LINUX TIDLAST COHORT: ordinary=1 namespace=1 self=2 uid=1000 page=4096 raw=96 classes=6 shared=3 last_user_classes=4
+LINUX TIDLAST CASES: ordinary=1 namespace=1 kind=0 calls=16 failures=16
+LINUX TIDLAST CASES: ordinary=1 namespace=1 kind=1 calls=16 failures=16
+LINUX TIDLAST CASES: ordinary=1 namespace=1 kind=2 calls=16 failures=16
+LINUX TIDLAST CASES: ordinary=1 namespace=1 kind=3 calls=16 failures=16
+LINUX TIDLAST CASES: ordinary=1 namespace=1 kind=4 calls=16 failures=0
+LINUX TIDLAST CASES: ordinary=1 namespace=1 kind=5 calls=16 failures=0
+LINUX TIDLAST FINAL: ordinary=1 namespace=1 kind=0 calls=16 failures=16
+LINUX TIDLAST FINAL: ordinary=1 namespace=1 kind=1 calls=16 failures=16
+LINUX TIDLAST FINAL: ordinary=1 namespace=1 kind=2 calls=16 failures=16
+LINUX TIDLAST FINAL: ordinary=1 namespace=1 kind=3 calls=16 failures=16
+LINUX TIDLAST FINAL: ordinary=1 namespace=1 kind=4 calls=16 failures=0
+LINUX TIDLAST FINAL: ordinary=1 namespace=1 kind=5 calls=16 failures=0
+LINUX TIDLAST FAIL: clear-child-tid last-map-user suppression, positive notifications, queue counts or retained storage
+QEMU: Terminated
+

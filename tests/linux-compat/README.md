@@ -1881,3 +1881,17 @@ adding `tests/desktop-perf` to V's module path. It retains the strict auditor's
 actual refusal and explicitly reports the single observed EXT2 rename retention
 finding; its evidence-integrity pass leaves general retention qualification
 open. Desktop/application lifecycle qualification remains separate.
+
+The `tidlast` case checks clear-child-tid suppression for the last address-space
+user. Four sole-user paths (exit, exit_group, exit after a joined thread, exit
+after a reaped CLONE_VM peer) preserve the shared word and all three admitted
+shared waiters. Surviving-thread and surviving-CLONE_VM-process controls still
+wake exactly one, including through a read-only alias. Its 384 controls per
+architecture cover root/UID1000, both PID namespace views, four initial words,
+two native-page offsets, replaced registrations, private/abandoned queues and
+complete two-page alias canaries. Four warmed 200-trial cohorts measure complete
+cleanup. Use `--cases tidlast --timeout 1200` with a fresh state directory.
+`tidlast-reference.v` boots the unchanged ELF on Linux; compile `tidlast-check.v`
+without `-prod` to check original failures, corrected results, whole-C scope,
+storage, retained setup/compiler refusals and executing negative controls.
+See [the last-user report](../../docs/linux-posix-qualification.md#native-clear-child-tid-last-address-space-user).

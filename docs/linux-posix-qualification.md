@@ -8976,3 +8976,80 @@ last-address-space-user behavior, clone child_tid flags, exec/forced sibling
 exit, concurrent mapping/registration changes, GNU libc and foreign/translated
 paths remain separate. The broad libc, installation/sandbox/portal and
 translated/32-bit roadmap gates remain open.
+
+## Native clear-child-tid last address-space user
+
+The `tidlast` qualification distinguishes sharing an address space from sharing
+the backing of a futex word. A task leaving the last user of its map must leave
+the registered word and unrelated processes' shared queues intact. The previous
+implementation always attempted the store and wake. The guard now observes the
+process thread list under its existing lock and the map's atomic process-owner
+count. Sibling threads and independent CLONE_VM processes both preserve the
+notification path. Inspection pins remain separate from map ownership.
+The contract follows [Linux v6.12 mm_release](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c#L1605-L1628).
+
+Each native architecture runs 384 semantic controls across root/UID1000 and
+initial/one-level PID namespace cohorts. Six topologies each run sixteen
+controls: four fixed initial words (zero, all ones and two sentinels), two
+offsets (128 and the native page's last aligned word), and writable/read-only
+registrations through a distinct shared alias. The four sole-user topologies
+are raw exit, exit_group, exit after joining a pthread, and exit after reaping
+a non-thread CLONE_VM peer. The two positive controls retire a worker while a
+conductor thread or a separate CLONE_VM process still uses its map. For those
+controls the worker's ESRCH and conductor's continued liveness precede the
+conductor's release; the CLONE_VM worker is reaped before the conductor exits.
+
+The parent has a separate forked map and starts its observers after the owner
+registers its replacement clear-tid pointer. Positive CMP_REQUEUE counts prove
+admission of three shared waiters, a private-key waiter and an abandoned-word
+waiter before exit is allowed. Sole-user cases leave all three shared waiters;
+positive controls leave exactly two. Every private/abandoned waiter remains
+queued. Complete two-page comparisons through both parent aliases check the
+store and surrounding bytes after the conductor is reaped. Read-only positive
+controls preserve the word while still waking one shared waiter. Ordinary
+pthread joins use musl's own registration; raw registered workers exit without
+asking libc to join a registration they replaced.
+
+Original kernels fail 256 controls each, confined to the four sole-user classes.
+Corrected kernels and the identical original probe ELFs on Linux 6.12.51 pass
+all 384. Native ARM uses 16KiB pages; native x86 and both Linux references use
+4KiB pages. Four warmed retention cohorts per architecture each run 96 complete
+trials, settle thirteen seconds, measure 200 complete trials and settle again.
+All live slab classes and big-heap page totals stay flat. They include forks,
+thread/CLONE_VM creation, registrations, queue admission/drains, exit/reap,
+guards, temporary stacks, pipes and joins. The two parent aliases and memfd
+remain open throughout; this measures kernel heap retention, not user pages
+or general filesystem retention. The earlier unresolved EXT2 rename retention
+observation remains open and was not requalified by these focused cohorts.
+
+Four isolated production builds bind original and corrected kernels. Exact
+whole-C comparison permits only the new clear_child_tid guard: no new
+allocation, free, pin, reference transfer or lock ordering with another lock.
+The existing retirement, store-fault and one-waiter paths remain identical.
+Probe C contains eleven explicit stack allocas and no dynamic allocation or
+fixed-index helper. Its successful compiler preflight produces the same C as
+the original ARM guest input. Early build attempts started before worktree
+setup completed and refused; the first fixture compilation used a reserved V
+variable name and was also refused. Those failed inputs and outputs are pinned
+separately from the actual semantic baseline failures.
+
+Both corrected kernels also pass runtime, tidwake and tidfault regressions.
+The auditor checks source/C scope, all outcome/topology/storage rows, original
+and corrected probe identity, Linux references, retained native case files,
+67 dispatch inventory inputs, 2,014 SDK files and 15,146 compiler pins. False
+assertions and passing-Linux-as-original controls must execute and fail, so
+compile the auditor without `-prod`.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/tidlast-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/tidlast-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/tidlast-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/tidlast-diagnostic-pins.json).
+Raw original/corrected/Linux, build and regression logs accompany the receipts.
+The maintained auditor is `tests/linux-compat/tidlast-check.v`.
+
+This qualifies stable task/map ownership at ordinary exits. Concurrent peer
+detach, clone or inspection references, exec and forced sibling retirement,
+clone child_tid flags, alternate backing types, unaligned/cross-page words,
+GNU libc and translated/32-bit paths remain separate. Process owners and
+inspection pins are not a complete Linux mm_users accounting model. The broad
+libc, application-installation/sandbox/portal and translation gates stay open.
