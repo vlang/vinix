@@ -6439,22 +6439,52 @@ sites and native inspection. The native-symbol lookup and oracle cleanup
 failures are retained as earlier trials. Full iOS regression remains unpassed
 and published runners remain unchanged.
 
-The current IPA probe resolves Base64 encoding, then exits with status 1 at
+The Base64 checkpoint resolves that encoding API, then exits with status 1 at
 `_$s10Foundation4DataV36_unconditionallyBridgeFromObjectiveCyACSo6NSDataCSgFZ`
 (`Data._unconditionallyBridgeFromObjectiveC(_:)`). Fortnite has not entered
 application code and remains unplayable.
+
+`Data._unconditionallyBridgeFromObjectiveC(_:)` now resolves through both
+Foundation install names. A borrowed nullable NSData arrives in x0 and the
+owned Data result returns in x0/x1. Nil returns canonical empty Data without
+allocating snapshot storage or its descriptor arena. Non-nil built-in NSData
+uses the checked snapshot constructor, including mutable, no-copy and Swift
+wrapper inputs. The result survives source mutation/release and owns fresh
+storage when larger than 14 bytes. Native wrapper conversion uses a different
+capacity/deallocator flag layout; Vinix normalizes these inputs into its
+existing private snapshot layout. Custom NSData subclasses, general Data
+metadata/value witnesses and large-range values remain unsupported.
+
+Eight ASan/UBSan runs and four Vinix ARM64 suites pass for optional NSData
+conversion, Base64, Data bridging and reference snapshots. The new fixture
+checks nil without descriptor allocation, unchanged source reference counts,
+the 14/15-byte boundary and 16 MiB limit, native ordinary/compact storage
+variants, mutable and no-copy source isolation, independent bridge roundtrips,
+guarded byte/result spans and x8, concurrent nil/snapshot calls and two drained
+runtime lifetimes with unmapped storage pages.
+
+Eleven final C streams/programs and four joined, retired VM phases are retained
+under `build/ios/fortnite/data-unbridge-checks`, with actual IPA consumers and
+native nil/storage inspection. Earlier assertions that assumed one native
+storage layout are retained as failed trials. Full iOS regression remains
+unpassed; published runners remain unchanged.
+
+The current IPA probe resolves optional NSData conversion, then exits with
+status 1 at `_$s10Foundation4DataV5write2to7optionsyAA3URLV_So20NSDataWritingOptionsVtKF`
+(`Data.write(to:options:)`). Fortnite has not entered application code and
+remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,505 | 655 | 79 |
+| Fortnite executable | 1,506 | 654 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,340 | 658 | 120 |
+| All images | 2,341 | 657 | 120 |
 
-The C++/GLES/Text variant reports 2,353 resolved imports, 645 unresolved strong
+The C++/GLES/Text variant reports 2,354 resolved imports, 644 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
