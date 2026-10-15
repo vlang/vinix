@@ -765,6 +765,16 @@ to the file, installed state, current trust or policy are checked by that new
 review and the existing confirmation flow. A drift report never authorizes an
 installation. See [Software audit qualification](../tests/packages/software-deployment-audit-check.md).
 
+Deployment forms and proposals keep Back, Stop, Cancel, status, progress and
+failure access available in small windows. **Stop review**, Cancel or Escape
+can stop and reap a pending read-only proposal, discard its unaccepted output
+and retain the literal filename for a fresh review. Completed proposals and
+package details retain their own cancellation/back controls after resizing.
+Approved deployment transactions keep running until they finish, including
+empty deployments that remove all packages. Compact windows omit confirmation
+controls; enlarge the window to inspect the complete plan. See
+[navigation qualification](../tests/packages/software-deployment-navigation-check.md).
+
 Software’s **Clean up versions** opens a read-only, paged review of obsolete
 generation IDs, with the architecture and current/rollback identities. Confirming
 **Delete listed versions** uses administrator authorization and deletes only that

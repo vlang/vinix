@@ -1,0 +1,370 @@
+The initial full desktop typecheck failed because an unrelated uncommitted desktop/main.v edit called os without importing it. That file was left untouched. Another session subsequently supplied the import; the final full desktop typechecks passed for both architectures using the current checkout.
+
+The expanded allocation fixture then measured full idle deployment-form redraws and retained 21822000 bytes across 1000 cycles covering both normal and empty proposals. The form element array reserved ten slots but had outgrown them after the fourth form action was added. It now reserves sixteen slots for all actions, progress and failure controls without growing a manual-free frame buffer. Final focused, independent maintained-driver, sanitizer and zero-byte results supersede both attempts. This does not measure whole-service or worker-process allocation freedom.
+
+Original working-checkout typecheck output:
+Compiler output from the default V compiler:
+build/package-view-reader-work/desktop/app_calculator.v:4:8: warning: module 'ui2' is imported but never used. Use `import ui2 as _`, to silence this warning, or just remove the unused import line
+    2 | 
+    3 | import math
+    4 | import ui2
+      |        ~~~
+    5 | 
+    6 | const window_width = 284
+desktop/editor_documents.v:3:8: warning: module 'os' is imported but never used. Use `import os as _`, to silence this warning, or just remove the unused import line
+    1 | // SPDX-License-Identifier: GPL-2.0-or-later
+    2 | module main
+    3 | import os
+      |        ~~
+    4 | import ui2
+    5 | import desktop.workflowcore
+desktop/activity.v:996:4: notice: unused function: `activity_header`
+  994 | // darker and has an arrow for its direction, and a rule between headings
+  995 | // shows where one target ends and the next begins.
+  996 | fn activity_header(mut children []ui2.Element, width int, sort ActivitySort, descending bool) {
+      |    ~~~~~~~~~~~~~~~
+  997 |     name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column - activity_mem_column
+  998 |     pid_x := activity_padding + name_width
+desktop/activity.v:1116:4: notice: unused function: `activity_row_cells`
+ 1114 | // activity_row_cells lays one process across the same four columns the
+ 1115 | // headings above use.
+ 1116 | fn activity_row_cells(entry ActivityRow, width int) []ui2.Element {
+      |    ~~~~~~~~~~~~~~~~~~
+ 1117 |     name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column - activity_mem_column
+ 1118 |     number := ui2.TextStyle{
+desktop/activity_preferences.v:7:7: notice: unused constant: `activity_preferences_filename`
+    5 | import ui2
+    6 | 
+    7 | const activity_preferences_filename = '.vinix-activity-settings'
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    8 | const activity_preferences_limit = 1024
+    9 |
+build/package-view-reader-work/desktop/app_calculator.v:8:7: notice: unused constant: `calculator_vml_source`
+    6 | const window_width = 284
+    7 | const window_height = 364
+    8 | const calculator_vml_source = $embed_file('calculator.vml').to_string()
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    9 | 
+   10 | pub struct CalculatorKey {
+build/package-view-reader-work/desktop/app_calculator.v:61:4: notice: unused function: `initial_calculator`
+   59 | }
+   60 | 
+   61 | fn initial_calculator() Calculator {
+      |    ~~~~~~~~~~~~~~~~~~
+   62 |     return Calculator{
+   63 |         keys: calculator_keys()
+desktop/app_process.v:398:4: notice: unused function: `wire_take_state`
+  396 | }
+  397 | 
+  398 | fn wire_take_state(mut reader WireReader) !AppWireState {
+      |    ~~~~~~~~~~~~~~~
+  399 |     return wire_take_state_flags(mut reader, 0)
+  400 | }
+desktop/battery.v:330:4: notice: unused function: `battery_settings_elements`
+  328 | // A percentage with nothing else known about it draws as one /dev/battery
+  329 | // reported.
+  330 | fn battery_settings_elements(percent int, history &BatteryHistory, x int, inner int) []ui2.Element {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~
+  331 |     return battery_reading_elements(BatteryReading{
+  332 |         percent: percent
+desktop/calculator_app.v:101:4: notice: unused function: `build_compiled_calculator`
+   99 | }
+  100 | 
+  101 | fn build_compiled_calculator(app &CalculatorApp) ui2.Element {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~
+  102 |     return $vml('calculator_vinix.vml')
+  103 | }
+desktop/calculator_programmer.v:84:4: notice: unused function: `calculator_integer_parse`
+   82 | // Prefixes are allowed for a pasted single operand, regardless of the active
+   83 | // display base. Leading signs, whitespace within a number and commands fail.
+   84 | fn calculator_integer_parse(text string, selected_base int) (u64, string) {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~
+   85 |     return calculator_integer_parse_width(text, selected_base, 64)
+   86 | }
+desktop/calculator_programmer.v:271:4: notice: unused function: `calculator_integer_result`
+  269 | }
+  270 | 
+  271 | fn calculator_integer_result(left u64, right u64, operation CalculatorIntegerOperation) (u64, string) {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~
+  272 |     return calculator_integer_result_width(left, right, operation, 64)
+  273 | }
+desktop/capture.v:213:4: notice: unused function: `capture_png_bytes`
+  211 | }
+  212 | 
+  213 | fn capture_png_bytes(canvas &Canvas) ![]u8 {
+      |    ~~~~~~~~~~~~~~~~~
+  214 |     return capture_png_bytes_with_backing(canvas, unsafe { nil })
+  215 | }
+desktop/capture.v:283:4: notice: unused function: `capture_write_png`
+  281 | }
+  282 | 
+  283 | fn capture_write_png(path string, canvas &Canvas) bool {
+      |    ~~~~~~~~~~~~~~~~~
+  284 |     return capture_write_png_with_backing(path, canvas, unsafe { nil })
+  285 | }
+desktop/clock.v:15:7: notice: unused constant: `weekday_names`
+   13 | // English abbreviations, for code that has not yet moved to the translated
+   14 | // names below. Text the user reads comes from date_weekday_short and friends.
+   15 | const weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   16 | const month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
+   17 |     'Dec']
+desktop/clock.v:16:7: notice: unused constant: `month_names`
+   14 | // names below. Text the user reads comes from date_weekday_short and friends.
+   15 | const weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+   16 | const month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   17 |     'Dec']
+   18 |
+desktop/idle_timer.v:163:2: notice: variable `sleep_ms` shadows a function declaration
+  161 | fn (t &IdleTimer) wait_ms(now_ms u64, display_off_minutes int, sleep_minutes int, limit u64) u64 {
+  162 |     display_ms := idle_timeout_ms(display_off_minutes)
+  163 |     sleep_ms := if t.refused { u64(0) } else { idle_timeout_ms(sleep_minutes) }
+      |     ~~~~~~~~
+  164 |     if t.phase == .asleep || (t.phase == .active && display_ms == 0 && sleep_ms == 0) {
+  165 |         return limit
+desktop/reminders_app.v:10:7: notice: unused constant: `reminders_filename`
+    8 | const reminders_record_header = 'VINIX-REMINDERS 2\n'
+    9 | const reminders_record_header_v1 = 'VINIX-REMINDERS 1\n'
+   10 | const reminders_filename = '.vinix-reminders'
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   11 | 
+   12 | enum ReminderPriority { none low medium high }
+desktop/software_health.v:35:6: notice: variable `arguments` shadows a function declaration
+   33 |     a.focus = false; a.select_all = false
+   34 |     a.health_focus = false; a.health_select_all = false
+   35 |     mut arguments := ['--json', '--progress', 'health']
+      |         ~~~~~~~~~
+   36 |     a.start(arguments, true)
+   37 |     unsafe { (&array(&arguments)).free() }
+desktop/software_policy.v:59:6: notice: variable `arguments` shadows a function declaration
+   57 |     a.clear_policy_pages()
+   58 |     a.policy_ready = false; a.focus = false; a.select_all = false
+   59 |     mut arguments := ['policy']
+      |         ~~~~~~~~~
+   60 |     a.start(arguments, true)
+   61 |     unsafe { (&array(&arguments)).free() }
+desktop/software_policy.v:96:6: notice: variable `arguments` shadows a function declaration
+   94 |     a.policy_pending = path.clone()
+   95 |     a.focus = false; a.select_all = false
+   96 |     mut arguments := ['policy-review', a.policy_pending]
+      |         ~~~~~~~~~
+   97 |     a.start(arguments, false)
+   98 |     unsafe { (&array(&arguments)).free() }
+desktop/software_policy.v:154:8: notice: variable `arguments` shadows a function declaration
+  152 |                 unsafe { encoded.free() }
+  153 |             }
+  154 |             mut arguments := ['policy-apply', a.policy_snapshot.fingerprint, a.policy_pending]
+      |                 ~~~~~~~~~
+  155 |             a.start(arguments, false)
+  156 |             unsafe { (&array(&arguments)).free() }
+desktop/software_window.v:39:6: notice: variable `arguments` shadows a function declaration
+   37 |     unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+   38 |     a.clear_window()
+   39 |     mut arguments := ['run-window', request.id]
+      |         ~~~~~~~~~
+   40 |     if request.document != '' { arguments << request.document }
+   41 |     defer { unsafe { (&array(&arguments)).free() } }
+desktop/software_window.v:157:7: notice: variable `arguments` shadows a function declaration
+  155 |     if event_id == 'software.window.back' && a.worker == unsafe { nil } {
+  156 |         a.clear_window()
+  157 |         mut arguments := ['view']
+      |             ~~~~~~~~~
+  158 |         a.start(arguments, true)
+  159 |         unsafe { (&array(&arguments)).free() }
+desktop/terminal.v:259:4: notice: unused function: `terminal_rebuild_message`
+  257 | }
+  258 | 
+  259 | fn terminal_rebuild_message(value string, compositor_pid int, now_ms u64) string {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~
+  260 |     record := terminal_rebuild_record(value, compositor_pid, now_ms) or { return '' }
+  261 |     return terminal_rebuild_result(record, now_ms)
+desktop/translations.v:101:4: notice: unused function: `tr_count_fill`
+   99 | // tr_count_fill is tr_count for a sentence that names something besides the
+  100 | // count, which goes in `{1}`.
+  101 | fn tr_count_fill(key string, count i64, b string) string {
+      |    ~~~~~~~~~~~~~
+  102 |     number := count.str()
+  103 |     text := tr_substitute(tr_plural_form(key, count), number, b, '')
+desktop/activity_controls.c.v:18:7: notice: unused constant: `activity_controls_height`
+   16 | const activity_action_priority_down = 'activity.control.priority.down'
+   17 | const activity_action_kill_tree = 'activity.control.kill_tree'
+   18 | const activity_controls_height = 62
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   19 | 
+   20 | // No waitpid: the monitor does not own the inspected processes. Actions only
+desktop/editor_save_as.c.v:6:4: notice: unused function: `editor_create_file`
+    4 | // Exclusive creation never truncates an existing regular file or follows an
+    5 | // existing final symlink. On failed writes remove only this new file's inode.
+    6 | fn editor_create_file(path string, data []u8) string {
+      |    ~~~~~~~~~~~~~~~~~~
+    7 |     fd := C.open(&char(path.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_NOFOLLOW | C.O_NONBLOCK | C.O_CLOEXEC, u32(0o600))
+    8 |     if fd < 0 { return if C.errno == C.EEXIST { 'editor.workflow.exists' } else { 'editor.status.cannot_save' } }
+desktop/file_context_ops.c.v:196:4: notice: unused function: `file_context_clipboard_available`
+  194 | }
+  195 | 
+  196 | fn file_context_clipboard_available() bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  197 |     clipboard := file_context_clipboard_load() or { return false }
+  198 |     unsafe { clipboard.path.free() }
+desktop/files_trash_io.c.v:362:4: notice: unused function: `files_trash_directory_empty`
+  360 | }
+  361 | 
+  362 | fn files_trash_directory_empty(directory int) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  363 |     fd := C.openat(directory, c'item', C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC, 0)
+  364 |     if fd < 0 { return false }
+desktop/files_trash_io.c.v:418:4: notice: unused function: `files_trash_empty_one`
+  416 | }
+  417 | 
+  418 | fn files_trash_empty_one(store int, entry &FilesTrashEntry) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+  419 |     mut progress := FilesTrashProgress{}
+  420 |     return files_trash_empty_one_progress(store, entry, mut progress)
+desktop/files_trash_io.c.v:434:4: notice: unused function: `files_trash_remove_tree`
+  432 | // Walk anchored descriptors, never symbolic links or nested mounted devices.
+  433 | // Failure retains the bucket/metadata so a partial removal remains visible.
+  434 | fn files_trash_remove_tree(parent int, name string, device u64, depth int, mut budget [1]int) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+  435 |     mut progress := FilesTrashProgress{remaining: budget[0]}
+  436 |     ok := files_trash_remove_tree_progress(parent, name, device, depth, mut progress)
+build/package-view-reader-work/desktop/modules/ui2/ui/animation.v:1278:4: notice: unused function: `reset_widget_animations`
+ 1276 | }
+ 1277 | 
+ 1278 | fn reset_widget_animations() {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+ 1279 |     mut runtime := g_animation_runtime
+ 1280 |     runtime.mutex.lock()
+build/package-view-reader-work/desktop/modules/ui2/ui/file_dialog.v:119:4: notice: unused function: `file_dialog_filter_spec`
+  117 | // Windows backend. It is deliberately plain text so each backend can map the
+  118 | // same public filters onto its own native control.
+  119 | fn file_dialog_filter_spec(filters []FileDialogFilter) string {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+  120 |     mut parts := []string{}
+  121 |     for filter in filters {
+build/package-view-reader-work/desktop/modules/ui2/ui/menu.v:110:4: notice: unused function: `emit_menu_event`
+  108 | // emit_menu_event sends a chosen row to the window's event handler, the same
+  109 | // channel a button tap arrives on.
+  110 | fn emit_menu_event(id string) {
+      |    ~~~~~~~~~~~~~~~
+  111 |     st := menu_state()
+  112 |     if id.len > 0 && voidptr(st.dispatch) != unsafe { nil } {
+build/package-view-reader-work/desktop/modules/ui2/ui/menu.v:117:4: notice: unused function: `menu_app_name`
+  115 | }
+  116 | 
+  117 | fn menu_app_name() string {
+      |    ~~~~~~~~~~~~~
+  118 |     return menu_state().app_name
+  119 | }
+build/package-view-reader-work/desktop/modules/ui2/ui/menu.v:121:4: notice: unused function: `menu_window`
+  119 | }
+  120 | 
+  121 | fn menu_window() voidptr {
+      |    ~~~~~~~~~~~
+  122 |     return menu_state().window
+  123 | }
+build/package-view-reader-work/desktop/modules/ui2/ui/menu.v:129:4: notice: unused function: `install_declared_menus`
+  127 | // is installed even when nothing was declared, because macOS still needs its
+  128 | // application menu.
+  129 | fn install_declared_menus() {
+      |    ~~~~~~~~~~~~~~~~~~~~~~
+  130 |     st := menu_state()
+  131 |     native_set_menu_bar(st.menus)
+build/package-view-reader-work/desktop/modules/ui2/ui/ui.v:330:4: notice: unused function: `box_draws_fill`
+  328 | // box_draws_fill is shared by native and custom renderers so every element
+  329 | // backed by BoxStyle gives transparent the same meaning.
+  330 | fn box_draws_fill(box BoxStyle) bool {
+      |    ~~~~~~~~~~~~~~
+  331 |     return !box.transparent
+  332 | }
+build/package-view-reader-work/desktop/modules/ui2/ui/ui.v:345:4: notice: unused function: `label_needs_container`
+  343 | // while the text moves within it. A label with none of those stays the control itself,
+  344 | // because a view per label costs a third of a frame in a grid of them.
+  345 | fn label_needs_container(el Element) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+  346 |     return el.kind == .label && (el.tooltip.len > 0 || el.menu.len > 0
+  347 |         || box_draws_border(el.box))
+build/package-view-reader-work/desktop/modules/ui2/ui/ui.v:463:4: notice: unused function: `reconciliation_child_key`
+  461 | // reconciliation_child_key encodes user keys so separators inside a key
+  462 | // cannot alias a nested key path.
+  463 | fn reconciliation_child_key(parent string, index int, el Element) string {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~
+  464 |     suffix := if el.key.len > 0 { 'k:' + el.key.bytes().hex() } else { 'i:' + index.str() }
+  465 |     return if parent.len == 0 { suffix } else { parent + '/' + suffix }
+build/package-view-reader-work/desktop/modules/ui2/ui/ui.v:722:4: notice: unused function: `scroll_mode_offset`
+  720 | // the mode leaves out the position is the start: anything else would keep the content
+  721 | // shifted with no way to scroll it back.
+  722 | fn scroll_mode_offset(mode ScrollMode, x f64, y f64) (f64, f64) {
+      |    ~~~~~~~~~~~~~~~~~~
+  723 |     return if mode == .vertical_only { 0.0 } else { x }, if mode == .horizontal_only {
+  724 |         0.0
+tools/packages/pkgadmin/socket.c.v:84:2: notice: variable `path` shadows a function declaration
+   82 |     private_directory(directory, uid)!
+   83 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+   84 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+   85 |     mut accepted := false
+   86 |     defer { if !accepted { unsafe { path.free() } } }
+tools/packages/pkgadmin/socket.c.v:103:2: notice: variable `path` shadows a function declaration
+  101 |     private_directory(directory, uid)!
+  102 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+  103 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+  104 |     defer { unsafe { path.free() } }
+  105 |     location := address(path)!
+desktop/main.v:124:14: error: undefined variable: `os`
+  122 |     all_args := arguments()
+  123 |     if all_args.len > 0 {
+  124 |         command := os.file_name(all_args[0])
+      |                    ~~
+  125 |         vendor := if command == 'codium' { 'vscodium' } else { command }
+  126 |         if vendor in first_run_vendor_names() && os.is_dir('/opt/vinix-apps/' + vendor) {
+desktop/main.v:125:16: error: undefined variable `command` (used before declaration)
+  123 |     if all_args.len > 0 {
+  124 |         command := os.file_name(all_args[0])
+  125 |         vendor := if command == 'codium' { 'vscodium' } else { command }
+      |                      ~~~~~~~
+  126 |         if vendor in first_run_vendor_names() && os.is_dir('/opt/vinix-apps/' + vendor) {
+  127 |             first_run_launch_vendor(vendor, all_args[1..]) or { eprintln(err); exit(1) }
+desktop/main.v:125:16: error: unresolved variable: `command`
+  123 |     if all_args.len > 0 {
+  124 |         command := os.file_name(all_args[0])
+  125 |         vendor := if command == 'codium' { 'vscodium' } else { command }
+      |                      ~~~~~~~
+  126 |         if vendor in first_run_vendor_names() && os.is_dir('/opt/vinix-apps/' + vendor) {
+  127 |             first_run_launch_vendor(vendor, all_args[1..]) or { eprintln(err); exit(1) }
+desktop/main.v:125:58: error: undefined variable `command` (used before declaration)
+  123 |     if all_args.len > 0 {
+  124 |         command := os.file_name(all_args[0])
+  125 |         vendor := if command == 'codium' { 'vscodium' } else { command }
+      |                                                                ~~~~~~~
+  126 |         if vendor in first_run_vendor_names() && os.is_dir('/opt/vinix-apps/' + vendor) {
+  127 |             first_run_launch_vendor(vendor, all_args[1..]) or { eprintln(err); exit(1) }
+desktop/main.v:125:58: error: unresolved variable: `command`
+  123 |     if all_args.len > 0 {
+  124 |         command := os.file_name(all_args[0])
+  125 |         vendor := if command == 'codium' { 'vscodium' } else { command }
+      |                                                                ~~~~~~~
+  126 |         if vendor in first_run_vendor_names() && os.is_dir('/opt/vinix-apps/' + vendor) {
+  127 |             first_run_launch_vendor(vendor, all_args[1..]) or { eprintln(err); exit(1) }
+desktop/main.v:125:58: error: the final expression in `if` or `match`, must have a value of a non-void type
+  123 |     if all_args.len > 0 {
+  124 |         command := os.file_name(all_args[0])
+  125 |         vendor := if command == 'codium' { 'vscodium' } else { command }
+      |                                                                ~~~~~~~
+  126 |         if vendor in first_run_vendor_names() && os.is_dir('/opt/vinix-apps/' + vendor) {
+  127 |             first_run_launch_vendor(vendor, all_args[1..]) or { eprintln(err); exit(1) }
+desktop/main.v:126:44: error: undefined ident: `os`
+  124 |         command := os.file_name(all_args[0])
+  125 |         vendor := if command == 'codium' { 'vscodium' } else { command }
+  126 |         if vendor in first_run_vendor_names() && os.is_dir('/opt/vinix-apps/' + vendor) {
+      |                                                  ~~
+  127 |             first_run_launch_vendor(vendor, all_args[1..]) or { eprintln(err); exit(1) }
+  128 |             return
+
+Initial full-form allocation output:
+/Users/alex/code/vinix/build/package-deployment-navigation-work/software-ui/software_deployment_navigation_fixture.v:193: FAIL: fn main.check_software_deployment_navigation_memory: assert kept == 0, 'deployment navigation retained ${kept} bytes'
+   left value: kept = 21822000
+  right value: 0
+      message: deployment navigation retained 21822000 bytes
+V panic: Assertion failed...

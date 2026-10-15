@@ -175,6 +175,11 @@ changed field names, with a **Differences only** filter and visible result count
 Filtering preserves package identity and leaves reconciliation scoped to the
 complete deployment file. See [qualification](../../tests/packages/software-audit-search-check.md).
 
+Deployment reviews support Stop, Cancel and Escape before changes begin, with
+the source filename retained for a fresh review. Small windows keep navigation,
+status, progress and failure access; approved transactions keep running until
+completion. See [qualification](../../tests/packages/software-deployment-navigation-check.md).
+
 Configuration reads reject ambiguous keys, null values and incorrect field
 types while preserving legacy defaults for omitted fields. Policy typos fail
 before acquisition, cleanup or activation; correcting the configuration permits

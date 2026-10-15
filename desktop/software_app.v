@@ -763,6 +763,10 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		a.stop_mirror_review()
 		return
 	}
+	if a.deployment_review_running() && event_id in ['software.deployment.stop', 'software.cancel']! {
+		a.stop_deployment_review()
+		return
+	}
 	if event_id.starts_with(packagecore.request_prefix) {
 		if a.policy_mode { a.set_status('Return to the catalog before opening an application.'); return }
 		if a.data_mode { a.set_status('Return to the catalog before opening an application.'); return }
@@ -1094,6 +1098,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.audit_mode && (width < 640 || height < 610) { return a.build_deployment_audit_compact(width, height) }
 	if a.health_mode && (width < 640 || height < 610) { return a.build_health_compact(width, height) }
 	if a.cleanup_mode && (width < 640 || height < 610) { return a.build_cleanup_compact(width, height) }
+	if a.deployment_mode && (width < 640 || height < 610) { return a.build_deployment_compact(width, height) }
 	if width < 640 || height < 610 {
 		mut compact := frame_elements(2)
 		compact << software_label('Software', 14, 8, width - 28, 28, false)
@@ -1114,7 +1119,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.launch_mode { return a.build_launch_options(width, height) }
 	if a.repository_mode { return a.build_repositories(width, height) }
 	if a.mirror_mode && (a.review == '' || a.mirror_details || a.mirror_review_running()) { return a.build_mirror(width, height) }
-	if a.deployment_mode && a.review == '' { return a.build_deployment(width, height) }
+	if a.deployment_mode && (a.review == '' || a.deployment_review_running()) { return a.build_deployment(width, height) }
 	mut children := frame_elements(48)
 	reviewing := a.review.len > 0
 	children << software_label('Software', 14, 8, 150, 28, false)

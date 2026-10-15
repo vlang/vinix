@@ -2073,6 +2073,20 @@ diagnostic tail separately from progress events.
 The [Software deployment checks](../../tests/packages/deployment-ui-check.md)
 cover this workflow and snapshot retirement independently of the service tests.
 
+Software can stop only the pending read-only `deployment-review` worker, with
+Stop review, Cancel or Escape. It kills and reaps that child, closes its pipes,
+discards all unaccepted output and retires the proposal and fingerprint. Even
+complete JSON received before exit is discarded. The literal form filename
+survives, so retry obtains a fresh proposal. Approved `deployment-apply` workers
+keep their existing close guard and ignore these cancellation actions.
+
+Compact deployment screens retain phase-appropriate Back/Stop/Cancel controls,
+Back to review from nested package details, current status, progress and failure
+access. They expose no confirmation control. Snapshot saving and installed-audit
+subflows retain their own routing and lifecycle rules. The same protection
+applies to empty deployments with complete removals. See
+[navigation qualification](../../tests/packages/software-deployment-navigation-check.md).
+
 `policy` emits a canonical format-1 `{format,architecture,policy}` document from
 persistent configuration. `policy-review FILE` emits
 `{format:1,architecture,generation,fingerprint,previous,proposed,rows}` without

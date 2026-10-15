@@ -69,6 +69,17 @@ fn (mut a SoftwareApp) handle_deployment(event_id string) {
 }
 
 fn (mut a SoftwareApp) deployment_key_input(input string) {
+	if input == '\x1b' {
+		if a.deployment_review_running() { a.stop_deployment_review(); return }
+		if a.worker == unsafe { nil } {
+			if a.review != '' {
+				a.clear_review()
+				a.set_status('Deployment review cancelled before starting changes.')
+				return
+			}
+			if !a.focus { a.handle_deployment('software.deployment.back'); return }
+		}
+	}
 	// A pending review or transaction owns its literal path. Editing is only
 	// possible in the form, after cancellation/failure or before review.
 	if !a.focus || a.review != '' || a.worker != unsafe { nil } { return }
@@ -100,7 +111,9 @@ fn (mut a SoftwareApp) deployment_key_input(input string) {
 
 fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
 	a.initialize_deployment_field()
-	mut children := frame_elements(10)
+	// Include all four actions, progress and failure controls without growing
+	// the manual-free frame buffer on each redraw.
+	mut children := frame_elements(16)
 	children << software_label('Software · Deployment', 14, 8, width - 188, 28, false)
 	if a.worker == unsafe { nil } {
 		children << software_button('software.deployment.back', 'Back to catalog', width - 174, 8, 160)
@@ -114,6 +127,8 @@ fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
 		children << software_button('software.deployment.audit', 'Check installed', 210, 286, 160)
 		children << software_button('software.policy', 'Organization policy', 14, 330, 180)
 		children << software_button('software.deployment.snapshot', 'Save installed…', 210, 330, 160)
+	} else if a.deployment_review_running() {
+		children << software_button('software.deployment.stop', 'Stop review', 14, 286, 160)
 	}
 	if a.progress_seen { children << a.progress_bar(width, height) }
 	a.add_status_footer(mut children, width, height, a.progress_seen)
