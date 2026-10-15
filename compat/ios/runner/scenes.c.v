@@ -31,6 +31,10 @@ fn objc_responds(object u64, selector &char) bool {
 	if game_keyboard_selector(object, name) { return true }
 	if ns_uuid_selector(object, name) { return true }
 	if ns_date_selector(object, name) { return true }
+	if ns_timezone_family(if object in ios_runtime.classes { object } else { read64(object) }) {
+		if name in ['init', 'new', 'mutableCopy', 'mutableCopyWithZone:']! { return false }
+		if ns_timezone_selector(object, name) { return true }
+	}
 	if ns_input_stream_family(if object in ios_runtime.classes { object } else { read64(object) }) {
 		if name in ['init', 'new', 'copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return false }
 		if ns_input_stream_selector(object, name) { return true }

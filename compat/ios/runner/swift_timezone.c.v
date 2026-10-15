@@ -39,6 +39,10 @@ fn swift_timezone_input_checked(value u64) !SwiftURLWords {
 
 fn swift_timezone_identifier(owner u64) SwiftStringWords {
 	seconds := swift_timezone_seconds_checked(owner) or { panic(err) }
+	return swift_timezone_identifier_seconds(seconds)
+}
+
+fn swift_timezone_identifier_seconds(seconds i64) SwiftStringWords {
 	// The identifier rounds to minutes, while calculations preserve exact
 	// seconds. Native rounds half a minute away from zero on both signs.
 	minutes := ((if seconds < 0 { -seconds } else { seconds }) + 30) / 60
@@ -61,6 +65,13 @@ fn swift_timezone_identity(seconds i64) i64 {
 }
 
 fn swift_timezone_storage_destroy(owner u64) { swift_heap_deallocate(owner, 24, 7) }
+
+fn swift_timezone_bridge(owner u64) u64 {
+	seconds := swift_timezone_seconds_checked(owner) or { panic(err) }
+	// Native returns a fresh owned Objective-C result without consuming Self.
+	// Vinix copies the immutable seconds instead of retaining the Swift owner.
+	return ns_timezone_fixed(seconds)
+}
 
 fn swift_timezone_emit(code u64, data u64) {
 	// Swift Int in x0; owned optional resilient result through x8.
@@ -101,4 +112,13 @@ fn swift_timezone_emit(code u64, data u64) {
 	swift_protocol_relative(data + 3208, data + 3264); C.memcpy(voidptr(data + 3264), c'TimeZoneStorage', 16)
 	write32(code + 3264, 0xaa1403e0); write32(code + 3268, 0x58000070); write32(code + 3272, 0xd61f0200)
 	unsafe { *(&u64(code + 3280)) = u64(voidptr(swift_timezone_identifier)) }
+	// Borrow Self; invoke the owned NSTimeZone witness at table +128 with the
+	// formal implementation type in x0, table in x1 and slot address in x8.
+	for i, op in [u32(0xa9bd57f6), 0xa9014ff4, 0xa9027bfd, 0x910083fd,
+		0xa9405693, 0xaa1303e0, 0x580002d0, 0xd63f0200, 0x910202a8,
+		0xf94042a9, 0xaa1303f4, 0xaa1503e1, 0xd63f0120, 0xa9427bfd,
+		0xa9414ff4, 0xa8c357f6, 0xd65f03c0]! { write32(code + 3520 + u64(i * 4), op) }
+	unsafe { *(&u64(code + 3632)) = u64(voidptr(swift_object_type)); *(&u64(data + 3088)) = code + 3664 }
+	write32(code + 3664, 0xaa1403e0); write32(code + 3668, 0x58000070); write32(code + 3672, 0xd61f0200)
+	unsafe { *(&u64(code + 3680)) = u64(voidptr(swift_timezone_bridge)) }
 }

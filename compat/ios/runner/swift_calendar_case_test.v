@@ -34,6 +34,13 @@ type CalendarSign = fn (u64, u64) u64
 type CalendarLocaleCString = fn (&u8) SwiftStringWords
 type CalendarLocaleUTF8 = fn (u64, u64) u64
 type CalendarLocaleDrop = fn (u64)
+type CalendarZoneSend = fn (u64, u64, u64) u64
+type CalendarZoneReal = fn (u64, u64, u64) f64
+type CalendarZoneSelector = fn (&char) u64
+type CalendarZoneClass = fn (&char) u64
+type CalendarZoneKeep = fn (u64) u64
+type CalendarZonePool = fn () u64
+type CalendarZoneDate = fn (u64, f64) u64
 
 struct CalendarLocaleApi {
 	native bool
@@ -483,6 +490,8 @@ fn calendar_zone_api(api CalendarApi) CalendarZoneApi {
 
 fn calendar_zone_label(seconds i64) string {
 	return match seconds {
+		-61260 { 'GMT-1701' }
+		61260 { 'GMT+1701' }
 		-64800, -64799 { 'GMT-1800' }
 		-3600 { 'GMT-0100' }
 		-61, -60, -59, -31, -30 { 'GMT-0001' }
@@ -618,6 +627,190 @@ fn calendar_zones_suite(api CalendarApi) {
 	mut got := [2]u64{}; output := u64(unsafe { &got[0] })
 	api.call(api.entries[8], 0, 0, self, output); api.destroy(self)
 	zone.value.check(api, output, 'GMT', 0); zone.value.destroy(output)
+}
+
+struct CalendarZoneBridgeApi {
+	zone CalendarZoneApi
+	entry u64
+	cls u64
+	send CalendarZoneSend
+	real CalendarZoneReal
+	selector CalendarZoneSelector
+	keep CalendarZoneKeep
+	drop CalendarLocaleDrop
+	push CalendarZonePool
+	pop CalendarLocaleDrop
+	date CalendarZoneDate
+}
+
+fn calendar_zone_bridge_api(api CalendarApi) CalendarZoneBridgeApi {
+	symbol := '_$s10Foundation8TimeZoneV19_bridgeToObjectiveCSo06NSTimeC0CyF'
+	zone := calendar_zone_api(api)
+	mut entry := u64(0)
+	for library in ['/System/Library/Frameworks/Foundation.framework/Foundation', '/usr/lib/swift/libswiftFoundation.dylib']! {
+		mut address := u64(0)
+		$if macos { if api.native { address = u64(C.dlsym(C.dlopen(library.str, 2), symbol[1..].str)) } }
+		if !api.native { address = runtime_symbol(library, symbol) or { panic(err) } }
+		assert address != 0 && (entry == 0 || entry == address); entry = address
+	}
+	$if macos { if api.native {
+		obj := C.dlopen(c'/usr/lib/libobjc.A.dylib', 2)
+		cf := C.dlopen(c'/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation', 2)
+		return CalendarZoneBridgeApi{zone: zone, entry: entry,
+			cls: unsafe { CalendarZoneClass(C.dlsym(obj, c'objc_getClass'))(c'NSTimeZone') },
+			send: unsafe { CalendarZoneSend(C.dlsym(obj, c'objc_msgSend')) }, real: unsafe { CalendarZoneReal(C.dlsym(obj, c'objc_msgSend')) },
+			selector: unsafe { CalendarZoneSelector(C.dlsym(obj, c'sel_registerName')) }, keep: unsafe { CalendarZoneKeep(C.dlsym(obj, c'objc_retain')) },
+			drop: unsafe { CalendarLocaleDrop(C.dlsym(obj, c'objc_release')) }, push: unsafe { CalendarZonePool(C.dlsym(obj, c'objc_autoreleasePoolPush')) },
+			pop: unsafe { CalendarLocaleDrop(C.dlsym(obj, c'objc_autoreleasePoolPop')) }, date: unsafe { CalendarZoneDate(C.dlsym(cf, c'CFDateCreate')) }}
+	} }
+	cls := ios_runtime.names['NSTimeZone']
+	for library in ['/System/Library/Frameworks/Foundation.framework/Foundation', '/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation']! {
+		assert runtime_symbol(library, '_OBJC_CLASS_$_NSTimeZone') or { panic(err) } == cls
+		assert runtime_symbol(library, '_OBJC_METACLASS_$_NSTimeZone') or { panic(err) } == read64(cls)
+	}
+	assert ios_runtime.classes[cls].size == 8
+	return CalendarZoneBridgeApi{zone: zone, entry: entry, cls: cls,
+		send: unsafe { CalendarZoneSend(voidptr(C.ios_objc_msgsend)) }, real: unsafe { CalendarZoneReal(voidptr(C.ios_objc_msgsend)) },
+		selector: objc_selector, keep: objc_retain, drop: objc_release, push: objc_pool_push, pop: objc_pool_pop, date: cf_date_create}
+}
+
+fn (bridge CalendarZoneBridgeApi) call(api CalendarApi, self u64, guard u64) u64 {
+	mut capture := [u64(0xcafe), 0, 0, 0, 0, 0xbeef]!
+	api.probe(bridge.entry, guard, guard, self, guard, unsafe { &capture[1] })
+	assert capture[0] == 0xcafe && capture[3] == self && capture[4] == 0x5021 && capture[5] == 0xbeef
+	return capture[1]
+}
+
+fn (bridge CalendarZoneBridgeApi) text(object u64) string {
+	return unsafe { (&char(bridge.send(object, bridge.selector(c'UTF8String'), 0))).vstring() }
+}
+
+fn (bridge CalendarZoneBridgeApi) check(object u64, seconds i64, date u64) {
+	assert bridge.send(object, bridge.selector(c'isKindOfClass:'), bridge.cls) == 1
+	assert bridge.text(bridge.send(object, bridge.selector(c'name'), 0)) == calendar_zone_label(seconds)
+	abbreviation := match seconds {
+		-64800, -64799 { 'GMT-18' }
+		-61260 { 'GMT-17:01' }
+		-61, -60, -59, -31, -30 { 'GMT-0:01' }
+		-29, -1, 0, 1, 29 { 'GMT' }
+		30, 31, 59, 60, 61 { 'GMT+0:01' }
+		19800 { 'GMT+5:30' }
+		61260 { 'GMT+17:01' }
+		64799, 64800 { 'GMT+18' }
+		else { panic('missing abbreviation expectation') }
+	}
+	for name in [c'abbreviation', c'abbreviationForDate:']! { assert bridge.text(bridge.send(object, bridge.selector(name), date)) == abbreviation }
+	for name in [c'secondsFromGMT', c'secondsFromGMTForDate:']! { assert i64(bridge.send(object, bridge.selector(name), date)) == seconds }
+	for name in [c'isDaylightSavingTime', c'isDaylightSavingTimeForDate:', c'nextDaylightSavingTimeTransition', c'nextDaylightSavingTimeTransitionAfterDate:']! {
+		assert bridge.send(object, bridge.selector(name), date) == 0
+	}
+	for name in [c'daylightSavingTimeOffset', c'daylightSavingTimeOffsetForDate:']! { assert bridge.real(object, bridge.selector(name), date) == 0 }
+	assert bridge.send(object, bridge.selector(c'classForCoder'), 0) == bridge.cls
+}
+
+fn calendar_zone_bridge_case(api CalendarApi, bridge CalendarZoneBridgeApi, seconds i64, at_end bool) {
+	page := usize(C.getpagesize())
+	span := u64(C.mmap(unsafe { nil }, page * 3, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+	assert span != u64(-1) && C.mprotect(voidptr(span + u64(page)), page, C.PROT_READ | C.PROT_WRITE) == 0
+	C.memset(voidptr(span + u64(page)), 0xa5, page)
+	self := span + u64(page) + if at_end { u64(page) - 16 } else { u64(0) }
+	pool := bridge.push()
+	api.call(bridge.zone.constructor, u64(seconds), span, span, self)
+	before := unsafe { *(&SwiftURLWords(self)) }
+	assert C.mprotect(voidptr(span + u64(page)), page, C.PROT_READ) == 0
+	first := bridge.call(api, self, span); second := bridge.call(api, self, span)
+	assert first != 0 && second != 0 && first != second && unsafe { *(&SwiftURLWords(self)) } == before
+	calendar_identifier_padding(span + u64(page), u64(page), self, 16)
+	copied := bridge.send(first, bridge.selector(c'copyWithZone:'), 0)
+	assert copied == first
+	name := bridge.keep(bridge.send(first, bridge.selector(c'name'), 0))
+	bridge.zone.value.destroy(self)
+	bridge.pop(pool) // Owned bridge results and the explicitly retained name survive.
+	pool2 := bridge.push()
+	past := bridge.date(0, -63114076800.0); future := bridge.date(0, 63113904000.0)
+	bridge.check(first, seconds, past); bridge.check(second, seconds, future)
+	assert bridge.send(first, bridge.selector(c'isEqualToTimeZone:'), second) == 1
+	assert bridge.send(first, bridge.selector(c'hash'), 0) == bridge.send(second, bridge.selector(c'hash'), 0)
+	bridge.drop(first); bridge.check(copied, seconds, past); bridge.drop(copied)
+	bridge.check(second, seconds, future); bridge.drop(second)
+	assert bridge.text(name) == calendar_zone_label(seconds)
+	bridge.drop(name); bridge.drop(past); bridge.drop(future); bridge.pop(pool2)
+	assert C.munmap(voidptr(span), page * 3) == 0
+}
+
+fn calendar_zone_bridge_worker(api CalendarApi, bridge CalendarZoneBridgeApi, self u64) {
+	for _ in 0 .. 32 {
+		pool := bridge.push(); date := bridge.date(0, 0)
+		object := bridge.call(api, self, 0); bridge.check(object, 19800, date)
+		bridge.drop(object); bridge.drop(date); bridge.pop(pool)
+	}
+}
+
+fn calendar_zone_bridge_spy(metadata u64, table u64, owner u64, slot u64) u64 {
+	assert slot == table + 128 && owner == read64(table + 144) && metadata == read64(table + 152)
+	return read64(table + 160)
+}
+
+fn calendar_zone_bridge_dispatch(api CalendarApi, bridge CalendarZoneBridgeApi, code u64) {
+	page := usize(C.getpagesize())
+	span := u64(C.mmap(unsafe { nil }, page * 3, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+	assert span != u64(-1) && C.mprotect(voidptr(span + u64(page)), page, C.PROT_READ | C.PROT_WRITE) == 0
+	table := span + u64(page) + 64; self := table + 256
+	mut original := [2]u64{}; value := u64(unsafe { &original[0] })
+	api.call(bridge.zone.constructor, 19800, span, span, value)
+	owner := original[0]
+	mut metadata := u64(0); mut callback := code + 352
+	$if macos { if api.native {
+		core := C.dlopen(c'/usr/lib/swift/libswiftCore.dylib', 2)
+		metadata = unsafe { CalendarObjectType(C.dlsym(core, c'swift_getObjectType'))(owner) }
+		callback = unsafe { CalendarSign(voidptr(code + 288))(callback, (table + 128) | (u64(37611) << 48)) }
+	} }
+	if !api.native { metadata = swift_object_type(owner) }
+	unsafe {
+		*(&u64(table + 128)) = callback; *(&u64(table + 144)) = owner; *(&u64(table + 152)) = metadata
+		*(&u64(table + 160)) = 0xcafebabefeed1234; *(&SwiftURLWords(self)) = SwiftURLWords{owner: owner, table: table}
+	}
+	assert C.mprotect(voidptr(span + u64(page)), page, C.PROT_READ) == 0
+	assert bridge.call(api, self, span) == 0xcafebabefeed1234
+	bridge.zone.value.destroy(value)
+	assert C.munmap(voidptr(span), page * 3) == 0
+}
+
+fn calendar_zone_bridges_suite(api CalendarApi, code u64) {
+	bridge := calendar_zone_bridge_api(api)
+	calendar_zone_bridge_dispatch(api, bridge, code)
+	for seconds in [i64(-64800), -64799, -61260, -61, -60, -59, -31, -30, -29, -1, 0, 1, 29, 30, 31, 59, 60, 61, 19800, 61260, 64799, 64800]! {
+		for at_end in [false, true]! { calendar_zone_bridge_case(api, bridge, seconds, at_end) }
+	}
+	pool := bridge.push()
+	for pair in [[i64(-1), 0]!, [i64(0), 1]!, [i64(29), 0]!, [i64(30), 59]!, [i64(59), 60]!, [i64(60), 61]!,
+		[i64(64799), 64800]!, [i64(-61), -60]!, [i64(-29), 29]!, [i64(-30), 30]!, [i64(29), 30]!, [i64(19800), 64800]!]! {
+		a := bridge.send(bridge.cls, bridge.selector(c'timeZoneForSecondsFromGMT:'), u64(pair[0]))
+		b := bridge.send(bridge.cls, bridge.selector(c'timeZoneForSecondsFromGMT:'), u64(pair[1]))
+		equal := calendar_zone_label(pair[0]) == calendar_zone_label(pair[1])
+		for selector in [c'isEqual:', c'isEqualToTimeZone:']! { assert bridge.send(a, bridge.selector(selector), b) == u64(equal) }
+		if equal { assert bridge.send(a, bridge.selector(c'hash'), 0) == bridge.send(b, bridge.selector(c'hash'), 0) }
+		if !api.native {
+			assert cf_equal_depth(a, b, 0) == equal
+			if equal { assert cf_hash(a) == cf_hash(b) }
+			copy_value := objc_copy_value(a, false); assert copy_value == a; objc_release(copy_value)
+		}
+	}
+	for seconds in [i64(-64801), 64801]! { assert bridge.send(bridge.cls, bridge.selector(c'timeZoneForSecondsFromGMT:'), u64(seconds)) == 0 }
+	if !api.native {
+		for seconds in [i64(-9223372036854775807) - 1, 9223372036854775807]! { assert ns_timezone_fixed(seconds) == 0 }
+		for pair in [['name', '@16@0:8']!, ['secondsFromGMTForDate:', 'q24@0:8@16']!, ['isEqualToTimeZone:', 'B24@0:8@16']!,
+			['daylightSavingTimeOffsetForDate:', 'd24@0:8@16']!, ['copyWithZone:', '@24@0:8^{_NSZone=}16']!, ['classForCoder', '#16@0:8']!]! {
+			method := objc_instance_method(bridge.cls, bridge.selector(unsafe { &char(pair[0].str) }))
+			assert method != 0 && unsafe { objc_method_types(method).vstring() } == pair[1]
+		}
+	}
+	bridge.pop(pool)
+	mut value := [2]u64{}; self := u64(unsafe { &value[0] })
+	api.call(bridge.zone.constructor, 19800, 0, 0, self)
+	mut workers := []thread{}
+	for _ in 0 .. 8 { workers << spawn calendar_zone_bridge_worker(api, bridge, self) }
+	workers.wait(); bridge.zone.value.destroy(self)
 }
 
 fn calendar_identifier_relative(address u64) u64 {
@@ -949,7 +1142,9 @@ fn test_swift_calendar_case() {
 	write32(code + 288, 0xdac10020); write32(code + 292, 0xd65f03c0)
 	for i, op in [u32(0xaa1403e4), 0xaa0803e5, 0x58000050, 0xd61f0200]! { write32(code + 320 + u64(i * 4), op) }
 	unsafe { *(&u64(code + 336)) = u64(voidptr(calendar_spy_day)) }
-	C.__builtin___clear_cache(voidptr(code), voidptr(code + 344))
+	for i, op in [u32(0xaa1403e2), 0xaa0803e3, 0x58000050, 0xd61f0200]! { write32(code + 352 + u64(i * 4), op) }
+	unsafe { *(&u64(code + 368)) = u64(voidptr(calendar_zone_bridge_spy)) }
+	C.__builtin___clear_cache(voidptr(code), voidptr(code + 376))
 	assert C.mprotect(voidptr(code), page, C.PROT_READ | C.PROT_EXEC) == 0
 	probe := unsafe { CalendarCaseLoad(voidptr(code)) }
 	$if macos {
@@ -966,7 +1161,8 @@ fn test_swift_calendar_case() {
 		calendar_days_suite(calendar_api(true, code), code)
 		calendar_locales_suite(calendar_api(true, code))
 		calendar_zones_suite(calendar_api(true, code))
-		println('IOS-SWIFT-CALENDAR-CASE-NATIVE: fixed-offset TimeZone construction/metadata/identifier, exact seconds and rounded equality, Calendar timezone/locale snapshot independence, Gregorian/ISO startOfDay boundaries and concurrent copied-Calendar mutation; guarded values, ARC and native Identifier witnesses measured')
+		calendar_zone_bridges_suite(calendar_api(true, code), code)
+		println('IOS-SWIFT-CALENDAR-CASE-NATIVE: owned TimeZone Objective-C bridge, generic callback dispatch, exact seconds and rounded name/equality, abbreviation, DST queries, copies and independent getter/result lifetimes; guarded values, concurrent bridges, Calendar settings/day boundaries and native Identifier witnesses measured')
 	}
 	if _ := swift_foundation_symbol(calendar_case_symbol) {
 		assert false
@@ -998,10 +1194,11 @@ fn test_swift_calendar_case() {
 		calendar_days_suite(api, code)
 		calendar_locales_suite(api)
 		calendar_zones_suite(api)
+		calendar_zone_bridges_suite(api, code)
 		assert read64(arena + u64(page) + 2208) == arena + 3456
 		for invalid in [u8(27), 28, 127, 255]! { if _ := swift_calendar_input_checked(u64(unsafe { &invalid })) { assert false } }
 		if _ := swift_calendar_identifier_checked(0) { assert false }
-		for symbol in ['_$s10Foundation8CalendarV10IdentifierO9gregorianyA2EmFWC', '_$s10Foundation8TimeZoneV19_bridgeToObjectiveCSo06NSTimeC0CyF']! {
+		for symbol in ['_$s10Foundation8CalendarV10IdentifierO9gregorianyA2EmFWC', '_$s10Foundation8TimeZoneV36_unconditionallyBridgeFromObjectiveCyACSo06NSTimeC0CSgFZ']! {
 			if _ := swift_foundation_symbol(symbol) {
 				assert false
 			}
@@ -1032,5 +1229,5 @@ fn test_swift_calendar_case() {
 		}
 	}
 	assert C.munmap(voidptr(code), page) == 0
-	println('IOS-SWIFT-CALENDAR-CASE: fixed-offset TimeZone construction/metadata/identifier, exact seconds and rounded equality, Calendar timezone/locale immutable snapshots, owned getter results and Gregorian/ISO startOfDay, guarded values and concurrent mutation, native Identifier witnesses, two drained/unmapped runtimes; default/named timezone rules, other calendar calculations and Objective-C bridging remain unsupported')
+	println('IOS-SWIFT-CALENDAR-CASE: owned TimeZone Objective-C bridge, generic callback dispatch, exact seconds/rounded names/equality, fixed abbreviations/DST queries, copies/hash/metadata, guarded and independent value/result lifetimes, concurrent bridges, Calendar settings/day intervals and native Identifier witnesses, two drained/unmapped runtimes; default/named zones, other calendar calculations, Calendar Objective-C bridge and reverse TimeZone bridge remain unsupported')
 }

@@ -6921,22 +6921,59 @@ Calendar/TimeZone allocation and matching destruction without hidden allocations
 in the new successful paths. Published runners remain unchanged; the full iOS
 regression remains unpassed.
 
-The current IPA probe links past the fixed TimeZone constructor, metadata and
+The fixed-zone IPA probe links past the TimeZone constructor, metadata and
 Calendar timezone setter, then exits with status 1 at
 `_$s10Foundation8TimeZoneV19_bridgeToObjectiveCSo06NSTimeC0CyF`.
-Fortnite has not entered application code and remains unplayable.
+
+The next milestone implements that borrowed Swift TimeZone bridge in V. Native
+dispatch uses implementation-table slot +128, passing the formal owner type,
+table, owner and slot address, and returns an owned NSTimeZone in x0. The
+private callback creates a fresh immutable Objective-C snapshot on each call;
+the snapshot survives destruction of the Swift value and autorelease-pool
+drain. Its public class layout is eight bytes, with exact fixed-offset seconds
+stored in owned Vinix metadata. No Swift owner is retained by the bridge.
+
+The fixed NSTimeZone profile provides `name`, abbreviations, exact
+`secondsFromGMT` queries, equality/hash, retained immutable copies, fixed DST
+queries, method type encodings and the bounded `timeZoneForSecondsFromGMT:`
+factory. Names and equality use the native minute rounding while calculations
+retain exact seconds. Abbreviations use the native form, such as `GMT+5:30`;
+fixed zones have no DST or future transition. Default/current/named zones,
+custom subclasses, coding, localized formatting, reverse Swift bridging and
+Calendar Objective-C bridging remain unsupported.
+
+The Calendar fixture compares 44 guarded bridge cases with native Foundation,
+including nine-byte abbreviations such as `GMT+17:01`.
+It checks repeated independent bridges, immutable copies, retained names,
+source and autorelease-pool teardown, twelve equality pairs, typed date/DST
+queries, a substituted generic bridge witness and 256 concurrent bridges from
+one borrowed Swift value. Each private runtime must drain every snapshot before
+unmapping its sealed Swift metadata.
+
+All twelve normal/deterministic ASan/UBSan host runs and six ARM64 Vinix guest
+suites pass. Native reference tools, fifteen generated C streams and executables,
+four retired VM phases and pinned inputs are retained under
+`build/ios/fortnite/timezone-bridge-checks`. Generated C confirms explicit owned
+Objective-C allocation without hidden V allocations in the new successful paths.
+Published runners remain unchanged; the full iOS regression remains unpassed.
+
+The current IPA probe links past the TimeZone bridge and NSTimeZone class import,
+then exits with status 1 at
+`_$sSD10FoundationE19_bridgeToObjectiveCSo12NSDictionaryCyF`
+(Swift Dictionary's Objective-C bridge). Fortnite has not entered application
+code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,535 | 625 | 79 |
+| Fortnite executable | 1,537 | 623 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,370 | 628 | 120 |
+| All images | 2,372 | 626 | 120 |
 
-The C++/GLES/Text variant reports 2,383 resolved imports, 615 unresolved strong
+The C++/GLES/Text variant reports 2,385 resolved imports, 613 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

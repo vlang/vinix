@@ -114,6 +114,7 @@ mut:
 	process_arguments_array bool
 	date_owned bool
 	date_initialized bool
+	timezone_initialized bool
 	input_stream_owned bool
 	input_stream_initialized bool
 	input_stream_file bool
@@ -344,7 +345,7 @@ fn objc_start() {
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
-        'NSData', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
+        'NSData', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
@@ -411,7 +412,7 @@ fn objc_start() {
 			'GCKeyboard' { u32(32) }
 			'NSFileManager' { u32(32) }
 			'NSProcessInfo' { u32(48) }
-			'NSDate', 'VinixCFDate' { u32(8) }
+			'NSDate', 'VinixCFDate', 'NSTimeZone' { u32(8) }
 			'NSStream' { u32(8) }
 			'NSInputStream' { u32(136) }
 			'NSAutoreleasePool' { u32(40) }
@@ -489,6 +490,7 @@ fn objc_allocate(cls u64) u64 {
 	if connection_family(cls) && cls != ios_runtime.names['NSURLConnection'] { panic('iOS: custom connection subclass construction is not implemented') }
 	ns_input_stream_require_class(cls)
 	ns_pool_require_class(cls)
+	ns_timezone_require_class(cls)
 	allocation_class := ns_date_allocation_class(ns_uuid_allocation_class(cls))
 	objc_initialize(allocation_class)
 	info := ios_runtime.classes[allocation_class] or { panic('iOS: allocation of an unknown class') }
@@ -585,6 +587,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).pool_owned { ns_pool_initialize(object); return object }
 	if obj_header(object).uuid_owned { ns_uuid_initialize(object, 0, true); return object }
 	if obj_header(object).date_owned { ns_date_initialize(object, cf_absolute_time()); return object }
+	if ns_timezone_family(cls) { panic('iOS: default timezone construction is not implemented') }
 	if obj_header(object).input_stream_owned { panic('iOS: input stream requires designated construction') }
 	if obj_header(object).connection_owned { panic('iOS: connection requires designated construction') }
 	if obj_header(object).value_owned { objc_release(object); return 0 }

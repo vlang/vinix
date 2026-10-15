@@ -146,7 +146,7 @@ fn swift_foundation_arena() u64 {
 	// read as four-byte data before calling the enum tag injection witness.
 	// Its native case number is 7; this export does not construct a Calendar.
 	write32(data + 800, 7)
-	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 3512) })
+	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 3688) })
 	if C.mprotect(unsafe { voidptr(base) }, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(unsafe { voidptr(base) }, usize(page * 2)); panic('iOS: cannot seal Swift Foundation entries')
@@ -307,6 +307,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 		'_$s10Foundation8TimeZoneVMa' { swift_foundation_arena() + 3064 }
 		'_$s10Foundation8TimeZoneVMn' { swift_foundation_arena() + u64(C.getpagesize()) + 2784 }
 		'_$s10Foundation8TimeZoneV10identifierSSvg' { swift_foundation_arena() + 3096 }
+		'_$s10Foundation8TimeZoneV19_bridgeToObjectiveCSo06NSTimeC0CyF' { swift_foundation_arena() + 3520 }
 		'_$s10Foundation8CalendarVMa' { swift_foundation_arena() + 2528 }
 		'_$s10Foundation8CalendarVMn' { swift_foundation_arena() + u64(C.getpagesize()) + 1600 }
 		'_$s10Foundation8CalendarV10IdentifierOMa' { swift_foundation_arena() + 2336 }
