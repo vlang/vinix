@@ -1,0 +1,22 @@
+{
+    "base_commit": "eb7de67a3b096418d97509832973eb2956af692e",
+    "inputs_before": 66,
+    "inputs_after": 67,
+    "dispatch_unchanged": true,
+    "changed_wait_source_rejected": true,
+    "changed_wait_source_sha256": "2fd4ef41aafcb2e5ce43772b61058954607db5acae371c05e352ce7b7ca68383",
+    "restored_source_accepted": true,
+    "artifacts": {
+        "changed-source-refusal.log": "1e4827595ba1ed19726b9ed0c201eb0e91a249432dfdd11bda8a25755945f1a9",
+        "check.log": "ca7e387206f38825d8d7b52f24ccfcac64c2accd5a321327d5262d48adf08d05",
+        "docs/linux-syscall-coverage.json": "b8dc55137ca92d285aa1bbb92f0eb7f6628930c203fa72c8ab712d585e1f0cc0",
+        "docs/linux-syscall-coverage.md": "4305395cdcc636069d542145816e73da768d7108f99f075a7fefb04cce79b72c",
+        "generate.log": "ca7e387206f38825d8d7b52f24ccfcac64c2accd5a321327d5262d48adf08d05",
+        "host-tests-incomplete-sparse-view.log": "9098d91b4c09e6631676370a9f5e221b963a3a3c101add0a14e2794fdbb9e898",
+        "host-tests.log": "67a3ffad0fffaed656104fa5d30380e78e03f58c2eaaa668659524958c8d073b",
+        "kernel/userland/linux_task.v": "60464c5867efb9619fef88c531b5b5f142a006e888e1b28e72fec047338c9f4e",
+        "restored-source-check.log": "ca7e387206f38825d8d7b52f24ccfcac64c2accd5a321327d5262d48adf08d05",
+        "tools/linux-compat/coverage.v": "604028cd0f7462f86f94269e08cdfe5e63b7efe4cca099611c6cdb57e99364c4",
+        "tools/linux-compat/coverage_test.v": "9915c227efff0cb14f5044ddf1c16b2308708c07354c37fc6ccc9a5e4c507d20"
+    }
+}

@@ -51,11 +51,19 @@ fn test_semantic_source_changes_invalidate_fingerprints_without_qualifying_dispa
 		os.cp(root + '/' + path, work + '/' + path)!
 	}
 	assert coverage(work)!.inputs == original.inputs
-	path := 'kernel/proc/seccomp.v'
-	source := os.read_file(work + '/' + path)!
-	assert source.contains('instructions.len == 0')
-	os.write_file(work + '/' + path, source.replace('instructions.len == 0', 'instructions.len == 1'))!
-	changed := coverage(work)!
-	assert changed.inputs[path] != original.inputs[path]
-	assert changed.syscalls == original.syscalls
+	for change in [
+		['kernel/proc/seccomp.v', 'instructions.len == 0', 'instructions.len == 1'],
+		['kernel/userland/linux_task.v', 'pid := int(i32(pid_word))', 'pid := int(pid_word)'],
+	] {
+		path := change[0]
+		old := change[1]
+		new := change[2]
+		source := os.read_file(work + '/' + path)!
+		assert source.contains(old)
+		os.write_file(work + '/' + path, source.replace(old, new))!
+		changed := coverage(work)!
+		assert changed.inputs[path] != original.inputs[path]
+		assert changed.syscalls == original.syscalls
+		os.write_file(work + '/' + path, source)!
+	}
 }

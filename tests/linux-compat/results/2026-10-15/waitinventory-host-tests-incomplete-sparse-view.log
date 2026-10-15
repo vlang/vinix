@@ -1,0 +1,64 @@
+---- Testing... ----------------------------------------------------------------
+OK    [1/8] C: 3913.196 ms, R:   662.297 ms /Users/alex/.cache/vinix-linux-compat/waitinventory-20261015/tree/tools/linux-compat/applications/audit_test.v
+OK    [2/8] C: 3866.926 ms, R:   782.984 ms /Users/alex/.cache/vinix-linux-compat/waitinventory-20261015/tree/tools/linux-compat/coverage_test.v
+tools/linux-compat/workloads/browsers.v:106:2: notice: variable `stop` shadows a function declaration
+  104 |         + '<p id="verdict">pending</p><script>const answer=6*7;document.getElementById("verdict").textContent=answer;'
+  105 |         + 'const proof=new Image();proof.src="/result/' + nonce + '/"+answer;document.body.appendChild(proof);</script>'
+  106 |     stop := chan bool{cap: 1}
+      |     ~~~~
+  107 |     worker := spawn browser_http(mut listener, page, verdict, stop)
+  108 |     mut finished := false
+tools/linux-compat/workloads/browsers.v:106:2: notice: variable `stop` shadows a function declaration
+  104 |         + '<p id="verdict">pending</p><script>const answer=6*7;document.getElementById("verdict").textContent=answer;'
+  105 |         + 'const proof=new Image();proof.src="/result/' + nonce + '/"+answer;document.body.appendChild(proof);</script>'
+  106 |     stop := chan bool{cap: 1}
+      |     ~~~~
+  107 |     worker := spawn browser_http(mut listener, page, verdict, stop)
+  108 |     mut finished := false
+OK    [3/8] C: 5150.644 ms, R:   559.325 ms /Users/alex/.cache/vinix-linux-compat/waitinventory-20261015/tree/tools/linux-compat/workloads/browsers_test.v
+OK    [4/8] C: 4978.894 ms, R:  1410.196 ms /Users/alex/.cache/vinix-linux-compat/waitinventory-20261015/tree/tools/linux-compat/workloads/diagnostics_test.v
+tools/linux-compat/workloads/browsers.v:106:2: notice: variable `stop` shadows a function declaration
+  104 |         + '<p id="verdict">pending</p><script>const answer=6*7;document.getElementById("verdict").textContent=answer;'
+  105 |         + 'const proof=new Image();proof.src="/result/' + nonce + '/"+answer;document.body.appendChild(proof);</script>'
+  106 |     stop := chan bool{cap: 1}
+      |     ~~~~
+  107 |     worker := spawn browser_http(mut listener, page, verdict, stop)
+  108 |     mut finished := false
+tools/linux-compat/workloads/browsers.v:106:2: notice: variable `stop` shadows a function declaration
+  104 |         + '<p id="verdict">pending</p><script>const answer=6*7;document.getElementById("verdict").textContent=answer;'
+  105 |         + 'const proof=new Image();proof.src="/result/' + nonce + '/"+answer;document.body.appendChild(proof);</script>'
+  106 |     stop := chan bool{cap: 1}
+      |     ~~~~
+  107 |     worker := spawn browser_http(mut listener, page, verdict, stop)
+  108 |     mut finished := false
+OK    [5/8] C: 4591.911 ms, R:   308.159 ms /Users/alex/.cache/vinix-linux-compat/waitinventory-20261015/tree/tools/linux-compat/workloads/jit_test.v
+OK    [6/8] C: 4742.785 ms, R:   534.765 ms /Users/alex/.cache/vinix-linux-compat/waitinventory-20261015/tree/tools/linux-compat/workloads/games_test.v
+tools/linux-compat/workloads/browsers.v:106:2: notice: variable `stop` shadows a function declaration
+  104 |         + '<p id="verdict">pending</p><script>const answer=6*7;document.getElementById("verdict").textContent=answer;'
+  105 |         + 'const proof=new Image();proof.src="/result/' + nonce + '/"+answer;document.body.appendChild(proof);</script>'
+  106 |     stop := chan bool{cap: 1}
+      |     ~~~~
+  107 |     worker := spawn browser_http(mut listener, page, verdict, stop)
+  108 |     mut finished := false
+tools/linux-compat/workloads/browsers.v:106:2: notice: variable `stop` shadows a function declaration
+  104 |         + '<p id="verdict">pending</p><script>const answer=6*7;document.getElementById("verdict").textContent=answer;'
+  105 |         + 'const proof=new Image();proof.src="/result/' + nonce + '/"+answer;document.body.appendChild(proof);</script>'
+  106 |     stop := chan bool{cap: 1}
+      |     ~~~~
+  107 |     worker := spawn browser_http(mut listener, page, verdict, stop)
+  108 |     mut finished := false
+FAIL  [7/8] C: 4497.548 ms, R:   313.171 ms /Users/alex/.cache/vinix-linux-compat/waitinventory-20261015/tree/tools/linux-compat/workloads/runtime_sources_test.v
+V panic: EmbedFileData error: files "../../../tests/go/smoke.go" and "/Users/alex/.cache/vinix-linux-compat/waitinventory-20261015/tree/tools/linux-compat/workloads/../../../tests/go/smoke.go" do not exist
+ v hash: f6358ec
+    pid: 0xe4c2
+    tid: 0x1f8a45e80
+0   runtime_sources_test                0x000000010067d900 embed_file__reload_from_file_at_runtime + 312
+1   runtime_sources_test                0x000000010067d710 embed_file__EmbedFileData__data + 724
+2   runtime_sources_test                0x000000010066d804 embed_file__EmbedFileData__to_string + 36
+3   runtime_sources_test                0x00000001006cc4d0 test_native_runtime_inputs_keep_the_workload_and_architecture_assertion + 148
+4   runtime_sources_test                0x00000001006d80e0 main + 224
+5   dyld                                0x000000018c507e00 start + 6992
+OK    [8/8] C: 4778.406 ms, R:  1376.196 ms /Users/alex/.cache/vinix-linux-compat/waitinventory-20261015/tree/tools/linux-compat/workloads/runner_test.v
+--------------------------------------------------------------------------------
+To reproduce just failure 1 run:    '/Users/alex/.cache/vinix-linux-compat/proctask-20261014/compiler/v' -enable-globals -nocache '/Users/alex/.cache/vinix-linux-compat/waitinventory-20261015/tree/tools/linux-compat/workloads/runtime_sources_test.v'
+Summary for all V _test.v files: 1 failed, 7 passed, 8 total. Elapsed time: 11867 ms, on 4 parallel jobs. Comptime: 36520 ms. Runtime: 5947 ms.

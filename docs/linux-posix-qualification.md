@@ -7688,6 +7688,15 @@ and its digest are retained with the evidence.
 The older inventory input list omits `linux_task.v`; the wait source is pinned
 separately against the committed base, both worktrees and complete production C.
 
+The public inventory now also fingerprints `linux_task.v`, with 67 total inputs.
+A regression test changes wait4's signed32 import back to full-width and checks
+that the fingerprint changes while dispatch classifications stay unchanged.
+An isolated generated-inventory check rejects this mutation, then accepts the
+restored source; all eight host test files pass. An initial sparse checkout
+omitted the embedded Go/Java workload inputs; its failed host log is retained
+before the complete checkout passes. See the
+[inventory freshness receipt](../tests/linux-compat/results/2026-10-15/waitinventory-receipt.json).
+
 P_PIDFD, __WCLONE/__WALL/__WNOTHREAD, ptrace/cross-thread waits, consuming
 copyout faults, error siginfo copyout, successful-event UID/accounting,
 concurrent group/reap changes, signal restart, GNU libc and translated/ELF32

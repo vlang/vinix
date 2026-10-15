@@ -74,6 +74,7 @@ fn coverage(root string) !Coverage {
 		'kernel/sched/inherit.v', 'kernel/sched/reap.v',
 		'kernel/lib/stubs/pthread.v', 'kernel/c/pthread.h',
 		'kernel/userland/exit.v',
+		'kernel/userland/linux_task.v',
 		'kernel/userland/userland.v',
 		'kernel/kbudget/budget.v', 'kernel/proc/kernel_budget.v',
 		'kernel/vmstorage/storage.v',
