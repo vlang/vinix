@@ -7589,23 +7589,64 @@ Eleven final generated C streams/executables, native measurements, actual IPA
 consumers and joined VM evidence are retained under
 `build/ios/fortnite/metal-cache-checks`.
 
-This implements the CoreVideo/device boundary. A system Metal device, shaders,
-command queues and renderer are still unavailable. Fortnite remains unplayable
-and the full iOS regression remains unpassed. The actual IPA probe links past
-the three Metal-cache imports, then exits with status 1 before application entry
-at CoreMedia's `_CMAudioFormatDescriptionGetStreamBasicDescription`.
+This implements the CoreVideo/device boundary. Its IPA probe linked past the
+three Metal-cache imports, then stopped before application entry at CoreMedia's
+`_CMAudioFormatDescriptionGetStreamBasicDescription`.
+
+CoreMedia format descriptions now own independent format metadata. Generic,
+audio and video constructors produce retainable CF objects with stable type IDs,
+media type/subtype queries, borrowed extension queries, audio ASBD pointers and
+video dimension queries. ASBD input bytes are copied, including reserved fields;
+the pointer stays valid while its description is retained. Equality ignores the
+reserved ASBD field, matching native behavior. Generic audio descriptions expose
+a zeroed ASBD. Video descriptions
+preserve signed dimensions, including zero and negative values; creation alone
+does not validate a codec's decodability or usable image dimensions.
+
+Extension dictionaries are deep, immutable property-list snapshots. Nested
+dictionaries, arrays, strings, data and dates are copied; immutable numbers and
+booleans are retained. Input mutation or release cannot change the snapshot.
+Callers can retain the returned dictionary independently of its description.
+Snapshots are bounded to 64 levels and 65,536 values; invalid types, raw CF
+callbacks and excessive nesting fail with partial copies released. Audio
+construction requires a nonzero sample rate and nil channel-layout/magic-cookie
+arguments in this profile. Other layouts and cookies return a value-unavailable
+error. A zero generic media type preserves the output; audio construction
+clears it before validation. Format metadata does not create codecs.
+
+Seven sealed CoreMedia CFString cells provide full-range video, sample-description
+atoms and the required HLG, Linear, PQ, ST 428-1 and sRGB transfer-function values.
+The sRGB value is the native `IEC_sRGB` string. These globals are scoped to
+CoreMedia and retired after autorelease teardown.
+
+Eight final host sanitizer runs and four ARM64 guest suites cover format
+descriptions, CoreVideo texture imports, borrowed pixel buffers and autorelease
+pools. Native comparisons verify copied ASBDs, signed dimensions, nested extension
+mutation, CF equality and ownership, concurrent readers and exact metadata
+strings. V checks additionally cover unsupported inputs, failed snapshot cleanup,
+concurrent global initialization and two fully drained runtimes. Actual IPA call
+sites obtain the audio description through `CMSampleBufferGetFormatDescription`
+before reading the ASBD and block-buffer data. Eleven final generated C streams
+and executables, native measurements and joined guest evidence are retained under
+`build/ios/fortnite/media-format-checks`.
+
+These changes resolve thirteen more required imports. The actual IPA probe now
+exits with status 1 before application entry at
+`_CMBlockBufferCreateWithMemoryBlock`. Block/sample buffers, codec processing and
+the system Metal device/renderer remain unavailable. Fortnite remains unplayable
+and the full iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,607 | 553 | 79 |
+| Fortnite executable | 1,620 | 540 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,442 | 556 | 120 |
+| All images | 2,455 | 543 | 120 |
 
-The C++/GLES/Text variant reports 2,455 resolved imports, 543 unresolved strong
+The C++/GLES/Text variant reports 2,468 resolved imports, 530 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

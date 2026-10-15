@@ -95,6 +95,7 @@ mut:
 	swift_data_owner u64 // NSData bridge owns one Swift snapshot storage reference.
 	cv_pixel &CVPixelState = unsafe { nil }
 	cv_metal &CVMetalState = unsafe { nil }
+	cm_format &CMFormatState = unsafe { nil }
 	provider_info voidptr
 	provider_release u64
 	real_number f64
@@ -288,6 +289,7 @@ mut:
 	url_error_arena u64 // Sealed NSString global cells; objects stay immortal until pools drain.
 	url_session_constants_arena u64 // Mixed-width Foundation data and immortal resume-data keys.
 	corevideo_constants_arena u64 // Sealed CoreVideo CFString cells and records.
+	coremedia_constants_arena u64 // Sealed format-description CFString cells and records.
 	avfoundation_constants_arena u64 // Sealed AVFoundation NSString cells and records.
 	foundation_keys_arena u64 // Sealed ubiquity, underlying-error and web-activity NSString cells.
 	file_manager u64 // One owned NSFileManager cache reference, retired at shutdown.
@@ -352,7 +354,7 @@ fn objc_start() {
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
-		'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
+		'VinixCMFormatDescription', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
@@ -691,6 +693,7 @@ fn objc_stop() {
 	ns_foundation_keys_stop()
 	avfoundation_constants_stop()
 	corevideo_constants_stop()
+	coremedia_constants_stop()
 	if ios_runtime.live != 0 {
 		eprintln('iOS: ${ios_runtime.live} Objective-C objects still owned at shutdown')
 	}

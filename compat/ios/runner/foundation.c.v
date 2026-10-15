@@ -27,6 +27,7 @@ fn object_equal(left u64, right u64) bool {
 fn cf_equal_depth(left u64, right u64, depth int) bool {
 	if left == right { return true }
 	if left == 0 || right == 0 { return false }
+	if objc_is_kind(left, ios_runtime.names['VinixCMFormatDescription']) { return cm_format_equal(left, right) }
 	if objc_is_kind(left, ios_runtime.names['NSUUID']) { return ns_uuid_equal(left, right) }
 	if ns_date_is_date(left) { return ns_date_equal(left, right) }
 	if objc_is_kind(left, ios_runtime.names['NSTimeZone']) { return ns_timezone_equal(left, right) }

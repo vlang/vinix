@@ -291,6 +291,7 @@ fn cf_callback_release(allocator u64, value u64) { _ = allocator; objc_release(v
 
 fn cf_hash(object u64) u64 {
 	if object == 0 { return 0 }
+	if read64(object) == cm_format_id() { return u64(cm_format_media(object)) ^ (u64(cm_format_subtype(object)) << 32) }
 	if objc_is_kind(object, ios_runtime.names['NSUUID']) { return ns_uuid_hash(object) }
 	if ns_date_is_date(object) { return ns_date_hash(object) }
 	if objc_is_kind(object, ios_runtime.names['NSTimeZone']) { return ns_timezone_hash(object) }
