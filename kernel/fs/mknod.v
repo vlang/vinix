@@ -12,6 +12,7 @@ import kbudget
 import errno
 import katomic
 import klock
+import lib
 import pipe
 import proc
 import resource
@@ -305,11 +306,12 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 		return errno.err, errno.eperm
 	}
 
-	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	parent := parent_and_mount_for(dirfd, path, identity) or { return errno.err, errno.get() }
 	vfs_lock.acquire()
 	defer { vfs_lock.release() }
 	// A view into `path`: the node made below is given a copy of its own.
-	parent_of_tgt_node, target_node, basename := walk_path(parent, path, 0, true)
+	parent_of_tgt_node, target_node, basename := walk_path_on_mount(parent, path, 0, true, identity)
 	if unsafe { parent_of_tgt_node == 0 } {
 		return errno.err, errno.get()
 	}
@@ -326,7 +328,7 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 	if unsafe { target_node != 0 } {
 		return errno.err, errno.eexist
 	}
-	if read_only(parent_of_tgt_node) {
+	if read_only_on_mount(parent_of_tgt_node, identity) {
 		return errno.err, errno.erofs
 	}
 	if !attr_allows_dir_add(parent_of_tgt_node) {
@@ -351,7 +353,9 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 	}
 	match kind {
 		0, stat.ifreg {
-			internal_create_with_acl_locked(dir, basename, stat.ifreg | (mode & 0o7777), 0, true) or {
+			// Keep the same attachment for the regular-file creation walk too.
+			internal_create_resolved_locked(dir, basename, stat.ifreg | (mode & 0o7777),
+				0, true, identity, 0, false, true, 0) or {
 				return errno.err, errno.get()
 			}
 		}

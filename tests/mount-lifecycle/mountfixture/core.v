@@ -15,6 +15,7 @@ module mountfixture
 
 struct C.stat {
 	st_dev u64
+	st_rdev u64
 	st_ino u64
 	st_nlink u64
 	st_size i64
@@ -29,6 +30,7 @@ struct C.stat {
 fn C.mount(&char, &char, &char, usize, voidptr) int
 fn C.umount2(&char, int) int
 fn C.mkdir(&char, u32) int
+fn C.umask(u32) u32
 fn C.symlink(&char, &char) int
 fn C.open(&char, int, ...) int
 fn C.openat(int, &char, int, ...) int
@@ -386,6 +388,8 @@ pub fn run() int {
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		rename_case := if count == 4 && name[0] == `r` && name[1] == `p` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
+		node_case := if count == 4 && name[0] == `n` && name[1] == `d` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		writer_case := if count == 4 && name[0] == `w` && name[1] == `r` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		check(C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'move') == 0
@@ -407,7 +411,8 @@ pub fn run() int {
 			|| C.strcmp(selected, c'unlinks') == 0 || unlink_case >= 0
 			|| C.strcmp(selected, c'links') == 0 || link_case >= 0
 			|| C.strcmp(selected, c'renames') == 0 || rename_case >= 0
-			|| C.strcmp(selected, c'writers') == 0 || writer_case >= 0, 4)
+			|| C.strcmp(selected, c'writers') == 0 || writer_case >= 0
+			|| C.strcmp(selected, c'nodes') == 0 || node_case >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
@@ -464,6 +469,9 @@ pub fn run() int {
 		if C.strcmp(selected, c'writers') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { mount_writer_cases(-1) }
 		if writer_case >= 0 { mount_writer_cases(writer_case) }
+		if C.strcmp(selected, c'nodes') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { mount_node_cases(-1) }
+		if node_case >= 0 { mount_node_cases(node_case) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }

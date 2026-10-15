@@ -436,7 +436,7 @@ attachment while backend read-only state and existing authorization still
 apply. Retained fds, copied namespaces, chroot/cwd aliases and private thread
 views pass on both architectures and the same-ELF Linux reference. Internal
 inode-only creators keep their conservative fallback. The subsequent checks
-extend coverage to metadata, hard links, rename and descriptor truncation;
+extend coverage to metadata, hard links, rename, descriptor truncation and `mknodat`;
 broader policy combinations still need qualification.
 The [writer lifetime checks](../tests/mount-lifecycle/writer-policy.md) qualify
 regular-file descriptions holding a writer count on their actual mount object.
@@ -451,6 +451,16 @@ denied. Independent lifetime/generated-C review covers lock ordering and
 balanced pins. General mutation/remount serialization, divergent inherited-fd
 policy lookup, filesystem-wide remount semantics and persistent/overlay
 integration remain open.
+The [`mknodat` checks](../tests/mount-lifecycle/mknod-policy.md) carry the selected
+directory attachment through special-file lookup and read-only admission, and
+through the regular-file branch's second creation walk. Both architectures and
+the same-ELF Linux reference cover writable/read-only binds, namespace copies,
+chroot/cwd, symlinked parents and detached/retired directory descriptors. Regular
+files, FIFOs and zero-device-number character/block nodes retain mode/umask,
+ownership and identity semantics; ordinary users remain subject to directory
+permissions and device-creation capability checks. Backend construction and
+publication are unchanged. Persistent/overlay device integration, general
+mutation/remount serialization and complete OCI semantics remain open.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,
