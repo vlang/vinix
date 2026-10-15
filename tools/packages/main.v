@@ -25,6 +25,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  apply REVIEW_FINGERPRINT OPERATION [ID...]\n' +
 	'  policy | policy-review POLICY.json | policy-apply REVIEW_FINGERPRINT POLICY.json\n' +
 	'  deployment-lock [ID...] | deployment-snapshot [INSTALLED_ID...]\n' +
+	'  deployment-snapshot-save NEW_FILE [INSTALLED_ID...]\n' +
 	'  deployment-audit FILE (read-only metadata drift; exit 0 match, 3 drift)\n' +
 	'  deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE\n' +
 	'  run ID [ABSOLUTE_FILE...] | data-list | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
@@ -169,6 +170,13 @@ fn checked(arguments []string) !int {
 	service := pkgcore.Service{ root: root, offline: offline,
 		progress: if progress && command == 'health' { print_health_progress } else if progress { print_progress } else { ignore_progress } }
 	match command {
+		'deployment-snapshot-save' {
+			if names.len == 0 { return error('deployment-snapshot-save requires a new destination file and optional installed IDs') }
+			mut saved := service.save_deployment_snapshot(names[0], names[1..])!
+			defer { saved.close() }
+			if as_json { println(json2.encode(saved)) }
+			else { println('Installed deployment snapshot saved: ${saved.destination}\nGeneration: ${saved.generation}; application roots: ${saved.roots}; packages: ${saved.packages}\nSHA-256: ${saved.sha256}') }
+		}
 		'deployment-audit' {
 			if names.len != 1 { return error('deployment-audit requires one exact deployment lock') }
 			mut report := service.audit_deployment(names[0])!

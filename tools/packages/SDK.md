@@ -1805,6 +1805,51 @@ Use `Service.snapshot_deployment(names)` from V. Both this method and
 fields; `.close()` retires the returned document. See
 [installed snapshot qualification](../../tests/packages/deployment-snapshot-check.md).
 
+`deployment-snapshot-save NEW_FILE [INSTALLED_ID...]` saves that same sorted
+format-2 snapshot plus one terminating LF. The reader lock covers generation
+capture and publication. Catalogs, replay history, cache objects, payload health
+and current repository/policy admission are not consulted. Invalid/missing roots
+or malformed state refuse before a temporary file is created. A fresh store
+produces an empty file/document without initializing package state. The
+destination is a literal absolute or relative path in the caller's filesystem;
+`--root` selects only the installed package store, not the export location.
+Parents must already exist. Paths are nonempty printable UTF-8 up to 4096 bytes.
+
+Publication captures an ordinary parent descriptor without following a final
+parent symlink, creates an exclusive random 0600 sibling temporary, handles short
+and interrupted writes, sets 0644, flushes the file and atomically renames it with
+exclusive creation. Existing ordinary/special files, dangling aliases and
+directories fail before writing; destinations created during capture/write also
+refuse at publication. Directory flushing and final parent/file identity,
+size/link-count/mode admission complete before success. Filesystems lacking
+exclusive atomic rename report failure. Normal prepublication errors clean only
+the owned temporary and leave the final name absent or the racing name intact.
+Postpublication failures retain the saved name and explicitly say it was saved;
+inspect that file and storage before retrying. Abrupt termination may leave a
+hidden `.package-*.tmp` sibling. After the process has stopped, its owner may
+inspect/remove that specific leftover; retry never imports or sweeps it. Keep
+destination ancestors controlled; simultaneous same-user in-place content edits
+are not frozen by this API.
+
+With `--json`, success returns a format-1 receipt requiring `format`, `generation`,
+`architecture`, `destination`, `sha256`, `roots`, `packages`. The digest identifies
+the exact saved bytes including LF; it is not a signature. Counts are unsigned,
+at most 4096, roots cannot exceed packages, and zero roots/packages agree. A
+generation-zero receipt is empty. CLI errors return 1 without a success receipt;
+`--progress` is unsupported. V clients use
+`Service.save_deployment_snapshot(path, names)` and
+`pkgprotocol.decode_deployment_saved(text)`; returned receipts own their strings
+and `.close()` retires them. The bounded 32 KiB reader requires complete typed
+fields, canonical unsigned numbers and coherent counts; duplicate/unknown keys,
+bad UTF-8/paths/digests and trailing data refuse with partial cleanup.
+
+`atomic_write_new(path, text)` exposes the same bounded new-file writer to V
+clients. Existing `atomic_write` replacement semantics remain unchanged. Saving
+metadata does not enroll publishers, export payloads, accept licenses or bypass
+authenticated deployment/mirror admission. It is outside the administrator
+mutation transport and can run under an ordinary identity into an owned
+destination. See [snapshot-save qualification](../../tests/packages/deployment-save-check.md).
+
 `[--json] deployment-audit FILE` compares an exact format-2 document with one
 reader-locked installed generation. It does not resolve against a catalog, read
 objects/replay history, verify installed payloads or apply policy/trust admission.

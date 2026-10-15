@@ -1,0 +1,27 @@
+26 successful host compile/run checks:
+PASS pkgcore-deployment_save-core-compile
+PASS pkgcore-deployment_save-core-run
+PASS pkgcore-atomic_new-core-compile
+PASS pkgcore-atomic_new-core-run
+PASS pkgprotocol-deployment_saved-core-compile
+PASS pkgprotocol-deployment_saved-core-run
+PASS pkgcore-atomic-regressions-compile
+PASS pkgcore-atomic-regressions-run
+PASS pkgcore-deployment_snapshot-regressions-compile
+PASS pkgcore-deployment_snapshot-regressions-run
+PASS pkgcore-deployment_audit-regressions-compile
+PASS pkgcore-deployment_audit-regressions-run
+PASS pkgcore-deployment_save-asan-compile
+PASS pkgcore-deployment_save-asan-run
+PASS pkgcore-atomic_new-asan-compile
+PASS pkgcore-atomic_new-asan-run
+PASS pkgprotocol-deployment_saved-asan-compile
+PASS pkgprotocol-deployment_saved-asan-run
+PASS pkgprotocol-deployment_saved-heap-compile
+PASS pkgprotocol-deployment_saved-heap-run
+PASS cli-public-compile
+PASS probe-public-compile
+PASS probe-public-run
+PASS cli-public-asan-compile
+PASS probe-public-asan-compile
+PASS probe-public-asan-run

@@ -16,6 +16,7 @@ fn C.setgroups(usize, voidptr) int
 fn C.setgid(u32) int
 fn C.setuid(u32) int
 fn C._exit(int)
+fn C.chown(&char, int, int) int
 
 fn ordinary_snapshot(binary string, root string, expected string) ! {
 	if os.geteuid() != 0 { return }
@@ -59,6 +60,24 @@ fn ordinary_audit(binary string, root string, path string, expected string) ! {
 	mut status := 0
 	assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
 	println('DEPLOYMENT AUDIT ordinary UID 1000 reads exact root-owned comparison without administrator authorization PASS')
+}
+
+fn ordinary_save(binary string, root string, directory string, expected string) ! {
+	if os.geteuid() != 0 { return }
+	os.mkdir(directory, mode: 0o700)!; assert C.chown(directory.str, 1000, 1000) == 0
+	child := C.fork(); if child < 0 { return error('cannot fork ordinary snapshot saver') }
+	if child == 0 {
+		assert C.setgroups(0, unsafe { nil }) == 0 && C.setgid(1000) == 0 && C.setuid(1000) == 0
+		os.chdir(directory)!
+		mut saved := pkgprotocol.decode_deployment_saved(command(binary, root, ['--json', 'deployment-snapshot-save', 'saved.json'])!)!; defer { saved.close() }
+		assert saved.destination == 'saved.json' && saved.generation == 1 && saved.roots == 1 && saved.packages == 3
+		assert os.read_file('saved.json')! == expected
+		assert command_status(binary, root, ['deployment-snapshot-save', 'saved.json'], 1)!.contains('already exists')
+		assert os.read_file('saved.json')! == expected && os.ls('.')! == ['saved.json']
+		C._exit(0)
+	}
+	mut status := 0; assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
+	println('DEPLOYMENT SAVE ordinary UID 1000 saves exact root-owned installed metadata into an owned relative destination without administrator authorization PASS')
 }
 
 fn version(work string, architecture string, value string) ! {
@@ -109,7 +128,13 @@ fn check() ! {
 	assert command(binary, root, ['deployment-snapshot'])! == first
 	assert command(binary, root, ['--offline', 'deployment-snapshot'])! == first
 	ordinary_snapshot(binary, root, first)!
-	path := work + '/snapshot é; $literal.json'; os.write_file(path, first)!
+	path := work + '/snapshot é; $literal.json'
+	mut saved := pkgprotocol.decode_deployment_saved(command(binary, root, ['--json', 'deployment-snapshot-save', path])!)!; defer { saved.close() }
+	assert saved.generation == 1 && saved.roots == 1 && saved.packages == 3 && saved.destination == path
+	assert os.read_file(path)! == first
+	ordinary_save(binary, root, work + '/ordinary-export', first)!
+	assert command_status(binary, root, ['deployment-snapshot-save', path], 1)!.contains('already exists')
+	assert os.read_file(path)! == first
 	audit := audit_command(binary, root, path, true)!
 	ordinary_audit(binary, root, path, audit)!
 	newer_path := work + '/newer-lock.json'; os.write_file(newer_path, json2.encode(catalog))!
@@ -129,6 +154,8 @@ fn check() ! {
 		policy: pkgcore.Policy{ offline: true, allowed: ['unrelated'], permissions: [], reserve_bytes: 0 } }))!
 	assert command(binary, root, ['deployment-snapshot'])! == first
 	assert audit_command(binary, root, path, true)! == audit
+	command(binary, root, ['--offline', 'deployment-snapshot-save', work + '/revoked.json'])!
+	assert os.read_file(work + '/revoked.json')! == first
 	for file in ['catalog.json', 'trust-history.json'] { assert os.read_file(directory + '/' + file)! == 'unavailable metadata' }
 	os.write_file(root + '/etc/vinix-packages/config.json', config_text)!
 	os.write_file(directory + '/catalog.json', catalog_text)!; os.write_file(directory + '/trust-history.json', history_text)!
@@ -164,12 +191,19 @@ fn check() ! {
 	assert !pkgadmin.administrative(['deployment-snapshot'])
 	refused = false; pkgadmin.validate_arguments(['deployment-audit', path]) or { refused = true }; assert refused
 	assert !pkgadmin.administrative(['deployment-audit', path])
+	refused = false; pkgadmin.validate_arguments(['deployment-snapshot-save', path]) or { refused = true }; assert refused
+	assert !pkgadmin.administrative(['deployment-snapshot-save', path])
+	assert command_status(binary, root, ['deployment-snapshot-save'], 1)!.contains('requires a new destination')
+	assert command_status(binary, root, ['--progress', 'deployment-snapshot-save', path], 1)!.contains('--progress supports')
+	assert command_status(binary, root, ['deployment-snapshot-save', work + '/missing-root.json', 'missing'], 1)!.contains('is not installed')
+	assert !os.exists(work + '/missing-root.json')
 	assert command(binary, root, ['deployment-audit', path])!.contains('Metadata comparison only;')
 	assert command_status(binary, root, ['deployment-audit'], 1)!.contains('requires one exact deployment lock')
 	assert command_status(binary, root, ['--progress', 'deployment-audit', path], 1)!.contains('--progress supports')
 	bad_path := work + '/roots-only.json'
 	os.write_file(bad_path, '{"format":1,"architecture":"' + architecture + '","packages":["app"]}')!
 	assert command_status(binary, root, ['--json', 'deployment-audit', bad_path], 1)!.contains('requires an exact format-2 lock')
+	println('DEPLOYMENT SAVE CLI new-file durable export, exact receipt and withdrawn/offline/revoked metadata, existing-file preservation and authenticated reproduction PASS')
 	println('DEPLOYMENT AUDIT CLI exact offline metadata and sequence-floor matches, missing/changed drift exit 3, no fresh-state initialization and authenticated reproduction PASS')
 	println('DEPLOYMENT SNAPSHOT CLI preserves withdrawn installed app/runtime/all-data pins offline with revoked policy, refuses missing roots and unauthenticated apply, and reproduces exact versions from newly authenticated media PASS')
 }

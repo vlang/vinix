@@ -696,6 +696,20 @@ then use the existing reviewed deployment flow. Current signatures, replay
 history, policy, permissions, licenses and firmware admission still apply. See
 [qualification](../tests/packages/deployment-snapshot-check.md).
 
+Use `vinix-package deployment-snapshot-save /path/to/new-lock.json` to save that
+installed set directly. Optional installed IDs select a subset and its complete
+runtime/data closure. The file is published atomically with mode 0644 and never
+replaces an existing name, including a dangling symlink or a destination created
+by another writer. The parent must already exist and permit the caller to write;
+ordinary users can save root-owned installed metadata into their own directories.
+`--json` returns the captured generation, destination, digest and package counts.
+
+Write/space failures before publication clean the owned temporary. An error after
+publication explicitly reports that the file was saved; inspect the file and
+storage before retrying, since retry will preserve an existing destination.
+Saving remains an export of historical metadata, with no payload backup, trust
+enrollment or installation approval. See [qualification](../tests/packages/deployment-save-check.md).
+
 For read-only organization drift checks, run
 `vinix-package --json deployment-audit /path/to/approved-lock.json`. It compares
 exact installed manifests and provenance with a format-2 lock, including the

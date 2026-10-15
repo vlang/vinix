@@ -6,6 +6,7 @@ import crypto.rand
 fn C.renameat(int, &char, int, &char) int
 
 struct AtomicWriteOptions {
+	exclusive bool
 	checkpoint fn (string, string) ! = mirror_no_checkpoint
 	write fn (int, voidptr, usize) isize = atomic_write_bytes
 	flush fn (int) int = atomic_flush
@@ -55,6 +56,26 @@ pub fn atomic_write(path string, text string) ! {
 	atomic_write_with(path, text, AtomicWriteOptions{})!
 }
 
+// Save only to a new name, including when another writer creates it after
+// preflight. Publication and flushing use the same captured parent descriptor.
+pub fn atomic_write_new(path string, text string) ! {
+	atomic_write_with(path, text, AtomicWriteOptions{ exclusive: true })!
+}
+
+fn atomic_publish_new(parent int, source string, destination string) int {
+	$if macos {
+		return C.renameatx_np(parent, source.str, parent, destination.str, C.RENAME_EXCL)
+	} $else $if linux {
+		return int(C.syscall(i64(C.SYS_renameat2), parent, source.str, parent, destination.str, u32(1)))
+	} $else { return -1 }
+}
+
+fn atomic_new_file_matches(parent int, name string, fd int, size int) bool {
+	mut info := C.stat{}
+	return atomic_name_matches(parent, name, fd) && C.fstat(fd, &info) == 0 && info.st_nlink == 1
+		&& info.st_mode & 0o7777 == 0o644 && info.st_size == size
+}
+
 // Capture the parent once. Creation, publication, cleanup and directory flush
 // use that descriptor; neither a stale .new alias nor a reopened path is used.
 fn atomic_write_with(path string, text string, options AtomicWriteOptions) ! {
@@ -76,6 +97,11 @@ fn atomic_write_with(path string, text string, options AtomicWriteOptions) ! {
 	}
 	device := u64(info.st_dev)
 	inode := u64(info.st_ino)
+	if options.exclusive {
+		mut existing := C.stat{}
+		if C.fstatat(directory, name.str, &existing, C.AT_SYMLINK_NOFOLLOW) == 0 { return error('package metadata destination already exists; choose a new file name') }
+		if C.errno != C.ENOENT { return error('cannot inspect new package metadata destination') }
+	}
 	fd, leaf := create_atomic_file(directory)!
 	temporary := if parent == '/' { parent + leaf } else { parent + '/' + leaf }
 	mut published := false
@@ -99,10 +125,13 @@ fn atomic_write_with(path string, text string, options AtomicWriteOptions) ! {
 	if C.fchmod(fd, 0o644) != 0 || options.flush(fd) != 0 { return error('cannot flush package metadata before publication; check storage and retry') }
 	options.checkpoint('flushed', temporary)!
 	check_atomic_temporary(directory, leaf, fd, text.len)!
+	if options.exclusive && !atomic_new_file_matches(directory, leaf, fd, text.len) { return error('new package metadata temporary file changed before publication') }
 	if !atomic_parent_matches(parent, device, inode) { return error('package metadata parent path changed before publication; restore it and retry') }
 	// renameat replaces a leaf directory symlink itself. os.rename may instead
 	// move the temporary inside the referenced directory.
-	if C.renameat(directory, leaf.str, directory, name.str) != 0 { return error('cannot atomically replace package metadata; check its destination and storage') }
+	if options.exclusive {
+		if atomic_publish_new(directory, leaf, name) != 0 { return error('cannot exclusively publish package metadata; destination must be new and storage must support exclusive atomic rename') }
+	} else if C.renameat(directory, leaf.str, directory, name.str) != 0 { return error('cannot atomically replace package metadata; check its destination and storage') }
 	published = true
 	options.checkpoint('published', temporary) or {
 		cause := err.msg()
@@ -112,4 +141,5 @@ fn atomic_write_with(path string, text string, options AtomicWriteOptions) ! {
 	}
 	if options.flush(directory) != 0 { return error('package metadata saved, but directory flush failed; inspect state and check storage before retrying') }
 	if !atomic_parent_matches(parent, device, inode) { return error('package metadata saved in its captured directory, but parent path changed; inspect state before retrying') }
+	if options.exclusive && !atomic_new_file_matches(directory, name, fd, text.len) { return error('package metadata saved, but its final file changed; inspect the saved file before retrying') }
 }

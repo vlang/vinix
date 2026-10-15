@@ -1,0 +1,21 @@
+DEPLOYMENT SAVE exact sorted installed app/runtime/all-data metadata, subset closure, generation/digest receipt, offline revoked policy and no source mutation on both architectures PASS
+DEPLOYMENT SAVE malformed roots/paths/state and busy writers refuse before output; existing files preserved, temporary cleanup and fresh empty observation PASS
+
+NEW METADATA existing file/alias/dangling/FIFO/directory/hardlink destinations refuse without replacement or blocking PASS
+NEW METADATA checkpoint/write/space/flush failures, destination races, mode/parent/final substitutions, cleanup and saved-file retry refusal PASS
+NEW METADATA concurrent publishers admit exactly one complete file with canonical final mode and no temporary leftovers PASS
+
+DEPLOYMENT SAVED PROTOCOL complete typed fields, duplicate/unknown keys, numeric/path/count/digest bounds and independent closeable strings PASS
+
+
+DEPLOYMENT SNAPSHOT exact sorted roots, shared runtime/all-data closure, metadata/provenance/sequence pins, offline revoked policy independence and no mutation on both architectures PASS
+DEPLOYMENT SNAPSHOT independently owned closeable documents and invalid/duplicate/missing/excess roots refusal PASS
+DEPLOYMENT SNAPSHOT fresh empty read without initialization, writer exclusion and malformed state refusal PASS
+
+DEPLOYMENT AUDIT exact installed metadata, sorted runtime/all-data closure, captured digest, minimum sequence floors and offline revoked policy on both architectures PASS
+DEPLOYMENT AUDIT missing/unexpected packages, versions, architecture, digests, publisher/repository, floor and requested-root differences PASS
+DEPLOYMENT AUDIT writer exclusion, malformed/roots-only/mismatched/aliased inputs and corrupt state refusal; empty read without initialization PASS
+
+DEPLOYMENT SAVED PROTOCOL complete typed fields, duplicate/unknown keys, numeric/path/count/digest bounds and independent closeable strings PASS
+DEPLOYMENT SAVED PROTOCOL 1000 valid/partial-invalid decode/close cycles retain zero tracked bytes PASS
+

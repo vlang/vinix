@@ -126,6 +126,15 @@ of selecting replacements. Applying the document still requires authenticated
 repository metadata and current policy approval; it contains no payloads or
 trust enrollment. See [qualification](../../tests/packages/deployment-snapshot-check.md).
 
+`deployment-snapshot-save NEW_FILE [INSTALLED_ID...]` captures the same exact
+installed metadata and saves it atomically to a new file. Existing files,
+symlinks, directories and racing destinations are preserved. `--json` returns a
+closeable receipt with the captured generation, architecture, literal destination,
+SHA-256 and root/package counts after publication and directory flush succeed.
+The file contains no payloads, private data or trust enrollment. A failure after
+publication explicitly reports that the file was saved and needs inspection;
+retry never overwrites it. See [qualification](../../tests/packages/deployment-save-check.md).
+
 `[--json] deployment-audit LOCK.json` compares that exact format-2 lock with
 installed metadata, without catalog, payload or trust-history access. It reports
 missing, unexpected and changed packages, including requested roots, publisher

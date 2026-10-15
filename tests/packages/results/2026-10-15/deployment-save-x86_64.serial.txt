@@ -1,0 +1,43 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=25
+!>+ [11] ./sbin/init sz=210912
+!>+ [12] ./usr/bin/ sz=0
+!>+ [13] ./usr/share/ sz=0
+!>+ [14] ./usr/share/package-fixtures/ sz=0
+!>+ [15] ./usr/share/package-fixtures/save-probe sz=1388240
+!>+ [16] ./usr/share/package-fixtures/save-protocol sz=558904
+!>+ [17] ./usr/share/package-fixtures/atomic-new sz=890024
+!>+ [18] ./usr/share/package-fixtures/save-core sz=1085080
+!>+ [19] ./usr/bin/vinix-package sz=2287872
+!>+ [20] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e8ac00
+initramfs: Done (20 entries)
+HWTEST START packages-deployment-save
+DEPLOYMENT SAVE exact sorted installed app/runtime/all-data metadata, subset closure, generation/digest receipt, offline revoked policy and no source mutation on both architectures PASS
+DEPLOYMENT SAVE malformed roots/paths/state and busy writers refuse before output; existing files preserved, temporary cleanup and fresh empty observation PASS
+SAVE PROCESS save-core PASS
+NEW METADATA existing file/alias/dangling/FIFO/directory/hardlink destinations refuse without replacement or blocking PASS
+NEW METADATA checkpoint/write/space/flush failures, destination races, mode/parent/final substitutions, cleanup and saved-file retry refusal PASS
+NEW METADATA concurrent publishers admit exactly one complete file with canonical final mode and no temporary leftovers PASS
+SAVE PROCESS atomic-new PASS
+DEPLOYMENT SAVED PROTOCOL complete typed fields, duplicate/unknown keys, numeric/path/count/digest bounds and independent closeable strings PASS
+SAVE PROCESS save-protocol PASS
+DEPLOYMENT SNAPSHOT ordinary UID 1000 reads exact root-owned metadata without administrator authorization PASS
+DEPLOYMENT SAVE ordinary UID 1000 saves exact root-owned installed metadata into an owned relative destination without administrator authorization PASS
+DEPLOYMENT AUDIT ordinary UID 1000 reads exact root-owned comparison without administrator authorization PASS
+DEPLOYMENT SAVE CLI new-file durable export, exact receipt and withdrawn/offline/revoked metadata, existing-file preservation and authenticated reproduction PASS
+DEPLOYMENT AUDIT CLI exact offline metadata and sequence-floor matches, missing/changed drift exit 3, no fresh-state initialization and authenticated reproduction PASS
+DEPLOYMENT SNAPSHOT CLI preserves withdrawn installed app/runtime/all-data pins offline with revoked policy, refuses missing roots and unauthenticated apply, and reproduces exact versions from newly authenticated media PASS
+SAVE PROCESS save-probe PASS
+HWTEST PASS packages-deployment-save
