@@ -113,7 +113,7 @@ app_selection.install.done
 選択したアプリをインストールしました。デスクトップやスタートメニューから開けます。
 -----
 app_selection.install.failed
-未インストール:{0}。pkg install{0}で再試行できます。
+未インストール:{0}。vinix-desktop --install-setup-app{0}で再試行できます。
 -----
 app_selection.install.started
 セットアップで選択したアプリをインストール中: {0}
@@ -4831,7 +4831,7 @@ app_selection.install_many
 選択したアプリをインストール
 -----
 app_selection.ios.detail
-ARM64で互換性のあるiOSアプリを直接実行
+iOSのアプリとゲームを実行
 -----
 app_selection.keepassxc.detail
 ローカル保存のパスワードマネージャー

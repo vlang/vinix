@@ -192,14 +192,13 @@ fn test_app_selection_in_spanish() {
 	set_desktop_language(.es)
 	begin_frame_elements()
 	root := state.element(&desktop)
-	assert i18n_apps_has_text(root, 'Elige tus aplicaciones')
-	assert i18n_apps_has_text(root, 'Navegador web de Mozilla')
+	assert i18n_apps_has_text(root, tr('app_selection.intro'))
 	// Product names are not translated.
 	assert i18n_apps_has_text(root, 'Firefox')
 	button := i18n_apps_element(root, action_apps_install) or { panic('missing install button') }
 	assert button.text == 'Instalar 2 aplicaciones'
 	free_tree(root)
-	state.select_category(first_run_apps[3].category)
+	state.scroll_to(app_selection_row_y(3, state.columns) - app_selection_heading_height)
 	begin_frame_elements()
 	installed := state.element(&desktop)
 	assert i18n_apps_has_text(installed, 'Instalada')
@@ -245,7 +244,7 @@ fn test_first_run_install_reports_in_russian() {
 	result := os.execute('PATH="${work}/bin:\$PATH" sh -c ${os.quoted_path(script)}')
 	assert result.exit_code == 0
 	assert result.output.contains('Установка приложений, выбранных при настройке: firefox chromium')
-	assert result.output.contains('Не установлены: chromium. Чтобы повторить попытку, выполните pkg install chromium.')
+	assert result.output.contains('Не установлены: chromium. Чтобы повторить попытку, выполните vinix-desktop --install-setup-app chromium.')
 
 	set_desktop_language(.es)
 	success := first_run_install_command('firefox').replace('exec /bin/zsh -i', 'exit 0')

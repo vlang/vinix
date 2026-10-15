@@ -113,7 +113,7 @@ app_selection.install.done
 所选应用已安装。可从桌面或开始菜单打开。
 -----
 app_selection.install.failed
-未安装：{0}。运行 pkg install{0} 重试。
+未安装：{0}。运行 vinix-desktop --install-setup-app{0} 重试。
 -----
 app_selection.install.started
 正在安装初始设置时选择的应用：{0}
@@ -4831,7 +4831,7 @@ app_selection.install_many
 安装所选应用
 -----
 app_selection.ios.detail
-原生 ARM64；兼容的 iOS 应用，无需模拟
+运行 iOS 应用和游戏
 -----
 app_selection.keepassxc.detail
 本地密码管理器

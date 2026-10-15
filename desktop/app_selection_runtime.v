@@ -4,16 +4,32 @@ module main
 import os
 import encoding.binary
 
-// Image publishers can include the static, native runner here instead of
-// preinstalling it. No Apple frameworks or emulator are downloaded by setup.
+// Image publishers can include the static native runner here. Older images
+// build it on demand from the official Vinix source using the bundled V toolchain.
 const first_run_ios_payload = '/usr/share/vinix/optional/ios-runtime/run-ios'
 
-fn first_run_ios_payload_available() bool {
-	$if arm64 {
-		return C.access(&char(first_run_ios_payload.str), C.X_OK) == 0
-	} $else {
-		return false
-	}
+fn first_run_prepare_ios_payload() ! {
+	$if !arm64 { return error('the native iOS runtime requires ARM64 hardware') }
+	first_run_tool(['pkg', 'install', 'libarchive-tools', 'gcc', 'musl-dev', 'binutils'])!
+	if !os.is_executable('/usr/bin/v') { return error('the image is missing its native V compiler') }
+	work := '/var/cache/vinix-ios-setup-${os.getpid()}'
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	archive := work + '/vinix.tar.gz'
+	first_run_download('https://codeload.github.com/vlang/vinix/tar.gz/refs/heads/master', archive)!
+	first_run_unpack(archive, work, false)!
+	source := work + '/vinix-master/compat/ios/runner'
+	output := work + '/run-ios'
+	first_run_tool(['/usr/bin/v', '-os', 'linux', '-arch', 'arm64', '-cc', 'gcc',
+		'-enable-globals', '-gc', 'none', '-prod', '-d', 'glibc', '-d', 'no_backtrace',
+		'-cflags', '-ffixed-x18', '-ldflags', '-static ${source}/abi/dispatch.S',
+		'-path', '@vlib|${work}/vinix-master/compat/ios|@vmodules', '-o', output, source])!
+	data := os.read_bytes(output)!
+	defer { unsafe { data.free() } }
+	if !first_run_ios_elf(data) { return error('the iOS build did not produce a static ARM64 runtime') }
+	os.mkdir_all(os.dir(first_run_ios_payload))!
+	os.cp(output, first_run_ios_payload)!
+	os.chmod(first_run_ios_payload, 0o755)!
 }
 
 fn first_run_ios_elf(data []u8) bool {
@@ -56,6 +72,7 @@ fn first_run_install_ios_runtime(root string) ! {
 		return error('the native iOS runtime requires ARM64 hardware')
 	}
 	source := '${root}${first_run_ios_payload}'
+	if root == '' && !os.is_file(source) { first_run_prepare_ios_payload()! }
 	data := os.read_bytes(source)!
 	defer { unsafe { data.free() } }
 	if !first_run_ios_elf(data) {

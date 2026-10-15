@@ -113,7 +113,7 @@ app_selection.install.done
 Выбранные приложения установлены. Открывайте их с рабочего стола или из меню «Пуск».
 -----
 app_selection.install.failed
-Не установлены:{0}. Чтобы повторить попытку, выполните pkg install{0}.
+Не установлены:{0}. Чтобы повторить попытку, выполните vinix-desktop --install-setup-app{0}.
 -----
 app_selection.install.started
 Установка приложений, выбранных при настройке: {0}
@@ -4832,7 +4832,7 @@ app_selection.install_many
 Установить выбранные приложения
 -----
 app_selection.ios.detail
-Нативный ARM64; совместимые iOS-приложения
+Позволяет запускать приложения и игры iOS
 -----
 app_selection.keepassxc.detail
 Менеджер паролей с локальной базой

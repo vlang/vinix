@@ -187,11 +187,12 @@ const first_run_app_catalogue = [
 		requirement:     .steam
 	},
 	FirstRunApp{
-		title:           'iOS runtime'
+		title:           'iOS'
 		icon:            'asset:ios'
 		package_name:    'ios-runtime'
 		action:          'apps.toggle.ios'
 		installed_paths: ['/usr/bin/run-ios']
+		arm64_only:      true
 		category:        .runtimes
 		requirement:     .ios
 	},
@@ -205,20 +206,4 @@ fn (app FirstRunApp) requirement_text() string {
 		.steam { tr('app_selection.requires.steam') }
 		.ios { tr('app_selection.requires.ios') }
 	}
-}
-
-// Testing packages are offered only on an image already configured for edge;
-// setup must not mix an edge dependency closure into the stable Alpine base.
-fn first_run_testing_repositories(repositories string) bool {
-	mut main_repo := false
-	mut community := false
-	mut testing := false
-	for line in repositories.split_into_lines() {
-		entry := line.all_before('#').trim_space()
-		if entry.starts_with('@') { continue }
-		main_repo = main_repo || entry.ends_with('/edge/main')
-		community = community || entry.ends_with('/edge/community')
-		testing = testing || entry.ends_with('/edge/testing')
-	}
-	return main_repo && community && testing
 }

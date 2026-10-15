@@ -132,7 +132,13 @@ What it does:
   browsers, productivity tools, development tools, communication apps, media,
   games and runtimes on one scrollable page with category headings and three
   columns (two or one on narrower screens); the chosen apps install in a
-  Terminal window through `pkg`
+  Terminal window through `pkg`. Every offered app is selectable: when the
+  configured Alpine repositories lack VSCodium, Zed, Discord, Slack, Spotify or
+  Steam, setup downloads the official Linux release on demand, with a private
+  Debian library tree and x86 translation where needed. Stable Alpine images
+  keep their existing repositories. **iOS** allows running iOS apps and games;
+  setup installs the optional native ARM64 runner, or builds it from official
+  Vinix sources with the image's V toolchain when the payload is absent
 - optional **VOffice Writer and Calc** (`pkg install voffice`), downloaded from
   the VOffice releases and running as native ui2 clients inside ordinary Vinix
   windows

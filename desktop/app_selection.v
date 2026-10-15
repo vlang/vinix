@@ -63,9 +63,8 @@ fn (l AppSelectionInstallLabel) text() string {
 // FirstRunApp is one optional application offered during setup. Any one of
 // `installed_paths` being executable means the image already carries it. The
 // title is a product name; detail_text says what it is in the desktop's
-// language. `arm64_only` apps have no package for other architectures:
-// VOffice is only published for AArch64, and pkg's Minecraft install uses
-// AArch64 natives.
+// language. VOffice is published for AArch64, pkg's Minecraft install uses
+// AArch64 natives, and the native iOS runner requires ARM64 hardware.
 struct FirstRunApp {
 	title           string
 	icon            string
@@ -175,17 +174,11 @@ fn new_app_selection_state() AppSelectionState {
 		installed: []bool{len: first_run_apps.len}
 		available: []bool{len: first_run_apps.len}
 	}
-	repositories := os.read_file('/etc/apk/repositories') or { '' }
-	testing := first_run_testing_repositories(repositories)
-	unsafe { repositories.free() }
 	for i, app in first_run_apps {
 		state.installed[i] = first_run_app_installed(app)
-		state.available[i] = match app.requirement {
-			.alpine { true }
-			.testing { testing }
-			.ios { first_run_ios_payload_available() }
-			else { false }
-		}
+		// Installation resolves an Alpine package or the official download on
+		// demand. Repository configuration must not disable a setup choice.
+		state.available[i] = true
 	}
 	state.set_focus(state.next_available(-1, 1))
 	return state
@@ -361,12 +354,17 @@ fn app_selection_row(app FirstRunApp, installed bool, available bool, selected b
 	}
 	title_color := if installed || !available { body_muted } else { body_heading }
 	title_width := width - 60 - if installed { 98 } else if available { 28 } else { 0 }
-	children << ui2.label('', app.title, ui2.rect(47, f64((height - 22) / 2), f64(title_width), 22),
+	title_y := if app.package_name == 'ios-runtime' { 0 } else { (height - 22) / 2 }
+	children << ui2.label('', app.title, ui2.rect(47, f64(title_y), f64(title_width), 22),
 		ui2.TextStyle{
 			color: title_color
 			size:  14
 			bold:  true
 		})
+	if app.package_name == 'ios-runtime' {
+		children << ui2.label('', app.detail_text(), ui2.rect(47, 20, f64(title_width), 16),
+			ui2.TextStyle{ color: body_muted, size: 10 })
+	}
 	if installed {
 		children << ui2.label('', tr('app_selection.installed'), ui2.rect(f64(width - 111), f64((height - 20) / 2), 94, 20),
 			ui2.TextStyle{
@@ -698,10 +696,7 @@ fn first_run_install_command(request string) string {
 	mut packages := []string{cap: first_run_apps.len}
 	for word in words {
 		for app in first_run_apps {
-			if word == app.package_name && app.package_name !in packages && app.requirement !in [
-				.external,
-				.steam,
-			] {
+			if word == app.package_name && app.package_name !in packages {
 				packages << app.package_name
 			}
 		}
@@ -734,6 +729,7 @@ fn first_run_install_command(request string) string {
 		'failed=; for app in ${names}; do ' +
 		'case "\$app" in ios-runtime) /usr/bin/vinix-desktop --install-ios-runtime && ' +
 		'{ if [ -x /usr/libexec/vinix-persist-packages ]; then /usr/libexec/vinix-persist-packages save; fi; } ;; ' +
+		'vscodium|zed|discord|slack|spotify|steam) /usr/bin/vinix-desktop --install-setup-app "\$app" ;; ' +
 		'vlc-qt|keepassxc) pkg install "\$app" qt5-qtbase-x11 font-dejavu ;; ' +
 		'telegram-desktop) pkg install "\$app" qt6-qtbase-x11 font-dejavu ;; ' +
 		'*) pkg install "\$app" ;; esac || failed="\$failed \$app"; done; echo; ' +

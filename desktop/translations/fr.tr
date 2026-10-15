@@ -113,7 +113,7 @@ app_selection.install.done
 Les applications choisies sont installées. Ouvrez-les depuis le bureau ou le menu Démarrer.
 -----
 app_selection.install.failed
-Non installées :{0}. Exécutez pkg install{0} pour réessayer.
+Non installées :{0}. Exécutez vinix-desktop --install-setup-app{0} pour réessayer.
 -----
 app_selection.install.started
 Installation des applications choisies à la configuration : {0}
@@ -4831,7 +4831,7 @@ app_selection.install_many
 Installer les apps choisies
 -----
 app_selection.ios.detail
-ARM64 natif ; apps iOS compatibles, sans émulation
+Permet de lancer des apps et jeux iOS
 -----
 app_selection.keepassxc.detail
 Gestionnaire de mots de passe local

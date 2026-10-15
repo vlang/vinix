@@ -113,7 +113,7 @@ app_selection.install.done
 The selected apps are installed. Open them from the desktop or the Start menu.
 -----
 app_selection.install.failed
-Not installed:{0}. Run pkg install{0} to try again.
+Not installed:{0}. Run vinix-desktop --install-setup-app{0} to try again.
 -----
 app_selection.install.started
 Installing the apps chosen during setup: {0}
@@ -4832,7 +4832,7 @@ app_selection.install_many
 Install selected apps
 -----
 app_selection.ios.detail
-Native ARM64; compatible iOS apps, no emulation
+Allows running iOS apps & games
 -----
 app_selection.keepassxc.detail
 Password manager with a local vault

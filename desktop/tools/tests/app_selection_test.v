@@ -62,7 +62,7 @@ fn app_selection_test_state() AppSelectionState {
 	mut state := new_app_selection_state()
 	for i in 0 .. state.installed.len {
 		state.installed[i] = false
-		state.available[i] = first_run_apps[i].requirement !in [.external, .steam]
+		state.available[i] = true
 	}
 	state.focus = 0
 	return state
@@ -82,16 +82,16 @@ fn app_selection_test_button_label(mut state AppSelectionState) string {
 fn test_app_selection_offers_the_optional_apps_this_machine_can_install() {
 	assert first_run_app_catalogue.map(it.title) == ['Firefox', 'Chromium', 'VOffice', 'Minecraft',
 		'Blender', 'VLC', 'VSCodium', 'Zed', 'Neovim', 'KeePassXC', 'Discord', 'Telegram', 'Slack',
-		'Spotify', 'OBS Studio', 'Steam', 'iOS runtime']
+		'Spotify', 'OBS Studio', 'Steam', 'iOS']
 	assert first_run_app_catalogue.map(it.package_name) == ['firefox', 'chromium', 'voffice',
 		'minecraft', 'blender', 'vlc-qt', 'vscodium', 'zed', 'neovim', 'keepassxc', 'discord',
 		'telegram-desktop', 'slack', 'spotify', 'obs-studio', 'steam', 'ios-runtime']
 	$if arm64 {
 		assert first_run_apps.len == first_run_app_catalogue.len
 	} $else {
-		// VOffice and Minecraft are only packaged for AArch64.
-		assert first_run_apps.len == first_run_app_catalogue.len - 2
-		assert !first_run_apps.any(it.package_name in ['voffice', 'minecraft'])
+		// VOffice, Minecraft and the native iOS runner require AArch64.
+		assert first_run_apps.len == first_run_app_catalogue.len - 3
+		assert !first_run_apps.any(it.package_name in ['voffice', 'minecraft', 'ios-runtime'])
 	}
 
 	desktop := app_selection_test_desktop()
@@ -128,7 +128,7 @@ fn test_app_selection_offers_the_optional_apps_this_machine_can_install() {
 				continue
 			}
 			row := app_selection_test_element(tree, app.action) or { panic('missing ${app.title}') }
-			assert row.clickable == (app.requirement !in [.external, .steam])
+			assert row.clickable
 			assert app_selection_test_has_image(row, app.icon)
 			assert !app_selection_test_has_image(row, 'builtin:check')
 		}
@@ -274,10 +274,11 @@ fn test_app_selection_retains_choices_while_scrolling_and_counts_many_apps() {
 	state.handle_action('apps.toggle.slack')
 	state.handle_action('apps.toggle.spotify')
 	state.handle_action('apps.toggle.steam')
-	assert state.selected_count() == 6
+	assert state.selected_count() == 10
 	state.scroll_to(0)
-	assert state.selected_count() == 6
-	assert state.packages() == ['firefox', 'chromium', 'blender', 'vlc-qt', 'neovim', 'keepassxc']
+	assert state.selected_count() == 10
+	assert state.packages() == ['firefox', 'chromium', 'blender', 'vlc-qt', 'neovim', 'keepassxc',
+		'discord', 'slack', 'spotify', 'steam']
 }
 
 fn test_app_selection_scrolling_keeps_rows_and_hit_targets_inside_the_list() {
@@ -423,20 +424,30 @@ fn test_app_selection_vertical_arrows_follow_grid_columns_and_skip_unavailable_a
 	}
 }
 
-fn test_first_run_install_command_uses_alpine_names_and_never_installs_external_clients() {
+fn test_first_run_install_command_keeps_all_choices_and_routes_vendor_downloads() {
 	command := first_run_install_command('vlc-qt telegram-desktop neovim keepassxc obs-studio ios-runtime discord slack spotify steam')
-	assert command.contains('for app in vlc-qt telegram-desktop neovim keepassxc obs-studio ios-runtime;')
+	$if arm64 {
+		assert command.contains('for app in vlc-qt telegram-desktop neovim keepassxc obs-studio ios-runtime discord slack spotify steam;')
+	} $else {
+		assert command.contains('for app in vlc-qt telegram-desktop neovim keepassxc obs-studio discord slack spotify steam;')
+	}
 	assert command.contains('qt5-qtbase-x11')
 	assert command.contains('qt6-qtbase-x11')
 	assert command.contains('/usr/bin/vinix-desktop --install-ios-runtime')
-	assert first_run_install_command('discord slack spotify steam') == ''
+	assert command.contains('--install-setup-app "\$app"')
+	assert first_run_install_command('discord slack spotify steam').contains('for app in discord slack spotify steam;')
 }
 
-fn test_first_run_testing_packages_require_an_existing_complete_edge_configuration() {
-	assert first_run_testing_repositories('https://mirror/alpine/edge/main\nhttps://mirror/alpine/edge/community\nhttps://mirror/alpine/edge/testing\n')
-	assert !first_run_testing_repositories('https://mirror/alpine/v3.21/main\nhttps://mirror/alpine/v3.21/community\n')
-	assert !first_run_testing_repositories('https://mirror/alpine/edge/main\nhttps://mirror/alpine/edge/community\n# https://mirror/alpine/edge/testing\n')
-	assert !first_run_testing_repositories('https://mirror/alpine/edge/main\nhttps://mirror/alpine/edge/community\n@testing https://mirror/alpine/edge/testing\n')
+fn test_first_run_every_app_is_selectable_without_repository_or_payload_probes() {
+	mut state := new_app_selection_state()
+	defer { state.close() }
+	assert state.available.all(it)
+	for i in 0 .. first_run_apps.len {
+		state.installed[i] = false
+		state.toggle(i)
+	}
+	assert state.selected_count() == first_run_apps.len
+	assert state.packages() == first_run_apps.map(it.package_name)
 }
 
 fn app_selection_test_ios_payload() []u8 {
@@ -522,7 +533,7 @@ fn test_first_run_install_command_reports_failures_and_continues() {
 	assert result.exit_code == 0
 	assert os.read_file(log) or { '' } == 'install firefox\ninstall chromium\n'
 	assert result.output.contains('Installing the apps chosen during setup: firefox chromium')
-	assert result.output.contains('Not installed: chromium. Run pkg install chromium to try again.')
+	assert result.output.contains('Not installed: chromium. Run vinix-desktop --install-setup-app chromium to try again.')
 
 	success := first_run_install_command('firefox').replace('exec /bin/zsh -i', 'exit 0')
 	ok := os.execute('PATH="${work}/bin:\$PATH" sh -c ${os.quoted_path(success)}')

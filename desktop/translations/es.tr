@@ -113,7 +113,7 @@ app_selection.install.done
 Las aplicaciones seleccionadas están instaladas. Ábrelas desde el escritorio o el menú Inicio.
 -----
 app_selection.install.failed
-No se instalaron:{0}. Para volver a intentarlo, ejecuta pkg install{0}.
+No se instalaron:{0}. Para volver a intentarlo, ejecuta vinix-desktop --install-setup-app{0}.
 -----
 app_selection.install.started
 Instalando las aplicaciones elegidas durante la configuración: {0}
@@ -4832,7 +4832,7 @@ app_selection.install_many
 Instalar apps seleccionadas
 -----
 app_selection.ios.detail
-ARM64 nativo; apps iOS compatibles, sin emulación
+Permite ejecutar apps y juegos de iOS
 -----
 app_selection.keepassxc.detail
 Gestor de contraseñas con bóveda local

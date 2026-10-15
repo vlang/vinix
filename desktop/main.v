@@ -12,6 +12,8 @@
 // through.
 module main
 
+import os
+
 // What the loop asks to wait after a frame changed. Vinix wakes a sleeping
 // thread on the scheduler's timeslice, so the shortest sleep that actually
 // happens is around twice this and never less than about 12 ms. This cadence
@@ -120,6 +122,33 @@ fn main() {
 	gpu_present_startup_stage(c'entered main')
 	gpu_present_startup_stage(c'collecting process arguments')
 	all_args := arguments()
+	if all_args.len > 0 {
+		command := os.file_name(all_args[0])
+		vendor := match command {
+			'codium' { 'vscodium' }
+			'run-zed' { 'zed' }
+			'steam-hosted' { 'steam' }
+			else { command }
+		}
+		if vendor in first_run_vendor_names() && os.is_dir('/opt/vinix-apps/' + vendor) {
+			first_run_launch_vendor(vendor, all_args[1..]) or { eprintln(err); exit(1) }
+			return
+		}
+	}
+	for i, arg in all_args {
+		if arg == '--install-setup-app' && i + 1 < all_args.len {
+			mut failed := false
+			for name in all_args[i + 1..] {
+				first_run_install_vendor(name) or { eprintln(err); failed = true }
+			}
+			if failed { exit(1) }
+			return
+		}
+		if arg == '--run-setup-app' && i + 1 < all_args.len {
+			first_run_launch_vendor(all_args[i + 1], all_args[i + 2..]) or { eprintln(err); exit(1) }
+			return
+		}
+	}
 	if '--install-ios-runtime' in all_args {
 		first_run_install_ios_runtime('') or { eprintln(err); exit(1) }
 		return
