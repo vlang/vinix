@@ -162,7 +162,7 @@ pub fn initialise() {
 	vfs_root = create_node(&TmpFS(unsafe { nil }), &VFSNode(unsafe { nil }), '', false)
 	file.on_handle_released(release_handle_node)
 	proc.on_directory_released(directory_releasing)
-	file.on_mount_flags(mount_flags)
+	file.on_mount_flags(raw_mount_flags)
 	file.on_mount_writer_released(release_mount_writer)
 
 	filesystems = map[string]&FileSystem{}

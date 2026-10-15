@@ -518,6 +518,16 @@ backend, capability, securelevel, copy-up and persistence checks remain.
 These flag payloads remain outside the portable Linux reference suite;
 filesystem-backed Linux comparison and concurrent remount serialization remain
 open.
+The [descriptor mapping checks](../tests/mount-lifecycle/descriptor-mmap.md)
+use the saved mount's `noexec` policy for private/shared file mappings and
+subsequent execute upgrades with `mprotect`. A copied namespace's opposite
+flags do not grant or revoke an inherited description's authority. Native
+ARM/x86 checks and the same probe executables on Linux cover linked/unlinked
+files, ordinary owners, fork inheritance and closed descriptors. Shared mappings
+of descriptors opened for reading retain their write restriction. MAC,
+mapping/resource pins, maximum protections, fork inheritance and releases remain
+unchanged. Concurrent remount timing, broader policy combinations and other
+backends remain open.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,
