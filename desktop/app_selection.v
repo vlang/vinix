@@ -32,6 +32,7 @@ const app_selection_heading_height = 22
 const app_selection_category_gap = 16
 const action_apps_scrollbar = 'apps.scrollbar'
 const app_selection_selected_bg = u32(0xeef4fd)
+const app_selection_selected_border = u32(0x3975bd)
 const app_selection_installed_bg = u32(0xf5f6f8)
 
 // One install-button label per count of chosen apps, each a whole
@@ -343,7 +344,7 @@ fn app_selection_bordered(id string, frame ui2.Rect, radius int, border_color u3
 fn app_selection_row(app FirstRunApp, installed bool, available bool, selected bool, hovered bool, x int, y int,
 	width int, height int) ui2.Element {
 	// Child coordinates are inside the one-pixel border.
-	mut children := frame_elements(5)
+	mut children := frame_elements(4)
 	icon := ui2.image('', app.icon, ui2.rect(9, f64((height - 28) / 2), 28, 28))
 	// Bundled artwork ignores the colour; a builtin glyph is drawn in it.
 	children << ui2.Element{
@@ -353,7 +354,7 @@ fn app_selection_row(app FirstRunApp, installed bool, available bool, selected b
 		}
 	}
 	title_color := if installed || !available { body_muted } else { body_heading }
-	title_width := width - 60 - if installed { 98 } else if available { 28 } else { 0 }
+	title_width := width - 60 - if installed { 98 } else { 0 }
 	title_y := if app.package_name == 'ios-runtime' { 0 } else { (height - 22) / 2 }
 	children << ui2.label('', app.title, ui2.rect(47, f64(title_y), f64(title_width), 22),
 		ui2.TextStyle{
@@ -372,20 +373,6 @@ fn app_selection_row(app FirstRunApp, installed bool, available bool, selected b
 				size:  11
 				align: .right
 			})
-	} else if available {
-		mut mark := frame_elements(1)
-		if selected {
-			check := ui2.image('', 'builtin:check', ui2.rect(0, 0, 20, 20))
-			mark << ui2.Element{
-				...check
-				text_style: ui2.TextStyle{
-					color: app_on_accent
-				}
-			}
-		}
-		children << app_selection_bordered('', ui2.rect(f64(width - 41), f64((height - 22) / 2), 22, 22), 5,
-			if selected || hovered { app_accent } else { body_rule },
-			if selected { app_accent } else { registration_field_bg }, mark)
 	}
 	mut background := registration_field_bg
 	if installed || !available {
@@ -394,7 +381,8 @@ fn app_selection_row(app FirstRunApp, installed bool, available bool, selected b
 		background = app_selection_selected_bg
 	}
 	row := app_selection_bordered(app.action, ui2.rect(f64(x), f64(y), f64(width),
-		f64(height)), 8, if hovered || selected { app_accent } else { body_rule },
+		f64(height)), 8,
+		if selected { app_selection_selected_border } else if hovered { app_accent } else { body_rule },
 		background, children)
 	// The whole row is the hit target, so clicking an app's name or icon picks it.
 	return ui2.Element{
@@ -547,7 +535,10 @@ fn (mut s AppSelectionState) element(d &Desktop) ui2.Element {
 			if row_y < layout.list_height && row_y + app_selection_row_height > 0 {
 				if s.focus == i {
 					list_children << ui2.view('apps.focus', ui2.rect(f64(x - 1), f64(row_y - 1), f64(row_width + 2),
-						app_selection_row_height + 2), ui2.BoxStyle{ bg: app_accent, radius: 9 }, []ui2.Element{})
+						app_selection_row_height + 2), ui2.BoxStyle{
+							bg: if s.selected[i] { app_selection_selected_border } else { app_accent }
+							radius: 9
+						}, []ui2.Element{})
 				}
 				// Crop the hit target as well as its pixels at the viewport edges.
 				top := math.max(0, row_y)

@@ -151,8 +151,9 @@ fn test_app_selection_clicks_toggle_apps_and_confirm() {
 	root := state.element(&desktop)
 	firefox := app_selection_test_element(root, 'apps.toggle.firefox') or { panic('missing row') }
 	chromium := app_selection_test_element(root, 'apps.toggle.chromium') or { panic('missing row') }
-	assert app_selection_test_has_image(firefox, 'builtin:check')
-	assert !app_selection_test_has_image(chromium, 'builtin:check')
+	assert !app_selection_test_has_image(root, 'builtin:check')
+	assert firefox.children[0].box.bg == app_selection_selected_border
+	assert chromium.children[0].box.bg == body_rule
 	free_tree(root)
 
 	state.handle_action('apps.toggle.chromium')
