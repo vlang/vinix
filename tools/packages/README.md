@@ -49,6 +49,14 @@ receipts also render every prepared line as an individual monospace label. Narro
 report panels paginate shorter UTF-8 fragments so complete provenance, paths and
 diagnostics remain available. See [disclosure checks](../../tests/packages/software-disclosure-lines-check.md).
 
+Compact **Package details** windows at least 180 pixels wide and 220 high now
+show complete short pages and Previous/Next section controls. Left/Right and
+Page keys turn pages; Up/Down and Tab/Shift-Tab change sections. Resizing retains
+the short page and its corresponding full page. Smaller windows retain Back.
+This applies to catalog facts and frozen install, remove, update, repair,
+deployment, rollback and offline-export reviews. See
+[compact detail checks](../../tests/packages/software-details-navigation-check.md).
+
 Software's warning and status paragraphs also use individual wrapped lines.
 Deletion, trust, launch and restore explanations fit their minimum full-window
 frames; long keys and paths can split within a word. Oversized summaries show an

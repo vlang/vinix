@@ -1,0 +1,74 @@
+Initial UI compile/functional and first ten allocation modes passed. The helper then failed to open ui-snapshot-export-memory.txt with errno 28 (no space left on device); it did not finish the batch or write results-ui.json. Both desktop architecture typechecks and the font check passed. Retired, unpinned generated C files were removed only when their content identified one of this package thread's private workspaces. No recorded evidence, binaries, repository sources or other sessions' files were removed.
+/private/tmp/v_501/ui-check.89008.5989327416.6025241664.tmp.c bytes=11741169 sha256=54f003ddbe9ed5528daa14a01a51487b609b6a9ddd093d6dc5681b1586b15a7f
+/private/tmp/v_501/ui-check.1694.6413587708.13970091920.tmp.c bytes=11742801 sha256=dc15bfda29929dc372fc2994ff9342cbd98a884564ed115caa4193215abda893
+/private/tmp/v_501/ui-check.8174.13030996583.13930395744.tmp.c bytes=11258313 sha256=ff7759639f56fdb9ac3b9b8bfd84eb0c9712d095be4830b81c82982f45de82cc
+/private/tmp/v_501/ui-check.45422.6470495541.13985375584.tmp.c bytes=11739031 sha256=c4b20ce79ed6f9a57b6117f341243a026530a1146a3562feb0f81d0c92348cfb
+/private/tmp/v_501/ui-check.19989.33860531833.13977498832.tmp.c bytes=11101489 sha256=0f88256c3dd2db34b04a27cebb2060459d235a7f7290e19ac82894f2a287e8a5
+/private/tmp/v_501/ui-check.93784.6466019750.13899230336.tmp.c bytes=11741942 sha256=3cb4956f4af40cb91ee32dcf5cf36a54b1eb8a1ad21da0593cea8198b0782e62
+/private/tmp/v_501/ui-asan-check.34226.30031720000.13919658592.tmp.c bytes=11154654 sha256=f557696f683f95a1a033f4deab62bfcd86f249f348c114e7ff32c290767c8d88
+/private/tmp/v_501/ui-check.41571.12932121166.13897268224.tmp.c bytes=11423718 sha256=d1247976c3a144a18157c19aa06b79c6f4e954643ad5c3eef02d9919f0ebd8d6
+/private/tmp/v_501/ui-asan-check.8922.7947758500.6008795120.tmp.c bytes=11826887 sha256=066f00126ae4a25710f592eec612eef875effb01e610a174f27a650a9eb4e171
+/private/tmp/v_501/ui-check.85295.18382874958.13988567568.tmp.c bytes=11089923 sha256=0c6b71ca5a1443a9d9b4e07b8172ce391adbc73bc69e1a5ef7ee4d921cb91b17
+/private/tmp/v_501/ui-asan-check.73082.6936742416.13923310624.tmp.c bytes=11714444 sha256=f01fe5475a558c765dfab7c1f5e5a09bb3b489d46fd7194f3dabcbcd2e85cf2e
+/private/tmp/v_501/ui-asan-check.12172.12399999500.13908643936.tmp.c bytes=11313868 sha256=5d3ef10f85d442ed5c66767c2dd6342b6c6e5a8b77669e090d96206bcbbf172b
+/private/tmp/v_501/ui-check.98113.4995564083.6406729024.tmp.c bytes=11742190 sha256=0460f78a6fb8555cdd9e2b658a0829e2f0d18abffa10f5e0aefe49321d27f545
+/private/tmp/v_501/ui-asan-check.54342.8980271250.6414521248.tmp.c bytes=11481643 sha256=13f43de3398b0b3fac4646d62d8172ed4a366c7ef7199ed167f13adf8abe358c
+/private/tmp/v_501/ui-asan-check.4208.6357214791.14003721040.tmp.c bytes=11807511 sha256=338958fe25b05c425945f51828b02cdbf8679587d035e8dcc984d58b387d81f1
+/private/tmp/v_501/ui-check.85075.9665363250.13897587888.tmp.c bytes=11506798 sha256=6df66a864c37325838df2b2cc17c97cc76fd33a3f6f4b240cf5385df86009314
+/private/tmp/v_501/ui-asan-check.59123.4970110750.13971594384.tmp.c bytes=11807927 sha256=eae2e21d767378898a2e777d1f9a90b87be45d319ff2d424d4e22d1721cb579c
+/private/tmp/v_501/ui-asan-check.86497.9313560458.6420119648.tmp.c bytes=11566253 sha256=25058d947a91b354d5686f7bbe936dee1e474a76b4e6cafed3e6cb11a6824650
+/private/tmp/v_501/ui-check.2349.27371931958.6027638848.tmp.c bytes=11258199 sha256=2feff881eb83b2527978c2c207ca1eb3b3be2e02a4b8d6556b7cde3df0353e8b
+/private/tmp/v_501/ui-check.88987.5942347833.13924716656.tmp.c bytes=11763157 sha256=946f6faec3ab3600fe689e48c8f1355cfe5a69bd38ca520c24f686d70bf90781
+/private/tmp/v_501/ui-check.52328.4791775916.13971098336.tmp.c bytes=11908037 sha256=c51948d1fba5bd7dd0d5469e97121d779950102e34ca0a0543e30577b858e14a
+/private/tmp/v_501/ui-check.32896.11492440958.6421986128.tmp.c bytes=11596850 sha256=a1277198ddc5c3d5fa9f96026ff8deae53a97b273b3cad45bc956ac5715e95ad
+/private/tmp/v_501/ui-check.51293.5704057708.6047688256.tmp.c bytes=11740430 sha256=8820c2f7505c2c09a167f11c03ddecc9ebe71409de9f9ae3c742f1f791492cd4
+/private/tmp/v_501/ui-asan-check.40960.15250911083.6020277040.tmp.c bytes=11657330 sha256=83c13353685f53dde571a848154f8be285a89962333895eb56799e4a90ca0242
+/private/tmp/v_501/ui-check.57301.5601108708.13907571824.tmp.c bytes=11745032 sha256=f627a52cacbb20162b52c7ee7b419ce9cd1725cc794cb43b3837affa27c1bc74
+/private/tmp/v_501/ui-check.68111.8297540458.13930791984.tmp.c bytes=11652654 sha256=baadc9d2e93d64ec0ef75ead4b63756cf091670d1f0c576e50291d95107452e2
+/private/tmp/v_501/ui-check.1710.6607712166.6011998272.tmp.c bytes=11763192 sha256=e7519e92aa06a121abc675adb4b3419a9c903b13307e28f752989968ba81837b
+Released generated C bytes: 312845442
+
+Re-running the evidence generator with the compiler's incremental module cache caused duplicate generated string declarations. The wrapper retried with its V 0.5.2 fallback and reported an automatic metadata-only compiler error report (no source). Subsequent helper builds explicitly disable fallback and automatic error reports and use -nocache. The generator is rerun and the retain/audit executables are rebuilt with the frozen compiler under those settings before recording evidence. All qualification compiler invocations already used -nocache with fallback disabled; this helper-cache issue did not affect their results.
+
+Initial successful functional result before the interrupted allocation batch:
+Software package navigation: all five operations, partial and complete-before-exit Stop/Cancel/Escape, fresh retry, frozen catalog state, compact review/details/status/progress/failures, protected apply/refresh and reload passed
+Software configured repositories: damaged metadata does not block reviewed revocation; enrollment remains refused PASS
+Software repository navigation: compact list/review/status/progress/failures, partial and complete-before-exit Stop/Cancel/Escape, retained inputs/list, fresh paged review, protected apply/refresh and retry passed
+Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed
+Software Verify: visible control, no administrator/catalog dependency, streamed progress, stable selection, incomplete/failure retention, review isolation and safe close PASS
+Software verification navigation: partial/live/complete-before-exit Stop/Cancel/Escape, pending completion despite human success text, kill/reap and buffer retirement, fresh retry and late failure, compact diagnostics, frozen catalog state and protected verify-phase transactions/launches passed
+Software repair: installed dependency control, exact-version closure disclosure, read-only review, duplicate/modal isolation, frozen confirmation and reviewed administrator apply PASS
+Software health navigation: partial/live/complete-before-exit Stop/Cancel/Escape, compact reload/status/progress/summary/failure, frozen search/filter/selection/paging, late failure and fresh retry PASS
+Software health: read-only asynchronous report, issue-first searchable metadata/diagnostics, issues-only filtering, stable visible selection, empty results, bounded Unicode editing, reload retention, compact Back, isolated catalog state, full-set repair review and safe close PASS
+Software health progress: separate bounded stderr, live package names, both-pipe EOF, complete/exit/report/count admission, malformed/partial/late/flood refusal, Stop/Escape kill and reap, retry and compact cancellation PASS
+SOFTWARE CLEANUP read-only review, complete paged disclosure, modal/compact controls, frozen administrator approval, stale refusal, diagnostics and reload PASS
+Software cleanup navigation: partial and complete-before-exit Stop/Cancel/Escape, fresh review requirement, 4096-generation admission and stable resize anchor, compact diagnostics, approval cancellation, protected deletion, stopped/failed post-cleanup reload and retained result passed
+Software deployment: full closure, frozen literal path, empty removal, cancellation, bounds, stale/error diagnostics and close guard passed
+Software deployment navigation: compact form/review/details/status/progress/failures, partial and complete-before-exit Stop/Cancel/Escape, fresh literal retry, empty removal, protected apply and subflow routing passed
+Software deployment audit: literal ordinary argv, exit 0/3 coherence, complete drift rows, details/paging, frozen reload/review, cancellation, failure diagnostics, bounds and compact navigation passed
+Software deployment audit search: all 8192 rows, difference-first projection, IDs/status/versions/fields, stable selection/resize, bounded UTF-8 editing, reload/stop/error retention, empty results and full deployment review passed
+Software save navigation: literal paste/control refusal, focus-first Escape, full/compact status/failure, frozen receipt paging, partial/complete-before-exit writer guards and late failure PASS
+Software deployment saving: literal ordinary argv, bounded complete receipt, destination binding, both architectures, empty generation, close guard, fresh audit/review, diagnostics and compact navigation passed
+Software saved deployment export: frozen source/digest, explicit new destination, no catalog selection, full path/package/license review, administrator apply, progress, changed-source refusal, retry and retirement passed
+Software offline export navigation: compact Back/Cancel/Stop/status/progress/failures, partial and complete-before-exit review cancellation/reaping, frozen retry and protected publication passed
+Software offline export: destination paging, dependency provenance, literal confirmation, installed scope, progress, stale diagnostics and close guard passed
+Software locked offline export: exact older runtime, source/digest paging, literal frozen confirmation, invalid responses, stale diagnostics, progress and cancellation passed
+Software launch options: quoted literal arguments, separate file grants, frozen worker input, diagnostics and terminal transfer passed
+Software launch navigation: compact Back/status/failures, stable draft and file paging, Escape blur/back, control-paste refusal, installed permission basis, protected literal batch success/failure, retry and exact terminal transfer passed
+Software native windows: bounded frames, namespaced controls, ordinary-service launch, clicks, close acknowledgement and EOF retirement passed
+Software native text: focus, UTF-8 bounds, literal replacement, stale controls, explicit commit/discard, close guard and protocol admission passed
+Software administrator approval: frozen literal request, masked bounded UTF-8 password, hidden-action refusal, credential wiping, cancellation and progress passed
+Software personal data: own-account inventory, installed/unsafe refusal, frozen explicit confirmation, cancellation, paging, live-lease diagnostics, reload and close guard passed
+Software personal data navigation: partial and complete-before-exit inventory Stop/Cancel/Escape, fresh inventory requirement, compact controls and stable selection, protected purge, stopped post-delete reload, retained result and failure diagnostics passed
+Software organization policy: current restrictions, complete settings/impact paging, literal file review, frozen confirmation, administrator approval/cancel/wipe, stale/error refusal, reload and close guard passed
+Software policy navigation: partial and complete-before-exit read/review Stop/Cancel/Escape, fresh policy requirement, literal retry, compact controls and stable pages, approval cancellation, protected save/progress, stopped post-save reload and failure diagnostics passed
+Software metadata review: missing firmware and escaped duplicate flags refuse confirmation before administrator approval
+Software paragraphs: complete minimum-size destructive/trust/restore/launch warnings, keys and permissions, explicit newlines, UTF-8 wrapping, overflow marks, borrowed lines and unobscured administrator controls PASS
+Software disclosure lines: complete catalog/review/health/audit/snapshot/policy pages, individual native-renderer labels, narrow UTF-8 columns, geometry and unchanged review state PASS
+Software compact package details: complete catalog/seven-operation review pages, twelve-byte UTF-8 fragments, section/page/keyboard navigation, resize anchors, tiny Back, frozen review and cache retirement PASS
+Software package details: complete Unicode descriptions/provenance/licenses/diagnostics, installed versus displayed permissions, paging, frozen review, hidden-action refusal, legacy fields and invalid-text refusal passed
+Software catalog reader: complete typed flags, installed-versus-planned launch fields, asynchronous malformed-response refusal, prior-valid-view preservation and explicit legacy details passed
+Software failure navigation: complete short Unicode/escaped diagnostic pages, separate native-renderer lines, Previous/Next/arrow/Page keys, resize anchors, narrow/tiny Back, modal isolation and clear PASS
+Software failure details: complete retained Unicode output, progress filtering, paging, read-only modal, compact back, reload retention and replacement/clear passed
+Software failure details: bounded tail, truncation disclosure, valid UTF-8/control escaping, empty diagnostics and response-limit failure passed
+Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed

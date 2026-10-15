@@ -52,6 +52,9 @@ mut:
 	details_mode    bool
 	details_review  bool
 	details_pages   []SoftwareDetailsPage
+	details_compact_pages []SoftwareFailurePage
+	details_compact_page int
+	details_compact_mode bool
 	details_page    int
 	details_section int
 	details_starts  [6]int
@@ -1029,7 +1032,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.failure_mode { a.failure_key_input(input); return }
 	if a.snapshot_mode { a.snapshot_key_input(input); return }
 	if a.audit_mode { a.audit_key_input(input); return }
-	if a.details_mode { if input == '\x1b' { a.clear_details() }; return }
+	if a.details_mode { a.details_key_input(input); return }
 	if a.health_mode { a.health_key_input(input); return }
 	if a.cleanup_mode { a.cleanup_key_input(input); return }
 	if a.policy_mode { a.policy_key_input(input); return }
@@ -1175,6 +1178,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.failure_mode { return a.build_failure(size) }
 	width := int(size.width)
 	height := int(size.height)
+	if a.details_mode { return a.build_details(width, height) }
 	if a.snapshot_mode { return a.build_deployment_snapshot(width, height) }
 	if a.mirror_mode && (width < 640 || height < 610) { return a.build_mirror_compact(width, height) }
 	if a.audit_mode && (width < 640 || height < 610) { return a.build_deployment_audit_compact(width, height) }
@@ -1197,7 +1201,6 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		a.page_rows = if height > 400 { (height - if a.review != '' { 274 } else if a.health_mode { 348 } else { 310 }) / 30 } else { 5 }
 		if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
 	}
-	if a.details_mode { return a.build_details(width, height) }
 	if a.audit_mode { return a.build_deployment_audit(width, height) }
 	if a.health_mode { return a.build_health(width, height) }
 	if a.cleanup_mode { return a.build_cleanup(width, height) }

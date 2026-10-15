@@ -1029,6 +1029,15 @@ present. **Back to review** or Escape returns to the unchanged confirmation and
 selection. Only navigation is active while details are open. See the
 [package-details UI checks](../tests/packages/details-ui-check.md).
 
+Package details remain readable in compact windows at least 180 pixels wide
+and 220 high. Previous/Next changes short pages within the selected section;
+Prev section/Next section changes the facts being shown. Left/Right and Page
+keys navigate pages, Up/Down and Tab/Shift-Tab change sections, and Escape
+returns to the same catalog or frozen review. Resizing keeps the short page
+and its corresponding full page. Smaller windows retain Back. No confirmation,
+application action or editable field is active in this view. See
+[compact details checks](../tests/packages/software-details-navigation-check.md).
+
 Prepared package, policy, health, deployment-check and saved-receipt pages now
 render each line as a separate monospace label. This makes every prepared line
 visible in the native renderer. Health and deployment-check side panels use

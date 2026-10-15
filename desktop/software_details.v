@@ -20,8 +20,12 @@ fn (mut a SoftwareApp) clear_details() {
 	unsafe {
 		for page in a.details_pages { page.title.free(); page.text.free(); page.label.free() }
 		(&array(&a.details_pages)).free()
+		for page in a.details_compact_pages { page.text.free(); page.label.free() }
+		(&array(&a.details_compact_pages)).free()
 	}
 	a.details_pages = []SoftwareDetailsPage{}
+	a.details_compact_pages = []SoftwareFailurePage{}
+	a.details_compact_page = 0; a.details_compact_mode = false
 	a.details_mode = false; a.details_review = false
 	a.details_section = 0; a.details_page = 0
 	for index in 0 .. 6 { a.details_starts[index] = -1 }
@@ -179,6 +183,14 @@ fn (mut a SoftwareApp) prepare_details(row SoftwareRow, action string, reviewing
 		unsafe { number.free() }
 	}
 	unsafe { for total in totals { total.free() } }
+	// Reuse the failure view's UTF-8 pagination and canonical-page anchors.
+	// Prepare owned caches once; every redraw borrows its individual lines.
+	a.details_compact_pages = []SoftwareFailurePage{cap: 32}
+	unsafe { a.details_compact_pages.flags |= .noslices }
+	for index, page in a.details_pages {
+		software_failure_paginate(mut a.details_compact_pages, page.text, 12, 3, index)
+	}
+	software_failure_labels(mut a.details_compact_pages)
 	a.details_mode = true; a.focus = false; a.select_all = false
 }
 
@@ -201,6 +213,16 @@ fn (mut a SoftwareApp) open_details() {
 fn (mut a SoftwareApp) handle_details(action string) {
 	if action == 'software.details.back' { a.clear_details(); return }
 	if action in ['software.details.previous', 'software.details.next']! {
+		if a.details_compact_mode {
+			next := a.details_compact_page + if action == 'software.details.next' { 1 } else { -1 }
+			if next >= 0 && next < a.details_compact_pages.len {
+				canonical := a.details_compact_pages[next].source_page
+				if a.details_pages[canonical].section == a.details_section {
+					a.details_compact_page = next; a.details_page = canonical
+				}
+			}
+			return
+		}
 		mut index := a.details_page + if action == 'software.details.next' { 1 } else { -1 }
 		for index >= 0 && index < a.details_pages.len {
 			if a.details_pages[index].section == a.details_section { a.details_page = index; break }
@@ -208,14 +230,72 @@ fn (mut a SoftwareApp) handle_details(action string) {
 		}
 		return
 	}
+	if action in ['software.details.section.previous', 'software.details.section.next']! {
+		step := if action == 'software.details.section.next' { 1 } else { -1 }
+		mut section := a.details_section + step
+		for section >= 0 && section < software_details_actions.len {
+			if a.details_starts[section] >= 0 {
+				a.handle_details(software_details_actions[section]); break
+			}
+			section += step
+		}
+		return
+	}
 	for section, event_id in software_details_actions {
 		if action == event_id && a.details_starts[section] >= 0 {
-			a.details_section = section; a.details_page = a.details_starts[section]; return
+			a.details_section = section; a.details_page = a.details_starts[section]
+			a.anchor_details_compact_page(); return
 		}
 	}
 }
 
+fn (mut a SoftwareApp) details_key_input(input string) {
+	match input {
+		'\x1b' { a.clear_details() }
+		'\x1b[D', '\x1b[5~' { a.handle_details('software.details.previous') }
+		'\x1b[C', '\x1b[6~' { a.handle_details('software.details.next') }
+		'\x1b[A', '\x1b[Z' { a.handle_details('software.details.section.previous') }
+		'\x1b[B', '\t' { a.handle_details('software.details.section.next') }
+		else {}
+	}
+}
+
+fn (mut a SoftwareApp) anchor_details_compact_page() {
+	if a.details_compact_page >= 0 && a.details_compact_page < a.details_compact_pages.len
+		&& a.details_compact_pages[a.details_compact_page].source_page == a.details_page { return }
+	for index, page in a.details_compact_pages {
+		if page.source_page == a.details_page { a.details_compact_page = index; return }
+	}
+}
+
+fn (mut a SoftwareApp) build_details_compact(width int, height int) ui2.Element {
+	a.details_compact_mode = true
+	a.anchor_details_compact_page()
+	mut children := frame_elements(10)
+	content_width := if width > 28 { width - 28 } else { 1 }
+	back_width := if content_width >= 56 { 56 } else { content_width }
+	children << software_button('software.details.back', 'Back', if width > back_width + 28 { width - back_width - 14 } else { 14 }, 8, back_width)
+	if width < 180 || height < 220 {
+		children << software_label('Enlarge to read package details.', 14, 46, content_width, 28, false)
+		return ui2.screen(app_surface, children)
+	}
+	children << software_label(software_details_titles[a.details_section], 14, 46, content_width, 28, false)
+	button_width := (width - 42) / 2
+	children << software_button('software.details.section.previous', 'Prev section', 14, 80, button_width)
+	children << software_button('software.details.section.next', 'Next section', width - 14 - button_width, 80, button_width)
+	if a.details_compact_page >= 0 && a.details_compact_page < a.details_compact_pages.len {
+		page := a.details_compact_pages[a.details_compact_page]
+		children << software_label(page.label, 14, 8, width - back_width - 42, 28, false)
+		software_page_lines(mut children, page.text, 14, 118, content_width, 18)
+	}
+	children << software_button('software.details.previous', 'Previous', 14, height - 36, button_width)
+	children << software_button('software.details.next', 'Next', width - 14 - button_width, height - 36, button_width)
+	return ui2.screen(app_surface, children)
+}
+
 fn (mut a SoftwareApp) build_details(width int, height int) ui2.Element {
+	if width < 640 || height < 610 { return a.build_details_compact(width, height) }
+	a.details_compact_mode = false
 	mut children := frame_elements(32)
 	children << software_label('Package details', 14, 8, width - 202, 28, false)
 	children << software_button('software.details.back', if a.details_review { 'Back to review' } else { 'Back to packages' }, width - 174, 8, 160)

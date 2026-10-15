@@ -203,6 +203,94 @@ fn details_fixture_check_all_pages(mut app SoftwareApp) ! {
 	app.details_page = page; app.details_section = section
 }
 
+fn details_fixture_check_compact(mut app SoftwareApp) ! {
+	page := app.details_page; section := app.details_section
+	selected := app.selected; review_selected := app.review_selected; review_scroll := app.review_scroll
+	page_rows := app.page_rows; fingerprint := app.review_snapshot.fingerprint
+	assert app.details_compact_pages.len > app.details_pages.len
+	// Recover every canonical page from its compact fragments, including all
+	// bullet/continuation prefixes. Only prepared layout newlines are omitted.
+	for canonical, full in app.details_pages {
+		mut bytes := []u8{cap: full.text.len}
+		for short in app.details_compact_pages {
+			if short.source_page != canonical { continue }
+			for byte in short.text { if byte != `\n` { bytes << byte } }
+		}
+		expected := full.text.replace('\n', '')
+		assert editor_bytes_text(bytes) == expected
+		unsafe { bytes.free(); expected.free() }
+	}
+	app.handle('software.details.overview')!
+	for index, short in app.details_compact_pages {
+		canonical := app.details_pages[short.source_page]
+		if canonical.section != app.details_section {
+			app.key_input('\x1b[B'); assert app.details_section == canonical.section
+		}
+		for size in [ui2.rect(0, 0, 180, 220), ui2.rect(0, 0, 320, 240)]! {
+			tree := app.build(size)!
+			assert app.details_compact_mode && app.details_compact_page == index && app.details_page == short.source_page
+			details_fixture_rendered_lines(&tree, short.text, 14, 118, int(size.width) - 28, 18, 12)
+			for id in ['software.details.back', 'software.details.previous', 'software.details.next',
+				'software.details.section.previous', 'software.details.section.next']! { assert tree.children.any(it.id == id) }
+			assert tree.children.any(it.text == short.label) && tree.children.any(it.text == software_details_titles[canonical.section])
+			assert !tree.children.any(it.id in ['software.confirm', 'software.cancel', 'software.failure'])
+			for element in tree.children {
+				assert element.frame.x >= 0 && element.frame.x + element.frame.width <= size.width
+				assert element.frame.y >= 0 && element.frame.y + element.frame.height <= size.height
+			}
+			free_window_tree(tree)
+		}
+		if index % 3 == 0 { app.key_input('\x1b[C') }
+		else if index % 3 == 1 { app.key_input('\x1b[6~') }
+		else { app.handle('software.details.next')! }
+		next := if index + 1 < app.details_compact_pages.len
+			&& app.details_pages[app.details_compact_pages[index + 1].source_page].section == canonical.section { index + 1 } else { index }
+		assert app.details_compact_page == next
+	}
+	assert app.details_section == 5
+	app.key_input('\t'); assert app.details_section == 5
+	last := app.details_compact_page
+	app.key_input('\x1b[5~'); assert app.details_compact_page == last - 1
+	app.handle('software.details.section.previous')!; assert app.details_section == 4
+	app.key_input('\x1b[Z'); assert app.details_section == 3
+	app.key_input('\x1b[A'); assert app.details_section == 2
+	app.key_input('\t'); assert app.details_section == 3
+	app.handle('software.details.description')!
+	for _ in 0 .. 3 { app.key_input('\x1b[C') }
+	anchor := app.details_compact_page; canonical := app.details_page
+	assert anchor > 0
+	for size in [ui2.rect(0, 0, 900, 660), ui2.rect(0, 0, 180, 220), ui2.rect(0, 0, 180, 96),
+		ui2.rect(0, 0, 160, 240), ui2.rect(0, 0, 320, 240)]! {
+		tree := app.build(size)!
+		assert app.details_compact_page == anchor && app.details_page == canonical && app.details_section == 1
+		assert tree.children.any(it.id == 'software.details.back')
+		if size.width < 180 || size.height < 220 {
+			assert !tree.children.any(it.id == 'software.details.next')
+			assert !tree.children.any(it.text_style.font_family == 'mono')
+		}
+		for element in tree.children {
+			assert element.frame.x >= 0 && element.frame.x + element.frame.width <= size.width
+			assert element.frame.y >= 0 && element.frame.y + element.frame.height <= size.height
+		}
+		free_window_tree(tree)
+	}
+	full := app.build(ui2.rect(0, 0, 640, 610))!; free_window_tree(full)
+	app.key_input('\x1b[6~')
+	// Small reviews may have only one canonical description page.
+	assert app.details_page == canonical || app.details_page == canonical + 1
+	compact := app.build(ui2.rect(0, 0, 320, 240))!; free_window_tree(compact)
+	assert app.details_compact_pages[app.details_compact_page].source_page == app.details_page
+	if app.details_page != canonical {
+		assert app.details_compact_page == 0 || app.details_compact_pages[app.details_compact_page - 1].source_page != app.details_page
+	}
+	for event in ['software.confirm', 'software.cancel', 'software.install', 'software.reload', 'software.row.0', 'software.failure']! { app.handle(event)! }
+	app.key_input('typed'); app.paste_input('\x1b'); app.paste_input('\x1b[C')
+	assert app.details_mode && app.selected == selected && app.review_selected == review_selected && app.review_scroll == review_scroll
+	assert app.page_rows == page_rows && app.review_snapshot.fingerprint == fingerprint && app.worker == unsafe { nil }
+	app.details_page = page; app.details_section = section; app.details_compact_mode = false
+	app.anchor_details_compact_page()
+}
+
 fn check_software_report_page_lines() ! {
 	mut app := SoftwareApp{ output: []u8{cap: 8192}, query: []u8{cap: 256} }
 	unsafe { app.output.flags |= .noslices }
@@ -282,6 +370,7 @@ fn check_software_details() ! {
 	app.handle('software.details')!
 	assert app.details_mode && !app.details_review && app.worker == unsafe { nil } && app.prepare_close()
 	details_fixture_check_all_pages(mut app)!
+	details_fixture_check_compact(mut app)!
 	assert details_fixture_values(&app, 1) == [row.description]
 	assert 'Publisher key: ' + row.public_key in details_fixture_values(&app, 2)
 	assert 'Displayed package repository: ' + row.repository in details_fixture_values(&app, 2)
@@ -312,7 +401,7 @@ fn check_software_details() ! {
 	assert details.children.any(it.id == 'software.details.back') && !details.children.any(it.id == 'software.confirm')
 	free_window_tree(details)
 	app.handle('software.details.back')!
-	assert !app.details_mode && app.details_pages.len == 0 && app.selected == 0
+	assert !app.details_mode && app.details_pages.len == 0 && app.details_compact_pages.len == 0 && app.selected == 0
 	for operation in ['install', 'remove', 'upgrade', 'repair', 'deploy', 'rollback', 'mirror'] {
 		app.review = operation.clone()
 		base := fixture_review(operation, if operation in ['upgrade', 'repair', 'rollback'] { []string{} } else { ['editor'] })
@@ -322,9 +411,11 @@ fn check_software_details() ! {
 		app.review_snapshot = pkgprotocol.decode_review(json2.encode(snapshot))!
 		app.review_ready = true; app.review_selected = 1; app.review_scroll = 1
 		if operation == 'deploy' { app.deployment_pending = '/company/' + 'approved é🚀 '.repeat(160) + '.json' }
+		app.deployment_mode = operation == 'deploy'; app.mirror_mode = operation == 'mirror'
 		app.handle('software.details')!
 		assert app.details_mode && app.details_review
 		details_fixture_check_all_pages(mut app)!
+		details_fixture_check_compact(mut app)!
 		assert 'Package ID: runtime' in details_fixture_values(&app, 0)
 		if operation == 'rollback' { assert 'Restore from generation: 2' in details_fixture_values(&app, 0) }
 		assert 'License: Vendor-EULA' in details_fixture_values(&app, 4)
@@ -334,6 +425,7 @@ fn check_software_details() ! {
 		app.handle('software.details.back')!
 		assert app.review_ready && app.review_selected == 1 && app.review_snapshot.operation == operation
 		app.clear_review()
+		app.deployment_mode = false; app.mirror_mode = false
 	}
 	app.open_details(); app.key_input('\x1b')
 	assert !app.details_mode && app.details_pages.len == 0
@@ -356,6 +448,7 @@ fn check_software_details() ! {
 	assert !app.details_mode && app.details_pages.len == 0
 	wait_for_software(mut app)
 	assert !app.details_mode && app.selected == -1
+	println('Software compact package details: complete catalog/seven-operation review pages, twelve-byte UTF-8 fragments, section/page/keyboard navigation, resize anchors, tiny Back, frozen review and cache retirement PASS')
 	println('Software package details: complete Unicode descriptions/provenance/licenses/diagnostics, installed versus displayed permissions, paging, frozen review, hidden-action refusal, legacy fields and invalid-text refusal passed')
 }
 
@@ -374,6 +467,10 @@ fn check_software_details_memory() ! {
 				for section, action in software_details_actions {
 					app.handle_details(action)
 					free_window_tree(app.build_details(640, 610))
+					free_window_tree(app.build_details(180, 220))
+					app.details_key_input('\x1b[C'); app.details_key_input('\x1b[6~')
+					free_window_tree(app.build_details(900, 660))
+					free_window_tree(app.build_details(320, 240))
 					app.handle_details('software.details.next')
 					assert app.details_section == section
 				}
@@ -392,5 +489,6 @@ fn check_software_details_memory() ! {
 		assert kept == 0, 'details pages retained ${kept} bytes'
 		println('Software package details: 1000 catalog/review/open/growing-UTF-8-page/redraw/navigate/back/retire cycles retain zero tracked bytes')
 		println('Software paragraphs: 1000 owned/borrowed/wrapped/truncated label retirement cycles retain zero tracked bytes')
+		println('Software compact package details: 1000 prepare/section/full/compact/keys/resize/back/review/retire cycles retain zero tracked bytes')
 	}
 }
