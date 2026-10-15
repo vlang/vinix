@@ -6504,21 +6504,44 @@ with native APFS/HFS+ measurements and actual IPA consumers. Failed fixture
 and native attribute assumptions are retained as trials. Full iOS regression
 remains unpassed; published runners remain unchanged.
 
-The current IPA probe resolves Data writing, then exits with status 1 at
-`_$s10Foundation4DateV11distantPastACvgZ` (`Date.distantPast`). Fortnite has
-not entered application code and remains unplayable.
+The next milestone implements the actual IPA's `Date.distantPast` and
+`Date.timeIntervalSince(_:)` imports in V. The resilient Date getter stores
+the exact eight-byte native representation of -63114076800.0 through x8;
+unused arguments and Self are not read. The interval method borrows another
+Date through x0 and Self through x20, returning Self minus the other value
+as a Double in d0. Both entries use the sealed Foundation arena and perform
+no ARC or per-call allocation. Foundation.framework and its Swift overlay
+resolve to the same entries. Date construction, metadata, equality and
+coding conformances remain separate unsupported profiles.
+
+The fixture compares native getter bits, an actual native interval consumer,
+and 576 interval pairs/guard placements per runtime, including signed zero,
+finite overflow, infinities and quiet NaN payloads. It checks read-only Date
+spans at both page edges, protected unused x8, exact result spans and context,
+concurrent getter publication/calls, unchanged ownership counts and two
+unmapped teardowns. Eight ASan/UBSan runs and four ARM64 suites pass for Date,
+Data writing, Base64 and reference snapshots. Eleven final C streams/programs
+and four joined, retired VM phases are retained under
+`build/ios/fortnite/swift-date-checks`, with native disassembly and required
+IPA fixups/consumers for both imports. The unavailable native property-getter
+trial and analysis-helper include-path failure are retained. Full iOS
+regression remains unpassed; published runners remain unchanged.
+
+The current IPA probe resolves these Date imports, then exits with status 1
+at `_$s10Foundation4DateV2eeoiySbAC_ACtFZ` (`Date.==`). Fortnite has not
+entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,507 | 653 | 79 |
+| Fortnite executable | 1,509 | 651 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,342 | 656 | 120 |
+| All images | 2,344 | 654 | 120 |
 
-The C++/GLES/Text variant reports 2,355 resolved imports, 643 unresolved strong
+The C++/GLES/Text variant reports 2,357 resolved imports, 641 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
