@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
-Updated 2026-10-12 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Ordinary RCU validation baseline: **`ebefd710`**, with the final feature overlay described below. Recheck HEAD and the worktree before
+Updated 2026-10-15 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
+Latest conditional-annotation validation baseline: **`fe594a9c`**, with eight frozen native/tool overlays described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -36,7 +36,7 @@ x86-64 only. Default x86-64 and arm64 kernels leave it disabled.
 
 **There is no working native i915 GPU driver yet.** The complete driver does
 not compile, link or bind; the firmware framebuffer remains the display
-backend. The latest full syntax audit passes **5/269** i915 translation units.
+backend. The latest full syntax audit passes **6/269** i915 translation units.
 The already-linked `i915_memcpy.c` is a CPU WC-copy helper, not GPU bringup.
 Unrelated OpenGothic/Venus/KekVM commits are not evidence of native i915 support.
 
@@ -1796,8 +1796,90 @@ names the live V library. Preserve those exact historical artifacts and qualify
 their producer provenance rather than treating them as frozen-SDK evidence.
 
 The isolated full audit remains **5/269**; the nested-lock first error advances
-to `might_sleep_if`. A private design is checking original single predicate
-evaluation against the existing stronger native sleep-context annotation;
-there is no new conditional implementation at this snapshot. Genuine CPU-bug
-policy, task/MM/GFP/vfork ownership, device/DMA/DRM/firmware and full link/hardware
+to `might_sleep_if`; the next increment below supplies that annotation.
+Genuine CPU-bug policy, task/MM/GFP/vfork ownership, device/DMA/DRM/firmware and full link/hardware
 validation remain. GPU support is incomplete.
+
+## Latest conditional sleep annotation increment
+
+Nested IRQ-save spinlocks are committed as `fe594a9c`. The next V leaf and
+generated adapter implement `might_sleep_if`: one C scalar predicate evaluation,
+no context query for false, and the existing native `might_sleep` invariant
+for true. It does not reschedule. This native invariant is stronger than the
+configured upstream disabled-debug no-op. File/line reach the bug ABI, but the
+current native panic bridge discards those arguments and reports a generic
+failure.
+
+Focused GNU99/GNU11 ASan/UBSan tests and an independent cold replay pass 31
+safe cases each, eight total fatal children, ten compiler controls and seven
+malformed-metadata preservation controls. Thirteen false cases skip the query;
+18 true cases query once. Twenty-four selected V bodies and four full-module
+leaf/export/initialization bodies are byte-identical before execution. The
+staged module does not initialize unrelated workqueue/CPU-mask globals.
+Test/control runtime code is V; the C contract only supplies types, includes,
+static assertions, symbol aliases and the complex-construction intrinsic.
+Grouping is checked in generated source and through V branches, without a
+handwritten unbraced-C or postincrement test claim.
+
+Native worktrees are detached at `fe594a9c` with eight frozen native/tool
+overlays. The fixture adds five safe annotation calls per measured runtime
+iteration: 1,000 calls inside the existing 200-iteration page-recovery check.
+Real IF-enabled depth-one/depth-two interrupt frames call the false adapter;
+the observer verifies task pointer identity, CPU, IF, pins and nesting. Its
+CPU-local snapshots mask IRQs, then restore IF before the adapter and final
+sleep/fault queries. The first v3 normal/SSE boots failed because those
+snapshots violated `cpulocal.current()`'s IRQ-off contract. Preserve those
+failures; the fixed v4 source and regenerated artifacts supersede them.
+
+Final enabled/default x86 and default ARM builds pass. Enabled ELF
+`f55eabf3a0f120ff3a3cedcfee7ea734065dfd5ee4a42b69d50d67341bc7fc6f`
+passes fresh normal/SSE/four-level guests with all 46 markers and 28 existing
+strict allocation equalities. The new 1,000 runtime calls recover the measured
+page baseline; the complete IRQ actor lifecycle also recovers pages and heap
+counts after three warmups. Those observations are not a new per-call heap
+counter. Default Linux-ABI startup passes. Actual default/ARM C and ELF exclude
+the compatibility fixture. Independent review authenticates real native
+C/object/ELF and extracted guest images as well as source-level lifetimes.
+Use `conditional-sleep-build-profile-v4.json`, `conditional-sleep-*-native-v4/`,
+`conditional-sleep-guest-review-v4/` and `conditional-sleep-independent-oct15/`
+for final evidence, preserving the separate failed v3 states.
+
+Native compiler executable `335214a9...` and its actual copied SDK are selected
+together using the four macOS transport variables above. The older host compiler
+cannot compile the current typed spawn header, so host helpers use a separately
+copied newer compiler/SDK (`26b0f007...`). This is a snapshot of existing compiler
+state, including recorded dirty sources, not a pristine compiler rebuild.
+The private transparent V router selects native `-gc none` for explicit
+`-os vinix` and host `-gc boehm` otherwise. Actual generated SDK paths are
+authenticated. Use Boehm for host analysis/provenance loops: an earlier
+whole-blob analysis with GC disabled exhausted memory and is not passing
+evidence. Initial compiler-header, namespace and guest failures remain archived.
+Do not strip compiler headers or include Linux headers in the generic kernel
+blob; Linux C facade modules have their own configured include environment.
+
+Latest executed coherent full audit:
+`smp-oct10/conditional-sleep-final-isolated-audit-v2/i915-audit.json`, **6/269**.
+V3/v4 native observer changes are outside the driver's audited inputs; separate
+addenda check the complete guarded input set and regenerated headers. Only
+11 units emitted dependency files, so this does not claim complete discovered
+dependency graphs for all 269 units. The original software-fence object now
+compiles, but eight genuine runtime services still prevent its full link:
+`dma_fence_add_callback`, `dma_fence_release`, `dma_fence_signal`,
+`dma_fence_wait_timeout`, both unlocked reservation iterator operations,
+`irq_work_queue` and `kvfree_call_rcu`.
+
+Read `smp-oct10/sw-fence-link-design-oct15/design.txt` before tackling those
+lifetimes. IRQ work needs actual interrupt dispatch and post-callback BUSY
+ownership; native ordinary workqueues cannot replace it. Current SMP dispatch
+accepts CSD records only, and its local async-call path runs inline in task
+context. `kvfree_call_rcu` must support genuine allocator ownership and grace
+periods rather than casting an encoded offset to a callback. Current runtime
+has no `kvfree`/`vfree` service, and cache slots differ from ordinary allocation
+prefixes. Remaining task/MM/vfork, CPU-bug, timer, entry-stack and IRQ-header
+dependencies also remain. Full driver link and Tiger Lake hardware validation
+are still required; GPU support and the global allocation gate are incomplete.
+
+Focused replay command:
+`build-support/run-v-tool.sh tests/linuxkpi/conditional_sleep.v --keep-dir NEW`.
+Use fresh private compiler caches and the actual SDK selection above. Evidence
+is under `smp-oct10/conditional-sleep-*` and `conditional-host-probe-oct15/`.

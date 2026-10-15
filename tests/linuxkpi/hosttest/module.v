@@ -64,7 +64,7 @@ pub fn generate_header_primitives(output string, arch string, host bool, impleme
 	}
 	mut declarations := []string{}
 	common := os.read_file(os.join_path(source, 'common.v'))!
-	for name in ['spinlock_t', 'task_struct'] { declarations << foreign_type(common, name)! }
+	for name in ['spinlock_t', 'task_struct', 'vkh_const_char_p'] { declarations << foreign_type(common, name)! }
 	declarations << foreign_type(os.read_file(os.join_path(source, 'wait.v'))!, 'atomic_t')!
 	os.write_file(os.join_path(isolated, 'native_types.v'), '@[translated]\nmodule headercore\n' +
 		'#include "linuxkpi_header_primitive_v_contract.h"\n' + declarations.join('\n') + '\n')!

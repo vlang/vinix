@@ -23,6 +23,7 @@ import x86.idt
 fn C.vinix_linuxkpi_irq_probe(u32) i32
 fn C.vinix_linuxkpi_test_thread_reap_ready(voidptr) bool
 fn C.faulthandler_disabled() bool
+fn C.vinix_linuxkpi_conditional_irq_fixture() i32
 
 const irq_test_cpus = 4
 const irq_test_rounds = u64(8)
@@ -100,8 +101,20 @@ fn irq_test_task_zero(index u32) bool {
 fn irq_test_handler_queries(expected u32) bool {
 	// Deliberately observe with IF enabled. IF alone must not permit sleeping
 	// or waiting while the actual THUNK entry remains on this CPU's stack.
-	return cpu.interrupt_state() && cpulocal.maskable_irq_depth() == expected
-		&& !may_sleep() && !event.may_wait() && C.faulthandler_disabled()
+	entry_irq := cpu.interrupt_toggle(false)
+	local := cpulocal.current()
+	index := local.cpu_number
+	entry_pins := preempt_depth[index]
+	owner := proc.current_thread()
+	cpu.interrupt_toggle(entry_irq)
+	result := C.vinix_linuxkpi_conditional_irq_fixture()
+	observed_irq := cpu.interrupt_toggle(false)
+	after := cpulocal.current()
+	stable := result == 0 && entry_irq && observed_irq == entry_irq
+		&& after.cpu_number == index && preempt_depth[index] == entry_pins
+		&& voidptr(proc.current_thread()) == voidptr(owner) && after.maskable_irq_depth == expected
+	cpu.interrupt_toggle(entry_irq)
+	return stable && !may_sleep() && !event.may_wait() && C.faulthandler_disabled()
 }
 
 fn irq_test_inner(vector u32, frame &cpulocal.GPRState) {

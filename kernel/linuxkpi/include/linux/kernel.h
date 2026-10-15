@@ -7,6 +7,7 @@
 #include <linux/typecheck.h>
 #include <linux/bug.h>
 #include <vinix/runtime.h>
+#include <vinix/integer_policy.h>
 #include <linux/string.h>
 #include <linux/log2.h>
 #include <linux/minmax.h>
@@ -29,4 +30,5 @@
 #define container_of_safe(ptr, type, member) \
     ((ptr) ? container_of((ptr), type, member) : NULL)
 #define might_sleep() BUG_ON(!vinix_linuxkpi_may_sleep())
+#define might_sleep_if vinix_might_sleep_if
 #endif

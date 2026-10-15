@@ -138,6 +138,7 @@ fn C.preempt_disable()
 fn C.preempt_enable_no_resched()
 fn C.irqs_disabled() bool
 fn C.vinix_linuxkpi_may_sleep() bool
+fn C.might_sleep_if(i32)
 fn C.kprintf(&char, ...) i32
 
 @[c_extern]
@@ -514,6 +515,59 @@ fn string_helpers() i32 {
 	}
 }
 
+fn sleep_condition_once(value i32, calls &u32) i32 {
+	unsafe { (*calls)++ }
+	return value
+}
+
+// Keep the original C adapter in the separately compiled Linux-header facade.
+// The native IRQ caller checks its real IRQ depth, owner, pins and IF around it.
+@[export: 'vinix_linuxkpi_conditional_irq_fixture']
+pub fn conditional_irq_fixture() i32 {
+	mut calls := u32(0)
+	C.might_sleep_if(sleep_condition_once(0, unsafe { &calls }))
+	return if calls == 1 { i32(0) } else { i32(-5) }
+}
+
+fn conditional_sleep_checks() i32 {
+	unsafe {
+		entry_irq := C.vinix_linuxkpi_irq_flags()
+		entry_depth := C.preempt_count()
+		if !C.vinix_linuxkpi_may_sleep() { return -5 }
+		mut outcome := i32(0)
+		mut calls := u32(0)
+		mut visited := u32(0)
+		mut executed := u32(0)
+		for pinned in [false, true]! {
+			if pinned { C.preempt_disable() }
+			base := C.preempt_count()
+			for disabled in [false, true]! {
+				mut saved_entry := usize(0)
+				if disabled { saved_entry = C.vinix_linuxkpi_irq_save() }
+				incoming := C.vinix_linuxkpi_irq_flags()
+				for condition in [false, true]! {
+					visited++
+					// Invalid true cases are fatal and are covered by separate host children.
+					if condition && (pinned || disabled) { continue }
+					before := calls
+					value := if condition { i32(-17) } else { i32(0) }
+					C.might_sleep_if(sleep_condition_once(value, &calls))
+					executed++
+					if calls != before + 1 || C.vinix_linuxkpi_irq_flags() != incoming
+						|| C.preempt_count() != base { outcome = -5 }
+				}
+				if disabled { C.vinix_linuxkpi_irq_restore(saved_entry) }
+			}
+			if pinned { C.preempt_enable_no_resched() }
+		}
+		if visited != 8 || executed != 5 || calls != 5
+			|| C.vinix_linuxkpi_irq_flags() != entry_irq || C.preempt_count() != entry_depth {
+			outcome = -5
+		}
+		return outcome
+	}
+}
+
 @[export: 'vinix_linuxkpi_selftest']
 pub fn selftest() i32 {
 	unsafe {
@@ -632,6 +686,7 @@ pub fn selftest() i32 {
 		C.raw_spin_unlock(&raw)
 		if !C.vinix_linuxkpi_may_sleep() { result = -5 }
 		if nested_spin_locks() != 0 { result = -5 }
+		if conditional_sleep_checks() != 0 { result = -5 }
 		mut bits := [3]usize{}
 		C.bitmap_zero(&bits[0], 129)
 		C.set_bit(64, &bits[0])

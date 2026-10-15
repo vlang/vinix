@@ -4,6 +4,30 @@
   "sources": [
     "headercore/policy.v"
   ],
+  "native_types": [
+    {
+      "vtype": "C.vkh_const_char_p",
+      "kind": "const_pointer",
+      "pointee": "char"
+    }
+  ],
+  "native_call_adapters": [
+    {
+      "name": "vinix_might_sleep_if",
+      "parameters": ["condition"],
+      "shape": "statement",
+      "steps": [
+        {
+          "call": "vinix_might_sleep_if_native",
+          "arguments": [
+            "condition",
+            {"source_location": "file"},
+            {"source_location": "line"}
+          ]
+        }
+      ]
+    }
+  ],
   "boundary": {
     "kind": "native_compiler_primitive_constant_expression_and_operand_adapter",
     "v_algorithm_credit": 0,

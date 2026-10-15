@@ -480,6 +480,11 @@ after a filesystem failure. Mutable build inputs still require isolation.
   no-reschedule release and deferred rescheduling. `preempt_count` currently
   reports scheduler pins only. Full Linux IRQ/NMI/softirq context encoding and
   `in_interrupt`/`in_atomic` are not implemented.
+- `might_sleep_if` evaluates its C scalar predicate once. False predicates
+  skip the context query; true predicates enforce the existing native
+  `might_sleep` sleep-context invariant without rescheduling. This is stronger
+  than the pinned upstream annotation with debug/voluntary preemption disabled.
+  Caller file/line reach the bug ABI; the current native panic remains generic.
 - Native x86 maskable interrupts have CPU-owned nesting and entry counters
   from CPU initialization onward. Real vectors 32 through 255 enter after
   installing kernel GS; their ordinary thunk returns close the region with
@@ -2081,3 +2086,71 @@ now reaches `might_sleep_if`; task/MM/vfork, CPU-bug policy and other runtime
 dependencies remain. Full unchanged-driver compile/link and real Tiger Lake
 validation are still required. These feature checks do not establish a global
 kernel allocation pass or working GPU support.
+
+## Conditional sleep annotation, 2026-10-15
+
+`might_sleep_if` now has a V implementation and generated statement adapter.
+The C call boundary preserves scalar truth conversion and one predicate
+evaluation, including pointer, floating and complex operands. False predicates
+return before querying context. True predicates use the existing stronger
+native `might_sleep` invariant: IRQs enabled, no scheduler pins and no actual
+maskable interrupt frame. There is no implicit yield. The configured upstream
+annotation is a no-op after predicate evaluation, so this native policy is
+not claimed equivalent to that disabled-debug runtime. File/line transport
+is tested through the bug ABI; the native bug bridge still prints a generic
+panic rather than reporting those arguments.
+
+Two strict GNU99/GNU11 ASan/UBSan profiles and an independent cold replay pass.
+Each executes 31 safe cases, with 13 false predicates making no context query
+and 18 true predicates making one. Eight separate fatal children cover
+IRQ-off, pinned and IRQ-enabled depth-one/depth-two contexts and caller-location
+transport. Twenty-four selected V bodies remain unchanged, including the leaf;
+four production leaf/export/initialization bodies match a full module generation.
+Ten compiler controls accept scalar operands and reject records/unions at the
+actual Boolean parameter boundary. Seven malformed metadata controls preserve
+the previous output. Statement grouping is source-checked and exercised through
+V branches; there is no handwritten unbraced-C or postincrement runtime test.
+
+The native fixture adds five safe calls to each of the existing 200 measured
+runtime iterations, including false annotations under IRQ exclusion and pins.
+The real outer/nested interrupt fixture also invokes false predicates while
+IF is enabled and verifies CPU, task identity, depth, pins and IF afterward.
+CPU-local snapshots themselves require IRQ exclusion. The first two v3 guest
+runs caught an IRQ-enabled snapshot in that new observer and failed; their logs
+are retained. V4 masks around both snapshots and restores IF before invoking
+the annotation and before the final context queries. Successful final guest
+results are recorded separately from those failures.
+
+Final enabled/default x86-64 and default ARM64 builds pass. Saved enabled ELF
+`f55eabf3a0f120ff3a3cedcfee7ea734065dfd5ee4a42b69d50d67341bc7fc6f`
+passes fresh normal, SSE and four-level four-CPU guests. Each passes all 46
+required markers and 28 existing strict allocation equalities. The 1,000 new
+runtime calls retain no pages; the full interrupt actor lifecycle also recovers
+its page and heap baselines after three warmups. This does not create a new
+per-call heap measurement. Default Linux-ABI startup passes, and actual default
+and ARM C/ELF exclude the fixture. Independent review covers the saved native
+leaf, initialization guards, adapter, IRQ observer, objects and guest images.
+
+Builds use isolated worktrees at `fe594a9c` with eight frozen native/tool
+overlays. Native code uses the saved compiler and actual copied SDK; host tools
+use a separately copied newer compiler/SDK because the older host producer
+conflicts with the current typed spawn header. The private V launcher preserves
+arguments and status, selects native `-gc none` for `-os vinix`, and uses Boehm
+for host tooling. Initial host-header and monolithic Linux-header failures remain
+archived; no compiler headers or diagnostics were suppressed. Inspect actual
+generated SDK paths as well as executable hashes.
+
+The coherent full audit now passes **6/269**, including original
+`i915_sw_fence.c`. Its native object compiles but has eight remaining services:
+four DMA-fence operations, two unlocked DMA-reservation iterator operations,
+`irq_work_queue` and `kvfree_call_rcu`. This is not a full-object link or a GPU
+execution result. Remaining first-error groups include task/MM/vfork, CPU-bug
+policy, timer include closure, entry-stack layout and the IRQ-register wrapper.
+Full driver linkage and Tiger Lake validation remain pending.
+
+Run `build-support/run-v-tool.sh tests/linuxkpi/conditional_sleep.v --keep-dir NEW`
+with a fresh output directory, the compiler/SDK selection described in the
+handoff, and a Boehm host analysis build. Evidence is under
+`smp-oct10/conditional-sleep-*` and `conditional-host-probe-oct15/` in the private
+LinuxKPI cache. Focused evidence does not establish the broader host suite or
+global kernel allocation gate.

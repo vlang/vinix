@@ -95,8 +95,15 @@ fn abi_native_type(value string, types map[string]map[string]AbiValue) !string {
 	if value.starts_with('&') { return abi_native_type(value[1..], types)! + ' *' }
 	if value in types {
 		metadata := types[value]
-		name := abi_name(metadata, 'name')!
 		kind := abi_text(metadata, 'kind')!
+		if kind == 'const_pointer' {
+			if !abi_keys(metadata, ['vtype', 'kind', 'pointee'])
+				|| abi_text(metadata, 'pointee')! != 'char' {
+				return error('Invalid native const character pointer: ${value}')
+			}
+			return 'const char *'
+		}
+		name := abi_name(metadata, 'name')!
 		if kind == 'struct' { return 'struct ' + name }
 		if kind == 'typedef' { return name }
 		return error('Unknown native declaration kind: ${kind}')
@@ -242,9 +249,20 @@ fn abi_call_adapter(metadata map[string]AbiValue, exported map[string]AbiExport,
 		mut operands := []string{}
 		for argument in abi_list(step, 'arguments')! {
 			if argument is map[string]AbiValue {
-				address := abi_name(argument, 'address')!
-				if address !in parameters { return error('Unknown address argument in ${name}: ${address}') }
-				operands << '&(' + address + ')'
+				if 'source_location' in argument {
+					if !abi_keys(argument, ['source_location']) {
+						return error('Invalid native source location: ${name}')
+					}
+					location := abi_text(argument, 'source_location')!
+					if location !in ['file', 'line'] { return error('Unknown native source location: ${location}') }
+					operands << if location == 'file' { '__FILE__' } else { '__LINE__' }
+				} else {
+					address := abi_name(argument, 'address')!
+					if !abi_keys(argument, ['address']) || address !in parameters {
+						return error('Unknown address argument in ${name}: ${address}')
+					}
+					operands << '&(' + address + ')'
+				}
 			} else {
 				argument_name := abi_identifier(argument)!
 				if argument_name !in parameters && argument_name !in locals { return error('Unknown argument in ${name}: ${argument_name}') }

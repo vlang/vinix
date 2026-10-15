@@ -5,4 +5,6 @@
 /* Fixture only: execute a real IDT software interrupt on a private vector.
  * Invalid vectors fail before lookup; success returns only after IRET. */
 int32_t vinix_linuxkpi_irq_probe(uint32_t vector);
+/* Run the original false conditional annotation through its Linux facade. */
+int32_t vinix_linuxkpi_conditional_irq_fixture(void);
 #endif
