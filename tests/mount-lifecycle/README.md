@@ -88,6 +88,15 @@ through `df-5` select individual cases. Native `all` includes them. The Linux
 `--case descaccess` selects inherited-descriptor access queries; `da-0`
 through `da-7` select individual cases. Native `all` and Linux
 `move-reference` include them.
+`--case descexec` selects inherited-descriptor executable loading; `de-0`
+through `de-7` select individual cases. Native `all` and Linux
+`move-reference` include them.
+
+The [descriptor executable-loading checks](descriptor-exec.md) preserve the
+saved mount's `noexec` policy for direct ordinary and `O_PATH` descriptions,
+including unlinked files, ordinary owners and scripts. Fresh descriptors and
+the tested pathname requests use the namespace view; divergent paths relative
+to inherited directory descriptors remain open.
 
 The [descriptor access checks](descriptor-access.md) preserve the saved mount's
 read-only and `noexec` policy for empty-path ordinary and `O_PATH` descriptors,
@@ -272,7 +281,7 @@ rename cases, all ten writer-lifetime cases, all eight node-creation cases,
 all ten access-query cases, all ten filesystem-statistics cases, all eight
 inherited-descriptor metadata cases, all eight descriptor timestamp cases,
 all eight descriptor extended-attribute cases, all six descriptor mapping
-cases and all eight descriptor access cases.
+cases, all eight descriptor access cases and all eight descriptor exec cases.
 Vinix's cursor limit and unsupported unmount modes are excluded. Supply a matching Linux kernel and
 the ELF preserved by a native run:
 

@@ -345,8 +345,9 @@ fn move_cycles(check_depth bool) {
 }
 
 @[export: 'main']
-pub fn run() int {
+pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		descriptor_exec_entry(argc, argv)
 		check(C.mount(c'none', c'/', nil, usize(C.MS_PRIVATE | C.MS_REC), nil) == 0, 4)
 		directory(c'/tmp/mount-lifecycle')
 		fd := C.open(c'/mount-case', C.O_RDONLY)
@@ -388,6 +389,8 @@ pub fn run() int {
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		rename_case := if count == 4 && name[0] == `r` && name[1] == `p` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
+		descriptor_exec := if count == 4 && name[0] == `d` && name[1] == `e` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		descriptor_access := if count == 4 && name[0] == `d` && name[1] == `a` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		descriptor_mmaps := if count == 4 && name[0] == `m` && name[1] == `m` && name[2] == `-`
@@ -436,7 +439,8 @@ pub fn run() int {
 			|| C.strcmp(selected, c'descxattrs') == 0 || descriptor_xattrs >= 0
 			|| C.strcmp(selected, c'descflags') == 0 || descriptor_flags >= 0
 			|| C.strcmp(selected, c'descmaps') == 0 || descriptor_mmaps >= 0
-			|| C.strcmp(selected, c'descaccess') == 0 || descriptor_access >= 0, 4)
+			|| C.strcmp(selected, c'descaccess') == 0 || descriptor_access >= 0
+			|| C.strcmp(selected, c'descexec') == 0 || descriptor_exec >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
@@ -519,6 +523,9 @@ pub fn run() int {
 		if C.strcmp(selected, c'descaccess') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { descriptor_access_cases(-1) }
 		if descriptor_access >= 0 { descriptor_access_cases(descriptor_access) }
+		if C.strcmp(selected, c'descexec') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { descriptor_exec_cases(-1) }
+		if descriptor_exec >= 0 { descriptor_exec_cases(descriptor_exec) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }

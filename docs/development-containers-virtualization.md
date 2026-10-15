@@ -537,6 +537,16 @@ ordinary owner. Existing authorization and error ordering remain unchanged;
 these advisory queries do not replace authorization at a later operation.
 Concurrent remounts, broader policy combinations and backend integration
 remain open.
+The [descriptor executable-loading checks](../tests/mount-lifecycle/descriptor-exec.md)
+keep direct empty-path `execveat` on the description's saved `noexec` mount.
+Pathname requests and recursive interpreter/translator loads retain their
+namespace route. Native ARM/x86 and same-executable Linux probes cover actual
+image execution through ordinary/`O_PATH` descriptions, unlinked ELFs, ordinary
+owners and scripts, plus fresh descriptors and relative/absolute pathname
+requests. Existing authorization, W^X and descriptor lifetimes remain.
+Concurrent remounts, dynamic interpreters, runtime translation, descriptor
+`wxallowed` policy, divergent paths relative to inherited directory descriptors
+and broader backend integration remain open.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,

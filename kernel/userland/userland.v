@@ -258,14 +258,14 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		unsafe { _path.free() }
 	}
 	return start_program_node(execve, dir, prog_node, prog_mount, path, argv, envp, stdin_path,
-		stdout_path, stderr_path)
+		stdout_path, stderr_path, false)
 }
 
 // The part of exec that follows finding the program. execveat(2) on a
 // descriptor comes here directly: a memfd has no name to be found by. What an
 // exec was handed is freed here when it fails, unless load_program_image()
 // has handed it on to a script interpreter's exec, which frees it.
-pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount &lib.MountContext, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
+pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount &lib.MountContext, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string, description bool) ?&proc.Process {
 	mut mac_thread := proc.current_thread()
 	mac_previous := mac_thread.mac_loading
 	if execve { mac_thread.mac_loading = true }
@@ -273,7 +273,7 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 	handed_on := unsafe { &bool(C.vinix_stack_alloc(sizeof(bool))) }
 	unsafe { *handed_on = false }
 	process := load_program_image(execve, dir, prog_node, prog_mount, path, argv, envp, stdin_path,
-		stdout_path, stderr_path, handed_on) or {
+		stdout_path, stderr_path, handed_on, description) or {
 		if execve && !unsafe { *handed_on } {
 			free_exec_arguments(path, argv, envp)
 		}
@@ -282,7 +282,7 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 	return process
 }
 
-fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount &lib.MountContext, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string, handed_on &bool) ?&proc.Process {
+fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount &lib.MountContext, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string, handed_on &bool, description bool) ?&proc.Process {
  mut loading_thread := proc.current_thread()
  if loading_thread.exec_depth >= 8 { errno.set(errno.eloop); return none }
  loading_thread.exec_depth++
@@ -294,7 +294,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		return none
 	}
 	if !stat.isreg(prog_node.resource.stat.mode)
-		|| fs.mount_flags(prog_mount) & fs.ms_noexec != 0 {
+		|| (if description { fs.raw_mount_flags(prog_mount) } else { fs.mount_flags(prog_mount) }) & fs.ms_noexec != 0 {
 		errno.set(errno.eacces)
 		return none
 	}
@@ -654,6 +654,7 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 	mut process := proc.current_thread().process
 
 	path := fs.user_path(_path) or { return errno.err, errno.get() }
+	description := path.len == 0
 
 	mut directory := &fs.VFSNode(unsafe { nil })
 	mut target := path
@@ -714,7 +715,7 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 	// The path and both vectors are the exec's now, freed whether it works or
 	// not.
 	if direct_node != unsafe { nil } {
-		start_program_node(true, directory, direct_node, direct_mount, target, argv, envp, '', '', '') or {
+		start_program_node(true, directory, direct_node, direct_mount, target, argv, envp, '', '', '', description) or {
 			return errno.err, errno.get()
 		}
 		return errno.err, errno.get()

@@ -10,7 +10,7 @@ import os
 struct ReferenceReceipt {
 	architecture string
 	timeout_seconds int
-	context string = 'Linux QEMU reference; same native musl probe ELF; portable mount lifecycle, pivot admission, teardown, alias, private-thread, bind policy, pathname truncation, mode/ownership, timestamp, extended-attribute, symlink creation, removal, hard-link, rename, mount-writer, mknodat, access and filesystem-statistics and descriptor-metadata and descriptor-timestamp and descriptor-xattr and descriptor-mmap and descriptor-access attachment checks; networking disabled'
+	context string = 'Linux QEMU reference; same native musl probe ELF; portable mount lifecycle, pivot admission, teardown, alias, private-thread, bind policy, pathname truncation, mode/ownership, timestamp, extended-attribute, symlink creation, removal, hard-link, rename, mount-writer, mknodat, access and filesystem-statistics and descriptor-metadata and descriptor-timestamp and descriptor-xattr and descriptor-mmap and descriptor-access and descriptor-exec attachment checks; networking disabled'
 	artifacts map[string]string
 	command []string
 	passed bool
@@ -111,6 +111,7 @@ fn run() ! {
 		&& result.text.contains('MOUNT DESCXATTR: PASS')
 		&& result.text.contains('MOUNT DESCMAP: PASS')
 		&& result.text.contains('MOUNT DESCACCESS: PASS')
+		&& result.text.contains('MOUNT DESCEXEC: PASS')
 	mut cases_pass := true
 	for kind in 0 .. 7 { cases_pass = cases_pass && result.text.contains('MOUNT IDENTITY CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT ADMISSION CASE: ${kind} PASS') }
@@ -137,6 +138,7 @@ fn run() ! {
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT DESCXATTR CASE: ${kind} PASS') }
 	for kind in 0 .. 6 { cases_pass = cases_pass && result.text.contains('MOUNT DESCMAP CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT DESCACCESS CASE: ${kind} PASS') }
+	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT DESCEXEC CASE: ${kind} PASS') }
 	artifacts := {
 		'kernel': digest(state + '/linux')!
 		'probe': digest(state + '/probe')!
