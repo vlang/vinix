@@ -85,6 +85,13 @@ through `df-5` select individual cases. Native `all` includes them. The Linux
 `--case descmaps` selects inherited-descriptor executable-mapping checks;
 `mm-0` through `mm-5` select individual cases. Native `all` and Linux
 `move-reference` include them.
+`--case descaccess` selects inherited-descriptor access queries; `da-0`
+through `da-7` select individual cases. Native `all` and Linux
+`move-reference` include them.
+
+The [descriptor access checks](descriptor-access.md) preserve the saved mount's
+read-only and `noexec` policy for empty-path ordinary and `O_PATH` descriptors,
+including unlinked files, directories and ordinary owners.
 
 The [descriptor mapping checks](descriptor-mmap.md) preserve the saved mount's
 `noexec` policy for private/shared file mappings and subsequent `mprotect`,
@@ -264,8 +271,8 @@ creation cases, all eight removal cases, all ten hard-link cases, all ten
 rename cases, all ten writer-lifetime cases, all eight node-creation cases,
 all ten access-query cases, all ten filesystem-statistics cases, all eight
 inherited-descriptor metadata cases, all eight descriptor timestamp cases,
-all eight descriptor extended-attribute cases and all six descriptor mapping
-cases.
+all eight descriptor extended-attribute cases, all six descriptor mapping
+cases and all eight descriptor access cases.
 Vinix's cursor limit and unsupported unmount modes are excluded. Supply a matching Linux kernel and
 the ELF preserved by a native run:
 

@@ -1643,7 +1643,7 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 		if flags & at_empty_path == 0 { return errno.err, errno.enoent }
 		if is_fdcwd(dirfd) {
 			node := parent_and_mount_for(dirfd, '.', identity) or { return errno.err, errno.get() }
-			return faccess_node(node, mode, flags & at_eaccess != 0, identity)
+			return faccess_node(node, mode, flags & at_eaccess != 0, identity, false)
 		}
 		// Hold the description until all metadata and ACL checks finish. An
 		// unlinked file or O_PATH descriptor still names its original inode.
@@ -1652,9 +1652,11 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 		}
 		defer { fd.unref() }
 		if fd.handle.node != unsafe { nil } {
+			// Empty-path queries retain the actual open mount's policy even
+			// when a namespace copy with the same ID has different flags.
 			lib.copy_mount_context(identity, &fd.handle.mount)
 			return faccess_node(unsafe { &VFSNode(fd.handle.node) }, mode,
-				flags & at_eaccess != 0, identity)
+				flags & at_eaccess != 0, identity, true)
 		}
 		// Pipes, sockets and anonymous files have metadata but no pathname.
 		// The scratch is borrowed only during these synchronous checks.
@@ -1672,10 +1674,10 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 
 	node := get_node_with_credentials_on_mount(parent, path, follow_links,
 		flags & at_eaccess != 0, identity) or { return errno.err, errno.get() }
-	return faccess_node(node, mode, flags & at_eaccess != 0, identity)
+	return faccess_node(node, mode, flags & at_eaccess != 0, identity, false)
 }
 
-fn faccess_node(node &VFSNode, mode u32, effective bool, identity &lib.MountContext) (u64, u64) {
+fn faccess_node(node &VFSNode, mode u32, effective bool, identity &lib.MountContext, description bool) (u64, u64) {
 	// pledge(2) asks only "rpath" of access(2); unveil(2) the access asked about.
 	mut policy_access := proc.policy_inspect
 	if mode & access_read != 0 {
@@ -1692,14 +1694,17 @@ fn faccess_node(node &VFSNode, mode u32, effective bool, identity &lib.MountCont
 	}
 	// Execute permission on a regular file also depends on its attachment.
 	if mode & access_exec != 0 && stat.isreg(node.resource.stat.mode)
-		&& mount_flags(identity) & ms_noexec != 0 { return errno.err, errno.eacces }
+		&& (if description { raw_mount_flags(identity) } else { mount_flags(identity) }) & ms_noexec != 0 {
+		return errno.err, errno.eacces
+	}
 	if mode != 0 {
 		check_access(node, mode, effective) or { return errno.err, errno.get() }
 	}
 	// Device/FIFO/socket access does not write the containing filesystem.
 	kind := node.resource.stat.mode & stat.ifmt
 	special := kind == stat.ifchr || kind == stat.ifblk || kind == stat.ififo || kind == stat.ifsock
-	if mode & access_write != 0 && !special && read_only_on_mount(node, identity) {
+	if mode & access_write != 0 && !special
+		&& (if description { read_only_on_description(node, identity) } else { read_only_on_mount(node, identity) }) {
 		return errno.err, errno.erofs
 	}
 

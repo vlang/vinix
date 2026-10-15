@@ -388,6 +388,8 @@ pub fn run() int {
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		rename_case := if count == 4 && name[0] == `r` && name[1] == `p` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
+		descriptor_access := if count == 4 && name[0] == `d` && name[1] == `a` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		descriptor_mmaps := if count == 4 && name[0] == `m` && name[1] == `m` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `5` { int(name[3] - `0`) } else { -1 }
 		descriptor_flags := if count == 4 && name[0] == `d` && name[1] == `f` && name[2] == `-`
@@ -433,7 +435,8 @@ pub fn run() int {
 			|| C.strcmp(selected, c'desctimes') == 0 || descriptor_times >= 0
 			|| C.strcmp(selected, c'descxattrs') == 0 || descriptor_xattrs >= 0
 			|| C.strcmp(selected, c'descflags') == 0 || descriptor_flags >= 0
-			|| C.strcmp(selected, c'descmaps') == 0 || descriptor_mmaps >= 0, 4)
+			|| C.strcmp(selected, c'descmaps') == 0 || descriptor_mmaps >= 0
+			|| C.strcmp(selected, c'descaccess') == 0 || descriptor_access >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
@@ -513,6 +516,9 @@ pub fn run() int {
 		if C.strcmp(selected, c'descmaps') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { descriptor_map_cases(-1) }
 		if descriptor_mmaps >= 0 { descriptor_map_cases(descriptor_mmaps) }
+		if C.strcmp(selected, c'descaccess') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { descriptor_access_cases(-1) }
+		if descriptor_access >= 0 { descriptor_access_cases(descriptor_access) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }

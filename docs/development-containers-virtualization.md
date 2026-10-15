@@ -528,6 +528,15 @@ of descriptors opened for reading retain their write restriction. MAC,
 mapping/resource pins, maximum protections, fork inheritance and releases remain
 unchanged. Concurrent remount timing, broader policy combinations and other
 backends remain open.
+The [descriptor access checks](../tests/mount-lifecycle/descriptor-access.md)
+keep empty-path `faccessat2` queries on the descriptor's saved mount for
+read-only and `noexec` flags. Fresh descriptions and pathname queries follow
+the namespace copy. Native ARM/x86 and same-executable Linux checks cover
+ordinary and `O_PATH` descriptions, unlinked files, directories and a forked
+ordinary owner. Existing authorization and error ordering remain unchanged;
+these advisory queries do not replace authorization at a later operation.
+Concurrent remounts, broader policy combinations and backend integration
+remain open.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,
