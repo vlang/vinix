@@ -4,6 +4,11 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`backup-file` and `backup-file-delta` save complete or changed-chunk regular-file
+versions. `restore-file` and `restore-file-delta` validate and restore content,
+mode, ownership and modification time into a new file without replacement.
+See [file backup guarantees and limits](../../docs/file-backups.md).
+
 `verify-volume-monitor REFERENCE TRANSCRIPT` validates every saved ciphertext
 monitor frame against a private CH1 reference, including source/sequence/counters,
 native geometry and full digests. It prints whole-input hashes and transition

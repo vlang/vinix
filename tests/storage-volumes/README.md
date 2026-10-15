@@ -1,5 +1,10 @@
 # Storage-volume qualification
 
+`--host-file-backup` and `--file-backup` qualify full/incremental regular-file
+archives and no-overwrite version restoration, metadata, corruption refusal,
+actual I/O faults, bounded lifetimes and persistence across reordered reboot.
+See [file backup qualification](file-backup.md).
+
 `--host-cipher-monitor-verify` and `--cipher-monitor-verify` qualify complete
 saved ciphertext sessions in both source domains and mapping modes: canonical
 frame/reference/counter/source binding, full input hashes, transition counts,

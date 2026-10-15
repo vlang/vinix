@@ -12,8 +12,13 @@ mut:
 	st_mode u32
 	st_size i64
 	st_uid u32
+	st_gid u32
 	st_dev u64
 	st_ino u64
+	st_mtim C.timespec
+	st_ctim C.timespec
+	st_mtimespec C.timespec
+	st_ctimespec C.timespec
 }
 
 @[c_extern] __global C.errno i32

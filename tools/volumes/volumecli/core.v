@@ -56,6 +56,7 @@ fn decimal(text &char) ?u64 {
 }
 
 fn usage() i32 {
+	C.printf(c'       vinix-volume backup-file SOURCE ARCHIVE\n       vinix-volume backup-file-delta BASE_ARCHIVE SOURCE ARCHIVE\n       vinix-volume restore-file ARCHIVE DESTINATION\n       vinix-volume restore-file-delta BASE_ARCHIVE DELTA_ARCHIVE DESTINATION\n')
 	C.printf(c'       vinix-volume verify-volume-monitor REFERENCE TRANSCRIPT\n')
 	C.printf(c'       vinix-volume verify-data-monitor MANIFEST TRANSCRIPT\n')
 	C.printf(c'       vinix-volume monitor-volume-auto CONFIG PASSPHRASE_FILE REFERENCE INTERVAL_SECONDS COUNT\n       vinix-volume monitor-recovery-volume-auto BACKUP RECOVERY_KEYFILE REFERENCE INTERVAL_SECONDS COUNT\n')
@@ -119,6 +120,14 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'backup-file') == 0 || C.strcmp(argv[1], c'restore-file') == 0) {
+			if argc != 4 || argv[2][0] == 0 || argv[3][0] == 0 { return usage() }
+			return if C.strcmp(argv[1], c'backup-file') == 0 { backup_file(argv[2], nil, argv[3]) } else { restore_file(argv[2], nil, argv[3]) }
+		}
+		if argc >= 2 && (C.strcmp(argv[1], c'backup-file-delta') == 0 || C.strcmp(argv[1], c'restore-file-delta') == 0) {
+			if argc != 5 || argv[2][0] == 0 || argv[3][0] == 0 || argv[4][0] == 0 { return usage() }
+			return if C.strcmp(argv[1], c'backup-file-delta') == 0 { backup_file(argv[3], argv[2], argv[4]) } else { restore_file(argv[3], argv[2], argv[4]) }
+		}
 		if argc >= 2 && C.strcmp(argv[1], c'verify-volume-monitor') == 0 {
 			if argc != 4 || argv[2][0] == 0 || argv[3][0] == 0 { return usage() }
 			return verify_volume_monitor_files(argv[2], argv[3])

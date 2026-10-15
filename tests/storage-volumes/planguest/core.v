@@ -46,7 +46,7 @@ fn C.getpid() i32
 fn C.getppid() i32
 fn C.mkdir(&char, u32) i32
 
-struct C.stat { st_rdev u64; st_mode u32; st_size i64; st_uid u32 }
+struct C.stat { st_rdev u64; st_mode u32; st_size i64; st_uid u32; st_gid u32; st_mtim C.timespec }
 
 @[typedef]
 struct C.Elf64_Phdr {
@@ -577,6 +577,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 	$if volume_ciphertext_auto_test ? { return ciphertext_auto_entry() }
 	$if volume_reference_test ? { return reference_entry() }
 	$if data_auto_test ? { return data_auto_entry() }
+	$if file_backup_guest_test ? { return file_backup_entry() }
 	$if cipher_monitor_verify_test ? { return cipher_monitor_verify_entry() }
 	$if data_monitor_verify_test ? { return data_monitor_verify_entry() }
 	$if cipher_monitor_test ? { return cipher_monitor_entry() }

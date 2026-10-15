@@ -223,6 +223,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Offline complete ciphertext monitor transcript verification in both recorded source domains with canonical frame/source/counter binding, exact private reference geometry, full input hashes, transition summaries, fault precedence and bounded lifetimes across reordered reboot](docs/storage-volumes.md#offline-ciphertext-monitor-transcript-verification).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
+  - [x] [Durable full and changed-chunk regular-file archives, exact full-base binding and no-overwrite content/mode/ownership/mtime restoration with explicit quiescence and consistency limits](docs/file-backups.md).
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,
   with compatible behavior across normal, removable and shared filesystems.
 - [ ] Support interoperable removable media, including FAT32/exFAT and NTFS;
