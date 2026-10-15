@@ -1,0 +1,2 @@
+All assertions passed in nine package-core runners: resolve_search, distribution, release, review, deployment, catalog, composition, policy and service.
+The resolver runner includes the independent oracle, graph limits and current-cause/path assertions.

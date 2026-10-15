@@ -426,12 +426,50 @@ fn qualify_snapshot_schema(binary string, root string, repository string, key st
 	println('Package CLI: malformed cached snapshots preserve trust/state/recovery and permit verified refresh after restoration')
 }
 
+fn qualify_resolver_diagnostics(binary string, directory string) ! {
+	os.mkdir_all(directory + '/payload/data')!
+	os.write_file(directory + '/payload/data/value', 'Synthetic resolver fixture')!
+	key := success(binary, ['keygen', directory + '/seed'])!.trim_space()
+	repository := directory + '/repository'
+	for version in ['1.0.0', '2.0.0']! {
+		manifest := pkgcore.Package{ id: 'app', name: 'Application', version: version, architecture: 'all', kind: 'data',
+			license: if version == '2.0.0' { 'Vendor-EULA' } else { 'MIT' }, proprietary: version == '2.0.0',
+			dependencies: [pkgcore.Dependency{id: 'absent', minimum: '1.0.0', before: '3.0.0'}] }
+		os.write_file(directory + '/manifest.json', json2.encode(manifest))!
+		success(binary, ['pack', directory + '/manifest.json', directory + '/payload', repository])!
+	}
+	// Legacy publication permits incomplete catalogs; release publication must
+	// still reject them. Consumers report the same precise cause through the CLI.
+	expires := (time.now().unix() + 3600).str()
+	success(binary, ['publish', repository, 'fixture', directory + '/seed', '1', expires])!
+	refused_release := command(binary, ['publish-release', repository, 'fixture', directory + '/seed', '1', expires, directory + '/release'])!
+	assert refused_release.code == 1 && refused_release.text.contains('Dependency path: app -> absent') && !os.exists(directory + '/release')
+	for architecture in ['aarch64', 'x86_64']! {
+		root := directory + '/' + architecture
+		os.mkdir_all(root + '/etc/vinix-packages')!
+		config := pkgcore.Config{ architecture: architecture, repositories: [pkgcore.Repository{ id: 'fixture', url: 'file://' + repository, public_key: key }], policy: pkgcore.Policy{ reserve_bytes: 0 } }
+		os.write_file(root + '/etc/vinix-packages/config.json', json2.encode(config))!
+		success(binary, ['--root', root, 'update'])!
+		store := pkgcore.state_directory(root)
+		catalog := os.read_file(store + '/catalog.json')!; history := os.read_file(store + '/trust-history.json')!
+		for args in [['plan', 'install', 'app'], ['review', 'install', 'app'], ['install', 'app']] {
+			reply := command(binary, ['--root', root, ...args])!
+			assert reply.code == 1 && reply.text.contains('absent') && !reply.text.contains('Vendor-EULA'), reply.text
+			assert reply.text.contains('Dependency path: app -> absent') && reply.text.contains('Requirement: absent >= 1.0.0 < 3.0.0'), reply.text
+			assert !os.exists(store + '/current') && !os.is_link(store + '/current')
+			assert os.read_file(store + '/catalog.json')! == catalog && os.read_file(store + '/trust-history.json')! == history
+		}
+	}
+	println('Package CLI: signed policy fallback reports the current missing requirement and dependency path on both targets; plan/review/install refusal preserves trust and activation, and release closure refusal stays explicit PASS')
+}
+
 fn qualify(binary string) ! {
 	work := os.real_path(os.temp_dir()) + '/vinix-package-cli-' + os.getpid().str()
 	os.mkdir_all(work + '/root/etc/vinix-packages')!
 	os.mkdir_all(work + '/payload/bin')!
 	defer { os.rmdir_all(work) or {} }
 	qualify_catalog_cli(binary, work)!
+	qualify_resolver_diagnostics(binary, work + '/resolver-diagnostics')!
 	key := success(binary, ['keygen', work + '/seed'])!.trim_space()
 	assert key.len == 64
 	assert os.stat(work + '/seed')!.mode & 0o777 == 0o600

@@ -423,6 +423,16 @@ that budget across all advertised versions and both host architectures, with eac
 advertised root fixed to its exact variant. See
 [dependency resolver qualification](../tests/packages/resolver-check.md).
 
+Resolution failures report the cause of an encountered failing requirement and
+its dependency path. Version conflicts include the selected version and required
+range; missing, policy-denied and runtime-entrypoint failures keep their own
+context. Backtracking retires discarded path ancestry, and skipping a denied
+alternative before selecting an allowed version cannot supply a later error's
+cause. Paths retain the root and failing suffix, marking omitted middle hops.
+Diagnostics stay within 4,096 bytes and preserve the exact search-limit error.
+Publisher closure checks include their fixed advertised root. See
+[diagnostic qualification](../tests/packages/resolver-diagnostics-check.md).
+
 ## Install, maintenance and recovery
 
 ```sh

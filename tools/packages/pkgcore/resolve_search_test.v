@@ -20,6 +20,107 @@ fn search_fixture_config(architecture string) Config {
 	return Config{architecture: architecture, repositories: [Repository{id: 'fixture', url: 'https://example.invalid', public_key: 'a'.repeat(64)}]}
 }
 
+fn test_resolution_diagnostics_follow_the_current_requirement_after_a_policy_fallback() {
+	for architecture in ['aarch64', 'x86_64']! {
+		working := search_fixture_package('app', [Dependency{id: 'missing'}])
+		denied := Package{ ...working, version: '2.0.0', proprietary: true, license: 'Vendor-EULA', dependencies: []Dependency{} }
+		mut search := Search{ config: search_fixture_config(architecture), candidates: [search_fixture_candidate(denied), search_fixture_candidate(working)] }
+		defer { unsafe { search.diagnostic.free() } }
+		if _ := search.solve([Dependency{id: 'app'}]) { assert false } else {
+			message := err.msg()
+			defer { unsafe { message.free(); err.free() } }
+			assert message.contains('missing') && !message.contains('Vendor-EULA'), message
+			assert message.contains('Dependency path: app -> missing') && message.ends_with('Requirement: missing'), message
+		}
+	}
+}
+
+fn search_fixture_failure(mut search Search, roots []Dependency) string {
+	if _ := search.solve(roots) { assert false; return '' } else {
+		message := err.msg()
+		unsafe { (&err).free() }
+		return message
+	}
+}
+
+fn test_requirement_diagnostics_follow_backtracking_conflicts_policy_and_architecture() {
+	for architecture in ['aarch64', 'x86_64']! {
+		config := search_fixture_config(architecture)
+		app := search_fixture_package('app', [Dependency{id: 'old-missing'}])
+		newer := Package{ ...app, version: '2.0.0', dependencies: [Dependency{id: 'discarded'}] }
+		mut branch := Search{ config: config, candidates: [search_fixture_candidate(newer), search_fixture_candidate(app)] }
+		message := search_fixture_failure(mut branch, [Dependency{id: 'app'}])
+		assert message.contains('app -> old-missing') && !message.contains('discarded'), message
+		unsafe { message.free(); branch.diagnostic.free() }
+		left := search_fixture_package('left', [Dependency{id: 'shared', minimum: '2.0.0'}])
+		right := search_fixture_package('right', [Dependency{id: 'shared', before: '2.0.0'}])
+		shared := search_fixture_package('shared', [])
+		mut conflict := Search{ config: config, candidates: [search_fixture_candidate(left), search_fixture_candidate(right),
+			search_fixture_candidate(Package{ ...shared, version: '2.0.0' }), search_fixture_candidate(shared)] }
+		conflicting := search_fixture_failure(mut conflict, [Dependency{id: 'left'}, Dependency{id: 'right'}])
+		assert conflicting.contains('conflicting version requirements for shared: selected 2.0.0')
+		assert conflicting.contains('Dependency path: right -> shared') && conflicting.ends_with('Requirement: shared < 2.0.0'), conflicting
+		unsafe { conflicting.free(); conflict.diagnostic.free() }
+		mut denied := Search{ config: Config{ ...config, policy: Policy{ allowed: ['app'] } }, candidates: [
+			search_fixture_candidate(Package{ ...app, dependencies: [Dependency{id: 'shared', minimum: '1.0.0', before: '3.0.0'}] }), search_fixture_candidate(shared)] }
+		policy := search_fixture_failure(mut denied, [Dependency{id: 'app'}])
+		assert policy.contains('organization allowlist') && policy.contains('Dependency path: app -> shared')
+		assert policy.ends_with('Requirement: shared >= 1.0.0 < 3.0.0'), policy
+		unsafe { policy.free(); denied.diagnostic.free() }
+		mut foreign := Search{ config: config, candidates: [search_fixture_candidate(Package{ ...shared,
+			architecture: if architecture == 'aarch64' { 'x86_64' } else { 'aarch64' } })] }
+		wrong_arch := search_fixture_failure(mut foreign, [Dependency{id: 'shared'}])
+		assert wrong_arch.contains('no trusted ' + architecture + ' candidate satisfies shared') && wrong_arch.contains('Dependency path: shared')
+		unsafe { wrong_arch.free(); foreign.diagnostic.free() }
+	}
+}
+
+fn test_runtime_and_fixed_release_diagnostics_retain_the_required_root() {
+	app := Package{ ...search_fixture_package('app', [Dependency{id: 'runtime'}]), architecture: 'aarch64',
+		kind: 'linux', runtime: 'runtime', entrypoint: 'bin/run' }
+	runtime := Package{ ...search_fixture_package('runtime', []), architecture: 'aarch64', kind: 'runtime' }
+	root := search_fixture_package('root', [Dependency{id: 'app'}])
+	mut search := Search{ config: search_fixture_config('aarch64'), candidates: [
+		search_fixture_candidate(root), search_fixture_candidate(app), search_fixture_candidate(runtime)] }
+	text := search_fixture_failure(mut search, [Dependency{id: 'root'}])
+	assert text.contains('isolated runtime runtime does not provide bin/run') && text.contains('Dependency path: root -> app'), text
+	unsafe { text.free(); search.diagnostic.free() }; search.diagnostic = ''
+	if _ := search.solve_fixed(app.dependencies, [1]) { assert false } else {
+		message := err.msg()
+		assert message.contains('Dependency path: app') && message.contains('isolated runtime'), message
+		unsafe { message.free(); err.free() }
+	}
+	unsafe { search.diagnostic.free() }; search.diagnostic = ''
+	if _ := search.solve_fixed([Dependency{id: 'absent', minimum: '2.0.0'}], [1]) { assert false } else {
+		message := err.msg()
+		assert message.contains('Dependency path: app -> absent') && message.ends_with('Requirement: absent >= 2.0.0'), message
+		unsafe { message.free(); err.free() }
+	}
+	unsafe { search.diagnostic.free() }
+}
+
+fn test_requirement_paths_are_bounded_and_keep_the_root_and_failing_suffix() {
+	mut names := []string{cap: 4096}
+	for i in 0 .. 4096 { names << 'node-' + i.str() }
+	mut candidates := []Installed{cap: 4096}
+	for i in 0 .. 4096 {
+		dependency := if i + 1 < names.len { names[i + 1] } else { 'absent' }
+		candidates << search_fixture_candidate(search_fixture_package(names[i], [Dependency{id: dependency}]))
+	}
+	mut search := Search{ config: search_fixture_config('aarch64'), candidates: candidates }
+	message := search_fixture_failure(mut search, [Dependency{id: names[0]}])
+	assert message.len < 4096 && message.contains('Dependency path: node-0 -> ... -> node-4083 -> node-4084'), message
+	assert message.contains('node-4095 -> absent') && message.ends_with('Requirement: absent'), message
+	unsafe { message.free(); search.diagnostic.free() }
+	// A long UTF-8 cause is shortened before adding the path and range.
+	search.diagnostic = 'é'.repeat(1023) + '🚀'
+	requirements := [Dependency{id: 'app'}, Dependency{id: 'missing', minimum: '1.0.0'}]
+	search.trace_requirement(1, requirements, [-1, 0], '')
+	assert search.diagnostic.contains('(reason truncated)\nDependency path: app -> missing') && search.diagnostic.len < 4096
+	assert search.diagnostic.ends_with('Requirement: missing >= 1.0.0')
+	unsafe { search.diagnostic.free() }
+}
+
 fn test_resolution_search_budget_is_not_swallowed_by_backtracking() {
 	mut search := Search{config: search_fixture_config('aarch64'), steps: 99999, candidates: [
 		search_fixture_candidate(search_fixture_package('app', [Dependency{id: 'data'}])),
@@ -234,6 +335,11 @@ fn test_search_work_buffers_retire_without_retained_allocations() {
 		blocked := Config{...config, policy: Policy{allowed: ['another-app']}}
 		roots := [Dependency{id: 'node-0'}]
 		missing := [Dependency{id: 'absent'}]
+		app := search_fixture_package('app', [Dependency{id: 'absent'}])
+		fallback := [search_fixture_candidate(Package{ ...app, version: '2.0.0', proprietary: true, license: 'Vendor-EULA' }), search_fixture_candidate(app)]
+		app_root := [Dependency{id: 'app'}]
+		mut broken := candidates.clone()
+		broken[255] = search_fixture_candidate(search_fixture_package('node-255', [Dependency{id: 'absent'}]))
 		for warmup in 0 .. 2 {
 			if warmup == 1 { C.vinix_heap_begin() }
 			for _ in 0 .. 1000 {
@@ -254,10 +360,22 @@ fn test_search_work_buffers_retire_without_retained_allocations() {
 					unsafe { message.free(); err.free() }
 				}
 				unsafe { denied.diagnostic.free() }
+				for inputs in [fallback, broken]! {
+					mut failed := Search{ config: config, candidates: inputs }
+					// Returning an error message from a helper makes the pinned V
+					// compiler box that helper's local IError. Keep this refusal inline.
+					if _ := failed.solve(if inputs.len == 2 { app_root } else { roots }) { assert false } else {
+						message := err.msg()
+						assert message.contains('absent') && message.contains('Dependency path:') && !message.contains('Vendor-EULA')
+						unsafe { message.free(); err.free() }
+					}
+					unsafe { failed.diagnostic.free() }
+				}
 			}
 		}
 		kept := C.vinix_heap_end()
 		assert kept == 0, 'dependency search work buffers retained ${kept} bytes'
 		println('Dependency search: 1000 successful 256-package chains and missing/policy refusals retain zero tracked bytes')
+		println('Dependency diagnostics: 1000 policy-fallback and deep missing-path refusals retain zero tracked bytes')
 	}
 }

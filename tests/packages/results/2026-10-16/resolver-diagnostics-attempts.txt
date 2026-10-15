@@ -1,0 +1,62 @@
+Expected baseline failure is retained separately.
+Baseline helper first used a directory name already occupied by its compiled binary; the corrected helper uses baseline-source.
+
+baseline-helper-initial.txt:
+The initial private helper stopped before staging or compiling the regression:
+V panic: path `/Users/alex/code/vinix/build/package-resolver-diagnostics-work/baseline` already exists, and is not a folder
+`v run baseline.v` created an executable named baseline, colliding with the
+helper's intended staging directory. The stage is now named baseline-source.
+
+initial-resolve-memory-run.txt:
+tools/packages/pkgcore/resolve_search_test.v:372: fn test_search_work_buffers_retire_without_retained_allocations
+   > assert kept == 0, 'dependency search work buffers retained ${kept} bytes'
+     Left value (len: 5): `32000`
+    Right value (len: 1): `0`
+        Message: dependency search work buffers retained 32000 bytes
+
+
+initial-resolve_search-sanitize-run.txt:
+tools/packages/pkgcore/resolve_search_test.v:372: fn test_search_work_buffers_retire_without_retained_allocations
+   > assert kept == 0, 'dependency search work buffers retained ${kept} bytes'
+     Left value (len: 5): `32000`
+    Right value (len: 1): `0`
+        Message: dependency search work buffers retained 32000 bytes
+
+
+second-resolve-memory-run.txt:
+tools/packages/pkgcore/resolve_search_test.v:372: fn test_search_work_buffers_retire_without_retained_allocations
+   > assert kept == 0, 'dependency search work buffers retained ${kept} bytes'
+     Left value (len: 5): `32000`
+    Right value (len: 1): `0`
+        Message: dependency search work buffers retained 32000 bytes
+
+
+initial-aarch64.txt:
+no AArch64 musl sysroot at /Users/alex/code/vinix/build-aarch64-userland/sysroot; set VINIX_AARCH64_SYSROOT
+
+second-aarch64.txt:
+/Users/alex/code/vinix/build/package-resolver-diagnostics-work/cross-cc --target=aarch64-linux-musl --sysroot=/opt/homebrew/opt/musl-cross/libexec/aarch64-linux-musl -static -O1 -w -D_GNU_SOURCE -fno-stack-protector -L/opt/homebrew/opt/musl-cross/libexec/aarch64-linux-musl/lib -fuse-ld=lld -o /Users/alex/code/vinix/build/pkg-rdiag-arm2/guest/init /Users/alex/code/vinix/build/pkg-rdiag-arm2/guest/init.c -lm -lpthread
+cross-cc: exit status 1
+/Users/alex/code/vinix/build/pkg-rdiag-arm2/guest/init.c: In function 'os__Process__impl_check_pid_status':
+/Users/alex/code/vinix/build/pkg-rdiag-arm2/guest/init.c:51998:39: error: passing argument 2 of 'waitpid' from incompatible pointer type [-Wincompatible-pointer-types]
+51998 |                 ret = waitpid(p->pid, &cstatus, waitpid_options);
+      |                                       ^~~~~~~~
+      |                                       |
+      |                                       i64 * {aka long int *}
+In file included from /Users/alex/code/vinix/build/pkg-rdiag-arm2/guest/init.c:53:
+/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/aarch64-linux-musl/include/sys/wait.h:21:23: note: expected 'int *' but argument is of type 'i64 *' {aka 'long int *'}
+   21 | pid_t waitpid (pid_t, int *, int );
+      |                       ^~~~~
+/Users/alex/code/vinix/build/pkg-rdiag-arm2/guest/init.c: In function 'package_collection_limit_probe':
+/Users/alex/code/vinix/build/pkg-rdiag-arm2/guest/init.c:54344:41: error: passing argument 2 of 'execv' from incompatible pointer type [-Wincompatible-pointer-types]
+54344 |         execv("/usr/bin/vinix-package", &arguments[0]);
+      |                                         ^~~~~~~~~~~~~
+      |                                         |
+      |                                         u8 ** {aka unsigned char **}
+In file included from /Users/alex/code/vinix/build/pkg-rdiag-arm2/guest/init.c:37:
+/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/aarch64-linux-musl/include/unistd.h:91:25: note: expected 'char * const*' but argument is of type 'u8 **' {aka 'unsigned char **'}
+   91 | int execv(const char *, char *const []);
+      |                         ^~~~~~~~~~~~~~
+
+Final measured refusal handling stays inline to avoid boxed local IError wrappers. Final native and sanitizer retained-byte checks pass.
+Final AArch64 uses an explicit installed musl sysroot and a V adapter to GCC with -Wno-error=incompatible-pointer-types and -Wno-error=int-conversion for existing generated C.

@@ -1,0 +1,3 @@
+Native -gc none -manualfree -d track_heap
+Dependency search: 1000 successful 256-package chains and missing/policy refusals retain zero tracked bytes
+Dependency diagnostics: 1000 policy-fallback and deep missing-path refusals retain zero tracked bytes

@@ -38,4 +38,15 @@ fn qualify_package_resolver(mut t Test, architecture string) ! {
 		unsafe { (&array(&names)).free() }
 	}
 	t.say('PACKAGE RESOLVER chain-4096 dense-cycle-512 explicit-search-limit bounded-iterative PASS')
+	base := pkgcore.Package{ id: 'app', name: 'Application', version: '1.0.0', architecture: 'all', kind: 'data', license: 'MIT',
+		dependencies: [pkgcore.Dependency{id: 'absent', minimum: '1.0.0', before: '3.0.0'}] }
+	catalog := pkgcore.Catalog{ packages: [pkgcore.Installed{ package: base, repository: 'resolver-fixture' },
+		pkgcore.Installed{ package: pkgcore.Package{ ...base, version: '2.0.0', proprietary: true, license: 'Vendor-EULA' }, repository: 'resolver-fixture' }] }
+	if _ := pkgcore.resolve(catalog, config, pkgcore.State{}, ['app'], true) { assert false } else {
+		message := err.msg()
+		assert message.contains('absent') && !message.contains('Vendor-EULA') && message.len <= 4096, message
+		assert message.contains('Dependency path: app -> absent') && message.ends_with('Requirement: absent >= 1.0.0 < 3.0.0'), message
+		unsafe { message.free(); err.free() }
+	}
+	t.say('PACKAGE RESOLVER current-cause dependency-path bounded-diagnostic PASS')
 }

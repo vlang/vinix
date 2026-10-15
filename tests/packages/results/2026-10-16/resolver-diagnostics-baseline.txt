@@ -1,0 +1,5 @@
+Pre-change resolve_search.v snapshot, with the new policy-fallback assertion: expected failure reports Vendor-EULA instead of the missing dependency. The exact baseline module and compiler input are pinned in the ledger.
+
+/Users/alex/code/vinix/build/package-resolver-diagnostics-work/baseline-source/resolve_search_test.v:32: fn test_resolution_diagnostics_follow_the_current_requirement_after_a_policy_fallback
+    assert message.contains('missing') && !message.contains('Vendor-EULA'), message
+        Message: app: administrator must accept license Vendor-EULA

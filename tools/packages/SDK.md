@@ -313,6 +313,14 @@ identities remain bound to their installed repository. These limits supplement
 the signed metadata bounds; they do not truncate an accepted closure. See
 [resolver qualification](../../tests/packages/resolver-check.md).
 
+Failed resolution reports the encountered requirement, its version bounds and a
+dependency path from the requested application. Skipped policy refusals do not
+replace a later missing dependency's cause. Deep paths retain their root and
+failing suffix, with omitted middle hops marked explicitly; diagnostics are
+bounded to 4,096 UTF-8 bytes. Release closure checks include the fixed advertised
+version's root. Search-budget exhaustion remains a direct limit error. See
+[diagnostic qualification](../../tests/packages/resolver-diagnostics-check.md).
+
 The command verifies and deduplicates objects, checks destination space with a
 64 MiB reserve, creates a private `.vinix-release-*` sibling tree, verifies copied
 bytes and flushes the tree. Exclusive atomic rename publishes the complete new
