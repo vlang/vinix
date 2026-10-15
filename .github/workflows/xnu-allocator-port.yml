@@ -23,11 +23,15 @@ env:
 jobs:
   host-tests:
     runs-on: ubuntu-22.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
+        id: uses_checkout_v6
         with:
           persist-credentials: false
       - name: Fetch pinned V 0.5.2 host toolchain
+        id: fetch_pinned_v_0_5_2_host_toolchain
+        if: ${{ !cancelled() && steps.uses_checkout_v6.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -40,12 +44,16 @@ jobs:
           chmod +x "$RUNNER_TEMP/xnu-port-v/v/v"
           "$RUNNER_TEMP/xnu-port-v/v/v" version
       - name: Retain verified toolchain for reproducing the host tests
+        id: retain_verified_toolchain_for_reproducing_the_host_tests
+        if: ${{ !cancelled() && steps.fetch_pinned_v_0_5_2_host_toolchain.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: xnu-port-host-toolchain
           path: ${{ runner.temp }}/v_linux.zip
           retention-days: 1
       - name: Independent V models and extracted C-reference checks
+        id: independent_v_models_and_extracted_c_reference_checks
+        if: ${{ !cancelled() && steps.retain_verified_toolchain_for_reproducing_the_host_tests.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -55,6 +63,8 @@ jobs:
           VMODULES="$GITHUB_WORKSPACE/tests/memory" "$V" -cc gcc \
             test tests/xnualloc/refmodel tests/xnualloc/zonemodel
       - name: Actual V tests (debug and production)
+        id: actual_v_tests_debug_and_production
+        if: ${{ !cancelled() && steps.independent_v_models_and_extracted_c_reference_checks.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -67,21 +77,31 @@ jobs:
   kernel-smoke:
     needs: host-tests
     runs-on: ubuntu-22.04
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         arch: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v6
+        id: uses_checkout_v6
         with:
           persist-credentials: false
       - name: Install native and cross-build dependencies
+        id: install_native_and_cross_build_dependencies
+        if: ${{ !cancelled() && steps.uses_checkout_v6.outcome == 'success' }}
         run: sudo apt-get update && sudo apt-get install -y build-essential clang lld llvm
       - name: Build the pinned kernel compiler
+        id: build_the_pinned_kernel_compiler
+        if: ${{ !cancelled() && steps.install_native_and_cross_build_dependencies.outcome == 'success' }}
         run: sh tools/m1-wifi/get-v.sh "$RUNNER_TEMP/xnu-kernel-v"
       - name: Fetch kernel dependencies
+        id: fetch_kernel_dependencies
+        if: ${{ !cancelled() && steps.build_the_pinned_kernel_compiler.outcome == 'success' }}
         run: cd kernel && ./get-deps
       - name: Build flag-off, bitmap-only and zone kernels (debug)
+        id: build_flag_off_bitmap_only_and_zone_kernels_debug
+        if: ${{ !cancelled() && steps.fetch_kernel_dependencies.outcome == 'success' }}
         shell: bash
         env:
           TARGET_ARCH: ${{ matrix.arch }}
