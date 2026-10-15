@@ -7456,21 +7456,51 @@ hidden V allocations in dispatch/serialization, plus registry locking and
 stream translation. Published runners remain unchanged; the full iOS regression
 remains unpassed.
 
-The current IPA probe links past both required AudioToolbox imports and exits
+The AudioToolbox IPA probe links past both required imports and exits
 with status 1 at AVFoundation's `_AVCaptureDeviceTypeBuiltInTelephotoCamera`.
-Fortnite has not entered application code and remains unplayable.
+
+V now supplies the seventeen missing AVFoundation NSString globals used by the
+IPA: five capture-device types, five capture-session notification names, the
+high-quality capture preset, five media types and the player-item end notification.
+The existing medium preset, aspect-fill gravity and video media type use the same
+storage. All twenty values were measured through the installed AVFoundation
+library and checked against its SDK declarations. Media types contain `soun`,
+`clcp`, `sbtl`, `text`, `tmcd` and `vide`, rather than their export names.
+
+These exports address aligned NSString pointer cells in one read-only page,
+alongside immortal CFSTR records and their UTF-8 bytes. First publication uses
+the runtime lock. Notification, collection, autorelease and Swift owners retire
+before the page is unmapped; shutdown callbacks can still read published globals.
+Exports are scoped to AVFoundation. This implements constant data; capture-device
+discovery, camera capture and player classes still need their own implementations.
+
+Eight normal/deterministic host sanitizer runs and four ARM64 guest suites pass:
+AVFoundation constants, Foundation keys, URL-error globals and autorelease pools.
+Native comparisons cover exact values, immutable copies, retained arrays and
+dictionaries, equal-name delivery/filtering/removal for all six notifications,
+eight concurrent readers and two drained runtime lifetimes. The actual IPA
+consumer at `0x10a652048` loads the telephoto pointer cell, dereferences it at
+`0x10a652050`, and adds it to the device-type collection before discovery.
+The eleven final generated C streams/executables, native measurements, pinned
+inputs, source inspection and retired VM evidence are retained under
+`build/ios/fortnite/avfoundation-constants-checks`. Published runners remain
+unchanged; the full iOS regression remains unpassed.
+
+The current IPA probe links past this AVFoundation group and exits with status 1
+at CoreVideo's `_CVMetalTextureCacheCreate`. Fortnite has not entered application
+code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,560 | 600 | 79 |
+| Fortnite executable | 1,577 | 583 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,395 | 603 | 120 |
+| All images | 2,412 | 586 | 120 |
 
-The C++/GLES/Text variant reports 2,408 resolved imports, 590 unresolved strong
+The C++/GLES/Text variant reports 2,425 resolved imports, 573 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

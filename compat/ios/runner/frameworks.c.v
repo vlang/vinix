@@ -77,6 +77,9 @@ fn framework_symbol(library string, symbol string) ?u64 {
 			'_$s10Foundation11JSONEncoderC20DateEncodingStrategyO9formattedyAESo15NSDateFormatterCcAEmFWC'] {
 		return swift_foundation_symbol(symbol) or { return none }
 	}
+	if library == '/System/Library/Frameworks/AVFoundation.framework/AVFoundation' {
+		if address := avfoundation_constant_symbol(symbol) { return address }
+	}
 	if library == '/System/Library/Frameworks/CFNetwork.framework/CFNetwork' {
 		if address := cfnetwork_symbol(symbol) { return address }
 	}
@@ -334,9 +337,6 @@ fn framework_constant(symbol string) ?u64 {
 		'_AVAudioSessionRouteChangeReasonKey' { 'AVAudioSessionRouteChangeReasonKey' }
 		'_AVAudioSessionSilenceSecondaryAudioHintNotification' { 'AVAudioSessionSilenceSecondaryAudioHintNotification' }
 		'_AVAudioSessionSilenceSecondaryAudioHintTypeKey' { 'AVAudioSessionSilenceSecondaryAudioHintTypeKey' }
-		'_AVCaptureSessionPresetMedium' { 'AVCaptureSessionPresetMedium' }
-		'_AVLayerVideoGravityResizeAspectFill' { 'AVLayerVideoGravityResizeAspectFill' }
-		'_AVMediaTypeVideo' { 'vide' }
 		'_UIApplicationLaunchOptionsURLKey' { 'UIApplicationLaunchOptionsURLKey' }
 		'_UIApplicationWillTerminateNotification' { 'UIApplicationWillTerminateNotification' }
 		'_UIDeviceBatteryLevelDidChangeNotification' { 'UIDeviceBatteryLevelDidChangeNotification' }
