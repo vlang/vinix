@@ -6183,8 +6183,8 @@ joined, retired VM phases are retained under
 `build/ios/fortnite/json-encoder-initializer-checks`.
 Full iOS regression remains unpassed and published runners remain unchanged.
 
-The current IPA startup probe resolves the encoder constructor and metadata
-imports, then exits with status 1 at the required import
+That IPA startup probe resolved the encoder constructor and metadata
+imports, then exited with status 1 at the required import
 `_$s10Foundation14LocalizedErrorPAAE10helpAnchorSSSgvg`.
 Fortnite has not entered application code and remains unplayable.
 
@@ -6193,17 +6193,41 @@ The final builds use pinned musl headers/libraries and GCC startup objects
 already present in this checkout. The failed generated C and diagnostics are
 retained separately; no failed guest executable ran.
 
+The four LocalizedError protocol-extension default getters now resolve through
+both Foundation install names: errorDescription, failureReason,
+recoverySuggestion and helpAnchor. Installed Foundation returns a nil optional
+String as two zero words in x0/x1, without reading Self, metadata, witnesses or
+x8. Vinix mirrors these defaults with distinct entries in the existing sealed
+Foundation code page. An empty String has a different representation. These
+exports do not provide protocol metadata or custom witness dispatch.
+
+Eight ASan/UBSan runs and four Vinix ARM64 guest suites pass for the defaults,
+Error.localizedDescription, CocoaError protocol layout and JSONEncoder
+construction. The new fixture executes all native and Vinix defaults with
+null, invalid and protected inputs, readonly Self at a guard edge, register and
+vector canaries, concurrent calls/publication and two unmapped retirements.
+It verifies per-property alias identity and distinct addresses across properties.
+Eleven final C streams/programs and four joined, retired VM phases are retained
+under `build/ios/fortnite/localized-error-checks`. The private build uses
+the previously pinned local musl/GCC SDK and C++/GLES dependencies.
+Full iOS regression remains unpassed and published runners remain unchanged.
+
+The current IPA startup probe resolves the LocalizedError default getter
+imports, then exits with status 1 at the required import
+`_$s10Foundation18_ErrorCodeProtocolPAAE2teoiySbx_s0B0_ptFZ`.
+Fortnite has not entered application code and remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,490 | 670 | 79 |
+| Fortnite executable | 1,494 | 666 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,325 | 673 | 120 |
+| All images | 2,329 | 669 | 120 |
 
-The C++/GLES/Text variant reports 2,338 resolved imports, 660 unresolved strong
+The C++/GLES/Text variant reports 2,342 resolved imports, 656 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

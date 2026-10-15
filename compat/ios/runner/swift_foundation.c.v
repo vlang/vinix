@@ -95,6 +95,14 @@ fn swift_foundation_arena() u64 {
 	write32(base + 240, 0xd63f0100) // blr x8
 	write32(base + 244, 0xa8c17bfd) // ldp x29, x30, [sp], #16
 	write32(base + 248, 0xd65f03c0) // ret
+	// LocalizedError's four protocol-extension defaults return nil String?.
+	// Native returns both words in x0/x1 and reads none of Self, metadata,
+	// witnesses or x8. Keep distinct entries for the four distinct exports.
+	for offset in [u64(256), 272, 288, 304]! {
+		write32(base + offset, 0xd2800000) // mov x0, #0
+		write32(base + offset + 4, 0xd2800001) // mov x1, #0
+		write32(base + offset + 8, 0xd65f03c0) // ret
+	}
 	// A concrete specialization of Foundation's retroactive String conformance.
 	// The installed descriptor uses a generic witness cache; this implementation
 	// supplies its already-specialized table, accepted by normal witness lookup.
@@ -113,7 +121,7 @@ fn swift_foundation_arena() u64 {
 	// destructiveInjectEnumTag witness. Native formatted(DateFormatter) is
 	// payload case zero; this does not construct an encoder or format a date.
 	write32(data + 96, 0)
-	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 252) })
+	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 316) })
 	if C.mprotect(unsafe { voidptr(base) }, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(unsafe { voidptr(base) }, usize(page * 2)); panic('iOS: cannot seal Swift Foundation entries')
@@ -273,6 +281,10 @@ fn swift_foundation_symbol(symbol string) !u64 {
 		'_$s10Foundation11JSONDecoderC6decode_4fromxxm_AA4DataVtKSeRzlFTj' { swift_foundation_arena() + 160 }
 		'_$s10Foundation11JSONEncoderC20dateEncodingStrategyAC04DatedE0OvsTj' { swift_foundation_arena() + 192 }
 		'_$s10Foundation11JSONEncoderC6encodeyAA4DataVxKSERzlFTj' { swift_foundation_arena() + 224 }
+		'_$s10Foundation14LocalizedErrorPAAE16errorDescriptionSSSgvg' { swift_foundation_arena() + 256 }
+		'_$s10Foundation14LocalizedErrorPAAE13failureReasonSSSgvg' { swift_foundation_arena() + 272 }
+		'_$s10Foundation14LocalizedErrorPAAE18recoverySuggestionSSSgvg' { swift_foundation_arena() + 288 }
+		'_$s10Foundation14LocalizedErrorPAAE10helpAnchorSSSgvg' { swift_foundation_arena() + 304 }
 		'_$s10Foundation11JSONEncoderC20DateEncodingStrategyO9formattedyAESo15NSDateFormatterCcAEmFWC' {
 			swift_foundation_arena() + u64(C.getpagesize()) + 96
 		}

@@ -26,6 +26,10 @@ fn framework_symbol(library string, symbol string) ?u64 {
 			'_$s10Foundation11JSONEncoderC20DateEncodingStrategyOMn',
 			'_$s10Foundation11JSONEncoderC20dateEncodingStrategyAC04DatedE0OvsTj',
 			'_$s10Foundation11JSONEncoderC6encodeyAA4DataVxKSERzlFTj',
+			'_$s10Foundation14LocalizedErrorPAAE16errorDescriptionSSSgvg',
+			'_$s10Foundation14LocalizedErrorPAAE13failureReasonSSSgvg',
+			'_$s10Foundation14LocalizedErrorPAAE18recoverySuggestionSSSgvg',
+			'_$s10Foundation14LocalizedErrorPAAE10helpAnchorSSSgvg',
 			'_$s10Foundation11JSONEncoderC20DateEncodingStrategyO9formattedyAESo15NSDateFormatterCcAEmFWC'] {
 		return swift_foundation_symbol(symbol) or { return none }
 	}
