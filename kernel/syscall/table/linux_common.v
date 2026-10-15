@@ -1051,14 +1051,15 @@ fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) 
 		if !krandom.fill(&bounce[0], chunk, allow_insecure) {
 			return errno.err, errno.eagain
 		}
-		if !usercopy.copy_to_user(buf + written, voidptr(&bounce[0]), chunk) {
-			// Report the bytes that did land, as the manual page requires.
+		remaining := usercopy.raw_copy_to_user(buf + written, voidptr(&bounce[0]), chunk)
+		written += chunk - remaining
+		if remaining != 0 {
+			// Include a committed prefix within this chunk in the short result.
 			if written > 0 {
 				return written, 0
 			}
 			return errno.err, errno.efault
 		}
-		written += chunk
 	}
 	unsafe { C.memset(&bounce[0], 0, sizeof(bounce)) }
 

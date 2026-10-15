@@ -950,6 +950,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   architectures, with flat repeated-path storage. See the
   [random-flag receipts](docs/linux-posix-qualification.md#native-getrandom-flag-validation).
 
+- [x] Return positive getrandom short counts after partial output faults;
+  qualify guarded PROT_NONE/read-only/unmapped suffixes, raw/musl calls, root
+  and UID1000, native page/chunk boundaries and exact repeated native copying
+  on both architectures against identical-ELF Linux references. See the
+  [partial-copy receipts](docs/linux-posix-qualification.md#native-getrandom-partial-copy-faults).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

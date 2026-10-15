@@ -1,0 +1,2 @@
+arm fixture C heap-free preflight: PASS; explicit allocas=4
+x86 fixture C heap-free preflight: PASS; explicit allocas=4

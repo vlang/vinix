@@ -1617,3 +1617,16 @@ binds complete source/C scope, real errno/data guards, four-alloca probe identit
 Linux references and exact retained inputs. Entropy quality, unseeded blocking,
 interruption, partial faults, large valid requests and GNU/foreign paths remain
 separate; the three broad section 15 gates stay open.
+
+The `randomcopy` case qualifies seeded getrandom partial-copy accounting across
+PROT_NONE/read-only/unmapped suffixes, root/UID1000, six valid flags and raw/musl
+calls. The common native/Linux oracle requires a positive short count bounded
+by the accessible prefix and intact guards outside that prefix. ARM Linux may
+stop copying early or modify additional accessible bytes beyond its conservative
+return after a faulting store. The native storage cycle requires exact
+complete-prefix returns. `randomcopy-reference.v` boots the unchanged probe ELF
+on supplied Linux kernels. Compile `randomcopy-check.v` without `-prod` and
+pass the retained evidence area to audit compiler/build/source/C/input identities,
+real receipts, original failures, guarded transfers, flat storage and executing
+negative controls. Both stricter exploratory ARM reference failures and a
+controller restart recovery remain published. See the [partial-copy report](../../docs/linux-posix-qualification.md#native-getrandom-partial-copy-faults).

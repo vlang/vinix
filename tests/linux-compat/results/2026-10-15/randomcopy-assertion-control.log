@@ -1,0 +1,3 @@
+tests/linux-compat/randomcopy-check.v:497: FAIL: fn main.main: assert false, 'randomcopy assertions must execute'
+      message: randomcopy assertions must execute
+V panic: Assertion failed...

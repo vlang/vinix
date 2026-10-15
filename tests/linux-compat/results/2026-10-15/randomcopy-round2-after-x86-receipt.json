@@ -1,0 +1,31 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "3304319c60109c96d034aced31f3f1dfcc9696c1fa4e49f09500e8f2e2c2839c",
+    "results": [
+        {
+            "name": "randomcopy",
+            "source_sha256": "032395a31df29920ffd88b1df39b31973a30e45aadc367a79c0161d4b5d3ceee",
+            "init_sha256": "763481ae3e5717383f8049707d87a3676c71baaeac87b7bc6c28f3c0b0b34d65",
+            "iso_sha256": "8d4b86ef14183f3c12ae45cb087a18c3040a2d21e3a5834bb3f6be81229ed473",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "3c22f6e44700a031e0c6e9bd04427095e423d595d3f9b81e09f07539d1ea3b9f",
+            "iso_sha256": "51a76666c8ba297ec7a28e18d7a997adbcdc0f59bcf67a2154f562e65361ce9d",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "randomflags",
+            "source_sha256": "f83b0e17a64213de21e348c25a5e1146035ca20862ed9edab3834db935049eec",
+            "init_sha256": "4d202d310be75cb1ecf967746159b799fe15210b5f7882a3fda4b538c99123c0",
+            "iso_sha256": "fabf5a536bd5edc1a2e137403fcfeab06f3907a599303245a4534749b209ab78",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

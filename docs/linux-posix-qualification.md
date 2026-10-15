@@ -6952,3 +6952,108 @@ The three broad section 15 gates remain open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/randomflags-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/randomflags-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/randomflags-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/randomflags-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/randomflags-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/randomflags-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/randomflags-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/randomflags-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/randomflags-check.v), [verdict](../tests/linux-compat/results/2026-10-15/randomflags-audit.log).
+
+## Native getrandom partial-copy faults
+
+`getrandom` now returns every byte committed before an output fault, including
+a prefix within its 256-byte bounce chunk. Previously a one-byte writable prefix
+followed by PROT_NONE returned EFAULT after writing that byte; a 257-byte prefix
+returned 256 after writing 257. The counted copy helper now supplies the actual
+uncopied suffix. A fault before any output still returns EFAULT. Complete
+transfers, zero counts, flag validation and seeded readiness retain their
+existing behavior.
+
+The primary [Linux 6.12 random implementation](https://github.com/torvalds/linux/blob/v6.12/drivers/char/random.c)
+accumulates the bytes copied to the user iterator and returns EFAULT only when
+none were copied. The supplied Linux 6.12.51 reference kernels run the exact
+same native musl probe ELFs used with Vinix, rather than rebuilt equivalents.
+
+Each root and UID1000 cohort executes the following groups for PROT_NONE,
+read-only and unmapped suffixes, all six accepted flags, three raw register-word
+forms and the genuine musl getrandom call:
+
+| Group | Controls per cohort | Behavior |
+| --- | --- | --- |
+| 0 | 5,472 | Positive short counts bounded by 19 prefixes that are not multiples of 256 |
+| 1 | 864 | Existing exact short counts for prefixes 256, 512 and native page size |
+| 2 | 6,336 | Successful zero, one-byte, prefix-minus-one and exact-prefix transfers |
+| 3 | 1,152 | Zero-count success and first-byte EFAULT for NULL, address1, front guard and fault-page destinations |
+
+The 22 prefix lengths are 1/2/7/15/31/32/33/63/64/65/127/128/129/255/256/
+257/511/512/513/page-minus-one/page/page-plus-one. Partial requests extend the
+prefix by 1, 17, 257 or page-plus-one bytes. Native AArch64 pages are 16KiB;
+native x86-64 and both Linux references use 4KiB pages. The probe checks every
+byte outside the accessible output prefix, preserves the read-only-page
+sentinel and checks that prefixes of at least 32 bytes contain output. Random
+values have no deterministic content oracle and this is not an entropy-quality
+qualification.
+
+| Architecture | Controls | Original failures | Corrected failures | Same-ELF Linux failures |
+| --- | --- | --- | --- | --- |
+| AArch64 | 27,648 | 8,064 | 0 | 0 |
+| x86-64 | 27,648 | 8,064 | 0 | 0 |
+
+Original failures are confined to group0: 4,032 failures per cohort for
+accessible prefixes below 256 returning EFAULT after output. CASES and FINAL
+vectors agree. The common native/Linux oracle accepts positive short counts up
+to the accessible prefix and checks guards outside that prefix. Each corrected
+cohort also warms 32 cycles, then measures 200 repeated
+partial-copy/zero-count cycles with 13-second settling intervals. All 18 ARM/14
+x86 slab classes and positive large-page counts stay flat. The observer closes
+and the five-page mapping is unmapped before Counts transfer; the parent closes
+its pipe and waits even after failed transfer. Fatal setup cleanup and process
+churn remain separate.
+
+Four fresh production builds use isolated worktrees at
+`010468874ce63a2caec7e469bfe37ec4fd866936`. Complete generated C differs only in
+the getrandom definition and the exact bodies/declarations of two newly
+reachable existing helpers, raw_copy_to_user and raw_copy_user. Their source
+matches the frozen committed base. The first scope audit refused these emitted
+helpers; its real failure and status remain pinned. The maintained auditor now
+checks the two complete helper bodies/declarations and requires exact counted
+copy substitution and byte accumulation. There are no added allocations, frees
+or kernel pointer lifetimes. Existing bounce ownership and erasure policy are
+unchanged. Artifact captures read back and compare complete bytes before a build
+passes. Allocation diagnostics remain byte-identical at 398 ARM/290 x86 existing
+sites, including existing allowance refusals. Eight host test files and both
+frozen before/after 64-input dispatch inventories pass. Public fingerprints use
+the committed parent plus this change, separately from historical test kernels.
+
+Probe preflight/native/reference generated C and ELF identities agree. Probe C
+has four explicit stack allocas and no heap, dynamic-array or fixed-index
+helpers. The repeated native cycle requires exact complete-prefix returns for
+lengths 1/255/256/257/page-plus-one; the Linux ABI oracle accepts conservative
+short copies. Corrected randomcopy/runtime/randomflags cases pass on both native
+architectures. The auditor verifies compiler pins, full source/C scope, actual
+build stdout, receipts and the exact 72-file walk of eight completed native
+captures. False-assertion and passing-Linux-as-failing-original controls execute
+and exit 1 without -prod. Disposable staging is retired only after hash capture
+and rechecks.
+
+Two exploratory oracle failures remain visible. The first required the whole
+accessible prefix: ARM Linux returned one byte for a two-byte prefix and failed
+3,024 group0 controls per cohort. The second accepted shorter counts but required
+untouched bytes beyond the return: ARM Linux returned 24 for a 32-byte accessible
+prefix while a faulting store committed additional accessible bytes, failing 432
+controls per cohort. The [ARM copy routine](https://github.com/torvalds/linux/blob/v6.12/arch/arm64/lib/copy_to_user.S)
+uses conservative exception accounting for its [copy template](https://github.com/torvalds/linux/blob/v6.12/arch/arm64/lib/copy_template.S).
+The final single oracle permits both architecture behaviors while preserving
+guards outside accessible memory, exact success/zero/error controls and the
+native complete-prefix storage checks. It has no reference-only semantic branch.
+The auditor verifies all 62 first-round and 128 second-round regular-file
+identities plus their original receipts and logs; both initial ARM Linux
+failures remain failures. Two restart attempts refused already-used initial
+directories. Their real refusals are retained, and overwritten aggregate logs
+were restored from published hash-identical retained copies. Final references
+use fresh p3 directories and the final original native probe ELFs.
+
+Entropy quality, unseeded blocking/interruption, signal interruptions,
+canonical-range/wrap policy, huge valid transfers, glibc and translated/ELF32
+getrandom paths remain unqualified. This bounded fix leaves the three broad
+section 15 gates open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/randomcopy-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/randomcopy-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/randomcopy-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/randomcopy-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/randomcopy-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/randomcopy-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/randomcopy-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/randomcopy-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/randomcopy-check.v), [verdict](../tests/linux-compat/results/2026-10-15/randomcopy-audit.log).
+- [Initial scope audit refusal](../tests/linux-compat/results/2026-10-15/randomcopy-audit-producer-first.log).
+- [First exploratory identities](../tests/linux-compat/results/2026-10-15/randomcopy-exploratory-inputs.json), [first ARM Linux receipt](../tests/linux-compat/results/2026-10-15/randomcopy-exploratory-reference-arm-receipt.json), [second exploratory identities](../tests/linux-compat/results/2026-10-15/randomcopy-round2-inputs.json), [second ARM Linux receipt](../tests/linux-compat/results/2026-10-15/randomcopy-round2-reference-arm-receipt.json), [aggregate recovery identities](../tests/linux-compat/results/2026-10-15/randomcopy-reference-recovery-inputs.json).

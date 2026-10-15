@@ -1,0 +1,1 @@
+arm/x86: complete generated production C differs only in getrandom plus the exact bodies/declarations of newly reachable existing raw_copy_to_user/raw_copy_user helpers; usercopy source matches frozen committed base. Exact counted raw-copy substitution and short-result accumulation; existing bounce lifetime and erasure unchanged; no compiler normalization or added allocation/free
