@@ -6512,7 +6512,7 @@ Date through x0 and Self through x20, returning Self minus the other value
 as a Double in d0. Both entries use the sealed Foundation arena and perform
 no ARC or per-call allocation. Foundation.framework and its Swift overlay
 resolve to the same entries. Date construction, metadata, equality and
-coding conformances remain separate unsupported profiles.
+coding conformances were not included in that milestone.
 
 The fixture compares native getter bits, an actual native interval consumer,
 and 576 interval pairs/guard placements per runtime, including signed zero,
@@ -6527,21 +6527,46 @@ IPA fixups/consumers for both imports. The unavailable native property-getter
 trial and analysis-helper include-path failure are retained. Full iOS
 regression remains unpassed; published runners remain unchanged.
 
-The current IPA probe resolves these Date imports, then exits with status 1
-at `_$s10Foundation4DateV2eeoiySbAC_ACtFZ` (`Date.==`). Fortnite has not
-entered application code and remains unplayable.
+The following milestone implements the IPA's `Date.==` and `Date()` imports
+in V. Equality borrows two eight-byte values through x0/x1 and returns a
+canonical Bool in w0, including zeroed upper register bits. It compares the
+stored Doubles: signed zeros compare equal, while quiet and signaling NaNs
+compare unequal even when both arguments alias the same word. Neither
+input is changed. The constructor reads the realtime clock's seconds and
+nanoseconds, subtracts the 2001 epoch before adding the fractional second,
+and stores its eight-byte result through x8. Its timestamp is explicitly
+stack allocated; generated C inspection confirms no allocation on this
+normal path. Both entries preserve Swift context and avoid ARC.
+
+Eight ASan/UBSan runs and four ARM64 suites pass for Date, Data writing,
+Base64 and reference snapshots. The Date fixture adds 1,024 equality
+pair/guard placements per runtime, aliases, subnormals and quiet/signaling
+NaNs; native equality comparisons; and fresh constructor results bounded
+by the CF clock, guarded result edges and concurrent calls. The probe seeds
+d0 with NaN so storing an old floating return cannot satisfy construction.
+Ownership counts stay unchanged across two unmapped teardowns, and both
+Foundation install names resolve to the same entries. Eleven final C
+streams/programs and four joined, retired VM phases are retained under
+`build/ios/fortnite/date-value-checks`, with native constructor tail-body
+inspection, IPA equality call sites and constructor function-address
+references. Full iOS regression remains unpassed; published runners remain
+unchanged. Date metadata and protocol conformances remain unsupported.
+
+The current IPA probe resolves equality and construction, then exits with
+status 1 at `_$s10Foundation4DateVMa` (the Date metadata accessor). Fortnite
+has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,509 | 651 | 79 |
+| Fortnite executable | 1,511 | 649 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,344 | 654 | 120 |
+| All images | 2,346 | 652 | 120 |
 
-The C++/GLES/Text variant reports 2,357 resolved imports, 641 unresolved strong
+The C++/GLES/Text variant reports 2,359 resolved imports, 639 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
