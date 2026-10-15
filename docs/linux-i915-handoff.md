@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-16 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Latest kernel build baseline: **`8b423eba5`**, with the fourteen frozen constant-string integration inputs described below. Recheck HEAD and the worktree before
+Latest kernel build baseline: **`53edd103f`**, with the sixteen frozen formatted-allocation integration inputs described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -81,7 +81,7 @@ global fault-lease rewrite was not applied.
 
 Ordinary RCU, deferred page-backed frees, native IRQ work and the DMA-fence
 synchronization core are implemented and validated. The latest normal/SSE/
-four-level guests pass 56 markers and 38 strict allocation equalities.
+four-level guests pass 57 markers and 39 strict allocation equalities.
 Fence containers, reservation ownership and unchanged i915 software fences are
 implemented and validated. Original boot-CPU L1TF queries are also implemented
 and validated, with native positive-MSR execution still pending. Task-owned migration pins now preserve CPU identity through sleep and yield; final validation is recorded below. Continue through the remaining task/MM, device,
@@ -91,6 +91,7 @@ memory and DRM services; complete i915 support is still pending.
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `53edd103f` | Native constant-string ownership with actual image-rodata bounds |
 | `8b423eba5` | Native sleeping reader/writer semaphores, original layout and measured handoff lifetimes |
 | `a55cf6540` | Original grouped-field and flexible-array declaration wrappers |
 | `3d4be91a6` | Worker priority Process pointer ownership and actual IRQ-frame rejection before mutation |
@@ -2946,5 +2947,93 @@ ownership; complete driver/core linking and Tiger Lake validation are pending.
 
 ```sh
 build-support/run-v-tool.sh tests/linuxkpi/const_string.v --keep-dir NEW_DIRECTORY
+# Use --timeout 600 for the full tests/linuxkpi/run_vm suite.
+```
+
+## Native formatted allocation (2026-10-16)
+
+`kasprintf`, `kvasprintf` and `kvasprintf_const` now allocate through the real
+checked native allocator and existing V Linux-format parser. Public interfaces
+retain the original const-qualified types and genuine compiler `va_list`.
+The instruction-only `kasprintf` entry captures its two named arguments.
+The sizing pass copies the native cursor into fixed stack storage; ordinary
+two-pass allocation failure preserves the original cursor. The writing pass
+consumes its actual ABI-defined parameter. Nested `%pV` borrows the original
+descriptor and preserves its nested cursor. There is no separately owned cursor
+or temporary V string.
+
+Constant allocation follows the original no-percent and exact-`%s` shortcuts,
+including NULL behavior and image-rodata identity. Other forms allocate and
+terminate an owned copy. Supported counts end at `INT_MAX-1`; overflow is checked
+before allocation or count addition, including remaining nested budgets.
+Ordinary pass-length mismatches retain the first-sized terminated prefix and
+issue the real warning. A second-pass count overflow is outside this supported
+length domain: the warning reports `UINT_MAX`, and nested overflow conservatively
+retains the preceding outer prefix. The maintained host fixture explicitly
+exercises this policy. The previously documented formatting subset still applies.
+This supplies formatted names as a prerequisite; object registration, sysfs,
+Linux MM, complete driver linking and GPU execution remain unresolved.
+
+The final host matrix passes twelve GNU99/GNU11 O0/O1/O2 ASan/UBSan profiles
+across SysV64 through Rosetta and native Darwin ARM64: 32 scenarios and 5,841
+assertions per profile, 70,092 assertions overall, with 192 real warnings and
+zero retained transport pages. Original typed facades, actual native variadic
+origins, instruction capture, allocator, classifier, formatter and warning/taint
+bodies execute. Page allocation, image endpoints and console output are explicit
+host transports. Freestanding genuine-cursor objects also compile for AAPCS64;
+ARM kernel runtime execution is not claimed. Final host result SHA256:
+`c6eec6b0dd767f6e62f3c77b7e41f787f84aae87acd12be31aae55efa8b50ec0`.
+
+Fresh isolated enabled/default x86 and disabled ARM builds pass at `53edd103f`
+plus sixteen frozen production/tool inputs. Source freeze SHA256:
+`892b208742582dbc21e2f568a388c8b1043e8f3a82fb3d75612eb17ef7357358`.
+The saved freeze/build records retained stale constant-string wording from the
+previous helper template. An append-only scope clarification pins their original
+hashes and actual source set; no authenticated record was rewritten. Clarification
+SHA256: `51f3b05b4971d05118cb9b1abc468ccd3f709d87aed1a1e5ab5f5d807d8e5ebc`.
+
+Final enabled ELF SHA256:
+`1f67fe23caf4370d679115bd2c7d6dcffa99f2b9678906c2d7228c500c640bb6`;
+default ELF SHA256:
+`e60382df797c03558ddcceaff1d5a84e8b2846d61a78e7334511db0b470e4478`.
+Normal, original-SSE4.1, four-level and default guests complete Linux ABI startup.
+Enabled guests pass 57 markers and 39 strict page/live-heap equalities. The new
+test runs three warmups plus a measured fourth batch of 200 ownership operations,
+genuine register/overflow cursors, nested `%pV`, OOM/GFP rejection, pre-allocation
+count overflow and borrowed-only IRQ-off/preemption-pinned paths. Its normal/SSE
+baseline is 378245120 bytes before and after, with every live heap class equal.
+These are feature-specific measurements, not a global kernel allocation gate.
+Earlier guest/tool sessions interrupted before startup completed are retained
+and excluded; final fresh state directories use the saved exact ELF.
+
+Independent saved native C/object/ELF and source integration review SHA256:
+`a21bc1f1d6e980d46a67e7f9a12c224d8b8aed171e67fb7f43314d20377fa27c`.
+Independent host/native consumer lifetime review SHA256:
+`b085014bf294d0001fd994d7b55512bafcc1899a42e23c60ad7c909eda9174c7`.
+The unchanged complete legacy formatter fixture also passes O2 and ASan/UBSan
+against a freshly generated production core; receipt SHA256:
+`356b2f172945faf597387fa20f36435032ed91c57e25cc14556bdd1c24937452`.
+This focused replay does not establish the broader host suite. Its maintained
+launcher encountered an unrelated host `C.stat` declaration failure before
+reaching the compatibility runtime; the reduced V launcher leaves the original
+fixture, goldens, host model and production algorithms unchanged.
+Independent backend, checked-count, default-mode and assembly review SHA256:
+`3403581737ea530ef235100ac3fd36a0dc9429e1c0d614ca089be09b7f65d33e`.
+It reviews all 23 actual backend/helper C bodies and the 16 retained optimized
+bodies; seven internal helpers have no separate linked symbol. The bounded
+native/standalone bitmap compiler differences and original raw bodies are
+retained in that review. Final independent guest/artifact review SHA256:
+`a488960b2e0be7ea043bdfd4764a2d974f4323a4817cc765c5195d0251d58d77`.
+Its parser passes 81 negative controls and retains the earlier constant-string
+checks. Exact saved ISO, PID 1, kernel, CPU profile and serial bytes are bound
+separately for all four final runs.
+The full unchanged-driver syntax audit remains **6/269**, with 232 missing
+`vfork_done`, 30 missing `mm` and one entry-stack record. All 7,668 imported
+files remain unchanged. Continue through genuine object/device ownership and
+task/MM services; confirmed hardware identity and Tiger Lake validation remain
+pending.
+
+```sh
+build-support/run-v-tool.sh tests/linuxkpi/kasprintf.v --keep-dir NEW_DIRECTORY
 # Use --timeout 600 for the full tests/linuxkpi/run_vm suite.
 ```

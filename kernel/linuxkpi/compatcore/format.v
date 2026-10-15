@@ -30,6 +30,9 @@ mut:
 	position usize
 	status   u32
 	stop     bool
+	count_checked  bool
+	count_limit    usize
+	count_overflow bool
 }
 
 @[export: 'vkr_format_key']
@@ -52,8 +55,22 @@ fn vkrf_alnum(c u8) bool {
 	return (c >= `0` && c <= `9`) || (c >= `a` && c <= `z`) || (c >= `A` && c <= `Z`)
 }
 
+// Allocation sizing must reject a count before it can wrap or narrow to int.
+// Ordinary formatter callers keep the existing unchecked counting mode.
+fn vkrf_count_overflows(out &FormatOutput, len usize) bool {
+	if !out.count_checked { return false }
+	if out.count_overflow { return true }
+	if out.position > out.count_limit || len > out.count_limit - out.position {
+		out.count_overflow = true
+		out.stop = true
+		return true
+	}
+	return false
+}
+
 fn vkrf_bytes(out &FormatOutput, data &char, len usize) {
 	unsafe {
+		if vkrf_count_overflows(out, len) { return }
 		if out.position < out.size {
 			available := out.size - out.position
 			copy := if len < available { len } else { available }
@@ -65,6 +82,7 @@ fn vkrf_bytes(out &FormatOutput, data &char, len usize) {
 
 fn vkrf_pad(out &FormatOutput, c u8, len usize) {
 	unsafe {
+		if vkrf_count_overflows(out, len) { return }
 		if out.position < out.size {
 			available := out.size - out.position
 			copy := if len < available { len } else { available }
@@ -287,7 +305,7 @@ fn vkrf_hex_bytes(out &FormatOutput, bytes &u8, spec FormatSpec, suffix u8) {
 		} else {
 			u8(` `)
 		}
-		for i := i32(0); i < len; i++ {
+		for i := i32(0); !out.stop && i < len; i++ {
 			byte := bytes[i]
 			vkrf_char(out, u8(hex[byte >> 4]))
 			vkrf_char(out, u8(hex[byte & 15]))
@@ -303,7 +321,7 @@ fn vkrf_bitmap(out &FormatOutput, bits &u64, spec FormatSpec, list bool) {
 		if list {
 			mut first := true
 			mut index := u32(0)
-			for index < nr_bits {
+			for !out.stop && index < nr_bits {
 				if !native_test_bit(index, bits) {
 					index++
 					continue
@@ -322,7 +340,7 @@ fn vkrf_bitmap(out &FormatOutput, bits &u64, spec FormatSpec, list bool) {
 		} else {
 			mut chunk_spec := FormatSpec{ base: 16, precision: 0, flags: 32 | 16 }
 			mut chunks := (nr_bits + 31) / 32
-			for chunks != 0 {
+			for !out.stop && chunks != 0 {
 				chunks--
 				first_bit := chunks * 32
 				len := if nr_bits - first_bit < 32 { nr_bits - first_bit } else { u32(32) }
@@ -412,8 +430,18 @@ fn vkrf_pointer(out &FormatOutput, extension &char, len usize, ptr voidptr, orig
 				mut inner := FormatOutput{
 					buf:  if out.position < out.size { out.buf + out.position } else { &char(0) }
 					size: if out.position < out.size { out.size - out.position } else { usize(0) }
+					count_checked: out.count_checked
+					count_limit: if out.count_checked && out.position <= out.count_limit {
+						out.count_limit - out.position
+					} else { usize(0) }
 				}
 				vkr_nested_parse(&inner, ptr)
+				if inner.count_overflow {
+					out.count_overflow = true
+					out.stop = true
+					return
+				}
+				if vkrf_count_overflows(out, inner.position) { return }
 				out.position += inner.position
 				out.status |= inner.status
 				if (inner.status & 2) != 0 { out.stop = true }
@@ -448,7 +476,7 @@ fn vkrf_precision_literal(value u32) i32 {
 pub fn vkr_format_parse(out &FormatOutput, format &char, args voidptr) {
 	unsafe {
 		mut fmt := format
-		for fmt[0] != 0 && !out.stop {
+		for !out.stop && fmt[0] != 0 {
 			if fmt[0] != char(`%`) {
 				vkrf_char(out, u8(fmt[0]))
 				fmt++

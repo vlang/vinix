@@ -94,7 +94,7 @@ fn guest_drive(serial string, qemu_log string, timeout_text string, no_linuxkpi 
    final_output := guest_call('read_text', {'path': guest_path(serial)})!.str()
    if guest_failed(final_output) { return guest_failure('guest failed after startup; see ' + serial) }
    guest_call('print', {'lines': json2.Any([
-    json2.Any(hex.encode((if no_linuxkpi { 'Default guest: PASS (4 CPUs, Linux ABI)' } else { 'LinuxKPI guest: PASS (4 CPUs, user-copy prefixes/demand faults/COW, allocator/object caches, constant string ownership, logging/formatting, locks, per-CPU storage, task waits/references, synchronization/reader-writer semaphores/sequence counters, clocks/timed waits, timers, ordered/delayed/unbound/bound work, priority/system queues, SRCU, wound/wait, bit/variable/I/O waits, scheduler/migration pins, boot CPU L1TF policy, RCU/deferred frees, IRQ work, DMA fences/containers/reservations, unchanged i915 software fences, i915 copy/FPU)' }).bytes())),
+    json2.Any(hex.encode((if no_linuxkpi { 'Default guest: PASS (4 CPUs, Linux ABI)' } else { 'LinuxKPI guest: PASS (4 CPUs, user-copy prefixes/demand faults/COW, allocator/object caches, constant string ownership, formatted allocation, logging/formatting, locks, per-CPU storage, task waits/references, synchronization/reader-writer semaphores/sequence counters, clocks/timed waits, timers, ordered/delayed/unbound/bound work, priority/system queues, SRCU, wound/wait, bit/variable/I/O waits, scheduler/migration pins, boot CPU L1TF policy, RCU/deferred frees, IRQ work, DMA fences/containers/reservations, unchanged i915 software fences, i915 copy/FPU)' }).bytes())),
     json2.Any(hex.encode(('Serial log: ' + serial).bytes()))
    ])})!
    return 0
