@@ -1,0 +1,1 @@
+arm/x86: complete production C differs only in setpriority/getpriority definitions and their prototype parameter names; no identifier normalization or allocation/free/escape; existing table locks, borrowed targets and nice mutation remain unchanged

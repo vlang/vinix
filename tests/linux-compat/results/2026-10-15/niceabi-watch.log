@@ -1,0 +1,11 @@
+Completed /Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/p1-before-arm/niceabi: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/p1-before-x86/niceabi: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/p1-after-arm/niceabi: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/p1-after-x86/niceabi: captured files byte-identical; disposable boot staging retired
+Completed preparation failure /Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/p1-after-arm/runtime: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/p1-after-arm/attrclass: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/p1-after-arm/attrnice: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/p2-after-arm/runtime: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/p1-after-x86/runtime: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/p1-after-x86/attrclass: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/p1-after-x86/attrnice: captured files byte-identical; disposable boot staging retired

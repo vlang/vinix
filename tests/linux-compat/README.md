@@ -1567,3 +1567,22 @@ lifetime review. Reference fair slice/clamp defaults remain configuration fields
 Canonical signed64 broker setup is explicit; setpriority signed32/admission/group
 semantics, worker nice/races, deadline/reset/utilization/security and GNU/foreign
 paths remain separate. The three broad compatibility gates remain open.
+
+The `niceabi` case qualifies PRIO_PROCESS getpriority/setpriority signed32
+selector/target/nice words and negative-target ESRCH for stable process leaders.
+Root/CAP_SYS_NICE and UID1000/no-capability zero-limit cohorts cover seven word
+forms, eight target kinds, three policies, clamped nice boundaries, genuine musl
+calls, exact errors and retained raw/musl nice and scheduling state. Each
+architecture runs 13,214 controls; originals fail 2,898, corrected Vinix and
+identical ELFs on Linux 6.12.51 pass. Two warmed 200-cycle cohorts stay flat.
+Run `--cases niceabi,runtime,attrclass,attrnice --timeout 900` with a fresh state
+directory. `niceabi-reference.v` uses the preceding reference arguments; compile
+`niceabi-check.v` without `-prod` and supply the retained evidence area.
+[The report](../../docs/linux-posix-qualification.md#native-priority-argument-words-and-missing-target-errors)
+binds one actual failed ARM C preparation separately from final four-alloca
+probe identities, real Linux references, storage, receipts and independent review.
+The first ARM runtime ISO preparation also fails for disk space; its real failure
+receipt and initial watcher assertion remain bound alongside a fresh runtime-only
+completion with unchanged kernel/source/C/ELF. Passing cases are retained.
+PRIO_PGRP/PRIO_USER, full capability/limit admission, worker nice/races/security,
+GNU/translated/ELF32 priority paths and the three broad gates remain open.

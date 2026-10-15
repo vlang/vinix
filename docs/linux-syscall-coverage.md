@@ -704,7 +704,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/fs/mount_policy.v` | `a0e1df0df703f314ff5bce2dd46716f1bcc0fa4ee5f4555062db0cc2c7fbb868` |
 | `kernel/fs/procfs.v` | `b924f6eee11e596e4abdeaf1816421ed0c2964956f9a75b1c34a3d60fe6ccb86` |
 | `kernel/fs/tmpfs.v` | `99a10d885597ccb745530e639685f282703332667066a28dd79f18195ec3e010` |
-| `kernel/fs/vfs.v` | `8ff006341d05c39b6f18b3a079ab7beeca0def31a7d00c14ef40e32061c33e19` |
+| `kernel/fs/vfs.v` | `4ce828b7bd16ad7f63b5b90ee127f7c862d7d5b5bd86f707d5dd65e89fd161c6` |
 | `kernel/futex/futex.v` | `171c2e30ac47d2b0d682e00e7aca04a8a1ddd7d3c65e27fae4a2e7d7dd9e015d` |
 | `kernel/futex/pi.v` | `69a0a836bcaba1fc18b7e3298d31cb848f885798e37a8d6fdd095b910ba073ba` |
 | `kernel/kbudget/budget.v` | `980b9ae894bda6376f920e22bbca0aa953e02bd0349977bfe054a24580869b06` |
@@ -742,7 +742,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/sched/sched_arm64.v` | `47cf9e8deba0f3d10da99cafcb4b96467e6bc889583394fc987b69a4d30fd514` |
 | `kernel/socket/unix/unix.v` | `84875f74a964798fa7e64c6ed4a2c096ace28620fbe8bbaa3b8486d2789f5600` |
 | `kernel/syscall/table/container.v` | `3bd7f741353d73549d61affa8e6a9ee822fef466f997e10498dfd94cbd11c04f` |
-| `kernel/syscall/table/linux_common.v` | `e02ca1595fcc117e237c44cfd5634218184c328592f9e4fcb82af3be15047f68` |
+| `kernel/syscall/table/linux_common.v` | `c702f22b005dabbe482c6ba6b4d1ee2b773f73980e88705b8104cd5646cbbf88` |
 | `kernel/syscall/table/linux_compat.v` | `c925dde7b04e8fb6798b48b5b0afa7007d5e43c74505e2f10bc9e8d2c9e3e688` |
 | `kernel/syscall/table/linux_table_amd64.v` | `f7e48c44a6152339e2ecb7a668102546a85cff540120109809ce3bd79c3a1bb7` |
 | `kernel/syscall/table/syscall_table_arm64.v` | `9e27de44d482ba0581c023f2486b295f16a2f5f8b4d02f7d42d6d9940d637747` |

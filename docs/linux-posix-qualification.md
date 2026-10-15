@@ -6661,3 +6661,113 @@ the ARM CPU1 QoS blocker remain separate. The three broad section 15 gates stay 
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/attrclass-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/attrclass-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/attrclass-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/attrclass-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/attrclass-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/attrclass-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/attrclass-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/attrclass-reference-x86_64-receipt.json).
 - [Maintained V audit](../tests/linux-compat/attrclass-check.v), [verdict](../tests/linux-compat/results/2026-10-15/attrclass-audit.log), [independent lifetime review](../tests/linux-compat/results/2026-10-15/attrclass-lifetime-review.md).
+
+## Native priority argument words and missing-target errors
+
+The 2026-10-15 qualification covers PRIO_PROCESS getpriority/setpriority on
+stable single-thread process leaders. Both calls now decode which/who as
+signed32, and setpriority decodes nice as signed32 before its existing -20..19
+clamp. Negative process targets reach the existing guarded process lookup and
+return ESRCH; invalid selectors retain EINVAL. Previously full register words
+could reject live targets or turn a zero-extended negative nice into positive 19.
+
+The retained [Linux v6.12 implementation](https://raw.githubusercontent.com/torvalds/linux/v6.12/kernel/sys.c)
+declares all these syscall arguments as int and starts missing-target lookup
+with ESRCH. Supplied Linux 6.12.51 kernels execute each architecture's exact
+original native probe ELF. Genuine musl getpriority/setpriority calls remain
+passing controls; their signed arguments are widened by musl's syscall macros.
+Raw syscall tests exercise seven register forms, including canonical signed64,
+zero extension, individual upper selector/target/nice words and two combined
+upper patterns. No setup operation is replaced with success.
+
+Root cohorts retain effective CAP_SYS_NICE. UID/GID1000 cohorts have no such
+capability and zero soft/hard RLIMIT_NICE. Live targets are PID0, self, a same-owner
+peer and a UID/GID1001 peer; absent, reaped, -1 and INT_MIN targets supply errors.
+Privileged parent setup uses canonical signed64 words, verifies actual state
+and acknowledges only registered positive PIDs. The peers remain live until
+explicit release and wait/reap; no pointer crosses the 16-byte Message pipe.
+
+| Group | Controls per cohort | Contract |
+| --- | --- | --- |
+| 0 | 840 | OTHER/BATCH/IDLE, five actual nice values, eight targets and seven query word forms |
+| 1 | 1,512 | Three policies, eight targets, nine requested nice values and seven setter word forms |
+| 2 | 4,032 | Four invalid selectors, eight targets, nine nice values, seven word forms and both syscalls |
+| 3 | 223 | 216 genuine musl setters and seven initial/final capability, limit and state observations |
+
+The requested nice values are INT_MIN/-21/-20/-1/0/1/19/20/INT_MAX. Every live
+control observes actual raw and musl nice, including legitimate -1 with errno
+zero, plus retained policy and priority. Nonselected leaders stay OTHER/nice0.
+Unprivileged cross-owner setters return EPERM before lowering admission; same-owner
+lowering with zero nice limit returns EACCES. Errors preserve actual task state.
+Argument decoding is tested independently of these existing bounded conditions.
+
+| Architecture | Controls | Original failures | Corrected failures | Same-ELF Linux failures |
+| --- | --- | --- | --- | --- |
+| AArch64 | 13,214 | 2,898 | 0 | 0 |
+| x86-64 | 13,214 | 2,898 | 0 | 0 |
+
+Root original failures are 480/984/0/0, ordinary failures 480/954/0/0. Independent
+source derivation matches both actual guest vectors. CASES/FINAL keys and counts
+are exact and unique. Successful queries preserve nice and policy; setters apply
+the clamped value only after real permission checks. Genuine musl and invalid-
+selector controls pass on original kernels as well.
+
+Each corrected native cohort retains all three leaders at nice19, warms 32
+cycles, then runs 200 query/setter/error cycles. Slab snapshots bracket the loop
+with 13-second settling intervals. All 18 ARM/14 x86 classes and positive large
+page counts remain flat in each cohort: 85/85 ARM and 216/216 x86. This measures repeated legacy priority
+paths with retained leaders; process churn and whole-kernel allocation are outside
+the claim. The observer closes before peer release. The qualifier transfers its
+counts before its parent reaps it; the peers have already been released and reaped.
+
+Four fresh production builds use isolated worktrees at
+`e72783a88349ac10cd1d3ec405237c9438b94eca`. Whole generated C is identical outside
+the two priority definitions and their renamed prototype parameters, without
+compiler identifier normalization. The source diff is exactly five signed32
+conversions, parameter renaming and removal of the shared negative-target EINVAL
+condition. Existing PID-table locks, guarded lookup, borrowed targets, MAC/owner
+checks and nice mutation remain unchanged, with no new allocation/free or escape.
+Allocation diagnostics remain byte-identical at 398 ARM/290 x86 sites and retain
+existing allowance refusals. Eight host files and both frozen before/after
+inventories pass; public dispatch fingerprints use committed-parent inputs plus
+this owned change and do not upgrade the historical test kernel.
+
+First ARM preflight C compilation failed because V moved four addressed Counts/
+Slabs temporaries to memdup. Its actual source, C and failure output remain bound;
+it supplies no probe ELF or guest verdict. Fresh preflight2 replaces those four
+temporaries with explicit stack allocas. Final preflight/native/reference C/ELF
+identities agree; final C has four explicit allocas and no heap/dynamic-array or
+fixed-index helpers. Kernel borrowing/lifetimes are unchanged.
+
+Four corrected native cases per architecture are niceabi/runtime/attrclass/attrnice.
+The first ARM batch records overall status 1: runtime image assembly encountered
+`No space left on device`, leaving source/C/ELF but no ISO or guest serial. The
+other three cases pass. A fresh runtime-only retry uses the same corrected kernel,
+source/C/ELF and supplies the genuine passing completion receipt. The x86 batch
+passes all four together. The failed ARM preparation and its original aggregate
+remain bound; no passing guest verdict is reconstructed for it.
+
+The maintained V auditor rehashes compiler inputs, frozen inventories, complete
+source/C, kernels, probe ELFs/ISOs, serial logs, receipts and every retained regular
+file. The initial watcher rejects the ARM failed-preparation row after four
+captures; its actual assertion, log and partial inventory remain retained. The
+resumed classifier binds eleven captures: ten completed guests and one failed
+preparation, with 97 regular files. It retires only unbound boot staging after
+hash and recheck. False-assertion and passing-Linux-as-failing-original controls actually
+exit 1 without -prod. Independent lifetime/provenance review gates publication.
+
+Nice remains process-wide natively. Worker-thread nice, target/credential races,
+PRIO_PGRP/PRIO_USER, full capability/RLIMIT_NICE admission, root without effective
+CAP_SYS_NICE, namespace/security configurations, realtime physical scheduling,
+glibc and translated/ELF32 priority paths remain unqualified. The three broad
+section 15 gates and the ARM CPU1 QoS blocker stay open.
+
+Probe setup/protocol abort cleanup is outside this qualification: if the count
+transfer fails, the parent's short-circuit condition can skip waitpid until the
+controller tears down the failed guest. Every qualified failing-original or
+passing capture transfers the complete counts and reaps the qualifier normally.
+An aborted transfer supplies no qualified success.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/niceabi-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/niceabi-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/niceabi-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/niceabi-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/niceabi-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/niceabi-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/niceabi-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/niceabi-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/niceabi-check.v), [verdict](../tests/linux-compat/results/2026-10-15/niceabi-audit.log), [failed preparation](../tests/linux-compat/results/2026-10-15/niceabi-preflight-failure.log), [independent review](../tests/linux-compat/results/2026-10-15/niceabi-lifetime-review.md).

@@ -1,0 +1,6 @@
+Retired completed boot staging: niceabi/arm/before
+Retired completed boot staging: niceabi/x86/before
+Retired completed boot staging: niceabi/arm/after
+Retired completed boot staging: niceabi/x86/after
+/Users/alex/.cache/vinix-linux-compat/niceabi-20261015/watch.v:58: FAIL: fn main.main: assert code.int() == if phase == 'before' { 1 } else { 0 }
+V panic: Assertion failed...

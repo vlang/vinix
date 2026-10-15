@@ -1,0 +1,51 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=80008
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX NICEABI TOPOLOGY: ordinary=0 uid=0 self=17273 same=31040 cross=43319 reaped=24434 cap_sys_nice=1
+LINUX NICEABI DETAIL: ordinary=0 kind=0 which=0 who=0 nice=-20 form=2 result=-1/22 expected_errno=0
+LINUX NICEABI DETAIL: ordinary=0 kind=0 which=0 who=0 nice=-20 form=3 result=-1/3 expected_errno=0
+LINUX NICEABI DETAIL: ordinary=0 kind=0 which=0 who=0 nice=-20 form=5 result=-1/22 expected_errno=0
+LINUX NICEABI DETAIL: ordinary=0 kind=0 which=0 who=0 nice=-20 form=6 result=-1/22 expected_errno=0
+LINUX NICEABI DETAIL: ordinary=0 kind=1 which=0 who=0 nice=-2147483648 form=1 result=0/0 expected_errno=0
+LINUX NICEABI DETAIL: ordinary=0 kind=1 which=0 who=0 nice=-2147483648 form=2 result=-1/22 expected_errno=0
+LINUX NICEABI DETAIL: ordinary=0 kind=1 which=0 who=0 nice=-2147483648 form=3 result=-1/3 expected_errno=0
+LINUX NICEABI DETAIL: ordinary=0 kind=1 which=0 who=0 nice=-2147483648 form=4 result=0/0 expected_errno=0
+LINUX NICEABI CASES: ordinary=0 kind=0 calls=840 failures=480
+LINUX NICEABI CASES: ordinary=0 kind=1 calls=1512 failures=984
+LINUX NICEABI CASES: ordinary=0 kind=2 calls=4032 failures=0
+LINUX NICEABI CASES: ordinary=0 kind=3 calls=223 failures=0
+LINUX NICEABI FINAL: ordinary=0 kind=0 calls=840 failures=480
+LINUX NICEABI FINAL: ordinary=0 kind=1 calls=1512 failures=984
+LINUX NICEABI FINAL: ordinary=0 kind=2 calls=4032 failures=0
+LINUX NICEABI FINAL: ordinary=0 kind=3 calls=223 failures=0
+LINUX NICEABI TOPOLOGY: ordinary=1 uid=1000 self=2403 same=51442 cross=7214 reaped=13584 cap_sys_nice=0
+LINUX NICEABI DETAIL: ordinary=1 kind=0 which=0 who=0 nice=-20 form=2 result=-1/22 expected_errno=0
+LINUX NICEABI DETAIL: ordinary=1 kind=0 which=0 who=0 nice=-20 form=3 result=-1/3 expected_errno=0
+LINUX NICEABI DETAIL: ordinary=1 kind=0 which=0 who=0 nice=-20 form=5 result=-1/22 expected_errno=0
+LINUX NICEABI DETAIL: ordinary=1 kind=0 which=0 who=0 nice=-20 form=6 result=-1/22 expected_errno=0
+LINUX NICEABI DETAIL: ordinary=1 kind=1 which=0 who=0 nice=-2147483648 form=1 result=0/0 expected_errno=13
+LINUX NICEABI DETAIL: ordinary=1 kind=1 which=0 who=0 nice=-2147483648 form=2 result=-1/22 expected_errno=13
+LINUX NICEABI DETAIL: ordinary=1 kind=1 which=0 who=0 nice=-2147483648 form=3 result=-1/3 expected_errno=13
+LINUX NICEABI DETAIL: ordinary=1 kind=1 which=0 who=0 nice=-2147483648 form=4 result=0/0 expected_errno=13
+LINUX NICEABI CASES: ordinary=1 kind=0 calls=840 failures=480
+LINUX NICEABI CASES: ordinary=1 kind=1 calls=1512 failures=954
+LINUX NICEABI CASES: ordinary=1 kind=2 calls=4032 failures=0
+LINUX NICEABI CASES: ordinary=1 kind=3 calls=223 failures=0
+LINUX NICEABI FINAL: ordinary=1 kind=0 calls=840 failures=480
+LINUX NICEABI FINAL: ordinary=1 kind=1 calls=1512 failures=954
+LINUX NICEABI FINAL: ordinary=1 kind=2 calls=4032 failures=0
+LINUX NICEABI FINAL: ordinary=1 kind=3 calls=223 failures=0
+LINUX NICEABI FAIL: priority words, errors or state
+QEMU: Terminated
+

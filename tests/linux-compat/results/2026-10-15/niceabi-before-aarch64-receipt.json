@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "d0661ee405ccc7f62a5167da67bc9996b6fedc093d4ff162ddfcb5a36e53f36b",
+    "results": [
+        {
+            "name": "niceabi",
+            "source_sha256": "2252f4c64891af9262d704738ce8c4a8205f8fd3cc50b52ff4c402c710169194",
+            "init_sha256": "3d3554f514a7992748027210626c350148a46732965b0e9443184cb80fcefcc6",
+            "iso_sha256": "74ea3b7d845075044cb92b41815c394bf81a3c89993c39836788e4387a5e33ae",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

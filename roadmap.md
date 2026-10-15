@@ -931,6 +931,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   exact errors/state and flat repeated-query storage, with independent review.
   See [the realtime query contract](docs/linux-posix-qualification.md#native-realtime-scheduling-attribute-queries).
 
+- [x] Decode native process-priority selector/target/nice words as signed32
+  and return ESRCH for missing/negative process targets. Qualify 13,214 leader
+  controls per architecture against identical-ELF Linux, real raw/musl state,
+  exact errors and flat repeated-call storage, with independent lifetime review.
+  See [the priority-word contract](docs/linux-posix-qualification.md#native-priority-argument-words-and-missing-target-errors).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -1064,9 +1064,12 @@ fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) 
 
 const prio_process = 0
 
-fn syscall_linux_setpriority(_ voidptr, which int, local_who int, prio int) (u64, u64) {
+fn syscall_linux_setpriority(_ voidptr, raw_which int, raw_local_who int, raw_prio int) (u64, u64) {
+	which := int(i32(raw_which))
+	local_who := int(i32(raw_local_who))
+	prio := int(i32(raw_prio))
 	who := proc.kernel_id(local_who)
-	if which != prio_process || who < 0 {
+	if which != prio_process {
 		return errno.err, errno.einval
 	}
 	mut caller := proc.current_thread().process
@@ -1096,9 +1099,11 @@ fn syscall_linux_setpriority(_ voidptr, which int, local_who int, prio int) (u64
 	return 0, 0
 }
 
-fn syscall_linux_getpriority(_ voidptr, which int, local_who int) (u64, u64) {
+fn syscall_linux_getpriority(_ voidptr, raw_which int, raw_local_who int) (u64, u64) {
+	which := int(i32(raw_which))
+	local_who := int(i32(raw_local_who))
 	who := proc.kernel_id(local_who)
-	if which != prio_process || who < 0 {
+	if which != prio_process {
 		return errno.err, errno.einval
 	}
 	target_pid := if who == 0 { proc.current_thread().process.pid } else { who }

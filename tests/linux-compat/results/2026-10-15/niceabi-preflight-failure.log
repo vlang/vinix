@@ -1,0 +1,45 @@
+/Users/alex/.cache/vinix-linux-compat/niceabi-20261015/tmp/vinix-v-module-OgFYGu/niceabifixture/core.v:137:3: notice: variable `raw` shadows a function declaration
+  135 |         err := C.__errno_location()
+  136 |         *err = 0
+  137 |         raw := C.syscall(C.SYS_getpriority, u64(0), u64(i64(pid)))
+      |         ~~~
+  138 |         raw_error := *err
+  139 |         *err = 0
+/Users/alex/.cache/vinix-linux-compat/niceabi-20261015/tmp/vinix-v-module-OgFYGu/niceabifixture/core.v:372:5: notice: variable `setter` shadows a function declaration
+  370 |                 pid := target(i32(index), fixture, 0)
+  371 |                 getter := raw(false, 0, pid, 0, i32(form))
+  372 |                 setter := raw(true, 0, pid, 19, i32(form))
+      |                 ~~~~~~
+  373 |                 code := if ordinary && index == 3 { i32(C.EPERM) } else { i32(0) }
+  374 |                 if getter.ret != 1 || getter.code != 0 || setter.ret != if code == 0 {
+/Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/preflight1-niceabi-arm/fixture.c:1731:64: error: call to undeclared function 'memdup'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1731 |                                         niceabifixture__Counts* counts = (niceabifixture__Counts*)memdup(&(niceabifixture__Counts){0}, sizeof(niceabifixture__Counts));
+      |                                                                                                   ^
+/Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/preflight1-niceabi-arm/fixture.c:1731:64: note: did you mean 'memcmp'?
+/Users/alex/code/vinix/build-aarch64-userland/sysroot/include/string.h:30:5: note: 'memcmp' declared here
+   30 | int memcmp (const void *, const void *, size_t);
+      |     ^
+/Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/preflight1-niceabi-arm/fixture.c:1731:39: error: cast to 'niceabifixture__Counts *' (aka 'struct niceabifixture__Counts *') from smaller integer type 'int' [-Werror,-Wint-to-pointer-cast]
+ 1731 |                                         niceabifixture__Counts* counts = (niceabifixture__Counts*)memdup(&(niceabifixture__Counts){0}, sizeof(niceabifixture__Counts));
+      |                                                                          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/preflight1-niceabi-arm/fixture.c:1748:63: error: call to undeclared function 'memdup'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1748 |                                 niceabifixture__Counts* counts = (niceabifixture__Counts*)memdup(&(niceabifixture__Counts){0}, sizeof(niceabifixture__Counts));
+      |                                                                                           ^
+/Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/preflight1-niceabi-arm/fixture.c:1748:38: error: cast to 'niceabifixture__Counts *' (aka 'struct niceabifixture__Counts *') from smaller integer type 'int' [-Werror,-Wint-to-pointer-cast]
+ 1748 |                                 niceabifixture__Counts* counts = (niceabifixture__Counts*)memdup(&(niceabifixture__Counts){0}, sizeof(niceabifixture__Counts));
+      |                                                                  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/preflight1-niceabi-arm/fixture.c:1987:59: error: call to undeclared function 'memdup'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1987 |                 niceabifixture__Slabs* before = (niceabifixture__Slabs*)memdup(&(niceabifixture__Slabs){0}, sizeof(niceabifixture__Slabs));
+      |                                                                         ^
+/Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/preflight1-niceabi-arm/fixture.c:1987:35: error: cast to 'niceabifixture__Slabs *' (aka 'struct niceabifixture__Slabs *') from smaller integer type 'int' [-Werror,-Wint-to-pointer-cast]
+ 1987 |                 niceabifixture__Slabs* before = (niceabifixture__Slabs*)memdup(&(niceabifixture__Slabs){0}, sizeof(niceabifixture__Slabs));
+      |                                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/alex/.cache/vinix-linux-compat/niceabi-20261015/states/preflight1-niceabi-arm/fixture.c:1988:34: error: cast to 'niceabifixture__Slabs *' (aka 'struct niceabifixture__Slabs *') from smaller integer type 'int' [-Werror,-Wint-to-pointer-cast]
+ 1988 |                 niceabifixture__Slabs* after = (niceabifixture__Slabs*)memdup(&(niceabifixture__Slabs){0}, sizeof(niceabifixture__Slabs));
+      |                                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+7 errors generated.
+V panic: Command failed
+ v hash: f6358ec
+    pid: 0x9ff5
+    tid: 0x9ff5
+0   dyld                                0x000000018c507e00 start + 6992
