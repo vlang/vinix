@@ -114,6 +114,8 @@ fn swift_foundation_arena() u64 {
 		write32(base + 320 + u64(i * 4), op)
 	}
 	unsafe { *(&u64(base + 392)) = u64(voidptr(swift_object_type)) }
+	swift_url_path_emit(base + 416, false)
+	swift_url_path_emit(base + 672, true)
 	// A concrete specialization of Foundation's retroactive String conformance.
 	// The installed descriptor uses a generic witness cache; this implementation
 	// supplies its already-specialized table, accepted by normal witness lookup.
@@ -132,7 +134,7 @@ fn swift_foundation_arena() u64 {
 	// destructiveInjectEnumTag witness. Native formatted(DateFormatter) is
 	// payload case zero; this does not construct an encoder or format a date.
 	write32(data + 96, 0)
-	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 400) })
+	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 928) })
 	if C.mprotect(unsafe { voidptr(base) }, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(unsafe { voidptr(base) }, usize(page * 2)); panic('iOS: cannot seal Swift Foundation entries')
@@ -282,6 +284,8 @@ fn swift_foundation_symbol(symbol string) !u64 {
 	if address := swift_json_decoder_symbol(symbol) { return address }
 	if address := swift_json_date_symbol(symbol) { return address }
 	return match symbol {
+		'_$s10Foundation3URLV22appendingPathComponent_11isDirectoryACSS_SbtF' { swift_foundation_arena() + 416 }
+		'_$s10Foundation3URLV25deletingLastPathComponentACyF' { swift_foundation_arena() + 672 }
 		'_$s10Foundation3URLV19_bridgeToObjectiveCSo5NSURLCyF' { swift_foundation_arena() + 320 }
 		'_$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF' { u64(voidptr(swift_error_to_nserror)) }
 		'_$s10Foundation22_convertNSErrorToErrorys0E0_pSo0C0CSgF' { u64(voidptr(swift_nserror_to_error)) }

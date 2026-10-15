@@ -13,6 +13,8 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	if library == '/System/Library/Frameworks/Foundation.framework/Foundation'
 		&& symbol in ['_$s10Foundation5NSLogyySS_s7CVarArg_pdtF',
 			'_$s10Foundation3URLV19_bridgeToObjectiveCSo5NSURLCyF',
+			'_$s10Foundation3URLV22appendingPathComponent_11isDirectoryACSS_SbtF',
+			'_$s10Foundation3URLV25deletingLastPathComponentACyF',
 			'_$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF',
 			'_$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ',
 			'_$sSSs7CVarArg10FoundationMc', '_$ss5ErrorP10FoundationE20localizedDescriptionSSvg',

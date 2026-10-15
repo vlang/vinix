@@ -6295,8 +6295,33 @@ resolution and the IPA's actual bridge consumers. The private build uses the
 pinned local SDK; full iOS regression remains unpassed and published runners
 remain unchanged.
 
-The current IPA startup probe resolves the URL-to-NSURL bridge, then exits with
+That IPA startup probe resolves the URL-to-NSURL bridge, then exits with
 status 1 at `_$s10Foundation3URLV22appendingPathComponent_11isDirectoryACSS_SbtF`.
+Fortnite has not entered application code and remains unplayable.
+
+`URL.appendingPathComponent(_:isDirectory:)` and `deletingLastPathComponent()`
+now resolve through both Foundation install names. They borrow URL's
+implementation and dispatch through witness slots 336 and 368 with its formal
+type metadata. Appending forwards the borrowed String words and Bool unchanged.
+Both return an owned two-word URL through x8: a nonnil witness result passes
+through unchanged; a nil result retains the original implementation with
+`swift_unknownObjectRetain` and returns its original table. The original URL
+survives releasing either result. Concrete URL construction and path backends
+remain unsupported; these operations require the caller's working witnesses.
+
+Eight ASan/UBSan runs and four Vinix ARM64 suites pass for path operations,
+URL bridging, heap ownership and formal object type lookup. The path fixture
+compares native and Vinix ownership for Swift and Objective-C implementations,
+replacement and identity results, empty/nonempty String arguments, both Bool
+values, signed native witnesses, protected Self/slot/result boundaries,
+preserved context, concurrent calls/publication and two unmapped lifetimes.
+Eleven final C streams/programs and four joined, retired VM phases are retained
+under `build/ios/fortnite/url-path-checks`, with both actual IPA consumers and
+native helper targets. Full iOS regression remains unpassed and published runners
+remain unchanged.
+
+The current IPA startup probe resolves both URL path operations, then exits with
+status 1 at the required metadata accessor `_$s10Foundation3URLVMa`.
 Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -6304,12 +6329,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,498 | 662 | 79 |
+| Fortnite executable | 1,500 | 660 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,333 | 665 | 120 |
+| All images | 2,335 | 663 | 120 |
 
-The C++/GLES/Text variant reports 2,346 resolved imports, 652 unresolved strong
+The C++/GLES/Text variant reports 2,348 resolved imports, 650 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
