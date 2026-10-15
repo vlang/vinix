@@ -31,9 +31,10 @@ their case-distinct filenames cannot coexist on default macOS filesystems.
 
 The current build compiles and links unmodified Linux `lib/list_sort.c`,
 `lib/sort.c`, `lib/rbtree.c`, `lib/find_bit.c`, `lib/hweight.c`,
-`lib/ctype.c`, `lib/siphash.c` and i915's `i915_config.c`, `display/intel_qp_tables.c` and
-`i915_memcpy.c`. These supply timeout policy, DSC lookup tables and a WC
-memory-copy component; they do not initialize the GPU or submit commands. Importing
+`lib/ctype.c`, `lib/siphash.c` and i915's `i915_config.c`, `display/intel_qp_tables.c`,
+`i915_memcpy.c` and `i915_sw_fence.c`. These supply timeout policy, DSC lookup
+tables, a WC memory-copy component and software dependency fences; they do not
+initialize the GPU or submit commands. Importing
 the complete i915 source tree is not evidence that the driver runs.
 
 Enabled native builds and driver audits derive `generated/bounds.h` by compiling
@@ -344,6 +345,13 @@ after a filesystem failure. Mutable build inputs still require isolation.
   waits and deadlines have real ownership and allocation-failure cleanup.
   Native bounds/restart corrections are documented below. `dma_resv_describe`
   still requires a real `seq_file` sink; this supplies no DRM device or GPU VM.
+- The complete unchanged `i915_sw_fence.c` uses the native synchronization
+  services. Its original dependency graphs, notification phases, DMA callbacks,
+  timeout ownership and reservation iteration execute in native tests. A timed
+  wait retains its DMA callback owner after expiry until the late DMA signal,
+  IRQ-work timer shutdown and RCU retirement. Supplied wait records and sleeping
+  waiters must retain their backing through their final accesses. Configured
+  DAG and debug-object checking remain disabled.
 - Unmodified Linux `wait.h`, `swait.h` and `completion.h` use native-backed
   queues and task wakeups. Ordinary wait queues preserve nonexclusive,
   exclusive and priority order, wake quotas, callback keys and automatic
@@ -2647,3 +2655,75 @@ The full unchanged i915 audit remains **6/269**, with all 7,668 imported files
 verified unchanged. Reservation ownership closes another synchronization
 dependency; DRM device/file services, typesafe request caches, memory/device
 ownership, complete driver compile/link and Tiger Lake validation remain pending.
+
+## Unchanged i915 software-fence execution, 2026-10-15
+
+The opt-in native link now includes the complete original `i915_sw_fence.c`,
+with all four identities from its pinned Kbuild rule. Its source SHA256 remains
+`4876074a64e975fd4823d4f442aab9c5a30f857f0ec9b970abea77c84c5491e9`.
+All ten configured public exports are retained in the actual object and enabled
+ELF, and every original import resolves to an existing concrete implementation.
+The driver source is unchanged; the new callers and diagnostic tooling are V.
+
+Native cases exercise initial/committed notification phases, first-error
+handling, reinitialization, sleeping waiters, a 129-node continuation chain,
+allocated and supplied dependencies, a separately owned target freed by its
+FREE notification, DMA callbacks, blocking/nonblocking allocation failure,
+reservation usage filtering and partial registration failure. Original
+continuation/error behavior is preserved. Declining COMPLETE leaves the
+original terminal pending-zero state; no resumable-notification guarantee or
+configured cycle detection is added.
+
+Both DMA-before-expiry and expiry-before-late-DMA execute the real timer,
+maskable IRQ work, synchronous timer shutdown and RCU release. A remote ordinary
+reader retains the private 128-byte timeout owner while the controller checks
+metadata and synchronizes its work. The timer notification verifies actual
+IRQ-off/preemption state. Expiry alone does not release the callback or its DMA
+reference. Supplied wait entries live separately from immediately freed target
+owners because the original wake function still reads their flags after FREE.
+Waiter backing remains alive through `finish_wait`.
+
+Strict GNU99/GNU11 ASan/UBSan host runs pass 8,296/8,515 assertions. They execute
+the entire original object and retain all ten exports. Each host profile's 39
+service imports maps to exactly one retained concrete definition; compiler and
+sanitizer imports are recorded separately. Of 723 selected V bodies, 720 match
+full generated modules and three disclosed completion adapters serve bootstrap.
+All 268 fixture occurrence keys are inspected. The typed timeout-notice
+transport preserves argument evaluation; full preprocessing against a genuine
+variadic control differs only by the sink identifier. Native printk is a
+separate already implemented service. Exact original enum callback identity is
+preserved, including Clang's sanitizer function-type identity. The host README
+documents scheduler, clock, page, IRQ and logging transport boundaries.
+
+Enabled/default x86-64 and default ARM64 builds pass. Normal/SSE/four-level
+enabled guests use the same saved ELF and pass 52 required markers and 34 strict
+PMM/live-heap rows. Three complete software-fence warmups precede its measured
+fourth lifecycle; all three actors are joined and off stack before measurement.
+Default startup passes without LinuxKPI markers. ARM is build/artifact evidence.
+The public VM runner now requires all six newer deferred-free/IRQ-work/fence/
+container/reservation/software-fence markers. Independent actual generated-C
+and O2 review covers all 65 new native/facade/export/init bodies.
+
+The isolated baseline is `59b1e9ac5` plus nine frozen production/tool paths.
+Final freeze `sw-fence-native-freeze-v2.json` SHA256:
+`1d26673b11ba2787c0a8996d6d42aeb5ec1dccc11ea6b34aeb8c7ade5e9518dc`.
+Enabled ELF:
+`31578e45624d33fdd1623d8e0d506fc277b5c6deb94333151f54663e372cb5f4`.
+Host result `sw-fence-host-final-v1/result.json` SHA256:
+`1907b9231e4c78633f9b6339ca1cc7806860aa6ae85d6277c43eb3eb030cb54b`.
+Independent native review `sw-fence-independent-x86-oct15-v2/review.json` SHA256:
+`621c0121719f487b7c2039a57e535680f1ea9515e23dd6608edc7003048a821c`.
+Independent host lifetime/evidence review SHA256:
+`06bccfd36eb17c387c74dd1c49574f1ddf760d0511d66489c4ccefbdf9425ca5`.
+Independent four-ISO/guest chronology review SHA256:
+`faf260668a753cc67a5555ca5f6c3e9e5631321111180c954044dfc0595e46e2`.
+Evidence remains under `/Users/alex/.cache/vinix-linuxkpi/smp-oct10/sw-fence-*`.
+Repeat the host consumer with:
+
+```sh
+build-support/run-v-tool.sh tests/linuxkpi/i915_sw_fence.v --keep-directory NEW_DIRECTORY
+```
+
+The complete i915 syntax audit remains **6/269**, with all 7,668 imported files
+unchanged. This executes a synchronization component; GPU device binding, full
+driver/core compile/link and physical Tiger Lake validation remain pending.

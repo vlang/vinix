@@ -307,7 +307,7 @@ ifeq ($(LINUXKPI),1)
     override VFLAGS += -d linuxkpi
     override CPPFLAGS += -DVINIX_LINUXKPI
     LINUXKPI_CPPFLAGS := -I obj/linuxkpi/include -D__KERNEL__ -include linux/kconfig.h -include $(LINUXKPI_SOURCE_DIR)/include/linux/compiler_types.h -I linuxkpi/include -I $(LINUXKPI_SOURCE_DIR)/include -I $(LINUXKPI_SOURCE_DIR)/include/uapi -I $(LINUXKPI_SOURCE_DIR)/arch/x86/include -I $(LINUXKPI_SOURCE_DIR)/arch/x86/include/uapi -I $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915 -Wno-unused-parameter -fwrapv
-    LINUXKPI_OBJ := obj/linuxkpi/list_sort.o obj/linuxkpi/sort.o obj/linuxkpi/rbtree.o obj/linuxkpi/find_bit.o obj/linuxkpi/hweight.o obj/linuxkpi/ctype.o obj/linuxkpi/siphash.o obj/linuxkpi/i915_config.o obj/linuxkpi/intel_qp_tables.o obj/linuxkpi/i915_memcpy.o
+    LINUXKPI_OBJ := obj/linuxkpi/list_sort.o obj/linuxkpi/sort.o obj/linuxkpi/rbtree.o obj/linuxkpi/find_bit.o obj/linuxkpi/hweight.o obj/linuxkpi/ctype.o obj/linuxkpi/siphash.o obj/linuxkpi/i915_config.o obj/linuxkpi/intel_qp_tables.o obj/linuxkpi/i915_memcpy.o obj/linuxkpi/i915_sw_fence.o
     LINUXKPI_OBJ += obj/linuxkpi/headercore.o obj/linuxkpi/exchangecore.o
     # Keep the native 128-bit helper dormant until a caller selects that width.
     LINUXKPI_LIB := obj/linuxkpi/exchange128.a
@@ -315,7 +315,7 @@ ifeq ($(LINUXKPI),1)
     # Match the generator's resolved -MQ target, including macOS /tmp aliases.
     LINUXKPI_BOUNDS_HEADER := $(realpath $(CURDIR))/obj/linuxkpi/include/generated/bounds.h
     LINUXKPI_GENERATED_HEADERS := $(LINUXKPI_ABI_HEADERS) $(LINUXKPI_BOUNDS_HEADER)
-    LINUXKPI_FIXTURES := cachefixture i915policyfixture pciconfigfixture runtimefixture taskfixture timefixture timerfixture syncfixture wwfixture iofixture seqfixture srcufixture workerfixture workfixture usleepfixture waitbitfixture printkfixture smpfixture workirqfixture rcufixture rcufreefixture irqworkfixture dmafencefixture fencecontainerfixture resvfixture tscfixture aggregatefixture
+    LINUXKPI_FIXTURES := cachefixture i915policyfixture pciconfigfixture runtimefixture taskfixture timefixture timerfixture syncfixture wwfixture iofixture seqfixture srcufixture workerfixture workfixture usleepfixture waitbitfixture printkfixture smpfixture workirqfixture rcufixture rcufreefixture irqworkfixture dmafencefixture fencecontainerfixture resvfixture swfencefixture tscfixture aggregatefixture
     LINUXKPI_FIXTURE_C := $(addprefix obj/linuxkpi/,$(addsuffix .c,$(LINUXKPI_FIXTURES)))
     LINUXKPI_FIXTURE_OBJ := $(LINUXKPI_FIXTURE_C:.c=.o)
     LINUXKPI_OBJ += $(LINUXKPI_FIXTURE_OBJ)
@@ -504,6 +504,11 @@ obj/linuxkpi/intel_qp_tables.o: $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915/disp
 obj/linuxkpi/i915_memcpy.o: $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915/i915_memcpy.c GNUmakefile $(V_CONFIG_STAMP)
 	mkdir -p "$(@D)"
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11 -c $< -o $@
+
+# Preserve the four object/module identities supplied by the pinned i915 Kbuild.
+obj/linuxkpi/i915_sw_fence.o: $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915/i915_sw_fence.c GNUmakefile $(V_CONFIG_STAMP)
+	mkdir -p "$(@D)"
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11 -DKBUILD_BASENAME='"i915_sw_fence"' -DKBUILD_MODNAME='"i915"' -D__KBUILD_MODNAME=kmod_i915 -DKBUILD_MODFILE='"drivers/gpu/drm/i915/i915"' -c $< -o $@
 endif
 
 # Compile the maintained V sampler separately so benchmark callers can use

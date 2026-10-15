@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-15 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Latest DMA-reservation build baseline: **`321bb4c63`**, with 13 frozen production/tool paths described below. Recheck HEAD and the worktree before
+Latest software-fence build baseline: **`59b1e9ac5`**, with nine frozen production/tool paths described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -81,14 +81,18 @@ global fault-lease rewrite was not applied.
 
 Ordinary RCU, deferred page-backed frees, native IRQ work and the DMA-fence
 synchronization core are implemented and validated. The latest normal/SSE/
-four-level guests pass 49 markers and 31 strict allocation equalities. Continue
-with real fence containers and reservation ownership; complete i915 support is
-still pending.
+four-level guests now pass 52 markers and 34 strict allocation equalities.
+Fence containers, reservation ownership and unchanged i915 software fences are
+implemented and validated. Continue through the remaining task/MM, device,
+memory and DRM services; complete i915 support is still pending.
 
 ## Committed progress
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `59b1e9ac5` | Native DMA reservation producers, usage tags, writer ownership, RCU iteration and collection lifetimes |
+| `321bb4c63` | DMA-fence arrays/chains, actual IRQ union reuse and deferred container release |
+| `c136b3209` | Native DMA-fence synchronization core, callbacks, waits and RCU release |
 | `beb571021` | Real maskable IRQ work, lazy PIT delivery, concurrent callback synchronization and measured teardown |
 | `a97f0490` | Genuine page-backed `kvfree` and deferred RCU free, original embedded/headless macros and measured complete actor teardown |
 | `1d0f5b00` | Native ordinary RCU callback/cookie service, real IRQ-return grace periods, fixed CPU-domain guards and V-only validation tools |
@@ -2308,7 +2312,7 @@ implementation or correction is included in this container increment. Keep the
 verified upstream sources unchanged and distinguish native corrections from
 exact upstream behavior.
 
-## Latest native DMA-reservation increment
+## Native DMA-reservation increment
 
 The isolated baseline is `321bb4c63` plus 13 frozen production/tool paths.
 All 15 configured non-lockdep public APIs and the genuine mutable original
@@ -2399,3 +2403,99 @@ paths and all 7,668 unchanged imported files:
 Continue through actual driver/core consumers and remaining device, memory and
 DRM services. Full driver compile/link, confirmed PCI identity and physical
 Tiger Lake validation remain pending.
+
+## Latest unchanged software-fence increment
+
+The isolated baseline is `59b1e9ac5` plus nine frozen production/tool paths:
+the new native self-test, typed facade and two metadata headers, plus Make,
+bridge, fixture allowlist and the two public VM harness policy/marker files.
+The complete original `i915_sw_fence.c` is now compiled, linked and executed;
+all ten configured exports survive the actual enabled ELF and every original
+import resolves. The four pinned Kbuild identities are preserved. Keep the
+original source SHA256
+`4876074a64e975fd4823d4f442aab9c5a30f857f0ec9b970abea77c84c5491e9`.
+This is a synchronization component, with no GPU initialization or binding.
+
+Original storage sizes are SW fence 40, supplied wait entry 40, DMA callback 32
+and private timed owner 128 bytes. Preserve the exact original notify enum,
+including its nominal identity for Clang function sanitization; an
+unsigned-int alias passed ordinary C compatibility assertions but failed the
+host sanitizer. The typed facade calls original `__i915_sw_fence_init` with a
+valid runtime callback; the public init macro requires a compile-time callback.
+
+FREE may release the target owner, but supplied wait entries must remain live
+through the wake callback's later flags read. Waiter backing survives
+`finish_wait`. Timed owners keep the DMA callback/reference after timeout until
+late DMA, actual IRQ-work synchronous timer shutdown and genuine RCU retirement.
+Native tests use a remote ordinary reader through raw-owner metadata/IRQ sync;
+current-task RCU cannot surround a sleeping sync. Do not use a generic DMA
+callback's 24-byte prefix as a 128-byte timed owner. The dedicated diagnostic
+lookup checks allocation span and producer identity before extension reads.
+
+Preserve the original continuation/error behavior and weak reservation
+iteration contract. Declining COMPLETE leaves pending zero without done/FREE;
+no resumable notification is supplied. Configured DAG/debug-object checking is
+disabled. Atomic allocation failure is tested with supported GFP zero; the
+limited native allocator does not accept all GFP_ATOMIC bits.
+
+Final freeze `sw-fence-native-freeze-v2.json` SHA256:
+`1d26673b11ba2787c0a8996d6d42aeb5ec1dccc11ea6b34aeb8c7ade5e9518dc`.
+Enabled proof SHA256:
+`bb272b92ae5d055cf8505fc0cbb9f4e93cbb6e8913245e0a9ff3f2dbc43b22c8`;
+ELF `31578e45624d33fdd1623d8e0d506fc277b5c6deb94333151f54663e372cb5f4`.
+ARM proof SHA256:
+`9ec6a410418ce6bb015c66cac56d429e799457098b5e898499e6df1cbb459f02`.
+Default proof SHA256:
+`f1bfef20bfc2255967415f14534d2a0f0610eb9836cf686337c16edde7db0ef0`.
+V1's full x86 V compile caught an i64 fixture OOM gate passed to i32; v2 changes
+only that field and rebuilds both architectures. Preserve v1 failure/audit logs.
+Author facade preflight alone did not establish a full generic-blob build.
+
+GNU99/GNU11 ASan/UBSan host tests pass 8,296/8,515 assertions. All ten original
+exports are retained and exercised; each of 39 host service imports has one
+concrete definition, with compiler/sanitizer imports recorded separately. The
+earlier native compile inventory has 42 imports and is a separate profile.
+723 selected V bodies comprise 720 exact bodies and three disclosed completion
+adapters; 268 fixture occurrence keys are inspected. The typed notice transport
+is explicit; full preprocessing against the genuine variadic control differs
+only in the sink identifier. Host result SHA256:
+`1907b9231e4c78633f9b6339ca1cc7806860aa6ae85d6277c43eb3eb030cb54b`;
+four-path manifest SHA256:
+`0278712d5f56c76d1e5937d29a94e5b6e9823f04d11cc472fa03d4a87620247d`.
+
+Normal/SSE/four-level enabled guests pass 52 markers/34 strict PMM/live-heap
+rows, with three complete software-fence warmups before its measured fourth
+lifecycle. All three actors join and retire off stack. Default startup and
+enabled/default x86/default ARM builds pass; ARM is build/artifact evidence.
+Independent native actual-C/O2 review covers all 65 new bodies:
+`sw-fence-independent-x86-oct15-v2/review.json`, SHA256
+`621c0121719f487b7c2039a57e535680f1ea9515e23dd6608edc7003048a821c`.
+Reciprocal root-integration/actual stack review:
+`sw-fence-independent-root-integration-v2/review.json`, SHA256
+`44a81e595e71403fb6d8a6fddeca4d81eeaae778a92aa51f841b0f6adae0a29d`.
+Independent final host source/lifetime/evidence review:
+`sw-fence-independent-host-lifetime-v1/review.json`, SHA256
+`06bccfd36eb17c387c74dd1c49574f1ddf760d0511d66489c4ccefbdf9425ca5`.
+Independent four actual ISO/init/image-id and guest chronology review:
+`sw-fence-independent-guests-oct15-v2/review.json`, SHA256
+`faf260668a753cc67a5555ca5f6c3e9e5631321111180c954044dfc0595e46e2`.
+Final full audit remains 6/269, all 7,668 imports unchanged. Independent 8,028
+input/dependency/log review:
+`sw-fence-independent-audit-oct15-v2/review.json`, SHA256
+`389b2e031184c95714fd9e2c08f76bb7b5321a435b739bd80b54c0fdd82d43fb`.
+
+New worktrees are private under
+`/Volumes/HommV66Scratch/vinix-linuxkpi-swfence-oct15-59b1e9ac5`; all final proofs,
+ELFs, guest images/logs and receipts remain durable under
+`/Users/alex/.cache/vinix-linuxkpi/smp-oct10/sw-fence-*`. Enabled artifacts now
+also save the actual storage assembly object before the default rebuild.
+Completed older DMA-fence x86/ARM worktrees were retired after source/commit and
+saved-artifact verification; all durable evidence is retained.
+
+The next source-backed audit frontier is recorded in
+`audit-next-native-services-oct15-v1/review.json`: real L1TF bug queries; coherent
+native vfork/real-parent/shared-map identity and task/MM lifetime services; then
+page/SG/DMA ownership, mapping pinning/invalidation and MMIO/PCI services.
+Adding placeholder task fields or constant CPU-bug answers is not an
+implementation. Device binding, full driver/core compile/link, confirmed PCI
+identity and physical Tiger Lake validation remain pending.
