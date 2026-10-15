@@ -2,7 +2,13 @@
 @[translated]
 module compatcore
 
+#include "linuxkpi_v_primitives.h"
+
 fn C.vinix_linuxkpi_alloc_pages(usize, bool) voidptr
+fn C.vkr_page_owner_byte(voidptr) u8
+fn C.vkr_page_owner_tag(voidptr) u64
+
+const page_allocation_tag = u64(0x564b5049504147a5)
 
 // The old aligned C metadata occupied 32 bytes. Keep that complete size,
 // including its unused tail, immediately before the aligned payload.
@@ -11,7 +17,7 @@ mut:
 	requested usize
 	pages     usize
 	base      voidptr
-	padding   u64
+	owner_tag u64
 }
 
 @[export: 'vinix_linuxkpi_gfp_supported']
@@ -51,6 +57,7 @@ pub fn runtime_kmalloc(size usize, flags u32) voidptr {
 		allocation.requested = size
 		allocation.pages = pages
 		allocation.base = base
+		allocation.owner_tag = page_allocation_tag
 		if (flags & 0x100) != 0 { C.memset(result, 0, size) }
 		return result
 	}
@@ -77,6 +84,48 @@ pub fn runtime_ksize(ptr voidptr) usize {
 	unsafe {
 		if usize(ptr) <= 16 { return 0 }
 		return (&RuntimeAllocation(usize(ptr) - sizeof(RuntimeAllocation))).requested
+	}
+}
+
+// Only page-backed kmalloc owners have this prefix. CacheSlot's allocated
+// byte occupies the same offset and is always 0/1; inspect that initialized
+// byte before reading any word that could include cache padding.
+@[export: 'vkr_page_allocation_size']
+pub fn page_allocation_size(ptr voidptr) usize {
+	unsafe {
+		require(sizeof(RuntimeAllocation) == 32 && __offsetof(RuntimeAllocation, owner_tag) == 24)
+		address := usize(ptr)
+		require(address >= sizeof(RuntimeAllocation) && (address & 15) == 0)
+		prefix := address - sizeof(RuntimeAllocation)
+		tag_address := voidptr(prefix + __offsetof(RuntimeAllocation, owner_tag))
+		require(C.vkr_page_owner_byte(tag_address) == u8(page_allocation_tag & 255))
+		require(C.vkr_page_owner_tag(tag_address) == page_allocation_tag)
+		allocation := &RuntimeAllocation(prefix)
+		requested := allocation.requested
+		pages := allocation.pages
+		base := usize(allocation.base)
+		page_size := C.vinix_linuxkpi_page_size()
+		require(requested != 0 && page_size != 0 && (page_size & (page_size - 1)) == 0)
+		require(pages != 0 && pages <= usize(-1) / page_size)
+		require(base != 0 && (base & (page_size - 1)) == 0 && base <= prefix)
+		capacity := pages * page_size
+		require(base <= usize(-1) - capacity)
+		offset := address - base
+		require(offset <= capacity && requested <= capacity - offset)
+		mut alignment := requested & (usize(0) - requested)
+		if alignment < 16 { alignment = 16 }
+		require(base <= usize(-1) - sizeof(RuntimeAllocation) - (alignment - 1))
+		require(address == ((base + sizeof(RuntimeAllocation) + alignment - 1) & ~(alignment - 1)))
+		return requested
+	}
+}
+
+@[export: 'vkr_kvfree']
+pub fn runtime_kvfree(ptr voidptr) {
+	unsafe {
+		if usize(ptr) <= 16 { return }
+		page_allocation_size(ptr)
+		runtime_kfree(ptr)
 	}
 }
 

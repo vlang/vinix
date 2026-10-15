@@ -23,8 +23,11 @@ _Static_assert(sizeof(unsigned long) == sizeof(uint64_t) &&
 
 /* Genuine public signatures. CONFIG_TREE_RCU selects the original SMP reader
  * ABI; these native exports do not import Linux's tree backend or supply
- * PREEMPT_RCU, hotplug, BH, NMI or generic deferred-free implementation. */
+ * PREEMPT_RCU, hotplug, BH, NMI or generic VM/cache allocation ownership. */
 void call_rcu(struct rcu_head *, rcu_callback_t);
+/* Native kvfree currently accepts page-backed kmalloc owners only. */
+void kvfree(const void *);
+void kvfree_call_rcu(struct rcu_head *, void *);
 void synchronize_rcu(void);
 void synchronize_rcu_expedited(void);
 void rcu_barrier(void);

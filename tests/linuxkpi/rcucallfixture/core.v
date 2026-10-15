@@ -327,6 +327,13 @@ fn await_poll(cookie usize) {
 @[export: 'kfree'] pub fn deallocate(owner C.rcuh_const_voidp) {
 	unsafe { check(usize(owner) != 0 && C.rcuh_load32(&allocation_live) != 0, @LINE); C.rcuh_add32(&allocation_live, u32(-1)); C.free(voidptr(owner)) }
 }
+// Fail-fast transport guards, never an allocator or deferred-free model.
+// The separate deferred_free fixture executes the original runtime.v paths.
+@[export: 'vkr_page_allocation_size'] pub fn unsupported_page_owner(_owner voidptr) usize {
+	check(false, @LINE)
+	return 0
+}
+@[export: 'vkr_kvfree'] pub fn unsupported_page_free(_owner voidptr) { check(false, @LINE) }
 @[export: 'vkr_rcu_host_create_error'] pub fn create_error() i32 {
 	unsafe {
 		C.rcuh_add32(&create_calls, 1)

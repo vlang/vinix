@@ -6,6 +6,8 @@ module headercore
 #include "linuxkpi_rcu_v_contract.h"
 
 fn C.vkr_rcu_call(voidptr, fn (&C.callback_head))
+fn C.vkr_kvfree(voidptr)
+fn C.vkr_kvfree_call_rcu(voidptr, voidptr)
 fn C.vkr_rcu_synchronize(bool)
 fn C.vkr_rcu_barrier()
 fn C.vkr_rcu_get_state() u64
@@ -23,6 +25,10 @@ fn C.vkr_rcu_host_create_error() i32
 pub fn rcu_call(head &C.callback_head, callback fn (&C.callback_head)) {
 	C.vkr_rcu_call(head, callback)
 }
+@[export: 'kvfree']
+pub fn rcu_kvfree(base C.vhp_const_voidp) { C.vkr_kvfree(voidptr(base)) }
+@[export: 'kvfree_call_rcu']
+pub fn rcu_kvfree_call(head &C.callback_head, base voidptr) { C.vkr_kvfree_call_rcu(head, base) }
 @[export: 'synchronize_rcu']
 pub fn rcu_synchronize() { C.vkr_rcu_synchronize(false) }
 @[export: 'synchronize_rcu_expedited']

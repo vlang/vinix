@@ -83,4 +83,5 @@ void *krealloc(const void *, size_t, gfp_t) __must_check;
 void *kmemdup(const void *, size_t, gfp_t) __must_check;
 size_t ksize(const void *);
 void kfree(const void *);
+void kvfree(const void *);
 #endif

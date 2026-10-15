@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-15 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Latest native compiler-profile baseline: **`41f6da03`**, with one frozen Makefile overlay described below. Recheck HEAD and the worktree before
+Latest deferred-free build baseline: **`b5f2131e`**, with 14 frozen production/tool paths described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -1981,3 +1981,69 @@ regenerated ABI/bounds are unchanged. No new full audit was needed; the last
 executed result remains **6/269**, with the same task/MM, CPU-bug and entry-stack
 blockers. Full driver link, hardware PCI identity and real GPU validation remain
 unfinished.
+
+## Latest page-backed deferred RCU free increment
+
+Native `kvfree`, `kvfree_call_rcu`, embedded original `kfree_rcu`/`kvfree_rcu`
+and headless `kvfree_rcu_mightsleep` now work for page-backed kmalloc owners.
+The 32-byte prefix's unused tail holds a discriminator; its initialized low
+byte rejects packed-cache slots before reading the whole tag. Full original
+allocation geometry and embedded-head containment are validated before head
+mutation/publication. This requires a caller-owned live pointer, not arbitrary
+pointer validation. Cache slots, vmalloc and vfree remain unsupported.
+
+Private embedded offsets below 4096 use the original intrusive callback field.
+Zero is valid. No allocation or invalid function-pointer construction occurs
+on enqueue. Dispatch copies successor/raw bits before clearing and invoking or
+freeing; nothing reads the head afterward. Callback/barrier ordinal completion
+follows actual freeing. Headless calls require ordinary sleepable task context
+and use the pinned implementation's legitimate synchronous GP/free fallback.
+External producers and readers still have their ordinary ownership duties.
+
+The focused host suite passes both production C dialects and ASan/UBSan,
+181 full-module-identical generated bodies, two safe runs and 36 fatal children.
+The original RCU matrix passes 70 safe and 12 fatal children. The old ordinary
+transport explicitly aborts if it enters allocator branches; only the new
+fixture executes actual runtime/cache allocation ownership. No fake allocator
+or queue model supplies the new coverage. Repeat:
+
+```sh
+V=<authenticated-router> V3CACHE=<private-cache> VTMP=<private-temp> \
+  build-support/run-v-tool.sh tests/linuxkpi/deferred_free.v \
+  --keep-directory <new-directory>
+```
+
+Fresh isolated builds at `b5f2131e` plus 14 frozen paths pass enabled/default
+x86 and default ARM. Saved enabled ELF is
+`1ec6c7ce063aec1ea206f386e875c5eeda1c8144fce6ed2830415a4176e545a7`.
+Normal, SSE and four-level guests each pass 47 markers and 29 strict allocation
+rows. New native coverage holds real implicit readers, queues with IRQs off and
+pins held, mixes embedded frees with self-free/requeued callbacks, waits a
+headless actor and joins both actors through actual off-stack retirement.
+Three warmups precede a fourth lifecycle with exact PMM and every live heap
+class restored. The enqueue context is an ordinary IRQ-off/pinned task, not an
+actual interrupt handler. Default startup passes; actual ARM/default C/ELF
+exclude the feature. Independent generated-C/object lifetime reviews pass.
+
+Evidence root remains `/Users/alex/.cache/vinix-linuxkpi/smp-oct10`.
+`rcufree-native-freeze-v2.json` SHA256 is
+`34d81f4350c0fca3fdfc94dcb20efd32aa70640fca54802cb170a2f0a0d689f7`;
+`rcufree-guest-review-oct16/final.json` SHA256 is
+`d2aef5cb646dc6a59a7b0e6b072e95b2bce7e088771564a23b8e554e7a3f9615`.
+Focused host result: `rcufree-host-oct15-final-v2/result.json`, SHA256
+`3ef4b633092f3334a9cc8923945cd1ef385399e2946e3a97b0f9a91f6ac95cc8`.
+Preserve the first failed x86 generator-allowlist attempt and the original
+13-path freeze; v2 adds the genuine maintained generator choice. Native code
+uses compiler/SDK `335214a9`; host tooling uses copied compiler/SDK `26b0f007`
+through the existing V router. Import verification still passes 7,668 files.
+
+Next runtime dependency: genuine IRQ work. i915 uses ordinary initialization,
+local deferred queueing and breadcrumbs synchronization. Do not reuse local
+`smp_async` execution: it invokes inline and breaks GuC lock ordering. Actual
+hard-IRQ dispatch, pending/busy/requeue ordering and post-callback ownership
+must follow the pinned semantics. Review original `kernel/irq_work.c` in
+`sw-fence-link-design-oct15/reference/` and the native SMP IPI transport first.
+DMA fence and reservation lifetime/producer APIs remain a larger separate
+service; implementing only two reservation iterators cannot supply ownership.
+The last executed full audit remains 6/269. Full driver compile/link, confirmed
+PCI identity and real Tiger Lake validation are still pending.

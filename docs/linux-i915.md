@@ -289,8 +289,14 @@ after a filesystem failure. Mutable build inputs still require isolation.
   behavior. Expedited synchronization uses the same forced native service,
   without a separate latency guarantee. Constructor failures join and verify
   actual off-stack retirement before releasing either worker owner.
-  PREEMPT_RCU, NMI/BH/task RCU, CPU hotplug/NOHZ, `kfree_rcu`/`kvfree_rcu`
-  ownership and the completed-cookie shortcut remain unresolved. Selecting
+  `kfree_rcu`/`kvfree_rcu` now accept native page-backed kmalloc owners,
+  with original embedded heads and allocation-free enqueue. Dispatch frees
+  only after a future grace period and retires its barrier ordinal after the
+  actual free. Headless `kvfree_rcu_mightsleep` uses a real synchronous grace
+  period in ordinary sleepable task context. `kvfree` supports the same
+  page-backed owners; cache slots and generic vmalloc owners remain unsupported.
+  PREEMPT_RCU, NMI/BH/task RCU, CPU hotplug/NOHZ and the completed-cookie
+  shortcut remain unresolved. Selecting
   `CONFIG_TREE_RCU` supplies the original nonpreemptible ABI; it does not import
   Linux's hierarchical implementation. Native validation is recorded below.
 - Unmodified Linux `wait.h`, `swait.h` and `completion.h` use native-backed
@@ -2152,7 +2158,8 @@ generated SDK paths as well as executable hashes.
 The coherent full audit now passes **6/269**, including original
 `i915_sw_fence.c`. Its native object compiles but has eight remaining services:
 four DMA-fence operations, two unlocked DMA-reservation iterator operations,
-`irq_work_queue` and `kvfree_call_rcu`. This is not a full-object link or a GPU
+`irq_work_queue` and `kvfree_call_rcu` (the latter is implemented in the later
+deferred-free increment below). This is not a full-object link or a GPU
 execution result. Remaining first-error groups include task/MM/vfork, CPU-bug
 policy, timer include closure, entry-stack layout and the IRQ-register wrapper.
 Full driver linkage and Tiger Lake validation remain pending.
@@ -2247,3 +2254,63 @@ No new boot or allocation measurement is claimed. All 7,958 prior audit inputs,
 269 driver commands and regenerated ABI/bounds remain unchanged; the executed
 full-audit result remains **6/269**. Final evidence uses `smp-oct10/native-uapi-*`
 and `sw-fence-fixed-native-closure-oct15/`.
+
+## Page-backed deferred RCU frees, 2026-10-15
+
+`kvfree`, `kvfree_call_rcu` and the original embedded `kfree_rcu`/`kvfree_rcu`
+macros now release genuine native page-backed kmalloc allocations. The existing
+32-byte allocation prefix uses its unused tail as an ownership discriminator;
+payload layout and allocation size do not change. An initialized byte rejects
+packed-cache slots before any wider tag read. Geometry and complete embedded
+head containment are checked before publication. Callers must supply a live
+owned allocation; this tag is not a live-pointer registry. Cache slots and
+generic vmalloc/vfree ownership remain unsupported and fail explicitly.
+
+Embedded enqueue allocates nothing, preserves IRQ/pin state and accepts head
+offsets below 4096, including zero. Private offset bits occupy the original
+callback field without constructing an invalid function pointer. The existing
+RCU queue starts a future grace period. Dispatch saves its successor and raw
+bits, clears the head before invoking a callback or freeing pages, and never
+reads that head afterward. Barrier ordinals retire after the actual free.
+The headless `kvfree_rcu_mightsleep` path uses the original permitted synchronous
+fallback: an ordinary sleepable task waits for a real future grace period,
+then frees its owner. It supplies no asynchronous headless batching service.
+
+The focused V host fixture passes strict GNU99/GNU11 production compilation
+and ASan/UBSan: two complete safe runs and 36 isolated fatal children. It
+checks 181 generated production bodies against full modules, including exports
+and initialization guards. Real allocator/cache bodies and original free macros
+cover immediate recovery, mixed callbacks/frees, self-requeue/free, offset
+0/8/4088 under four held-reader modes, allocation-free enqueue, a barrier paused
+at actual free, exclusion of later submissions and joined headless execution.
+Invalid owners, head ranges and contexts fail before changing original head
+bytes, callback ordinals or page-free counts. The existing ordinary RCU matrix
+also passes its 70 safe and 12 fatal runs. These are focused suites, not a new
+global allocation or complete host-suite pass.
+
+Fresh worktrees at `b5f2131e` plus 14 frozen production/tool paths build enabled
+and default x86-64 and default ARM64. Enabled ELF
+`1ec6c7ce063aec1ea206f386e875c5eeda1c8144fce6ed2830415a4176e545a7`
+passes fresh normal, SSE and four-level four-CPU guests. Each passes 47 markers
+and 29 strict allocation equalities. Three complete actor/callback warmups
+precede the new fourth-lifecycle measurement; every page and live heap class
+returns to baseline. Native coverage includes real nested pins, an IRQ-off
+reader, allocation-free IRQ-off/pinned enqueue, mixed callbacks and synchronous
+headless waiting. This enqueue test is not an actual interrupt-handler test.
+Default Linux-ABI startup passes; actual default/ARM C and ELF exclude the feature.
+Independent reviewers approve the allocator, deferred dispatch and fixture
+lifetimes in saved generated C and native objects. The first x86 build's missing
+fixture-generator choice is preserved as a failed attempt; the corrected
+allowlist is part of the final freeze.
+
+Evidence is under `smp-oct10/rcufree-*`. Focused host results are
+`rcufree-host-oct15-final-v2/result.json`; independent native approval is
+`rcufree-guest-review-oct16/final.json`, SHA256
+`d2aef5cb646dc6a59a7b0e6b072e95b2bce7e088771564a23b8e554e7a3f9615`.
+Repeat with `build-support/run-v-tool.sh tests/linuxkpi/deferred_free.v
+--keep-directory NEW_DIRECTORY`, using the authenticated native/host compiler
+router and private architecture caches described above. The import verifies
+all 7,668 files unchanged. This closes the page-backed RCU-free runtime gap;
+IRQ work, DMA fences/reservations and generic VM ownership remain dependencies.
+The last full audit remains 6/269; no new full-driver link or Tiger Lake result
+is claimed.

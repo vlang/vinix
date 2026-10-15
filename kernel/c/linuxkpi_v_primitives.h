@@ -21,6 +21,12 @@ void vinix_linuxkpi_bug(char *, int);
 void vinix_linuxkpi_bug(const char *, int);
 #endif
 size_t vinix_linuxkpi_page_size(void);
+size_t vkr_page_allocation_size(void *);
+void vkr_kvfree(void *);
+/* Ordered compiler loads preserve the byte discriminator before a tag word
+ * that must never be read from uninitialized packed-cache padding. */
+#define vkr_page_owner_byte(p) __atomic_load_n((const unsigned char *)(p), __ATOMIC_ACQUIRE)
+#define vkr_page_owner_tag(p) __atomic_load_n((const uint64_t *)(p), __ATOMIC_ACQUIRE)
 bool vinix_linuxkpi_may_sleep(void);
 bool vinix_linuxkpi_gfp_supported(unsigned int);
 void *vinix_linuxkpi_alloc_gfp_pages(size_t, unsigned int);

@@ -559,6 +559,10 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Native ordinary RCU self-test failed')
 		}
 		C.kprintf(c'linuxkpi: ordinary RCU implicit readers, native IRQ returns, callback barriers and cookies passed; no pages or heap objects retained\n')
+		if !rcufree_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Native deferred RCU free self-test failed')
+		}
+		C.kprintf(c'linuxkpi: page-backed deferred RCU frees, mixed callback barriers and headless grace periods passed; no pages or heap objects retained\n')
 		if !work_irq_native_selftest() {
 			lib.kpanic(unsafe { nil }, c'Native workqueue IRQ identity self-test failed')
 		}

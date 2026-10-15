@@ -31,6 +31,11 @@ void rcuh_completion_complete(void *);
 void rcuh_completion_wait(void *);
 /* Exact selected production V body, not a model of its public-cookie rule. */
 bool compatcore__rcu_sequence_exact_done(uint64_t, uint64_t);
+/* Ordinary-callback regression transport deliberately supplies no generic
+ * allocator ownership. Entering a new deferred-free branch fails explicitly;
+ * deferred_free.v executes the real page/cache allocator instead. */
+size_t vkr_page_allocation_size(void *);
+void vkr_kvfree(void *);
 _Static_assert(sizeof(struct rcu_head)==16 && _Alignof(struct rcu_head)==8 &&
                offsetof(struct rcu_head,next)==0 && offsetof(struct rcu_head,func)==8,
                "original callback head ABI");

@@ -17,6 +17,7 @@ bool vkr_rcu_ready(void);
  * permanent scalar storage: no allocation, locks, task borrows or wakeups. */
 void vkr_rcu_quiescent(uint32_t);
 void vkr_rcu_call(void *, vkr_rcu_callback_fn);
+void vkr_kvfree_call_rcu(void *, void *);
 void vkr_rcu_synchronize(bool);
 void vkr_rcu_barrier(void);
 uint64_t vkr_rcu_get_state(void);
