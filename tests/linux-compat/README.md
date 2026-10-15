@@ -1630,3 +1630,14 @@ pass the retained evidence area to audit compiler/build/source/C/input identitie
 real receipts, original failures, guarded transfers, flat storage and executing
 negative controls. Both stricter exploratory ARM reference failures and a
 controller restart recovery remain published. See the [partial-copy report](../../docs/linux-posix-qualification.md#native-getrandom-partial-copy-faults).
+
+The `randomrange` case qualifies seeded getrandom request capping and complete
+range errors before output, including invalid zero-count addresses. It uses
+fixed 4GiB and discovered-ceiling guarded arenas, six accepted flags, raw/musl
+calls, positive bounded partial results and unchanged canaries. The same ELF
+runs through `randomrange-reference.v` on supplied Linux kernels. Compile
+`randomrange-check.v` without `-prod` and pass its retained evidence area to
+verify actual original failures, native/reference outcomes, source/C/build and
+compiler identities, seven primary source pins, flat storage, exact retained
+inputs and executing audit controls. The initial compile refusal remains
+separate from guest evidence. See the [request-range report](../../docs/linux-posix-qualification.md#native-getrandom-request-ranges).

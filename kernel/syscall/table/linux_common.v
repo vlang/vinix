@@ -1030,7 +1030,14 @@ fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) 
 	if flags & u32(grnd_random | grnd_insecure) == u32(grnd_random | grnd_insecure) {
 		return errno.err, errno.einval
 	}
-	if count == 0 {
+	// Linux imports one bounded user buffer before generating any output.
+	max_count := u64(0x7fffffff) & ~(memory.page_size - 1)
+	length := if count > max_count { max_count } else { count }
+	limit := memory.user_address_limit()
+	if buf > limit || length > limit - buf {
+		return errno.err, errno.efault
+	}
+	if length == 0 {
 		return 0, 0
 	}
 	if buf == 0 {
@@ -1043,8 +1050,8 @@ fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) 
 	}
 	mut bounce := [256]u8{}
 	mut written := u64(0)
-	for written < count {
-		mut chunk := count - written
+	for written < length {
+		mut chunk := length - written
 		if chunk > bounce.len {
 			chunk = u64(bounce.len)
 		}

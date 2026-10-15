@@ -1,0 +1,1 @@
+arm/x86: complete generated production C differs only in table__syscall_linux_getrandom; exact request cap and complete range guard before zero count with bounded copy loop; existing bounce lifetime, erasure and counted copies unchanged, with no compiler normalization or added allocation/free

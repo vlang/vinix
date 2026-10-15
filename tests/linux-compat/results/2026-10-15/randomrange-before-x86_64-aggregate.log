@@ -1,0 +1,100 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   320k      0 --:--:-- --:--:-- --:--:--  320k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0 2880k    0 11239    0     0  16054      0  0:03:03 --:--:--  0:03:03 16055 84 2880k   84 2431k    0     0  1374k      0  0:00:02  0:00:01  0:00:01 1374k100 2880k  100 2880k    0     0  1428k      0  0:00:02  0:00:02 --:--:-- 1429k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 49 22528   49 11239    0     0  13833      0  0:00:01 --:--:--  0:00:01 13824100 22528  100 22528    0     0  23289      0 --:--:-- --:--:-- --:--:-- 23272
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 54  207k   54  112k    0     0  71025      0  0:00:02  0:00:01  0:00:01 71024100  207k  100  207k    0     0   122k      0  0:00:01  0:00:01 --:--:--  122k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  91262      0 --:--:-- --:--:-- --:--:-- 91418
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   125k      0 --:--:-- --:--:-- --:--:--  125k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/randomrange-20261015/states/p1-before-x86/randomrange/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/randomrange-20261015/states/p1-before-x86/randomrange/.vinix-amd64.iso.38XyDi'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 5804m free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/randomrange-20261015/states/p1-before-x86/randomrange/iso-build/.iso-staging.DukaK0/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13689 sectors
+Written to medium : 13689 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/randomrange-20261015/states/p1-before-x86/randomrange/.vinix-amd64.iso.38XyDi' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd5e3.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/randomrange-20261015/states/p1-before-x86/randomrange/test.iso (28035072 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/randomrange-20261015/states/p1-before-x86/randomrange
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=75544
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91c00
+initramfs: Done (9 entries)
+LINUX RANDOMRANGE TOPOLOGY: ordinary=0 uid=0 page=4096 readiness=seeded ceiling=100000000000000 cap=7ffff000
+LINUX RANDOMRANGE DETAIL: ordinary=0 kind=0 flags=0 form=0 shape=6 count=1073741696 result=8064/0 expected_errno=14 partial=0
+LINUX RANDOMRANGE DETAIL: ordinary=0 kind=0 flags=0 form=0 shape=6 count=1073741697 result=8064/0 expected_errno=14 partial=0
+LINUX RANDOMRANGE DETAIL: ordinary=0 kind=0 flags=0 form=0 shape=6 count=2147479552 result=8064/0 expected_errno=14 partial=0
+LINUX RANDOMRANGE DETAIL: ordinary=0 kind=0 flags=0 form=0 shape=6 count=2147479553 result=8064/0 expected_errno=14 partial=0
+LINUX RANDOMRANGE CASES: ordinary=0 kind=0 calls=888 failures=504
+LINUX RANDOMRANGE CASES: ordinary=0 kind=1 calls=1800 failures=0
+LINUX RANDOMRANGE CASES: ordinary=0 kind=2 calls=1440 failures=0
+LINUX RANDOMRANGE CASES: ordinary=0 kind=3 calls=1464 failures=0
+LINUX RANDOMRANGE FINAL: ordinary=0 kind=0 calls=888 failures=504
+LINUX RANDOMRANGE FINAL: ordinary=0 kind=1 calls=1800 failures=0
+LINUX RANDOMRANGE FINAL: ordinary=0 kind=2 calls=1440 failures=0
+LINUX RANDOMRANGE FINAL: ordinary=0 kind=3 calls=1464 failures=0
+LINUX RANDOMRANGE TOPOLOGY: ordinary=1 uid=1000 page=4096 readiness=seeded ceiling=100000000000000 cap=7ffff000
+LINUX RANDOMRANGE DETAIL: ordinary=1 kind=0 flags=0 form=0 shape=6 count=1073741696 result=8064/0 expected_errno=14 partial=0
+LINUX RANDOMRANGE DETAIL: ordinary=1 kind=0 flags=0 form=0 shape=6 count=1073741697 result=8064/0 expected_errno=14 partial=0
+LINUX RANDOMRANGE DETAIL: ordinary=1 kind=0 flags=0 form=0 shape=6 count=2147479552 result=8064/0 expected_errno=14 partial=0
+LINUX RANDOMRANGE DETAIL: ordinary=1 kind=0 flags=0 form=0 shape=6 count=2147479553 result=8064/0 expected_errno=14 partial=0
+LINUX RANDOMRANGE CASES: ordinary=1 kind=0 calls=888 failures=504
+LINUX RANDOMRANGE CASES: ordinary=1 kind=1 calls=1800 failures=0
+LINUX RANDOMRANGE CASES: ordinary=1 kind=2 calls=1440 failures=0
+LINUX RANDOMRANGE CASES: ordinary=1 kind=3 calls=1464 failures=0
+LINUX RANDOMRANGE FINAL: ordinary=1 kind=0 calls=888 failures=504
+LINUX RANDOMRANGE FINAL: ordinary=1 kind=1 calls=1800 failures=0
+LINUX RANDOMRANGE FINAL: ordinary=1 kind=2 calls=1440 failures=0
+LINUX RANDOMRANGE FINAL: ordinary=1 kind=3 calls=1464 failures=0
+LINUX RANDOMRANGE FAIL: range errors, bounded transfers or buffer guards
+QEMU: Terminated
+Missing verdicts: ['LINUX RANDOMRANGE: PASS']; failures: ['FAIL:', 'LINUX RANDOMRANGE FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/randomrange-20261015/states/p1-before-x86/receipt.json

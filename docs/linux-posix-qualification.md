@@ -7057,3 +7057,100 @@ section 15 gates open.
 - [Maintained audit](../tests/linux-compat/randomcopy-check.v), [verdict](../tests/linux-compat/results/2026-10-15/randomcopy-audit.log).
 - [Initial scope audit refusal](../tests/linux-compat/results/2026-10-15/randomcopy-audit-producer-first.log).
 - [First exploratory identities](../tests/linux-compat/results/2026-10-15/randomcopy-exploratory-inputs.json), [first ARM Linux receipt](../tests/linux-compat/results/2026-10-15/randomcopy-exploratory-reference-arm-receipt.json), [second exploratory identities](../tests/linux-compat/results/2026-10-15/randomcopy-round2-inputs.json), [second ARM Linux receipt](../tests/linux-compat/results/2026-10-15/randomcopy-round2-reference-arm-receipt.json), [aggregate recovery identities](../tests/linux-compat/results/2026-10-15/randomcopy-reference-recovery-inputs.json).
+
+## Native getrandom request ranges
+
+Seeded `getrandom` now caps the requested count at the native page-aligned
+MAX_RW_COUNT and checks the complete bounded range before generating output.
+A range that crosses the userspace limit returns EFAULT without modifying a
+writable prefix. Zero counts also validate the address domain: NULL, address1
+and inaccessible userspace mappings still return zero, while the tested
+out-of-domain pointers return EFAULT. Existing flag errors retain precedence.
+The copy loop uses the capped length and retains counted partial-copy handling.
+
+The primary [Linux import_ubuf implementation](https://github.com/torvalds/linux/blob/v6.12/lib/iov_iter.c)
+caps length before access_ok. The [random implementation](https://github.com/torvalds/linux/blob/v6.12/drivers/char/random.c)
+uses that importer after readiness handling. Seven primary files are pinned,
+including generic bounds and the x86 access/limit definitions. Readiness
+ordering and unseeded blocking remain separate from this seeded qualification.
+
+Each root and UID1000 cohort runs these groups with three raw register-word
+forms and the genuine musl getrandom call:
+
+| Group | Controls per cohort | Behavior |
+| --- | --- | --- |
+| 0 | 888 | Six valid flags, four high-arena destinations and eight crossing/large lengths return EFAULT; five out-of-domain zero-count addresses also return EFAULT |
+| 1 | 1,800 | Six conflicting/unknown flag masks retain EINVAL across all 15 destinations and zero/short/large counts |
+| 2 | 1,440 | Four aligned/unaligned writable destinations preserve bounded success and partial copying; large counts through SIZE_MAX remain usable at the low arena after capping |
+| 3 | 1,464 | Valid userspace zero-count controls and first-byte EFAULT for NULL/address1/guard/read-only/out-of-domain destinations retain all guards |
+
+The low five-page arena is fixed at 4GiB with MAP_FIXED_NOREPLACE, keeping its
+large capped requests safely inside the address domain. The second arena is
+1GiB below a ceiling discovered with exact, non-replacing mmap probes at
+candidate address widths. Both have two writable pages, a read-only page and
+front/rear guards. No existing mapping is replaced. Requests that have valid
+address ranges fault at the read-only page, so the test does not copy gigabytes.
+All writable bytes outside the permitted output prefix and both read-only
+sentinels are checked. Prefixes of at least 32 bytes must contain output; random
+values have no deterministic oracle and entropy quality is not qualified.
+
+| Context | Page size | Observed ceiling | Capped length |
+| --- | --- | --- | --- |
+| Native AArch64 | 16KiB | 2^47 | 0x7fffc000 |
+| Linux AArch64 reference | 4KiB | 2^48 | 0x7ffff000 |
+| Native x86-64 | 4KiB | 2^56 | 0x7ffff000 |
+| Linux x86-64 reference | 4KiB | 2^47 | 0x7ffff000 |
+
+The identical ELF computes each context's geometry and runs the same predicate;
+reference mode only skips native slab measurement. Exact last-user-page policy
+and tagged-pointer modes are not covered by these margin-separated ranges.
+
+| Architecture | Controls | Original failures | Corrected failures | Same-ELF Linux failures |
+| --- | --- | --- | --- | --- |
+| AArch64 | 11,184 | 1,008 | 0 | 0 |
+| x86-64 | 11,184 | 1,008 | 0 | 0 |
+
+Original failures are exactly 504 group0 controls per cohort: 384 crossing
+requests starting in writable high memory incorrectly return a partial success,
+and 120 invalid-address zero counts incorrectly return zero. Other original
+controls pass. CASES and FINAL vectors agree. Corrected and supplied Linux
+6.12.51 kernels pass the unchanged native probe ELF on both architectures.
+
+Each corrected cohort warms 32 cycles, then measures 200 repeated whole-range
+and invalid-zero refusals with 13-second settling intervals. All 18 ARM/14 x86
+slab classes and positive large-page counts stay flat. The observer closes and
+both arenas are unmapped before Counts transfer; the parent closes its pipe and
+waits even after a failed transfer. Setup allocation/churn and fatal-abort
+cleanup remain separate.
+
+Four fresh production builds use isolated worktrees at
+`c9495f033519d1313520d2b954620671e3db594f`. Complete generated C differs only in
+the getrandom definition, without compiler-identifier normalization. The audit
+requires the exact scalar cap/range addition and bounded-loop substitution;
+counted copies, bounce ownership and existing erasure policy are unchanged.
+There are no added allocations, frees or kernel pointer lifetimes. Captures
+read back complete copied bytes before reporting build success. Allocation
+diagnostics remain byte-identical at 398 ARM/290 x86 existing sites, including
+existing allowance refusals. Eight host files and before/after 64-input dispatch
+inventories pass. Public fingerprints use the committed parent plus this change,
+separately from historical test kernels.
+
+Final probe preflight/native/reference C and ELF identities agree; generated C
+has four explicit stack allocas and no heap, dynamic-array or fixed-index
+helpers. An initial probe compile rejected a fixed-index helper and printf
+format types; its actual diagnostics, C identity and lack of an executable are
+retained. That attempt has no guest qualification. Corrected
+randomrange/runtime/randomcopy cases pass on both native architectures. The
+maintained auditor verifies compiler pins, full C/source scope, real build
+stdout, receipts and the exact 72-file walk of eight completed native captures.
+False-assertion and passing-Linux-as-failing-original controls execute and exit
+1 without -prod. Disposable staging is retired only after capture and rechecks.
+
+Entropy quality, unseeded readiness/error ordering/blocking/interruption,
+tagged pointers, exact last-page policy, mapping/range races, full bulk 2GiB
+transfers, glibc and translated/ELF32 paths remain unqualified. The three broad
+section 15 gates remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/randomrange-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/randomrange-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/randomrange-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/randomrange-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/randomrange-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/randomrange-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/randomrange-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/randomrange-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/randomrange-check.v), [verdict](../tests/linux-compat/results/2026-10-15/randomrange-audit.log), [primary pins](../tests/linux-compat/results/2026-10-15/randomrange-primary-inputs.json), [initial compile refusal](../tests/linux-compat/results/2026-10-15/randomrange-compilation-attempt1.log).

@@ -1,0 +1,9 @@
+{
+    "linux-access_ok-v6.12.c": "208c8de8a36d6c8d8169f1b19be991cf658490fb8ae009d3fe516ab0939b1b13 https://raw.githubusercontent.com/torvalds/linux/v6.12/include/asm-generic/access_ok.h",
+    "linux-cpu-x86-v6.12.c": "e02ce5e430c87bebebaf20cafa14220de9c43394da8ef39668cb3c42d07ee35b https://raw.githubusercontent.com/torvalds/linux/v6.12/arch/x86/kernel/cpu/common.c",
+    "linux-iov_iter-v6.12.c": "5485f82f523df97071a0d56cade23c9ec83e82de0b937a9542667fe6932a9063 https://raw.githubusercontent.com/torvalds/linux/v6.12/lib/iov_iter.c",
+    "linux-page-x86-v6.12.c": "0fabfb5b6c79bbd8909e2f69192b56889265438a80b2f2b79768a860ef8ad7d0 https://raw.githubusercontent.com/torvalds/linux/v6.12/arch/x86/include/asm/page_64_types.h",
+    "linux-random-v6.12.c": "395bb854da12bb40d491dbc129063218b3f45f65bacaa8e21b17a4584bea4d3c https://raw.githubusercontent.com/torvalds/linux/v6.12/drivers/char/random.c",
+    "linux-uaccess-x86-v6.12.c": "b708bcb597fd900e0f6a020417f6a475fe1d87893b304645bd5b9e520514306d https://raw.githubusercontent.com/torvalds/linux/v6.12/arch/x86/include/asm/uaccess.h",
+    "linux-uaccess64-x86-v6.12.c": "f26e4b5aeb5b904a802e3a853d524c2fe42def2f2269c4bff6c0068277c2f62b https://raw.githubusercontent.com/torvalds/linux/v6.12/arch/x86/include/asm/uaccess_64.h"
+}

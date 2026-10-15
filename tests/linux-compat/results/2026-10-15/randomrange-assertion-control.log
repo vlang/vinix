@@ -1,0 +1,3 @@
+tests/linux-compat/randomrange-check.v:383: FAIL: fn main.main: assert false, 'randomrange assertions must execute'
+      message: randomrange assertions must execute
+V panic: Assertion failed...

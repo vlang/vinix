@@ -956,6 +956,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   on both architectures against identical-ELF Linux references. See the
   [partial-copy receipts](docs/linux-posix-qualification.md#native-getrandom-partial-copy-faults).
 
+- [x] Cap getrandom requests and reject complete out-of-userspace ranges
+  before output, including invalid zero-count addresses; qualify guarded
+  low/high arenas, raw/musl calls, real errors/partial data and flat storage
+  on both native architectures against identical-ELF Linux. See the
+  [request-range receipts](docs/linux-posix-qualification.md#native-getrandom-request-ranges).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

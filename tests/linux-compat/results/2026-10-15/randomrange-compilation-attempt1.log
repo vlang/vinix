@@ -1,0 +1,20 @@
+/Users/alex/.cache/vinix-linux-compat/randomrange-20261015/states/preflight1-randomrange-arm/fixture.c:1224:20: error: call to undeclared function 'v_fixed_index'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1224 |                                 if (__in_arr_0[v_fixed_index(__contains_idx_3, 2)] == __contains_needle_1) {
+      |                                                ^
+/Users/alex/.cache/vinix-linux-compat/randomrange-20261015/states/preflight1-randomrange-arm/fixture.c:1240:22: error: call to undeclared function 'v_fixed_index'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1240 |                                                 if (__in_arr_4[v_fixed_index(__contains_idx_7, 2)] == __contains_needle_5) {
+      |                                                                ^
+/Users/alex/.cache/vinix-linux-compat/randomrange-20261015/states/preflight1-randomrange-arm/fixture.c:1586:138: error: format specifies type 'unsigned long long' but the argument has type 'u64' (aka 'unsigned long') [-Werror,-Wformat]
+ 1586 |                 printf("LINUX RANDOMRANGE TOPOLOGY: ordinary=%d uid=%u page=%lu readiness=seeded ceiling=%llx cap=%llx\n", (i32)(ordinary), uid, page, limit, (u64)(0x7fffffff) & ~((u64)(page) - 1));
+      |                                                                                                          ~~~~                                          ^~~~~
+      |                                                                                                          %lx
+/Users/alex/.cache/vinix-linux-compat/randomrange-20261015/states/preflight1-randomrange-arm/fixture.c:1586:145: error: format specifies type 'unsigned long long' but the argument has type 'u64' (aka 'unsigned long') [-Werror,-Wformat]
+ 1586 |                 printf("LINUX RANDOMRANGE TOPOLOGY: ordinary=%d uid=%u page=%lu readiness=seeded ceiling=%llx cap=%llx\n", (i32)(ordinary), uid, page, limit, (u64)(0x7fffffff) & ~((u64)(page) - 1));
+      |                                                                                                                   ~~~~                                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                                                                                                   %lx
+4 errors generated.
+V panic: Command failed
+ v hash: f6358ec
+    pid: 0x15995
+    tid: 0x15995
+0   dyld                                0x000000018c507e00 start + 6992
