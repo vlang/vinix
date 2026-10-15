@@ -1,0 +1,2 @@
+PASS x86_64 packages-installed-namespace (22.9s)
+package-installed-namespace x86_64: 1 passed, 0 failed, 0 skipped

@@ -5,9 +5,13 @@ struct StageTarget { name string device u64 inode u64 }
 struct StageDirectory { path string parent int device u64 inode u64 }
 
 fn recovery_directory(fd int, device u64) !C.stat {
+	return owned_generation_directory(fd, device, u32(C.geteuid()))
+}
+
+fn owned_generation_directory(fd int, device u64, owner u32) !C.stat {
 	mut info := C.stat{}
 	if C.fstat(fd, unsafe { &info }) != 0 || info.st_mode & 0o170000 != 0o040000
-		|| info.st_uid != u32(C.geteuid()) || u64(info.st_dev) != device {
+		|| info.st_uid != owner || u64(info.st_dev) != device {
 		return error('generation retirement requires ordinary administrator-owned directories on the generation filesystem')
 	}
 	return info
@@ -54,6 +58,10 @@ fn check_stage_name(parent int, name string, device u64, inode u64) ! {
 // Reopen each component relative to the captured tree. Closing the preceding
 // walk descriptor bounds descriptor usage independently of directory depth.
 fn open_stage_path(root int, path string, device u64) !int {
+	return open_owned_generation_path(root, path, device, u32(C.geteuid()))
+}
+
+fn open_owned_generation_path(root int, path string, device u64, owner u32) !int {
 	mut fd := C.openat(root, c'.', C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
 	if fd < 0 { return error('cannot reopen package generation for retirement') }
 	mut retained := false
@@ -65,7 +73,7 @@ fn open_stage_path(root int, path string, device u64) !int {
 			next := C.openat(fd, part.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
 			if next < 0 { return error('cannot reopen ordinary generation directory: ${path}') }
 			C.close(fd); fd = next
-			recovery_directory(fd, device)!
+			owned_generation_directory(fd, device, owner)!
 		}
 	}
 	retained = true

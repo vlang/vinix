@@ -17,8 +17,9 @@ fn transaction_repairs(directory string, current State, plan Plan, operation str
 		index := positions[target.package.id] or { continue }
 		old := current.packages[index]
 		if old.package != target.package || old.repository != target.repository || old.public_key != target.public_key { continue }
-		mut damaged := false
+		mut damaged := !installed_namespace_valid(directory, current.generation, target.package)
 		for payload in target.package.files {
+			if damaged { break }
 			path := '${directory}/generations/${number}/apps/${target.package.id}/${payload.path}'
 			valid := verified_installed_file(path, payload)
 			unsafe { path.free() }

@@ -1,0 +1,2 @@
+PASS aarch64 packages-installed-namespace (23.9s)
+package-installed-namespace aarch64: 1 passed, 0 failed, 0 skipped

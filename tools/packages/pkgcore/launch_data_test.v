@@ -180,7 +180,7 @@ fn test_launch_refuses_aliased_app_data_before_creating_or_chmodding_the_target(
 	// Invalid ELF bytes: even a regression must never run a synthetic script.
 	os.write_file(file, '\x7fELFfixture')!
 	os.chmod(file, 0o755)!
-	key := 'a'.repeat(64)
+	key := 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a'
 	config := Config{ architecture: 'aarch64', repositories: [Repository{ id: 'fixture', public_key: key }] }
 	app := Package{ id: 'app', name: 'App', version: '1.0.0', architecture: 'aarch64', kind: 'native', license: 'MIT', entrypoint: 'bin/app',
 		files: [Payload{ path: 'bin/app', bytes: os.file_size(file), sha256: hash_file(file)!, executable: true }] }

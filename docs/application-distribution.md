@@ -668,6 +668,20 @@ inspect storage and restore an empty regular lease under the writer lock before
 retrying. Active and rollback generations and busy leases remain protected.
 See [collection retirement checks](../tests/packages/collection-retirement-check.md).
 
+Installed package verification now checks each complete `apps/ID` namespace too.
+Extra files, empty directories and FIFOs, directory aliases, hard-linked payloads,
+foreign ownership and changed directory permissions fail verification and produce
+repair rows for affected unchanged packages. Ownership comes from the captured
+state administrator, allowing ordinary accounts to inspect root-owned installations.
+Traversal uses captured directories without following aliases and keeps descriptor
+use independent of depth. Launch checks the selected app's runtime/dependency
+closure before private-data preparation or execution. Repair uses authenticated
+cache objects to stage a fresh generation, preserving damaged old generations,
+outside targets, trust history and personal data. Restore invalid state parents
+outside the generation administratively before retrying. The
+[namespace checks](../tests/packages/installed-namespace-check.md) cover Verify,
+repair review/application, stale approvals, ordinary launch refusal and rollback.
+
 Readers, writers and launch admission also check the captured lock/lease file
 type. FIFO replacements refuse promptly, without opening a blocking read or
 changing the FIFO's permissions. Directory, socket and symbolic replacements

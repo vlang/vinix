@@ -61,6 +61,18 @@ retry builds a fresh generation. Rollback checks the same complete tree and
 captured state bytes after progress, preserving format-1 whitespace compatibility.
 See [generation admission qualification](../../tests/packages/generation-admission-check.md).
 
+Verify, unchanged-manifest repair discovery and launch also admit each installed
+package's complete `apps/ID` namespace. Only declared regular single-link files
+and the directories implied by their paths are permitted. Directories use 0755;
+files retain their signed executable/data modes. Ownership follows the captured
+state administrator, including when an ordinary account reads root-owned
+generations. Package paths are opened without following aliases and remain on
+the generation filesystem. Launch checks its application/runtime/dependency
+closure before preparing private data or executing a program. Repair stages a
+fresh authenticated generation without mutating damaged installed entries.
+Invalid state parents outside the generation require administrator restoration.
+See [installed namespace qualification](../../tests/packages/installed-namespace-check.md).
+
 Transactions and `gc` capture all abandoned stage roots before retiring any of
 them. Aliases, special roots, foreign ownership/filesystems and roots writable
 by other accounts refuse recovery. Cleanup checks captured directory identities,

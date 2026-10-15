@@ -188,6 +188,7 @@ fn run_leased_mode(config Config, directory string, state State, id string, inpu
 		if !config.repositories.any(it.id == installed.repository && it.public_key == installed.public_key) {
 			return error('runtime publisher key has been revoked')
 		}
+		verify_installed_namespace(directory, state.generation, installed.package)!
 		for file in installed.package.files {
 			path := directory + '/generations/' + state.generation.str() + '/apps/' + installed.package.id + '/' + file.path
 			if !verified_installed_file(path, file) {

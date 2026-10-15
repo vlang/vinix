@@ -13,6 +13,7 @@ fn verify_installed(directory string, state State, report fn (pkgprotocol.Progre
 	defer { unsafe { generation.free(); number.free() } }
 	for installed in state.packages {
 		p := installed.package
+		verify_installed_namespace(directory, state.generation, p)!
 		for file in p.files {
 			report(pkgprotocol.Progress{ phase: 'verify', package: p.id, repository: installed.repository, path: file.path })
 			path := '${generation}/apps/${p.id}/${file.path}'

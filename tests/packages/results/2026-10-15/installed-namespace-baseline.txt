@@ -1,0 +1,5 @@
+Baseline 1321756d1 accepts an undeclared runtime library in Verify and unchanged-manifest repair discovery; the new namespace assertion exits 1.
+
+INSTALLED NAMESPACE extra-runtime refused=false repair=false
+tools/packages/pkgcore/installed_namespace_test.v:37: fn test_verify_and_repair_discovery_refuse_undeclared_installed_payloads
+    assert refused && repairs == ['runtime']
