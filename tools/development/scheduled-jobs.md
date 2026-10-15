@@ -24,6 +24,30 @@ to stop their own child groups, then applies the owned group's SIGKILL fallback.
 the qualifier has a one-second child shutdown window and the build runner
 has five seconds. Each leader remains unreaped until its group is retired.
 
+Export an existing schedule for the desktop's Services tab:
+
+```
+vinix-jobs service-unit /home/developer/job-state > scheduled-ci.service
+```
+
+Choose **Import Linux service…**, select the exported file, then **Start**.
+Import leaves the service disabled until that action. **Stop** disables the
+watcher and gives it ten seconds to finish its normal eight-second child
+retirement window. The unit uses `Type=simple`, `Restart=on-failure` and the
+current scheduler executable with literal `watch STATE` arguments. Export
+validates the private account-owned schedule and the native unit contract,
+without executing jobs or changing the schedule or service registry. Credentials
+and job environment values stay in their existing protected files and plan.
+
+Spaces, quotes and backslashes in paths are quoted for the native importer.
+Dollar/percent expansion, control bytes and arguments exceeding its bounded
+record size are refused before any unit is emitted. The same unit uses the
+supported Linux service subset; full systemd qualification remains separate.
+Session persistence uses the existing service manager. Persistent-home cold
+boot and the complete native Services-managed scheduler lifecycle still need
+their own qualification. An interrupted job retains its existing owner
+acknowledgement requirement across service restarts.
+
 For repeatable CI builds, set `expand_attempt: true` on the job and put
 `{attempt}` in its output argument. For example, pin `vinix-build` as the
 executable and use arguments
@@ -155,3 +179,16 @@ Deadline/signal retirement, watcher ownership, interrupted-run recovery and
 the two matching build artifacts also passed. The native inputs and recorded
 kernel compiler adaptation are detailed in the
 [guest workflow instructions](../../tests/development/README.md).
+
+Service export validation on 15 October 2026 passed all six scheduler/importer/
+supervisor host test files with V `be2eb40`. The public CLI exported literal
+paths containing spaces, quotes and backslashes; the imported disabled service
+ran two real watcher ticks after enablement and stopped through the supervisor
+model. Expansion/control/oversized paths and changed plans were refused before
+output. ARM64 HVF and x86-64 TCG also passed native UID/GID 1000 export and the
+full base account/job/build checks, retaining 14 validated receipts plus the
+unit text and export verdict in each serial log. Evidence and static tool-stage
+pins remain in `build/development-service-20261015/guest-arm`, `guest-x86`,
+`tools-arm` and `tools-x86`. The runs reuse the isolated kernels and recorded
+compiler adaptation from the FIFO validation above. Native desktop-managed
+watcher lifecycle and persistent-home cold boot remain separate acceptance work.

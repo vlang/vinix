@@ -16,13 +16,24 @@ do not complete the installed-system self-hosting gate.
 The scheduler's private-file checks now open without waiting for FIFO writers,
 so invalid credential or stored plan/state paths cannot block before descriptor
 validation. Public CLI tests verify prompt refusal, preserved FIFOs, failed
-attempt accounting and successful credential rotation. The three host scheduler
-test files and both static Linux architecture builds pass. The extended native
+attempt accounting and successful credential rotation. The host scheduler
+checks and both static Linux architecture builds pass. The extended native
 account/job/build gate now also passes as UID/GID 1000 on ARM64 HVF and x86-64
 TCG, with 14 independently validated receipts per architecture. A controlled
 blocking-open build reproduced the FIFO hang inside ARM64 Vinix. The
 [native workflow evidence](../tests/development/README.md) records the exact
 kernel/tool pins and the isolated kernel's typed-null compiler adaptation.
+
+`vinix-jobs service-unit STATE` exports a literal foreground watcher unit for
+the existing Services importer. Import and Start retain its existing compositor
+authorization. Host integration checks disabled import, exact argv with quoted
+paths, two real watcher ticks and graceful stop through the supervisor model.
+All six scheduler/importer/supervisor host test files pass. Native ARM64 and
+x86-64 also pass export and parser compatibility as UID/GID 1000, with the
+full 14-record account/job/build gate retained in
+`build/development-service-20261015/guest-arm` and `guest-x86`;
+the complete native Services-managed scheduler lifecycle and persistent-home
+cold boot remain open.
 
 | Requirement | Available implementation | Remaining acceptance / implementation |
 | --- | --- | --- |

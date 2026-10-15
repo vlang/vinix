@@ -519,6 +519,7 @@ fn account_checks() {
 		check(C.open(c'/home/developer/payload.done', C.O_RDONLY) == -1, 143)
 		C.puts(c'DEVELOPMENT ACCOUNT PASS: UID 1000 jobs, credentials, environment, receipts, interval, unsafe-file refusal')
 		private_file_checks()
+		service_export_checks()
 		job_lifecycle_checks()
 		build_checks()
 		reference_checks()

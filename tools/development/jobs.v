@@ -9,7 +9,7 @@ import time
 fn dispatch() ! {
 	args := os.args[1..]
 	if args.len == 0 || args == ['--help'] {
-		println('Usage: vinix-jobs init PLAN.json FRESH-STATE | run-due|watch|status STATE | acknowledge-interrupted STATE JOB')
+		println('Usage: vinix-jobs init PLAN.json FRESH-STATE | run-due|watch|status|service-unit STATE | acknowledge-interrupted STATE JOB')
 		return
 	}
 	if args.len == 3 && args[0] == 'init' {
@@ -26,6 +26,7 @@ fn dispatch() ! {
 	match args[0] {
 		'watch' { jobcore.watch(args[1])! }
 		'status' { println(json2.encode(jobcore.inspect(args[1])!, prettify: true)) }
+		'service-unit' { print(jobcore.service_unit(args[1])!) }
 		'run-due' {
 			state := jobcore.run_due(args[1], time.now().unix())!
 			if state.jobs.values().any(it.in_flight || it.exit_code != 0) { exit(1) }

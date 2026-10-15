@@ -24,6 +24,23 @@ credential files. The payload deliberately writes the synthetic credential to
 both stdout and stderr; the controller fails if it appears in the serial log.
 Successful jobs produce a file, and rejected jobs must produce none.
 
+The base gate also exports a scheduler service unit as UID/GID 1000. The CLI
+validates it through the maintained native importer; the fixture checks its
+exact literal watcher argv, restart policy, ten-second stop window, private
+output file and unchanged schedule, with no credential embedded in the unit.
+The serial log retains the exported text and `DEVELOPMENT SERVICE EXPORT PASS`.
+This checks native export and parser compatibility; desktop import/start/stop
+and persistent-home cold boot remain separate service acceptance work.
+
+The export gate passed on 15 October 2026 on ARM64 HVF and x86-64 TCG with
+the maintained stager's updated CLIs. The 14-record receipts, native exported
+unit text and passing verdict are retained in
+`build/development-service-20261015/guest-arm` and `guest-x86`, with the two
+complete tool stages beside them. These runs reuse the isolated kernels and
+typed-null compiler adaptation recorded below. All six scheduler/importer/
+supervisor host test files also passed, including real watcher start/stop and
+literal paths with spaces, quotes and backslashes.
+
 Every run also checks FIFO private-file paths without creating a writer. As
 UID/GID 1000, the fixture replaces the credential with a mode-0600 FIFO and
 requires the public scheduler to fail within three seconds, preserve the inode,
