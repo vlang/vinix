@@ -248,8 +248,8 @@ fn test_swift_json_decoder_dispatch() {
 		json_dispatch_mapping(arena + u64(page), true, false)
 		json_dispatch_spans(entry, code, false)
 		assert ios_runtime.live == 0 && ios_runtime.swift_heap.len == 0 && ios_runtime.swift_arrays.len == 0
-		for symbol in ['_$s10Foundation11JSONDecoderCACycfc', '_$s10Foundation11JSONDecoderCMa',
-			'_$s10Foundation11JSONDecoderCMn']! {
+		for symbol in ['_$s10Foundation11JSONDecoderCACycfC',
+			'_$s10Foundation11JSONDecoderC6decode_4fromxxm_AA4DataVtKSeRzlF']! {
 			if _ := swift_foundation_symbol(symbol) {
 				assert false
 			}
@@ -269,5 +269,5 @@ fn test_swift_json_decoder_dispatch() {
 		}
 	}
 	assert C.munmap(voidptr(code), page) == 0
-	println('IOS-JSON-DISPATCH: real virtual override forwarding through slot320, preserved arguments/results/error channel without ARC/allocation or unused header reads, sealed concurrent publication and two unmapped retirements; decoder construction/metadata/backend remain unsupported')
+	println('IOS-JSON-DISPATCH: real virtual override forwarding through slot320, preserved arguments/results/error channel without ARC/allocation or unused header reads, sealed concurrent publication and two unmapped retirements; default backend remains unsupported')
 }

@@ -5981,8 +5981,9 @@ callback under a runtime lock. The entry shares the existing sealed Foundation
 arena and its drained shutdown lifetime. The caller owns valid readable Self
 and vtable spans, as required by the Swift dispatch ABI.
 
-This entry forwards an override; JSONDecoder construction, nominal metadata,
-configuration and the default decoding backend still require implementation.
+This entry forwards an override. Its original implementation left JSONDecoder
+construction, nominal metadata, configuration and the default decoding backend
+unresolved.
 The pinned IPA's dispatch import cell is `10dc98200`, its stub is `10c63a890`
 and its forwarding branch island is `107c28ae0`. The actual caller at
 `1000710ac` passes Self in x20, a two-word Data value in x1/x2, result storage
@@ -6010,17 +6011,54 @@ exits with status 1 at Foundation's required JSONDecoder initializing constructo
 `_$s10Foundation11JSONDecoderCACycfc`. Fortnite has not entered application code
 and remains unplayable.
 
+The Foundation bridge now resolves the base JSONDecoder initializing constructor,
+metadata accessor and nominal descriptor through the framework and Swift overlay
+install names. Fortnite's actual call at `100072344` obtains base metadata,
+allocates with its instance size/alignment, passes the object in x20 and stores
+returned Self. The V implementation supplies a canonical native-ARC class profile
+with 160-byte instances, the measured default-option extents, an immutable private
+JSON5 key and empty userInfo constant, and an independent owned lock context.
+Enum/bool padding remains untouched. Construction requires registered, unique,
+uninitialized base storage; unknown, short, duplicate and retired owners reject
+before mutation. Swift native/unknown ARC and reference value witnesses retain
+the object; destruction releases its lock and deallocates Self exactly once.
+After workers and heap owners drain, the sealed code/data pages retire before
+their borrowed ARC/value-witness support.
+
+The class has a private reflection profile. Subclassing, Objective-C exposure,
+option methods, allocating-constructor exports and the default JSON decoding
+backend remain unsupported. Unimplemented virtual entries fail explicitly;
+no decoded values or successful game startup are synthesized.
+
+Eight ASan/UBSan runs and four Vinix ARM64 guest suites pass for construction,
+virtual dispatch, heap lifetime and UnknownObject witnesses. The constructor
+fixture compares installed Foundation defaults and untouched padding, returned
+Self and x20/x21, lock ownership independent of Self, reference copies, eight
+concurrent constructors, concurrent metadata publication, RX/RO mappings and
+two unmapped retirements. Ownership registries drain after each worker group.
+A sanitizer failure in the fixture's unlocked map inspection was corrected;
+its executed C, executable, debug symbols, source and diagnostic are retained
+separately. Eleven final C streams/programs and four joined, retired VM phases
+are retained under `build/ios/fortnite/json-decoder-initializer-checks`.
+Full iOS regression remains unpassed and published runners remain unchanged.
+
+The actual IPA startup probe now resolves all three construction imports and
+exits with status 1 at Foundation's required JSONEncoder formatted-date enum case
+discriminator,
+`_$s10Foundation11JSONEncoderC20DateEncodingStrategyO9formattedyAESo15NSDateFormatterCcAEmFWC`.
+Fortnite has not entered application code and remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,480 | 680 | 79 |
+| Fortnite executable | 1,483 | 677 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,315 | 683 | 120 |
+| All images | 2,318 | 680 | 120 |
 
-The C++/GLES/Text variant reports 2,328 resolved imports, 670 unresolved strong
+The C++/GLES/Text variant reports 2,331 resolved imports, 667 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -114,6 +114,7 @@ fn swift_buffer_refs(object u64, delta i64) !u64 {
 	if swift_task_registered(object) { return swift_task_refs(object, delta) }
 	C.ios_objc_initialize_lock()
 	if object == ios_runtime.swift_empty_array || object == ios_runtime.swift_empty_set
+		|| swift_json_decoder_empty_locked(object)
 		|| swift_main_actor_is_singleton_locked(object) || swift_main_executor_is_singleton_locked(object) {
 		C.ios_objc_initialize_unlock()
 		return swift_strong_limit // Immortal storage never reports unique.
@@ -202,6 +203,7 @@ fn swift_unknown_is_native(object u64) bool {
 	if swift_task_find_locked(object) != 0 { return true }
 	if swift_main_actor_is_singleton_locked(object) { return true }
 	if swift_main_executor_is_singleton_locked(object) { return true }
+	if swift_json_decoder_empty_locked(object) { return true }
 	if object == ios_runtime.swift_empty_array || object == ios_runtime.swift_empty_set || object in ios_runtime.swift_buffers
 		|| object in ios_runtime.swift_strings || object in ios_runtime.swift_arrays
 		|| object in ios_runtime.swift_heap { return true }
@@ -228,6 +230,7 @@ fn swift_buffers_stop() {
 	unsafe { ios_runtime.swift_strings.free() }
 	swift_array_storage_stop()
 	swift_heap_stop()
+	swift_json_decoder_stop()
 	swift_main_actor_stop()
 	swift_logger_stop()
 	swift_arc_stop()
