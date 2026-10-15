@@ -7486,21 +7486,55 @@ inputs, source inspection and retired VM evidence are retained under
 `build/ios/fortnite/avfoundation-constants-checks`. Published runners remain
 unchanged; the full iOS regression remains unpassed.
 
-The current IPA probe links past this AVFoundation group and exits with status 1
-at CoreVideo's `_CVMetalTextureCacheCreate`. Fortnite has not entered application
-code and remains unplayable.
+The AVFoundation IPA probe links past that group and exits with status 1 at
+CoreVideo's `_CVMetalTextureCacheCreate`.
+
+V now implements CPU CVPixelBuffer storage for caller-supplied packed BGRA and
+two-plane 420v/420f YUV. Creation copies the plane descriptions. Final CF/ObjC
+release invokes the supplied storage-release callback exactly once. Buffers
+without a callback keep caller-owned bytes untouched.
+Geometry, pixel format, base-address/row-stride/data-size and plane accessors use
+that state. Lock/unlock make these permanently mapped CPU bytes accessible;
+they are cache-access operations, not mutual-exclusion locks. GPU coherence,
+IOSurface allocation, other pixel formats and nonempty creation attributes
+remain unsupported. Foreign or stale handles fail before object memory is read.
+
+Seventeen sealed CoreVideo CFString pointer globals cover pixel-buffer hints and
+color primaries, transfer functions, gamma and YCbCr matrix metadata. Their values
+and shared 709/240M string identities match the installed native library. The
+existing pixel-format key now uses this storage and CoreVideo export scope.
+The globals remain available through owner/pool/Swift teardown before unmapping.
+
+Eight normal/deterministic host sanitizer runs and four ARM64 guest suites pass:
+CoreVideo, Foundation keys, URL-error globals and autorelease pools. Native cases
+cover packed, disjoint-planar and contiguous-planar storage; short caller strides;
+packed plane-zero geometry; copied plane arrays; storage mutation; final-release
+callbacks; CF ownership; concurrent readers; and metadata aliases/collections.
+Private cases also exercise protected foreign/stale handles and two drained
+runtime lifetimes. Five actual IPA width-query callers were inspected, including
+`0x10a651498`, after `CMSampleBufferGetImageBuffer` and before Metal texture import.
+The eleven final generated C streams/executables, native measurements, pinned
+inputs and retired VM evidence are retained under `build/ios/fortnite/corevideo-checks`.
+Generated C inspection checks state ownership, allocation-free queries and late
+constant retirement. Published runners remain unchanged; the full iOS regression
+remains unpassed.
+
+This resolves twenty-seven required imports. Metal texture-cache creation,
+image-to-texture mapping and texture extraction still require a Metal device and
+shared-surface backend. The current IPA probe therefore still exits with status 1
+at `_CVMetalTextureCacheCreate`, before application entry. Fortnite remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,577 | 583 | 79 |
+| Fortnite executable | 1,604 | 556 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,412 | 586 | 120 |
+| All images | 2,439 | 559 | 120 |
 
-The C++/GLES/Text variant reports 2,425 resolved imports, 573 unresolved strong
+The C++/GLES/Text variant reports 2,452 resolved imports, 546 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -77,6 +77,10 @@ fn framework_symbol(library string, symbol string) ?u64 {
 			'_$s10Foundation11JSONEncoderC20DateEncodingStrategyO9formattedyAESo15NSDateFormatterCcAEmFWC'] {
 		return swift_foundation_symbol(symbol) or { return none }
 	}
+	if library == '/System/Library/Frameworks/CoreVideo.framework/CoreVideo' {
+		if address := corevideo_constant_symbol(symbol) { return address }
+		if address := corevideo_symbol(symbol) { return address }
+	}
 	if library == '/System/Library/Frameworks/AVFoundation.framework/AVFoundation' {
 		if address := avfoundation_constant_symbol(symbol) { return address }
 	}
@@ -303,7 +307,6 @@ fn framework_constant(symbol string) ?u64 {
 		'_kCTFontAttributeName' { 'NSFont' }
 		'_kCTFontNameAttribute' { 'NSFontNameAttribute' }
 		'_kCTForegroundColorFromContextAttributeName' { 'CTForegroundColorFromContext' }
-		'_kCVPixelBufferPixelFormatTypeKey' { 'PixelFormatType' }
 		'_NSDefaultRunLoopMode' { 'kCFRunLoopDefaultMode' }
 		'_NSLocaleIdentifier' { 'kCFLocaleIdentifierKey' }
 		'_GCControllerDidConnectNotification' { 'GCControllerDidConnectNotification' }
