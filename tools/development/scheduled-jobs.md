@@ -228,3 +228,7 @@ clean read-only filesystem checks, using the guarded kernels recorded there.
 Separate [child-mount checks](../../tests/mount-lifecycle/unmount-busy.md)
 qualify namespace-local descendant refusal. Broader open-file/mapping/cwd busy
 accounting, power-loss recovery and complete installed boot/login remain open.
+The [writable-description checks](../../tests/mount-lifecycle/unmount-writers.md)
+also cover ordinary unmount's existing regular-file writer pins. Cold-boot
+retries require a fresh writable open and write after each ext2 refusal,
+checking that backend failure restores admission for subsequent work.

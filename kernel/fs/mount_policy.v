@@ -103,6 +103,10 @@ fn retain_mount_writer(identity &lib.MountContext) ?voidptr {
 		errno.set(errno.erofs)
 		return none
 	}
+	if entry.unmount_closed {
+		errno.set(errno.ebusy)
+		return none
+	}
 	entry.writers++
 	return voidptr(entry)
 }

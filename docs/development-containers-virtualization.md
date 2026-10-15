@@ -496,6 +496,14 @@ descendants. Current namespace attachment ancestry handles moved trees, bind
 aliases and namespace copies; refusal preserves mount identities and contents.
 Child-first removal and recursive lazy detach remain available. This adds no
 mount reclamation or descriptor/mapping/cwd ownership accounting.
+The [writable-description unmount checks](../tests/mount-lifecycle/unmount-writers.md)
+use existing regular-file writer pins to refuse ordinary unmount across dup,
+fork and mappings retained after descriptor closure. Writer admission closes
+under the same lock before backend shutdown and reopens on failure; successful
+ordinary detach keeps it closed before any later copy-up/truncation. Bind aliases
+and namespace copies retain their distinct writer ownership, and lazy detach
+keeps its existing writable-route behavior. Read-only descriptions/mappings,
+executable mappings and cwd/root busy accounting remain open.
 The [attachment identity checks](../tests/mount-lifecycle/identities.md) qualify
 unmount, remount and move refusal through detached/foreign mount descriptors
 and cwd, while valid local operations remain available. Retained read-only

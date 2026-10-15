@@ -72,6 +72,9 @@ pub mut:
 	// Open regular-file descriptions and in-flight opens on this object.
 	// Namespace copies start with zero writers; inherited FDs keep the old pin.
 	writers u64
+	// Under lock: ordinary unmount closes regular-file writer admission before
+	// checking the backend. Lazy detach leaves retained routes writable.
+	unmount_closed bool
 	options string
 }
 
@@ -1160,6 +1163,9 @@ fn unmount(parent &VFSNode, target string, flags u64) ? {
 		}
 	}
 	table.lock.release()
+	begin_mount_unmount(mut entry)?
+	mut completed := false
+	defer { if !completed { cancel_mount_unmount(mut entry) } }
 	mut filesystem := entry.root.filesystem
 	if filesystem != unsafe { nil } { check_filesystem_unmount(mut filesystem)? }
 	if voidptr(entry.covered) != voidptr(entry.root) {
@@ -1169,6 +1175,7 @@ fn unmount(parent &VFSNode, target string, flags u64) ? {
 	table.lock.acquire()
 	entry.detached = true
 	table.lock.release()
+	completed = true
 }
 
 // ── chroot(2) and pivot_root(2) ──────────────────────────────────────────────

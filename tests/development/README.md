@@ -160,6 +160,12 @@ resource lifetimes. Its cost grows with filesystem inode
 metadata. Separate [child-mount checks](../mount-lifecycle/unmount-busy.md)
 qualify `EBUSY` while active descendants remain in the caller's namespace;
 comprehensive open-file/mapping/cwd busy accounting remains open.
+The [writable-description guard](../mount-lifecycle/unmount-writers.md) now
+refuses ordinary unmount while an existing regular-file writer pin remains.
+The cold-boot fixture also opens and writes a linked probe file after every
+ext2 `EBUSY` refusal, requiring failed backend shutdown to reopen writer
+admission before the next retry. Read-only descriptions/mappings and cwd/root
+busy accounting remain outside this gate.
 
 The immediate-attempt gate uses `persistent 0 30` and the new isolated kernels.
 An ARM64 control with the preceding kernel reports success on its first attempt,

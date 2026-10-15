@@ -156,6 +156,9 @@ fn service_cold_boot() bool {
 		for job_clock() < settle { C.usleep(100000) }
 		elapsed := (job_clock() - settle_started) / 1000000
 		C.sync()
+		// Keep one linked file for writable-open probes after backend refusals.
+		// Reuse it across boots so the probe creates no orphan cleanup of its own.
+		write_text(c'/home/developer/unmount-writer-probe', c'MOUNT-OK', 8)
 		unmount_started := job_clock()
 		mut attempts := u64(0)
 		mut busy := u64(0)
@@ -168,11 +171,18 @@ fn service_cold_boot() bool {
 			// A refused unmount must leave the original volume attached.
 			check(C.stat(c'/home/developer', &st) == 0 && st.st_dev == home_device
 				&& st.st_ino == 2 && st.st_uid == 1000, 519)
+			// The ext2 orphan guard refused shutdown after writer admission had
+			// closed. Its failure must reopen admission, including existing paths.
+			probe := C.open(c'/home/developer/unmount-writer-probe', C.O_WRONLY)
+			check(probe >= 0 && C.write(probe, c'MOUNT-OK', 8) == 8 && C.close(probe) == 0, 521)
 			C.usleep(100000)
 		}
 		unmount_elapsed := (job_clock() - unmount_started) / 1000000
 		check(retry == 0 || unmount_elapsed <= u64(retry) * 1000, 520)
 		C.sync()
+		if busy > 0 {
+			C.printf(c'DEVELOPMENT UNMOUNT WRITER ROLLBACK PASS: phase=%d, probes=%lu\n', phase, busy)
+		}
 		// The controller may stop QEMU only after the disk has been unmounted.
 		C.printf(c'DEVELOPMENT RECEIPT /fixture/service-cold-shutdown.json {"schema":2,"phase":%d,"runtime":"%s","settle_seconds":%d,"quiescence_millis":%lu,"unmounted":true,"unmount_attempts":%lu,"busy_refusals":%lu,"unmount_millis":%lu}\n',
 			phase, if persistent { &char(c'persistent') } else { &char(c'volatile') }, seconds, elapsed,
