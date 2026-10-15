@@ -140,16 +140,16 @@ const theme_default = Theme{
 	window_radius: 9
 	shadow_alpha: 150
 	title_height: default_title_height
-	title_active_bg: 0xffffff
-	title_inactive_bg: 0xf1f3f6
+	title_active_bg: 0x1b2436
+	title_inactive_bg: 0x202938
 	title_highlight: 0
 	title_inactive_highlight: 0
-	title_active_bg2: 0xffffff
-	title_inactive_bg2: 0xf1f3f6
-	title_divider: 0xe4e8ee
-	title_inactive_divider: 0xe4e8ee
-	title_text_active: 0x18202f
-	title_text_inactive: 0x99a2b1
+	title_active_bg2: 0x1b2436
+	title_inactive_bg2: 0x202938
+	title_divider: 0x101726
+	title_inactive_divider: 0x161e2e
+	title_text_active: 0xecf2fb
+	title_text_inactive: 0x9aa8bd
 	title_centered: false
 	title_bold: true
 	title_size: 13
@@ -157,11 +157,11 @@ const theme_default = Theme{
 	button_size: 16
 	button_gap: 4
 	button_inset: 8
-	button_hover: 0xe7eaf0
+	button_hover: 0x33435f
 	button_close_hover: 0xe5484d
 	button_face: 0xe7eaf0
 	button_edge: 0xb9c2d0
-	glyph_color: 0x3b465a
+	glyph_color: 0xd9e2f2
 	glyph_on_close: 0xffffff
 	traffic_close: 0xff5f57
 	traffic_minimize: 0xfebc2e
