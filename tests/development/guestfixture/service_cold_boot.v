@@ -8,6 +8,22 @@ fn C.umount(&char) i32
 fn C.sync()
 fn C.lstat(&char, &C.stat) i32
 
+fn cold_boot_seconds(path &char) i32 {
+	unsafe {
+		mut text := [3]char{}
+		fd := C.open(path, C.O_RDONLY)
+		length := C.read(fd, &text[0], 3)
+		check(fd >= 0 && length in [i64(1), i64(2)]! && C.close(fd) == 0, 513)
+		mut seconds := i32(0)
+		for i in 0 .. int(length) {
+			check(text[i] >= char(`0`) && text[i] <= char(`9`), 514)
+			seconds = seconds * 10 + i32(text[i]) - i32(`0`)
+		}
+		check(seconds <= 30 && (length == 1 || text[0] != char(`0`)), 515)
+		return seconds
+	}
+}
+
 fn cold_boot_account(phase i32, persistent bool) {
 	unsafe {
 		check(C.setgroups(0, nil) == 0 && C.setgid(1000) == 0 && C.setuid(1000) == 0
@@ -98,16 +114,8 @@ fn service_cold_boot() bool {
 		check(runtime_fd >= 0 && C.read(runtime_fd, &runtime_text[0], 2) == 1
 			&& C.close(runtime_fd) == 0 && runtime_text[0] in [char(`v`), char(`p`)]!, 512)
 		persistent := runtime_text[0] == char(`p`)
-		mut settle_text := [3]char{}
-		settle_fd := C.open(c'/fixture/service-cold-settle', C.O_RDONLY)
-		settle_length := C.read(settle_fd, &settle_text[0], 3)
-		check(settle_fd >= 0 && settle_length in [i64(1), i64(2)]! && C.close(settle_fd) == 0, 513)
-		mut seconds := i32(0)
-		for i in 0 .. int(settle_length) {
-			check(settle_text[i] >= char(`0`) && settle_text[i] <= char(`9`), 514)
-			seconds = seconds * 10 + i32(settle_text[i]) - i32(`0`)
-		}
-		check(seconds <= 30 && (settle_length == 1 || settle_text[0] != char(`0`)), 515)
+		seconds := cold_boot_seconds(c'/fixture/service-cold-settle')
+		retry := cold_boot_seconds(c'/fixture/service-cold-retry')
 		mut device := [64]char{}
 		device_fd := C.open(c'/fixture/service-cold-device', C.O_RDONLY)
 		count := C.read(device_fd, &device[0], device.len - 1)
@@ -120,6 +128,7 @@ fn service_cold_boot() bool {
 		mut st := C.stat{}
 		check(C.stat(c'/home/developer', &st) == 0 && st.st_uid == 1000
 			&& st.st_mode & 0o777 == 0o700, 507)
+		home_device := st.st_dev
 		// Test either installed-session volatile IPC or sockets on the ext2 home.
 		runtime := if persistent { &char(c'/home/developer/service-runtime') } else { &char(c'/run/development-service') }
 		check(C.mkdir(c'/run', 0o755) == 0 || *C.__errno_location() == C.EEXIST, 492)
@@ -147,11 +156,27 @@ fn service_cold_boot() bool {
 		for job_clock() < settle { C.usleep(100000) }
 		elapsed := (job_clock() - settle_started) / 1000000
 		C.sync()
-		check(C.umount(c'/home/developer') == 0, 511)
+		unmount_started := job_clock()
+		mut attempts := u64(0)
+		mut busy := u64(0)
+		for {
+			attempts++
+			if C.umount(c'/home/developer') == 0 { break }
+			check(retry > 0 && *C.__errno_location() == C.EBUSY
+				&& job_clock() - unmount_started < u64(retry) * 1000000000, 511)
+			busy++
+			// A refused unmount must leave the original volume attached.
+			check(C.stat(c'/home/developer', &st) == 0 && st.st_dev == home_device
+				&& st.st_ino == 2 && st.st_uid == 1000, 519)
+			C.usleep(100000)
+		}
+		unmount_elapsed := (job_clock() - unmount_started) / 1000000
+		check(retry == 0 || unmount_elapsed <= u64(retry) * 1000, 520)
 		C.sync()
 		// The controller may stop QEMU only after the disk has been unmounted.
-		C.printf(c'DEVELOPMENT RECEIPT /fixture/service-cold-shutdown.json {"schema":1,"phase":%d,"runtime":"%s","settle_seconds":%d,"quiescence_millis":%lu,"unmounted":true}\n',
-			phase, if persistent { &char(c'persistent') } else { &char(c'volatile') }, seconds, elapsed)
+		C.printf(c'DEVELOPMENT RECEIPT /fixture/service-cold-shutdown.json {"schema":2,"phase":%d,"runtime":"%s","settle_seconds":%d,"quiescence_millis":%lu,"unmounted":true,"unmount_attempts":%lu,"busy_refusals":%lu,"unmount_millis":%lu}\n',
+			phase, if persistent { &char(c'persistent') } else { &char(c'volatile') }, seconds, elapsed,
+			attempts, busy, unmount_elapsed)
 		C.printf(c'DEVELOPMENT SERVICE COLD BOOT PASS: phase=%d, persistent ext2 home, UID 1000, all processes retired, volume unmounted\n', phase)
 		for { C.pause() }
 		return true

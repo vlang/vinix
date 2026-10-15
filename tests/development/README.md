@@ -76,7 +76,11 @@ in an installed session. Append `persistent` to put the broker socket under
 `/home/developer/service-runtime` on ext2 instead. Either mode defaults to a
 13-second cleanup interval; an optional second argument selects a canonical
 integer from `0` through `30` seconds for explicit timing controls, for example
-`persistent 7`. Short intervals must still pass the same filesystem checks.
+`persistent 7`. A third argument sets an `EBUSY` retry deadline, also in `0..30`
+seconds and disabled by default. `persistent 0 30` attempts unmount immediately
+after process retirement and retries only `EBUSY` for at most 30 seconds. Each
+refusal must leave the original ext2 device/inode attached. Short intervals
+and retries must still pass the same filesystem checks.
 Kernel, fixture, scheduler, broker, formatter/checker and
 each ISO are pinned in the receipt. The controller owns the new output directory
 and disk and refuses an existing output directory.
@@ -91,10 +95,11 @@ broker socket pathname has gone. The host checks every receipt, exact
 cross-boot state equality, service registry contents and disk hash continuity,
 then requires `e2fsck -f -n` to succeed without changing the image after each
 unmount. A separate post-unmount receipt reports the runtime mode, requested
-interval and monotonic measured wait; the controller rejects missing or
-mismatched shutdown evidence. Schema 2 controller receipts retain those options
-and eleven native records across the three boots. Payload credential output
-must stay out of all serial/broker logs.
+interval and monotonic measured wait; schema 2 shutdown records also report
+unmount attempts, busy refusals and total unmount time. The controller rejects
+missing or mismatched shutdown evidence. Schema 2 controller receipts retain
+those options and eleven native records across the three boots. Payload
+credential output must stay out of all serial/broker logs.
 
 This is a **quiescent shutdown** gate: PID 1 defaults to 13 seconds after account
 process retirement before sync/unmount, matching the kernel retention harness.
@@ -102,9 +107,11 @@ The tested kernel's socket pathname release and the endpoint's retained filesyst
 resource release each pass through a five-second grace period serviced by the
 writeback worker. A seven-second control snapshots between those two releases;
 its unlinked socket inode does not establish a permanent leak. An initial
-immediate-unmount run also left orphaned inode/block allocations. Immediate
-unmount cleanup, power-loss recovery, graphical interaction and a complete
-installed root/login/session startup remain outside this gate's acceptance.
+immediate-unmount run also left orphaned inode/block allocations. The backend
+guard below addresses premature success by refusing unmount until those orphans
+have retired. Full descriptor/mapping/submount busy accounting, power-loss
+recovery, graphical interaction and a complete installed root/login/session
+startup remain outside this gate's acceptance.
 
 On 15 October 2026 the earlier volatile-IPC cold-boot gate passed all three boots
 on ARM64 HVF and x86-64 TCG, with eight native receipts per architecture and six
@@ -140,6 +147,43 @@ maintained `persistent 7` control in `control-arm-seven` reproduces inode 23
 still allocated after a measured 7039 ms; its account/shutdown proofs pass, but
 the controller correctly remains incomplete when read-only fsck rejects the
 disk. The V control audit checks that failure and the unchanged disk hash.
+
+Ordinary ext2 unmount now consults its backing filesystem before detaching.
+Under the existing volume lock, the backend scans allocated non-reserved inodes
+in the coherent metadata cache and returns `EBUSY` for zero-link allocations or
+the native journaled format's pending truncate cleanup. Success flushes the
+target volume's cache and device barrier; backend read/flush failures preserve
+the attachment and propagate their error. Read-only backends and explicit lazy
+detach retain their existing behavior.
+This volume-wide metadata scan includes bind aliases and preserves existing
+resource lifetimes. Its cost grows with filesystem inode
+metadata; comprehensive open-file/mapping/submount busy accounting remains open.
+
+The immediate-attempt gate uses `persistent 0 30` and the new isolated kernels.
+An ARM64 control with the preceding kernel reports success on its first attempt,
+then fails read-only fsck with both inode and block bitmap differences. Evidence
+is in `build/development-unmount-20261015/before-arm-b`; no repair was applied.
+The patched ARM64 and x86-64 gates each pass all three boots and eleven native
+receipts in `final-arm` and `final-x86` beside it. Each first attempt is refused
+while the volume stays attached. Bounded retries complete after deferred cleanup,
+with six clean read-only filesystem checks and exact persisted schedule/disk
+continuity.
+The kernels are built from the earlier isolated `e42b3946c` source and saved
+typed-null adaptation, plus only `kernel/fs/mount.v`, `kernel/fs/unmount.v` and
+`kernel/fs/ext2/unmount.v` from this change. Both architectures' generated C uses
+stack scratch for the new callbacks, without new heap/interface allocations.
+
+| Immediate-attempt kernel | SHA-256 |
+| --- | --- |
+| AArch64 | `cc1b4102903c32cfb7480ab3585bce3e9eaf80ed2b56ecefa93021f2289344e2` |
+| x86_64 | `58ebd500db72d326504a95bb89972424f233ad30911d73c59c91066856024de1` |
+
+The complete mount-lifecycle/namespace suite also passes on both initial guard
+builds in `mount-arm` and `mount-x86`. The final backend refinement restricts
+the native pending-truncate marker to journaled volumes; the final cold-boot
+checks above exercise the rebuilt kernels. The audit also verifies that the
+dispatch callback is identical between those builds. Both receipt-validation
+host test files pass, including old proof compatibility and bounded retry validation.
 
 On 15 October 2026 the earlier broker-restart gate and full base workflow passed on
 ARM64 HVF and x86-64 TCG with 18 receipts each. Evidence remains under
@@ -915,5 +959,5 @@ This qualifies the tested per-account job workflows in Vinix guests, including
 the native watcher, signal, deadline and interruption checks recorded above.
 The optional native Services broker lifecycle and quiescent persistent-home
 cold boots are covered above. Graphical service control, complete installed
-boot/login, immediate-unmount cleanup, broader
+boot/login, comprehensive unmount busy accounting, broader
 server/SSH/CI projects and complete self-hosted builds remain open acceptance work.

@@ -1147,6 +1147,8 @@ fn unmount(parent &VFSNode, target string, flags u64) ? {
 		}
 		return
 	}
+	mut filesystem := entry.root.filesystem
+	if filesystem != unsafe { nil } { check_filesystem_unmount(mut filesystem)? }
 	if voidptr(entry.covered) != voidptr(entry.root) {
 		mut covered := entry.covered
 		detach_mount(mut table, mut covered)

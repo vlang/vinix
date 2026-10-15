@@ -9,17 +9,20 @@ pub struct Options {
 pub:
 	runtime string = 'volatile'
 	settle_seconds int = 13
+	retry_seconds int
 }
 
 pub fn options(arguments []string) !Options {
-	if arguments.len > 2 { return error('expected [volatile|persistent [0..30]]') }
+	if arguments.len > 3 { return error('expected [volatile|persistent [SETTLE-SECONDS [RETRY-SECONDS]]]') }
 	runtime := if arguments.len > 0 { arguments[0] } else { 'volatile' }
 	seconds := if arguments.len > 1 { arguments[1].int() } else { 13 }
+	retry := if arguments.len > 2 { arguments[2].int() } else { 0 }
 	if runtime !in ['volatile', 'persistent'] || seconds < 0 || seconds > 30
-		|| (arguments.len > 1 && arguments[1] != seconds.str()) {
-		return error('expected volatile|persistent and a canonical wait in 0..30 seconds')
+		|| retry < 0 || retry > 30 || (arguments.len > 1 && arguments[1] != seconds.str())
+		|| (arguments.len > 2 && arguments[2] != retry.str()) {
+		return error('expected volatile|persistent and canonical settle/retry intervals in 0..30 seconds')
 	}
-	return Options{runtime, seconds}
+	return Options{runtime, seconds, retry}
 }
 
 pub struct Shutdown {
@@ -30,6 +33,9 @@ pub:
 	settle_seconds int
 	quiescence_millis u64
 	unmounted bool
+	unmount_attempts u64
+	busy_refusals u64
+	unmount_millis u64
 }
 
 pub struct Proof {
@@ -119,13 +125,22 @@ pub fn verify(receipts map[string]string, phase int, pin string) !Proof {
 // Require the post-unmount observation as well as the account's job receipts.
 // A completion marker alone cannot qualify the requested runtime/wait mode.
 pub fn verify_shutdown(receipts map[string]string, phase int, pin string, selected Options) !Shutdown {
-	options([selected.runtime, selected.settle_seconds.str()])!
+	options([selected.runtime, selected.settle_seconds.str(), selected.retry_seconds.str()])!
 	path := '/fixture/service-cold-shutdown.json'
 	shutdown := json2.decode[Shutdown](receipts[path], strict: true)!
-	if shutdown.schema != 1 || shutdown.phase != phase || !shutdown.unmounted
+	if shutdown.schema !in [1, 2] || shutdown.phase != phase || !shutdown.unmounted
 		|| shutdown.runtime != selected.runtime || shutdown.settle_seconds != selected.settle_seconds
 		|| shutdown.quiescence_millis < u64(selected.settle_seconds) * 1000 {
 		return error('cold boot did not complete the selected quiescence and unmount')
+	}
+	if shutdown.schema == 1 && selected.retry_seconds != 0 {
+		return error('cold boot is missing the unmount retry proof')
+	}
+	if shutdown.schema == 2 && (shutdown.unmount_attempts == 0
+		|| shutdown.busy_refusals != shutdown.unmount_attempts - 1
+		|| (selected.retry_seconds == 0 && shutdown.busy_refusals != 0)
+		|| (selected.retry_seconds > 0 && shutdown.unmount_millis > u64(selected.retry_seconds) * 1000)) {
+		return error('cold boot did not complete bounded EBUSY-only unmount retries')
 	}
 	mut account := receipts.clone()
 	account.delete(path)

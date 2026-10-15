@@ -47,8 +47,8 @@ Session persistence uses the existing service manager. Native qualification
 checks disabled import, authorized Start/Stop, active-job retirement, enabled
 restoration after broker shutdown and removal across another broker restart.
 Quiescent persistent-home cold boots have a separate native gate. Complete
-installed boot/login, immediate-unmount cleanup and graphical interaction
-remain separate acceptance work.
+installed boot/login, comprehensive unmount busy accounting and graphical
+interaction remain separate acceptance work.
 A job left in flight after abrupt runner loss retains its owner acknowledgement
 requirement across service restarts.
 
@@ -212,12 +212,18 @@ The [persistent-home cold-boot gate](../../tests/development/README.md) also
 passed on both architectures on 15 October 2026. Three new QEMU processes reuse
 one ext2 home; the extended gate also puts the broker socket on that persistent
 volume. Later boots must restore the exact saved state and start the enabled
-watcher without another import or
-Start request. Each architecture passed eleven receipts and three read-only
-filesystem checks with the same kernels as the earlier volatile-IPC gate.
+watcher without another import or Start request. Each architecture passed eleven
+receipts and three read-only filesystem checks with the same kernels as the
+earlier volatile-IPC gate.
 The default 13-second cleanup interval covers cascading pathname and socket
 backing-resource grace periods. Each shutdown records the runtime mode, measured
 wait and completed unmount; bounded explicit timing controls remain subject to
 the same filesystem gate. Earlier seven-second controls observed the socket
-inode before its final deferred release. Immediate-unmount orphan cleanup,
-power-loss recovery and complete installed boot/login remain open.
+inode before its final deferred release. Ordinary ext2 unmount now refuses with
+`EBUSY` while allocated orphan inodes remain, preserving the attachment for a
+retry. The native gate's `persistent 0 30` mode checks immediate attempts and
+bounded busy-only retries, with attempt counts and elapsed time in the shutdown
+proof. The extended gate passes three boots on both architectures, with six
+clean read-only filesystem checks, using the guarded kernels recorded there.
+Broader open-file/mapping/submount busy accounting, power-loss recovery
+and complete installed boot/login remain open.

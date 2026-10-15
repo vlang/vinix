@@ -56,13 +56,40 @@ fn test_cold_boot_rejects_incomplete_evidence_and_changed_service_policy() {
 
 fn test_shutdown_options_reject_ambiguous_or_unbounded_controls() {
 	assert options([]string{})! == Options{}
-	assert options(['persistent'])! == Options{'persistent', 13}
-	assert options(['volatile', '0'])! == Options{'volatile', 0}
-	assert options(['persistent', '30'])! == Options{'persistent', 30}
+	assert options(['persistent'])! == Options{'persistent', 13, 0}
+	assert options(['volatile', '0'])! == Options{'volatile', 0, 0}
+	assert options(['persistent', '30'])! == Options{'persistent', 30, 0}
+	assert options(['persistent', '0', '30'])! == Options{'persistent', 0, 30}
 	for arguments in [['other'], ['persistent', '31'], ['volatile', '-1'],
 		['volatile', ''], ['persistent', 'junk'], ['volatile', '07'],
-		['persistent', '+7'], ['volatile', '7s'], ['volatile', '1', 'extra']] {
+		['persistent', '+7'], ['volatile', '7s'], ['volatile', '1', 'extra'],
+		['persistent', '0', '31'], ['persistent', '0', '-1'], ['volatile', '0', '01'],
+		['volatile', '0', '30', 'extra']] {
 		if _ := options(arguments) { assert false, 'invalid shutdown options accepted' }
+	}
+}
+
+fn test_shutdown_retries_require_complete_bounded_busy_evidence() {
+	selected := options(['persistent', '0', '30'])!
+	mut receipts := proof_fixture(1)!
+	path := '/fixture/service-cold-shutdown.json'
+	shutdown := Shutdown{schema: 2, phase: 1, runtime: 'persistent', settle_seconds: 0,
+		unmounted: true, unmount_attempts: 101, busy_refusals: 100, unmount_millis: 11000}
+	receipts[path] = json2.encode(shutdown)
+	verify_shutdown(receipts, 1, 'a'.repeat(64), selected)!
+	for changed in [Shutdown{...shutdown, schema: 1}, Shutdown{...shutdown, unmount_attempts: 0},
+		Shutdown{...shutdown, busy_refusals: 99}, Shutdown{...shutdown, unmount_millis: 30001}] {
+		receipts[path] = json2.encode(changed)
+		if _ := verify_shutdown(receipts, 1, 'a'.repeat(64), selected) {
+			assert false, 'missing, inconsistent or unbounded unmount retries accepted'
+		}
+	}
+	receipts[path] = json2.encode(Shutdown{...shutdown, unmount_attempts: 1, busy_refusals: 0, unmount_millis: 0})
+	verify_shutdown(receipts, 1, 'a'.repeat(64), selected)!
+	verify_shutdown(receipts, 1, 'a'.repeat(64), options(['persistent', '0'])!)!
+	receipts[path] = json2.encode(shutdown)
+	if _ := verify_shutdown(receipts, 1, 'a'.repeat(64), options(['persistent', '0'])!) {
+		assert false, 'unrequested retries accepted'
 	}
 }
 

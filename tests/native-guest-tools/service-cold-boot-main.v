@@ -77,8 +77,8 @@ fn receipts(path string) !map[string]string {
 }
 
 fn run() ! {
-	if os.args.len < 6 || os.args.len > 8 || os.args[1] !in ['aarch64', 'x86_64'] {
-		return error('usage: service-cold-boot ARCH KERNEL-DIR STAGED-TOOLS NATIVE-DESKTOP FRESH-STATE [volatile|persistent [0..30]]')
+	if os.args.len < 6 || os.args.len > 9 || os.args[1] !in ['aarch64', 'x86_64'] {
+		return error('usage: service-cold-boot ARCH KERNEL-DIR STAGED-TOOLS NATIVE-DESKTOP FRESH-STATE [volatile|persistent [SETTLE-SECONDS [RETRY-SECONDS]]] (intervals: 0..30)')
 	}
 	selected := coldbootcore.options(os.args[6..])!
 	arch := os.args[1]
@@ -148,6 +148,7 @@ fn run() ! {
 		os.write_file(boot + '/rootfs/fixture/service-cold-phase', phase.str())!
 		os.write_file(boot + '/rootfs/fixture/service-cold-runtime', if selected.runtime == 'persistent' { 'p' } else { 'v' })!
 		os.write_file(boot + '/rootfs/fixture/service-cold-settle', selected.settle_seconds.str())!
+		os.write_file(boot + '/rootfs/fixture/service-cold-retry', selected.retry_seconds.str())!
 		os.write_file(boot + '/rootfs/fixture/service-cold-device', if arch == 'aarch64' { '/dev/vda' } else { '/dev/sd0' })!
 		archive := guesthost.image(init, boot)!
 		os.rmdir_all(boot + '/rootfs')!

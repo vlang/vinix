@@ -13,6 +13,7 @@ struct C.utsname {
 }
 
 struct C.stat {
+	st_dev  u64
 	st_uid  u32
 	st_mode u32
 	st_size i64
