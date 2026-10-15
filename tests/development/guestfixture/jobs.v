@@ -65,6 +65,12 @@ fn lifecycle_payload(mode &char) i32 {
 		count := C.snprintf(&text[0], text.len, c'%d\n', C.getpid())
 		check(count > 0, 327)
 		write_text(&path[0], &text[0], usize(count))
+		if C.strcmp(mode, c'service-linger') == 0 {
+			C.snprintf(&path[0], path.len, c'%s.owner.pid', prefix)
+			owner_count := C.snprintf(&text[0], text.len, c'%d\n', C.getppid())
+			check(owner_count > 0, 483)
+			write_text(&path[0], &text[0], usize(owner_count))
+		}
 		pid := C.fork()
 		check(pid >= 0, 328)
 		if pid == 0 {

@@ -31,9 +31,16 @@ paths, two real watcher ticks and graceful stop through the supervisor model.
 All six scheduler/importer/supervisor host test files pass. Native ARM64 and
 x86-64 also pass export and parser compatibility as UID/GID 1000, with the
 full 14-record account/job/build gate retained in
-`build/development-service-20261015/guest-arm` and `guest-x86`;
-the complete native Services-managed scheduler lifecycle and persistent-home
-cold boot remain open.
+`build/development-service-20261015/guest-arm` and `guest-x86`.
+The real native broker now also passes disabled import, compositor-authorized
+Start/Stop, active-job retirement during Stop and broker shutdown, enabled
+configuration restoration, and removal across broker restart. ARM64 HVF and
+x86-64 TCG each pass 18 independently validated receipts as UID/GID 1000 in
+`build/development-service-lifecycle-20261015/guest-arm-current` and
+`guest-x86-current`. Ordinary-child control is refused without configuration
+changes, and all three observed stop cycles finish below 500 ms. Seven relevant
+host test files pass. Persistent-home cold boot and graphical interaction
+remain open.
 
 | Requirement | Available implementation | Remaining acceptance / implementation |
 | --- | --- | --- |
@@ -43,7 +50,7 @@ cold boot remain open.
 | OCI and rootless containers | Existing mount/PID/IPC/UTS namespaces, resource-group controls and overlay copy-up provide parts of container support; see [resource groups](resource-groups.md) and [compatibility status](linux-posix-compatibility.md). | User ID mapping, user/network namespace ownership, network isolation, complete delegation and OCI security semantics; mainstream-runtime and rootless adversarial qualification. Existing refusal of unsupported isolation stays intact. |
 | Practical hardware VM hosting | QEMU provides practical RAM sizes and multiple virtual CPUs. The [VM manager](../tools/development/virtual-machines.md) selects an accelerator explicitly. The native Intel backend supports page-backed RAM up to 1 GiB, with allocation rollback, shared mapping lifetimes and EPT invalidation. | Native Intel still has one vCPU and a real-mode entry API. Larger-memory VM entry requires physical/nested VT-x qualification. AMD SVM, ARM virtualization, interrupts and device integration remain open. QEMU TCG inside Vinix does not satisfy hardware acceleration acceptance. |
 | VM integration and lifecycle | Private per-VM qcow2 disks/firmware variables, QMP lifecycle, offline paired snapshots with exact-name restoration and backend identity binding, guarded recovery of interrupted restores/deletions and identified creations, explicit user networking/loopback SSH forwarding, read-only 9p shares and bounded read-only guest-agent health/OS/network queries. | Qualify guest OS workflows inside Vinix, provide Vinix guest tools/drivers, qualify shared folders and network behavior, and implement running-state snapshots and crash-atomic snapshot transactions if required. |
-| Server/SSH/CI and automation | Native SQLite transaction/rollback/reopen/integrity and authenticated HTTP/CGI projects on both architectures. AArch64 also passes two scheduled native Go CI builds with matching artifacts, isolated credentials and refusal of an existing output. [Per-account interval jobs](../tools/development/scheduled-jobs.md) use pinned executables, selected environment, protected credential files and durably reserved attempts for fresh outputs. [Native x86_64/AArch64 job checks](../tests/development/README.md) qualify ordinary-account execution, private receipts, credential/output isolation, unsafe-file refusal, deadlines, INT/TERM group retirement, watcher ticks with one PID, concurrent-owner refusal and killed-owner retry/acknowledgement. The [VFS rename regression](../tests/vfs-rename/README.md) covers the reproduced watcher-state publication race. | Installed-system service/boot integration, wider database/server/TLS/load qualification, authenticated SSH development, native x86 CI and broader CI/deployment workflows. A retained x86 HTTP connection-aborted run still needs investigation. |
+| Server/SSH/CI and automation | Native SQLite transaction/rollback/reopen/integrity and authenticated HTTP/CGI projects on both architectures. AArch64 also passes two scheduled native Go CI builds with matching artifacts, isolated credentials and refusal of an existing output. [Per-account interval jobs](../tools/development/scheduled-jobs.md) use pinned executables, selected environment, protected credential files and durably reserved attempts for fresh outputs. [Native x86_64/AArch64 job checks](../tests/development/README.md) qualify ordinary-account execution, private receipts, credential/output isolation, unsafe-file refusal, deadlines, INT/TERM group retirement, watcher ticks with one PID, concurrent-owner refusal and killed-owner retry/acknowledgement. Both architectures also qualify real native Services broker import/start/stop, active-job retirement, enabled restoration and removal across broker restart. The [VFS rename regression](../tests/vfs-rename/README.md) covers the reproduced watcher-state publication race. | Graphical service control, persistent-home cold boot, wider database/server/TLS/load qualification, authenticated SSH development, native x86 CI and broader CI/deployment workflows. A retained x86 HTTP connection-aborted run still needs investigation. |
 
 Validation on 12 October 2026 used the Darwin ARM host, V 0.5.2 `f6358ec`,
 QEMU 11.1.1 and the installed musl cross-compilers. All checks below passed:

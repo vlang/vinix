@@ -13,6 +13,7 @@ import crypto.ed25519
 import encoding.hex
 import tests.development.referencecore
 import tests.development.cicore
+import tests.development.servicecore
 
 struct Pin {
 	path   string
@@ -276,6 +277,9 @@ fn run() !int {
 		os.chmod(root + '/usr/bin/' + tool, 0o755)!
 		hashes[tool] = hash
 	}
+	if broker := os.getenv_opt('VINIX_DEVELOPMENT_SERVICE_BROKER') {
+		hashes['vinix-desktop'] = servicecore.stage(broker, root, arch)!
+	}
 	if source := os.getenv_opt('VINIX_DEVELOPMENT_V_SMOKE_ROOT') {
 		v_root := os.real_path(source)
 		os.mkdir_all(root + '/usr/lib')!
@@ -329,13 +333,13 @@ fn run() !int {
 	}
 	os.write_file(root + '/home/developer/token', 'vinix-native-fixture-secret')!
 	mut lifecycle_plans := map[string]string{}
-	for name in ['deadline', 'term', 'int', 'watch', 'interrupted'] {
+	for name in ['deadline', 'term', 'int', 'watch', 'interrupted', 'service'] {
 		plan := Plan{jobs: [Job{
 			executable: Pin{'/usr/bin/development-payload', digest(init)!}
-			interval_seconds: if name == 'watch' { 2 } else { 3600 }
+			interval_seconds: if name == 'service' { 1 } else if name == 'watch' { 2 } else { 3600 }
 			timeout_seconds: if name == 'deadline' { 1 } else { 30 }
 			environment: {
-				'VINIX_DEVELOPMENT_PAYLOAD': if name == 'watch' { 'tick' } else if name == 'interrupted' { 'recover' } else { 'linger' }
+				'VINIX_DEVELOPMENT_PAYLOAD': if name == 'service' { 'service-linger' } else if name == 'watch' { 'tick' } else if name == 'interrupted' { 'recover' } else { 'linger' }
 				'VINIX_JOB_PROOF_PREFIX': '/home/developer/' + name
 			}
 			credential_files: { 'TEST_TOKEN': '/home/developer/token' }
@@ -628,6 +632,7 @@ fn run() !int {
 	if 'http' in reference.profiles { expected << 'DEVELOPMENT HTTP PASS:' }
 	if 'lscpu-smoke' in hashes { expected << 'DEVELOPMENT CPU PASS:' }
 	if 'v-smoke' in hashes { expected << 'DEVELOPMENT V SMOKE PASS:' }
+	if 'vinix-desktop' in hashes { expected << 'DEVELOPMENT SERVICE LIFECYCLE PASS:' }
 	result := guesthost.boot(command, launch.env, state, expected,
 		['DEVELOPMENT GUEST FAIL', 'KERNEL PANIC', 'vinix-native-fixture-secret'], if selfhost_v { 7200 } else if v_root_hash != '' { 2400 } else { 900 }, true)!
 	mut receipts := map[string]string{}
@@ -647,6 +652,8 @@ fn run() !int {
 			'/home/developer/deadline-state/state.json', '/home/developer/term-state/state.json',
 			'/home/developer/int-state/state.json', '/home/developer/watch-state/state.json',
 			'/home/developer/interrupted-before.json', '/home/developer/interrupted-state/state.json',
+			'/home/developer/service-stop-1.json', '/home/developer/service-stop-2.json',
+			'/home/developer/service-stop-3.json', '/home/developer/service-proof.json',
 			'/home/developer/reference-build.json', '/home/developer/reference-a/receipt.json', '/home/developer/reference-b/receipt.json',
 			'/home/developer/reference-a/work/qualification/report.json', '/home/developer/reference-b/work/qualification/report.json',
 			'/home/developer/reference-a/work/qualification/http/server.json', '/home/developer/reference-b/work/qualification/http/server.json',
@@ -659,7 +666,8 @@ fn run() !int {
 		json2.decode[json2.Any](body)!
 		receipts[path] = body
 	}
-	if result == 0 && receipts.len != 2 + if reference_ci { 22 } else if 'http' in reference.profiles { 19 } else if reference_hash != '' { 17 } else if sdk_hash == '' { 12 } else if v_root_hash == '' { 13 } else { 20 } {
+	base_receipts := 2 + if reference_ci { 22 } else if 'http' in reference.profiles { 19 } else if reference_hash != '' { 17 } else if sdk_hash == '' { 12 } else if v_root_hash == '' { 13 } else { 20 }
+	if result == 0 && receipts.len != base_receipts + if 'vinix-desktop' in hashes { 4 } else { 0 } {
 		return error('missing native workflow receipts')
 	}
 	if result == 0 {
@@ -751,6 +759,20 @@ fn run() !int {
 				|| job.started <= 0 || (!interrupted_before && (job.finished < job.started
 					|| job.next_due != job.finished + if name == 'watch' { 2 } else { 3600 })) {
 				return error('native job deadline, signal, watch or recovery state failed validation')
+			}
+		}
+		if 'vinix-desktop' in hashes {
+			servicecore.verify(receipts['/home/developer/service-proof.json'])!
+			for cycle in 1 .. 4 {
+				job_record := json2.decode[NativeSchedule](receipts['/home/developer/service-stop-${cycle}.json'], strict: true)!
+				job := job_record.jobs['fixture']
+				if job_record.schema != 1 || job_record.uid != 1000
+					|| job_record.plan_sha256 != lifecycle_plans['service'] || job_record.jobs.len != 1
+					|| 'fixture' !in job_record.jobs || job.in_flight || job.runs != u64(cycle)
+					|| job.attempts != u64(cycle) || job.detail != 'job interrupted' || job.exit_code != -1
+					|| job.started <= 0 || job.finished < job.started || job.next_due != job.finished + 1 {
+					return error('native Services manager lost, duplicated or failed to retire a scheduled job')
+				}
 			}
 		}
 		expected_artifact := sha256.sum('build-fixture-input\n'.bytes()).hex()

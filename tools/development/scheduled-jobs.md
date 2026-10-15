@@ -43,10 +43,12 @@ Spaces, quotes and backslashes in paths are quoted for the native importer.
 Dollar/percent expansion, control bytes and arguments exceeding its bounded
 record size are refused before any unit is emitted. The same unit uses the
 supported Linux service subset; full systemd qualification remains separate.
-Session persistence uses the existing service manager. Persistent-home cold
-boot and the complete native Services-managed scheduler lifecycle still need
-their own qualification. An interrupted job retains its existing owner
-acknowledgement requirement across service restarts.
+Session persistence uses the existing service manager. Native qualification
+checks disabled import, authorized Start/Stop, active-job retirement, enabled
+restoration after broker shutdown and removal across another broker restart.
+Persistent-home cold boot and graphical interaction retain separate gates.
+A job left in flight after abrupt runner loss retains its owner acknowledgement
+requirement across service restarts.
 
 For repeatable CI builds, set `expand_attempt: true` on the job and put
 `{attempt}` in its output argument. For example, pin `vinix-build` as the
@@ -107,9 +109,9 @@ killed before recording completion, the job remains blocked on subsequent ticks.
 After checking that the interrupted job and its descendants have stopped, its
 owner can run `acknowledge-interrupted STATE JOB` to permit another run. This
 never signals a saved numeric PID and prevents an automatic overlapping retry
-after the owner was killed. No system daemon or boot service is installed by
-these commands; service integration and production SSH/server/CI qualification
-remain separate acceptance work.
+after the owner was killed. Service installation and Start use the desktop's
+explicit import and control actions. Persistent-home boot integration and
+production SSH/server/CI qualification remain separate acceptance work.
 
 `v -enable-globals -cc cc test tools/development/jobcore` checks real job
 execution, credential handling, interval coalescing, interrupted-run refusal,
@@ -190,5 +192,16 @@ full base account/job/build checks, retaining 14 validated receipts plus the
 unit text and export verdict in each serial log. Evidence and static tool-stage
 pins remain in `build/development-service-20261015/guest-arm`, `guest-x86`,
 `tools-arm` and `tools-x86`. The runs reuse the isolated kernels and recorded
-compiler adaptation from the FIFO validation above. Native desktop-managed
-watcher lifecycle and persistent-home cold boot remain separate acceptance work.
+compiler adaptation from the FIFO validation above.
+
+On 15 October 2026 the real native Services broker also passed the scheduler
+lifecycle gate on ARM64 HVF and x86-64 TCG as UID/GID 1000. Seven host test files
+passed, including rejection of incomplete or changed lifecycle evidence. Both
+native runs retain 18 independently validated receipts in
+`build/development-service-lifecycle-20261015/guest-arm-current` and
+`guest-x86-current`. Explicit Stop, broker shutdown and Stop after enabled
+restoration retired all observed processes in 125/212/120 ms on ARM64 and
+394/498/463 ms on x86-64. Unauthorized import and control from an ordinary child
+were denied without configuration changes; removed services stayed absent on
+broker restart. These are headless broker checks; persistent-home cold boot and
+graphical Services interaction remain open.

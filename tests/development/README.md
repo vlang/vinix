@@ -29,8 +29,55 @@ validates it through the maintained native importer; the fixture checks its
 exact literal watcher argv, restart policy, ten-second stop window, private
 output file and unchanged schedule, with no credential embedded in the unit.
 The serial log retains the exported text and `DEVELOPMENT SERVICE EXPORT PASS`.
-This checks native export and parser compatibility; desktop import/start/stop
-and persistent-home cold boot remain separate service acceptance work.
+This base gate checks native export and parser compatibility. Select the real
+Services broker explicitly to add import/start/stop and broker-restart checks:
+
+```
+VINIX_DEVELOPMENT_SERVICE_BROKER=/path/to/native/vinix-desktop \
+tests/development/run-guest aarch64 /path/to/kernel /path/to/staged-tools /path/to/new-state
+```
+
+Supply a static broker with embedded VML assets for the selected architecture. The
+controller copies the exact ELF into the guest and records its SHA-256 beside
+the four development commands. An unsuitable or missing broker cannot satisfy
+the optional verdict or its four extra receipts.
+
+The ordinary account exports and imports its schedule disabled. Import before
+compositor attachment and Start from an ordinary child of the attached process
+must be refused without changing configuration. The fixture then starts a real
+watcher with a credential-bearing job and a forked descendant. Explicit Stop,
+session-broker shutdown during the next active job, and Stop after enabled
+configuration restoration must each retire the guardian, watcher and both job
+processes within the exported ten-second stop window. Removing the stopped
+service must survive another broker restart. No authorization rule is changed.
+
+The host checks all three interrupted schedule receipts against the generated
+plan hash, account, exact attempt/run counts and next-due interval. It also
+requires distinct guardian/watcher identities, bounded stops and byte-exact
+enabled/disabled/removed service registry records through the maintained
+importer. Credential bytes must never reach the serial transcript or broker
+log. Persistent-home cold boot and graphical interaction remain separate gates.
+
+On 15 October 2026 this optional gate and the full base workflow passed on
+ARM64 HVF and x86-64 TCG with 18 receipts each. Evidence remains under
+`build/development-service-lifecycle-20261015/guest-arm-current` and
+`guest-x86-current`. Their receipts pin the copied kernels, V fixtures, four
+staged commands and native desktop brokers. Stops took 125/212/120 ms on ARM64
+and 394/498/463 ms on x86-64, including retirement probes for every observed
+guardian, watcher and job descendant. All seven scheduler/importer/supervisor/
+receipt-validation host test files passed with V `be2eb40`.
+
+The retained `broker-arm64` and `broker-amd64` build directories contain source
+hash maps and the actual executables. Each uses this checkout's unchanged
+`desktop/session_service.c.v` and complete `desktop/sessioncore` module with a
+retained materialized UI source tree. The V build script, generated C and logs
+are beside them; production V translation embeds assets, and Clang links the
+matching musl and V signal-handler runtime statically. The audit checks those
+runtime/module source hashes, kernel/fixture/broker pins and both native proofs.
+The initial prepared brokers failed before opening their sockets because they
+referenced host-path VML assets; the failed serial transcripts are retained as
+`guest-arm-c`, `guest-arm-d` and `guest-x86-c`. The final runs reuse the isolated
+production kernels and typed-null compiler adaptation recorded below.
 
 The export gate passed on 15 October 2026 on ARM64 HVF and x86-64 TCG with
 the maintained stager's updated CLIs. The 14-record receipts, native exported
@@ -783,5 +830,6 @@ it does not run native compiler projects without an x86 SDK.
 
 This qualifies the tested per-account job workflows in Vinix guests, including
 the native watcher, signal, deadline and interruption checks recorded above.
-Installed service and boot integration, server/SSH/CI projects, and complete self-hosted builds
-remain open acceptance work.
+The optional native Services broker lifecycle is covered above. Graphical
+service control, persistent-home cold boot, broader server/SSH/CI projects and
+complete self-hosted builds remain open acceptance work.

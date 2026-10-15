@@ -521,6 +521,7 @@ fn account_checks() {
 		private_file_checks()
 		service_export_checks()
 		job_lifecycle_checks()
+		service_lifecycle_checks()
 		build_checks()
 		reference_checks()
 		sdk := C.open(c'/home/developer/qualify-sdk', C.O_RDONLY)
@@ -561,7 +562,7 @@ pub fn run() i32 {
 		if mode != nil {
 			if C.strcmp(mode, c'build') == 0 { return build_payload() }
 			if C.strcmp(mode, c'ci-check') == 0 { return ci_payload() }
-			if C.strcmp(mode, c'linger') == 0 || C.strcmp(mode, c'tick') == 0 || C.strcmp(mode, c'recover') == 0 {
+			if C.strcmp(mode, c'linger') == 0 || C.strcmp(mode, c'tick') == 0 || C.strcmp(mode, c'recover') == 0 || C.strcmp(mode, c'service-linger') == 0 {
 				return lifecycle_payload(mode)
 			}
 			return job_payload()
@@ -574,7 +575,7 @@ pub fn run() i32 {
 			&char(c'/home/developer/link-jobs.json'), &char(c'/home/developer/fifo-jobs.json'), &char(c'/home/developer/build-template.json')]! {
 			check(C.chown(path, 1000, 1000) == 0 && C.chmod(path, 0o600) == 0, 156)
 		}
-		for name in [&char(c'deadline'), &char(c'term'), &char(c'int'), &char(c'watch'), &char(c'interrupted')]! {
+		for name in [&char(c'deadline'), &char(c'term'), &char(c'int'), &char(c'watch'), &char(c'interrupted'), &char(c'service')]! {
 			mut path := [256]char{}
 			C.snprintf(&path[0], path.len, c'/home/developer/%s-jobs.json', name)
 			check(C.chown(&path[0], 1000, 1000) == 0 && C.chmod(&path[0], 0o600) == 0, 361)
