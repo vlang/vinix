@@ -1,0 +1,27 @@
+Initial functional assertion compared a phrase across presentation line wrapping. The fixture now reconstructs continuation lines. The first allocation run retained 875128 bytes across 1000 cycles; temporary detail arrays now use noslices so growth retires old buffers. A focused remeasurement left the live 128-byte window status, which the fixture now retires before sampling, matching existing presentation fixtures. Final functional, allocation and sanitizer results supersede these attempts.
+
+Initial functional output:
+Software configured repositories: damaged metadata does not block reviewed revocation; enrollment remains refused PASS
+Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed
+Software Verify: visible control, no administrator/catalog dependency, streamed progress, stable selection, incomplete/failure retention, review isolation and safe close PASS
+Software repair: installed dependency control, exact-version closure disclosure, read-only review, duplicate/modal isolation, frozen confirmation and reviewed administrator apply PASS
+Software health: read-only asynchronous report, issue-first searchable metadata/diagnostics, issues-only filtering, stable visible selection, empty results, bounded Unicode editing, reload retention, compact Back, isolated catalog state, full-set repair review and safe close PASS
+Software health progress: separate bounded stderr, live package names, both-pipe EOF, complete/exit/report/count admission, malformed/partial/late/flood refusal, Stop/Escape kill and reap, retry and compact cancellation PASS
+SOFTWARE CLEANUP read-only review, complete paged disclosure, modal/compact controls, frozen administrator approval, stale refusal, diagnostics and reload PASS
+Software deployment: full closure, frozen literal path, empty removal, cancellation, bounds, stale/error diagnostics and close guard passed
+/Users/alex/code/vinix/build/package-software-audit-work/software-ui/software_audit_fixture.v:70: FAIL: fn main.check_software_audit: assert facts.contains('Changed field: public_key') && facts.contains('below the lock minimum') && facts.contains('SHA-256')
+V panic: Assertion failed...
+
+Initial allocation output:
+/Users/alex/code/vinix/build/package-software-audit-work/software-ui/software_audit_fixture.v:143: FAIL: fn main.check_software_audit_memory: assert kept == 0, 'deployment audit UI retained ${kept} bytes'
+   left value: kept = 875128
+  right value: 0
+      message: deployment audit UI retained 875128 bytes
+V panic: Assertion failed...
+
+Focused remeasurement before status retirement:
+/Users/alex/code/vinix/build/package-software-audit-work/software-ui/software_audit_fixture.v:143: FAIL: fn main.check_software_audit_memory: assert kept == 0, 'deployment audit UI retained ${kept} bytes'
+   left value: kept = 128
+  right value: 0
+      message: deployment audit UI retained 128 bytes
+V panic: Assertion failed...

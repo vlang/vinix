@@ -58,6 +58,14 @@ mut:
 	worker_run      bool
 	worker_verify   bool
 	worker_health   bool
+	worker_audit bool
+	audit_mode bool
+	audit_ready bool
+	audit_snapshot pkgprotocol.DeploymentAudit
+	audit_path string
+	audit_summary string
+	audit_selected int = -1
+	audit_scroll int
 	worker_failed   bool
 	health_mode bool
 	health_ready bool
@@ -229,6 +237,7 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	a.worker_run = false
 	a.worker_verify = arguments.len == 1 && arguments[0] == 'verify'
 	a.worker_health = arguments == ['--json', '--progress', 'health']
+	a.worker_audit = false
 	a.worker_mirror = false
 	a.repository_worker = .none
 	a.data_worker = .none
@@ -548,6 +557,12 @@ fn (mut a SoftwareApp) poll() bool {
 		}
 	}
 	code := a.worker.code
+	if a.worker_audit {
+		a.finish_deployment_audit(code)
+		a.retire_worker()
+		a.worker_audit = false
+		return true
+	}
 	if a.worker_health {
 		a.finish_health_output(code)
 	}
@@ -714,6 +729,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		if a.worker == unsafe { nil } && a.failure_pages.len > 0 { a.failure_mode = true; a.focus = false }
 		return
 	}
+	if a.audit_mode { a.handle_deployment_audit(event_id); return }
 	if a.health_mode {
 		if event_id == 'software.health.stop' { a.stop_health() }
 		else if a.worker == unsafe { nil } { a.handle_health(event_id) }
@@ -951,6 +967,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.window_mode { a.window_key_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
 	if a.failure_mode { if input == '\x1b' { a.failure_mode = false }; return }
+	if a.audit_mode { if input == '\x1b' { a.handle_deployment_audit('software.audit.back') }; return }
 	if a.details_mode { if input == '\x1b' { a.clear_details() }; return }
 	if a.health_mode { a.health_key_input(input); return }
 	if a.cleanup_mode {
@@ -985,6 +1002,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.window_mode { a.window_paste_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
 	if a.failure_mode { return }
+	if a.audit_mode { return }
 	if a.details_mode { return }
 	if a.health_mode { a.health_paste_input(input); return }
 	if a.cleanup_mode { return }
@@ -1038,6 +1056,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.failure_mode { return a.build_failure(size) }
 	width := int(size.width)
 	height := int(size.height)
+	if a.audit_mode && (width < 640 || height < 610) { return a.build_deployment_audit_compact(width, height) }
 	if a.health_mode && (width < 640 || height < 610) { return a.build_health_compact(width, height) }
 	if a.cleanup_mode && (width < 640 || height < 610) { return a.build_cleanup_compact(width, height) }
 	if width < 640 || height < 610 {
@@ -1050,6 +1069,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	a.page_rows = if height > 400 { (height - if a.review != '' { 274 } else if a.health_mode { 348 } else { 310 }) / 30 } else { 5 }
 	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
 	if a.details_mode { return a.build_details(width, height) }
+	if a.audit_mode { return a.build_deployment_audit(width, height) }
 	if a.health_mode { return a.build_health(width, height) }
 	if a.cleanup_mode { return a.build_cleanup(width, height) }
 	if a.policy_mode { return a.build_policy(width, height) }
@@ -1232,6 +1252,7 @@ fn (mut a SoftwareApp) close_app() {
 	a.clear_failure()
 	a.clear_health()
 	a.clear_cleanup()
+	a.clear_deployment_audit()
 	unsafe {
 		a.launch_request.free()
 		a.service_path.free()

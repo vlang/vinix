@@ -238,6 +238,8 @@ fn check() ! {
 	os.cp(repository + '/tests/packages/software_failure_fixture.v', work + '/software/failure_fixture.v')!
 	os.cp(repository + '/tests/packages/software_verify_fixture.v', work + '/software/verify_fixture.v')!
 	os.cp(repository + '/desktop/software_deployment.v', work + '/software/software_deployment.v')!
+	os.cp(repository + '/desktop/software_audit.v', work + '/software/software_audit.v')!
+	os.cp(repository + '/tests/packages/software_audit_fixture.v', work + '/software/audit_fixture.v')!
 	os.cp(repository + '/desktop/software_mirror.v', work + '/software/software_mirror.v')!
 	os.cp(repository + '/desktop/software_terminal.v', work + '/software/software_terminal.v')!
 	os.cp(repository + '/desktop/software_launch.v', work + '/software/software_launch.v')!
@@ -274,6 +276,7 @@ fn check() ! {
 	run(work + '/window-broker-memory', ['health-memory'])!
 	run(work + '/window-broker-memory', ['health-progress-memory'])!
 	run(work + '/window-broker-memory', ['cleanup-memory'])!
+	run(work + '/window-broker-memory', ['audit-memory'])!
 	if '--cross' in os.args {
 		run(v, [...helper_flags, '-o', work + '/package-stage', repository + '/tools/packages/stage.v'])!
 		for architecture in ['aarch64', 'x86_64'] {

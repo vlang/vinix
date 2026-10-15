@@ -56,6 +56,7 @@ fn (mut a SoftwareApp) handle_deployment(event_id string) {
 			a.select_all = false
 		}
 		'software.deployment.review' { a.begin_deployment_review() }
+		'software.deployment.audit' { a.begin_deployment_audit() }
 		'software.deployment.back' {
 			a.deployment_mode = false
 			a.focus = false
@@ -105,10 +106,11 @@ fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
 	}
 	children << software_label('Deployment file (absolute path)', 14, 52, width - 28, 28, false)
 	children << console_field('software.deployment.path', editor_bytes_text(a.deployment_path), 14, 86, width - 28, a.focus)
-	children << software_label('Apply a deployment supplied by your organization or exported with deployment-lock. Locked files preserve exact application and runtime versions.', 14, 128, width - 28, 60, false)
+	children << software_label('Use a deployment file supplied by your organization. Check installed compares an exact lock with recorded installed metadata. Review deployment checks the full application set before any changes.', 14, 128, width - 28, 60, false)
 	children << software_label('The review includes installs, retained packages, updates and removals, with publisher keys, permissions, licenses and disk requirements. Empty deployments remove all packages. Personal data stays on disk.', 14, 204, width - 28, 60, false)
 	if a.worker == unsafe { nil } {
 		children << software_button('software.deployment.review', 'Review deployment', 14, 286, 180)
+		children << software_button('software.deployment.audit', 'Check installed', 210, 286, 160)
 		children << software_button('software.policy', 'Organization policy', 14, 330, 180)
 	}
 	if a.progress_seen { children << a.progress_bar(width, height) }

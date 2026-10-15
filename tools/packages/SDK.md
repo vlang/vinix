@@ -1841,6 +1841,23 @@ attest filesystem health, reauthorize a revoked package, or prove that current
 repositories can reproduce it. Use `health` for installed integrity and the
 existing authenticated deployment review/apply flow for changes.
 
+Software's Deployment form offers **Check installed** for format-2 documents.
+It calls `--json deployment-audit FILE` directly, buffers the complete bounded
+reply, waits for process exit and accepts only coherent 0/match or 3/drift pairs.
+Other exits, malformed/incomplete/oversized replies and contradictory results
+produce failure diagnostics without accepting a partial report. The read-only
+worker can be stopped or closed without transaction authorization.
+
+The report retains its own source filename, generation, architecture, exact input
+digest and all package rows. Paged details include every changed field, expected
+and installed versions, requested-root differences and sequence-floor meaning.
+Reload retires the previous report before starting and uses the captured filename;
+editing the deployment form cannot redirect it. The compact view retains Back or
+Stop. **Review deployment** retires the observation and calls `deployment-review`
+on that same filename, reading current bytes and obtaining a fresh authenticated
+proposal. Confirm and administrator authorization remain separate actions. See
+[Software audit qualification](../../tests/packages/software-deployment-audit-check.md).
+
 `deployment-review FILE` emits the existing format-1 `pkgprotocol.Review`, with
 operation `deploy`, complete target/removal rows and disk requirements. Its opaque
 fingerprint binds a deployment-specific domain, canonical document, configuration,

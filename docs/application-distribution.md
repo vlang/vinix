@@ -708,6 +708,19 @@ nor authorizes changes. Use **Health report** for installed integrity, and the
 reviewed deployment flow to reconcile drift under current trust and policy. See
 [audit qualification](../tests/packages/deployment-audit-check.md).
 
+In Software, open **Deployment**, enter an exact lock path and choose **Check
+installed**. The report lists matching, missing, unexpected and changed packages,
+with separate expected/installed versions and paged details for every difference,
+the full source path and captured digest. Reload replaces the observation; Stop
+and closing the window cancel the read-only check. Small windows keep Back or
+Stop available. No administrator prompt is required for observation.
+
+**Review deployment** on the report opens a fresh authenticated deployment
+proposal using the captured source filename, even if the form was edited. Changes
+to the file, installed state, current trust or policy are checked by that new
+review and the existing confirmation flow. A drift report never authorizes an
+installation. See [Software audit qualification](../tests/packages/software-deployment-audit-check.md).
+
 Software’s **Clean up versions** opens a read-only, paged review of obsolete
 generation IDs, with the architecture and current/rollback identities. Confirming
 **Delete listed versions** uses administrator authorization and deletes only that

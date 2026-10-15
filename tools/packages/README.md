@@ -134,6 +134,13 @@ for an error. A match describes recorded metadata; `health` checks payloads and
 reviewed deployment still admits current trust and policy. See
 [qualification](../../tests/packages/deployment-audit-check.md).
 
+Software's **Deployment → Check installed** runs this comparison without an
+administrator prompt. It shows the complete package union, paged source/digest
+and difference details, Reload and Stop controls, and useful failure diagnostics.
+**Review deployment** obtains a fresh authenticated proposal from the report's
+captured source; the audit never supplies installation approval. See
+[Software qualification](../../tests/packages/software-deployment-audit-check.md).
+
 Configuration reads reject ambiguous keys, null values and incorrect field
 types while preserving legacy defaults for omitted fields. Policy typos fail
 before acquisition, cleanup or activation; correcting the configuration permits
