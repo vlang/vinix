@@ -7630,23 +7630,64 @@ before reading the ASBD and block-buffer data. Eleven final generated C streams
 and executables, native measurements and joined guest evidence are retained under
 `build/ios/fortnite/media-format-checks`.
 
-These changes resolve thirteen more required imports. The actual IPA probe now
-exits with status 1 before application entry at
-`_CMBlockBufferCreateWithMemoryBlock`. Block/sample buffers, codec processing and
-the system Metal device/renderer remain unavailable. Fortnite remains unplayable
-and the full iOS regression remains unpassed.
+These changes resolved thirteen more required imports. That IPA probe exited
+with status 1 before application entry at
+`_CMBlockBufferCreateWithMemoryBlock`.
+
+CoreMedia block buffers now provide contiguous owned or borrowed memory,
+deferred allocation, retained buffer references, data pointers and lengths,
+copy/replace/fill operations, contiguity/empty queries and CF type IDs. Default
+allocation owns and frees the supplied or allocated block; `kCFAllocatorNull`
+borrows supplied storage. Custom sources copy the packed 28-byte callback
+record, reading its unaligned pointers byte by byte. Their release callback
+runs once at final release, with the original base address and block size.
+Unused deferred blocks allocate and free no memory.
+
+Pointer and copy queries leave deferred storage unallocated and return the
+native value-unavailable error. Assure, replace and fill allocate it on demand;
+failed allocation can be retried. Out-of-range requests fail before allocation.
+Pointer failures clear the pointer/available outputs while reporting the known
+total length; a nil buffer leaves outputs untouched. Zero-length replacement
+and copy fail, while zero-length fill or buffer reference uses the remaining
+range. Nested references retain their root storage and share writes after the
+source handles are released. Allocation callbacks run outside the runtime lock,
+can join readers on another thread, and receive an explicit error if they try
+to allocate the same block recursively.
+
+This profile accepts nonempty contiguous blocks up to 2,147,483,647 bytes,
+default structure allocation and default, null or version-zero custom block
+allocation. Other CF allocators, empty/fragmented assembly and contiguous-copy
+construction remain unavailable. Callers retain buffers while using their
+borrowed pointers; allocation and mutation require caller synchronization.
+The actual IPA's helper at `0x101fc6374` requests immediate default allocation,
+with its ninth output-pointer argument on the stack.
+
+Eight final host sanitizer runs and four ARM64 guest suites cover block buffers,
+format descriptions, borrowed CoreVideo buffers and autorelease pools. Native
+comparisons verify packed callbacks, eager/deferred allocation, allocation
+failure/retry, range and output errors, shared slice writes, CF ownership and
+concurrent readers. Private cases also check callback reentrancy and two fully
+drained runtimes. Generated C audits verify explicit state allocation/free and
+root ownership; eleven final C streams and executables are retained under
+`build/ios/fortnite/block-buffer-checks` with the native measurements and IPA
+consumer inspection.
+
+Four more required imports resolve. The actual IPA probe still exits with status
+1 before application entry, now at `_CMSampleBufferCreate`. Sample buffers,
+codec processing and the system Metal device/renderer remain unavailable.
+Fortnite remains unplayable and the full iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,620 | 540 | 79 |
+| Fortnite executable | 1,624 | 536 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,455 | 543 | 120 |
+| All images | 2,459 | 539 | 120 |
 
-The C++/GLES/Text variant reports 2,468 resolved imports, 530 unresolved strong
+The C++/GLES/Text variant reports 2,472 resolved imports, 526 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

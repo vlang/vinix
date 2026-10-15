@@ -84,6 +84,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	}
 	if library == '/System/Library/Frameworks/CoreMedia.framework/CoreMedia' {
 		if address := coremedia_format_symbol(symbol) { return address }
+		if address := coremedia_block_symbol(symbol) { return address }
 		if address := coremedia_constant_symbol(symbol) { return address }
 	}
 	if library == '/System/Library/Frameworks/IOSurface.framework/IOSurface' {
@@ -139,7 +140,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	if symbol == '_NSSearchPathForDirectoriesInDomains' { return u64(unsafe { voidptr(ns_search_paths) }) }
 	if library == '/System/Library/Frameworks/Foundation.framework/Foundation' && symbol == '_NSHomeDirectory' { return u64(unsafe { voidptr(ns_home_directory) }) }
 	if library == '/System/Library/Frameworks/Foundation.framework/Foundation' && symbol == '_NSTemporaryDirectory' { return u64(unsafe { voidptr(ns_temp_directory) }) }
-	if symbol in ['_kCFAllocatorSystemDefault', '_kCFBooleanTrue', '_kCFBooleanFalse'] {
+	if symbol in ['_kCFAllocatorSystemDefault', '_kCFAllocatorNull', '_kCFBooleanTrue', '_kCFBooleanFalse'] {
 		framework_object(symbol)
 		return ios_runtime.framework_data[symbol]
 	}
@@ -173,8 +174,9 @@ fn framework_empty_dictionary() u64 {
 
 fn framework_object(symbol string) u64 {
 	if address := ios_runtime.framework_data[symbol] { return read64(address) }
-	object := objc_allocate(ios_runtime.names[if symbol == '_kCFAllocatorSystemDefault' { 'NSObject' } else { 'NSNumber' }])
-	if symbol != '_kCFAllocatorSystemDefault' {
+	allocator := symbol in ['_kCFAllocatorSystemDefault', '_kCFAllocatorNull']!
+	object := objc_allocate(ios_runtime.names[if allocator { 'NSObject' } else { 'NSNumber' }])
+	if !allocator {
 		mut header := obj_header(object)
 		header.cf_boolean = true
 		header.number = i64(symbol == '_kCFBooleanTrue')
