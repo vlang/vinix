@@ -76,6 +76,7 @@ fn native_fixture_source(item string) string {
 		'json-serialization-checks' { 'json_serialization_test.v' }
 		'nsuuid-checks' { 'ns_uuid_test.v' }
 		'filemanager-checks' { 'ns_file_manager_test.v' }
+		'home-directory-checks' { 'ns_home_directory_test.v' }
 		'autopool-checks' { 'ns_autorelease_pool_test.v' }
 		'processinfo-checks' { 'ns_process_info_test.v' }
 		'date-checks' { 'ns_date_test.v' }
@@ -221,7 +222,7 @@ fn native_fixture_source(item string) string {
 }
 
 fn build(root string, out string, only string) {
-	for item in ['run-ios', 'run-ios-gles', 'objc-constant-dictionary-checks', 'layout-constraint-checks', 'json-serialization-checks', 'condition-checks', 'cookie-checks', 'webkit-configuration-checks', 'user-script-checks', 'webview-checks', 'request-checks', 'value-checks', 'response-checks', 'alert-checks', 'set-checks', 'thread-checks', 'auth-session-checks', 'image-view-checks', 'keyboard-checks', 'nsuuid-checks', 'filemanager-checks', 'autopool-checks', 'processinfo-checks', 'date-checks', 'inputstream-checks', 'connection-checks', 'type-encoding-checks', 'dispatch-queue-class-checks', 'oslog-checks', 'secure-memory-checks', 'select-checks', 'semaphore-checks', 'signal-checks',
+	for item in ['run-ios', 'run-ios-gles', 'objc-constant-dictionary-checks', 'layout-constraint-checks', 'json-serialization-checks', 'condition-checks', 'cookie-checks', 'webkit-configuration-checks', 'user-script-checks', 'webview-checks', 'request-checks', 'value-checks', 'response-checks', 'alert-checks', 'set-checks', 'thread-checks', 'auth-session-checks', 'image-view-checks', 'keyboard-checks', 'nsuuid-checks', 'filemanager-checks', 'home-directory-checks', 'autopool-checks', 'processinfo-checks', 'date-checks', 'inputstream-checks', 'connection-checks', 'type-encoding-checks', 'dispatch-queue-class-checks', 'oslog-checks', 'secure-memory-checks', 'select-checks', 'semaphore-checks', 'signal-checks',
 		'error-checks', 'sysctl-checks', 'terminal-checks', 'thread-policy-checks', 'file-time-checks', 'uuid-checks', 'audio-session-checks', 'cf-dictionary-checks', 'objc-storage-checks', 'objc-associated-checks', 'objc-property-checks', 'objc-sync-checks', 'swift-unknown-value-checks', 'swift-string-checks', 'swift-empty-string-checks', 'swift-describing-checks', 'swift-cstring-checks', 'swift-foreign-count-checks', 'swift-foreign-index-checks', 'swift-foreign-offset-checks', 'swift-foreign-subscript-checks', 'swift-utf16-offset-checks', 'swift-sequence-checks', 'swift-array-sequence-checks', 'swift-collection-checks', 'swift-set-checks', 'swift-metadata-checks', 'swift-protocol-checks', 'swift-hash-checks', 'swift-hasher-checks', 'swift-raw-representable-checks', 'swift-array-checks', 'swift-integer-checks', 'swift-integer-hash-checks', 'swift-fatal-checks', 'swift-interpolation-checks', 'swift-array-storage-checks', 'swift-vararg-checks', 'swift-void-checks', 'swift-version-checks', 'swift-initializer-checks', 'swift-empty-array-checks', 'swift-any-checks', 'swift-byte-metadata-checks', 'swift-raw-equality-checks', 'swift-array-class-checks', 'swift-shared-utf8-checks', 'swift-string-guts-checks', 'swift-foreign-copy-checks', 'swift-set-algebra-checks', 'swift-raw-copy-checks', 'swift-pointer-alloc-checks', 'swift-pointer-deinit-checks', 'swift-raw-alloc-checks', 'swift-dispatch-async-checks', 'swift-dispatch-main-checks', 'swift-dispatch-scheduler-checks', 'swift-dispatch-qos-checks', 'swift-dispatch-algebra-checks', 'swift-dispatch-flags-checks', 'swift-stack-checks', 'swift-heap-checks', 'swift-string-replace-checks', 'swift-array-unbridge-checks', 'swift-dictionary-bridge-checks','swift-calendar-case-checks', 'swift-locale-checks', 'swift-date-checks', 'swift-data-write-checks', 'swift-data-unbridge-checks', 'swift-data-base64-checks', 'swift-data-bridge-checks', 'swift-data-checks', 'swift-url-metadata-checks', 'swift-url-path-checks', 'swift-url-bridge-checks', 'swift-error-bridge-checks', 'swift-error-checks', 'swift-error-value-checks', 'swift-dynamic-cast-checks', 'swift-objc-cast-checks', 'swift-foreign-metadata-checks', 'swift-object-type-checks', 'swift-mangled-state-checks', 'swift-mangled-checks', 'swift-witness-checks', 'swift-once-checks', 'swift-set-bridge-checks', 'swift-logger-checks', 'swift-main-actor-witness-checks', 'swift-main-actor-checks', 'swift-nsobject-hashable-checks', 'swift-objc-bool-metadata-checks', 'swift-objc-bool-checks', 'swift-actor-executor-checks', 'swift-task-priority-checks', 'swift-task-alloc-checks', 'swift-task-create-checks', 'swift-task-switch-checks', 'swift-json-encoder-initializer-checks', 'swift-json-encoder-dispatch-checks', 'swift-json-encoder-date-dispatch-checks', 'swift-json-date-strategy-checks', 'swift-json-encoder-date-case-checks', 'swift-json-decoder-initializer-checks', 'swift-json-decoder-dispatch-checks', 'swift-cocoa-error-protocol-checks', 'swift-cocoa-error-code-checks', 'swift-nslog-checks', 'swift-string-unbridge-checks', 'swift-cocoa-match-checks', 'swift-localized-error-checks', 'swift-error-description-checks', 'module-lookup-checks', 'native-init'] {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
@@ -363,6 +364,7 @@ fn regression_root(root string, out string, fs string) {
 	copy_file(out + '/keyboard-checks', fs + '/opt/ios/keyboard-checks')
 	copy_file(out + '/nsuuid-checks', fs + '/opt/ios/nsuuid-checks')
 	copy_file(out + '/filemanager-checks', fs + '/opt/ios/filemanager-checks')
+	copy_file(out + '/home-directory-checks', fs + '/opt/ios/home-directory-checks')
 	copy_file(out + '/autopool-checks', fs + '/opt/ios/autopool-checks')
 	copy_file(out + '/processinfo-checks', fs + '/opt/ios/processinfo-checks')
 	copy_file(out + '/date-checks', fs + '/opt/ios/date-checks')
@@ -545,7 +547,7 @@ fn vm(root string, out string, mode string) {
 	} else if mode == 'objc' {
 		for directory in ['sbin', 'proc', 'sys', 'dev', 'tmp', 'opt/ios'] { os.mkdir_all(fs + '/' + directory) or { panic(err) } }
 		copy_file(root + '/build/ios/fortnite/local/Payload/FortniteClient-IOS-Shipping.app/Frameworks/EOSSDK.framework/EOSSDK', fs + '/opt/ios/constant-dictionary-image')
-		for name in ['objc-constant-dictionary', 'layout-constraint', 'json-serialization', 'condition', 'cookie', 'webkit-configuration', 'user-script', 'webview', 'request', 'value', 'response', 'alert', 'set', 'thread', 'auth-session', 'image-view', 'keyboard', 'nsuuid', 'filemanager', 'autopool', 'processinfo', 'date', 'inputstream', 'connection', 'type-encoding', 'oslog', 'secure-memory', 'cf-dictionary', 'objc-storage', 'objc-associated', 'objc-property', 'objc-sync'] {
+		for name in ['objc-constant-dictionary', 'layout-constraint', 'json-serialization', 'condition', 'cookie', 'webkit-configuration', 'user-script', 'webview', 'request', 'value', 'response', 'alert', 'set', 'thread', 'auth-session', 'image-view', 'keyboard', 'nsuuid', 'filemanager', 'home-directory', 'autopool', 'processinfo', 'date', 'inputstream', 'connection', 'type-encoding', 'oslog', 'secure-memory', 'cf-dictionary', 'objc-storage', 'objc-associated', 'objc-property', 'objc-sync'] {
 			copy_file(out + '/' + name + '-checks', fs + '/opt/ios/' + name + '-checks')
 		}
 	} else if mode == 'swift' {
@@ -700,6 +702,8 @@ fn main() {
 		build(root, out, 'processinfo-checks')
 	} else if mode == 'build-autopool' {
 		build(root, out, 'autopool-checks')
+	} else if mode == 'build-home-directory' {
+		build(root, out, 'home-directory-checks')
 	} else if mode == 'build-filemanager' {
 		build(root, out, 'filemanager-checks')
 	} else if mode == 'build-nsuuid' {

@@ -7110,21 +7110,59 @@ call sites, four retired VM phases and pinned inputs are retained under
 stack temporaries and explicit buffer cleanup. Published runners remain
 unchanged; the full iOS regression remains unpassed.
 
-The current IPA probe links past String replacement and exits with status 1
-at `_NSHomeDirectory`. Fortnite has not entered application code and remains
-unplayable.
+The String-replacement IPA probe links past that operation and exits with
+status 1 at `_NSHomeDirectory`.
+
+V now supplies Foundation's `NSHomeDirectory` C entry. Installed-library
+inspection shows a no-argument call returning a +0 NSString in x0, with the
+ordinary preserved-register ABI. Native calls agree with the file manager's
+home URL, return independently autoreleased strings, and survive pool teardown
+when explicitly retained. Separate native processes verify that changing HOME
+does not change the result, while Foundation's fixed-home setting selects a
+normalized path. The IPA calls this entry at `0x100628924` and `0x1006289ec`,
+including a filesystem capacity query inside an autorelease pool.
+
+Vinix uses its existing application Documents convention: home is the parent
+of VINIX_IOS_DOCUMENTS when configured, otherwise the parent of the loaded
+bundle. Paths are absolute, valid UTF-8 and at most 1023 bytes; NUL and dot
+components are rejected. Trailing/repeated separators are normalized. The
+getter reads bounded borrowed configuration and path prefixes, copies into a
+new NSString and autoreleases it on the calling thread. It does not create
+directories, resolve symlinks, consult host account paths or add a permanent
+cache. Calls require an active runtime and a configured bundle or Documents
+path; configuration is established before app initializers and worker threads.
+
+The fixture checks direct calls and protected ARM64 arguments/x8/x20, preserved
+x20/x21, +0 ownership and retained strings after pool teardown. Eleven private
+path cases cover both configured roots, Unicode/spaces, root and repeated or
+trailing separators, the 1023-byte boundary and non-NUL-terminated protected
+prefixes. It also checks Documents-directory integration without home-query
+side effects, rejected inputs/lifetimes, eight concurrent readers and two
+completely drained runtimes.
+
+All 20 normal/deterministic sanitizer runs and ten ARM64 guest suites pass.
+The 23 generated C streams and executables, native measurements, actual IPA
+calls, four retired VM phases and pinned inputs are retained under
+`build/ios/fortnite/home-directory-checks`. Generated C inspection verifies
+borrowed spans, stack normalization and copied autorelease ownership without
+hidden V temporaries. The initial successful prefix-only host trial is retained
+separately from the final normalized-path results. Published runners remain
+unchanged; the full iOS regression remains unpassed.
+
+The current IPA probe links past `NSHomeDirectory` and exits with status 1 at
+`_NSLogv`. Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,541 | 619 | 79 |
+| Fortnite executable | 1,542 | 618 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,376 | 622 | 120 |
+| All images | 2,377 | 621 | 120 |
 
-The C++/GLES/Text variant reports 2,389 resolved imports, 609 unresolved strong
+The C++/GLES/Text variant reports 2,390 resolved imports, 608 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

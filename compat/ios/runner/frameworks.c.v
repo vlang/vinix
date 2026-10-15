@@ -107,6 +107,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	if symbol == '_NSSelectorFromString' { return u64(unsafe { voidptr(ns_selector_from_string) }) }
 	if symbol == '_NSStringFromSelector' { return u64(unsafe { voidptr(ns_string_from_selector) }) }
 	if symbol == '_NSSearchPathForDirectoriesInDomains' { return u64(unsafe { voidptr(ns_search_paths) }) }
+	if library == '/System/Library/Frameworks/Foundation.framework/Foundation' && symbol == '_NSHomeDirectory' { return u64(unsafe { voidptr(ns_home_directory) }) }
 	if symbol in ['_kCFAllocatorSystemDefault', '_kCFBooleanTrue', '_kCFBooleanFalse'] {
 		framework_object(symbol)
 		return ios_runtime.framework_data[symbol]
