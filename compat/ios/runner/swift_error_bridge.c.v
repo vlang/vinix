@@ -38,3 +38,36 @@ fn swift_error_bridge_checked(owner u64) !u64 {
 fn swift_error_bridge(owner u64) u64 {
 	return swift_error_bridge_checked(owner) or { panic(err) }
 }
+
+// Foundation's ordinary Swift entry borrows Error and returns an owned
+// NSError. For the registered toll-free representations, preserve identity
+// and retain once. Validation and retention share the recursive runtime lock;
+// no native Swift error box or user domain/code callback is approximated.
+fn swift_error_to_nserror_checked(owner u64) !u64 {
+	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired {
+		return swift_error_bridge_failure()
+	}
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	swift_error_bridge_checked(owner)!
+	return objc_retain(owner)
+}
+
+fn swift_error_to_nserror(owner u64) u64 {
+	return swift_error_to_nserror_checked(owner) or { panic(err) }
+}
+
+// The inverse Foundation entry also borrows its nonnil Objective-C input.
+// Native nil input returns a cached Swift _GenericObjCError box, whose type
+// identity and Error witnesses cannot be replaced by an arbitrary NSError.
+fn swift_nserror_to_error_checked(owner u64) !u64 {
+	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired {
+		return swift_error_bridge_failure()
+	}
+	if owner == 0 { return error('iOS: nil NSError requires the unimplemented Swift _GenericObjCError fallback') }
+	return swift_error_to_nserror_checked(owner)!
+}
+
+fn swift_nserror_to_error(owner u64) u64 {
+	return swift_nserror_to_error_checked(owner) or { panic(err) }
+}

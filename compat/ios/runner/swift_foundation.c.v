@@ -271,6 +271,8 @@ fn swift_foundation_symbol(symbol string) !u64 {
 	if address := swift_json_decoder_symbol(symbol) { return address }
 	if address := swift_json_date_symbol(symbol) { return address }
 	return match symbol {
+		'_$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF' { u64(voidptr(swift_error_to_nserror)) }
+		'_$s10Foundation22_convertNSErrorToErrorys0E0_pSo0C0CSgF' { u64(voidptr(swift_nserror_to_error)) }
 		'_$s10Foundation5NSLogyySS_s7CVarArg_pdtF' { u64(voidptr(swift_nslog)) }
 		'_$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF' { u64(voidptr(swift_foundation_bridge)) }
 		'_$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ' { u64(voidptr(swift_foundation_unbridge)) }

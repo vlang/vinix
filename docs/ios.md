@@ -6238,8 +6238,41 @@ retired VM phases are retained under `build/ios/fortnite/cocoa-error-match-check
 The private build reuses the pinned local musl/GCC SDK and C++/GLES dependencies.
 Full iOS regression remains unpassed and published runners remain unchanged.
 
-The current IPA startup probe resolves the error-code matching import, then
-exits with status 1 at the required import `_$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF`.
+That IPA startup probe resolved the error-code matching import, then
+exited with status 1 at the required import `_$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF`.
+Fortnite has not entered application code and remains unplayable.
+
+Foundation's Error/NSError conversions now resolve through both Foundation
+install names for registered CFError, NSError and Objective-C NSError subclasses.
+The installed `_convertErrorToNSError` retains its borrowed Error in x0 before
+tail-calling the consuming Core bridge. Vinix validates the live object and
+retains it once under the recursive runtime lock, returning the same object as
+an owned NSError.
+The caller's original reference survives disposal of that result. Domain, code
+and userInfo ownership stay intact. Native Swift error boxes remain explicitly
+unsupported; the existing Core bridge keeps its consuming ownership rule.
+
+The inverse `_convertNSErrorToError` also retains a borrowed nonnil input and
+returns the same object as an owned Error. Native nil input returns a cached
+Swift `_GenericObjCError` box; its NSError bridge has domain
+`Foundation._GenericObjCError`, code zero and empty userInfo. Vinix explicitly
+rejects that unimplemented boxed nil-error fallback.
+
+Eight ASan/UBSan runs and four Vinix ARM64 suites pass for both Foundation
+conversions, the Core bridge, Error extraction/value witnesses,
+Error.localizedDescription and Cocoa matching.
+The extended bridge fixture compares thirty field/ownership cases for each of
+three entry points with native libraries, including signed 64-bit extrema,
+NSError subclasses, x20/x21,
+invalid and protected owners, concurrent calls/alias publication, weak zeroing
+and reentrant destruction across two drained lifetimes. Eleven final generated
+C streams/programs and four joined, retired VM phases are retained under
+`build/ios/fortnite/error-nserror-checks`. The private build reuses the pinned
+local musl/GCC SDK and C++/GLES dependencies. Full iOS regression remains
+unpassed and published runners remain unchanged.
+
+The current IPA startup probe resolves both Foundation error conversion imports,
+then exits with status 1 at the required import `_$s10Foundation3URLV19_bridgeToObjectiveCSo5NSURLCyF`.
 Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -6247,12 +6280,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,495 | 665 | 79 |
+| Fortnite executable | 1,497 | 663 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,330 | 668 | 120 |
+| All images | 2,332 | 666 | 120 |
 
-The C++/GLES/Text variant reports 2,343 resolved imports, 655 unresolved strong
+The C++/GLES/Text variant reports 2,345 resolved imports, 653 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

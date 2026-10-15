@@ -18,6 +18,8 @@ fn framework_symbol(library string, symbol string) ?u64 {
 			'_$s10Foundation10CocoaErrorV19fileWriteFileExistsAC4CodeVvgZ',
 			'_$s10Foundation10CocoaErrorV4CodeVAA01_cD8ProtocolAAMc', '_$s10Foundation10CocoaErrorV4CodeVMa',
 			'_$s10Foundation18_ErrorCodeProtocolPAAE2teoiySbx_s0B0_ptFZ',
+			'_$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF',
+			'_$s10Foundation22_convertNSErrorToErrorys0E0_pSo0C0CSgF',
 			'_$s10Foundation11JSONDecoderC6decode_4fromxxm_AA4DataVtKSeRzlFTj',
 			'_$s10Foundation11JSONDecoderCACycfc', '_$s10Foundation11JSONDecoderCMa',
 			'_$s10Foundation11JSONDecoderCMn',
