@@ -193,6 +193,13 @@ fn test_app_selection_skips_apps_the_image_already_has() {
 	}
 	assert !firefox.clickable && !firefox.enabled
 	assert app_selection_test_has_text(firefox, 'Installed')
+	// Compact cells keep the title and installed status on separate lines.
+	labels := firefox.children[0].children[0].children
+	assert labels[1].text == 'Firefox'
+	assert labels[1].frame.width > 0
+	assert labels[2].text == 'Installed'
+	assert labels[2].frame.y >= labels[1].frame.y + labels[1].frame.height
+	assert labels[2].frame.x == labels[1].frame.x
 	// Keyboard focus starts on the first app that can still be chosen.
 	focus := app_selection_test_element(root, 'apps.focus') or { panic('missing focus ring') }
 	chromium := app_selection_test_element(root, 'apps.toggle.chromium') or {
@@ -380,6 +387,13 @@ fn test_app_selection_uses_three_columns_and_adapts_to_narrow_screens() {
 		browsers := app_selection_test_element(tree, 'apps.heading.browsers') or { panic('missing heading') }
 		assert browsers.frame.x == firefox.frame.x
 		assert browsers.frame.y + browsers.frame.height < firefox.frame.y
+		expected_cell_width := match width {
+			1024 { 152 }
+			800 { 175 }
+			else { 276 }
+		}
+		assert firefox.frame.width == expected_cell_width
+		assert chromium.frame.width == expected_cell_width
 		if width >= 800 {
 			assert firefox.frame.y == chromium.frame.y
 			assert firefox.frame.x + firefox.frame.width < chromium.frame.x

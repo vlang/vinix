@@ -355,24 +355,30 @@ fn app_selection_row(app FirstRunApp, installed bool, available bool, selected b
 		}
 	}
 	title_color := if installed || !available { body_muted } else { body_heading }
-	title_width := width - 60 - if installed { 98 } else { 0 }
-	title_y := if app.package_name == 'ios-runtime' { 0 } else { (height - 22) / 2 }
+	compact_installed := installed && width < 240
+	title_width := math.max(0, width - 60 - if installed && !compact_installed { 98 } else { 0 })
+	title_y := if app.package_name == 'ios-runtime' || compact_installed { 0 } else { (height - 22) / 2 }
 	children << ui2.label('', app.title, ui2.rect(47, f64(title_y), f64(title_width), 22),
 		ui2.TextStyle{
 			color: title_color
 			size:  14
 			bold:  true
 		})
-	if app.package_name == 'ios-runtime' {
+	if app.package_name == 'ios-runtime' && !compact_installed {
 		children << ui2.label('', app.detail_text(), ui2.rect(47, 20, f64(title_width), 16),
 			ui2.TextStyle{ color: body_muted, size: 10 })
 	}
 	if installed {
-		children << ui2.label('', tr('app_selection.installed'), ui2.rect(f64(width - 111), f64((height - 20) / 2), 94, 20),
+		status_frame := if compact_installed {
+			ui2.rect(47, 22, f64(title_width), 16)
+		} else {
+			ui2.rect(f64(width - 111), f64((height - 20) / 2), 94, 20)
+		}
+		children << ui2.label('', tr('app_selection.installed'), status_frame,
 			ui2.TextStyle{
 				color: body_muted
 				size:  11
-				align: .right
+				align: if compact_installed { .left } else { .right }
 			})
 	}
 	mut background := registration_field_bg
@@ -507,7 +513,7 @@ fn (mut s AppSelectionState) element(d &Desktop) ui2.Element {
 	card_y := layout.y
 	inner := card_width - 48
 	grid_width := inner - 16
-	row_width := (grid_width - (layout.columns - 1) * app_selection_column_gap) / layout.columns
+	row_width := (grid_width - (layout.columns - 1) * app_selection_column_gap) / layout.columns / 2
 	s.prepare_viewport(layout.list_height, layout.columns)
 
 	mut card_children := frame_elements(24)
