@@ -16,6 +16,12 @@ bool spin_is_locked(const spinlock_t *);
 void spin_lock_irq(spinlock_t *);
 void spin_unlock_irq(spinlock_t *);
 #include <vinix/spinlock_adapters.h>
+/* The pinned no-lockdep nested IRQ-save form discards subclass entirely.
+ * Generated metadata retains its original unsigned-long flags witness. */
+#ifndef CONFIG_DEBUG_LOCK_ALLOC
+#define spin_lock_irqsave_nested vinix_spin_lock_irqsave_nested
+#define raw_spin_lock_irqsave_nested spin_lock_irqsave_nested
+#endif
 #define raw_spin_lock_init spin_lock_init
 #define raw_spin_lock spin_lock
 #define raw_spin_unlock spin_unlock

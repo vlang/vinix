@@ -189,6 +189,15 @@ pub fn spin_lock(guard &C.spinlock_t) {
 	for !spin_raw_try(guard) { C.vinix_linuxkpi_spin_wait() }
 }
 
+// The caller evaluates its lock operand before entering this leaf and stores
+// returned IRQ flags only after acquisition, matching the original wrapper.
+@[export: 'vinix_spin_lock_irqsave_nested_native']
+pub fn spin_lock_irqsave_nested(guard &C.spinlock_t) usize {
+	flags := C.vinix_linuxkpi_irq_save()
+	spin_lock(guard)
+	return flags
+}
+
 @[export: 'spin_trylock']
 pub fn spin_trylock(guard &C.spinlock_t) bool {
 	C.vinix_linuxkpi_preempt_disable()

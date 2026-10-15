@@ -1743,3 +1743,61 @@ Use `aggregate-final-isolated-audit/` and the exact `aggregate-*-native/`,
 Full link, Tiger Lake PCI identity and physical/passthrough validation remain
 pending. Continue genuine CPU-bug policy and task/MM/GFP ownership work, then
 device/DMA/DRM/firmware services. GPU support is incomplete.
+
+## Latest nested IRQ-save spinlock increment
+
+Typed aggregate exchange is committed as `41587f08`. Normal/raw nested
+IRQ-save forms now preserve the original configured-disabled lockdep flags
+type witness, subclass elision and native IRQ/pin restoration. Runtime logic
+is a V leaf; structured ABI metadata generates the original compiler witness
+and post-acquisition flags assignment. Ordinary IRQ-save ordering and non-IRQ
+nested-class handling are outside this increment; configured lockdep remains
+unsupported.
+
+Two focused strict sanitizer profiles, an independent replay, 38 compiler
+profiles and seven malformed-metadata controls pass. Twelve compiler cases
+are accepted and 26 rejected. The actual leaf/module C and native objects are
+reviewed, including allocation-free guards, stack locals and fixed arrays.
+The broader host suite is not a fresh passing result.
+
+Fresh architecture worktrees at `41587f08` plus five exact production/tool
+overlays build enabled/default x86 and default ARM. Enabled ELF
+`0d463db9277a7070002e271d8ede652c1fbcf96144d2f6def89371621c012d4d`
+boots normal/SSE/four-level four-CPU guests, each with 46 required markers and
+28 existing strict allocation equalities. The new nested fixture executes
+1,600 cases/3,200 acquisitions inside the existing 200-runtime page-recovery
+measurement, which retains no pages. Those 28 other rows do not measure a new
+per-case heap counter. Default startup passes; actual default/ARM C and ELF
+exclude compatibility fixture symbols.
+
+Important build-isolation correction: the copied V executable alone did not
+select the copied standard library. On this macOS driver, use all of:
+
+```sh
+export VEXE=/Users/alex/.cache/vinix-linuxkpi/smp-oct10/toolchain-native/v
+export V_MACOS_V3_CALLER_VEXE=/Users/alex/.cache/vinix-linuxkpi/smp-oct10/toolchain-native/v
+export V_MACOS_V3_CALLER_VEXE_PRESENT=1
+export V_MACOS_V3_CALLER_VCHILD_PRESENT=0
+```
+
+These assignments must be present in the build environment. `V3CACHE` and
+`VTMP` are architecture-private; `VCACHE` alone does not isolate this compiler.
+The private transparent V launcher adds `-nocache -gc none` for host helpers
+and forwards every original argument/status. Earlier failed compiler outputs
+were archived before regeneration; no SDK/shared compiler source was edited
+and no compiler errors were hidden. Authenticate the actual frozen SDK include
+paths as well as the executable hash. Exact launch/source/object/ELF evidence
+is in `nested-spin-build-profile.json`, `native-compiler-diagnosis-oct12/`,
+`nested-spin-*-native/`, `nested-spin-guest-review/` and
+`nested-spin-independent-oct12/` below `smp-oct10/`.
+Earlier successful artifact records bound the compiler executable but did not
+establish the copied standard-library root; the saved aggregate ARM C explicitly
+names the live V library. Preserve those exact historical artifacts and qualify
+their producer provenance rather than treating them as frozen-SDK evidence.
+
+The isolated full audit remains **5/269**; the nested-lock first error advances
+to `might_sleep_if`. A private design is checking original single predicate
+evaluation against the existing stronger native sleep-context annotation;
+there is no new conditional implementation at this snapshot. Genuine CPU-bug
+policy, task/MM/GFP/vfork ownership, device/DMA/DRM/firmware and full link/hardware
+validation remain. GPU support is incomplete.

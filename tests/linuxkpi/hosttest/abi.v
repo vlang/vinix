@@ -210,13 +210,28 @@ fn abi_atomic_adapter(metadata map[string]AbiValue, exported map[string]AbiExpor
 	return '#define ' + name + '(' + expected.join(', ') + ') ({' + continuation + lines.map('    ' + it).join(continuation) + continuation + '})'
 }
 
-fn abi_call_adapter(metadata map[string]AbiValue, exported map[string]AbiExport) !string {
+fn abi_call_adapter(metadata map[string]AbiValue, exported map[string]AbiExport, symbols map[string]AbiSymbol) !string {
 	name := abi_name(metadata, 'name')!
 	parameters := abi_list(metadata, 'parameters')!.map(abi_identifier(it)!)
 	mut locals := []string{}
 	mut lines := []string{}
 	for value in abi_list(metadata, 'steps')! {
 		step := abi_object(value)!
+		if 'typecheck' in step {
+			parameter := abi_name(step, 'typecheck')!
+			if !abi_keys(step, ['typecheck', 'type']) || parameter !in parameters
+				|| abi_text(step, 'type')! != 'unsigned_long' {
+				return error('Invalid native flags type check: ${name}')
+			}
+			check := symbols['typecheck'] or { return error('Missing original typecheck import: ${name}') }
+			if check.kind != 'native_helper' || check.kinds != ['type', 'operand'] {
+				return error('Invalid original typecheck import: ${name}')
+			}
+			// Keep the pinned compiler witness, including its qualifier and
+			// diagnostic behavior, before the real IRQ-saving operation.
+			lines << '(void)typecheck(unsigned long, (' + parameter + '));'
+			continue
+		}
 		if 'result' in step {
 			result := abi_name(step, 'result')!
 			if result !in locals { return error('Unknown result in ${name}: ${result}') }
@@ -449,7 +464,7 @@ pub fn generate_abi(schema_path string, source_root string, output string) ! {
 	}
 	for _, value in exported { text << value.prototype }
 	for metadata in atomic_adapters { text << abi_atomic_adapter(metadata, exported)! }
-	for metadata in call_adapters { text << abi_call_adapter(metadata, exported)! }
+	for metadata in call_adapters { text << abi_call_adapter(metadata, exported, symbols)! }
 	for metadata in intrinsics { text << abi_intrinsic(metadata)! }
 	for metadata in expressions {
 		name := abi_name(metadata, 'name')!

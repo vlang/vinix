@@ -13,6 +13,28 @@
   ],
   "native_call_adapters": [
     {
+      "name": "vinix_spin_lock_irqsave_nested",
+      "parameters": [
+        "lock",
+        "flags",
+        "subclass"
+      ],
+      "shape": "statement",
+      "steps": [
+        {
+          "typecheck": "flags",
+          "type": "unsigned_long"
+        },
+        {
+          "call": "vinix_spin_lock_irqsave_nested_native",
+          "arguments": [
+            "lock"
+          ],
+          "publish": "flags"
+        }
+      ]
+    },
+    {
       "name": "spin_lock_irqsave",
       "parameters": [
         "lock",
@@ -85,6 +107,16 @@
         {
           "result": "__vinix_acquired"
         }
+      ]
+    }
+  ],
+  "native_expression_imports": [
+    {
+      "name": "typecheck",
+      "header": "linux/typecheck.h",
+      "parameters": [
+        "type",
+        "operand"
       ]
     }
   ]

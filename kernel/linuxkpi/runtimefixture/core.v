@@ -67,11 +67,15 @@ fn C.atomic_long_read(&C.atomic_long_t) isize
 fn C.atomic_long_try_cmpxchg(&C.atomic_long_t, &isize, isize) bool
 fn C.spin_lock_init(&C.spinlock_t)
 fn C.spin_lock_irqsave(&C.spinlock_t, usize)
+fn C.spin_lock_irqsave_nested(&C.spinlock_t, usize, i32)
+fn C.spin_is_locked(&C.spinlock_t) bool
 fn C.spin_unlock_irqrestore(&C.spinlock_t, usize)
 fn C.raw_spin_lock_init(&C.raw_spinlock_t)
 fn C.raw_spin_lock(&C.raw_spinlock_t)
 fn C.raw_spin_unlock(&C.raw_spinlock_t)
 fn C.raw_spin_trylock_irqsave(&C.raw_spinlock_t, usize) bool
+fn C.raw_spin_lock_irqsave_nested(&C.raw_spinlock_t, usize, i32)
+fn C.raw_spin_is_locked(&C.raw_spinlock_t) bool
 fn C.raw_spin_unlock_irqrestore(&C.raw_spinlock_t, usize)
 fn C.bitmap_zero(&usize, u32)
 fn C.set_bit(i32, &usize)
@@ -153,6 +157,98 @@ mut:
 	key  i32
 	list C.list_head
 	tree C.rb_node
+}
+
+fn nested_spin_subclass(vns_effect_storage &u32) i32 {
+	unsafe { (*vns_effect_storage)++ }
+	return 3
+}
+
+fn nested_spin_guard(vns_guard &C.spinlock_t, vns_flags &usize, vns_irq usize, vns_depth u32,
+	vns_calls &u32, vns_outcome &i32) &C.spinlock_t {
+	unsafe {
+		if *vns_flags != usize(0xf1a6) || C.vinix_linuxkpi_irq_flags() != vns_irq
+			|| C.preempt_count() != vns_depth { *vns_outcome = -5 }
+		(*vns_calls)++
+		return vns_guard
+	}
+}
+
+fn nested_raw_spin_guard(vns_guard &C.raw_spinlock_t, vns_flags &usize, vns_irq usize,
+	vns_depth u32, vns_calls &u32, vns_outcome &i32) &C.raw_spinlock_t {
+	unsafe {
+		if *vns_flags != usize(0xf1a6) || C.vinix_linuxkpi_irq_flags() != vns_irq
+			|| C.preempt_count() != vns_depth { *vns_outcome = -5 }
+		(*vns_calls)++
+		return vns_guard
+	}
+}
+
+fn nested_spin_locks() i32 {
+	unsafe {
+		entry_irq := C.vinix_linuxkpi_irq_flags()
+		entry_depth := C.preempt_count()
+		mut outcome := i32(0)
+		for pinned in [false, true]! {
+			if pinned { C.preempt_disable() }
+			base := C.preempt_count()
+			for disabled in [false, true]! {
+				mut saved_entry := usize(0)
+				if disabled { saved_entry = C.vinix_linuxkpi_irq_save() }
+				incoming := C.vinix_linuxkpi_irq_flags()
+				for raw_first in [false, true]! {
+					mut normal := C.spinlock_t{}
+					mut raw := C.raw_spinlock_t{}
+					C.spin_lock_init(&normal)
+					C.raw_spin_lock_init(&raw)
+					mut first_flags := usize(0xf1a6)
+					mut second_flags := usize(0xf1a6)
+					mut vns_effects := u32(0)
+					mut vns_calls := u32(0)
+					if raw_first {
+						C.raw_spin_lock_irqsave_nested(nested_raw_spin_guard(&raw, &first_flags, incoming, base, &vns_calls, &outcome), first_flags, nested_spin_subclass(&vns_effects))
+					} else {
+						C.spin_lock_irqsave_nested(nested_spin_guard(&normal, &first_flags, incoming, base, &vns_calls, &outcome), first_flags, nested_spin_subclass(&vns_effects))
+					}
+					if !C.irqs_disabled() || C.preempt_count() != base + 1 || first_flags != incoming || vns_effects != 0 || vns_calls != 1 {
+						outcome = -5
+					}
+					if raw_first {
+						C.spin_lock_irqsave_nested(nested_spin_guard(&normal, &second_flags, 0, base + 1, &vns_calls, &outcome), second_flags, nested_spin_subclass(&vns_effects))
+					} else {
+						C.raw_spin_lock_irqsave_nested(nested_raw_spin_guard(&raw, &second_flags, 0, base + 1, &vns_calls, &outcome), second_flags, nested_spin_subclass(&vns_effects))
+					}
+					if !C.irqs_disabled() || C.preempt_count() != base + 2 || second_flags != 0 || vns_effects != 0
+						|| vns_calls != 2 || !C.spin_is_locked(&normal) || !C.raw_spin_is_locked(&raw) {
+						outcome = -5
+					}
+					if raw_first {
+						C.spin_unlock_irqrestore(&normal, second_flags)
+					} else {
+						C.raw_spin_unlock_irqrestore(&raw, second_flags)
+					}
+					if !C.irqs_disabled() || C.preempt_count() != base + 1 || vns_effects != 0 {
+						outcome = -5
+					}
+					if raw_first {
+						C.raw_spin_unlock_irqrestore(&raw, first_flags)
+					} else {
+						C.spin_unlock_irqrestore(&normal, first_flags)
+					}
+					if C.vinix_linuxkpi_irq_flags() != incoming || C.preempt_count() != base || vns_effects != 0
+						|| C.spin_is_locked(&normal) || C.raw_spin_is_locked(&raw) {
+						outcome = -5
+					}
+				}
+				if disabled { C.vinix_linuxkpi_irq_restore(saved_entry) }
+			}
+			if pinned { C.preempt_enable_no_resched() }
+		}
+		if C.vinix_linuxkpi_irq_flags() != entry_irq || C.preempt_count() != entry_depth {
+			outcome = -5
+		}
+		return outcome
+	}
 }
 
 struct UnsignedCase {
@@ -535,6 +631,7 @@ pub fn selftest() i32 {
 		}
 		C.raw_spin_unlock(&raw)
 		if !C.vinix_linuxkpi_may_sleep() { result = -5 }
+		if nested_spin_locks() != 0 { result = -5 }
 		mut bits := [3]usize{}
 		C.bitmap_zero(&bits[0], 129)
 		C.set_bit(64, &bits[0])

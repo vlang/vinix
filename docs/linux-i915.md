@@ -200,6 +200,10 @@ after a filesystem failure. Mutable build inputs still require isolation.
   guards. Lock spinning continues to answer Vinix's TLB shootdowns. IRQ flags belong to
   the caller, not to shared lock storage.
   Failed IRQ-save trylocks restore both IRQ and preemption state.
+  With lockdep disabled, normal/raw `spin_lock_irqsave_nested` retain the
+  original unsigned-long flags check and discard the subclass argument.
+  Their native V leaf evaluates the lock before saving IRQ state and publishes
+  flags after acquisition. This adds no configured lockdep or non-IRQ nested API.
 - Unmodified Linux `seqlock.h` supplies plain, spinlock-associated and
   mutex-associated sequence counters, seqlocks and two-copy latch counters.
   Readers retry inconsistent scalar snapshots; writers use real native locks
@@ -2031,3 +2035,49 @@ Evidence is under `smp-oct10/aggregate-*`, including independent source/lifetime
 review, exact saved native artifacts, guest ISO proofs and complete audit
 diagnostics. These feature measurements do not establish a global allocation
 gate pass.
+
+## Original nested IRQ-save spinlocks
+
+The configured-disabled lockdep normal/raw nested IRQ-save forms now use a
+real V leaf and structured ABI metadata. The unchanged Linux `typecheck`
+witness retains flags diagnostics; subclass expressions are discarded entirely.
+Lock operands are evaluated once before saving IRQ state, and saved flags are
+stored after acquisition. Distinct locks each acquire a native preemption pin;
+reverse unlocking restores the caller's IRQ state and original pin depth.
+This increment does not change ordinary IRQ-save adapter ordering or implement
+configured lockdep and non-IRQ nested-class handling.
+
+Two focused strict GNU99/GNU11 ASan/UBSan profiles pass the existing raw-lock
+regressions and eight IRQ/pin/acquisition-order cases. Independent replay
+authenticates 53 selected production/test bodies. Thirty-eight compiler profiles
+cover 12 accepted and 26 rejected cases, including flags types, subclass
+elision, operand order and configured-lockdep rejection. Seven malformed
+metadata controls preserve existing output. Native leaf objects and actual
+full-module C/object review find no allocation or retained operand ownership.
+These are focused checks; the broader host suite is not declared passing.
+
+Fresh worktrees at `41587f08` plus five frozen native/tool overlays build enabled
+and default x86-64 and default ARM64. Enabled ELF
+`0d463db9277a7070002e271d8ede652c1fbcf96144d2f6def89371621c012d4d`
+passes fresh normal, SSE and four-level four-CPU guests. Each passes 46 markers
+and 28 existing strict allocation equalities. The new fixture runs inside the
+separate existing 200-runtime page-recovery check: 1,600 nested cases and 3,200
+acquisitions, with no pages retained. Those 28 other measurements are not a
+new per-case heap measurement. Default Linux-ABI startup passes; actual default
+and ARM C/ELF exclude the compatibility fixture.
+
+The saved V executable initially selected the mutable checkout's standard
+library despite its copied SDK. Failed attempts are preserved. Explicit macOS
+caller transport fields select the frozen SDK; separate architecture caches
+and a private transparent `execv` launcher add `-nocache -gc none`. Successful
+build logs, exact arguments/environment, actual SDK include paths and saved
+artifacts are authenticated under `smp-oct10/nested-spin-*` and
+`smp-oct10/native-compiler-diagnosis-oct12/`. No compiler headers were removed.
+Executable hashes alone did not authenticate older builds' library root:
+the saved successful aggregate ARM C also names the live standard library.
+
+The coherent full audit remains **5/269**. The former nested-lock first error
+now reaches `might_sleep_if`; task/MM/vfork, CPU-bug policy and other runtime
+dependencies remain. Full unchanged-driver compile/link and real Tiger Lake
+validation are still required. These feature checks do not establish a global
+kernel allocation pass or working GPU support.
