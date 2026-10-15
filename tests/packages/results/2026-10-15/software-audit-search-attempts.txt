@@ -1,0 +1,13 @@
+The initial functional fixture and both full desktop architecture typechecks passed. The first audit-search allocation run retained 151000 bytes across 1000 cycles. The diagnostic probe found exactly 1000 retained allocations of 151 bytes; generated C identified a heap-backed five-query list in the fixture loop. The fixture now uses a fixed array. Production search code was unchanged. The diagnostic probe replaced the final zero-byte assertion with measurements, so its inherited success text is not a passing allocation assertion. Final focused, maintained-driver, sanitizer and zero-byte results supersede this attempt.
+
+Initial allocation output:
+/Users/alex/code/vinix/build/package-audit-search-work/software-ui/software_audit_search_fixture.v:184: FAIL: fn main.check_software_audit_search_memory: assert kept == 0, 'deployment audit search retained ${kept} bytes'
+   left value: kept = 151000
+  right value: 0
+      message: deployment audit search retained 151000 bytes
+V panic: Assertion failed...
+
+Diagnostic sizes:
+151000
+{151: 1000}
+Software deployment audit search: 1000 decode/search/filter/select/empty/resize/render/retirement cycles retain zero tracked bytes

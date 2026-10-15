@@ -749,6 +749,16 @@ the full source path and captured digest. Reload replaces the observation; Stop
 and closing the window cancel the read-only check. Small windows keep Back or
 Stop available. No administrator prompt is required for observation.
 
+The audit's **Search** field matches package IDs, result status, expected or
+installed versions, and changed field names such as `public_key` or `sequence`.
+**Differences only** hides matching rows; differences appear first in either
+view. The result count describes the visible subset while the header retains
+the full comparison totals. Search and filtering preserve selected package
+identity and remain available after Reload or a stopped check. Empty search
+results keep the deployment path, digest and generation inspectable. **Review
+deployment** always reviews the complete captured file, including packages
+hidden by filters. See [search qualification](../tests/packages/software-audit-search-check.md).
+
 **Review deployment** on the report opens a fresh authenticated deployment
 proposal using the captured source filename, even if the form was edited. Changes
 to the file, installed state, current trust or policy are checked by that new

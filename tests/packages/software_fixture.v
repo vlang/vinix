@@ -362,6 +362,7 @@ fn main() {
 	unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
 	if os.args.len == 2 && os.args[1] == 'cleanup-memory' { check_software_cleanup_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'audit-memory' { check_software_audit_memory() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'audit-search-memory' { check_software_audit_search_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'snapshot-memory' { check_software_snapshot_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'snapshot-export-memory' { check_software_snapshot_export_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'mirror-navigation-memory' { check_software_mirror_navigation_memory() or { panic(err) }; return }
@@ -381,6 +382,7 @@ fn main() {
 	// This same executable is a literal-argv service fixture for asynchronous
 	// view/run transitions. It deliberately returns useful launch diagnostics.
 	if args.len > 1 {
+		if software_audit_search_service_fixture(args) { return }
 		if software_mirror_navigation_service_fixture(args) or { panic(err) } { return }
 		if software_snapshot_service_fixture(args) { return }
 		if software_audit_service_fixture(args) { return }
@@ -579,6 +581,7 @@ fn main() {
 	check_software_cleanup() or { panic(err) }
 	check_software_deployment() or { panic(err) }
 	check_software_audit() or { panic(err) }
+	check_software_audit_search() or { panic(err) }
 	check_software_snapshot() or { panic(err) }
 	check_software_snapshot_export() or { panic(err) }
 	check_software_mirror_navigation() or { panic(err) }

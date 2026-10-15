@@ -1949,6 +1949,23 @@ on that same filename, reading current bytes and obtaining a fresh authenticated
 proposal. Confirm and administrator authorization remain separate actions. See
 [Software audit qualification](../../tests/packages/software-deployment-audit-check.md).
 
+Software projects deployment audit rows into a difference-first list of canonical
+row indices. Search matches IDs, raw result status, expected/installed versions
+and changed field names without case sensitivity; an independent differences-only
+filter excludes matching rows. The selected row keeps its report identity when
+still visible and moves to the first visible row otherwise. No visible row means
+no package selection; global source/digest/generation details remain available.
+Filtering keeps the selected row on a visible page, and resizing recomputes that
+page without undoing deliberate paging on ordinary redraw.
+
+Audit query text accepts at most 256 UTF-8 bytes without controls. Invalid or
+oversized edits leave the query intact; Backspace retires a complete character.
+Reload and Stop preserve query/filter choices while retiring the old observation.
+Back, fresh reconciliation and application retirement release query, projection,
+result-count and detail storage. The filters never change the captured document,
+the report's full totals or the arguments to a new deployment review. See
+[search qualification](../../tests/packages/software-audit-search-check.md).
+
 `deployment-review FILE` emits the existing format-1 `pkgprotocol.Review`, with
 operation `deploy`, complete target/removal rows and disk requirements. Its opaque
 fingerprint binds a deployment-specific domain, canonical document, configuration,

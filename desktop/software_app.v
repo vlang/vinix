@@ -69,6 +69,12 @@ mut:
 	audit_snapshot pkgprotocol.DeploymentAudit
 	audit_path string
 	audit_summary string
+	audit_results string
+	audit_matching []int
+	audit_query []u8
+	audit_focus bool
+	audit_select_all bool
+	audit_differences_only bool
 	audit_selected int = -1
 	audit_scroll int
 	worker_failed   bool
@@ -993,7 +999,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
 	if a.failure_mode { if input == '\x1b' { a.failure_mode = false }; return }
 	if a.snapshot_mode { a.snapshot_key_input(input); return }
-	if a.audit_mode { if input == '\x1b' { a.handle_deployment_audit('software.audit.back') }; return }
+	if a.audit_mode { a.audit_key_input(input); return }
 	if a.details_mode { if input == '\x1b' { a.clear_details() }; return }
 	if a.health_mode { a.health_key_input(input); return }
 	if a.cleanup_mode {
@@ -1029,7 +1035,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
 	if a.failure_mode { return }
 	if a.snapshot_mode { a.snapshot_key_input(input); return }
-	if a.audit_mode { return }
+	if a.audit_mode { a.audit_paste_input(input); return }
 	if a.details_mode { return }
 	if a.health_mode { a.health_paste_input(input); return }
 	if a.cleanup_mode { return }
@@ -1095,8 +1101,10 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 			14, 40, width - 28, 60, false)
 		return ui2.screen(app_surface, compact)
 	}
-	a.page_rows = if height > 400 { (height - if a.review != '' { 274 } else if a.health_mode { 348 } else { 310 }) / 30 } else { 5 }
-	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
+	if !a.audit_mode {
+		a.page_rows = if height > 400 { (height - if a.review != '' { 274 } else if a.health_mode { 348 } else { 310 }) / 30 } else { 5 }
+		if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
+	}
 	if a.details_mode { return a.build_details(width, height) }
 	if a.audit_mode { return a.build_deployment_audit(width, height) }
 	if a.health_mode { return a.build_health(width, height) }

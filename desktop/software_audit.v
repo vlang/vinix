@@ -7,14 +7,16 @@ import tools.packages.pkgprotocol
 fn (mut a SoftwareApp) clear_deployment_audit_report() {
 	a.clear_details()
 	a.audit_snapshot.close()
-	unsafe { a.audit_summary.free() }
-	a.audit_summary = ''
+	unsafe { a.audit_summary.free(); a.audit_results.free(); a.audit_matching.free() }
+	a.audit_summary = ''; a.audit_results = ''; a.audit_matching = []int{}
 	a.audit_ready = false; a.audit_selected = -1; a.audit_scroll = 0
+	a.audit_focus = false; a.audit_select_all = false
 }
 
 fn (mut a SoftwareApp) clear_deployment_audit() {
 	a.clear_deployment_audit_report()
-	unsafe { a.audit_path.free() }
+	unsafe { a.audit_path.free(); a.audit_query.free() }
+	a.audit_query = []u8{}; a.audit_differences_only = false
 	a.audit_path = ''; a.audit_mode = false
 }
 
@@ -87,19 +89,16 @@ fn (mut a SoftwareApp) load_deployment_audit(code int) bool {
 	}
 	a.audit_snapshot = report
 	a.audit_ready = true
-	a.audit_selected = if report.rows.len > 0 { 0 } else { -1 }
 	mut differences := 0
-	for index, row in report.rows {
+	for row in report.rows {
 		if row.status != 'match' {
-			if differences == 0 { a.audit_selected = index }
 			differences++
 		}
 	}
-	if a.audit_selected >= 0 && a.page_rows > 0 { a.audit_scroll = a.audit_selected / a.page_rows * a.page_rows }
 	count := report.rows.len.str(); changed := differences.str(); generation := report.generation.str()
 	a.audit_summary = 'Generation ' + generation + ' · ' + count + ' packages · ' + changed + ' differences'
 	unsafe { count.free(); changed.free(); generation.free() }
-	a.prepare_deployment_audit_details()
+	a.filter_deployment_audit()
 	a.set_status(if report.matches { 'Installed metadata matches the deployment lock. Health and current trust are separate checks.' }
 		else { 'Installed metadata differs. Inspect the rows, then request a fresh deployment review to reconcile the complete application set.' })
 	return true
@@ -138,6 +137,13 @@ fn (mut a SoftwareApp) handle_deployment_audit(event_id string) {
 	}
 	if a.worker != unsafe { nil } { return }
 	match event_id {
+		'software.audit.search' { if a.audit_ready { a.audit_focus = true } }
+		'software.audit.differences' {
+			if !a.audit_ready { return }
+			a.audit_differences_only = !a.audit_differences_only
+			a.audit_focus = false; a.audit_select_all = false
+			a.filter_deployment_audit()
+		}
 		'software.audit.reload' { a.read_deployment_audit() }
 		'software.audit.review' {
 			if !a.audit_ready { return }
@@ -151,11 +157,12 @@ fn (mut a SoftwareApp) handle_deployment_audit(event_id string) {
 		'software.audit.previous' { if a.details_page > 0 { a.details_page-- } }
 		'software.audit.next' { if a.details_page + 1 < a.details_pages.len { a.details_page++ } }
 		'software.audit.up' { if a.audit_scroll >= a.page_rows { a.audit_scroll -= a.page_rows } else { a.audit_scroll = 0 } }
-		'software.audit.down' { if a.audit_scroll + a.page_rows < a.audit_snapshot.rows.len { a.audit_scroll += a.page_rows } }
+		'software.audit.down' { if a.audit_scroll + a.page_rows < a.audit_matching.len { a.audit_scroll += a.page_rows } }
 		else {
 			for slot, action in software_row_actions {
-				if event_id == action && a.audit_ready && a.audit_scroll + slot < a.audit_snapshot.rows.len {
-					a.audit_selected = a.audit_scroll + slot
+				if event_id == action && a.audit_ready && a.audit_scroll + slot < a.audit_matching.len {
+					a.audit_selected = a.audit_matching[a.audit_scroll + slot]
+					a.audit_focus = false; a.audit_select_all = false
 					a.prepare_deployment_audit_details()
 					return
 				}
@@ -165,37 +172,50 @@ fn (mut a SoftwareApp) handle_deployment_audit(event_id string) {
 }
 
 fn (mut a SoftwareApp) build_deployment_audit_compact(width int, height int) ui2.Element {
-	mut children := frame_elements(4)
+	mut children := frame_elements(5)
 	children << software_button(if a.worker == unsafe { nil } { 'software.audit.back' } else { 'software.audit.stop' },
 		if a.worker == unsafe { nil } { 'Back to deployment' } else { 'Stop check' }, 14, 8, if width > 188 { 174 } else { width - 28 })
 	children << software_label('Installed deployment check', 14, 46, width - 28, 28, false)
-	children << software_label('Enlarge this window to inspect package differences and deployment details.', 14, 80, width - 28, if height > 140 { 60 } else { 28 }, false)
+	if a.audit_ready { children << software_label(a.audit_results, 14, 80, width - 28, 28, false) }
+	children << software_label('Enlarge this window to search packages, filter differences and inspect deployment details.', 14, if a.audit_ready { 114 } else { 80 }, width - 28, if height > 180 { 60 } else { 28 }, false)
 	return ui2.screen(app_surface, children)
 }
 
 fn (mut a SoftwareApp) build_deployment_audit(width int, height int) ui2.Element {
-	a.page_rows = (height - 300) / 30
+	previous_size := a.page_rows
+	a.page_rows = (height - 334) / 30
 	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
+	if a.page_rows != previous_size { a.keep_audit_selection_visible() }
 	mut children := frame_elements(40)
 	children << software_label('Installed deployment check', 14, 8, width - 202, 28, false)
 	children << software_button(if a.worker == unsafe { nil } { 'software.audit.back' } else { 'software.audit.stop' },
 		if a.worker == unsafe { nil } { 'Back to deployment' } else { 'Stop check' }, width - 188, 8, 174)
 	children << software_label(a.audit_summary, 14, 46, width - 28, 36, false)
 	if a.audit_ready {
-		if a.audit_snapshot.rows.len == 0 { children << software_label('No package metadata in either set.', 14, 94, 236, 72, false) }
+		children << software_label('Search', 14, 90, 56, 28, false)
+		children << console_field('software.audit.search', if a.audit_query.len == 0 { '' } else { editor_bytes_text(a.audit_query) }, 76, 90, width - 252, a.audit_focus)
+		children << ui2.button('software.audit.differences', 'Differences only', ui2.rect(f64(width - 164), 90, 150, 28),
+			ui2.BoxStyle{ bg: if a.audit_differences_only { settings_choice_bg } else { body_panel }, radius: 3 },
+			ui2.TextStyle{ color: body_text, size: 12, align: .center })
+		children << software_label(a.audit_results, 14, height - 206, 236, 28, false)
+		if a.audit_matching.len == 0 {
+			children << software_label(if a.audit_snapshot.rows.len == 0 { 'No package metadata in either set.' }
+				else { 'No packages match this search and filter.' }, 14, 128, 236, 72, false)
+		}
 		for slot in 0 .. a.page_rows {
 			index := a.audit_scroll + slot
-			if index >= a.audit_snapshot.rows.len { break }
-			row := a.audit_snapshot.rows[index]
+			if index >= a.audit_matching.len { break }
+			row_index := a.audit_matching[index]
+			row := a.audit_snapshot.rows[row_index]
 			children << ui2.Element{
-				...ui2.button(software_row_actions[slot], row.status + ': ' + row.id, ui2.rect(14, f64(94 + slot * 30), 236, 28),
-					ui2.BoxStyle{ bg: if index == a.audit_selected { settings_choice_bg } else { body_panel }, radius: 3 },
+				...ui2.button(software_row_actions[slot], row.status + ': ' + row.id, ui2.rect(14, f64(128 + slot * 30), 236, 28),
+					ui2.BoxStyle{ bg: if row_index == a.audit_selected { settings_choice_bg } else { body_panel }, radius: 3 },
 					ui2.TextStyle{ color: body_text, size: 12, align: .left })
 				key: workflow_owned_text_key
 			}
 		}
 		if a.details_page >= 0 && a.details_page < a.details_pages.len {
-			children << ui2.label('', a.details_pages[a.details_page].text, ui2.rect(274, 94, f64(width - 288), f64(height - 300)),
+			children << ui2.label('', a.details_pages[a.details_page].text, ui2.rect(274, 128, f64(width - 288), f64(height - 334)),
 				ui2.TextStyle{ color: body_text, size: 12, lines: 14 })
 			children << software_label(a.details_pages[a.details_page].label, 274, height - 206, width - 288, 28, false)
 		}

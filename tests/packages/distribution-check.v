@@ -239,6 +239,8 @@ fn check() ! {
 	os.cp(repository + '/tests/packages/software_verify_fixture.v', work + '/software/verify_fixture.v')!
 	os.cp(repository + '/desktop/software_deployment.v', work + '/software/software_deployment.v')!
 	os.cp(repository + '/desktop/software_audit.v', work + '/software/software_audit.v')!
+	os.cp(repository + '/desktop/software_audit_search.v', work + '/software/software_audit_search.v')!
+	os.cp(repository + '/tests/packages/software_audit_search_fixture.v', work + '/software/audit_search_fixture.v')!
 	os.cp(repository + '/tests/packages/software_audit_fixture.v', work + '/software/audit_fixture.v')!
 	os.cp(repository + '/desktop/software_snapshot.v', work + '/software/software_snapshot.v')!
 	os.cp(repository + '/tests/packages/software_snapshot_fixture.v', work + '/software/snapshot_fixture.v')!
@@ -281,6 +283,7 @@ fn check() ! {
 	run(work + '/window-broker-memory', ['health-progress-memory'])!
 	run(work + '/window-broker-memory', ['cleanup-memory'])!
 	run(work + '/window-broker-memory', ['audit-memory'])!
+	run(work + '/window-broker-memory', ['audit-search-memory'])!
 	run(work + '/window-broker-memory', ['snapshot-memory'])!
 	run(work + '/window-broker-memory', ['snapshot-export-memory'])!
 	run(work + '/window-broker-memory', ['mirror-navigation-memory'])!

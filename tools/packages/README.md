@@ -170,6 +170,11 @@ and difference details, Reload and Stop controls, and useful failure diagnostics
 captured source; the audit never supplies installation approval. See
 [Software qualification](../../tests/packages/software-deployment-audit-check.md).
 
+The audit supports case-insensitive search across IDs, status, versions and
+changed field names, with a **Differences only** filter and visible result counts.
+Filtering preserves package identity and leaves reconciliation scoped to the
+complete deployment file. See [qualification](../../tests/packages/software-audit-search-check.md).
+
 Configuration reads reject ambiguous keys, null values and incorrect field
 types while preserving legacy defaults for omitted fields. Policy typos fail
 before acquisition, cleanup or activation; correcting the configuration permits
