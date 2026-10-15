@@ -116,6 +116,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 		'dealloc', 'release' { 'v16@0:8' }
 		'isKindOfClass:' { 'B24@0:8#16' }
 		'respondsToSelector:' { 'B24@0:8:16' }
+		'conformsToProtocol:' { 'B24@0:8@16' }
 		'alloc', 'new' { if info.meta { '@16@0:8' } else { return none } }
 		else { return none }
 	}
@@ -227,7 +228,7 @@ fn objc_register_class(cls u64) {
 fn objc_class_metadata_free(info &ObjClass) {
 	for _, method in info.method_info { unsafe { method.types.free() }; C.free(method) }
 	for _, ivar in info.ivars { unsafe { ivar.name.free(); ivar.types.free() }; C.free(ivar) }
-	unsafe { info.method_info.free(); info.ivars.free(); info.methods.free() }
+	unsafe { info.method_info.free(); info.ivars.free(); info.methods.free(); info.protocols.free() }
 	if info.dynamic && !info.meta { unsafe { info.name.free() } }
 }
 fn objc_dispose_class(cls u64) {
@@ -374,6 +375,12 @@ fn objc_runtime_symbol(symbol string) ?u64 {
 		'_method_setImplementation' { u64(unsafe { voidptr(objc_method_set_imp) }) }
 		'_method_getTypeEncoding' { u64(unsafe { voidptr(objc_method_types) }) }
 		'_method_getName' { u64(unsafe { voidptr(objc_method_name) }) }
+		'_objc_getProtocol' { u64(unsafe { voidptr(objc_get_protocol) }) }
+		'_protocol_getName' { u64(unsafe { voidptr(objc_protocol_name) }) }
+		'_protocol_isEqual' { u64(unsafe { voidptr(objc_protocol_equal) }) }
+		'_protocol_conformsToProtocol' { u64(unsafe { voidptr(objc_protocol_conforms) }) }
+		'_class_conformsToProtocol' { u64(unsafe { voidptr(objc_class_conforms) }) }
+		'_class_addProtocol' { u64(unsafe { voidptr(objc_class_add_protocol) }) }
 		'_objc_allocateClassPair' { u64(unsafe { voidptr(objc_allocate_class) }) }
 		'_objc_registerClassPair' { u64(unsafe { voidptr(objc_register_class) }) }
 		'_objc_disposeClassPair' { u64(unsafe { voidptr(objc_dispose_class) }) }

@@ -70,7 +70,7 @@ fn objc_responds(object u64, selector &char) bool {
 	}
 	if webkit_selector(object, name) { return true }
 	if accessibility_selector(object, name) { return true }
-	if name in ['class', 'isKindOfClass:', 'respondsToSelector:', 'copy', 'init', 'dealloc'] { return true }
+	if name in ['class', 'isKindOfClass:', 'respondsToSelector:', 'conformsToProtocol:', 'copy', 'init', 'dealloc'] { return true }
 	if object in ios_runtime.classes {
 		if name in ['alloc', 'new'] { return true }
 		info := ios_runtime.classes[object] or { return false }

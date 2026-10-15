@@ -44,6 +44,7 @@ mut:
 	dynamic bool
 	registered bool
 	instances i64
+	protocols []u64 // Owned array of canonical adopted protocol identities.
 }
 
 // Metadata is private to Vinix and stored separately from object bytes. The
@@ -258,6 +259,9 @@ mut:
 	swift_hash_code u64 // Sealed generic Hashable forwarding entries, retired after callbacks drain.
 	swift_fatal_code u64 // Assertion argument capture and BRK, retired at quiescent teardown.
 	names        map[string]u64
+	protocol_names map[string]u64
+	protocols map[u64]&ObjProtocol
+	protocol_aliases map[u64]u64
 	pool_key u64
 	pool_sequence i64 = 2 // Globally distinct opaque tokens for this runtime lifetime.
 	thread_key u64
@@ -339,7 +343,7 @@ fn objc_start() {
 	ios_runtime.observers.flags |= .noslices
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
-	for name in ['NSObject', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
+	for name in ['NSObject', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
@@ -433,6 +437,7 @@ fn objc_start() {
 		ios_runtime.classes[meta] = &ObjClass{ name: name, parent: metaclass.parent, size: 40, meta: true }
 		ios_runtime.names[name] = u64(cls)
 	}
+	objc_protocols_start()
 	dispatch_objc_publish_classes()
 	mut root := ios_runtime.classes[ios_runtime.names['NSObject']] or { panic('iOS: missing NSObject') }
 	root.ivars['isa'] = &ObjIvar{name: 'isa'.clone(), types: '#'.clone(), offset: 0, size: 8}
@@ -666,6 +671,7 @@ fn objc_stop() {
 		ios_runtime.empty_dictionary = 0
 	}
 	objc_constant_dictionaries_stop()
+	objc_protocols_stop()
 	swift_data_bridge_stop()
 	if ios_runtime.live != 0 {
 		eprintln('iOS: ${ios_runtime.live} Objective-C objects still owned at shutdown')
@@ -964,11 +970,15 @@ fn (m ObjMetadata) register(cls u64, depth int) ! {
 			info.ivars[ivar_name] = &ObjIvar{name: ivar_name.clone(), types: ivar_types.clone(), offset: i64(offset), size: ivar_size}
 		}
 	}
-	if !meta { ios_runtime.names[name] = cls }
+	if !meta {
+		m.protocol_list(read64(ro + 40), cls)!
+		ios_runtime.names[name] = cls
+	}
 }
 
 fn objc_register_image(image macho.Image, layout macho.Layout, base u64) ! {
 	m := ObjMetadata{image, layout, base}
+	m.protocols_register()!
 	mut classes := []u64{}
 	for segment in image.segments {
 		for section in segment.sections {

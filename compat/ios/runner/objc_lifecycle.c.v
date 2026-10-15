@@ -62,6 +62,7 @@ fn (m ObjMetadata) attach_category(category u64) ! {
 	cls := read64(category + 8)
 	m.register(cls, 0)!
 	m.register(read64(cls), 0)!
+	m.protocol_list(read64(category + 32), cls)!
 	instances := m.methods(read64(category + 16))!
 	defer { unsafe { instances.free() } }
 	for name, method in instances {

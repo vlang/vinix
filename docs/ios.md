@@ -7183,21 +7183,68 @@ width mismatch and private build-list omission are retained with their corrected
 results. Published runners remain unchanged; the full iOS regression remains
 unpassed.
 
-The current IPA probe links past `NSLogv` and exits with status 1 at
-`_NSProtocolFromString`. Fortnite has not entered application code and remains
-unplayable.
+The NSLogv IPA probe links past logging and exits with status 1 at
+`_NSProtocolFromString`.
+
+V now supplies Foundation's `NSProtocolFromString` and an Objective-C protocol
+registry. Native measurements verify the borrowed NSString argument and +0
+Protocol result in x0, preserved contexts, case-sensitive UTF-8 names, nil and
+unknown-name results, embedded-NUL rejection and stable identities across
+autorelease pools. Fortnite's calls at `0x100054c38` and `0x100054cdc` request
+`UNUserNotificationCenterDelegate`, then send `conformsToProtocol:`. That
+protocol is present among the main executable's 79 declarations; EOSSDK has
+seven more declarations. Their emitted descriptors are 96 bytes.
+
+Image registration validates protocol roots, adoption graphs and writable
+reference cells before publishing them. It copies names and graph edges,
+coalesces identities by name and rewrites protocol references to canonical
+runtime metadata. Class and category adoption lists feed the same registry.
+Protocol objects support ARC as immortal metadata until quiescent shutdown.
+The supplied NSObject adoption and six basic Foundation protocol identities
+are installed at startup; further supplied-framework class adoptions still
+require individual implementation. Image-declared adoptions are registered.
+
+The libobjc entries cover name lookup, names, equality, protocol conformance,
+class conformance and class adoption. Native comparison distinguishes the C
+class query, which checks that class's declarations, from NSObject's method,
+which also searches superclasses. Adding a protocol rejects one already
+implied by a direct adoption and accepts one inherited only from a superclass.
+The new method is also advertised by `respondsToSelector:`. Lookups and
+conformance traversal allocate no heap scratch. Names are bounded to 1023 UTF-8
+bytes, the registry to 4096 identities and 16384 image aliases, and metadata
+traversal to 64 levels. Method/property reflection and Swift demangled protocol
+aliases remain unsupported.
+
+Eight normal/deterministic sanitizer runs and four ARM64 guest suites pass:
+protocol lookup, supplied instance storage, associated objects and autorelease
+pools. Coverage includes guarded C arguments, copied names, canonical image
+references, class/category adoption, inherited conformance, nullable equality,
+protected NSString spans, malformed/cyclic/truncated metadata, concurrent
+readers and two completely drained registries. The eleven final generated C
+streams and executables, native measurements, actual IPA protocol tables and
+calls, four retired VM phases and pinned inputs are retained under
+`build/ios/fortnite/protocol-lookup-checks`. Initial conformance/array failures,
+cross-target guard checks, restored native fixture setup and the successful
+trial before the method-availability fix are retained separately. Generated C
+inspection checks the allocation-free query paths and explicit metadata/name/
+array retirement. Published runners remain unchanged; the full iOS regression
+remains unpassed.
+
+The current IPA probe links past protocol lookup and exits with status 1 at
+`_NSSetUncaughtExceptionHandler`. Fortnite has not entered application code and
+remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,543 | 617 | 79 |
+| Fortnite executable | 1,545 | 615 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,378 | 620 | 120 |
+| All images | 2,380 | 618 | 120 |
 
-The C++/GLES/Text variant reports 2,391 resolved imports, 607 unresolved strong
+The C++/GLES/Text variant reports 2,393 resolved imports, 605 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

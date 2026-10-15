@@ -111,6 +111,10 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 		frame.x[0] = u64(objc_is_kind(object, frame.x[2]))
 		return true
 	}
+	if selector == 'conformsToProtocol:' {
+		frame.x[0] = u64(objc_object_conforms(if object in ios_runtime.classes { object } else { read64(object) }, frame.x[2]))
+		return true
+	}
 	if selector == 'respondsToSelector:' {
 		frame.x[0] = u64(objc_responds(object, unsafe { &char(frame.x[2]) }))
 		return true
