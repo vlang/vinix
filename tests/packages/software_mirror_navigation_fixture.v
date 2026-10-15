@@ -77,6 +77,8 @@ fn check_software_mirror_navigation() ! {
 					free_window_tree(tree)
 				}
 				app.handle('software.confirm')!; assert app.worker.pid == pid && !app.review_ready
+				for input in ['\x1b', '\r', '\n', '\x01', '\x08', '\x7f']! { app.paste_input(input) }
+				assert app.worker.pid == pid && app.mirror_review_running()
 				if action == 'escape' { app.key_input('\x1b') } else { app.handle(action)! }
 				assert app.worker == unsafe { nil } && !app.worker_review && !app.review_ready && app.review == ''
 				assert app.output.len == 0 && !app.output_truncated && app.mirror_pages.len == 0 && !app.poll()
@@ -89,6 +91,8 @@ fn check_software_mirror_navigation() ! {
 				os.unsetenv('VINIX_SOFTWARE_MIRROR_NAVIGATION')
 				app.handle('software.mirror.review')!; wait_for_software(mut app)
 				assert app.review_ready && app.mirror_details
+				for input in ['\x1b', '\r', '\n', '\x01', '\x08', '\x7f']! { app.paste_input(input) }
+				assert app.review_ready && app.mirror_details && app.mirror_pending == mirror_fixture_destination && app.worker == unsafe { nil }
 				for packages in [false, true]! {
 					if packages {
 						for app.mirror_seen + 1 < app.mirror_pages.len { app.handle('software.mirror.next')! }
@@ -127,6 +131,7 @@ fn check_software_mirror_navigation() ! {
 			free_window_tree(tree)
 		}
 		for action in ['software.mirror.stop', 'software.cancel', 'software.mirror.back'] { app.handle(action)! }
+		for input in ['\x1b', '\r', '\n', '\x01', '\x08', '\x7f']! { app.paste_input(input) }
 		app.key_input('\x1b'); app.stop_mirror_review()
 		assert app.worker.pid == pid && C.kill(pid, 0) == 0 && app.mirror_mode && !os.exists(receipt)
 		release := u8(`!`); assert C.write(app.worker.stdio_fd[0], &release, 1) == 1
@@ -164,6 +169,9 @@ fn check_software_mirror_navigation_memory() ! {
 				app.snapshot_pending = software_snapshot_fixture_path.clone()
 				app.snapshot_saved = software_snapshot_fixture_receipt(software_snapshot_fixture_path)
 				app.handle_deployment_snapshot('software.snapshot.export')
+				app.select_all = true; app.mirror_paste_input(mirror_fixture_destination)
+				app.select_all = true; app.mirror_paste_input('\x1b'); app.mirror_paste_input('bad\xff'); app.mirror_paste_input('')
+				assert app.focus && app.select_all && editor_bytes_text(app.mirror_path) == mirror_fixture_destination
 				free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
 				app.review = 'mirror'.clone(); app.mirror_pending = mirror_fixture_destination.clone()
 				app.mirror_lock_pending = app.mirror_source.clone()
@@ -187,5 +195,6 @@ fn check_software_mirror_navigation_memory() ! {
 		app.set_status('')
 		kept := C.vinix_heap_end(); assert kept == 0, 'offline export navigation retained ${kept} bytes'
 		println('Software offline export navigation: 1000 compact form/path/package/failure render, cancel and retirement cycles retain zero tracked bytes')
+		println('Software offline path paste: 1000 literal/rejected/selected/empty input cycles retain zero tracked bytes')
 	}
 }

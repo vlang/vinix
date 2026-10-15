@@ -53,6 +53,7 @@ fn check_software_snapshot_navigation() ! {
 		assert editor_bytes_text(app.deployment_path) == software_snapshot_fixture_path
 		assert app.worker == unsafe { nil } && app.status.contains('field was kept intact')
 	}
+	app.paste_input(''); assert app.focus && app.select_all && editor_bytes_text(app.deployment_path) == software_snapshot_fixture_path
 	app.paste_input('x'.repeat(4097))
 	assert app.select_all && editor_bytes_text(app.deployment_path) == software_snapshot_fixture_path
 	app.key_input('\x1b')

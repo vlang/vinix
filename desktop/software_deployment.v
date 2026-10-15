@@ -90,23 +90,27 @@ fn (mut a SoftwareApp) deployment_key_input(input string) {
 			a.select_all = false
 		}
 		'\x1b', '\r', '\n' { a.focus = false }
-		else {
-			length := if a.select_all { 0 } else { a.deployment_path.len }
-			if input.len > software_deployment_path_limit - length {
-				a.set_status('The deployment file path exceeds 4096 bytes. The field was kept intact.')
-				return
-			}
-			// Preserve the literal filename. The shared search-field paste helper
-			// drops invalid UTF-8/control characters, which could name another file.
-			if !software_deployment_text_valid(input) {
-				a.set_status('The deployment file path contains control characters or invalid UTF-8. The field was kept intact.')
-				return
-			}
-			if a.select_all { a.deployment_path.clear() }
-			for byte in input { a.deployment_path << byte }
-			a.select_all = false
-		}
+		else { a.deployment_paste_input(input) }
 	}
+}
+
+fn (mut a SoftwareApp) deployment_paste_input(input string) {
+	if !a.focus || a.review != '' || a.worker != unsafe { nil } || input.len == 0 { return }
+	length := if a.select_all { 0 } else { a.deployment_path.len }
+	if input.len > software_deployment_path_limit - length {
+		a.set_status('The deployment file path exceeds 4096 bytes. The field was kept intact.')
+		return
+	}
+	// Clipboard text is a literal filename, never navigation or editing keys.
+	// Refuse it as a whole rather than silently selecting a different file.
+	if !software_deployment_text_valid(input) {
+		a.set_status('The deployment file path contains control characters or invalid UTF-8. The field was kept intact.')
+		return
+	}
+	a.initialize_deployment_field()
+	if a.select_all { a.deployment_path.clear() }
+	for byte in input { a.deployment_path << byte }
+	a.select_all = false
 }
 
 fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {

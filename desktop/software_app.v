@@ -1080,9 +1080,9 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.data_mode { return }
 	if a.launch_mode { a.launch_paste_input(input); return }
 	if a.repository_mode { a.repository_paste_input(input) } else if a.deployment_mode {
-		a.deployment_key_input(input)
+		a.deployment_paste_input(input)
 	} else if a.mirror_mode {
-		a.mirror_key_input(input)
+		a.mirror_paste_input(input)
 	} else if a.focus { a.key_input(input) }
 }
 

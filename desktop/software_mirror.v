@@ -239,17 +239,28 @@ fn (mut a SoftwareApp) mirror_field_input(mut field []u8, input string) {
 		'\x01' { a.select_all = true }
 		'\x7f', '\x08' { console_backspace(mut field, a.select_all); a.select_all = false }
 		'\x1b', '\r', '\n' { a.focus = false; a.select_all = false }
-		else {
-			length := if a.select_all { 0 } else { field.len }
-			if input.len > software_deployment_path_limit - length || !software_deployment_text_valid(input) {
-				a.set_status('The path exceeds 4096 bytes or contains invalid text. The field was kept intact.')
-				return
-			}
-			if a.select_all { field.clear() }
-			for byte in input { field << byte }
-			a.select_all = false
-		}
+		else { a.mirror_field_paste(mut field, input) }
 	}
+}
+
+fn (mut a SoftwareApp) mirror_paste_input(input string) {
+	if !a.focus || a.review != '' || a.worker != unsafe { nil } || input.len == 0 { return }
+	a.initialize_mirror_field()
+	if a.mirror_locked && a.mirror_lock_focus {
+		if a.mirror_source == '' { a.mirror_field_paste(mut a.mirror_lock_path, input) }
+	} else { a.mirror_field_paste(mut a.mirror_path, input) }
+}
+
+fn (mut a SoftwareApp) mirror_field_paste(mut field []u8, input string) {
+	if input.len == 0 { return }
+	length := if a.select_all { 0 } else { field.len }
+	if input.len > software_deployment_path_limit - length || !software_deployment_text_valid(input) {
+		a.set_status('The path exceeds 4096 bytes or contains invalid text. The field was kept intact.')
+		return
+	}
+	if a.select_all { field.clear() }
+	for byte in input { field << byte }
+	a.select_all = false
 }
 
 fn (a &SoftwareApp) build_mirror_compact(width int, height int) ui2.Element {

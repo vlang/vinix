@@ -246,6 +246,13 @@ empty/unfocused pastes and pastes during reads, reviews or writes do nothing.
 Keyboard commands retain their usual behavior. See
 [paste checks](../../tests/packages/software-repository-paste-check.md).
 
+Deployment files, offline-export destinations and deployment-lock sources also
+use separate clipboard handlers. Pasted controls cannot blur fields, cancel
+proposals or stop review workers. Invalid or oversized input preserves the
+literal filename and selection; empty/unfocused pastes do nothing. Saved export
+sources stay fixed, and approved writers keep running. See
+[distribution path checks](../../tests/packages/software-distribution-paste-check.md).
+
 Organization policy reads and reviews support Stop/Cancel/Escape and retain
 their filename for retry. Compact windows keep navigation and diagnostics;
 approved saves remain protected. Stopping a reload requires a fresh read before

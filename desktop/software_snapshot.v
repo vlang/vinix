@@ -148,7 +148,7 @@ fn (mut a SoftwareApp) snapshot_paste_input(input string) {
 		a.set_status('The deployment file path contains control characters or invalid UTF-8. The field was kept intact.')
 		return
 	}
-	a.deployment_key_input(input)
+	a.deployment_paste_input(input)
 }
 
 fn (a &SoftwareApp) build_snapshot_compact(width int, height int) ui2.Element {

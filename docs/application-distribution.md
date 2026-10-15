@@ -1289,6 +1289,16 @@ running until completion. Compact windows omit confirmation controls so paths
 and package facts can be inspected after enlarging the window. See
 [navigation qualification](../tests/packages/software-mirror-navigation-check.md).
 
+Deployment-file, export-destination and deployment-lock path fields treat paste
+as filename data. Controls, malformed UTF-8 and input exceeding 4096 bytes are
+refused as a whole, preserving focus, selection and the previous path. Empty or
+unfocused pastes do nothing. Pasted Escape cannot cancel a frozen proposal or
+stop its reader; pasted Enter, select-all and backspace cannot act as keys.
+Keyboard editing and cancellation remain available. Saved deployment sources
+stay fixed while their export destinations remain editable. The save form uses
+the same literal path insertion. See
+[distribution path checks](../tests/packages/software-distribution-paste-check.md).
+
 Cycle the scope button to **Organization deployment lock** to preserve exact
 approved versions, including older runtimes. Enter the absolute path of a
 nonempty format-2 lock; this works without an installed application set or catalog
