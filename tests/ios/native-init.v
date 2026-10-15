@@ -136,6 +136,7 @@ fn main() {
 		require_child('/opt/ios/swift-dispatch-flags-checks')
 		require_child('/opt/ios/swift-stack-checks')
 		require_child('/opt/ios/swift-heap-checks')
+		require_child('/opt/ios/swift-array-unbridge-checks')
 		require_child('/opt/ios/swift-dictionary-bridge-checks')
 		require_child('/opt/ios/swift-calendar-case-checks')
 		require_child('/opt/ios/swift-locale-checks')

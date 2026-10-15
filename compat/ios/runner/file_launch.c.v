@@ -19,6 +19,10 @@ fn ui_file_url(path string) u64 {
 }
 
 fn ui_file_url_string(url u64) u64 {
+	// Immutable URLs can be shared by concurrent Swift Array bridges. Publish
+	// the lazy string once, so a second reader cannot replace and release it.
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
 	mut header := obj_header(url)
 	if header.number == 1 { return header.fields[1] }
 	if header.fields[1] == 0 {

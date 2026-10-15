@@ -7001,23 +7001,82 @@ under `build/ios/fortnite/dictionary-bridge-checks`. The generated C audit check
 the result arrays, temporary hash-table cleanup and partial-result ownership.
 Published runners remain unchanged; the full iOS regression remains unpassed.
 
-The current IPA probe links past the Dictionary bridge and empty Dictionary
+The Dictionary-bridge IPA probe links past that bridge and the empty Dictionary
 global, then exits with status 1 at
 `_$sSa10FoundationE36_unconditionallyBridgeFromObjectiveCySayxGSo7NSArrayCSgFZ`
-(NSArray to Swift Array conversion). Fortnite has not entered application code
-and remains unplayable.
+(NSArray to Swift Array conversion).
+
+The next milestone implements that Array bridge in V. Native ARM64 inspection
+shows a borrowed optional NSArray in x0, Element metadata in x1 and an owned
+Array result in x0. Self and x8 are unused; nil returns the immortal empty Array
+without reading Element metadata. The actual IPA call at `0x100074598` passes
+the result of Foundation's URL metadata accessor, so this path must handle
+`[URL]` as well as reference elements.
+
+The bounded implementation accepts registered NSArray/NSMutableArray storage
+with at most 4096 non-nil object members. It retains an ordered member snapshot
+under the runtime lock, then constructs existing typed Swift Array storage.
+Supported elements are String, URL and canonical NSObject-derived wrappers.
+String conversion copies up to 1 MiB per value; object values retain their
+identity. Duplicates and order are preserved. The initialized count advances
+only after constructing each element, so failure releases the initialized
+prefix and the entire source snapshot. The result works with existing Array
+value witnesses and Sequence operations after source mutation, release and
+autorelease-pool teardown. Any, numeric/value coercions, custom conversions and
+general native storage reflection remain unsupported.
+
+URL elements use a retained built-in NSURL implementation owner and a private
+sealed witness table compatible with the existing two-word URL value. Its
+Objective-C bridge returns an owned NSURL. File URL append/delete operations
+use that same table and preserve directory slashes and percent-encoded strings.
+The bounded path profile accepts absolute file paths up to 65536 bytes and
+single nonempty components up to 4096 bytes; slash, backslash, NUL and dot
+components are rejected. HTTP URLs support round-trip bridging; their path
+mutation and other URL protocol slots remain unsupported. Parent paths are
+copied using explicit lengths, including prefixes without a NUL terminator.
+
+Concurrent readers exposed a race in NSURL's existing lazy `absoluteString`
+cache. Its publication now holds the runtime lock so readers cannot replace
+and release another reader's cached string. The failing sanitizer run and
+generated C are retained with the new cohort's evidence.
+
+The dedicated fixture compares 48 native/Vinix array cases across four Element
+types, immutable/mutable sources and counts through 4096. It checks protected
+nil metadata/Self/x8 arguments, independent source/result lifetimes, Array
+copy/take/destruction, contiguous Sequence consumption, duplicate references,
+HTTP round trips, file URL path operations, concurrent readers, invalid member
+provenance/types and partial cleanup. It also writes Data through a bridged file
+URL and requires two private runtime lifetimes to drain completely.
+
+All 16 normal/deterministic sanitizer runs and eight ARM64 guest suites pass.
+The 19 generated C streams and executables, native measurements, actual IPA
+call site, four retired VM phases and pinned inputs are retained under
+`build/ios/fortnite/array-unbridge-checks`. The generated C audit checks explicit
+snapshot/buffer cleanup and initialized-prefix ownership. Published runners
+remain unchanged; the full iOS regression remains unpassed.
+
+The first guest image omitted the new fixture; its captured failure output is
+retained. After the temporary RAM staging volume disappeared, guest binaries
+were rebuilt from the verified C archives and the corrected image passed.
+The lost RAM-only boot/serial files and raw supervisor logs are identified in
+the evidence; joined child output and statuses remain available on Data.
+
+The current IPA probe links past the Array bridge, then exits with status 1 at
+`_$sSy10FoundationE20replacingOccurrences2of4with7options5rangeSSqd___qd_0_So22NSStringCompareOptionsVSnySS5IndexVGSgtSyRd__SyRd_0_r0_lF`
+(StringProtocol's String replacement operation). Fortnite has not entered
+application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,539 | 621 | 79 |
+| Fortnite executable | 1,540 | 620 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,374 | 624 | 120 |
+| All images | 2,375 | 623 | 120 |
 
-The C++/GLES/Text variant reports 2,387 resolved imports, 611 unresolved strong
+The C++/GLES/Text variant reports 2,388 resolved imports, 610 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

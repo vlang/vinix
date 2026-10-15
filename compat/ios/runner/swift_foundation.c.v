@@ -125,6 +125,7 @@ fn swift_foundation_arena() u64 {
 	swift_calendar_emit(base, data)
 	swift_timezone_emit(base, data)
 	swift_dictionary_emit(data)
+	swift_array_unbridge_emit(base, data)
 	// A concrete specialization of Foundation's retroactive String conformance.
 	// The installed descriptor uses a generic witness cache; this implementation
 	// supplies its already-specialized table, accepted by normal witness lookup.
@@ -147,7 +148,7 @@ fn swift_foundation_arena() u64 {
 	// read as four-byte data before calling the enum tag injection witness.
 	// Its native case number is 7; this export does not construct a Calendar.
 	write32(data + 800, 7)
-	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 3688) })
+	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 3800) })
 	if C.mprotect(unsafe { voidptr(base) }, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(unsafe { voidptr(base) }, usize(page * 2)); panic('iOS: cannot seal Swift Foundation entries')
@@ -293,6 +294,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 	$if !arm64 { return error('iOS: Swift Foundation requires ARM64') }
 	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired { return error('iOS: Swift Foundation outside runtime lifetime') }
 	if symbol == '_$sSD10FoundationE19_bridgeToObjectiveCSo12NSDictionaryCyF' { return u64(unsafe { voidptr(swift_foundation_dictionary_bridge) }) }
+	if symbol == '_$sSa10FoundationE36_unconditionallyBridgeFromObjectiveCySayxGSo7NSArrayCSgFZ' { return u64(unsafe { voidptr(swift_foundation_array_unbridge) }) }
 	if address := swift_cocoa_error_symbol(symbol) { return address }
 	if address := swift_json_encoder_symbol(symbol) { return address }
 	if address := swift_json_decoder_symbol(symbol) { return address }
