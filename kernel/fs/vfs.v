@@ -629,14 +629,23 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 }
 
 pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	unlink_on_mount(parent, name, remove_dir, identity, false)?
+}
+
+fn unlink_on_mount(parent &VFSNode, name string, remove_dir bool, identity &lib.MountContext, explicit_identity bool) ? {
 	vfs_lock.acquire()
 	defer { vfs_lock.release() }
+	// Internal callers infer a route under the lock. Syscall callers retain
+	// the directory and attachment captured together before the walk.
+	if !explicit_identity && !starting_mount(parent, identity) { return none }
 	// Nothing here keeps the final component, so it stays a view into `name`.
-	mut parent_of_tgt, mut node, basename := walk_path(parent, name, 0, true)
+	mut parent_of_tgt, mut node, basename := walk_path_on_mount(parent, name, 0, true, identity)
 	if node == unsafe { nil } || parent_of_tgt == unsafe { nil } { return none }
 	if managed_volume_node(node) { errno.set(errno.ebusy); return none }
 	if !policy_check_name(parent_of_tgt, basename, proc.policy_create) { return none }
-	if read_only(node) || read_only(parent_of_tgt) { errno.set(errno.erofs); return none }
+	if read_only_on_mount(node, identity) || read_only_on_mount(parent_of_tgt, identity)
+		|| (!explicit_identity && (read_only(node) || read_only(parent_of_tgt))) { errno.set(errno.erofs); return none }
 	// An immutable or append-only file cannot be removed, nor anything from an
 	// immutable or append-only directory.
 	if !attr_allows_remove(node) || !attr_allows_dir_remove(parent_of_tgt) { return none }
@@ -964,11 +973,12 @@ pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u6
 		return errno.err, errno.enoent
 	}
 
-	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	parent := parent_and_mount_for(dirfd, path, identity) or { return errno.err, errno.get() }
 
 	remove_dir := flags & at_removedir != 0
 
-	unlink(parent, path, remove_dir) or { return errno.err, errno.get() }
+	unlink_on_mount(parent, path, remove_dir, identity, true) or { return errno.err, errno.get() }
 
 	return 0, 0
 }

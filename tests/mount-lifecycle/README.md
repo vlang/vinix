@@ -47,6 +47,13 @@ the Linux `move-reference` suite excludes them.
 `--case symlinks` selects symbolic-link creation attachment policy; `sp-0`
 through `sp-7` select its individual cases. Native `all` and Linux
 `move-reference` include them.
+`--case unlinks` selects file, symlink and empty-directory removal policy;
+`up-0` through `up-7` select its individual cases. Native `all` and Linux
+`move-reference` include them.
+
+The [removal checks](unlink-policy.md) enforce attachment policy and directory
+permissions while preserving held descriptions, symlink targets and denied
+entries through live, detached and retired mount routes.
 
 The [symlink checks](symlink-policy.md) preserve literal target text and
 ownership while enforcing destination attachment policy through directory
@@ -117,7 +124,7 @@ iterations, verifies capability denial and finishes with valid local operations.
 
 Use `--probe-state /path/to/prior-native-result` to reuse its probe ELF and
 generated C with a different kernel or case. The controller requires a matching
-architecture and identical current/copied hashes of all fifteen fixture files,
+architecture and identical current/copied hashes of all sixteen fixture files,
 verifies both artifact hashes against the prior receipt and checks the ELF
 architecture before boot.
 The prior result may be a failed control; its receipt hash is pinned in the new

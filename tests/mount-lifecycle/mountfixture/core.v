@@ -379,6 +379,8 @@ pub fn run() int {
 			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		symlink_case := if count == 4 && name[0] == `s` && name[1] == `p` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
+		unlink_case := if count == 4 && name[0] == `u` && name[1] == `p` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		check(C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'move') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'identities') == 0 || identity >= 0
@@ -394,7 +396,8 @@ pub fn run() int {
 			|| C.strcmp(selected, c'times') == 0 || timestamp_case >= 0
 			|| C.strcmp(selected, c'xattrs') == 0 || xattr_case >= 0
 			|| C.strcmp(selected, c'inode-flags') == 0 || inode_flags_case >= 0
-			|| C.strcmp(selected, c'symlinks') == 0 || symlink_case >= 0, 4)
+			|| C.strcmp(selected, c'symlinks') == 0 || symlink_case >= 0
+			|| C.strcmp(selected, c'unlinks') == 0 || unlink_case >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
@@ -439,6 +442,9 @@ pub fn run() int {
 		if C.strcmp(selected, c'symlinks') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { mount_symlink_cases(-1) }
 		if symlink_case >= 0 { mount_symlink_cases(symlink_case) }
+		if C.strcmp(selected, c'unlinks') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { mount_unlink_cases(-1) }
+		if unlink_case >= 0 { mount_unlink_cases(unlink_case) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }
