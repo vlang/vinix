@@ -84,6 +84,17 @@ fn swift_foundation_arena() u64 {
 	write32(base + 192, 0xf9400290) // ldr x16, [x20]
 	write32(base + 196, 0xf9404201) // ldr x1, [x16, #128]
 	write32(base + 200, 0xd61f0020) // br x1
+	// JSONEncoder.encode<T> calls class slot 272 with borrowed Self in x20.
+	// Native uses x8 for the selected method, not an indirect Data result.
+	// Keep its call frame and forward x0-x7/q0-q7, the two-word register result
+	// and x21 error channel. The override owns encoding; this performs no ARC.
+	write32(base + 224, 0xa9bf7bfd) // stp x29, x30, [sp, #-16]!
+	write32(base + 228, 0x910003fd) // mov x29, sp
+	write32(base + 232, 0xf9400290) // ldr x16, [x20]
+	write32(base + 236, 0xf9408a08) // ldr x8, [x16, #272]
+	write32(base + 240, 0xd63f0100) // blr x8
+	write32(base + 244, 0xa8c17bfd) // ldp x29, x30, [sp], #16
+	write32(base + 248, 0xd65f03c0) // ret
 	// A concrete specialization of Foundation's retroactive String conformance.
 	// The installed descriptor uses a generic witness cache; this implementation
 	// supplies its already-specialized table, accepted by normal witness lookup.
@@ -102,7 +113,7 @@ fn swift_foundation_arena() u64 {
 	// destructiveInjectEnumTag witness. Native formatted(DateFormatter) is
 	// payload case zero; this does not construct an encoder or format a date.
 	write32(data + 96, 0)
-	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 204) })
+	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 252) })
 	if C.mprotect(unsafe { voidptr(base) }, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(unsafe { voidptr(base) }, usize(page * 2)); panic('iOS: cannot seal Swift Foundation entries')
@@ -260,6 +271,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 		'_$s10Foundation10CocoaErrorV19fileWriteFileExistsAC4CodeVvgZ' { swift_foundation_arena() + 128 }
 		'_$s10Foundation11JSONDecoderC6decode_4fromxxm_AA4DataVtKSeRzlFTj' { swift_foundation_arena() + 160 }
 		'_$s10Foundation11JSONEncoderC20dateEncodingStrategyAC04DatedE0OvsTj' { swift_foundation_arena() + 192 }
+		'_$s10Foundation11JSONEncoderC6encodeyAA4DataVxKSERzlFTj' { swift_foundation_arena() + 224 }
 		'_$s10Foundation11JSONEncoderC20DateEncodingStrategyO9formattedyAESo15NSDateFormatterCcAEmFWC' {
 			swift_foundation_arena() + u64(C.getpagesize()) + 96
 		}

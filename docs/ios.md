@@ -6129,9 +6129,35 @@ retired VM phases are retained under
 Default encoder construction, option storage and JSON encoding remain unsupported.
 Full iOS regression remains unpassed and published runners remain unchanged.
 
-The current IPA startup probe resolves the setter dispatch import and exits with
+That IPA startup probe resolved the setter dispatch import and exited with
 status 1 at the required import
 `_$s10Foundation11JSONEncoderC6encodeyAA4DataVxKSERzlFTj`.
+Fortnite has not entered application code and remains unplayable.
+
+The JSONEncoder generic encode dispatch thunk is now exported through both
+Foundation install names. Native Foundation selects class metadata slot 272,
+uses x8 for the selected method and calls it with a saved frame pointer/link
+register frame. Vinix mirrors that call frame, forwards scalar/vector arguments,
+returns the two Data words in registers and propagates the x21 error channel.
+The thunk performs no ARC, input access or encoding and reuses the sealed
+Foundation code page and its drained lifetime.
+
+Eight ASan/UBSan runs and four Vinix ARM64 guest suites pass for generic encode
+dispatch, date-strategy setter dispatch, enum metadata and CocoaError values.
+The encode fixture compares native signed vtable/header pointers with unsigned
+Vinix metadata, guards exact header/slot reads and surrounding metadata, checks
+successful and failing override results, live frame observations, concurrent
+calls/publication, mapping permissions and two unmapped retirements. It verifies
+that x8 contains the method pointer and that no indirect result storage is
+written. These overrides return synthetic Data words; no actual encoding runs.
+Eleven final C streams/programs and four joined, retired VM phases are retained
+under `build/ios/fortnite/json-encoder-dispatch-checks`.
+Default encoder construction, option storage and JSON encoding remain unsupported.
+Full iOS regression remains unpassed and published runners remain unchanged.
+
+The current IPA startup probe resolves the generic encode dispatch import and
+exits with status 1 at the required import
+`_$s10Foundation11JSONEncoderCACycfc`.
 Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -6139,12 +6165,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,486 | 674 | 79 |
+| Fortnite executable | 1,487 | 673 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,321 | 677 | 120 |
+| All images | 2,322 | 676 | 120 |
 
-The C++/GLES/Text variant reports 2,334 resolved imports, 664 unresolved strong
+The C++/GLES/Text variant reports 2,335 resolved imports, 663 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

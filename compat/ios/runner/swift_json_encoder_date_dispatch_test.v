@@ -263,7 +263,7 @@ fn test_swift_json_encoder_date_dispatch() {
 		json_setter_consumption(entry, code, false)
 		assert ios_runtime.live == 0 && ios_runtime.swift_heap.len == 0 && ios_runtime.swift_arrays.len == 0
 		for symbol in ['_$s10Foundation11JSONEncoderCACycfc',
-			'_$s10Foundation11JSONEncoderC6encodeyAA4DataVxKSERzlFTj']! {
+			'_$s10Foundation11JSONEncoderC6encodeyAA4DataVxKSERzlF']! {
 			if _ := swift_foundation_symbol(symbol) {
 				assert false
 			}
