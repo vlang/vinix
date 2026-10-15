@@ -80,7 +80,11 @@ pub fn mount_flags(identity &lib.MountContext) u64 {
 // Descriptor operations use the actual open mount, even when a namespace
 // copy with the same ID now has different flags.
 fn raw_mount_flags(identity &lib.MountContext) u64 {
-	mut entry := unsafe { &Mount(lib.mount_context_top(identity)) }
+	return raw_attachment_flags(lib.mount_context_top(identity))
+}
+
+fn raw_attachment_flags(identity voidptr) u64 {
+	mut entry := unsafe { &Mount(identity) }
 	if entry == unsafe { nil } { return 0 }
 	entry.lock.acquire()
 	flags := entry.flags

@@ -195,10 +195,16 @@ fn xattr_changed(target XAttrTarget) {
 fn xattr_may_change(target XAttrTarget, name string, removing bool) ? {
 	mut mandatory_res := target.res
 	security.mac_require(mut mandatory_res, proc.mac_metadata)?
-	if target.node != unsafe { nil }
-		&& (target.node.read_only || attachment_flags(target.attachment) & ms_rdonly != 0) {
-		errno.set(errno.erofs)
-		return none
+	if target.node != unsafe { nil } {
+		// Path targets own a resolved route; descriptors retain their actual
+		// mount even when the caller's namespace contains a different copy.
+		flags := if target.owned_path.node != unsafe { nil } {
+			attachment_flags(target.attachment)
+		} else { raw_attachment_flags(target.attachment) }
+		if target.node.read_only || flags & ms_rdonly != 0 {
+			errno.set(errno.erofs)
+			return none
+		}
 	}
 	if target.node != unsafe { nil } && !attr_allows_metadata(target.node) {
 		return none

@@ -498,6 +498,16 @@ explicit/current times and omission of either field. Existing authorization,
 attribute checks, resource pins, persistence rollback and release remain.
 Concurrent remount serialization and the other inherited-descriptor policy
 families remain open.
+The [descriptor xattr checks](../tests/mount-lifecycle/descriptor-xattr.md)
+extend saved-mount policy to `fsetxattr` and `fremovexattr`. Existing path-target
+ownership distinguishes namespace-aware pathname checks from descriptor checks;
+overlay target copies preserve that distinction. Native ARM/x86 and the same
+Linux executables cover opposite copied-mount flags, regular/directory/unlinked
+targets, dup/fork retention, binary/empty values, create/replace/remove rules
+and ordinary-user/trusted-attribute permissions. MAC, attributes, backend
+read-only state, capabilities, copy-up and resource release remain. Concurrent
+remount serialization, broader policy combinations and persistent/overlay
+integration remain open.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,
