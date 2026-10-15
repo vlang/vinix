@@ -129,7 +129,7 @@ fn (mut a SoftwareApp) launch_key_input(input string) {
 
 fn (mut a SoftwareApp) launch_paste_input(input string) {
 	// Pasted Escape/Enter/control bytes are text to validate, never navigation.
-	if a.worker != unsafe { nil } || a.launch_focus == 0 { return }
+	if a.worker != unsafe { nil } || a.launch_focus == 0 || input == '' { return }
 	length := if a.select_all { 0 } else if a.launch_focus == 1 { a.launch_arguments.len } else { a.launch_file.len }
 	if input.len > software_launch_text_limit - length || !software_deployment_text_valid(input) {
 		a.set_status('The field was kept intact: enter valid text without control characters, at most 4096 bytes.'); return

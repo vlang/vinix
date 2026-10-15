@@ -232,7 +232,7 @@ fn (mut a SoftwareApp) window_key_input(input string) {
 }
 
 fn (mut a SoftwareApp) window_paste_input(input string) {
-	if a.window_protocol != 2 || a.window_input_id == '' || a.window_closing || a.window_failure != '' { return }
+	if a.window_protocol != 2 || a.window_input_id == '' || a.window_closing || a.window_failure != '' || input == '' { return }
 	appsdk.validate_window_input(input) or { a.set_status(err.msg()); unsafe { err.free() }; return }
 	length := if a.window_input_select_all { 0 } else { a.window_input.len }
 	if input.len > appsdk.window_input_limit - length {

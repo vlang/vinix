@@ -70,6 +70,13 @@ pastes do nothing. Clipboard text cannot trigger keyboard navigation or cancel
 reviews; ordinary keyboard editing and search during catalog reload remain
 available. See [search input checks](../../tests/packages/software-search-paste-check.md).
 
+Empty clipboard events also leave policy filenames, launch arguments, pending
+file grants and administrator passwords unchanged, including their selection.
+Native application fields keep their current clean/edited state, so an empty
+paste does not create an unsent edit or block closing. Keyboard deletion still
+clears fields, and Enter can send an explicitly cleared native field. See
+[empty-paste checks](../../tests/packages/software-empty-paste-check.md).
+
 **Verify installed** supports Stop/Cancel/Escape in full and compact windows.
 Stopping retires unaccepted progress/output and keeps the catalog for retry.
 Completion and human success output wait for successful worker exit; late

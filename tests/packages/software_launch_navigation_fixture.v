@@ -59,6 +59,26 @@ fn wait_for_launch_navigation_output(mut app SoftwareApp) {
 	assert false, 'launch fixture did not reach its output barrier: ${app.status}'
 }
 
+fn check_launch_empty_paste(mut app SoftwareApp) {
+	arguments := editor_bytes_text(app.launch_arguments); file := editor_bytes_text(app.launch_file)
+	argument_storage := app.launch_arguments.data; file_storage := app.launch_file.data
+	status := app.status; selected := app.launch_file_selected; scroll := app.launch_file_scroll
+	count := app.launch_documents.len; cwd := app.launch_data_cwd; id := app.launch_id
+	focused := app.launch_focus; selection := app.select_all
+	for focus in 0 .. 3 {
+		for select_all in [false, true]! {
+			app.launch_focus = focus; app.select_all = select_all
+			app.paste_input('')
+			assert editor_bytes_text(app.launch_arguments) == arguments && editor_bytes_text(app.launch_file) == file
+			assert app.launch_arguments.data == argument_storage && app.launch_file.data == file_storage
+			assert app.launch_focus == focus && app.select_all == select_all && app.status == status
+			assert app.launch_mode && app.launch_id == id && app.launch_data_cwd == cwd && app.launch_documents.len == count
+			assert app.launch_file_selected == selected && app.launch_file_scroll == scroll && app.worker == unsafe { nil }
+		}
+	}
+	app.launch_focus = focused; app.select_all = selection
+}
+
 fn check_software_launch_navigation() ! {
 	receipt := os.temp_dir() + '/vinix-launch-navigation-' + os.getpid().str()
 	os.setenv('VINIX_SOFTWARE_LAUNCH_NAVIGATION_RECEIPT', receipt, true)
@@ -71,6 +91,7 @@ fn check_software_launch_navigation() ! {
 	mut app := launch_navigation_app()
 	defer { app.close_app() }
 	fill_launch_navigation_draft(mut app, files)!
+	check_launch_empty_paste(mut app)
 	assert app.launch_files_allowed && app.launch_name == 'Installed App é' && app.launch_documents == files && !app.launch_data_cwd
 	app.handle('software.launch.up')!; app.handle('software.launch.file.1')!; app.handle('software.launch.down')!
 	assert app.launch_file_scroll == 5 && app.launch_file_selected == 1
@@ -100,6 +121,7 @@ fn check_software_launch_navigation() ! {
 	assert app.query.bytestr() == 'kept query' && app.matching == [1, 0] && app.selected == 0 && app.filter == 2
 	fill_launch_navigation_draft(mut app, files)!
 	app.handle('software.launch.file')!; app.paste_input('/private/tmp/not-yet-added')
+	check_launch_empty_paste(mut app)
 	app.handle('software.launch.run')!; assert app.worker == unsafe { nil } && app.status.contains('Add the entered file')
 	app.key_input('\x01'); app.key_input('\x08')
 	assert app.launch_file.len == 0
@@ -168,8 +190,10 @@ fn check_software_launch_navigation_memory() ! {
 			if warmup == 1 { C.vinix_heap_begin() }
 			for _ in 0 .. 1000 {
 				fill_launch_navigation_draft(mut app, files)!
+				check_launch_empty_paste(mut app)
 				assert app.launch_documents.len == 256 && app.launch_file_scroll == 251 && app.launch_file_selected == 255
 				app.handle('software.launch.file')!; app.paste_input('/private/tmp/overflow'); app.handle('software.launch.add-file')!
+				check_launch_empty_paste(mut app)
 				assert app.launch_documents.len == 256 && app.status.contains('At most 256')
 				app.launch_file.clear(); app.handle('software.launch.arguments')!; app.key_input('\x01')
 				app.paste_input('\x1b'); assert app.launch_focus == 1 && app.launch_mode && app.select_all

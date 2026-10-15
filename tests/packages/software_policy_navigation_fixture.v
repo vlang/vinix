@@ -58,6 +58,22 @@ fn wait_for_policy_navigation_output(mut app SoftwareApp, progress bool) {
 	assert false, 'policy fixture did not reach its output barrier (progress=${progress}, worker=${app.policy_worker}): ${app.status}'
 }
 
+fn check_policy_empty_paste(mut app SoftwareApp) {
+	path := editor_bytes_text(app.policy_path); storage := app.policy_path.data; capacity := app.policy_path.cap
+	status := app.status; page := app.policy_page; section := app.policy_section
+	focused := app.focus; selected := app.select_all
+	for focus in [false, true]! {
+		for selection in [false, true]! {
+			app.focus = focus; app.select_all = selection
+			app.paste_input('')
+			assert editor_bytes_text(app.policy_path) == path && app.policy_path.data == storage && app.policy_path.cap == capacity
+			assert app.focus == focus && app.select_all == selection && app.status == status
+			assert app.policy_page == page && app.policy_section == section && app.worker == unsafe { nil }
+		}
+	}
+	app.focus = focused; app.select_all = selected
+}
+
 fn check_software_policy_navigation() ! {
 	receipt := os.temp_dir() + '/vinix-policy-navigation-' + os.getpid().str()
 	release := receipt + '.release'
@@ -71,7 +87,9 @@ fn check_software_policy_navigation() ! {
 	mut app := SoftwareApp{ administration_required: true, service_path: os.executable(), output: []u8{cap: 8192}, query: 'kept query'.bytes(), filter: 1 }
 	defer { app.close_app() }
 	app.handle('software.policy')!; wait_for_software(mut app)
+	check_policy_empty_paste(mut app)
 	software_repository_text(mut app.policy_path, policy_fixture_path)
+	check_policy_empty_paste(mut app)
 	for kind in ['list', 'review']! {
 		for ending in ['partial', 'complete']! {
 			for action in ['software.policy.stop', 'software.policy.cancel', 'escape']! {
@@ -194,6 +212,7 @@ fn check_software_policy_navigation_memory() ! {
 			for _ in 0 .. 1000 {
 				app.initialize_policy_path(); software_repository_text(mut app.policy_path, policy_fixture_path)
 				app.output.clear(); for byte in document_text { app.output << byte }; app.load_policy_document()
+				check_policy_empty_paste(mut app)
 				free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!); free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
 				app.policy_pending = policy_fixture_path.clone()
 				app.output.clear(); for byte in review_text { app.output << byte }; app.load_policy_review(); assert app.policy_review_ready

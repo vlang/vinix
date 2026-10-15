@@ -1007,6 +1007,14 @@ search pastes; ordinary catalog reads still permit searching, and keyboard
 editing/navigation retains its existing guards. See
 [search clipboard checks](../tests/packages/software-search-paste-check.md).
 
+Empty clipboard events also preserve policy filenames, launch arguments and
+pending file grants, administrator password bytes/masking, and native-window
+input. Focus, selected text and native clean/edited state stay intact. An empty
+paste cannot create an unsent native edit that blocks buttons or closing.
+Keyboard deletion still clears fields; Enter can commit an explicitly cleared
+native input as an empty protocol-2 text event. See
+[empty clipboard checks](../tests/packages/software-empty-paste-check.md).
+
 Pending install, uninstall, update, repair and rollback reviews support
 **Stop review**, Cancel and Escape before changes start. Stopping reaps the
 read-only worker and discards its proposal, fingerprint and unaccepted output;

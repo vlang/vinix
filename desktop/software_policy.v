@@ -179,7 +179,7 @@ fn (mut a SoftwareApp) handle_policy(event_id string) {
 }
 
 fn (mut a SoftwareApp) policy_paste_input(input string) {
-	if !a.focus || a.policy_review_ready || a.worker != unsafe { nil } { return }
+	if !a.focus || a.policy_review_ready || a.worker != unsafe { nil } || input == '' { return }
 	a.initialize_policy_path()
 	length := if a.select_all { 0 } else { a.policy_path.len }
 	if input.len > software_deployment_path_limit - length || !software_deployment_text_valid(input) {

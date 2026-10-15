@@ -87,7 +87,7 @@ fn (mut a SoftwareApp) admin_key_input(input string) {
 }
 
 fn (mut a SoftwareApp) admin_paste_input(input string) {
-	if !a.admin_prompt || !a.admin_focus { return }
+	if !a.admin_prompt || !a.admin_focus || input == '' { return }
 	length := if a.admin_select_all { 0 } else { a.admin_password_len }
 	if !utf8.validate_str(input) || input.len > pkgadmin.password_limit - length {
 		a.set_status('Password input was kept intact: enter valid UTF-8, at most 256 bytes.'); return

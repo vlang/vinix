@@ -289,7 +289,8 @@ fn software_window_text_child() {
 		mut event := appsdk.read_window_event_for(2) or { panic(err) }
 		assert frame.accepts(event)
 		if event.kind == 'close' { event.close(); return }
-		assert event.kind == 'text' && event.id == 'software.confirm' && event.text == 'é🚀 $literal; $(command)'
+		assert event.kind == 'text' && event.id == 'software.confirm'
+		assert event.text == if sequence == 1 { 'é🚀 $literal; $(command)' } else { '' }
 		unsafe { text.free() }
 		text = event.text.clone()
 		event.close(); sequence++
@@ -314,8 +315,10 @@ fn check_software_window_text() ! {
 	app.handle(software_window_input_action + '0.software.confirm')!
 	assert app.window_input_id == ''
 	app.handle(software_window_input_action + '1.software.confirm')!
+	check_window_empty_paste(mut app)
 	app.key_input('\x01')
 	app.paste_input('é🚀 $literal; $(command)')
+	check_window_empty_paste(mut app)
 	assert editor_bytes_text(app.window_input) == 'é🚀 $literal; $(command)'
 	app.paste_input('\n')
 	app.paste_input('x'.repeat(257))
@@ -338,6 +341,13 @@ fn check_software_window_text() ! {
 	assert app.window_input.len == 0
 	app.paste_input('\x1b') // paste must not activate Escape
 	assert app.window_input_dirty
+	check_window_empty_paste(mut app)
+	// Explicit keyboard deletion can still commit an empty protocol-2 value.
+	app.key_input('\r'); wait_window_frame(mut app, 3)!
+	assert app.window_frame.elements[0].text == '' && !app.window_input_dirty && app.window_input_id == ''
+	app.handle(software_window_input_action + '3.software.confirm')!
+	check_window_empty_paste(mut app)
+	app.key_input('unsent edit')
 	app.key_input('\x1b')
 	assert app.window_input_id == '' && !app.window_input_dirty
 	assert !app.prepare_close() && app.window_closing
@@ -627,6 +637,7 @@ fn main() {
 	check_software_view_reader() or { panic(err) }
 	check_software_failure() or { panic(err) }
 	check_software_failure_bounds() or { panic(err) }
+	println('Software empty clipboard: policy paths, launch arguments/file grants, administrator passwords and native clean/dirty fields preserve text, focus, selection and state; explicit keyboard editing and empty native commits passed')
 	println('Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed')
 }
 
@@ -640,7 +651,9 @@ fn check_software_admin() ! {
 	mut app := SoftwareApp{ administration_required: true, service_path: os.executable(), output: []u8{cap: 8192}, query: []u8{cap: 256} }
 	app.start(['apply', 'c'.repeat(64), 'install', 'editor'], false)
 	assert app.admin_prompt && app.worker.args == ['admin', '--progress', 'apply', 'c'.repeat(64), 'install', 'editor']
+	check_admin_empty_paste(mut app)
 	app.key_input('fixture secret é')
+	check_admin_empty_paste(mut app)
 	assert app.admin_password_len == 'fixture secret é'.len
 	app.paste_input('\n')
 	app.paste_input('x'.repeat(257))
@@ -672,6 +685,37 @@ fn check_software_admin() ! {
 	println('Software administrator approval: frozen literal request, masked bounded UTF-8 password, hidden-action refusal, credential wiping, cancellation and progress passed')
 }
 
+fn check_admin_empty_paste(mut app SoftwareApp) {
+	password := app.admin_password
+	length := app.admin_password_len; mask := editor_bytes_text(app.admin_mask); storage := app.admin_mask.data
+	status := app.status; focused := app.admin_focus; selected := app.admin_select_all; pid := app.worker.pid
+	for focus in [false, true]! {
+		for selection in [false, true]! {
+			app.admin_focus = focus; app.admin_select_all = selection
+			app.paste_input('')
+			assert app.admin_password == password && app.admin_password_len == length
+			assert editor_bytes_text(app.admin_mask) == mask && app.admin_mask.data == storage
+			assert app.admin_prompt && app.admin_focus == focus && app.admin_select_all == selection
+			assert app.status == status && app.worker.pid == pid
+		}
+	}
+	app.admin_focus = focused; app.admin_select_all = selected
+}
+
+fn check_window_empty_paste(mut app SoftwareApp) {
+	text := editor_bytes_text(app.window_input); storage := app.window_input.data
+	id := app.window_input_id; dirty := app.window_input_dirty; selected := app.window_input_select_all
+	status := app.status; sequence := app.window_frame.sequence; closing := app.window_closing
+	for selection in [false, true]! {
+		app.window_input_select_all = selection
+		app.paste_input('')
+		assert editor_bytes_text(app.window_input) == text && app.window_input.data == storage
+		assert app.window_input_id == id && app.window_input_dirty == dirty && app.window_input_select_all == selection
+		assert app.status == status && app.window_frame.sequence == sequence && app.window_closing == closing
+	}
+	app.window_input_select_all = selected
+}
+
 fn check_software_admin_memory() ! {
 	$if !track_heap ? { return error('compile administrator memory fixture with -d track_heap') }
 	$if track_heap ? {
@@ -683,7 +727,9 @@ fn check_software_admin_memory() ! {
 			if warmup == 1 { C.vinix_heap_begin() }
 			for _ in 0 .. 1000 {
 				app.begin_admin_prompt()
+				check_admin_empty_paste(mut app)
 				app.admin_paste_input('fixture secret é')
+				check_admin_empty_paste(mut app)
 				free_window_tree(app.build_admin(ui2.rect(0, 0, 900, 660)))
 				app.clear_admin_prompt()
 				for byte in app.admin_password { assert byte == 0 }
@@ -694,6 +740,7 @@ fn check_software_admin_memory() ! {
 		C.close(pipe[0]); app.retire_worker(); app.close_app()
 		assert kept == 0, 'administrator approval retained ${kept} bytes'
 		println('Software administrator approval: 1000 prompt/edit/render/wipe cycles retain zero tracked bytes')
+		println('Software empty clipboard: 1000 empty/populated credential focus/selection/render/wipe cycles retain zero tracked bytes')
 	}
 }
 
@@ -715,8 +762,10 @@ fn check_window_broker_memory() ! {
 			value := software_window_sequence(sequence)
 			action := software_window_input_action + value + 'software.confirm'
 			app.handle_window(action)
+			check_window_empty_paste(mut app)
 			app.window_key_input('\x01')
 			app.window_paste_input('draft')
+			check_window_empty_paste(mut app)
 			free_window_tree(app.build_window(ui2.rect(0, 0, 900, 660)))
 			app.window_key_input('\x1b')
 			unsafe { text.free(); line.free(); value.free(); action.free(); (&array(&frame.elements)).free() }
