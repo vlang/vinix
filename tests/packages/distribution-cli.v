@@ -463,6 +463,65 @@ fn qualify_resolver_diagnostics(binary string, directory string) ! {
 	println('Package CLI: signed policy fallback reports the current missing requirement and dependency path on both targets; plan/review/install refusal preserves trust and activation, and release closure refusal stays explicit PASS')
 }
 
+fn qualify_install_preference(binary string, directory string) ! {
+	os.mkdir_all(directory + '/payload/data')!
+	os.write_file(directory + '/payload/data/value', 'Synthetic installed-preference payload')!
+	key := success(binary, ['keygen', directory + '/seed'])!.trim_space()
+	repository := directory + '/repository'
+	mut ids := ['base']
+	for i in 0 .. 20 { ids << 'node-' + i.str() }
+	for id in ids {
+		manifest := pkgcore.Package{id: id, name: id, version: '1.0.0', architecture: 'all', kind: 'data', license: 'MIT'}
+		os.write_file(directory + '/manifest.json', json2.encode(manifest))!
+		success(binary, ['pack', directory + '/manifest.json', directory + '/payload', repository])!
+	}
+	expires := (time.now().unix() + 3600).str()
+	success(binary, ['publish', repository, 'fixture', directory + '/seed', '1', expires])!
+	for architecture in ['aarch64', 'x86_64']! {
+		root := directory + '/' + architecture
+		os.mkdir_all(root + '/etc/vinix-packages')!
+		config := pkgcore.Config{architecture: architecture, repositories: [pkgcore.Repository{id: 'fixture', url: 'file://' + repository, public_key: key}], policy: pkgcore.Policy{offline: true, reserve_bytes: 0}}
+		os.write_file(root + '/etc/vinix-packages/config.json', json2.encode(config))!
+		success(binary, ['--root', root, 'update'])!
+		success(binary, ['--root', root, 'install', ...ids])!
+	}
+	for id in ['base', 'node-0', 'zz-addon']! {
+		manifest := pkgcore.Package{id: id, name: id, version: if id == 'zz-addon' { '1.0.0' } else { '2.0.0' },
+			architecture: 'all', kind: 'data', license: 'MIT',
+			dependencies: if id == 'zz-addon' { [pkgcore.Dependency{id: 'base', minimum: '2.0.0'}] } else { []pkgcore.Dependency{} }}
+		os.write_file(directory + '/manifest.json', json2.encode(manifest))!
+		success(binary, ['pack', directory + '/manifest.json', directory + '/payload', repository])!
+	}
+	success(binary, ['publish', repository, 'fixture', directory + '/seed', '2', expires])!
+	for architecture in ['aarch64', 'x86_64']! {
+		root := directory + '/' + architecture
+		success(binary, ['--root', root, 'update'])!
+		store := pkgcore.state_directory(root)
+		before := os.readlink(store + '/current')!
+		history := os.read_file(store + '/trust-history.json')!; catalog := os.read_file(store + '/catalog.json')!
+		for operation in [['plan', 'install', 'zz-missing'], ['review', 'install', 'zz-missing'], ['install', 'zz-missing']] {
+			reply := command(binary, ['--root', root, ...operation])!
+			assert reply.code == 1 && reply.text.contains('zz-missing') && !reply.text.contains('search limit'), reply.text
+			assert os.readlink(store + '/current')! == before && os.read_file(store + '/trust-history.json')! == history && os.read_file(store + '/catalog.json')! == catalog
+		}
+		success(binary, ['--root', root, 'plan', 'install', 'zz-addon'])!
+		mut review := pkgprotocol.decode_review(success(binary, ['--root', root, '--json', 'review', 'install', 'zz-addon'])!)!
+		defer { review.close() }
+		assert review.rows.any(it.id == 'base' && it.version == '2.0.0') && review.rows.any(it.id == 'zz-addon')
+		assert os.readlink(store + '/current')! == before
+		success(binary, ['--root', root, 'apply', review.fingerprint, 'install', 'zz-addon'])!
+		state := pkgcore.read_state(store, architecture)!
+		assert state.generation == 2 && state.previous == 1 && state.packages.len == 22
+		assert state.packages.filter(it.package.id == 'base')[0].package.version == '2.0.0'
+		assert state.packages.filter(it.package.id == 'node-0')[0].package.version == '1.0.0'
+		success(binary, ['--root', root, 'verify'])!
+		success(binary, ['--root', root, 'rollback'])!
+		assert pkgcore.read_state(store, architecture)!.packages.len == 21
+		success(binary, ['--root', root, 'verify'])!
+	}
+	println('Package CLI: signed offline install backtracks past 20 unrelated installed identities; exact installed preference, missing-requirement refusal, reviewed activation and rollback pass on both targets PASS')
+}
+
 fn qualify(binary string) ! {
 	work := os.real_path(os.temp_dir()) + '/vinix-package-cli-' + os.getpid().str()
 	os.mkdir_all(work + '/root/etc/vinix-packages')!
@@ -470,6 +529,7 @@ fn qualify(binary string) ! {
 	defer { os.rmdir_all(work) or {} }
 	qualify_catalog_cli(binary, work)!
 	qualify_resolver_diagnostics(binary, work + '/resolver-diagnostics')!
+	qualify_install_preference(binary, work + '/install-preference')!
 	key := success(binary, ['keygen', work + '/seed'])!.trim_space()
 	assert key.len == 64
 	assert os.stat(work + '/seed')!.mode & 0o777 == 0o600

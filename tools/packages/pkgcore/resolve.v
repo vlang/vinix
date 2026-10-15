@@ -21,6 +21,34 @@ fn candidate_order(a &Installed, b &Installed) int {
 	return 0
 }
 
+// Move the exact installed variant to the front of its sorted identity group.
+// Rotate in place so every catalog candidate occurs once and the remaining
+// version/architecture order stays intact. Appending preferred copies gives
+// unrelated single-version packages artificial alternatives during backtracking.
+fn prefer_installed(mut candidates []Installed, current State) {
+	mut installed := map[string]int{}
+	defer { unsafe { installed.free() } }
+	for index, candidate in current.packages { installed[candidate.package.id] = index }
+	mut first := 0
+	for first < candidates.len {
+		id := candidates[first].package.id
+		mut end := first + 1
+		for end < candidates.len && candidates[end].package.id == id { end++ }
+		if index := installed[id] {
+			previous := current.packages[index]
+			for choice in first .. end {
+				candidate := candidates[choice]
+				if candidate.package != previous.package || candidate.repository != previous.repository
+					|| candidate.public_key != previous.public_key { continue }
+				for at := choice; at > first; at-- { candidates[at] = candidates[at - 1] }
+				candidates[first] = candidate
+				break
+			}
+		}
+		first = end
+	}
+}
+
 pub fn resolve(catalog Catalog, config Config, current State, requested []string, upgrade bool) !Plan {
 	config.validate()!
 	if requested.len > 4096 || catalog.packages.len > 32768 { return error('dependency resolution exceeds its input limits') }
@@ -50,21 +78,12 @@ pub fn resolve(catalog Catalog, config Config, current State, requested []string
 		// Reuse installed packages only when their exact provenance is still
 		// present in the authenticated catalog; revoked/removed versions cannot
 		// bypass current repository policy.
-		mut preferred := []Installed{cap: candidates.len * 2}
-		unsafe { preferred.flags |= .noslices }
-		for installed in current.packages {
-			for candidate in candidates {
-				if candidate.package == installed.package && candidate.repository == installed.repository && candidate.public_key == installed.public_key {
-					preferred << candidate
-				}
-			}
-		}
-		preferred << candidates
-		unsafe { (&array(&candidates)).free() }
-		candidates = unsafe { preferred }
+		prefer_installed(mut candidates, current)
 	}
-	mut search := Search{ config: config, candidates: candidates }
-	defer { unsafe { search.diagnostic.free() } }
+	// The returned closure borrows candidate fields, never this search object.
+	// Own it explicitly: the pinned compiler promotes the local to the heap.
+	mut search := &Search{ config: config, candidates: candidates }
+	defer { unsafe { search.diagnostic.free(); free(search) } }
 	mut packages := search.solve(pending)!
 	packages.sort(a.package.id < b.package.id)
 	accepted = true

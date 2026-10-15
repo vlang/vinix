@@ -433,6 +433,15 @@ Diagnostics stay within 4,096 bytes and preserve the exact search-limit error.
 Publisher closure checks include their fixed advertised root. See
 [diagnostic qualification](../tests/packages/resolver-diagnostics-check.md).
 
+A normal install prefers an exact installed variant still present in the
+authenticated catalog, keeping each catalog record once in the candidate list.
+Moving that variant to the front preserves the remaining version/architecture order. Unrelated
+installed packages with one version cannot create artificial backtracking
+alternatives or consume the search budget before a required dependency update.
+Changed metadata or publisher provenance cannot acquire installed preference;
+explicit upgrades retain newest-first selection. See
+[installed preference qualification](../tests/packages/resolver-preference-check.md).
+
 ## Install, maintenance and recovery
 
 ```sh

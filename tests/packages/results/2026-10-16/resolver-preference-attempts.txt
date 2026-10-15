@@ -1,0 +1,259 @@
+Expected baseline search-limit failure is retained separately. Initial preference functional/core and signed CLI checks passed, but the broader public-resolver allocation assertion retained 800000 bytes over 1000 success/refusal pairs. Generated C showed an unretired 400-byte Search object on each call. Explicit search ownership/freeing fixes success and failure paths.
+
+initial-resolve-memory-run.txt:
+Resolver preference: 32768 catalog variants and 4096 installed identities retain one choice each and stable fallback order PASS
+tools/packages/pkgcore/resolve_preference_test.v:162: fn test_public_install_preference_retires_scratch_and_preserves_borrowed_catalog_and_state
+   > assert kept == 0, 'public install preference retained ${kept} bytes'
+     Left value (len: 6): `800000`
+    Right value (len: 1): `0`
+        Message: public install preference retained 800000 bytes
+
+
+initial-resolve_preference-sanitize-run.txt:
+Resolver preference: 32768 catalog variants and 4096 installed identities retain one choice each and stable fallback order PASS
+tools/packages/pkgcore/resolve_preference_test.v:162: fn test_public_install_preference_retires_scratch_and_preserves_borrowed_catalog_and_state
+   > assert kept == 0, 'public install preference retained ${kept} bytes'
+     Left value (len: 6): `800000`
+    Right value (len: 1): `0`
+        Message: public install preference retained 800000 bytes
+
+
+Initial guest runs preceded the public search-object lifetime fix; fresh final guests rebuild all user programs from the corrected source. Final AArch64 uses the installed musl sysroot and a V GCC adapter for existing generated-C compatibility warnings.
+
+Initial aarch64:
+FAIL aarch64 packages-admin (104.5s)
+  forbidden "FAIL: fn main.qualify_package_admin" in the line: /Users/alex/code/vinix/tests/accounts/guest/package_admin.v:107: FAIL: fn main.qualify_package_admin: assert completed && service.verify()!.packages.len == 0
+  last 40 serial lines:
+  | TracerPid:	0
+  | Uid:	0	0	0	0
+  | Gid:	0	0	0	0
+  | NSpid:	62050
+  | Threads:	1
+  | VmLck:	0 kB
+  | CapInh:	0000000000000000
+  | CapPrm:	000001ffffffffff
+  | CapEff:	000001ffffffffff
+  | CapBnd:	000001ffffffffff
+  | CapAmb:	0000000000000000
+  | NoNewPrivs:	0
+  | Seccomp:	0
+  | Seccomp_filters:	0
+  | 
+  | PACKAGE ADMIN disconnected-worker process: 62592
+  | Name:	vinix-package[39849]
+  | Umask:	022
+  | State:	Z (zombie)
+  | Tgid:	62592
+  | Ngid:	0
+  | Pid:	62592
+  | PPid:	1
+  | TracerPid:	0
+  | Uid:	0	0	0	0
+  | Gid:	0	0	0	0
+  | NSpid:	62592
+  | Threads:	1
+  | VmLck:	0 kB
+  | CapInh:	0000000000000000
+  | CapPrm:	000001ffffffffff
+  | CapEff:	000001ffffffffff
+  | CapBnd:	000001ffffffffff
+  | CapAmb:	0000000000000000
+  | NoNewPrivs:	0
+  | Seccomp:	0
+  | Seccomp_filters:	0
+  | 
+  | /Users/alex/code/vinix/tests/accounts/guest/package_admin.v:107: FAIL: fn main.qualify_package_admin: assert completed && service.verify()!.packages.len == 0
+  | V panic: Assertion failed...
+  logs: /Users/alex/code/vinix/build/pkg-pref-arm/packages-admin
+
+Initial AArch64 passed resolver markers but failed the existing disconnected-worker completion assertion; cause not established. No completion check or timeout was changed.
+ {"format":1,"generation":3,"previous":2,"architecture":"aarch64","requested":["admin-fixture"],"packages":[{"package":{"id":"admin-fixture","version":"1.0.0","architecture":"all","name":"Administrator fixture","description":"Signed data only","homepage":"","license":"MIT","proprietary":false,"firmware":false,"kind":"data","runtime":"","entrypoint":"","arguments":[],"permissions":[],"associations":[],"dependencies":[],"files":[{"path":"share/fixture","sha256":"49752f624daf2c0954b64b4f90e0c512148add906cd7b84a98bf95db42f75d11","bytes":33,"executable":false}],"sdk":1},"repository":"admin-publisher","public_key":"dad487b08a90a7e924b93df3d53499b9276ca3f24ac3fb82e403fa974c1808a5","sequence":1}]}
+PACKAGE ADMIN disconnected-worker process: 1050
+Name:	vinix-package[63394]
+Umask:	022
+State:	Z (zombie)
+Tgid:	1050
+Ngid:	0
+Pid:	1050
+PPid:	1
+TracerPid:	0
+Uid:	0	0	0	0
+Gid:	0	0	0	0
+NSpid:	1050
+Threads:	1
+VmLck:	0 kB
+CapInh:	0000000000000000
+CapPrm:	000001ffffffffff
+CapEff:	000001ffffffffff
+CapBnd:	000001ffffffffff
+CapAmb:	0000000000000000
+NoNewPrivs:	0
+Seccomp:	0
+Seccomp_filters:	0
+
+PACKAGE ADMIN disconnected-worker process: 6815
+Name:	vinix-package[41983]
+Umask:	022
+State:	Z (zombie)
+Tgid:	6815
+Ngid:	0
+Pid:	6815
+PPid:	1
+TracerPid:	0
+Uid:	0	0	0	0
+Gid:	0	0	0	0
+NSpid:	6815
+Threads:	1
+VmLck:	0 kB
+CapInh:	0000000000000000
+CapPrm:	000001ffffffffff
+CapEff:	000001ffffffffff
+CapBnd:	000001ffffffffff
+CapAmb:	0000000000000000
+NoNewPrivs:	0
+Seccomp:	0
+Seccomp_filters:	0
+
+PACKAGE ADMIN disconnected-worker process: 17492
+Name:	vinix-package[7018]
+Umask:	022
+State:	Z (zombie)
+Tgid:	17492
+Ngid:	0
+Pid:	17492
+PPid:	1
+TracerPid:	0
+Uid:	0	0	0	0
+Gid:	0	0	0	0
+NSpid:	17492
+Threads:	1
+VmLck:	0 kB
+CapInh:	0000000000000000
+CapPrm:	000001ffffffffff
+CapEff:	000001ffffffffff
+CapBnd:	000001ffffffffff
+CapAmb:	0000000000000000
+NoNewPrivs:	0
+Seccomp:	0
+Seccomp_filters:	0
+
+PACKAGE ADMIN disconnected-worker process: 21187
+Name:	vinix-package[43816]
+Umask:	022
+State:	Z (zombie)
+Tgid:	21187
+Ngid:	0
+Pid:	21187
+PPid:	1
+TracerPid:	0
+Uid:	0	0	0	0
+Gid:	0	0	0	0
+NSpid:	21187
+Threads:	1
+VmLck:	0 kB
+CapInh:	0000000000000000
+CapPrm:	000001ffffffffff
+CapEff:	000001ffffffffff
+CapBnd:	000001ffffffffff
+CapAmb:	0000000000000000
+NoNewPrivs:	0
+Seccomp:	0
+Seccomp_filters:	0
+
+PACKAGE ADMIN disconnected-worker process: 25507
+Name:	vinix-package[60879]
+Umask:	022
+State:	Z (zombie)
+Tgid:	25507
+Ngid:	0
+Pid:	25507
+PPid:	1
+TracerPid:	0
+Uid:	0	0	0	0
+Gid:	0	0	0	0
+NSpid:	25507
+Threads:	1
+VmLck:	0 kB
+CapInh:	0000000000000000
+CapPrm:	000001ffffffffff
+CapEff:	000001ffffffffff
+CapBnd:	000001ffffffffff
+CapAmb:	0000000000000000
+NoNewPrivs:	0
+Seccomp:	0
+Seccomp_filters:	0
+
+PACKAGE ADMIN disconnected-worker process: 48931
+Name:	vinix-package[53132]
+Umask:	022
+State:	Z (zombie)
+Tgid:	48931
+Ngid:	0
+Pid:	48931
+PPid:	1
+TracerPid:	0
+Uid:	0	0	0	0
+Gid:	0	0	0	0
+NSpid:	48931
+Threads:	1
+VmLck:	0 kB
+CapInh:	0000000000000000
+CapPrm:	000001ffffffffff
+CapEff:	000001ffffffffff
+CapBnd:	000001ffffffffff
+CapAmb:	0000000000000000
+NoNewPrivs:	0
+Seccomp:	0
+Seccomp_filters:	0
+
+PACKAGE ADMIN disconnected-worker process: 62050
+Name:	vinix-package[28252]
+Umask:	022
+State:	Z (zombie)
+Tgid:	62050
+Ngid:	0
+Pid:	62050
+PPid:	1
+TracerPid:	0
+Uid:	0	0	0	0
+Gid:	0	0	0	0
+NSpid:	62050
+Threads:	1
+VmLck:	0 kB
+CapInh:	0000000000000000
+CapPrm:	000001ffffffffff
+CapEff:	000001ffffffffff
+CapBnd:	000001ffffffffff
+CapAmb:	0000000000000000
+NoNewPrivs:	0
+Seccomp:	0
+Seccomp_filters:	0
+
+PACKAGE ADMIN disconnected-worker process: 62592
+Name:	vinix-package[39849]
+Umask:	022
+State:	Z (zombie)
+Tgid:	62592
+Ngid:	0
+Pid:	62592
+PPid:	1
+TracerPid:	0
+Uid:	0	0	0	0
+Gid:	0	0	0	0
+NSpid:	62592
+Threads:	1
+VmLck:	0 kB
+CapInh:	0000000000000000
+CapPrm:	000001ffffffffff
+CapEff:	000001ffffffffff
+CapBnd:	000001ffffffffff
+CapAmb:	0000000000000000
+NoNewPrivs:	0
+Seccomp:	0
+Seccomp_filters:	0
+
+/Users/alex/code/vinix/tests/accounts/guest/package_admin.v:107: FAIL: fn main.qualify_package_admin: assert completed && service.verify()!.packages.len == 0
+V panic: Assertion failed...
+
+Initial x86_64:
+PASS x86_64 packages-admin (92.9s)

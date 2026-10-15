@@ -1,0 +1,5 @@
+clang ASan/UBSan with -d track_heap; detect_leaks=0; halt_on_error=1
+Resolver preference: 32768 catalog variants and 4096 installed identities retain one choice each and stable fallback order PASS
+Resolver preference: 1000 public successful multi-version installs and missing-requirement refusals retain zero tracked bytes PASS
+Dependency search: 1000 successful 256-package chains and missing/policy refusals retain zero tracked bytes
+Dependency diagnostics: 1000 policy-fallback and deep missing-path refusals retain zero tracked bytes

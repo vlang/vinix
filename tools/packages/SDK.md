@@ -321,6 +321,15 @@ bounded to 4,096 UTF-8 bytes. Release closure checks include the fixed advertise
 version's root. Search-budget exhaustion remains a direct limit error. See
 [diagnostic qualification](../../tests/packages/resolver-diagnostics-check.md).
 
+Installed preference moves the exact authenticated variant to the front of its
+identity group without copying it into the candidate list twice. Other variants
+retain their sorted version/architecture order. A late dependency constraint can
+therefore replace a preferred installed version without retrying unrelated
+single-version packages. Current sequence metadata comes from the catalog;
+different package metadata, repository or key does not match. Explicit upgrades
+continue to try the newest version first. See
+[preference qualification](../../tests/packages/resolver-preference-check.md).
+
 The command verifies and deduplicates objects, checks destination space with a
 64 MiB reserve, creates a private `.vinix-release-*` sibling tree, verifies copied
 bytes and flushes the tree. Exclusive atomic rename publishes the complete new

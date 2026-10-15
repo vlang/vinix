@@ -1,0 +1,12 @@
+Package CLI: signed policy fallback reports the current missing requirement and dependency path on both targets; plan/review/install refusal preserves trust and activation, and release closure refusal stays explicit PASS
+Package CLI: signed offline install backtracks past 20 unrelated installed identities; exact installed preference, missing-requirement refusal, reviewed activation and rollback pass on both targets PASS
+Package CLI: durable private key creation, existing-seed refusal and read-only public-key recovery passed
+Package CLI: malformed publisher history refuses release without changing prior publication
+Package CLI: scoped repository configuration survives damaged cache/history; strict listing/enrollment/update still refuse; reviewed revocation preserves active state and recovery data
+Package CLI: hard-linked locks refuse all read/write commands before chmod and preserve trust, state, cache and recovery data
+Package CLI: malformed locks refuse within two seconds, preserve state/cache/history and permit verified recovery
+Package CLI: special and oversized configuration, catalog, history and state refuse promptly, preserve recovery data and permit restored verification
+Package CLI: ambiguous configuration refused without activation, cache or trust changes
+Package CLI: malformed cached snapshots preserve trust/state/recovery and permit verified refresh after restoration
+Package CLI: malformed retained history refuses replay after revocation and empty refresh
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed

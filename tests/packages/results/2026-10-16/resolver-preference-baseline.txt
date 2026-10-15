@@ -1,0 +1,9 @@
+Pre-change resolve.v snapshot with the new installed-preference regression: expected failure hits the search limit despite a valid install closure. The exact baseline module and compiler input are pinned in the ledger.
+
+V panic: dependency resolution exceeded its search limit; narrow the requested versions
+ v hash: 826e96f
+    pid: 0x1765c
+    tid: 0x1765c
+0   baseline-check                      0x00000001046063d0 pkgcore__test_install_can_replace_a_preferred_version_without_retrying_unrelated_installed_choices + 1948
+1   baseline-check                      0x00000001046897bc main + 224
+2   dyld                                0x00000001802ebe00 start + 6992
