@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-15 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Latest priority-worker build baseline: **`219a33d6f`**, with the two frozen native inputs described below. Recheck HEAD and the worktree before
+Latest declaration-header build baseline: **`219a33d6f`**, with one frozen native header described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -91,6 +91,7 @@ memory and DRM services; complete i915 support is still pending.
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `3d4be91a6` | Worker priority Process pointer ownership and actual IRQ-frame rejection before mutation |
 | `219a33d6f` | Task-owned migration pins across sleep/yield, post-lock eligibility and coherent affinity release snapshots |
 | `6896a6ea9` | Original slab flag typedef ownership, with unchanged allocator semantics |
 | `d7b24c4bf` | Original boot-CPU L1TF query policy and observed native CPU classification |
@@ -2049,6 +2050,54 @@ Default raw C still contains ordinary unlinked helper definitions, matching its
 previous baseline; linked APIs and conditional IRQ tests are absent. The early
 overbroad reviewer assertion is preserved without treating it as a production
 failure. The final review authenticates all saved default compiler artifacts.
+
+## Original stddef declaration closure (2026-10-15)
+
+Six exact original wrappers now delegate to the unchanged original UAPI
+group/FAM owner. Native NULL/offsetof/Boolean ownership remains intact, without
+copying the original kernel false/true enum over stdbool. This is declaration
+and layout closure, without an allocation/mapping/device runtime or new lifetime.
+
+Maintained V `stddef_layout.v` final v2 passes 96 expected-result compiles on
+actual x86-64/AArch64 GNU99/GNU11: 28 constant-only objects with identical
+32-word/256-byte ABI facts and zero imports, 68 targeted rejections. Eight
+positive fake-zero-array controls show why outer layout alone is insufficient;
+eight fresh independent replays distinguish incomplete-member sizeof rejection.
+Aliases, packed/aligned copies and union, reusable tags, duplicate names, empty
+anchors, original/production layouts, Boolean/repeated-include ordering and the
+old missing wrapper are covered. Raw union FAM rejection explicitly enables
+the GNU flexible-union diagnostic; default GNU accepts that extension.
+
+Final result SHA256:
+`ba710210692d1827162aad678d452a21d4ef664b2f4f864815ff09fb8fb21d79`;
+two-path manifest SHA256:
+`d7d6e908881caa32f146ccf2e17a3f2e46d91f402fe822195e8fe25023bdc24c`.
+All 677 artifacts, compiler tools and input snapshots are authenticated. V1
+retains stale per-case pre-objcopy hashes; v2 hashes after object extraction and
+the freeze rechecks all 28 final objects. Independent source/compiler review:
+`8a172eb138f67216bb6387ec97f2e01e40f097e279cc7155ea19f01c53d8aa85`.
+
+Source1 freeze at isolated baseline `219a33d6f` SHA256:
+`9a4195de7ed5f9c24cde03608d93604b6f59ba7cf68a05a807a777eca555fd06`.
+Enabled x86 proof SHA256:
+`835f5058fdfba4eb515d94a11d59eb1e94a01cbbc3a099c9f6e73723d88ec4eb`;
+disabled ARM proof SHA256:
+`0cf79b0ee5863a0789e91617041304d980f164a5a1355bd371c162a4b1161a3a`;
+default x86 proof SHA256:
+`c4aa593a1972b43d9d49e764a4c5fb7f8c63385f5d99cc7dc2dd44c9b63472c7`.
+All three builds pass; x86 actual compiler dependencies consume both genuine
+headers. ARM evidence is disabled build plus generic declaration probes, with
+no ARM LinuxKPI or new header-specific guest result. These overlays exclude the
+separate priority-worker fix.
+
+Fresh full audit remains 6/269, with 232 vfork_done, 30 task.mm, one entry-stack
+record. All 30 previous FAM errors advance to real address-space ownership.
+Independent full269-command/Kbuild-metadata/input/import/native review SHA256:
+`0221ab4931e02a63b99806e667e4a85de9915dea58198224e1228b4794242a71`.
+The 7,668 imported files remain unchanged. Evidence is below
+`smp-oct10/stddef-*`; preserve the labeled stale-hash attempts as history.
+Continue through real task/MM/vfork, device/kobject/PCI ownership, mappings and
+DRM. Do not add placeholder task fields or declare native GPU support complete.
 
 ## Latest page-backed deferred RCU free increment
 

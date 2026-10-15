@@ -51,6 +51,11 @@ after a filesystem failure. Mutable build inputs still require isolation.
 ## Implemented APIs
 
 - Linux integer types, error pointers, overflow helpers and compiler macros.
+  The original `sizeof_field`, `offsetofend` and grouped/flexible-array
+  declaration wrappers use the unchanged Linux UAPI implementation, preserving
+  anonymous/named field aliases, attributes, reusable tags and genuinely
+  incomplete flexible members. Native standard and Boolean type ownership is
+  retained; these declarations supply no mapping or device runtime.
   Original Linux `log2.h` and `minmax.h` supply power-of-two, logarithm,
   rounding and clamp operations. Exact original `lower_32_bits` and
   `upper_32_bits` retain single evaluation and safe split shifts for 32-bit
@@ -3025,3 +3030,54 @@ independent guest/default artifact review SHA256:
 `39a837fa711234987741480e83577ad50ecbe7841907cd14a1c8d516b11e2527`.
 Default generated C retains ordinary unused helper definitions, as before;
 their APIs and the conditional IRQ tests are absent from the default linked ELF.
+
+## Original grouped and flexible-array declarations (2026-10-15)
+
+The stddef overlay now supplies all six exact pinned kernel wrapper macros:
+`sizeof_field`, `offsetofend`, `struct_group`, `struct_group_attr`,
+`struct_group_tagged` and `DECLARE_FLEX_ARRAY`. Their genuine unchanged UAPI
+owner implements the mirrored anonymous/named groups, attributes, named tags,
+empty anchors and incomplete array members. Native `stddef.h`/`stdbool.h`
+continue to own NULL, offsetof and Boolean declarations; the original kernel
+Boolean enum is not imported over the native Boolean macros.
+
+The maintained V compiler matrix passes 96 expected-result cases across strict
+GNU99/GNU11 on actual x86-64 and AArch64 targets: 28 constant-only objects with
+identical 32-word/256-byte ABI facts and zero runtime imports, and 68 targeted
+rejections. It checks complete alias/attribute/tag layouts, unique anchors,
+duplicate names, original/production equivalence, three Boolean/include orders
+and the historical missing declaration. Eight deliberately wrong zero-length
+array controls also pass outer layout checks; separate genuine incomplete-array
+`sizeof` rejections distinguish the real FAM type. Raw union FAM rejection
+explicitly enables Clang's GNU flexible-union extension diagnostic.
+
+Final result `stddef-layout-host-final-v2/result.json` SHA256:
+`ba710210692d1827162aad678d452a21d4ef664b2f4f864815ff09fb8fb21d79`;
+two-path manifest SHA256:
+`d7d6e908881caa32f146ccf2e17a3f2e46d91f402fe822195e8fe25023bdc24c`.
+The manifest authenticates 677 artifacts, compiler/object tools and input byte
+snapshots. V1 evidence is retained with its stale per-case object hashes labeled:
+objcopy can rewrite the input object, so final v2 hashes it after extraction and
+rechecks every saved object. Independent source/compiler review plus eight
+fresh incomplete-versus-zero-array compiler replays SHA256:
+`8a172eb138f67216bb6387ec97f2e01e40f097e279cc7155ea19f01c53d8aa85`.
+
+Fresh isolated enabled/default x86 and disabled ARM builds pass at
+`219a33d6f` plus this one header. Source freeze SHA256:
+`9a4195de7ed5f9c24cde03608d93604b6f59ba7cf68a05a807a777eca555fd06`.
+Native x86 compiler dependencies include the actual overlay and genuine UAPI
+owner. ARM covers the disabled kernel and direct generic declaration matrix;
+there is no ARM LinuxKPI runtime claim or new guest measurement for this header.
+The priority guard is a separately validated increment.
+
+Fresh full syntax audit remains **6/269**. The 30 former FAM declaration
+diagnostics now reach the genuine missing task address-space owner; first-error
+groups are 232 `vfork_done`, 30 `mm` and one entry-stack record. All 7,668 imports
+are unchanged. Independent complete audit/native consumption review SHA256:
+`0221ab4931e02a63b99806e667e4a85de9915dea58198224e1228b4794242a71`.
+No Linux memory, PCI object, DRM or GPU runtime follows from declaration
+closure. Full driver/core linking and Tiger Lake validation remain pending.
+
+```sh
+build-support/run-v-tool.sh tests/linuxkpi/stddef_layout.v --keep-dir NEW_DIRECTORY
+```
