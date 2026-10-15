@@ -144,6 +144,9 @@ enum HostedText {
 	zed_starting
 	zed_missing
 	zed_exited
+	emacs_starting
+	emacs_missing
+	emacs_exited
 	gimp_starting
 	gimp_missing
 	gimp_exited
@@ -205,6 +208,9 @@ fn (t HostedText) text() string {
 		.zed_starting { tr('wine.zed.starting') }
 		.zed_missing { tr('wine.zed.missing') }
 		.zed_exited { tr('wine.zed.exited') }
+		.emacs_starting { tr('wine.emacs.starting') }
+		.emacs_missing { tr('wine.emacs.missing') }
+		.emacs_exited { tr('wine.emacs.exited') }
 		.gimp_starting { tr('wine.gimp.starting') }
 		.gimp_missing { tr('wine.gimp.missing') }
 		.gimp_exited { tr('wine.gimp.exited') }
@@ -471,7 +477,7 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 	// passing them to the launcher, so an old or ignored game-size option can
 	// never leave a smaller GLFW window floating in a white root surface.
 	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command,
-		name == 'minecraft' || name == 'zed', name == 'doom' || name == 'qemu' || name == 'opengothic'
+		name == 'minecraft' || name == 'zed' || name == 'emacs', name == 'doom' || name == 'qemu' || name == 'opengothic'
 		|| name == 'roblox' || name == 'dota2', name == 'obs') or {
 		app.failed = true
 		app.failure = .host_failed
@@ -683,7 +689,8 @@ fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, button AppPointer
 }
 
 fn (mut app HostedX11App) key_input(text string) {
-	if text=='\x0f' && !app.portal_open { app.portal_open=session_dialog_open('hosted.open',0,'Open file',desktop_home,'',''); if app.portal_open { return } }
+	// Emacs binds C-o to open-line; its own file command is C-x C-f.
+	if text=='\x0f' && app.starting != .emacs_starting && !app.portal_open { app.portal_open=session_dialog_open('hosted.open',0,'Open file',desktop_home,'',''); if app.portal_open { return } }
 	if text.len > 0 {
 		app.send_host_event(.keys, 0, 0, text)
 	}

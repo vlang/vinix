@@ -769,7 +769,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 46
+	assert available_apps.len == 49
 	assert available_apps[31].process_name == 'vinix-preview'
 	assert available_apps[31].keyboard && available_apps[31].pointer
 	assert available_apps[32].process_name == 'vinix-console'
@@ -789,7 +789,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[38].process_name == 'vinix-reminders'
 	assert available_apps[38].keyboard && available_apps[38].polling
 	assert available_apps[39].process_name == 'vinix-grapher'
-	assert available_apps[39].keyboard && !available_apps[39].polling
+	assert available_apps[39].keyboard && available_apps[39].polling
 	assert available_apps[40].process_name == 'vinix-color-meter'
 	assert available_apps[40].keyboard && available_apps[40].polling && available_apps[40].desktop_services
 	assert available_apps[40].poll_interval_ms == 100
@@ -813,6 +813,9 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[45].standalone && available_apps[45].keyboard && available_apps[45].pointer
 	assert available_apps[45].polling && available_apps[45].poll_interval_ms == 16
 	assert available_apps[45].width == 800 && available_apps[45].height == 680 + default_title_height
+	assert available_apps[48].title == 'Emacs'
+	assert available_apps[48].process_name == 'vinix-emacs'
+	assert available_apps[48].keyboard && available_apps[48].pointer && available_apps[48].polling
 	assert app_matches(available_apps[45].title, 'nintendo 64')
 	assert !app_matches(available_apps[44].title, 'nintendo 64')
 	assert available_apps[0].process_name == 'vinix-files'
@@ -941,7 +944,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[28].keyboard && available_apps[28].pointer
 	assert available_apps[28].polling && available_apps[28].poll_interval_ms == 50
 	assert available_apps[28].hide_body_cursor && available_apps[28].us_keys
-	assert available_apps.len == 46
+	assert available_apps.len == 49
 	assert app_start_actions.len == available_apps.len
 	assert app_start_jump_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len

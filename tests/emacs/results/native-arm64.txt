@@ -1,0 +1,16 @@
+Emacs on Vinix, native ARM64 guest
+Recorded: 2026-10-15 20:28:03 UTC
+QEMU: aarch64 virt/GICv3, HVF, host CPU, 4 CPUs, 8192 MiB, ramfb
+Alpine Emacs: 30.1-r1, unchanged X11 executable, no native compilation
+Emacs APK SHA-256: 26cc9400b24035967596b040aa5b398ee3a8aba6a13ce1a8f8e8bc17fce2ae84
+Emacs ELF SHA-256: cfe4ce5d05f868a53ac9332df4f52e0b03c267cada2eba987c960e803bb3f7f5
+Kernel SHA-256: a310a06243cd397bba18c8e594d55fb2c0cee4610b2fc64643e437720345da5e
+Desktop SHA-256: 5ea7a83c5856e57dffd6643e59147ea9e720bf4d6a7a9eb607cff72fb8c424eb
+Screenshot SHA-256: ff3e9fddf6245547c9fde38d3e24371486b86bb21c68bc454725b75fd470a372
+
+EMACS CHECK: Lisp evaluation and file round trip PASS
+EMACS CHECK: GUI keyboard edit and save PASS
+Interactive evaluation: M-x eval-buffer displayed "Hello from Emacs on Vinix!".
+Keyboard: C-o inserted an open line; C-x h/C-w replaced the buffer and C-x C-s saved it.
+Screenshot: real QEMU screendump, after keyboard editing, C-x C-s and eval-buffer.
+Host checks: utility catalog, Start menu paging and taskbar pinning PASS.

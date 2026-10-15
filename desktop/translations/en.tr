@@ -4885,3 +4885,12 @@ Zed is not installed.
 wine.zed.exited
 Zed exited.
 -----
+wine.emacs.starting
+Starting Emacs…
+-----
+wine.emacs.missing
+Emacs is not installed. Stage the Emacs runtime first.
+-----
+wine.emacs.exited
+Emacs exited.
+-----

@@ -436,6 +436,13 @@ RandR mode without changing the Alpine executable. See
 a real QEMU screenshot. The tested Alpine package is `0.138.4-r5`, retained by
 an Alpine mirror after its removal from the current edge/testing index.
 
+Emacs has a Start-menu entry and uses the same hosted X11 path. Its unchanged
+Alpine ARM64 Emacs 30.1 executable, portable dump, Lisp files and libraries live
+under `/usr/libexec/vinix-emacs/root`. `run-emacs` selects that private runtime;
+Emacs keeps its `C-o` open-line binding and `C-x C-f` file command. See
+[the Emacs guest workflow](../tests/emacs/README.md) for staging, keyboard
+edit/save checks and the real QEMU screenshot.
+
 GIMP uses the same hosted X11 path. `pkg install gimp` installs Alpine's native
 AArch64/musl build and restores the executable modes for its plug-ins; the
 desktop's `run-gimp` launcher disables the unavailable AT-SPI service and opens
