@@ -2822,3 +2822,45 @@ errors now advance to real dependencies. Remaining first-error groups include
 atomic I/O mapping path uses preemption pins; declaring migration APIs alone
 would not implement I/O mapping. Full driver/core compile/link, device binding,
 confirmed PCI identity and physical Tiger Lake validation remain pending.
+
+
+## Original slab flag type ownership (2026-10-15)
+
+`slab_flags_t` now belongs to `linux/types.h`, matching the pinned original
+`typedef unsigned int __bitwise slab_flags_t;`. The duplicate declaration in
+`linux/slab.h` is removed. Original KASAN declarations can therefore include
+types before slab, without changing allocation flags, accepted cache modes,
+allocator behavior or any object lifetime.
+
+The maintained V test checks 48 GNU99/GNU11 cases: 24 corrected production
+objects, 12 valid historical include orders and 12 expected wrong-owner
+failures. Every compiled object has zero runtime imports. It verifies exact
+unsigned-int identity, width/alignment/signedness, original cache prototypes and
+flag expressions, and original disabled-KASAN return identity. Eight production
+objects use an actual AArch64 compiler for generic scalar/cache declarations;
+they do not supply an ARM LinuxKPI runtime. Original Sparse annotation expansion
+matches in both dialects; no Sparse semantic-analyzer run is claimed.
+
+Fresh enabled/default x86 and default ARM kernel builds pass from isolated
+baseline `d7b24c4bf` plus only these two header edits. Source freeze
+`slab-types-native-freeze-v1.json` SHA256:
+`e3ceb4721eacf4583a15288172117306003b8fe5ee5893a3d6bbd55528db90ce`.
+Host result `slab-flag-types-final-v1/result.json` SHA256:
+`38d2e36eea13e5235c63a7ab5481625c59c39c2ad8df7975bc8a985734c467cd`.
+The three-path manifest records 153 saved compiler-dependency snapshots so
+later unrelated header work cannot be mistaken for this test's inputs.
+Independent source, compiler-input, object and full-audit review SHA256:
+`2da86f390896a22a29190b7b92c6b008f592794cf17012f0edc362d384218ef2`.
+Evidence is under `/Users/alex/.cache/vinix-linuxkpi/smp-oct10/slab-*`.
+Repeat with:
+
+```sh
+build-support/run-v-tool.sh tests/linuxkpi/slab_flag_types.v --keep-dir NEW_DIRECTORY
+```
+
+All 25 previously blocked commands now pass the slab flag type declaration and
+reach original `memremap.h`'s existing `DECLARE_FLEX_ARRAY` dependency. The full
+unchanged audit remains **6/269**, with 229 task/MM/vfork first errors, 28 type
+declaration errors, five migration API declarations and one entry-stack record.
+The 7,668-file import is unchanged. This is compiler/type closure; driver/core
+linking, device ownership and physical Tiger Lake validation remain pending.

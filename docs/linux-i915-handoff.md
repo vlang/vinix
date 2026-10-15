@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-15 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Latest CPU-bug build baseline: **`156ef022a`**, with fifteen frozen production/tool paths described below. Recheck HEAD and the worktree before
+Latest type-header build baseline: **`d7b24c4bf`**, with two frozen production headers described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -2563,3 +2563,36 @@ identity and lifetimes; sleep-preserving migration pins if providing those APIs.
 Five migration diagnostics are parsed PREEMPT_RT alternatives, not five executed
 i915 migration sites. Do not add placeholder task fields or claim Linux page,
 MMIO, PCI/DRM ownership from header closure. GPU completion is still pending.
+
+
+## Slab flag type header ownership (2026-10-15)
+
+The exact original `slab_flags_t` typedef is now owned by `linux/types.h`, with
+the duplicate removed from `linux/slab.h`. No allocator mode or lifetime changes.
+Isolated enabled/default x86 and default ARM builds pass from `d7b24c4bf` plus
+only these two headers. Freeze SHA256:
+`e3ceb4721eacf4583a15288172117306003b8fe5ee5893a3d6bbd55528db90ce`.
+Maintained `tests/linuxkpi/slab_flag_types.v` passes 48 strict GNU99/GNU11 cases:
+24 production objects, 12 valid old include orders, 12 intended old-owner
+failures; all 36 compiled objects have zero imports. Actual AArch64 scalar/cache
+probes and original Sparse preprocessing are compiler evidence only.
+
+`slab-flag-types-final-v1/result.json` SHA256:
+`38d2e36eea13e5235c63a7ab5481625c59c39c2ad8df7975bc8a985734c467cd`;
+`slab-flag-types-three-path-manifest-v1.json` SHA256:
+`1614cad8cdc4ca05ccf41b0d8b11f46bb8d113b7b942866d5d87ce8b08932aa9`.
+This includes 153 saved compiler-dependency byte snapshots. Exact 25-command
+isolated replay receipt SHA256:
+`b0bae05001e55af8e86eded373bdf8858d92d63680f00c3eee0ce825d8fe9553`.
+Independent source, object/input and full-audit review SHA256:
+`2da86f390896a22a29190b7b92c6b008f592794cf17012f0edc362d384218ef2`.
+The full audit remains 6/269: 229 real task/MM/vfork, 28 type declaration,
+five migration API declarations, one entry-stack record. All 7,668 imported files
+are unchanged. The 25 slab errors now expose genuine DECLARE_FLEX_ARRAY usage
+in original memremap.h, not successful complete translation units.
+
+Evidence/build worktrees are durable below
+`/Users/alex/.cache/vinix-linuxkpi/smp-oct10/slab-*`. Migration-pin work may be
+in progress separately; it is not part of these type-only artifacts. Continue
+through real task/MM, page/mapping/device and DRM dependencies. GPU validation
+and full unchanged driver/core compile/link remain pending.

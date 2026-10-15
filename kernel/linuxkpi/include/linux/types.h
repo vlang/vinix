@@ -19,6 +19,7 @@ typedef u32 __kernel_dev_t;
 typedef __kernel_dev_t dev_t;
 typedef unsigned short umode_t;
 typedef unsigned int gfp_t;
+typedef unsigned int __bitwise slab_flags_t;
 #define pgoff_t unsigned long
 typedef u64 phys_addr_t;
 typedef u64 dma_addr_t;

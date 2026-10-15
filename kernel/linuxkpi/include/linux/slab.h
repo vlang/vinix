@@ -4,11 +4,6 @@
 #include <linux/types.h>
 /* Use the actual upstream flag definitions, including their numeric values. */
 #include <linux/gfp_types.h>
-#ifdef __CHECKER__
-typedef unsigned int __attribute__((bitwise)) slab_flags_t;
-#else
-typedef unsigned int slab_flags_t;
-#endif
 struct kmem_cache;
 
 /* Linux 6.6.157 flag values. Disabled diagnostic/accounting facilities use
