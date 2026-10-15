@@ -513,6 +513,13 @@ the busy state. Nested locks are tried without waiting under the process table
 lock, with conservative refusal on contention. Concurrent directory publication,
 read-only descriptions/mappings and executable mappings still need complete
 mount-reference admission and ownership accounting.
+The [running-executable unmount checks](../tests/mount-lifecycle/unmount-exec.md)
+also refuse ordinary detach while a live process's recorded executable uses
+the actual attachment selected by its loader. Namespace copies and bind aliases
+remain distinct; unlink and close-on-exec do not release a running image, while
+executable replacement and completed process teardown do. This borrows the
+existing executable snapshot without adding ownership or allocation. Concurrent
+image publication and arbitrary executable mappings remain open.
 The [attachment identity checks](../tests/mount-lifecycle/identities.md) qualify
 unmount, remount and move refusal through detached/foreign mount descriptors
 and cwd, while valid local operations remain available. Retained read-only

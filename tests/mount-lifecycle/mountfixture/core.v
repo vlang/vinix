@@ -347,6 +347,7 @@ fn move_cycles(check_depth bool) {
 @[export: 'main']
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		unmount_exec_entry(argc, argv)
 		exec_relative_entry(argc, argv)
 		exec_cloexec_entry(argc, argv)
 		exec_fd_entry(argc, argv)
@@ -359,6 +360,8 @@ pub fn run(argc i32, argv &&char) i32 {
 		count := C.read(fd, &name[0], 31)
 		check(fd >= 0 && count > 0 && C.close(fd) == 0, 4)
 		selected := &char(&name[0])
+		unmount_exec := if count == 4 && name[0] == `u` && name[1] == `e` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		unmount_path := if count == 4 && name[0] == `u` && name[1] == `d` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		unmount_writer := if count == 4 && name[0] == `u` && name[1] == `w` && name[2] == `-`
@@ -432,6 +435,7 @@ pub fn run(argc i32, argv &&char) i32 {
 		writer_case := if count == 4 && name[0] == `w` && name[1] == `r` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		check(C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'move') == 0
+			|| C.strcmp(selected, c'unmount-exec') == 0 || unmount_exec >= 0
 			|| C.strcmp(selected, c'unmount-paths') == 0 || unmount_path >= 0
 			|| C.strcmp(selected, c'unmount-writers') == 0 || unmount_writer >= 0
 			|| C.strcmp(selected, c'unmounts') == 0 || unmount_case >= 0
@@ -479,6 +483,9 @@ pub fn run(argc i32, argv &&char) i32 {
 		if C.strcmp(selected, c'unmount-paths') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { unmount_path_cases(-1) }
 		if unmount_path >= 0 { unmount_path_cases(unmount_path) }
+		if C.strcmp(selected, c'unmount-exec') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { unmount_exec_cases(-1) }
+		if unmount_exec >= 0 { unmount_exec_cases(unmount_exec) }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
 		if C.strcmp(selected, c'identities') == 0 || C.strcmp(selected, c'all') == 0

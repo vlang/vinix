@@ -46,7 +46,11 @@ fn unmount_paths_in_use(entry &Mount) bool {
 		mut owner := proc.process_at(pid)
 		if owner == unsafe { nil } || owner.exit_published { continue }
 		if !owner.fs_lock.test_and_acquire() { return true }
-		held := unmount_directory_uses(owner.current_directory, &owner.current_mount,
+		// Executables retain the loader's actual attachment, even after a
+		// namespace copy. Unlike cwd/root, do not resolve this route by id.
+		held := (owner.exe_node != unsafe { nil }
+			&& lib.mount_context_top(&owner.exe_mount) == voidptr(entry))
+			|| unmount_directory_uses(owner.current_directory, &owner.current_mount,
 			owner.ns.mnt, entry, boot_root)
 			|| unmount_directory_uses(owner.root_directory, &owner.root_mount,
 				owner.ns.mnt, entry, boot_root)

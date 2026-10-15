@@ -30,6 +30,9 @@ Linux `move-reference` includes the eight portable cases (`uw-0` through `uw-7`)
 `--case unmount-paths` selects [working/root-directory busy checks](unmount-paths.md);
 `ud-0` through `ud-9` select individual cases. Native `all` and Linux
 `move-reference` include all ten cases.
+`--case unmount-exec` selects [running-executable busy checks](unmount-exec.md);
+`ue-0` through `ue-7` select individual cases. Native `all` and Linux
+`move-reference` include all eight cases.
 `--case admission` selects the new-filesystem/bind/devpts admission group;
 `ad-0` through `ad-7` select its individual cases.
 `--case propagation` selects propagation request validation; `pr-0` through
