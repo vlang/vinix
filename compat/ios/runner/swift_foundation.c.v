@@ -119,7 +119,7 @@ fn swift_foundation_arena() u64 {
 	swift_url_metadata_emit(base, data)
 	swift_data_emit(base, data)
 	swift_data_write_emit(base)
-	swift_date_emit(base)
+	swift_date_emit(base, data)
 	// A concrete specialization of Foundation's retroactive String conformance.
 	// The installed descriptor uses a generic witness cache; this implementation
 	// supplies its already-specialized table, accepted by normal witness lookup.
@@ -138,7 +138,7 @@ fn swift_foundation_arena() u64 {
 	// destructiveInjectEnumTag witness. Native formatted(DateFormatter) is
 	// payload case zero; this does not construct an encoder or format a date.
 	write32(data + 96, 0)
-	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 1288) })
+	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 1336) })
 	if C.mprotect(unsafe { voidptr(base) }, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(unsafe { voidptr(base) }, usize(page * 2)); panic('iOS: cannot seal Swift Foundation entries')
@@ -288,6 +288,8 @@ fn swift_foundation_symbol(symbol string) !u64 {
 	if address := swift_json_decoder_symbol(symbol) { return address }
 	if address := swift_json_date_symbol(symbol) { return address }
 	return match symbol {
+		'_$s10Foundation4DateVMa' { swift_foundation_arena() + 1312 }
+		'_$s10Foundation4DateVMn' { swift_foundation_arena() + u64(C.getpagesize()) + 464 }
 		'_$s10Foundation4DateV11distantPastACvgZ' { swift_foundation_arena() + 1152 }
 		'_$s10Foundation4DateV17timeIntervalSinceySdACF' { swift_foundation_arena() + 1184 }
 		'_$s10Foundation4DateV2eeoiySbAC_ACtFZ' { swift_foundation_arena() + 1216 }

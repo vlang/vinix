@@ -6550,23 +6550,50 @@ streams/programs and four joined, retired VM phases are retained under
 `build/ios/fortnite/date-value-checks`, with native constructor tail-body
 inspection, IPA equality call sites and constructor function-address
 references. Full iOS regression remains unpassed; published runners remain
-unchanged. Date metadata and protocol conformances remain unsupported.
+unchanged. Date metadata and protocol conformances were not included in that
+milestone.
 
-The current IPA probe resolves equality and construction, then exits with
-status 1 at `_$s10Foundation4DateVMa` (the Date metadata accessor). Fortnite
-has not entered application code and remains unplayable.
+The following milestone implements Date's metadata accessor and nominal
+descriptor in V. Both Foundation install names publish one complete metadata
+identity for every request. Its eight-byte size/stride, alignment, native
+`0x02000007` witness flags, zero extra inhabitants and field offset match the
+installed runtime. Copy/take operations preserve every Double bit pattern,
+including signaling NaNs, without ARC; destruction is a no-op. Single-payload
+enum witnesses preserve present values and use the native ninth tag byte and
+wrapping UInt32 empty-case payload. The private descriptor supports nominal
+symbolic lookup; field reflection and Apple's initialization extensions remain
+outside this profile. Metadata and code share the existing sealed Foundation
+arena and retire with it.
+
+Eight ASan/UBSan runs and four ARM64 suites pass for Date, Data writing,
+Base64 and reference snapshots. Tests compare native metadata and all value
+witnesses, exact unaligned/read-only/guarded spans, copy aliases, enum tag
+boundaries, accessor result/context registers, protected unused arguments,
+bounded symbolic names, eight-worker publication and two unchanged-ownership,
+unmapped teardowns. Eleven final C streams/programs and four joined, retired
+VM phases are retained under `build/ios/fortnite/date-metadata-checks`, with
+native disassembly, generated-C allocation checks and required IPA accessor
+calls and indirect nominal type references. The initial descriptor audit
+that searched only text consumers and the next-blocker helper's attempt to
+disassemble conformance data are retained. Full iOS regression remains
+unpassed; published runners remain unchanged.
+
+The current IPA probe resolves Date metadata, then exits with status 1 at
+`_$s10Foundation4DateVSEAAMc` (the Date Encodable conformance). Date protocol
+conformances remain unsupported. Fortnite has not entered application code
+and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,511 | 649 | 79 |
+| Fortnite executable | 1,513 | 647 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,346 | 652 | 120 |
+| All images | 2,348 | 650 | 120 |
 
-The C++/GLES/Text variant reports 2,359 resolved imports, 639 unresolved strong
+The C++/GLES/Text variant reports 2,361 resolved imports, 637 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -21,6 +21,150 @@ type SwiftDateProbe = fn (u64, u64, u64, &u64)
 type SwiftDateAccess = fn (u64) SwiftAssociatedMetadata
 type SwiftDateIntervalProbe = fn (u64, u64, u64, u64, &u64)
 type SwiftDateClock = fn () f64
+type SwiftDateMetadataProbe = fn (u64, u64, &u64)
+type SwiftDateCopy = fn (u64, u64, u64) u64
+type SwiftDateDestroy = fn (u64, u64)
+type SwiftDateGetTag = fn (u64, u32, u64) u32
+type SwiftDateStoreTag = fn (u64, u32, u32, u64)
+type SwiftDateLookup = fn (u64, u64, u64, u64, u64) u64
+
+fn swift_date_relative(address u64) u64 {
+	delta := i32(read32(address))
+	return if delta == 0 { u64(0) } else { u64(i64(address) + delta) }
+}
+
+fn swift_date_metadata_cases(entry u64, descriptor u64, code u64, native bool) u64 {
+	response := unsafe { SwiftDateAccess(voidptr(entry))(0) }
+	metadata := response.metadata
+	assert response.state == 0 && read64(metadata) == 0x200
+	assert read64(metadata + 8) & 0x0000ffffffffffff == descriptor && read32(metadata + 16) == 0
+	witness := read64(metadata - 8) & u64(0x0000ffffffffffff)
+	assert read64(witness + 64) == 8 && read64(witness + 72) == 8
+	assert read32(witness + 80) == 0x02000007 && read32(witness + 84) == 0
+	assert read32(descriptor) & 0xffff == 0x51 && read32(descriptor + 20) == 1 && read32(descriptor + 24) == 2
+	assert unsafe { (&char(swift_date_relative(descriptor + 8))).vstring() } == 'Date'
+	parent := swift_date_relative(descriptor + 4)
+	assert unsafe { (&char(swift_date_relative(parent + 8))).vstring() } == 'Foundation'
+	if !native {
+		assert read32(descriptor) == 0x51 && swift_date_relative(descriptor + 16) == 0
+		swift_date_mapping(entry, 24, true, true)
+		swift_date_mapping(metadata - 8, 176, true, false)
+	}
+	probe := unsafe { SwiftDateMetadataProbe(voidptr(code + 544)) }
+	for accessor in [entry, swift_date_relative(descriptor + 12)]! {
+		for request in [u64(0), 0x3f, 0xff, 0x100, 0x13f, 0x1ff, ~u64(0)]! {
+			mut output := [u64(0xcafe), 0, 0, 0, 0, 0xbeef]!
+			probe(request, accessor, unsafe { &output[1] })
+			assert output == [u64(0xcafe), metadata, 0, 0x5020, 0x5021, 0xbeef]!
+		}
+	}
+	return metadata
+}
+
+fn swift_date_witness_cases(metadata u64, guard u64) {
+	witness := read64(metadata - 8) & u64(0x0000ffffffffffff)
+	page := usize(C.getpagesize())
+	span := u64(C.mmap(unsafe { nil }, page * 5, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+	assert span != u64(-1)
+	for source_end in [false, true]! {
+		for destination_end in [false, true]! {
+			source := span + u64(page) + if source_end { u64(page) - 8 } else { u64(1) }
+			destination := span + u64(page * 3) + if destination_end { u64(page) - 8 } else { u64(1) }
+			for bits in [u64(0), 1, 0x8000000000000000, 0x3ff0000000000000, 0xc22d63c8c5000000,
+				0x7ff0000000000000, 0x7ff0000000000042, 0xfff8000000000081, ~u64(0)]! {
+				assert C.mprotect(voidptr(span + u64(page)), page, C.PROT_READ | C.PROT_WRITE) == 0
+				C.memcpy(voidptr(source), unsafe { &bits }, 8)
+				assert C.mprotect(voidptr(span + u64(page)), page, C.PROT_READ) == 0
+				assert C.mprotect(voidptr(span + u64(page * 3)), page, C.PROT_READ | C.PROT_WRITE) == 0
+				for slot in [u64(0), 2, 3, 4, 5]! {
+					transfer := unsafe { SwiftDateCopy(voidptr(read64(witness + slot * 8) & 0x0000ffffffffffff)) }
+					C.memset(voidptr(span + u64(page * 3)), 0xa5, page)
+					assert transfer(destination, source, guard) == destination
+					assert transfer(destination, destination, guard) == destination
+					mut copied := u64(0)
+					C.memcpy(unsafe { &copied }, voidptr(destination), 8)
+					assert copied == bits
+					C.memcpy(unsafe { &copied }, voidptr(source), 8)
+					assert copied == bits
+					for offset in u64(0) .. u64(page) {
+						address := span + u64(page * 3) + offset
+						if address < destination || address >= destination + 8 { assert unsafe { *(&u8(address)) } == 0xa5 }
+					}
+				}
+			}
+		}
+	}
+	destroy := unsafe { SwiftDateDestroy(voidptr(read64(witness + 8) & 0x0000ffffffffffff)) }
+	get_tag := unsafe { SwiftDateGetTag(voidptr(read64(witness + 48) & 0x0000ffffffffffff)) }
+	store_tag := unsafe { SwiftDateStoreTag(voidptr(read64(witness + 56) & 0x0000ffffffffffff)) }
+	destroy(guard, guard)
+	assert get_tag(guard, 0, guard) == 0
+	store_tag(guard, 0, 0, guard)
+	for cases in [u32(0), 1, 17, 0x7fffffff, 0x80000000, 0xffffffff]! {
+		for tag in [u32(0), 1, 17, 0x7fffffff, 0xfffffffe, 0xffffffff]! {
+			for at_end in [false, true]! {
+				width := if cases == 0 { u64(8) } else { u64(9) }
+				value := span + u64(page * 3) + if at_end { u64(page) - width } else { u64(1) }
+				C.memset(voidptr(span + u64(page * 3)), 0xa5, page)
+				store_tag(value, tag, cases, guard)
+				mut bits := u64(0)
+				C.memcpy(unsafe { &bits }, voidptr(value), 8)
+				assert bits == if tag == 0 { u64(0xa5a5a5a5a5a5a5a5) } else { u64(tag - 1) }
+				assert get_tag(value, cases, guard) == if cases == 0 { u32(0) } else { tag }
+				if cases != 0 { assert unsafe { *(&u8(value + 8)) } == if tag == 0 { u8(0) } else { u8(1) } }
+				for offset in u64(0) .. u64(page) {
+					address := span + u64(page * 3) + offset
+					if address < value || address >= value + width { assert unsafe { *(&u8(address)) } == 0xa5 }
+				}
+			}
+		}
+	}
+	// A present payload leaves all eight bits untouched; nonzero tag bytes
+	// use a wrapping UInt32 payload increment, independent of the case count.
+	value := span + u64(page * 4) - 9
+	for byte in [u8(1), 0x80, 0xff]! {
+		C.memset(voidptr(value), 0xff, 8)
+		unsafe { *(&u8(value + 8)) = byte }
+		assert get_tag(value, 1, guard) == 0
+		store_tag(value, 0, 1, guard)
+		assert unsafe { *(&u8(value + 8)) } == 0
+		mut bits := u64(0)
+		C.memcpy(unsafe { &bits }, voidptr(value), 8)
+		assert bits == ~u64(0)
+	}
+	assert C.munmap(voidptr(span), page * 5) == 0
+}
+
+fn swift_date_symbolic(lookup SwiftDateLookup, descriptor u64, metadata u64) {
+	page := usize(C.getpagesize())
+	span := u64(C.mmap(unsafe { nil }, page * 2, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+	assert span != u64(-1) && C.mprotect(voidptr(span), page, C.PROT_READ | C.PROT_WRITE) == 0
+	name := span + u64(page) - 5
+	slot := span + 16
+	unsafe { *(&u8(name)) = 2; *(&u64(slot)) = descriptor }
+	delta := i32(i64(slot) - i64(name + 1))
+	C.memcpy(voidptr(name + 1), unsafe { &delta }, 4)
+	assert C.mprotect(voidptr(span), page, C.PROT_READ) == 0
+	for request in [u64(0), 0x3f, 0xff, 0x100, 0x13f, 0x1ff]! {
+		assert lookup(request, name, 5, 0, 0) == metadata
+	}
+	assert C.munmap(voidptr(span), page * 2) == 0
+}
+
+fn swift_date_metadata_publish(framework bool) u64 {
+	library := if framework { '/System/Library/Frameworks/Foundation.framework/Foundation' } else { '/usr/lib/swift/libswiftFoundation.dylib' }
+	first := if framework { '_$s10Foundation4DateVMa' } else { '_$s10Foundation4DateVMn' }
+	assert (runtime_symbol(library, first) or { panic(err) }) != 0
+	mut metadata := u64(0)
+	for _ in 0 .. 128 {
+		entry := runtime_symbol(library, '_$s10Foundation4DateVMa') or { panic(err) }
+		descriptor := runtime_symbol(library, '_$s10Foundation4DateVMn') or { panic(err) }
+		response := unsafe { SwiftDateAccess(voidptr(entry))(0xff) }
+		assert response.state == 0 && read64(response.metadata + 8) == descriptor
+		metadata = response.metadata
+	}
+	return metadata
+}
 
 fn swift_date_mapping(address u64, length u64, mapped bool, executable bool) {
 	$if macos {
@@ -276,7 +420,13 @@ fn test_swift_date() {
 		0xd28a0435, 0xd63f0200, 0xf9000260, 0xa900d674, 0xa94153f3, 0xa9425bf5, 0xa8c37bfd, 0xd65f03c0]! {
 		write32(code + 416 + u64(i * 4), op)
 	}
-	C.__builtin___clear_cache(unsafe { voidptr(code) }, unsafe { voidptr(code + 504) })
+	// Metadata accessor returns a complete x0/x1 pair for any request, while
+	// preserving Swift context. This also probes the descriptor's accessor.
+	for i, op in [u32(0xa9bd7bfd), 0xa90153f3, 0xa9025bf5, 0xaa0203f3, 0xaa0103f0, 0xd28a0414,
+		0xd28a0435, 0xd63f0200, 0xa9000660, 0xa9015674, 0xa94153f3, 0xa9425bf5, 0xa8c37bfd, 0xd65f03c0]! {
+		write32(code + 544 + u64(i * 4), op)
+	}
+	C.__builtin___clear_cache(unsafe { voidptr(code) }, unsafe { voidptr(code + 600) })
 	assert C.mprotect(unsafe { voidptr(code) }, page, C.PROT_READ | C.PROT_EXEC) == 0
 	probe := unsafe { SwiftDateProbe(voidptr(code)) }
 	mut interval_reader := u64(0)
@@ -302,6 +452,15 @@ fn test_swift_date() {
 		metadata := response.metadata
 		witness := read64(metadata - 8) & u64(0x0000ffffffffffff)
 		assert read64(witness + 64) == 8 && read64(witness + 72) == 8
+		descriptor := u64(C.dlsym(foundation, c'$s10Foundation4DateVMn'))
+		assert descriptor != 0 && descriptor == u64(C.dlsym(overlay, c'$s10Foundation4DateVMn'))
+		assert u64(access) == u64(C.dlsym(overlay, c'$s10Foundation4DateVMa'))
+		assert swift_date_metadata_cases(u64(access), descriptor, code, true) == metadata
+		swift_date_witness_cases(metadata, guard)
+		core := C.dlopen(c'/usr/lib/swift/libswiftCore.dylib', 2)
+		lookup := C.dlsym(core, c'swift_getTypeByMangledNameInContextInMetadataState')
+		assert lookup != unsafe { nil }
+		swift_date_symbolic(unsafe { SwiftDateLookup(lookup) }, descriptor, metadata)
 		swift_date_cases(entry, probe, guard, u64(page), interval_reader)
 		swift_date_intervals(interval_reader, 0, code, guard)
 		swift_date_equal_cases(native_equal, 0, code, guard)
@@ -316,7 +475,7 @@ fn test_swift_date() {
 		}
 		value_workers.wait()
 		unsafe { value_workers.free() }
-		println('IOS-SWIFT-DATE-NATIVE: distantPast bits and interval consumer; equality of finite values, signed zero, subnormals, infinities, quiet/signaling NaNs and aliases; Date() bounded by the CF clock, guarded eight-byte spans, protected unused registers, canonical Bool/context and concurrent calls measured')
+		println('IOS-SWIFT-DATE-NATIVE: complete Ma/Mn and nominal identity, POD8 witnesses/flags, unaligned guarded bit copies and aliases, no-op destruction, exact enum tag spans/wrapping and symbolic metadata lookup; distantPast, IEEE intervals/equality, fresh Date() and concurrent calls measured')
 	}
 	if _ := swift_foundation_symbol('_$s10Foundation4DateV11distantPastACvgZ') {
 		assert false
@@ -324,6 +483,18 @@ fn test_swift_date() {
 	for _ in 0 .. 2 {
 		objc_start()
 		baseline := ios_runtime.live
+		mut metadata_workers := []thread u64{}
+		for i in 0 .. 8 { metadata_workers << spawn swift_date_metadata_publish(i % 2 == 0) }
+		metadata_results := metadata_workers.wait()
+		metadata := metadata_results[0]
+		for result in metadata_results { assert result == metadata }
+		unsafe { metadata_workers.free(); metadata_results.free() }
+		accessor := swift_foundation_symbol('_$s10Foundation4DateVMa') or { panic(err) }
+		descriptor := swift_foundation_symbol('_$s10Foundation4DateVMn') or { panic(err) }
+		assert swift_date_metadata_cases(accessor, descriptor, code, false) == metadata
+		assert metadata != swift_integer_metadata() && metadata != swift_string_metadata()
+		swift_date_witness_cases(metadata, guard)
+		swift_date_symbolic(unsafe { SwiftDateLookup(voidptr(swift_mangled_state_lookup)) }, descriptor, metadata)
 		mut publishers := []thread u64{}
 		for i in 0 .. 8 { publishers << spawn swift_date_publish(i % 2 == 0) }
 		entries := publishers.wait()
@@ -341,6 +512,8 @@ fn test_swift_date() {
 		assert equal == arena + 1216 && now == arena + 1248
 		for library in ['/System/Library/Frameworks/Foundation.framework/Foundation',
 			'/usr/lib/swift/libswiftFoundation.dylib']! {
+			assert accessor == runtime_symbol(library, '_$s10Foundation4DateVMa') or { panic(err) }
+			assert descriptor == runtime_symbol(library, '_$s10Foundation4DateVMn') or { panic(err) }
 			assert equal == runtime_symbol(library, '_$s10Foundation4DateV2eeoiySbAC_ACtFZ') or { panic(err) }
 			assert now == runtime_symbol(library, '_$s10Foundation4DateVACycfC') or { panic(err) }
 		}
@@ -360,7 +533,7 @@ fn test_swift_date() {
 		mut workers := []thread{}
 		for _ in 0 .. 8 { workers << spawn swift_date_worker(entry, probe, guard) }
 		workers.wait()
-		for unsupported in ['_$s10Foundation4DateVMa', '_$s10Foundation4DateVMn',
+		for unsupported in ['_$s10Foundation4DateVN', '_$s10Foundation4DateVSeAAMc', '_$s10Foundation4DateVSEAAMc',
 			'_$s10Foundation4DateV13distantFutureACvgZ']! {
 			if _ := swift_foundation_symbol(unsupported) {
 				assert false
@@ -372,7 +545,7 @@ fn test_swift_date() {
 		if _ := framework_symbol('/System/Library/Frameworks/UIKit.framework/UIKit', '_$s10Foundation4DateV11distantPastACvgZ') {
 			assert false
 		}
-		for name in ['_$s10Foundation4DateV2eeoiySbAC_ACtFZ', '_$s10Foundation4DateVACycfC']! {
+		for name in ['_$s10Foundation4DateVMa', '_$s10Foundation4DateVMn', '_$s10Foundation4DateV2eeoiySbAC_ACtFZ', '_$s10Foundation4DateVACycfC']! {
 			if _ := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', name) {
 				assert false
 			}
@@ -387,12 +560,12 @@ fn test_swift_date() {
 		if _ := swift_foundation_symbol('_$s10Foundation4DateV11distantPastACvgZ') {
 			assert false
 		}
-		for name in ['_$s10Foundation4DateV2eeoiySbAC_ACtFZ', '_$s10Foundation4DateVACycfC']! {
+		for name in ['_$s10Foundation4DateVMa', '_$s10Foundation4DateVMn', '_$s10Foundation4DateV2eeoiySbAC_ACtFZ', '_$s10Foundation4DateVACycfC']! {
 			if _ := swift_foundation_symbol(name) {
 				assert false
 			}
 		}
 	}
 	assert C.munmap(unsafe { voidptr(code) }, page) == 0 && C.munmap(unsafe { voidptr(guard) }, page * 3) == 0
-	println('IOS-SWIFT-DATE: distantPast, intervals, canonical floating equality and fresh nanosecond-clock Date() values, guarded readonly inputs and x8 result boundaries, unused registers and context, native IEEE/alias behavior, concurrent calls, scoped publication and two unchanged-ownership/unmapped teardowns')
+	println('IOS-SWIFT-DATE: complete nominal Ma/Mn, POD8 witnesses/flags, guarded unaligned bit copies and enum tags, symbolic lookup and eight-worker publication; distantPast, IEEE intervals/equality and fresh Date(), scoped exports and two unchanged-ownership/unmapped teardowns')
 }
