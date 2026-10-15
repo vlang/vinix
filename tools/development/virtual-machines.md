@@ -85,9 +85,28 @@ tries IDs before names, so passing a numeric name directly could restore another
 snapshot's disk while loading the intended variables. Existing snapshot receipts
 remain compatible. Missing or duplicate names, invalid/duplicate IDs and failed
 inventory commands refuse restoration before changing disk or variables.
-Inspection uses the pinned image tool under the offline lock, with a 30-second
-deadline and a 1 MiB output limit. `snapshot-info.json` and `snapshot-info.log`
+Snapshot operations inspect the disk through the pinned image tool under the
+offline lock. Inventory commands have a 30-second deadline and a 1 MiB output
+limit. `snapshot-info.json` and `snapshot-info.log`
 retain the successful inventory and command diagnostics.
+
+New receipts also record `disk_identity`, a SHA-256 of the snapshot's ID,
+name and creation seconds/nanoseconds from QEMU's
+[snapshot metadata](https://github.com/qemu/qemu/blob/v11.1.0/qapi/block-core.json#L13).
+Restore and deletion compare that identity before preparing variables or a
+pending operation. A deleted and recreated backend snapshot cannot silently
+reuse the old firmware sidecar, even when qcow2 recycles its ID. Creation
+refuses a backend name that already exists without sidecars; deletion refuses
+duplicate names. Successful creation records identity only after inspecting
+the new backend snapshot. A failed final inspection leaves the pending marker
+and copied variables for recovery.
+
+Legacy receipts without `disk_identity` retain exact-name lookup and firmware
+hash checks; their original backend identity cannot be established retroactively.
+The binding detects metadata replacement rather than hashing the snapshot's
+disk contents. Managed operations share the offline lease; concurrent external
+image editing remains outside this protocol. To replace a managed snapshot,
+delete and recreate it through the manager while the VM is stopped.
 
 State must be owned by the calling user with mode 0700. QEMU option paths must
 be absolute and contain no comma or newline; state paths are limited to 80 bytes
@@ -113,3 +132,13 @@ inventory preserve disk/variables without leaving a pending marker or temporary
 variable image. Metadata checks also cover malformed JSON, incorrect formats,
 empty/NUL-containing IDs and duplicate IDs. The existing real QEMU lifecycle,
 locking, live-snapshot refusal and independent-variable checks also passed.
+
+The subsequent snapshot-binding regressions reproduced duplicate backend
+creation, ambiguous deletion and stale-sidecar acceptance after a real qcow2
+ID was recycled. The complete host `vmcore` suite then passed with identity
+binding on the same QEMU/V versions. Refused operations preserve the exact
+disk hash, current variables, existing sidecars and manifest, and leave no
+new pending marker or temporary variable image. Legacy receipt restoration,
+numeric names, ordinary snapshot round trips and the existing QEMU lifecycle
+checks also pass. Power-loss atomicity and Vinix-hosted QEMU qualification
+remain separate work.

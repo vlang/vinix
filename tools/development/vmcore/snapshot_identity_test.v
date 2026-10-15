@@ -43,7 +43,7 @@ fn snapshot_test_disk(image_tool string, state string, destination string, value
 }
 
 fn test_snapshot_inventory_requires_an_unambiguous_exact_name_and_id() {
-	assert snapshot_restore_id('{"format":"qcow2","snapshots":[{"id":"1","name":"anchor"},{"id":"2","name":"1"}]}', '1')! == '2'
+	assert snapshot_target('{"format":"qcow2","snapshots":[{"id":"1","name":"anchor"},{"id":"2","name":"1"}]}', '1')!.id == '2'
 	for text in [
 		'{"format":"raw","snapshots":[{"id":"1","name":"target"}]}',
 		'{"format":"qcow2","snapshots":[{"id":"target","name":"other"}]}',
@@ -54,7 +54,7 @@ fn test_snapshot_inventory_requires_an_unambiguous_exact_name_and_id() {
 		'not JSON',
 	] {
 		mut refused := false
-		snapshot_restore_id(text, 'target') or { refused = true }
+		snapshot_target(text, 'target') or { refused = true }
 		assert refused
 	}
 }
@@ -137,4 +137,108 @@ fn test_missing_or_duplicate_snapshot_names_refuse_before_changing_disk_or_varia
 	assert os.read_file(state + '/vars.fd')! == 'current-variables-must-survive'
 	assert !os.exists(state + '/snapshot.pending.json') && !os.exists(state + '/vars.restore')
 	assert os.read_file(state + '/snapshot-info.log')!.len > 0
+}
+
+fn test_snapshot_creation_refuses_an_existing_backend_name_without_sidecars() {
+	image_tool := os.find_abs_path_of_executable('qemu-img') or {
+		println('SKIP: snapshot creation identity requires qemu-img')
+		return
+	}
+	root := '/tmp/vinix-vm-snapshot-create-${os.getpid()}'
+	state := snapshot_test_state(root, image_tool)!
+	defer { os.rmdir_all(root) or {} }
+	snapshot_test_command([image_tool, 'snapshot', '-c', 'orphan', state + '/disk.qcow2'])!
+	disk_hash := devcore.file_hash(state + '/disk.qcow2')!
+	mut refused := false
+	snapshot('snapshot-create', state, 'orphan') or {
+		refused = true
+		assert err.msg().contains('already exists')
+	}
+	assert refused, 'a backend snapshot name must not be duplicated when its sidecars are absent'
+	assert devcore.file_hash(state + '/disk.qcow2')! == disk_hash
+	assert os.read_file(state + '/vars.fd')! == 'variables-anchor'
+	assert !os.exists(state + '/snapshots/orphan.json') && !os.exists(state + '/snapshots/orphan.fd')
+	assert !os.exists(state + '/snapshot.pending.json')
+}
+
+fn test_snapshot_deletion_refuses_an_ambiguous_backend_name() {
+	image_tool := os.find_abs_path_of_executable('qemu-img') or {
+		println('SKIP: snapshot deletion identity requires qemu-img')
+		return
+	}
+	root := '/tmp/vinix-vm-snapshot-delete-${os.getpid()}'
+	state := snapshot_test_state(root, image_tool)!
+	defer { os.rmdir_all(root) or {} }
+	snapshot('snapshot-create', state, 'duplicate')!
+	snapshot_test_command([image_tool, 'snapshot', '-c', 'duplicate', state + '/disk.qcow2'])!
+	disk_hash := devcore.file_hash(state + '/disk.qcow2')!
+	manifest := os.read_file(state + '/snapshots/duplicate.json')!
+	mut refused := false
+	snapshot('snapshot-delete', state, 'duplicate') or {
+		refused = true
+		assert err.msg().contains('ambiguous')
+	}
+	assert refused, 'ambiguous deletion must preserve both backend snapshots and the sidecars'
+	assert devcore.file_hash(state + '/disk.qcow2')! == disk_hash
+	assert os.read_file(state + '/snapshots/duplicate.json')! == manifest
+	assert os.read_file(state + '/snapshots/duplicate.fd')! == 'variables-anchor'
+	assert !os.exists(state + '/snapshot.pending.json')
+}
+
+fn test_recreated_backend_snapshot_with_recycled_id_refuses_stale_sidecars() {
+	image_tool := os.find_abs_path_of_executable('qemu-img') or {
+		println('SKIP: snapshot binding requires qemu-img and qemu-io')
+		return
+	}
+	io_tool := os.find_abs_path_of_executable('qemu-io')!
+	root := '/tmp/vinix-vm-snapshot-binding-${os.getpid()}'
+	state := snapshot_test_state(root, image_tool)!
+	defer { os.rmdir_all(root) or {} }
+	snapshot('snapshot-create', state, 'paired')!
+	before := sourcecommand.capture([image_tool, 'info', '--output=json', state + '/disk.qcow2'],
+		devcore.environment(0), 30, 65536, unsafe { nil })!
+	assert before.status == 0
+	before_info := json2.decode[SnapshotInventory](before.stdout)!
+	snapshot_test_command([image_tool, 'snapshot', '-d', 'paired', state + '/disk.qcow2'])!
+	snapshot_test_command([io_tool, '-f', 'qcow2', '-c', 'write -P 0x56 0 4096', state + '/disk.qcow2'])!
+	snapshot_test_command([image_tool, 'snapshot', '-c', 'paired', state + '/disk.qcow2'])!
+	after := sourcecommand.capture([image_tool, 'info', '--output=json', state + '/disk.qcow2'],
+		devcore.environment(0), 30, 65536, unsafe { nil })!
+	assert after.status == 0
+	after_info := json2.decode[SnapshotInventory](after.stdout)!
+	assert before_info.snapshots.len == 1 && after_info.snapshots.len == 1
+	assert before_info.snapshots[0].id == after_info.snapshots[0].id, 'exercise actual qcow2 ID reuse'
+	os.write_file(state + '/vars.fd', 'current-variables-must-survive')!
+	disk_hash := devcore.file_hash(state + '/disk.qcow2')!
+	manifest := os.read_file(state + '/snapshots/paired.json')!
+	for action in ['snapshot-restore', 'snapshot-delete'] {
+		mut refused := false
+		snapshot(action, state, 'paired') or {
+			refused = true
+			assert err.msg().contains('identity changed')
+		}
+		assert refused, 'a recreated disk snapshot must not use a previous snapshot\'s firmware sidecar'
+		assert devcore.file_hash(state + '/disk.qcow2')! == disk_hash
+		assert os.read_file(state + '/vars.fd')! == 'current-variables-must-survive'
+		assert os.read_file(state + '/snapshots/paired.json')! == manifest
+		assert os.read_file(state + '/snapshots/paired.fd')! == 'variables-anchor'
+		assert !os.exists(state + '/snapshot.pending.json') && !os.exists(state + '/vars.restore')
+	}
+}
+
+fn test_legacy_snapshot_receipts_still_restore_an_exact_name() {
+	image_tool := os.find_abs_path_of_executable('qemu-img') or {
+		println('SKIP: legacy snapshot identity requires qemu-img')
+		return
+	}
+	root := '/tmp/vinix-vm-snapshot-legacy-${os.getpid()}'
+	state := snapshot_test_state(root, image_tool)!
+	defer { os.rmdir_all(root) or {} }
+	snapshot('snapshot-create', state, 'legacy')!
+	hash := devcore.file_hash(state + '/snapshots/legacy.fd')!
+	os.write_file(state + '/snapshots/legacy.json', '{"schema":1,"name":"legacy","vars_sha256":"${hash}"}\n')!
+	os.write_file(state + '/vars.fd', 'changed-variables')!
+	snapshot('snapshot-restore', state, 'legacy')!
+	assert os.read_file(state + '/vars.fd')! == 'variables-anchor'
+	snapshot_test_disk(image_tool, state, root + '/restored.raw', 0)!
 }
