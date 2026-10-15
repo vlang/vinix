@@ -56,6 +56,13 @@ unchanged JSON on stdout with live progress on stderr. A complete report still
 requires a successful process exit. See
 [progress/cancellation qualification](../../tests/packages/health-progress-check.md).
 
+Launcher verification now captures and rechecks the generation’s `share` and
+`applications` directories, so identical files reached through aliased or unsafe
+parents fail integrity checks. Health identifies the affected apps; reviewed
+offline repair rebuilds their registration in a fresh generation. Ordinary launch
+checks registration before preparing private data or running a program. See
+[qualification](../../tests/packages/launcher-parent-check.md).
+
 **Clean up versions** reviews obsolete generation IDs and retains the active,
 rollback and running versions. Only **Delete listed versions** authorizes removal,
 using the exact review fingerprint through the administrator transport. A changed

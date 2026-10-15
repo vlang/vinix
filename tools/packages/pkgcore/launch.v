@@ -195,6 +195,13 @@ fn run_leased_mode(config Config, directory string, state State, id string, inpu
 				return error('installed application payload changed: ${path}')
 			}
 		}
+		number := state.generation.str()
+		generation := directory + '/generations/' + number
+		registration_valid := verified_registration(generation, installed.package)
+		unsafe { generation.free(); number.free() }
+		if !registration_valid {
+			return error('${installed.package.id}: installed application registration verification failed; use Repair installed or vinix-package repair')
+		}
 	}
 	prepare_launch_data(home, id, u32(uid))!
 	mut process := os.new_process(launch.program)

@@ -1,0 +1,2 @@
+LAUNCHER PARENTS BEFORE share: identical external launcher accepted through a symbolic parent
+LAUNCHER PARENTS BEFORE share/applications: identical external launcher accepted through a symbolic parent

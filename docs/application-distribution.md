@@ -525,12 +525,23 @@ exit and refuses incomplete or inconsistent responses and late diagnostics. See
 
 Installation health also checks payload modes (0755 for executables, 0644 for
 other files) and the exact generated desktop launcher/MIME contents at mode 0644.
-Verify and rollback enforce these checks; launch checks payload permissions
-before execution. Missing, altered, symlinked or special-file launchers and wrong
+Verify, rollback and ordinary launch enforce these checks before execution.
+Missing, altered, symlinked or special-file launchers and wrong
 modes trigger reviewed repair using a fresh generation. Existing inodes and
 outside aliases are never chmodded during discovery. Launcher staging sets its
 mode explicitly, including under umask 077. Cache object modes remain independent.
 See [installation health qualification](../tests/packages/installation-health-check.md).
+
+Launcher checks also capture the generation, `share` and `applications`
+directories without following aliases. Final directories must be administrator-owned
+0755 entries on the generation filesystem; the canonical 0644 launcher is read
+relative to its captured parent. All directory and file identities, ownership and
+modes are rechecked after reading. Shared-parent faults produce `registration`
+health findings and fresh repair proposals for the affected applications.
+Ordinary launch refuses damaged registration before preparing private data or
+executing a runtime. Repair creates a new generation and preserves outside alias
+targets, personal data and provenance. See
+[launcher parent qualification](../tests/packages/launcher-parent-check.md).
 Files stream in 64 KiB blocks.
 Partial downloads persist as `objects/HASH.part`; retries resume and verify the
 complete hash. A damaged resumed prefix triggers one fresh download from the

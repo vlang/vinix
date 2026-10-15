@@ -1,0 +1,7 @@
+ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1
+
+LAUNCHER PARENTS identical external launchers through share/application aliases refuse Verify, classify health and bind repairs; restored parents pass PASS
+LAUNCHER PARENTS directory modes and special entries refuse without mutation; private staged admission and canonical hard-linked launchers remain supported PASS
+LAUNCHER PARENTS 24 captured/opened/read root, parent and leaf identity/mode mutations refuse PASS
+LAUNCHER PARENTS ordinary launch refuses damaged registration before private data or execution; restored administrator-owned launchers verify; guest root checks foreign ownership PASS
+LAUNCHER PARENTS 128 healthy and 128 refused checks pass below 32 descriptors; tracked host retains zero checker bytes PASS

@@ -1,0 +1,14 @@
+LAUNCHER PARENTS identical external launchers through share/application aliases refuse Verify, classify health and bind repairs; restored parents pass PASS
+LAUNCHER PARENTS directory modes and special entries refuse without mutation; private staged admission and canonical hard-linked launchers remain supported PASS
+LAUNCHER PARENTS 24 captured/opened/read root, parent and leaf identity/mode mutations refuse PASS
+LAUNCHER PARENTS ordinary launch refuses damaged registration before private data or execution; restored administrator-owned launchers verify; guest root checks foreign ownership PASS
+LAUNCHER PARENTS 128 healthy and 128 refused checks pass below 32 descriptors; tracked host retains zero checker bytes PASS
+
+INSTALLATION HEALTH canonical executable/data modes, special bits, captured permission changes and cache isolation PASS
+INSTALLATION HEALTH canonical launcher/MIME bytes, independent runtime/data, permissions/type/content refusal and unchanged outside files PASS
+INSTALLATION HEALTH 128 healthy/registration-damaged discovery cycles retain zero tracked bytes PASS
+
+HEALTH REPORT all app/runtime/data packages inspected, sorted owned provenance, namespace/payload/registration classification, empty state and no filesystem mutation PASS
+HEALTH REPORT control/invalid bytes escaped and long UTF-8 diagnostics bounded with truncation disclosure PASS
+HEALTH REPORT 128 healthy and 128 multiple-issue scan/retirement cycles retain zero tracked bytes PASS
+

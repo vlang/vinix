@@ -1,0 +1,1 @@
+PASS aarch64 packages-native-catalog (88.2s)

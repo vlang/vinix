@@ -114,6 +114,6 @@ fn verify_generation_tree(root string, state State, text string, flushed bool) !
 			defer { unsafe { path.free() } }
 			if !verified_installed_file(path, file) { return error('generation payload changed: ${path}') }
 		}
-		if !verified_registration(root, p) { return error('generation application registration changed: ${p.id}') }
+		if !verified_registration_with(root, p, RegistrationOptions{ flushed: flushed }) { return error('generation application registration changed: ${p.id}') }
 	}
 }

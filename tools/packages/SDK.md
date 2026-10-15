@@ -1852,8 +1852,8 @@ at mode 0644, with leaf symlinks refused and the exact service-generated Name, C
 Exec, MIME and package/runtime fields derived from installed metadata. Canonical
 launcher bytes are unchanged, and staging sets their mode independently of umask.
 
-Verify and rollback enforce payload modes and desktop registration; launch
-enforces payload modes before executing the application closure. Repair uses
+Verify, rollback and ordinary launch enforce payload modes and desktop registration.
+Launch completes these checks before executing the application closure. Repair uses
 the existing affected-package IDs and `update` rows for these faults, so its
 space, stale-confirmation, trust/policy and offline behavior remains the same.
 Checks are read-only: repair stages fresh files rather than chmodding installed
@@ -1861,6 +1861,19 @@ files or launcher aliases. A healthy hard-linked regular launcher is readable;
 a changed alias is never repaired in place. Per-user MIME defaults and personal
 data remain outside this projection. See
 [installation health checks](../../tests/packages/installation-health-check.md).
+
+Launcher verification captures the generation, `share` and `applications`
+directories without following aliases, requires the generation administrator’s
+ownership, one filesystem and final 0755 directory modes, then opens the 0644
+launcher relative to the captured parent. File type, owner, size, canonical bytes
+and named identity are checked through that descriptor, and all parent identities
+and modes are checked again after reading. Runtime/data packages retain their
+no-launcher contract. Private stages admit their pre-flush directory modes before
+the existing full publication checks. Parent faults appear as `registration`
+health findings for affected applications and produce exact-version repair rows;
+repair builds fresh directories without touching alias targets. Ordinary launch
+refuses these faults before creating personal data or executing a runtime. See
+[launcher parent qualification](../../tests/packages/launcher-parent-check.md).
 
 V clients use `Service.lock_deployment`, `Service.review_deployment`,
 `Service.apply_deployment`, `DeploymentLock`, `DeploymentPackage` and

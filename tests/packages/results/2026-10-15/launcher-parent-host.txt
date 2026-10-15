@@ -1,0 +1,26 @@
+23 successful host compile/run checks:
+PASS registration_parent-core-compile
+PASS registration_parent-core-run
+PASS installed_health-core-compile
+PASS installed_health-core-run
+PASS health-core-compile
+PASS health-core-run
+PASS cli-compile
+PASS probe-compile
+PASS probe-run
+PASS generation_admission-regressions-compile
+PASS generation_admission-regressions-run
+PASS registration-regressions-compile
+PASS registration-regressions-run
+PASS launch_data-regressions-compile
+PASS launch_data-regressions-run
+PASS installed_namespace-regressions-compile
+PASS installed_namespace-regressions-run
+PASS review-regressions-compile
+PASS review-regressions-run
+PASS distribution-regressions-compile
+PASS distribution-regressions-run
+PASS registration_parent-asan-compile
+PASS registration_parent-asan-run
+PASS complete desktop typecheck arm64
+PASS complete desktop typecheck amd64

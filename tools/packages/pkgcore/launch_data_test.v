@@ -185,6 +185,8 @@ fn test_launch_refuses_aliased_app_data_before_creating_or_chmodding_the_target(
 	app := Package{ id: 'app', name: 'App', version: '1.0.0', architecture: 'aarch64', kind: 'native', license: 'MIT', entrypoint: 'bin/app',
 		files: [Payload{ path: 'bin/app', bytes: os.file_size(file), sha256: hash_file(file)!, executable: true }] }
 	state := State{ generation: 1, architecture: 'aarch64', requested: ['app'], packages: [Installed{ package: app, repository: 'fixture', public_key: key, sequence: 1 }] }
+	os.mkdir_all(directory + '/generations/1/share/applications')!
+	os.write_file(directory + '/generations/1/share/applications/vinix-app.desktop', desktop_entry(app))!
 	original_home := os.getenv('HOME')
 	os.setenv('HOME', home, true)
 	defer { os.setenv('HOME', original_home, true) }

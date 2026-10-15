@@ -1,0 +1,45 @@
+Updating trusted repository trusted
+Installing app 1.0.0 (1/4) from trusted
+Downloading app/bin/app (22 bytes)
+Installing assets 1.0.0 (2/4) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing runtime 1.0.0 (3/4) from trusted
+Downloading runtime/bin/app (26 bytes)
+Installing utility 1.0.0 (4/4) from trusted
+Downloading utility/bin/app (26 bytes)
+Activated package generation 1
+LAUNCHER CLI share alias: Verify/health, exact repair set, stale approvals, offline repair, preserved outside/state/history/data and uninstall PASS
+Updating trusted repository trusted
+Installing app 1.0.0 (1/4) from trusted
+Downloading app/bin/app (22 bytes)
+Installing assets 1.0.0 (2/4) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing runtime 1.0.0 (3/4) from trusted
+Downloading runtime/bin/app (26 bytes)
+Installing utility 1.0.0 (4/4) from trusted
+Downloading utility/bin/app (26 bytes)
+Activated package generation 1
+LAUNCHER CLI share/applications alias: Verify/health, exact repair set, stale approvals, offline repair, preserved outside/state/history/data and uninstall PASS
+Updating trusted repository trusted
+Installing app 1.0.0 (1/4) from trusted
+Downloading app/bin/app (22 bytes)
+Installing assets 1.0.0 (2/4) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing runtime 1.0.0 (3/4) from trusted
+Downloading runtime/bin/app (26 bytes)
+Installing utility 1.0.0 (4/4) from trusted
+Downloading utility/bin/app (26 bytes)
+Activated package generation 1
+LAUNCHER CLI share mode: Verify/health, exact repair set, stale approvals, offline repair, preserved outside/state/history/data and uninstall PASS
+Updating trusted repository trusted
+Installing app 1.0.0 (1/4) from trusted
+Downloading app/bin/app (22 bytes)
+Installing assets 1.0.0 (2/4) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing runtime 1.0.0 (3/4) from trusted
+Downloading runtime/bin/app (26 bytes)
+Installing utility 1.0.0 (4/4) from trusted
+Downloading utility/bin/app (26 bytes)
+Activated package generation 1
+LAUNCHER CLI share/applications mode: Verify/health, exact repair set, stale approvals, offline repair, preserved outside/state/history/data and uninstall PASS
+LAUNCHER CLI four signed shared-parent repairs preserve app/runtime/data manifests and provenance, cache recovery, retained generations and clean uninstall PASS
