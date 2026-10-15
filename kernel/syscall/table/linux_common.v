@@ -1067,6 +1067,17 @@ fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) 
 			}
 			return errno.err, errno.efault
 		}
+		// Linux returns a completed page prefix when an unblocked signal
+		// interrupts a large transfer; small requests remain indivisible.
+		if written < length && written % memory.page_size == 0 {
+			current := proc.current_thread()
+			if katomic.load(&current.must_exit)
+				|| proc.pending_signals(current) & ~current.masked_signals != 0 {
+				break
+			}
+			// Some platforms advance timers through cooperative scheduling.
+			sched.yield(true)
+		}
 	}
 	unsafe { C.memset(&bounce[0], 0, sizeof(bounce)) }
 

@@ -1,0 +1,6 @@
+Compiler output from the default V compiler:
+/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/preflight3.v:1:1: builder error: cannot import module "guesthost" (not found)
+    1 | import guesthost
+      | ~~~~~~~~~~~~~~~~
+    2 | import os
+    3 | fn main() {

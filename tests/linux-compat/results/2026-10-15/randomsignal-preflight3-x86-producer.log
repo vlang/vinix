@@ -1,0 +1,11 @@
+/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/manage.v:42: FAIL: fn main.run: assert code == expected, data
+   left value: code = 1
+  right value: expected = 0
+      message: /Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/preflight-jobs.v:7: FAIL: fn main.main: assert code == 0, output
+   left value: code = 1
+  right value: 0
+      message: os: failed to execute "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/preflight3"; code: 2
+
+V panic: Assertion failed...
+
+V panic: Assertion failed...

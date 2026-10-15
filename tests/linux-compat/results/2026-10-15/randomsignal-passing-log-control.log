@@ -1,0 +1,3 @@
+tests/linux-compat/randomsignal-check.v:376: FAIL: fn main.failure: assert log.contains("LINUX RANDOMSIGNAL FAIL:") && !log.contains("LINUX RANDOMSIGNAL REFERENCE: PASS"), "randomsignal baseline failure markers required"
+      message: randomsignal baseline failure markers required
+V panic: Assertion failed...

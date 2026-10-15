@@ -1,0 +1,31 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "9f27de9cf280c69f9a5d4518cf939b884fbedf4914949dca8503495d7125ce52",
+    "results": [
+        {
+            "name": "randomsignal",
+            "source_sha256": "c07bb7d11524c64bad37166ab3cffc931f0ace0db64b17e91e2d821cd7a66b8d",
+            "init_sha256": "",
+            "iso_sha256": "",
+            "exit_code": 1,
+            "detail": "Command failed"
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "",
+            "iso_sha256": "",
+            "exit_code": 1,
+            "detail": "Command failed"
+        },
+        {
+            "name": "randomrange",
+            "source_sha256": "3907b5a1625738f95b58ab42e2cb4f3337098b69e6c06d8af0cf6b6053cee434",
+            "init_sha256": "",
+            "iso_sha256": "",
+            "exit_code": 1,
+            "detail": "Command failed"
+        }
+    ]
+}

@@ -1,0 +1,20 @@
+{
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-after-arm/randomrange/fixture.c": "35af004a066f8952d5a4470afd54ac5a0ffd94868fe9769f1d16d469f23402ae",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-after-arm/randomrange/fixture.o": "c85415de95cf2cb596a4a4900db609cd8fdbed61c7d5b706226075f28b7dd3ba",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-after-arm/randomrange/init": "1ebee30858ab12759c38c00023ba85c06a181b24500a92bc2860d6819623b592",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-after-arm/randomrange/serial.c": "c49ac2e66ea0cd147fbe54a25564b5af26363f8905a8217ad65303d563093cd2",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-after-arm/randomrange/serial.o": "7488c6d09fb771cd848ba0ac868125a75a8ce243f213139a4a265318e5436e08",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-after-arm/runtime/fixture.c": "05967a3ff8bb35aafaf2e91e58e1203b35780818a33b84031590b52943d60128",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-after-arm/runtime/fixture.o": "3b6bb5631f3d7d8212f3f01ea977b9e4dd87700337e6b7ce7628b9b92f3296c2",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-after-arm/runtime/init": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-after-arm/runtime/serial.c": "c49ac2e66ea0cd147fbe54a25564b5af26363f8905a8217ad65303d563093cd2",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-after-arm/runtime/serial.o": "7488c6d09fb771cd848ba0ac868125a75a8ce243f213139a4a265318e5436e08",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-after-arm/sources/randomrangefixture/core.v": "3907b5a1625738f95b58ab42e2cb4f3337098b69e6c06d8af0cf6b6053cee434",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-after-arm/sources/runtimefixture/core.v": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-before-arm/randomsignal/fixture.c": "fd8fc20b96588f8820551faff5f65c58104b459e0c9b02408932804474d80d02",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-before-arm/randomsignal/fixture.o": "8823dfeb8865c1433940355f57422c7d154a9c73e9274a42b3bb895b9bc7a380",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-before-arm/randomsignal/init": "aff6d5123ac131986b9f61bb6ca6225754b6981b652f9bc24f2068cea9252163",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-before-arm/randomsignal/serial.c": "c49ac2e66ea0cd147fbe54a25564b5af26363f8905a8217ad65303d563093cd2",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-before-arm/randomsignal/serial.o": "7488c6d09fb771cd848ba0ac868125a75a8ce243f213139a4a265318e5436e08",
+    "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-before-arm/sources/randomsignalfixture/core.v": "c07bb7d11524c64bad37166ab3cffc931f0ace0db64b17e91e2d821cd7a66b8d"
+}

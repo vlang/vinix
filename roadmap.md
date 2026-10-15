@@ -964,6 +964,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   on both native architectures against identical-ELF Linux. See the
   [request-range receipts](docs/linux-posix-qualification.md#native-getrandom-request-ranges).
 
+- [x] Return completed page prefixes when signals interrupt large seeded
+  getrandom transfers, give cooperative timers a scheduling point, and honor
+  blocked signals, SA_RESTART and complete small requests. Qualify both native
+  architectures against identical-ELF Linux references; retain the initial
+  AArch64 failure and flat repeated-call storage. See the
+  [signal-interruption receipts](docs/linux-posix-qualification.md#native-getrandom-signal-interruption).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

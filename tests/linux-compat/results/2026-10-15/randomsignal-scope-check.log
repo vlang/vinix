@@ -1,0 +1,1 @@
+arm/x86: complete production C differs only in table__syscall_linux_getrandom; exact page-boundary current-thread borrowed signal/must-exit sampling, short-success loop exit and cooperative scheduling; all flag/range/readiness/copy checks, existing bounce lifetime and erasure unchanged; no allocation/free or compiler normalization

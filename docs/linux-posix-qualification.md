@@ -7154,3 +7154,99 @@ section 15 gates remain open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/randomrange-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/randomrange-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/randomrange-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/randomrange-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/randomrange-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/randomrange-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/randomrange-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/randomrange-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/randomrange-check.v), [verdict](../tests/linux-compat/results/2026-10-15/randomrange-audit.log), [primary pins](../tests/linux-compat/results/2026-10-15/randomrange-primary-inputs.json), [initial compile refusal](../tests/linux-compat/results/2026-10-15/randomrange-compilation-attempt1.log).
+
+## Native getrandom signal interruption
+
+Seeded large `getrandom` calls now check for unblocked pending signals and
+thread exit between completed native pages. A signal returns the bytes already
+copied. The copy loop also gives the scheduler a chance to run between pages,
+including on AArch64 platforms that advance timers cooperatively. No generator,
+mapping or other resource lock is held across this scheduling point. Requests
+that fit in a page complete without that scheduling point; existing flag,
+request-range, copy-fault and readiness checks remain unchanged.
+
+The contract follows Linux v6.12's
+[get_random_bytes_user](https://github.com/torvalds/linux/blob/v6.12/drivers/char/random.c):
+it samples pending signals and calls `cond_resched` after a completed page when
+more output remains. This change does not qualify early boot readiness or
+blocking before the generator is seeded.
+
+`randomsignal` runs 336 conformance calls per architecture in separate root and
+UID/GID 1000 children. Each child covers all six accepted flags, a raw call with
+nonzero upper flag bits and the actual musl call, with `SA_RESTART` enabled and
+disabled:
+
+| Calls per child | Required behavior |
+| --- | --- |
+| 24 large transfers | A one-shot 1 ms SIGALRM interrupts an 8 MiB request. The result is a positive native-page multiple below 8 MiB, errno stays zero, exactly one handler runs, and its saved syscall return register equals the reported short count. |
+| 24 blocked-signal transfers | SIGALRM is already pending and blocked before a 64 KiB call. The call completes; the signal remains pending and no handler runs until unblocking, then it runs once. |
+| 120 short requests | Zero, 1, 32, 255 and 256 byte calls stay complete while a 1 microsecond one-shot timer may expire. |
+
+The first test distinguishes a signal delivered before entering the call from
+one that interrupted the transfer: a full result, missing handler, mismatched
+saved return register or timeout fails. No retry replaces a failed transfer.
+Writable prefix and suffix sentinels are checked on every call; for a short
+result every byte beyond that result through the requested buffer and trailing
+guard must stay intact. Nontrivial successful output must change some bytes.
+The surrounding mapping also has inaccessible outer guard pages. This is a
+copy-accounting test, not an entropy-quality test.
+
+Original kernels fail exactly 48 large-transfer checks per architecture,
+completing all 8 MiB despite the delivered signal. Corrected kernels and the
+identical native probe ELFs under Linux 6.12.51 pass all 336 checks. Native pages
+are 16 KiB on AArch64 and 4 KiB on x86-64; both Linux references use 4 KiB.
+
+The first candidate only sampled pending bits. It passed x86-64 but still failed
+all 48 large AArch64 checks: without a scheduling point the cooperative timer
+had not published the signal while the loop ran. Both real candidate results,
+their source, production C/ELF/build identities, receipts, raw logs and hashes
+remain in the evidence. The final candidate adds the scheduling point and
+avoids it after a completely satisfied request. The first cleanup watcher
+correctly refused the failed AArch64 receipt; that refusal remains published.
+Early preflight helper setup/launch refusals and an audit-source compile refusal
+are also retained as tooling diagnostics, without claiming a guest verdict.
+
+Two warmed 200-cycle native cohorts repeatedly read `page + 1` bytes with a
+blocked pending signal through both call forms and six flags. A preopened
+`/proc/slabinfo` descriptor measures every live slab class and big-page total
+after settling; all remain flat. The actual probe C has four explicit stack
+allocas and no allocation, dynamic-array or fixed-index helper calls.
+
+Four production builds qualify the original/final kernels; two additional
+production builds produced the retained first candidate. Whole generated C
+differs only in `table__syscall_linux_getrandom`, without identifier
+normalization. The maintained audit requires the exact source patch and no new
+allocation/free calls. The current-thread pointer is borrowed only while the
+syscall is alive; it is not retained by another object or used after the
+scheduling point. Existing stack bounce ownership and erasure are unchanged.
+
+The shared AArch64 SDK disappeared before the final run could compile its
+three probes: each stopped on missing `fcntl.h`, with no init ELF, ISO or guest
+log. Those receipts remain failures. The final AArch64 run uses the explicit
+V `replay` adapter: it regenerates C, requires byte-identical V source and
+generated C, verifies all frozen object and ELF hashes, and copies the original
+object/ELF bytes into a fresh state directory. It does not claim a new C
+compilation. All three final AArch64 probe ELFs match their already executed
+pre-SDK-loss binaries; the signal probe also matches the Linux reference. The
+replay source, commands, input/output hashes and header-error receipts are
+published. The updated cleanup watcher accepts only the completed final
+profiles and preserves the refused attempts.
+
+The runtime and request-range regressions pass on both final kernels. Eight
+host test files pass. The frozen 15,146-input compiler inventory, 64-input
+dispatch inventories, native source/C/ELF/ISO/kernel receipts and same-ELF Linux
+references are checked. Allocation diagnostics are byte-identical before and
+after; existing allowance-file refusals remain recorded. Auditor assertions
+execute without `-prod`, including deliberate false-assertion and
+passing-Linux-as-original negative controls. All eight completed qualification
+profiles retain hash-checked regular files before disposable boot staging is
+retired.
+
+Entropy quality, unseeded readiness/blocking, exact scheduling latency, ignored
+signals, default stop/kill dispositions, thread-group-exit races, full 2 GiB
+transfers, GNU libc and translated/ELF32 paths remain unqualified. The three
+broad section 15 gates remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/randomsignal-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/randomsignal-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/randomsignal-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/randomsignal-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/randomsignal-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/randomsignal-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/randomsignal-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/randomsignal-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/randomsignal-check.v), [verdict](../tests/linux-compat/results/2026-10-15/randomsignal-audit.log), [first candidate pins](../tests/linux-compat/results/2026-10-15/randomsignal-exploratory-inputs.json), [first AArch64 result](../tests/linux-compat/results/2026-10-15/randomsignal-exploratory-arm-native.log), [first x86-64 result](../tests/linux-compat/results/2026-10-15/randomsignal-exploratory-x86-native.log).

@@ -1,0 +1,3 @@
+tests/linux-compat/randomsignal-check.v:382: FAIL: fn main.main: assert false, 'randomsignal assertions must execute'
+      message: randomsignal assertions must execute
+V panic: Assertion failed...

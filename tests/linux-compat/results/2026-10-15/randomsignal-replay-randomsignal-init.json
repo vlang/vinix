@@ -1,0 +1,11 @@
+{
+    "argv": "[\"-D_GNU_SOURCE\",\"-fno-strict-aliasing\",\"-I\",\"/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p3-after-arm/sources/randomsignalfixture\",\"--target=aarch64-linux-musl\",\"--sysroot=/Users/alex/code/vinix/build-aarch64-userland/sysroot\",\"-static\",\"-pthread\",\"-O2\",\"-fno-stack-protector\",\"-Wall\",\"-Wextra\",\"-Werror\",\"/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p3-after-arm/randomsignal/serial.o\",\"/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p3-after-arm/randomsignal/fixture.o\",\"-L/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib\",\"-fuse-ld=lld\",\"-o\",\"/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p3-after-arm/randomsignal/init\"]",
+    "fixture.c": "fd8fc20b96588f8820551faff5f65c58104b459e0c9b02408932804474d80d02",
+    "fixture.o": "8823dfeb8865c1433940355f57422c7d154a9c73e9274a42b3bb895b9bc7a380",
+    "frozen": "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-before-arm/randomsignal/init",
+    "input": "aff6d5123ac131986b9f61bb6ca6225754b6981b652f9bc24f2068cea9252163",
+    "output": "aff6d5123ac131986b9f61bb6ca6225754b6981b652f9bc24f2068cea9252163",
+    "serial.c": "c49ac2e66ea0cd147fbe54a25564b5af26363f8905a8217ad65303d563093cd2",
+    "serial.o": "7488c6d09fb771cd848ba0ac868125a75a8ce243f213139a4a265318e5436e08",
+    "source": "c07bb7d11524c64bad37166ab3cffc931f0ace0db64b17e91e2d821cd7a66b8d"
+}

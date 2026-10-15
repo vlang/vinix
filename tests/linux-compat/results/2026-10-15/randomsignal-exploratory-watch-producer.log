@@ -1,0 +1,8 @@
+/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/manage.v:42: FAIL: fn main.run: assert code == expected, data
+   left value: code = 1
+  right value: expected = 0
+      message: Retired completed boot staging: randomsignal/arm/before
+/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/watch.v:58: FAIL: fn main.main: assert code.int() == if phase == 'before' { 1 } else { 0 }
+V panic: Assertion failed...
+
+V panic: Assertion failed...

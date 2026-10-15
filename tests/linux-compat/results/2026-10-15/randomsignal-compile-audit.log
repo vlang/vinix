@@ -1,0 +1,4 @@
+Compiler output from the default V compiler:
+tests/linux-compat/randomsignal-check.v:524:1: error: unexpected eof, expecting `}`
+  522 |     println('Native randomsignal conformance audit: PASS')
+  523 | }

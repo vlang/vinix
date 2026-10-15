@@ -1,0 +1,8 @@
+{
+    "argv": "[\"-D_GNU_SOURCE\",\"-fno-strict-aliasing\",\"-I\",\"/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p3-after-arm/sources/runtimefixture\",\"--target=aarch64-linux-musl\",\"--sysroot=/Users/alex/code/vinix/build-aarch64-userland/sysroot\",\"-pthread\",\"-O2\",\"-fno-stack-protector\",\"-Wall\",\"-Wextra\",\"-Werror\",\"-Wno-unused-function\",\"-Wno-unused-parameter\",\"-fPIC\",\"-I\",\"/Users/alex/code/vinix/tests/kernel-gaps/serialcore\",\"-c\",\"/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p3-after-arm/runtime/serial.c\",\"-o\",\"/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p3-after-arm/runtime/serial.o\"]",
+    "frozen": "/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-after-arm/runtime/serial.o",
+    "generated_c": "c49ac2e66ea0cd147fbe54a25564b5af26363f8905a8217ad65303d563093cd2",
+    "input": "7488c6d09fb771cd848ba0ac868125a75a8ce243f213139a4a265318e5436e08",
+    "output": "7488c6d09fb771cd848ba0ac868125a75a8ce243f213139a4a265318e5436e08",
+    "source": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6"
+}

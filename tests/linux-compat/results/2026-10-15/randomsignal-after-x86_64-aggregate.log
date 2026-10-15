@@ -1,0 +1,292 @@
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/randomsignal/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/randomsignal/.vinix-amd64.iso.ofgbWz'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 34.3g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/randomsignal/iso-build/.iso-staging.qbsTT5/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13691 sectors
+Written to medium : 13691 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/randomsignal/.vinix-amd64.iso.ofgbWz' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd5eb.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/randomsignal/test.iso (28039168 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/randomsignal
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=76112
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX RANDOMSIGNAL TOPOLOGY: ordinary=0 uid=0 page=4096 readiness=seeded
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=0 form=0 request=8388608 result=20480 errno=0 seen=1 frame=20480 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=0 form=1 request=8388608 result=24576 errno=0 seen=1 frame=24576 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=1 form=0 request=8388608 result=16384 errno=0 seen=1 frame=16384 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=1 form=1 request=8388608 result=24576 errno=0 seen=1 frame=24576 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=2 form=0 request=8388608 result=28672 errno=0 seen=1 frame=28672 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=2 form=1 request=8388608 result=36864 errno=0 seen=1 frame=36864 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=3 form=0 request=8388608 result=16384 errno=0 seen=1 frame=16384 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=3 form=1 request=8388608 result=16384 errno=0 seen=1 frame=16384 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=4 form=0 request=8388608 result=16384 errno=0 seen=1 frame=16384 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=4 form=1 request=8388608 result=12288 errno=0 seen=1 frame=12288 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=5 form=0 request=8388608 result=73728 errno=0 seen=1 frame=73728 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=5 form=1 request=8388608 result=32768 errno=0 seen=1 frame=32768 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=0 form=0 request=8388608 result=16384 errno=0 seen=1 frame=16384 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=0 form=1 request=8388608 result=28672 errno=0 seen=1 frame=28672 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=1 form=0 request=8388608 result=16384 errno=0 seen=1 frame=16384 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=1 form=1 request=8388608 result=20480 errno=0 seen=1 frame=20480 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=2 form=0 request=8388608 result=24576 errno=0 seen=1 frame=24576 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=2 form=1 request=8388608 result=16384 errno=0 seen=1 frame=16384 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=3 form=0 request=8388608 result=12288 errno=0 seen=1 frame=12288 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=3 form=1 request=8388608 result=8192 errno=0 seen=1 frame=8192 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=4 form=0 request=8388608 result=24576 errno=0 seen=1 frame=24576 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=4 form=1 request=8388608 result=20480 errno=0 seen=1 frame=20480 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=5 form=0 request=8388608 result=24576 errno=0 seen=1 frame=24576 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=5 form=1 request=8388608 result=57344 errno=0 seen=1 frame=57344 guards=1
+LINUX RANDOMSIGNAL SLAB: ordinary=0 size=16 live=1621/1621 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=0 size=32 live=2876/2876 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=0 size=48 live=327/327 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=0 size=64 live=154/154 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=0 size=96 live=21/21 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=0 size=128 live=19/19 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=0 size=192 live=377/377 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=0 size=256 live=786/786 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=0 size=384 live=546/546 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=0 size=512 live=494/494 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=0 size=768 live=13/13 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=0 size=1024 live=13/13 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=0 size=1536 live=15/15 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=0 size=2048 live=0/0 cycles=200
+LINUX RANDOMSIGNAL STORAGE: ordinary=0 cycles=200 big_pages=160/160 PASS
+LINUX RANDOMSIGNAL CASES: ordinary=0 kind=0 calls=24 failures=0
+LINUX RANDOMSIGNAL CASES: ordinary=0 kind=1 calls=24 failures=0
+LINUX RANDOMSIGNAL CASES: ordinary=0 kind=2 calls=120 failures=0
+LINUX RANDOMSIGNAL FINAL: ordinary=0 kind=0 calls=24 failures=0
+LINUX RANDOMSIGNAL FINAL: ordinary=0 kind=1 calls=24 failures=0
+LINUX RANDOMSIGNAL FINAL: ordinary=0 kind=2 calls=120 failures=0
+LINUX RANDOMSIGNAL TOPOLOGY: ordinary=1 uid=1000 page=4096 readiness=seeded
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=0 form=0 request=8388608 result=32768 errno=0 seen=1 frame=32768 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=0 form=1 request=8388608 result=24576 errno=0 seen=1 frame=24576 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=1 form=0 request=8388608 result=28672 errno=0 seen=1 frame=28672 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=1 form=1 request=8388608 result=20480 errno=0 seen=1 frame=20480 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=2 form=0 request=8388608 result=28672 errno=0 seen=1 frame=28672 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=2 form=1 request=8388608 result=36864 errno=0 seen=1 frame=36864 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=3 form=0 request=8388608 result=20480 errno=0 seen=1 frame=20480 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=3 form=1 request=8388608 result=20480 errno=0 seen=1 frame=20480 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=4 form=0 request=8388608 result=32768 errno=0 seen=1 frame=32768 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=4 form=1 request=8388608 result=32768 errno=0 seen=1 frame=32768 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=5 form=0 request=8388608 result=24576 errno=0 seen=1 frame=24576 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=5 form=1 request=8388608 result=28672 errno=0 seen=1 frame=28672 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=0 form=0 request=8388608 result=20480 errno=0 seen=1 frame=20480 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=0 form=1 request=8388608 result=28672 errno=0 seen=1 frame=28672 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=1 form=0 request=8388608 result=16384 errno=0 seen=1 frame=16384 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=1 form=1 request=8388608 result=20480 errno=0 seen=1 frame=20480 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=2 form=0 request=8388608 result=45056 errno=0 seen=1 frame=45056 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=2 form=1 request=8388608 result=16384 errno=0 seen=1 frame=16384 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=3 form=0 request=8388608 result=32768 errno=0 seen=1 frame=32768 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=3 form=1 request=8388608 result=32768 errno=0 seen=1 frame=32768 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=4 form=0 request=8388608 result=16384 errno=0 seen=1 frame=16384 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=4 form=1 request=8388608 result=36864 errno=0 seen=1 frame=36864 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=5 form=0 request=8388608 result=20480 errno=0 seen=1 frame=20480 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=5 form=1 request=8388608 result=24576 errno=0 seen=1 frame=24576 guards=1
+LINUX RANDOMSIGNAL SLAB: ordinary=1 size=16 live=1621/1621 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=1 size=32 live=2876/2876 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=1 size=48 live=327/327 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=1 size=64 live=154/154 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=1 size=96 live=21/21 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=1 size=128 live=19/19 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=1 size=192 live=377/377 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=1 size=256 live=786/786 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=1 size=384 live=546/546 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=1 size=512 live=494/494 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=1 size=768 live=13/13 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=1 size=1024 live=13/13 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=1 size=1536 live=15/15 cycles=200
+LINUX RANDOMSIGNAL SLAB: ordinary=1 size=2048 live=0/0 cycles=200
+LINUX RANDOMSIGNAL STORAGE: ordinary=1 cycles=200 big_pages=160/160 PASS
+LINUX RANDOMSIGNAL CASES: ordinary=1 kind=0 calls=24 failures=0
+LINUX RANDOMSIGNAL CASES: ordinary=1 kind=1 calls=24 failures=0
+LINUX RANDOMSIGNAL CASES: ordinary=1 kind=2 calls=120 failures=0
+LINUX RANDOMSIGNAL FINAL: ordinary=1 kind=0 calls=24 failures=0
+LINUX RANDOMSIGNAL FINAL: ordinary=1 kind=1 calls=24 failures=0
+LINUX RANDOMSIGNAL FINAL: ordinary=1 kind=2 calls=120 failures=0
+LINUX RANDOMSIGNAL: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/runtime/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/runtime/.vinix-amd64.iso.UX6E9i'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 34.0g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/runtime/iso-build/.iso-staging.X2gQGX/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13676 sectors
+Written to medium : 13676 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/runtime/.vinix-amd64.iso.UX6E9i' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd5af.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/runtime/test.iso (28008448 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/runtime
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=46592
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91a00
+initramfs: Done (9 entries)
+LINUX RUNTIME page_size=4096 pointer_bits=64
+LINUX RUNTIME PASS: atomics SIMD TLS
+LINUX RUNTIME PASS: JIT page sizes
+LINUX RUNTIME PASS: wide offsets time64
+LINUX RUNTIME: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/randomrange/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/randomrange/.vinix-amd64.iso.4j9lTv'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 34.1g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/randomrange/iso-build/.iso-staging.eOVTO3/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13690 sectors
+Written to medium : 13690 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/randomrange/.vinix-amd64.iso.4j9lTv' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd5e7.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/randomrange/test.iso (28037120 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p2-after-x86/randomrange
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=75544
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91c00
+initramfs: Done (9 entries)
+LINUX RANDOMRANGE TOPOLOGY: ordinary=0 uid=0 page=4096 readiness=seeded ceiling=100000000000000 cap=7ffff000
+LINUX RANDOMRANGE SLAB: ordinary=0 size=16 live=1621/1621 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=0 size=32 live=2876/2876 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=0 size=48 live=326/326 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=0 size=64 live=156/156 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=0 size=96 live=20/20 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=0 size=128 live=19/19 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=0 size=192 live=383/383 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=0 size=256 live=786/786 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=0 size=384 live=546/546 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=0 size=512 live=494/494 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=0 size=768 live=14/14 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=0 size=1024 live=13/13 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=0 size=1536 live=15/15 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=0 size=2048 live=0/0 cycles=200
+LINUX RANDOMRANGE STORAGE: ordinary=0 cycles=200 big_pages=160/160 PASS
+LINUX RANDOMRANGE CASES: ordinary=0 kind=0 calls=888 failures=0
+LINUX RANDOMRANGE CASES: ordinary=0 kind=1 calls=1800 failures=0
+LINUX RANDOMRANGE CASES: ordinary=0 kind=2 calls=1440 failures=0
+LINUX RANDOMRANGE CASES: ordinary=0 kind=3 calls=1464 failures=0
+LINUX RANDOMRANGE FINAL: ordinary=0 kind=0 calls=888 failures=0
+LINUX RANDOMRANGE FINAL: ordinary=0 kind=1 calls=1800 failures=0
+LINUX RANDOMRANGE FINAL: ordinary=0 kind=2 calls=1440 failures=0
+LINUX RANDOMRANGE FINAL: ordinary=0 kind=3 calls=1464 failures=0
+LINUX RANDOMRANGE TOPOLOGY: ordinary=1 uid=1000 page=4096 readiness=seeded ceiling=100000000000000 cap=7ffff000
+LINUX RANDOMRANGE SLAB: ordinary=1 size=16 live=1621/1621 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=1 size=32 live=2876/2876 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=1 size=48 live=326/326 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=1 size=64 live=156/156 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=1 size=96 live=20/20 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=1 size=128 live=19/19 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=1 size=192 live=383/383 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=1 size=256 live=786/786 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=1 size=384 live=546/546 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=1 size=512 live=494/494 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=1 size=768 live=14/14 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=1 size=1024 live=13/13 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=1 size=1536 live=15/15 cycles=200
+LINUX RANDOMRANGE SLAB: ordinary=1 size=2048 live=0/0 cycles=200
+LINUX RANDOMRANGE STORAGE: ordinary=1 cycles=200 big_pages=160/160 PASS
+LINUX RANDOMRANGE CASES: ordinary=1 kind=0 calls=888 failures=0
+LINUX RANDOMRANGE CASES: ordinary=1 kind=1 calls=1800 failures=0
+LINUX RANDOMRANGE CASES: ordinary=1 kind=2 calls=1440 failures=0
+LINUX RANDOMRANGE CASES: ordinary=1 kind=3 calls=1464 failures=0
+LINUX RANDOMRANGE FINAL: ordinary=1 kind=0 calls=888 failures=0
+LINUX RANDOMRANGE FINAL: ordinary=1 kind=1 calls=1800 failures=0
+LINUX RANDOMRANGE FINAL: ordinary=1 kind=2 calls=1440 failures=0
+LINUX RANDOMRANGE FINAL: ordinary=1 kind=3 calls=1464 failures=0
+LINUX RANDOMRANGE: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+Linux compatibility guest suite: PASS

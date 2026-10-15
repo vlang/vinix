@@ -1641,3 +1641,16 @@ verify actual original failures, native/reference outcomes, source/C/build and
 compiler identities, seven primary source pins, flat storage, exact retained
 inputs and executing audit controls. The initial compile refusal remains
 separate from guest evidence. See the [request-range report](../../docs/linux-posix-qualification.md#native-getrandom-request-ranges).
+
+The `randomsignal` case checks large seeded getrandom calls interrupted by a
+one-shot timer, the syscall result saved in its signal frame, complete small
+requests, already pending blocked signals, SA_RESTART, six flags and raw/musl
+calls. Output after a short result must remain untouched. Native repeated
+page+1 calls check flat slab/page storage. The same ELF runs through
+`randomsignal-reference.v` on supplied Linux kernels. Compile
+`randomsignal-check.v` without `-prod` and supply the retained evidence area to
+verify original failures, native/reference outcomes, complete C scope, compiler
+and dispatch pins, executing audit controls and real diagnostic refusals.
+The final ARM run explicitly reuses byte-verified frozen objects/ELFs after
+shared SDK loss; it does not claim a fresh C compilation. See the
+[signal-interruption report](../../docs/linux-posix-qualification.md#native-getrandom-signal-interruption).

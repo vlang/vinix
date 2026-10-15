@@ -1,0 +1,136 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0  3  248k    3  8427    0     0   1835      0  0:02:18  0:00:04  0:02:14  1834 38  248k   38 97856    0     0  18887      0  0:00:13  0:00:05  0:00:08 23432100  248k  100  248k    0     0  43154      0  0:00:05  0:00:05 --:--:-- 56084
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0  2 2880k    2 62746    0     0  11492      0  0:04:16  0:00:05  0:04:11 14084  5 2880k    5  144k    0     0  22889      0  0:02:08  0:00:06  0:02:02 30560  8 2880k    8  239k    0     0  32517      0  0:01:30  0:00:07  0:01:23 49826 10 2880k   10  303k    0     0  37782      0  0:01:18  0:00:08  0:01:10 65809 13 2880k   13  400k    0     0  44440      0  0:01:06  0:00:09  0:00:57 87093 18 2880k   18  528k    0     0  52587      0  0:00:56  0:00:10  0:00:46 99113 22 2880k   22  656k    0     0  59418      0  0:00:49  0:00:11  0:00:38  105k 27 2880k   27  784k    0     0  65707      0  0:00:44  0:00:12  0:00:32  116k 31 2880k   31  912k    0     0  70870      0  0:00:41  0:00:13  0:00:28  123k 38 2880k   38 1104k    0     0  79163      0  0:00:37  0:00:14  0:00:23  139k 46 2880k   46 1327k    0     0  88881      0  0:00:33  0:00:15  0:00:18  159k 50 2880k   50 1455k    0     0  92099      0  0:00:32  0:00:16  0:00:16  163k 57 2880k   57 1647k    0     0  97600      0  0:00:30  0:00:17  0:00:13  170k 63 2880k   63 1839k    0     0   100k      0  0:00:28  0:00:18  0:00:10  180k 69 2880k   69 2000k    0     0   103k      0  0:00:27  0:00:19  0:00:08  177k 74 2880k   74 2159k    0     0   106k      0  0:00:27  0:00:20  0:00:07  167k 80 2880k   80 2320k    0     0   109k      0  0:00:26  0:00:21  0:00:05  170k 86 2880k   86 2479k    0     0   111k      0  0:00:25  0:00:22  0:00:03  166k 91 2880k   91 2640k    0     0   113k      0  0:00:25  0:00:23  0:00:02  160k 96 2880k   96 2768k    0     0   114k      0  0:00:25  0:00:24  0:00:01  154k100 2880k  100 2880k    0     0   114k      0  0:00:25  0:00:25 --:--:--  147k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0100 22528  100 22528    0     0   4646      0  0:00:04  0:00:04 --:--:--  4646
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0 49  207k   49  102k    0     0  20003      0  0:00:10  0:00:05  0:00:05 24735100  207k  100  207k    0     0  35782      0  0:00:05  0:00:05 --:--:-- 50167
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0 40 49092   40 19666    0     0   4350      0  0:00:11  0:00:04  0:00:07  4349100 49092  100 49092    0     0  10641      0  0:00:04  0:00:04 --:--:-- 13587
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0 16  117k   16 19666    0     0   4717      0  0:00:25  0:00:04  0:00:21  4718 69  117k   69 83796    0     0  18120      0  0:00:06  0:00:04  0:00:02 18118100  117k  100  117k    0     0  23861      0  0:00:05  0:00:05 --:--:-- 29808
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-before-x86/randomsignal/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-before-x86/randomsignal/.vinix-amd64.iso.OStclM'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 20.3g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-before-x86/randomsignal/iso-build/.iso-staging.n8VQFD/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13690 sectors
+Written to medium : 13690 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-before-x86/randomsignal/.vinix-amd64.iso.OStclM' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd5e7.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-before-x86/randomsignal/test.iso (28037120 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-before-x86/randomsignal
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=76112
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX RANDOMSIGNAL TOPOLOGY: ordinary=0 uid=0 page=4096 readiness=seeded
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=0 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=0 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=1 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=1 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=2 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=2 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=3 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=3 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=4 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=4 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=5 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=0 flags=5 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=0 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=0 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=1 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=1 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=2 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=2 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=3 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=3 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=4 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=4 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=5 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=0 restart=1 flags=5 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL CASES: ordinary=0 kind=0 calls=24 failures=24
+LINUX RANDOMSIGNAL CASES: ordinary=0 kind=1 calls=24 failures=0
+LINUX RANDOMSIGNAL CASES: ordinary=0 kind=2 calls=120 failures=0
+LINUX RANDOMSIGNAL FINAL: ordinary=0 kind=0 calls=24 failures=24
+LINUX RANDOMSIGNAL FINAL: ordinary=0 kind=1 calls=24 failures=0
+LINUX RANDOMSIGNAL FINAL: ordinary=0 kind=2 calls=120 failures=0
+LINUX RANDOMSIGNAL TOPOLOGY: ordinary=1 uid=1000 page=4096 readiness=seeded
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=0 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=0 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=1 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=1 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=2 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=2 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=3 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=3 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=4 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=4 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=5 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=0 flags=5 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=0 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=0 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=1 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=1 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=2 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=2 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=3 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=3 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=4 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=4 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=5 form=0 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL TRANSFER: ordinary=1 restart=1 flags=5 form=1 request=8388608 result=8388608 errno=0 seen=1 frame=8388608 guards=1
+LINUX RANDOMSIGNAL CASES: ordinary=1 kind=0 calls=24 failures=24
+LINUX RANDOMSIGNAL CASES: ordinary=1 kind=1 calls=24 failures=0
+LINUX RANDOMSIGNAL CASES: ordinary=1 kind=2 calls=120 failures=0
+LINUX RANDOMSIGNAL FINAL: ordinary=1 kind=0 calls=24 failures=24
+LINUX RANDOMSIGNAL FINAL: ordinary=1 kind=1 calls=24 failures=0
+LINUX RANDOMSIGNAL FINAL: ordinary=1 kind=2 calls=120 failures=0
+LINUX RANDOMSIGNAL FAIL: interruption, masks, short requests or guards
+QEMU: Terminated
+Missing verdicts: ['LINUX RANDOMSIGNAL: PASS']; failures: ['FAIL:', 'LINUX RANDOMSIGNAL FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/randomsignal-20261015/states/p1-before-x86/receipt.json
