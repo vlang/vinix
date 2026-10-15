@@ -13,9 +13,21 @@ enum FirstRunCategory {
 
 const first_run_categories = [FirstRunCategory.browsers, .productivity, .development, .communication,
 	.media, .games, .runtimes]
-const first_run_category_actions = ['apps.category.browsers', 'apps.category.productivity',
-	'apps.category.development', 'apps.category.communication', 'apps.category.media',
-	'apps.category.games', 'apps.category.runtimes']
+const first_run_category_headers = ['apps.heading.browsers', 'apps.heading.productivity',
+	'apps.heading.development', 'apps.heading.communication', 'apps.heading.media',
+	'apps.heading.games', 'apps.heading.runtimes']
+
+const first_run_app_order = first_run_app_display_order()
+
+fn first_run_app_display_order() []int {
+	mut order := []int{cap: first_run_apps.len}
+	for category in first_run_categories {
+		for i, app in first_run_apps {
+			if app.category == category { order << i }
+		}
+	}
+	return order
+}
 
 fn (category FirstRunCategory) text() string {
 	return match category {

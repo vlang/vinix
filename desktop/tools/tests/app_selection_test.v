@@ -68,7 +68,7 @@ fn app_selection_test_state() AppSelectionState {
 	return state
 }
 
-fn app_selection_test_button_label(state AppSelectionState) string {
+fn app_selection_test_button_label(mut state AppSelectionState) string {
 	desktop := app_selection_test_desktop()
 	begin_frame_elements()
 	root := state.element(&desktop)
@@ -107,13 +107,24 @@ fn test_app_selection_offers_the_optional_apps_this_machine_can_install() {
 	assert !app_selection_test_has_action_prefix(root, 'task.')
 	assert !app_selection_test_has_action_prefix(root, 'shortcut.')
 	assert !app_selection_test_has_action_prefix(root, 'win.')
+	assert !app_selection_test_has_action_prefix(root, 'apps.category.')
+	for heading in first_run_category_headers {
+		label := app_selection_test_element(root, heading) or { panic('missing category heading') }
+		assert label.kind == .label && !label.clickable
+	}
+	assert app_selection_test_element(root, 'apps.toggle.firefox') != none
+	assert app_selection_test_element(root, 'apps.toggle.keepassxc') != none
 	for category in first_run_categories {
-		state.select_category(category)
+		for i, app in first_run_apps {
+			if app.category == category {
+				state.scroll_to(app_selection_row_y(i) - app_selection_heading_height)
+				break
+			}
+		}
 		begin_frame_elements()
 		tree := state.element(&desktop)
 		for app in first_run_apps {
 			if app.category != category {
-				assert app_selection_test_element(tree, app.action) == none
 				continue
 			}
 			row := app_selection_test_element(tree, app.action) or { panic('missing ${app.title}') }
@@ -127,14 +138,14 @@ fn test_app_selection_offers_the_optional_apps_this_machine_can_install() {
 
 fn test_app_selection_clicks_toggle_apps_and_confirm() {
 	mut state := app_selection_test_state()
-	assert app_selection_test_button_label(state) == 'Continue'
+	assert app_selection_test_button_label(mut state) == 'Continue'
 	assert state.packages().len == 0
 
 	state.handle_action('apps.toggle.chromium')
 	state.handle_action('apps.toggle.firefox')
 	state.handle_action('apps.toggle.chromium')
 	assert state.selected_count() == 1
-	assert app_selection_test_button_label(state) == 'Install 1 app'
+	assert app_selection_test_button_label(mut state) == 'Install 1 app'
 	desktop := app_selection_test_desktop()
 	begin_frame_elements()
 	root := state.element(&desktop)
@@ -145,7 +156,7 @@ fn test_app_selection_clicks_toggle_apps_and_confirm() {
 	free_tree(root)
 
 	state.handle_action('apps.toggle.chromium')
-	assert app_selection_test_button_label(state) == 'Install 2 apps'
+	assert app_selection_test_button_label(mut state) == 'Install 2 apps'
 	// Installed in the order offered, not the order clicked.
 	assert state.packages() == ['firefox', 'chromium']
 	assert !state.complete
@@ -201,7 +212,7 @@ fn test_app_selection_is_keyboard_driven() {
 	expected := state.next_available(0, 1)
 	state.key_input('\t')
 	assert state.focus == expected
-	assert state.category == first_run_apps[expected].category
+	assert first_run_apps[expected].category == .productivity
 	state.key_input('\x1b[A')
 	assert state.focus == 0
 	last := state.next_available(0, -1)
@@ -215,9 +226,9 @@ fn test_app_selection_is_keyboard_driven() {
 	state.key_input(':;@ABCDEFG\x10\x11\x1b')
 	assert state.packages() == ['firefox']
 	state.key_input('\x1b[C')
-	assert state.category == .productivity
+	assert state.focus == expected
 	state.key_input('\x1b[D')
-	assert state.category == .browsers
+	assert state.focus == 0
 	assert !state.complete
 
 	state.key_input('\r')
@@ -250,49 +261,107 @@ fn test_first_run_install_command_accepts_only_offered_packages() {
 	}
 }
 
-fn test_app_selection_retains_choices_across_categories_and_counts_many_apps() {
+fn test_app_selection_retains_choices_while_scrolling_and_counts_many_apps() {
 	mut state := app_selection_test_state()
 	for action in ['apps.toggle.firefox', 'apps.toggle.chromium', 'apps.toggle.blender',
 		'apps.toggle.vlc', 'apps.toggle.neovim', 'apps.toggle.keepassxc'] {
 		state.handle_action(action)
 	}
 	assert state.selected_count() == 6
-	assert app_selection_test_button_label(state) == 'Install selected apps'
-	state.handle_action('apps.category.communication')
-	assert state.category == .communication
+	assert app_selection_test_button_label(mut state) == 'Install selected apps'
+	state.scroll_to(app_selection_content_height())
 	state.handle_action('apps.toggle.discord')
 	state.handle_action('apps.toggle.slack')
 	state.handle_action('apps.toggle.spotify')
 	state.handle_action('apps.toggle.steam')
 	assert state.selected_count() == 6
-	state.handle_action('apps.category.media')
+	state.scroll_to(0)
 	assert state.selected_count() == 6
 	assert state.packages() == ['firefox', 'chromium', 'blender', 'vlc-qt', 'neovim', 'keepassxc']
 }
 
-fn test_app_selection_categories_fit_a_standard_and_small_screen() {
+fn test_app_selection_scrolling_keeps_rows_and_hit_targets_inside_the_list() {
 	mut state := app_selection_test_state()
 	for size in [[1024, 720]!, [640, 480]!] {
 		desktop := Desktop{ canvas: Canvas{ width: size[0], height: size[1], scale: 1 } }
-		for category in first_run_categories {
-			state.select_category(category)
+		state.prepare_viewport(app_selection_layout(size[0], size[1]).list_height)
+		for offset in [0, 45, 350, app_selection_content_height()] {
+			state.scroll_to(offset)
 			begin_frame_elements()
 			tree := state.element(&desktop)
 			card := app_selection_test_element(tree, 'apps.window') or { panic('missing card') }
 			note := app_selection_test_element(tree, 'apps.note') or { panic('missing note') }
+			list := app_selection_test_element(tree, 'apps.list') or { panic('missing list') }
+			assert list.frame.y + list.frame.height < note.frame.y
+			assert list.frame.x + list.frame.width <= card.frame.width
 			for app in first_run_apps {
-				if app.category != category { continue }
-				row := app_selection_test_element(tree, app.action) or { panic('missing row') }
-				assert row.frame.x >= 0 && row.frame.x + row.frame.width <= card.frame.width
-				assert row.frame.y + row.frame.height < note.frame.y
-			}
-			for action in first_run_category_actions {
-				button := app_selection_test_element(tree, action) or { panic('missing category') }
-				assert button.frame.y + button.frame.height < note.frame.y
+				row := app_selection_test_element(tree, app.action) or { continue }
+				assert row.frame.x >= 0 && row.frame.x + row.frame.width <= list.frame.width
+				assert row.frame.y >= 0 && row.frame.y + row.frame.height <= list.frame.height
 			}
 			free_tree(tree)
 		}
 	}
+}
+
+fn test_app_selection_keyboard_reveals_each_app_in_display_order_and_wraps() {
+	mut state := app_selection_test_state()
+	desktop := app_selection_test_desktop()
+	mut expected := []string{}
+	for category in first_run_categories {
+		for i, app in first_run_apps {
+			if app.category == category && state.available[i] { expected << app.package_name }
+		}
+	}
+	mut visited := []string{}
+	for _ in 0 .. expected.len {
+		begin_frame_elements()
+		tree := state.element(&desktop)
+		row := app_selection_test_element(tree, first_run_apps[state.focus].action) or {
+			panic('keyboard focus scrolled off screen')
+		}
+		assert row.frame.height == app_selection_row_height
+		visited << first_run_apps[state.focus].package_name
+		free_tree(tree)
+		state.key_input('\t')
+	}
+	assert visited == expected
+	assert state.focus == 0
+	state.key_input('\x1b[F')
+	assert state.focus == state.next_available(-1, -1)
+	state.key_input('\x1b[H')
+	assert state.focus == 0
+}
+
+fn test_app_selection_wheel_and_scrollbar_reach_the_bottom_without_losing_choices() {
+	mut state := app_selection_test_state()
+	state.toggle(0)
+	layout := app_selection_layout(1024, 720)
+	mut desktop := app_selection_test_desktop()
+	desktop.pointer_x = layout.x + 100
+	desktop.pointer_y = layout.y + app_selection_row_top + 100
+	state.pointer_input(PointerPacket{ scroll: -4 }, &desktop)
+	assert state.scroll == 144
+	assert state.selected[0]
+	state.pointer_input(PointerPacket{ scroll: 100 }, &desktop)
+	assert state.scroll == 0
+	// Outside the app list, scrolling cannot move the page.
+	desktop.pointer_y = layout.y + layout.height - 40
+	state.pointer_input(PointerPacket{ scroll: -4 }, &desktop)
+	assert state.scroll == 0
+	desktop.hover = action_apps_scrollbar
+	desktop.pointer_y = layout.y + app_selection_row_top + layout.list_height - 1
+	state.pointer_input(PointerPacket{ pressed: button_left, buttons: button_left }, &desktop)
+	assert state.scroll == app_selection_content_height() - layout.list_height
+	assert state.scroll_drag
+	state.pointer_input(PointerPacket{ released: button_left }, &desktop)
+	assert !state.scroll_drag
+	begin_frame_elements()
+	tree := state.element(&desktop)
+	assert app_selection_test_element(tree, 'apps.toggle.ios') != none
+	assert app_selection_test_element(tree, action_apps_install) != none
+	free_tree(tree)
+	assert state.packages() == ['firefox']
 }
 
 fn test_first_run_install_command_uses_alpine_names_and_never_installs_external_clients() {

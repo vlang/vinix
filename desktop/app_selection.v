@@ -9,6 +9,7 @@
 // download progress and any network error remain visible.
 module main
 
+import math
 import os
 import ui2
 
@@ -25,6 +26,10 @@ const action_apps_install = 'apps.install'
 
 const app_selection_row_height = 64
 const app_selection_row_top = 104
+const app_selection_row_gap = 8
+const app_selection_heading_height = 32
+const app_selection_category_gap = 16
+const action_apps_scrollbar = 'apps.scrollbar'
 const app_selection_selected_bg = u32(0xeef4fd)
 const app_selection_installed_bg = u32(0xf5f6f8)
 
@@ -150,12 +155,16 @@ fn desktop_finish_app_selection(home string) {
 
 struct AppSelectionState {
 mut:
-	selected  []bool
-	installed []bool
-	available []bool
-	category  FirstRunCategory
-	focus     int
-	complete  bool
+	selected           []bool
+	installed          []bool
+	available          []bool
+	focus              int
+	complete           bool
+	scroll             int
+	viewport_height    int
+	reveal_focus       bool = true
+	scroll_drag        bool
+	scroll_drag_offset int
 }
 
 fn new_app_selection_state() AppSelectionState {
@@ -221,9 +230,13 @@ fn (s &AppSelectionState) packages() []string {
 // next_available walks from `from` in `step` direction to the next row that
 // can still be chosen, wrapping around. -1 means every app is installed.
 fn (s &AppSelectionState) next_available(from int, step int) int {
-	count := first_run_apps.len
+	count := first_run_app_order.len
+	mut position := if step > 0 { -1 } else { 0 }
+	for i, index in first_run_app_order {
+		if index == from { position = i; break }
+	}
 	for offset in 1 .. count + 1 {
-		index := ((from + step * offset) % count + count) % count
+		index := first_run_app_order[((position + step * offset) % count + count) % count]
 		if !s.installed[index] && s.available[index] {
 			return index
 		}
@@ -241,30 +254,13 @@ fn (mut s AppSelectionState) toggle(index int) {
 
 fn (mut s AppSelectionState) set_focus(index int) {
 	s.focus = index
-	if index >= 0 { s.category = first_run_apps[index].category }
-}
-
-fn (mut s AppSelectionState) select_category(category FirstRunCategory) {
-	s.category = category
-	s.focus = -1
-	for i, app in first_run_apps {
-		if app.category == category && s.available[i] && !s.installed[i] {
-			s.focus = i
-			break
-		}
-	}
+	s.reveal_focus = true
 }
 
 fn (mut s AppSelectionState) handle_action(action string) {
 	if action == action_apps_install {
 		s.complete = true
 		return
-	}
-	for i, category in first_run_categories {
-		if action == first_run_category_actions[i] {
-			s.select_category(category)
-			return
-		}
 	}
 	for i, app in first_run_apps {
 		if action == app.action {
@@ -284,14 +280,10 @@ fn (mut s AppSelectionState) key_input(keys string) {
 		if ch == 0x1b {
 			if i + 2 < keys.len && (keys[i + 1] == `[` || keys[i + 1] == `O`) {
 				match keys[i + 2] {
-					`A` { s.set_focus(s.next_available(s.focus, -1)) }
-					`B` { s.set_focus(s.next_available(s.focus, 1)) }
-					`C` {
-						s.select_category(first_run_categories[(int(s.category) + 1) % first_run_categories.len])
-					}
-					`D` {
-						s.select_category(first_run_categories[(int(s.category) + first_run_categories.len - 1) % first_run_categories.len])
-					}
+					`A`, `D` { s.set_focus(s.next_available(s.focus, -1)) }
+					`B`, `C` { s.set_focus(s.next_available(s.focus, 1)) }
+					`H` { s.set_focus(s.next_available(-1, 1)) }
+					`F` { s.set_focus(s.next_available(-1, -1)) }
 					else {}
 				}
 			}
@@ -396,37 +388,95 @@ fn app_selection_row(app FirstRunApp, installed bool, available bool, selected b
 	}
 }
 
-fn (s &AppSelectionState) element(d &Desktop) ui2.Element {
+struct AppSelectionLayout {
+	x           int
+	y           int
+	width       int
+	height      int
+	list_height int
+}
+
+fn app_selection_layout(width int, height int) AppSelectionLayout {
 	mut card_width := 780
-	if card_width > d.canvas.width - 24 {
-		card_width = d.canvas.width - 24
+	if card_width > width - 24 {
+		card_width = width - 24
 	}
 	if card_width < 1 {
 		card_width = 1
 	}
-	mut card_height := 520
-	if card_height > d.canvas.height - 24 {
-		card_height = d.canvas.height - 24
+	mut card_height := 680
+	if card_height > height - 48 {
+		card_height = height - 48
 	}
 	if card_height < 1 {
 		card_height = 1
 	}
-	card_x := (d.canvas.width - card_width) / 2
-	card_y := (d.canvas.height - card_height) / 2
-	inner := card_width - 48
-	sidebar_width := 142
-	row_x := sidebar_width + 40
-	row_width := card_width - row_x - 24
-	available_height := (card_height - 240) / 4
-	row_height := if available_height >= app_selection_row_height {
-		app_selection_row_height
-	} else if available_height >= 48 {
-		available_height
-	} else {
-		48
+	return AppSelectionLayout{
+		x: (width - card_width) / 2
+		y: (height - card_height) / 2
+		width: card_width
+		height: card_height
+		list_height: math.max(1, card_height - app_selection_row_top - 116)
 	}
-	row_gap := 6
-	category_gap := if card_height >= 488 { 38 } else { 32 }
+}
+
+fn app_selection_content_height() int {
+	return first_run_categories.len * (app_selection_heading_height + app_selection_category_gap)
+		+ first_run_apps.len * (app_selection_row_height + app_selection_row_gap)
+		- app_selection_row_gap - app_selection_category_gap
+}
+
+fn app_selection_row_y(index int) int {
+	mut y := 0
+	for category in first_run_categories {
+		y += app_selection_heading_height
+		for i, app in first_run_apps {
+			if app.category != category { continue }
+			if i == index { return y }
+			y += app_selection_row_height + app_selection_row_gap
+		}
+		y += app_selection_category_gap
+	}
+	return -1
+}
+
+fn (mut s AppSelectionState) scroll_to(offset int) {
+	s.scroll = math.max(0, math.min(offset, app_selection_content_height() - s.viewport_height))
+	s.reveal_focus = false
+}
+
+fn (mut s AppSelectionState) prepare_viewport(height int) {
+	s.viewport_height = height
+	s.scroll = math.max(0, math.min(s.scroll, app_selection_content_height() - height))
+	if s.reveal_focus && s.focus >= 0 {
+		y := app_selection_row_y(s.focus)
+		if y < s.scroll {
+			// Keep the category heading when moving to its first app.
+			s.scroll = math.max(0, y - app_selection_heading_height)
+		} else if y + app_selection_row_height > s.scroll + height {
+			s.scroll = y + app_selection_row_height - height
+		}
+	}
+	s.reveal_focus = false
+}
+
+fn (s &AppSelectionState) scrollbar_thumb() (int, int) {
+	content := app_selection_content_height()
+	height := s.viewport_height
+	thumb := math.min(height, math.max(24, height * height / content))
+	travel := height - thumb
+	return if content > height { s.scroll * travel / (content - height) } else { 0 }, thumb
+}
+
+fn (mut s AppSelectionState) element(d &Desktop) ui2.Element {
+	layout := app_selection_layout(d.canvas.width, d.canvas.height)
+	card_width := layout.width
+	card_height := layout.height
+	card_x := layout.x
+	card_y := layout.y
+	inner := card_width - 48
+	row_width := inner - 16
+	s.prepare_viewport(layout.list_height)
 
 	mut card_children := frame_elements(24)
 	card_children << ui2.label('apps.title', tr('app_selection.heading'), ui2.rect(24, 24, f64(inner),
@@ -440,33 +490,49 @@ fn (s &AppSelectionState) element(d &Desktop) ui2.Element {
 			color: body_muted
 			size:  12
 		})
-	for i, category in first_run_categories {
-		active := s.category == category
-		card_children << ui2.button(first_run_category_actions[i], category.text(),
-			ui2.rect(24, f64(app_selection_row_top + i * category_gap), sidebar_width, 32), ui2.BoxStyle{
-				bg:     if active { app_selection_selected_bg } else { registration_card }
-				radius: 6
-			}, ui2.TextStyle{
-				color: if active { app_accent } else { body_muted }
-				size:  12
-				bold:  active
+	mut list_children := frame_elements(first_run_apps.len * 2 + first_run_categories.len)
+	mut y := -s.scroll
+	for category_index, category in first_run_categories {
+		list_children << ui2.label(first_run_category_headers[category_index], category.text(),
+			ui2.rect(1, f64(y), f64(row_width), 24), ui2.TextStyle{
+				color: body_heading
+				size: 14
+				bold: true
 			})
-	}
-	mut row := 0
-	for i, app in first_run_apps {
-		if app.category != s.category { continue }
-		y := app_selection_row_top + row * (row_height + row_gap)
-		row++
-		if s.focus == i {
-			// The keyboard focus ring thickens the row's border to two pixels.
-			card_children << ui2.view('apps.focus', ui2.rect(f64(row_x - 1), f64(y - 1), f64(row_width + 2),
-				f64(row_height + 2)), ui2.BoxStyle{
-				bg:     app_accent
-				radius: 9
-			}, []ui2.Element{})
+		y += app_selection_heading_height
+		for i, app in first_run_apps {
+			if app.category != category { continue }
+			if y < layout.list_height && y + app_selection_row_height > 0 {
+				if s.focus == i {
+					list_children << ui2.view('apps.focus', ui2.rect(0, f64(y - 1), f64(row_width + 2),
+						app_selection_row_height + 2), ui2.BoxStyle{ bg: app_accent, radius: 9 }, []ui2.Element{})
+				}
+				// Crop the hit target as well as its pixels at the viewport edges.
+				top := math.max(0, y)
+				bottom := math.min(layout.list_height, y + app_selection_row_height)
+				row := app_selection_row(app, s.installed[i], s.available[i], s.selected[i],
+					d.hover == app.action, 0, y - top, row_width, app_selection_row_height)
+				content := ui2.Element{ ...row, id: '', clickable: false }
+				list_children << ui2.Element{
+					...ui2.view(app.action, ui2.rect(1, f64(top), f64(row_width), f64(bottom - top)),
+						ui2.BoxStyle{ transparent: true }, frame_child(content))
+					clickable: row.clickable
+					enabled: row.enabled
+				}
+			}
+			y += app_selection_row_height + app_selection_row_gap
 		}
-		card_children << app_selection_row(app, s.installed[i], s.available[i], s.selected[i],
-			d.hover == app.action, row_x, y, row_width, row_height)
+		y += app_selection_category_gap
+	}
+	card_children << ui2.view('apps.list', ui2.rect(24, app_selection_row_top, f64(inner),
+		f64(layout.list_height)), ui2.BoxStyle{ bg: registration_card }, list_children)
+	if app_selection_content_height() > layout.list_height {
+		thumb_y, thumb_height := s.scrollbar_thumb()
+		thumb := ui2.view('', ui2.rect(0, f64(thumb_y), 6, f64(thumb_height)),
+			ui2.BoxStyle{ bg: body_muted, radius: 3 }, []ui2.Element{})
+		card_children << ui2.clickable_view(action_apps_scrollbar,
+			ui2.rect(f64(card_width - 30), app_selection_row_top, 6, f64(layout.list_height)),
+			ui2.BoxStyle{ bg: body_rule, radius: 3 }, frame_child(thumb))
 	}
 	card_children << ui2.label('apps.note', tr('app_selection.note'),
 		ui2.rect(24, f64(card_height - 100), f64(inner), 20), ui2.TextStyle{
@@ -514,10 +580,45 @@ fn (mut s AppSelectionState) poll_pointer(mut d Desktop, mut pointer PointerDevi
 	d.pointer_y = int(i64(packet.y) * i64(d.canvas.height - 1) / i64(packet.max_y))
 	d.buttons = packet.buttons
 	d.set_hover(d.hit_action(d.pointer_x, d.pointer_y))
-	if packet.pressed & button_left != 0 {
-		s.handle_action(d.hover)
-	}
+	s.pointer_input(packet, d)
 	return true
+}
+
+fn (mut s AppSelectionState) pointer_input(packet PointerPacket, d &Desktop) {
+	layout := app_selection_layout(d.canvas.width, d.canvas.height)
+	s.prepare_viewport(layout.list_height)
+	list_y := layout.y + app_selection_row_top
+	if packet.released & button_left != 0 || packet.buttons & button_left == 0 {
+		s.scroll_drag = false
+	}
+	if packet.scroll != 0 && d.pointer_x >= layout.x + 24
+		&& d.pointer_x < layout.x + layout.width - 24
+		&& d.pointer_y >= list_y && d.pointer_y < list_y + layout.list_height {
+		s.scroll_to(s.scroll - int(packet.scroll) * 36)
+		return
+	}
+	if packet.pressed & button_left != 0 {
+		if d.hover == action_apps_scrollbar {
+			thumb_y, thumb_height := s.scrollbar_thumb()
+			position := d.pointer_y - list_y
+			s.scroll_drag_offset = if position >= thumb_y && position < thumb_y + thumb_height {
+				position - thumb_y
+			} else {
+				thumb_height / 2
+			}
+			s.scroll_drag = true
+		} else {
+			s.handle_action(d.hover)
+		}
+	}
+	if s.scroll_drag {
+		_, thumb_height := s.scrollbar_thumb()
+		travel := layout.list_height - thumb_height
+		if travel > 0 {
+			position := d.pointer_y - list_y - s.scroll_drag_offset
+			s.scroll_to(position * (app_selection_content_height() - layout.list_height) / travel)
+		}
+	}
 }
 
 // desktop_request_first_run_install hands the chosen pkg names to the next

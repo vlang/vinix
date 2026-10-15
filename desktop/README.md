@@ -129,8 +129,9 @@ What it does:
 - **native ui2 applications**: every Files, Calculator, Terminal, Settings and
   utility window is backed by its own OS process, PID and memory accounting
 - a **first-run app picker** shown right after the user is created, offering
-  Firefox, Chromium, VOffice and Minecraft; the chosen apps install in a
-  Terminal window through `pkg`
+  browsers, productivity tools, development tools, communication apps, media,
+  games and runtimes on one scrollable page with category headings; the chosen
+  apps install in a Terminal window through `pkg`
 - optional **VOffice Writer and Calc** (`pkg install voffice`), downloaded from
   the VOffice releases and running as native ui2 clients inside ordinary Vinix
   windows
