@@ -69,10 +69,26 @@ fn inspect_snapshots(config Config, state string) !string {
 	return result.stdout
 }
 
-pub fn snapshot(action string, path string, name string) ! {
+fn validate_snapshot_name(name string) ! {
 	if name == '' || name.len > 64 || !name.bytes().all(it.is_alnum() || it in [`-`, `_`]) {
 		return error('snapshot name must contain only letters, digits, dash or underscore')
 	}
+}
+
+fn validate_snapshot_receipt(saved Snapshot, name string) ! {
+	validate_snapshot_name(name)!
+	if saved.schema != 1 || saved.name != name || !snapshot_hash(saved.vars_sha256)
+		|| (saved.disk_identity != '' && !snapshot_hash(saved.disk_identity)) {
+		return error('invalid snapshot receipt')
+	}
+}
+
+fn snapshot_hash(value string) bool {
+	return value.len == 64 && value.bytes().all(it.is_hex_digit())
+}
+
+pub fn snapshot(action string, path string, name string) ! {
+	validate_snapshot_name(name)!
 	if action !in ['snapshot-create', 'snapshot-restore', 'snapshot-delete'] {
 		return error('unknown snapshot action')
 	}
@@ -87,11 +103,7 @@ pub fn snapshot(action string, path string, name string) ! {
 	manifest := state + '/snapshots/' + name + '.json'
 	vars := state + '/snapshots/' + name + '.fd'
 	mut disk_selector := name
-	flag := match action {
-		'snapshot-create' { '-c' }
-		'snapshot-restore' { '-a' }
-		else { '-d' }
-	}
+	mut saved := Snapshot{name: name}
 	if action == 'snapshot-create' {
 		if os.exists(manifest) || os.exists(vars) {
 			return error('snapshot already exists or is incomplete')
@@ -101,18 +113,19 @@ pub fn snapshot(action string, path string, name string) ! {
 			return error('snapshot name already exists in disk image: ${name}')
 		}
 		os.cp(state + '/vars.fd', vars)!
+		saved = Snapshot{name: name, vars_sha256: devcore.file_hash(vars)!}
 	} else {
-		saved := json2.decode[Snapshot](os.read_file(manifest)!, strict: true)!
-		if saved.schema != 1 || saved.name != name
-			|| (saved.disk_identity != '' && (saved.disk_identity.len != 64
-				|| !saved.disk_identity.bytes().all(it.is_hex_digit()))) {
-			return error('invalid snapshot receipt')
-		}
+		saved = json2.decode[Snapshot](os.read_file(manifest)!, strict: true)!
+		validate_snapshot_receipt(saved, name)!
 		devcore.verify(devcore.Pin{vars, saved.vars_sha256})!
 		target := snapshot_target(inspect_snapshots(config, state)!, name)!
-		if saved.disk_identity != '' && disk_snapshot_identity(target)! != saved.disk_identity {
+		identity := disk_snapshot_identity(target)!
+		if saved.disk_identity != '' && identity != saved.disk_identity {
 			return error('snapshot identity changed in disk image: ${name}')
 		}
+		// Bind the pending operation even when the original receipt predates
+		// backend identity checks. Recovery must never fall back to a new ID.
+		saved = Snapshot{...saved, disk_identity: identity}
 		if action == 'snapshot-restore' {
 			// Inspect under the existing offline lease, before copying variables
 			// or publishing an in-flight receipt. Old sidecars remain readable.
@@ -120,31 +133,26 @@ pub fn snapshot(action string, path string, name string) ! {
 			os.cp(vars, state + '/vars.restore')!
 		}
 	}
-	os.write_file(state + '/snapshot.pending.json', json2.encode({
-		'action': action
-		'name':   name
-	}) + '\n')!
-	status := devcore.run([config.qemu_img.path, 'snapshot', '-f', 'qcow2', flag, disk_selector, state + '/disk.qcow2'],
-		state, devcore.environment(0), 300, state + '/snapshot.log')!
-	if status != 0 {
-		if action == 'snapshot-create' { os.rm(vars) or {} }
-		return error('snapshot operation failed; see snapshot.log')
-	}
+	pending := SnapshotPending{action: action, snapshot: saved}
+	write_snapshot_pending(state, pending)!
+	run_snapshot(config, state, action, disk_selector, 'snapshot.log')!
 	match action {
 		'snapshot-create' {
 			target := snapshot_target(inspect_snapshots(config, state)!, name)!
-			os.write_file(manifest, json2.encode(Snapshot{
-				name: name
-				vars_sha256: devcore.file_hash(vars)!
-				disk_identity: disk_snapshot_identity(target)!
-			}) + '\n')!
+			bound := SnapshotPending{action: action, snapshot: Snapshot{
+				...saved, disk_identity: disk_snapshot_identity(target)!
+			}}
+			// Record the identity before publishing the manifest. A recovery
+			// after this point can establish exactly which snapshot we created.
+			write_snapshot_pending(state, bound)!
+			finish_snapshot_create(state, bound)!
 		}
 		'snapshot-restore' {
-			os.rename(state + '/vars.restore', state + '/vars.fd')!
+			finish_snapshot_restore(state, saved)!
 		}
 		else {
-			os.rm(manifest)!
-			os.rm(vars)!
+			confirm_snapshot_deleted(config, state, name)!
+			finish_snapshot_delete(state, saved)!
 		}
 	}
 	os.rm(state + '/snapshot.pending.json')!

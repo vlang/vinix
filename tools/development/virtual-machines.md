@@ -70,12 +70,46 @@ While the VM is stopped:
 
 Snapshots pair qcow2 disk state with a hashed copy of the VM's firmware variables.
 They do not save RAM or running devices. A pending-operation receipt blocks
-startup if the operation fails or is interrupted. Recover an incomplete
-operation by inspecting `snapshot.pending.json`, `snapshot.log`, the qcow2
-snapshot list and the preserved variable images; finish the selected disk/vars
-restoration before removing that marker. Disk and variables are separate files,
-so power-loss atomicity across them is not claimed. There is no implicit
-overwrite of an existing snapshot, source image or state directory.
+startup if the operation fails or is interrupted. Recover it while stopped:
+
+```
+./vinix-vm snapshot-recover /home/developer/vm-state
+```
+
+Recovery uses the same private-state, pinned-tool, offline and ownership-lock
+checks as ordinary snapshot operations. New pending journals record the action, snapshot
+name, firmware hash and backend identity, and are published through a temporary
+file and rename so an interrupted write cannot replace a complete journal with
+partial JSON. Failed commands retain the journal and saved variables even if
+the backend already changed the image. Recovery commands log separately to
+`snapshot-recover.log`, preserving the original `snapshot.log`.
+
+Before replay or cleanup, recovery runs the pinned tool's
+[consistency check](https://www.qemu.org/docs/master/tools/qemu-img.html#cmdoption-qemu-img-arg-check)
+without repair options, with a 300-second deadline and diagnostics in
+`snapshot-check.log`. Any nonzero status keeps the operation blocked; this
+includes leaked clusters as well as corrupt or unreadable images.
+
+Recovery reapplies a verified restore target before replacing the firmware
+variables, or finishes a deletion whose matching backend may already be gone.
+It tolerates interrupted sidecar cleanup and repeated restore failures. For
+creation, it finishes manifest publication only if the journal already records
+the new backend identity. If creation never produced a named backend, it
+abandons the preparation and removes its verified firmware copy. If the backend
+exists but its identity was never recorded, recovery refuses to adopt it.
+Changed firmware, conflicting manifests, ambiguous names and replaced backend
+identities also refuse recovery while retaining the evidence. Legacy pending
+markers without the new journal fields require manual recovery; legacy
+completed snapshot receipts remain readable.
+
+For these refused cases, inspect `snapshot.pending.json`, `snapshot.log`, the
+qcow2 snapshot list and the preserved variable images; establish the selected
+disk/vars pair before removing the marker. A preparation interrupted before
+the first journal publication may also leave an orphan sidecar for inspection.
+Disk, variables and receipts are separate files; this process-interruption
+protocol does not provide a power-loss transaction or repair corrupt qcow2
+images. There is no implicit overwrite of an existing snapshot, source image
+or state directory.
 
 Snapshot restoration resolves the exact name in `qemu-img info` JSON to one
 unique internal ID before preparing variables or publishing a pending operation.
@@ -142,3 +176,19 @@ new pending marker or temporary variable image. Legacy receipt restoration,
 numeric names, ordinary snapshot round trips and the existing QEMU lifecycle
 checks also pass. Power-loss atomicity and Vinix-hosted QEMU qualification
 remain separate work.
+
+The subsequent host recovery checks reproduced loss of the saved firmware
+copy after a real successful creation followed by an injected command failure.
+The corrected checks use a V delegate around real `qemu-img` to fail before or
+after create/restore/delete, repeat a failed restore recovery, and interrupt
+manifest publication and sidecar cleanup. Recovery verifies both the disk bytes
+and firmware pair for numeric names. Missing/changed metadata, firmware and
+manifests, legacy journals, and unresolved creation identity remain blocked.
+Failed image checks, changed tool pins and nonprivate state also refuse recovery.
+The real QEMU lifecycle test also checks that recovery refuses a running VM.
+The complete host `vmcore` suite passed on the same QEMU/V versions. The
+updated CLI also cross-compiled and linked as static Linux ELF64 for AArch64
+and x86_64, with both machine IDs checked. Build logs, source/compiler/binary
+hashes and the receipt are retained locally in
+`/tmp/vinix-vm-recovery-build-51315`; those cross-builds do not establish
+installed-Vinix execution or guest OS qualification.

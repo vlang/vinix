@@ -12,7 +12,7 @@ missing kernel isolation, debugger or hardware virtualization interfaces.
 | Debugging and diagnostics | Dumpability and authorized `process_vm_readv/writev` already exist. The GDB profile requires a real source breakpoint, backtrace and continued execution. The existing bounded security-event ring now uses stack-backed producer records; [native checks](../tests/overlay-rename/security-events.md) cover both producers, copied labels, ring counters and live authorization of inherited report descriptors. | Native ptrace attach/register/step/events, ELF core generation and output/limit policy, profiler events, process stack sampling and authorized hang/crash reporting. No new kernel tracing interface is claimed. |
 | OCI and rootless containers | Existing mount/PID/IPC/UTS namespaces, resource-group controls and overlay copy-up provide parts of container support; see [resource groups](resource-groups.md) and [compatibility status](linux-posix-compatibility.md). | User ID mapping, user/network namespace ownership, network isolation, complete delegation and OCI security semantics; mainstream-runtime and rootless adversarial qualification. Existing refusal of unsupported isolation stays intact. |
 | Practical hardware VM hosting | QEMU provides practical RAM sizes and multiple virtual CPUs. The [VM manager](../tools/development/virtual-machines.md) selects an accelerator explicitly. The native Intel backend supports page-backed RAM up to 1 GiB, with allocation rollback, shared mapping lifetimes and EPT invalidation. | Native Intel still has one vCPU and a real-mode entry API. Larger-memory VM entry requires physical/nested VT-x qualification. AMD SVM, ARM virtualization, interrupts and device integration remain open. QEMU TCG inside Vinix does not satisfy hardware acceleration acceptance. |
-| VM integration and lifecycle | Private per-VM qcow2 disks/firmware variables, QMP lifecycle, offline paired snapshots with exact-name restoration and backend identity binding, explicit user networking/loopback SSH forwarding, read-only 9p shares and a guest-agent transport. | Qualify guest OS workflows inside Vinix, provide Vinix guest tools/drivers, qualify shared folders and network behavior, and implement running-state snapshots and crash-atomic snapshot transactions if required. |
+| VM integration and lifecycle | Private per-VM qcow2 disks/firmware variables, QMP lifecycle, offline paired snapshots with exact-name restoration and backend identity binding, guarded recovery of interrupted restores/deletions and identified creations, explicit user networking/loopback SSH forwarding, read-only 9p shares and a guest-agent transport. | Qualify guest OS workflows inside Vinix, provide Vinix guest tools/drivers, qualify shared folders and network behavior, and implement running-state snapshots and crash-atomic snapshot transactions if required. |
 | Server/SSH/CI and automation | Native SQLite transaction/rollback/reopen/integrity and authenticated HTTP/CGI projects on both architectures. AArch64 also passes two scheduled native Go CI builds with matching artifacts, isolated credentials and refusal of an existing output. [Per-account interval jobs](../tools/development/scheduled-jobs.md) use pinned executables, selected environment, protected credential files and durably reserved attempts for fresh outputs. [Native x86_64/AArch64 job checks](../tests/development/README.md) qualify ordinary-account execution, private receipts, credential/output isolation, unsafe-file refusal, deadlines, INT/TERM group retirement, watcher ticks with one PID, concurrent-owner refusal and killed-owner retry/acknowledgement. The [VFS rename regression](../tests/vfs-rename/README.md) covers the reproduced watcher-state publication race. | Installed-system service/boot integration, wider database/server/TLS/load qualification, authenticated SSH development, native x86 CI and broader CI/deployment workflows. A retained x86 HTTP connection-aborted run still needs investigation. |
 
 Validation on 12 October 2026 used the Darwin ARM host, V 0.5.2 `f6358ec`,
@@ -56,6 +56,19 @@ checks. Refusals preserve disk, variables and sidecars before any pending
 operation. Numeric-name restoration and the full host VM lifecycle suite
 remain passing. Concurrent external image editing, content authentication and
 crash-atomic transactions are outside this metadata binding.
+
+The VM manager now publishes structured snapshot journals through rename,
+retains firmware copies on uncertain command failure, and provides
+`snapshot-recover STATE` under its existing private-state and offline lease
+checks. A bounded image consistency check refuses errors without attempting
+repair. Recovery replays verified restores, completes partial deletions, finishes
+identified creations or abandons a creation with no backend. Unidentified
+creations, changed sidecars/backend identities and legacy pending markers
+remain blocked for manual inspection. Host fault-injection checks exercise
+real qcow2 operations before and after command failure, repeated recovery,
+numeric-name disk/firmware pairing and partial publication/cleanup. This
+process-interruption recovery does not establish power-loss atomicity,
+corrupt-image repair or Vinix-hosted QEMU acceptance.
 
 Native hypervisor memory validation on the same date built isolated kernels
 from `1c2e33ce` plus the memory changes. The x86 memory fixture allocated and

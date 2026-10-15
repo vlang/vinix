@@ -93,7 +93,7 @@ fn test_real_qemu_lifecycle_isolated_state_offline_snapshots_and_locking() {
 	assert control('status', state)!.as_map()['running']!.bool()
 	control('pause', state)!
 	assert !control('status', state)!.as_map()['running']!.bool()
-	for command in [['start', state], ['snapshot-create', state, 'live']] {
+	for command in [['start', state], ['snapshot-create', state, 'live'], ['snapshot-recover', state]] {
 		refused := sourcecommand.capture([root + '/vinix-vm', ...command], os.environ(), 10, 4096, unsafe { nil })!
 		assert refused.status != 0 && refused.stderr.contains('running'), refused.stderr
 	}
