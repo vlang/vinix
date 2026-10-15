@@ -983,6 +983,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   PID namespaces on both architectures, with flat storage and lifetime review.
   See [the task-lookup receipts](docs/linux-posix-qualification.md#native-worker-process-group-and-session-lookup).
 
+- [x] Check native setpgid child-session eligibility before executed-child
+  refusal; qualify real exec, child/grandchild error ordering, group mutations
+  and retained identities as root/UID1000 in initial and one-level PID namespaces
+  on both architectures, with identical-ELF Linux references and flat storage.
+  See [the session/exec receipts](docs/linux-posix-qualification.md#native-process-group-session-and-exec-error-precedence).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

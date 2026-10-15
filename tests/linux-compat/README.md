@@ -1677,3 +1677,14 @@ pass the retained evidence area to verify original failures, native/reference
 results, exact whole-C scope, SDK/compiler/input pins, independent lifetime
 review and executing audit controls. See the
 [worker lookup report](../../docs/linux-posix-qualification.md#native-worker-process-group-and-session-lookup).
+
+The `grouporder` case checks setpgid child-session eligibility before the
+executed-child refusal, preserving same-session EACCES, non-child ESRCH and
+negative-group EINVAL. Six held child/grandchild targets include actual exec;
+11,520 controls per architecture run as root/UID1000 in initial and one-level
+PID namespaces, with real group changes, retained state and flat 200-cycle
+refusal paths. `grouporder-reference.v` boots the unchanged native ELF on Linux.
+Compile `grouporder-check.v` without `-prod` and pass its evidence area to verify
+original failures, native/reference results, exact one-function C scope,
+compiler/SDK/input pins, initial compile refusals and executing audit controls.
+See the [session/exec report](../../docs/linux-posix-qualification.md#native-process-group-session-and-exec-error-precedence).

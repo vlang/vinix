@@ -1,0 +1,1 @@
+arm/x86: complete production C differs only in set_process_group; same-session eligibility precedes executed-child refusal, while parent eligibility, negative-group priority and same-session exec errors remain; no new ownership, lifetime, allocation/pin/free or compiler normalization

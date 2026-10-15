@@ -1,0 +1,31 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "bcc29261f476eae024be82d6fda6a4bb60e2ed39374b2b39222cc47f767235f3",
+    "results": [
+        {
+            "name": "grouporder",
+            "source_sha256": "cc916af0782dd6901b0de1a71ad0c606c7e5871bc6252a1e07e61f55c32b9a58",
+            "init_sha256": "f77fe8179fde6efaab4274a3b1008b936b04aede0ac412ece1114bae15ef13b1",
+            "iso_sha256": "855df9b41c27b0381e8de71187bbac0aaed05d813f62a647ee212446ea5e399d",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "5d06c51b5ded2d2836e5ab383d1ebf5d6a7975236054076ea3402929e0b315ed",
+            "iso_sha256": "094ee2300601ccad5f0483c6bce5d57e766044d8639623f1ac0e6ccc11dbe289",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "grouptid",
+            "source_sha256": "b9a2fff60777b2462cb7c25bce5ad1742cb8ea5e722f058535ad90826636cfcd",
+            "init_sha256": "8569f16803610ea85b9bce5911bdaa1c8d01ee7de21c5df1f6d27490b8a90683",
+            "iso_sha256": "3d2adeb7a1cfb1b2be259fc2042b361e7c691b5613fa2cad0f1fa09396d685af",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

@@ -1,0 +1,133 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=80464
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91000
+initramfs: Done (9 entries)
+LINUX GROUPORDER EXEC: kind=1 pid=23587 parent=53470 group=53470 session=53470 uid=0
+LINUX GROUPORDER EXEC: kind=3 pid=52545 parent=53470 group=52545 session=52545 uid=0
+LINUX GROUPORDER EXEC: kind=5 pid=56681 parent=43683 group=56681 session=56681 uid=0
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=0 uid=0 self=53470 kind=0 pid=34592 parent=53470 reaper=34592 group=53470 session=53470 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=0 uid=0 self=53470 kind=1 pid=23587 parent=53470 reaper=23587 group=53470 session=53470 executed=1
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=0 uid=0 self=53470 kind=2 pid=45788 parent=53470 reaper=45788 group=45788 session=45788 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=0 uid=0 self=53470 kind=3 pid=52545 parent=53470 reaper=52545 group=52545 session=52545 executed=1
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=0 uid=0 self=53470 kind=4 pid=17198 parent=34211 reaper=34211 group=53470 session=53470 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=0 uid=0 self=53470 kind=5 pid=56681 parent=43683 reaper=43683 group=56681 session=56681 executed=1
+LINUX GROUPORDER DETAIL: ordinary=0 kind=3 pid=52545 group=0 pform=0 gform=0 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=0 kind=3 pid=52545 group=0 pform=0 gform=1 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=0 kind=3 pid=52545 group=0 pform=0 gform=2 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=0 kind=3 pid=52545 group=0 pform=0 gform=3 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=0 kind=3 pid=52545 group=0 pform=0 gform=4 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=0 kind=3 pid=52545 group=0 pform=0 gform=5 actual=-1/13 expected=-1/1
+LINUX GROUPORDER CASES: ordinary=0 namespace=0 kind=0 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=0 kind=1 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=0 kind=2 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=0 kind=3 calls=448 failures=320
+LINUX GROUPORDER CASES: ordinary=0 namespace=0 kind=4 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=0 kind=5 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=0 kind=6 calls=192 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=0 kind=0 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=0 kind=1 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=0 kind=2 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=0 kind=3 calls=448 failures=320
+LINUX GROUPORDER FINAL: ordinary=0 namespace=0 kind=4 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=0 kind=5 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=0 kind=6 calls=192 failures=0
+LINUX GROUPORDER EXEC: kind=1 pid=41080 parent=17355 group=17355 session=17355 uid=1000
+LINUX GROUPORDER EXEC: kind=3 pid=49940 parent=17355 group=49940 session=49940 uid=1000
+LINUX GROUPORDER EXEC: kind=5 pid=33166 parent=30104 group=33166 session=33166 uid=1000
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=17355 kind=0 pid=23321 parent=17355 reaper=23321 group=17355 session=17355 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=17355 kind=1 pid=41080 parent=17355 reaper=41080 group=17355 session=17355 executed=1
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=17355 kind=2 pid=56023 parent=17355 reaper=56023 group=56023 session=56023 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=17355 kind=3 pid=49940 parent=17355 reaper=49940 group=49940 session=49940 executed=1
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=17355 kind=4 pid=3504 parent=4808 reaper=4808 group=17355 session=17355 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=17355 kind=5 pid=33166 parent=30104 reaper=30104 group=33166 session=33166 executed=1
+LINUX GROUPORDER DETAIL: ordinary=1 kind=3 pid=49940 group=0 pform=0 gform=0 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=1 kind=3 pid=49940 group=0 pform=0 gform=1 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=1 kind=3 pid=49940 group=0 pform=0 gform=2 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=1 kind=3 pid=49940 group=0 pform=0 gform=3 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=1 kind=3 pid=49940 group=0 pform=0 gform=4 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=1 kind=3 pid=49940 group=0 pform=0 gform=5 actual=-1/13 expected=-1/1
+LINUX GROUPORDER CASES: ordinary=1 namespace=0 kind=0 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=0 kind=1 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=0 kind=2 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=0 kind=3 calls=448 failures=320
+LINUX GROUPORDER CASES: ordinary=1 namespace=0 kind=4 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=0 kind=5 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=0 kind=6 calls=192 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=0 kind=0 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=0 kind=1 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=0 kind=2 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=0 kind=3 calls=448 failures=320
+LINUX GROUPORDER FINAL: ordinary=1 namespace=0 kind=4 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=0 kind=5 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=0 kind=6 calls=192 failures=0
+LINUX GROUPORDER EXEC: kind=1 pid=4 parent=2 group=2 session=2 uid=0
+LINUX GROUPORDER EXEC: kind=3 pid=6 parent=2 group=6 session=6 uid=0
+LINUX GROUPORDER EXEC: kind=5 pid=10 parent=9 group=10 session=10 uid=0
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=0 pid=3 parent=2 reaper=3 group=2 session=2 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=1 pid=4 parent=2 reaper=4 group=2 session=2 executed=1
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=2 pid=5 parent=2 reaper=5 group=5 session=5 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=3 pid=6 parent=2 reaper=6 group=6 session=6 executed=1
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=4 pid=8 parent=7 reaper=7 group=2 session=2 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=5 pid=10 parent=9 reaper=9 group=10 session=10 executed=1
+LINUX GROUPORDER DETAIL: ordinary=0 kind=3 pid=6 group=0 pform=0 gform=0 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=0 kind=3 pid=6 group=0 pform=0 gform=1 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=0 kind=3 pid=6 group=0 pform=0 gform=2 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=0 kind=3 pid=6 group=0 pform=0 gform=3 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=0 kind=3 pid=6 group=0 pform=0 gform=4 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=0 kind=3 pid=6 group=0 pform=0 gform=5 actual=-1/13 expected=-1/1
+LINUX GROUPORDER CASES: ordinary=0 namespace=1 kind=0 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=1 kind=1 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=1 kind=2 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=1 kind=3 calls=448 failures=320
+LINUX GROUPORDER CASES: ordinary=0 namespace=1 kind=4 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=1 kind=5 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=1 kind=6 calls=192 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=1 kind=0 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=1 kind=1 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=1 kind=2 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=1 kind=3 calls=448 failures=320
+LINUX GROUPORDER FINAL: ordinary=0 namespace=1 kind=4 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=1 kind=5 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=1 kind=6 calls=192 failures=0
+LINUX GROUPORDER EXEC: kind=1 pid=4 parent=2 group=2 session=2 uid=1000
+LINUX GROUPORDER EXEC: kind=3 pid=6 parent=2 group=6 session=6 uid=1000
+LINUX GROUPORDER EXEC: kind=5 pid=10 parent=9 group=10 session=10 uid=1000
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=0 pid=3 parent=2 reaper=3 group=2 session=2 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=1 pid=4 parent=2 reaper=4 group=2 session=2 executed=1
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=2 pid=5 parent=2 reaper=5 group=5 session=5 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=3 pid=6 parent=2 reaper=6 group=6 session=6 executed=1
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=4 pid=8 parent=7 reaper=7 group=2 session=2 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=5 pid=10 parent=9 reaper=9 group=10 session=10 executed=1
+LINUX GROUPORDER DETAIL: ordinary=1 kind=3 pid=6 group=0 pform=0 gform=0 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=1 kind=3 pid=6 group=0 pform=0 gform=1 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=1 kind=3 pid=6 group=0 pform=0 gform=2 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=1 kind=3 pid=6 group=0 pform=0 gform=3 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=1 kind=3 pid=6 group=0 pform=0 gform=4 actual=-1/13 expected=-1/1
+LINUX GROUPORDER DETAIL: ordinary=1 kind=3 pid=6 group=0 pform=0 gform=5 actual=-1/13 expected=-1/1
+LINUX GROUPORDER CASES: ordinary=1 namespace=1 kind=0 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=1 kind=1 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=1 kind=2 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=1 kind=3 calls=448 failures=320
+LINUX GROUPORDER CASES: ordinary=1 namespace=1 kind=4 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=1 kind=5 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=1 kind=6 calls=192 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=1 kind=0 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=1 kind=1 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=1 kind=2 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=1 kind=3 calls=448 failures=320
+LINUX GROUPORDER FINAL: ordinary=1 namespace=1 kind=4 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=1 kind=5 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=1 kind=6 calls=192 failures=0
+LINUX GROUPORDER FAIL: session/exec setpgid error ordering or retained state
+QEMU: Terminated
+

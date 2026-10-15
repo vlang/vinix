@@ -1,0 +1,3 @@
+tests/linux-compat/grouporder-check.v:309: FAIL: fn main.main: assert false, 'grouporder assertions must execute'
+      message: grouporder assertions must execute
+V panic: Assertion failed...

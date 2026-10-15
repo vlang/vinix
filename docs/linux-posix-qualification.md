@@ -7418,3 +7418,84 @@ section 15 gates remain open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/grouptid-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/grouptid-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/grouptid-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/grouptid-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/grouptid-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/grouptid-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/grouptid-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/grouptid-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/grouptid-check.v), [verdict](../tests/linux-compat/results/2026-10-15/grouptid-audit.log), [SDK inputs](../tests/linux-compat/results/2026-10-15/grouptid-sdk-inputs.json), [lifetime review](../tests/linux-compat/results/2026-10-15/grouptid-lifetime-review.txt).
+
+## Native process group session and exec error precedence
+
+A parent calling `setpgid` on an executed child in another session now receives
+`EPERM`. Session eligibility is checked before the executed-child `EACCES`
+refusal, following Linux v6.12's
+[setpgid ordering](https://github.com/torvalds/linux/blob/v6.12/kernel/sys.c).
+Same-session executed children still return `EACCES`, non-children return
+`ESRCH`, and negative groups take `EINVAL` precedence. Refusals retain the
+existing process groups and sessions.
+
+The change moves an existing scalar session comparison earlier in
+`set_process_group`. Existing lookup, table-lock scope, orphan-change stack
+storage, group mutation and notification lifetimes are unchanged. Whole
+production C differs only in that function's body; the audit requires exact
+source changes and unchanged allocation/pin/free call counts, without compiler
+identifier normalization.
+
+The `grouporder` probe runs 11,520 controls per architecture across root and
+UID/GID1000 cohorts in the initial and one-level PID namespaces. Each cohort
+creates a private session and six held targets. Each target sends its
+PID/parent/group/session identities through a readiness pipe.
+Executed targets re-enter the same ELF through `/proc/self/exe`, publish their
+identities from the new entry point, then wait on an inherited release pipe.
+Intermediate parents wait for their target children. The cohort releases and
+reaps direct children and intermediate parents before reporting completion.
+
+| Calls per cohort | Original failures | Controls |
+| --- | --- | --- |
+| 448 | 0 | Same-session unexecuted child: real group assignments/restoration, foreign/missing-group `EPERM`, negative-group `EINVAL`. |
+| 448 | 0 | Same-session executed child: `EACCES` for nonnegative groups, negative-group `EINVAL`. |
+| 448 | 0 | Detached-session unexecuted child: `EPERM` and negative-group `EINVAL`. |
+| 448 | 320 | Detached-session executed child: session `EPERM` before exec `EACCES`, preserving negative-group `EINVAL`. |
+| 448 | 0 | Same-session unexecuted grandchild: non-child `ESRCH` and negative-group `EINVAL`. |
+| 448 | 0 | Detached-session executed grandchild: non-child `ESRCH` before session/exec errors, plus negative-group `EINVAL`. |
+| 192 | 0 | Before/after group/session queries of every target. |
+
+Seven group selections include zero, caller and target IDs, a detached-session
+leader, a missing positive group and two negative groups. Seven raw register-word
+forms and genuine musl calls vary the setter arguments independently. Every
+setter checks all held targets' group/session state. The eligible child makes
+actual group changes and is restored after each trial. Twelve exec-entry
+receipts per architecture are matched to the four cohorts' target identities.
+Original kernels fail exactly 1,280 controls each. Corrected kernels and the
+identical native probe ELFs on Linux 6.12.51 pass every control on both
+architectures.
+
+Four warmed 200-cycle cohorts repeat same-session exec, detached-session child,
+non-child and negative-group refusals. Every live slab class and big-page total
+stays flat after settling; fork/exec and teardown are outside this interval.
+AArch64 retains 18 classes and 111/111 big pages initially, 123/123 in the
+PID namespace. x86-64 retains 14 classes and 248/248 initially, 270/270 in the
+namespace, for both credential cohorts.
+The probe uses five explicit stack allocas and no allocation, dynamic-array or
+fixed-index helper calls.
+
+Four completed production builds qualify original and corrected kernels. Native
+runtime and worker-TID group/session regressions pass on both architectures;
+eight host test files pass. Allocation diagnostics remain byte-identical,
+including their existing allowance-file refusals. The audit binds 66 semantic
+input fingerprints, 15,146 V compiler inputs, all 2,014 copied SDK files, fresh
+ARM compiler-command receipts, source/C/ELF/ISO/kernel identities, Linux
+references and 84 retained regular files across eight native profiles.
+False-assertion and passing-Linux-as-original controls execute without `-prod`.
+
+The first probe compilation had no guest verdict or init ELF. It lacked the
+header defining `unshare`/`CLONE_NEWPID`, and V heap-promoted the state object,
+emitting an unavailable `memdup`. The final probe adds that header and uses
+explicit stack storage. The audit verifies that exact source transformation
+and preserves both architecture compile refusals, their receipts, original
+probe source, artifact pins and the initial watcher's missing-ELF refusal.
+The syscall expectations are unchanged.
+
+Concurrent exec/exit/credential changes, zombie setters, leader-only exit,
+nested/cross-namespace observers, MAC policy, terminal/job-control signals,
+PID reuse, GNU libc and translated/ELF32 paths remain unqualified. The three
+broad section 15 gates remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/grouporder-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/grouporder-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/grouporder-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/grouporder-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/grouporder-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/grouporder-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/grouporder-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/grouporder-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/grouporder-check.v), [verdict](../tests/linux-compat/results/2026-10-15/grouporder-audit.log), [initial ARM compile refusal](../tests/linux-compat/results/2026-10-15/grouporder-initial-compile-arm.log), [initial x86-64 compile refusal](../tests/linux-compat/results/2026-10-15/grouporder-initial-compile-x86.log), [initial probe](../tests/linux-compat/results/2026-10-15/grouporder-initial-probe.v).
