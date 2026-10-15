@@ -1023,10 +1023,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.audit_mode { a.audit_key_input(input); return }
 	if a.details_mode { if input == '\x1b' { a.clear_details() }; return }
 	if a.health_mode { a.health_key_input(input); return }
-	if a.cleanup_mode {
-		if input == '\x1b' && a.worker == unsafe { nil } { a.clear_cleanup() }
-		return
-	}
+	if a.cleanup_mode { a.cleanup_key_input(input); return }
 	if a.policy_mode { a.policy_key_input(input); return }
 	if a.data_mode { a.data_key_input(input); return }
 	if a.launch_mode { a.launch_key_input(input); return }

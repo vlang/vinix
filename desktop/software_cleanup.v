@@ -45,16 +45,18 @@ fn (mut a SoftwareApp) load_cleanup_review() {
 	a.set_status(if a.cleanup_result != '' { a.cleanup_result } else {
 		'Only the listed obsolete generations will be deleted. Current, rollback and running applications stay protected. Reload after applications finish to review newly eligible generations.'
 	})
+	unsafe { a.cleanup_result.free() }; a.cleanup_result = ''
 }
 
 fn (mut a SoftwareApp) handle_cleanup(event_id string) {
+	if a.cleanup_review_running() && event_id in ['software.cleanup.stop', 'software.cleanup.cancel']! {
+		a.stop_cleanup_review()
+		return
+	}
 	if a.worker != unsafe { nil } { return }
 	match event_id {
 		'software.cleanup.back' { a.clear_cleanup() }
-		'software.cleanup.reload' {
-			unsafe { a.cleanup_result.free() }; a.cleanup_result = ''
-			a.read_cleanup()
-		}
+		'software.cleanup.reload' { a.read_cleanup() }
 		'software.cleanup.confirm' {
 			if !a.cleanup_ready || a.cleanup_snapshot.generations.len == 0 { return }
 			a.start(['cleanup-apply', a.cleanup_snapshot.fingerprint], false)
@@ -70,12 +72,12 @@ fn (mut a SoftwareApp) handle_cleanup(event_id string) {
 
 fn (mut a SoftwareApp) build_cleanup(width int, height int) ui2.Element {
 	mut children := frame_elements(32)
-	children << software_label('Clean up obsolete package generations', 14, 8, width - 28, 28, false)
+	children << software_label('Clean up obsolete package generations', 14, 8, width - 202, 28, false)
+	if a.cleanup_review_running() { children << software_button('software.cleanup.stop', 'Stop review', width - 174, 8, 160) }
 	children << software_label(a.cleanup_summary, 14, 48, width - 28, 48, false)
 	children << software_label('Deletion is permanent for the listed versions. The current and rollback generations and versions used by running apps are retained. Cached downloads, interrupted stages and personal data are retained.', 14, 106, width - 28, 88, false)
 	rows := if height > 390 { (height - 390) / 30 } else { 1 }
 	a.page_rows = if rows > 16 { 16 } else if rows < 1 { 1 } else { rows }
-	a.cleanup_scroll = a.cleanup_scroll / a.page_rows * a.page_rows
 	for slot in 0 .. a.page_rows {
 		index := a.cleanup_scroll + slot
 		if index >= a.cleanup_snapshot.generations.len { break }
@@ -94,14 +96,7 @@ fn (mut a SoftwareApp) build_cleanup(width int, height int) ui2.Element {
 			children << software_button('software.cleanup.down', 'Next', 136, height - 176, 110)
 		}
 	}
-	a.add_status_footer(mut children, width, height, false)
-	return ui2.screen(app_surface, children)
-}
-
-fn (mut a SoftwareApp) build_cleanup_compact(width int, height int) ui2.Element {
-	mut children := frame_elements(4)
-	children << software_label('Clean up versions', 14, 8, width - 28, 28, false)
-	children << software_label('Enlarge this window to review every generation before confirming deletion.', 14, 46, width - 28, 76, false)
-	if a.worker == unsafe { nil } { children << software_button('software.cleanup.back', 'Back to catalog', 14, height - 48, 140) }
+	if a.progress_seen { children << a.progress_bar(width, height) }
+	a.add_status_footer(mut children, width, height, a.progress_seen)
 	return ui2.screen(app_surface, children)
 }

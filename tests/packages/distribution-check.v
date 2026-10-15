@@ -230,6 +230,8 @@ fn check() ! {
 	os.cp(repository + '/desktop/software_details.v', work + '/software/software_details.v')!
 	os.cp(repository + '/desktop/software_health.v', work + '/software/software_health.v')!
 	os.cp(repository + '/desktop/software_cleanup.v', work + '/software/software_cleanup.v')!
+	os.cp(repository + '/desktop/software_cleanup_navigation.v', work + '/software/software_cleanup_navigation.v')!
+	os.cp(repository + '/tests/packages/software_cleanup_navigation_fixture.v', work + '/software/cleanup_navigation_fixture.v')!
 	os.cp(repository + '/tests/packages/software_cleanup_fixture.v', work + '/software/cleanup_fixture.v')!
 	os.cp(repository + '/tests/packages/software_health_fixture.v', work + '/software/health_fixture.v')!
 	os.cp(repository + '/tests/packages/software_details_fixture.v', work + '/software/details_fixture.v')!
@@ -305,6 +307,7 @@ fn check() ! {
 	run(work + '/window-broker-memory', ['policy-navigation-memory'])!
 	run(work + '/window-broker-memory', ['data-navigation-memory'])!
 	run(work + '/window-broker-memory', ['launch-navigation-memory'])!
+	run(work + '/window-broker-memory', ['cleanup-navigation-memory'])!
 	if '--cross' in os.args {
 		run(v, [...helper_flags, '-o', work + '/package-stage', repository + '/tools/packages/stage.v'])!
 		for architecture in ['aarch64', 'x86_64'] {

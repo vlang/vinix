@@ -72,6 +72,12 @@ use `cleanup-review` and `cleanup-apply FINGERPRINT`; broader administrator `gc`
 still collects caches/stages. See
 [reviewed cleanup qualification](../../tests/packages/reviewed-cleanup-check.md).
 
+Cleanup reviews support Stop/Cancel/Escape before deletion. Small windows keep
+Back, reload, status and failure access; confirmation remains in the full view.
+Resize keeps the first visible generation. Stopped or failed post-cleanup reads
+retain the completed result until a successful review reload; approved deletion
+remains protected. See [navigation checks](../../tests/packages/software-cleanup-navigation-check.md).
+
 Rollback restores the previous package set in a fresh generation and retains
 the set it replaced, so cleanup cannot strand its rollback link. It uses verified
 local source files without cache or repository access, checks the disk reserve,

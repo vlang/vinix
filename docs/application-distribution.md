@@ -792,6 +792,16 @@ reviewed set. Cached complete/partial downloads, interrupted stages and personal
 data remain available. Versions held by running applications are omitted; reload
 after those applications finish to review newly eligible versions.
 
+Pending cleanup reviews support **Stop review**, Cancel and Escape. Stopping
+discards the unaccepted generation list and fingerprint; reload and inspect a
+fresh review before confirmation. Small windows retain Back, reload, status and
+failure access, with confirmation available in the full view. Resizing keeps
+the first visible generation. Escape returns an idle review to the catalog;
+approved deletion retains its close guard and cannot be interrupted through
+these controls. A stopped or failed post-cleanup reload keeps the completed
+result for the next successful read. See
+[cleanup navigation checks](../tests/packages/software-cleanup-navigation-check.md).
+
 The public commands are `cleanup-review` (format-1 JSON) and
 `cleanup-apply FINGERPRINT`. Approval binds configuration, both retained states
 and the complete removable set, including generation-parent, root and lease

@@ -1,0 +1,33 @@
+29 successful focused Software compile/run checks:
+PASS ui-compile
+PASS ui-functional
+PASS ui-cleanup-navigation-memory
+PASS ui-launch-navigation-memory
+PASS ui-data-navigation-memory
+PASS ui-policy-navigation-memory
+PASS ui-package-navigation-memory
+PASS ui-repository-navigation-memory
+PASS ui-deployment-navigation-memory
+PASS ui-audit-search-memory
+PASS ui-mirror-navigation-memory
+PASS ui-snapshot-export-memory
+PASS ui-snapshot-memory
+PASS ui-audit-memory
+PASS ui-health-memory
+PASS ui-health-progress-memory
+PASS ui-cleanup-memory
+PASS ui-repair-memory
+PASS ui-failure-memory
+PASS ui-admin-memory
+PASS ui-window-memory
+PASS ui-data-memory
+PASS ui-policy-memory
+PASS ui-metadata-memory
+PASS ui-details-memory
+PASS ui-view-memory
+PASS ui-asan-compile
+PASS ui-asan-functional
+PASS ui-asan-cleanup-navigation-memory
+PASS maintained Software-only driver and all twenty-four allocation modes
+PASS full desktop typecheck arm64
+PASS full desktop typecheck amd64

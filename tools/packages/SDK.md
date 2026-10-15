@@ -56,6 +56,17 @@ Software through `packages-change`; raw `gc` is excluded from that transport.
 No publisher refresh, catalog authentication or permission/license admission is
 needed for cleanup. See [qualification](../../tests/packages/reviewed-cleanup-check.md).
 
+Software can stop and reap an unaccepted `cleanup-review` worker with Stop,
+Cancel or Escape. Partial and complete-before-exit output and the confirmation
+fingerprint are discarded; a fresh successful review is required to confirm.
+Compact windows retain Back, reload, status and failure access, with no deletion
+confirmation. Full-view resizing preserves the first visible generation. An
+approved `cleanup-apply` keeps its administrator authorization and close guard;
+navigation cannot interrupt it. Stopping or failing its subsequent review reload
+preserves the completed cleanup result until a successful read displays it.
+Service arguments, authorization, fingerprint and deletion semantics are unchanged.
+See [navigation checks](../../tests/packages/software-cleanup-navigation-check.md).
+
 State readers, writers and launch admission require ordinary regular lock/lease
 files. Opens and advisory lock acquisition refuse malformed or busy entries
 without waiting on FIFOs or exclusive holders. Read-only requests require the
