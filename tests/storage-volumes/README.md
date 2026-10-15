@@ -1,5 +1,12 @@
 # Storage-volume qualification
 
+`--host-cipher-monitor-verify` and `--cipher-monitor-verify` qualify complete
+saved ciphertext sessions in both source domains and mapping modes: canonical
+frame/reference/counter/source binding, full input hashes, transition counts,
+private reference/public transcript policy, pinned inputs, fault precedence and
+bounded lifetimes across reordered reboot. An independent oracle reconstructs
+48 persisted files. See [ciphertext transcript verification](cipher-monitor-verify.md).
+
 `--host-data-monitor-verify` and `--data-monitor-verify` qualify whole saved
 plain-data monitor sessions: complete reference binding, canonical sequence
 and counter checks, all four transitions, buffered full-file hashes, pinned

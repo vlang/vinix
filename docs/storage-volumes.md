@@ -3154,6 +3154,63 @@ changing caller state; embedded identities, bounds, pools and global slots
 retain the ordinary bundle validation. See
 [qualification](../tests/storage-volumes/data-checksums.md).
 
+## Offline ciphertext monitor transcript verification
+
+`verify-volume-monitor REFERENCE TRANSCRIPT` checks a saved `VINIXCM1` session
+against its entire trusted `VINIXCH1` ciphertext reference. Both `source=volume`
+and `source=recovery` sessions are supported without credentials or device access.
+
+```sh
+vinix-volume verify-volume-monitor /root/volume.vchash /root/monitor.txt
+```
+
+Every sample must contain exactly the canonical monitor prefix and the complete
+two-line `VINIXCS1` ASCII scrub view. Samples start at 1 and advance consecutively;
+the source label must stay unchanged. Changed-sample counts and the session latch
+must agree with every expected/actual digest, including restoration. All native
+identity/capacity/sector and slot/offset/length/read-only fields, findings and
+reference fingerprints must match the supplied CH1. A complete frame is
+reconstructed from the reference and recorded observation and compared byte for
+byte, so noncanonical numbers, missing/reordered/extra fields, unrelated geometry
+or digests, changed source labels and later diagnostics invalidate the whole file.
+
+The CH1 must satisfy the established private regular-file ownership, permission,
+exact-length and post-EOF checks. The public ASCII transcript is an ordinary
+readable regular file, including 0644, with a size from 1 byte through 64 MiB.
+Both original file/parent descriptor pairs remain pinned through private parsing,
+formatting, printing and final stdout checks. Buffered reads retry interruptions,
+hash every original transcript byte, require true EOF and recheck its regular
+type and original size after EOF. Partial frames, NUL and appended data refuse.
+No summary is emitted before all frames validate; an output failure can leave a
+partial write. The command takes no directory writer lock, publishes no file,
+imports no mapping and performs no KDF, authentication or physical I/O.
+
+The bounded two-line summary starts with:
+
+```text
+format=VINIXCM1 operation=verified-ciphertext-monitor source=volume|recovery mappings=1 samples=N changed_samples=C session_changed=0|1 final_changed=0|1 stable=S new_changes=A restored=R changed_again=G algorithm=sha256 reference_sha256=HEX transcript_sha256=HEX
+```
+
+Its mapping line includes complete native geometry, saved mode, final match or
+changed finding, and expected/final digests. Adjacent equal actual digests count
+as `stable`, including unchanged corruption. Expected-to-different observations
+count as `new_changes`, different-to-expected as `restored`, and two distinct
+unexpected digests as `changed_again`. The first sample has no transition.
+The fixed 2048-byte summary covers full-width geometry and counters. Persistent
+reader/history workspaces precede the loop; transient sample storage retains
+no borrowed pointers after validation.
+
+A valid all-clean history returns 0; any recorded changed sample returns 2 even
+if the last sample is restored. Operational input, binding, encoding and stdout
+failures return 1 and take precedence over findings; syntax errors return 2.
+An exact complete-frame prefix is valid shorter evidence: the format records
+neither planned count nor originating command completion. Compare the returned
+sample count with an independently known count when needed. The source label
+records historical metadata; offline verification does not authenticate that
+label or either input, prove present ciphertext/plaintext integrity, provide a
+concurrent snapshot or repair data. See
+[qualification](../tests/storage-volumes/cipher-monitor-verify.md).
+
 ## Offline data monitor transcript verification
 
 `verify-data-monitor MANIFEST TRANSCRIPT` validates a saved plain-data monitor

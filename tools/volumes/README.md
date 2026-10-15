@@ -4,6 +4,12 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`verify-volume-monitor REFERENCE TRANSCRIPT` validates every saved ciphertext
+monitor frame against a private CH1 reference, including source/sequence/counters,
+native geometry and full digests. It prints whole-input hashes and transition
+counts after complete validation. Historical changes return 2; operational
+failures return 1. See [ciphertext transcript verification](../../docs/storage-volumes.md#offline-ciphertext-monitor-transcript-verification).
+
 `verify-data-monitor MANIFEST TRANSCRIPT` checks every saved plain-data monitor
 sample against its complete reference, including sequence, counters and latched
 changed status. It prints native geometry, full input hashes and per-mapping
