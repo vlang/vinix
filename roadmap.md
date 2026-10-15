@@ -1091,6 +1091,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   against identical probe ELFs on Linux.
   See [the stack range receipts](docs/linux-posix-qualification.md#native-clone3-stack-range-admission).
 
+- [x] Validate clone3 flag words, rejecting unknown high bits, reserved legacy
+  bits and conflicting shared/cleared handlers; stop unrequested child creation
+  and qualify import precedence, recognized admission, fork/reap and flat
+  cleanup on both native architectures against identical probe ELFs on Linux.
+  See [the flag receipts](docs/linux-posix-qualification.md#native-clone3-flag-word-validation).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

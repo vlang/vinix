@@ -1940,3 +1940,20 @@ Use `--cases clonestack --timeout 1200` with a fresh state directory.
 `clonestack-check.v` without `-prod` to audit original failures, corrected
 results, exact source/C scope, storage, pins and executing negative controls.
 See [the stack range report](../../docs/linux-posix-qualification.md#native-clone3-stack-range-admission).
+
+The `cloneflags` case checks native clone3 flag validation: unknown high bits,
+reserved former CSIGNAL/CLONE_DETACHED bits and conflicting
+CLONE_SIGHAND/CLONE_CLEAR_SIGHAND requests return EINVAL after argument import.
+Four credential/PID namespace cohorts run 1,056 controls per architecture
+through three protected layouts. Recognized flags reach an EBADF admission
+control; direct invalid calls must create no children. Original kernels create
+nine unrequested children per cohort, which the probe validates and reaps;
+corrected kernels and identical Linux ELFs create none. Valid SIGCHLD fork/reap
+controls, input faults, canaries and empty-child checks are included.
+Original and corrected kernels measure identical warmed 200-cycle cleanup
+workloads. Only this retention loop accepts original EBADF or corrected
+EINVAL; semantic cases require exact errors. Use `--cases cloneflags --timeout
+1200` with a fresh state directory. `cloneflags-reference.v` runs the unchanged
+ELF on Linux; compile `cloneflags-check.v` without `-prod` for the executing
+evidence audit. Recognized-flag admission does not qualify each flag's effects.
+See [the flag report](../../docs/linux-posix-qualification.md#native-clone3-flag-word-validation).

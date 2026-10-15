@@ -48,6 +48,9 @@ pub fn syscall_clone3(gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 	if !usercopy.copy_from_user(voidptr(&args), uargs, size) {
 		return errno.err, errno.efault
 	}
+	if !valid_clone3_flags(args.flags) {
+		return errno.err, errno.einval
+	}
 	if !valid_clone3_exit_signal(args.flags, args.exit_signal) {
 		return errno.err, errno.einval
 	}

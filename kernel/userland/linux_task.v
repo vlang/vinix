@@ -107,6 +107,16 @@ mut:
 
 const clone_args_size_ver0 = u64(64)
 
+// CLONE_CLEAR_SIGHAND and CLONE_INTO_CGROUP extend the legacy 32 flag bits.
+// clone3 reserves CLONE_DETACHED and former CSIGNAL bits other than NEWTIME.
+fn valid_clone3_flags(flags u64) bool {
+	known := u64(0xffffffff) | u64(0x100000000) | clone_into_cgroup
+	reserved := u64(0x0040007f)
+	clear_and_share := clone_sighand | u64(0x100000000)
+	return flags & ~known == 0 && flags & reserved == 0
+		&& flags & clear_and_share != clear_and_share
+}
+
 // clone3 carries the exit signal separately from flags. Linux accepts signal
 // zero through 64, but a thread or CLONE_PARENT child cannot select one.
 fn valid_clone3_exit_signal(flags u64, signal u64) bool {

@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "ade300805631127e994d17bf4d627a5177591350e60c65ced7e081000bcc0997",
+    "results": [
+        {
+            "name": "cloneflags",
+            "source_sha256": "86d197a5412a106aa492f4cf8b98a387d448684266293fbc2a03738900884ba3",
+            "init_sha256": "112af4d3566a227de790d1621fcbfba23e0d141015829cd937d7dc5f89cff5d5",
+            "iso_sha256": "76aec7a21eee42fc88fb4ddd43f009e9496e1980edfa2a9bfdaab83ae950fcde",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

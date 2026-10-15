@@ -9305,3 +9305,87 @@ exit notification, clone-child wait classes, selected TIDs, pidfds, extensible
 sizes, cgroup placement and its authorization/lifetimes, GNU libc and
 translated/32-bit paths remain separate.
 The broad libc, installation/sandbox/portal and translation gates remain open.
+
+## Native clone3 flag word validation
+
+Both native clone3 entry points now validate flags after importing the complete
+argument block. A shared scalar predicate recognizes the legacy 32-bit flag
+domain plus CLONE_CLEAR_SIGHAND and CLONE_INTO_CGROUP, rejects unknown bits
+34–63, reserves CLONE_DETACHED and former CSIGNAL bits other than CLONE_NEWTIME,
+and rejects simultaneous CLONE_SIGHAND/CLONE_CLEAR_SIGHAND. Invalid requests
+return EINVAL before later stack/cgroup admission. Legacy clone entry points
+are unchanged. This follows
+[Linux v6.12's clone3 flag validation](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c).
+
+The `cloneflags` probe runs 1,056 controls per architecture: 264 in each
+root/UID1000 and initial/one-level PID namespace cohort. Arguments use aligned,
+byte-unaligned and full-structure native-page-tail layouts. The input page is
+read-only and the following page is PROT_NONE. Most flag checks use a later
+invalid cgroup FD to distinguish correct EINVAL from the original EBADF.
+Separate direct calls omit that admission failure to expose child creation.
+
+| Class | Calls per cohort | Contract |
+| --- | ---: | --- |
+| Unknown high bits | 90 | Every bit 34–63 independently returns EINVAL before a missing cgroup FD. |
+| Reserved legacy bits | 42 | Bits 0–6, CLONE_DETACHED and six combinations return EINVAL, including former signal words and a reserved bit combined with CLONE_NEWTIME. |
+| Handler conflicts | 24 | Eight CLONE_SIGHAND/CLONE_CLEAR_SIGHAND combinations return EINVAL, including ordinary VM/sharing and valid zero-exit-signal thread flag combinations. |
+| Recognized admission | 48 | Sixteen recognized single flags/combinations reach EBADF. This tests admission, not the effects of every recognized flag. |
+| Input precedence | 36 | Short/excessive sizes, null/unmapped/wrapping argument addresses and protected suffixes retain exact EINVAL/E2BIG/EFAULT results despite readable invalid flag bits. |
+| Direct requests | 24 | Sizes 64/72/80/88 with zero flags produce real SIGCHLD children; four invalid flag requests without CLONE_INTO_CGROUP return EINVAL without children. |
+
+Originals fail exactly 672 controls per architecture. In each cohort, direct
+requests containing bit 63, CLONE_DETACHED or the old signal word 17 create
+nine unrequested children. The probe checks their PID/TID, parent, UID and
+exit-37 records, then reaps them; it does not leave original false successes
+running. Corrected kernels and the identical original ELFs on Linux 6.12.51
+pass every control and create zero unrequested children. Both retain twelve
+legitimate direct fork/reap controls per cohort. Child counts are checked in
+the cohort and again after transfer to its supervising process.
+
+Every call restores access and compares the complete two-page input canary,
+then requires ECHILD from an empty nonblocking wait. A matching error cannot
+hide a child left behind. Native ARM uses 16KiB pages; native x86 and both
+Linux references use 4KiB. Both corrected kernels also pass runtime and the
+768-control clonestack regression.
+
+Original and corrected kernels each measure four cleanup cohorts after 64
+warmup cycles and thirteen seconds of settling, followed by 200 measured
+cycles and another settle. Each cycle runs six invalid-flag calls with a
+missing cgroup FD, one recognized-flag admission refusal and one legitimate
+SIGCHLD fork/reap. These inputs and child lifecycles are identical on both
+kernels; only this retention loop accepts original EBADF or corrected EINVAL.
+Semantic cases always require exact Linux errors. All live slab classes and
+big-heap page totals stay flat. The input mapping and slab observer remain
+open throughout. This is targeted kernel-heap evidence; the earlier EXT2
+rename observation and general page/cache retention remain separate.
+
+Four isolated original/corrected production builds pass. Exact whole-C
+comparison confines the change to the shared scalar predicate/prototype and
+two clone3 call sites. No allocation, free, reference, ownership transfer or
+lock changes are introduced. The probe uses eight explicit stack allocas and
+no dynamic allocation or fixed-index helper. Its successful compiler preflight
+matches the original ARM guest C.
+
+The auditor verifies every case/cohort total, original failure counts, valid
+and unrequested child counts, credentials/page sizes, probe C/ELF identity,
+Linux receipts, both phases' storage, all 84 retained native case files,
+67 frozen dispatch inventory inputs, 2,014 SDK files and 15,146 compiler pins.
+A false assertion and passing-Linux-as-original control must execute and
+fail; compile the auditor without `-prod`.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/cloneflags-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/cloneflags-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/cloneflags-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/cloneflags-diagnostic-pins.json).
+Raw original/corrected/Linux, build, preflight and regression logs accompany
+the receipts. The maintained auditor is `tests/linux-compat/cloneflags-check.v`.
+
+This qualifies clone3 flag-word validation and the tested admission/direct-call
+behavior. Standalone CLONE_CLEAR_SIGHAND still does not reset inherited caught
+handlers, and other recognized-flag effects remain unqualified here. Selected
+TIDs and their pointer/error ordering, pidfds, zero-filled extensions,
+alternative exit notification and clone-child wait classes, supplied-stack
+execution/alignment, tagged/boundary addresses, cgroup placement and its
+authorization/lifetimes, concurrent arguments, GNU libc and translated/32-bit
+paths remain separate. The broad libc, installation/sandbox/portal and
+translation gates remain open.
