@@ -103,6 +103,17 @@ fn swift_foundation_arena() u64 {
 		write32(base + offset + 4, 0xd2800001) // mov x1, #0
 		write32(base + offset + 8, 0xd65f03c0) // ret
 	}
+	// URL is an indirect borrowed pair (implementation owner, witness table).
+	// Get its formal type without ARC, then call the borrowed implementation's
+	// witness at +432 for an owned NSURL. Match native's x0 metadata, x20 Self,
+	// x1 table and x8 slot address. The implementation owns bridging.
+	for i, op in [u32(0xa9bd57f6), 0xa9014ff4, 0xa9027bfd, 0x910083fd,
+		0xa9405693, 0xaa1303e0, 0x58000190, 0xd63f0200,
+		0x9106c2a8, 0xf940daa9, 0xaa1303f4, 0xaa1503e1,
+		0xd63f0120, 0xa9427bfd, 0xa9414ff4, 0xa8c357f6, 0xd65f03c0]! {
+		write32(base + 320 + u64(i * 4), op)
+	}
+	unsafe { *(&u64(base + 392)) = u64(voidptr(swift_object_type)) }
 	// A concrete specialization of Foundation's retroactive String conformance.
 	// The installed descriptor uses a generic witness cache; this implementation
 	// supplies its already-specialized table, accepted by normal witness lookup.
@@ -121,7 +132,7 @@ fn swift_foundation_arena() u64 {
 	// destructiveInjectEnumTag witness. Native formatted(DateFormatter) is
 	// payload case zero; this does not construct an encoder or format a date.
 	write32(data + 96, 0)
-	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 316) })
+	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 400) })
 	if C.mprotect(unsafe { voidptr(base) }, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(unsafe { voidptr(base) }, usize(page * 2)); panic('iOS: cannot seal Swift Foundation entries')
@@ -271,6 +282,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 	if address := swift_json_decoder_symbol(symbol) { return address }
 	if address := swift_json_date_symbol(symbol) { return address }
 	return match symbol {
+		'_$s10Foundation3URLV19_bridgeToObjectiveCSo5NSURLCyF' { swift_foundation_arena() + 320 }
 		'_$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF' { u64(voidptr(swift_error_to_nserror)) }
 		'_$s10Foundation22_convertNSErrorToErrorys0E0_pSo0C0CSgF' { u64(voidptr(swift_nserror_to_error)) }
 		'_$s10Foundation5NSLogyySS_s7CVarArg_pdtF' { u64(voidptr(swift_nslog)) }
