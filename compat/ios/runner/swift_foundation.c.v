@@ -124,6 +124,7 @@ fn swift_foundation_arena() u64 {
 	swift_calendar_identifier_emit(base, data)
 	swift_calendar_emit(base, data)
 	swift_timezone_emit(base, data)
+	swift_dictionary_emit(data)
 	// A concrete specialization of Foundation's retroactive String conformance.
 	// The installed descriptor uses a generic witness cache; this implementation
 	// supplies its already-specialized table, accepted by normal witness lookup.
@@ -291,6 +292,7 @@ fn swift_nslog(first u64, second u64, arguments u64) { swift_nslog_checked(first
 fn swift_foundation_symbol(symbol string) !u64 {
 	$if !arm64 { return error('iOS: Swift Foundation requires ARM64') }
 	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired { return error('iOS: Swift Foundation outside runtime lifetime') }
+	if symbol == '_$sSD10FoundationE19_bridgeToObjectiveCSo12NSDictionaryCyF' { return u64(unsafe { voidptr(swift_foundation_dictionary_bridge) }) }
 	if address := swift_cocoa_error_symbol(symbol) { return address }
 	if address := swift_json_encoder_symbol(symbol) { return address }
 	if address := swift_json_decoder_symbol(symbol) { return address }

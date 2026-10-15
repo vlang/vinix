@@ -6957,23 +6957,67 @@ four retired VM phases and pinned inputs are retained under
 Objective-C allocation without hidden V allocations in the new successful paths.
 Published runners remain unchanged; the full iOS regression remains unpassed.
 
-The current IPA probe links past the TimeZone bridge and NSTimeZone class import,
+The TimeZone-bridge IPA probe links past that bridge and NSTimeZone class import,
 then exits with status 1 at
 `_$sSD10FoundationE19_bridgeToObjectiveCSo12NSDictionaryCyF`
-(Swift Dictionary's Objective-C bridge). Fortnite has not entered application
-code and remains unplayable.
+(Swift Dictionary's Objective-C bridge).
+
+The next milestone implements that Dictionary bridge in V. Its native ARM64 ABI
+passes a borrowed storage word, Key/Value metadata and Key:Hashable table in
+x0 through x3 and returns an owned NSDictionary in x0; Self and x8 are unused.
+Tagged Cocoa dictionaries retain their original Objective-C identity without
+reading the generic arguments. Their positive low-bit bridge tags now also
+support the runtime's bridge-object retain/release operations.
+
+For registered native `Swift._DictionaryStorage`, the bounded profile validates
+the generic class descriptor and arguments, allocation extent, count/capacity,
+scale, key/value tail pointers and occupied bitmap. String keys and String, Int,
+inline Any containing those values or NSObject references are supported, with
+at most 4096 entries, scale 14, a 16 MiB source allocation and 1 MiB per String.
+Conversion creates
+an independent immutable NSDictionary, retaining object values and copying
+Strings. Two zeroed arrays belong to the result; a bounded temporary hash table
+detects duplicate bridged keys and is freed on success and conversion errors.
+Partially populated results release every converted key/value before returning
+an error. Dictionary construction/copy/resize, other key types, boxed/nested Any
+and general Swift-to-Objective-C value boxing remain unsupported.
+
+The required `__swiftEmptyDictionarySingleton` export uses the measured immutable
+header, sentinel pointers and bitmap in the sealed Foundation arena. Its native
+ARC state is immortal, and canonical empty dictionaries bridge to the runtime's
+cached immutable NSDictionary. Existing empty JSON userInfo dictionaries share
+that conversion path.
+
+The dedicated fixture compares native Foundation and Vinix across 25 populated
+or empty cases, including mixed Any values, sparse bitmap boundaries and 4096
+entries. It checks source/pool teardown, independent owned results, six Cocoa
+tag forms with protected generic arguments, tagged ARC, eight concurrent readers,
+invalid storage fields and partial-error cleanup in two drained runtimes.
+
+All 14 normal/deterministic sanitizer runs and seven ARM64 guest suites pass.
+The 17 generated C streams and executables, native library measurements,
+actual IPA call sites, four retired VM phases and pinned inputs are retained
+under `build/ios/fortnite/dictionary-bridge-checks`. The generated C audit checks
+the result arrays, temporary hash-table cleanup and partial-result ownership.
+Published runners remain unchanged; the full iOS regression remains unpassed.
+
+The current IPA probe links past the Dictionary bridge and empty Dictionary
+global, then exits with status 1 at
+`_$sSa10FoundationE36_unconditionallyBridgeFromObjectiveCySayxGSo7NSArrayCSgFZ`
+(NSArray to Swift Array conversion). Fortnite has not entered application code
+and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,537 | 623 | 79 |
+| Fortnite executable | 1,539 | 621 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,372 | 626 | 120 |
+| All images | 2,374 | 624 | 120 |
 
-The C++/GLES/Text variant reports 2,385 resolved imports, 613 unresolved strong
+The C++/GLES/Text variant reports 2,387 resolved imports, 611 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

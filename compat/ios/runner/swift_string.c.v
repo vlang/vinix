@@ -114,6 +114,7 @@ fn swift_buffer_refs(object u64, delta i64) !u64 {
 	if swift_task_registered(object) { return swift_task_refs(object, delta) }
 	C.ios_objc_initialize_lock()
 	if object == ios_runtime.swift_empty_array || object == ios_runtime.swift_empty_set
+		|| swift_dictionary_empty_locked(object)
 		|| swift_json_decoder_empty_locked(object) || swift_json_encoder_empty_locked(object)
 		|| swift_main_actor_is_singleton_locked(object) || swift_main_executor_is_singleton_locked(object) {
 		C.ios_objc_initialize_unlock()
@@ -179,6 +180,7 @@ fn swift_is_unique_native(object u64) bool {
 
 fn swift_bridge_retain(object u64) u64 {
 	if object == 0 || object & (u64(1) << 63) != 0 { return object }
+	if object & 1 != 0 { objc_retain(swift_dictionary_cocoa_checked(object) or { panic(err) }); return object }
 	address := object & swift_address_mask
 	if object & (u64(1) << 62) != 0 { objc_retain(address) }
 	else { swift_retain(address) }
@@ -187,6 +189,11 @@ fn swift_bridge_retain(object u64) u64 {
 fn swift_bridge_release_n(object u64, count i32) {
 	if object == 0 || object & (u64(1) << 63) != 0 || count == 0 { return }
 	if count < 0 { panic('iOS: negative Swift bridge release count') }
+	if object & 1 != 0 {
+		address := swift_dictionary_cocoa_checked(object) or { panic(err) }
+		for _ in 0 .. count { objc_release(address) }
+		return
+	}
 	address := object & swift_address_mask
 	if object & (u64(1) << 62) != 0 { for _ in 0 .. count { objc_release(address) } }
 	else { swift_release_n(address, u32(count)) }
@@ -246,6 +253,7 @@ fn swift_buffers_stop() {
 }
 
 fn swift_core_symbol(symbol string) ?u64 {
+	if symbol == '__swiftEmptyDictionarySingleton' { return swift_foundation_arena() + u64(C.getpagesize()) + 3328 }
 	if address := swift_raw_alloc_symbol(symbol) { return address }
 	if address := swift_once_symbol(symbol) { return address }
 	if address := swift_witness_symbol(symbol) { return address }
