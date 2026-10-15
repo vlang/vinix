@@ -1147,6 +1147,19 @@ fn unmount(parent &VFSNode, target string, flags u64) ? {
 		}
 		return
 	}
+	// Ordinary unmount must leave an attached subtree intact. Follow current
+	// namespace attachment identities: bind aliases can share inodes, and moves
+	// can change the parent without changing either mount's root directory.
+	table.lock.acquire()
+	for candidate in table.mounts {
+		if !candidate.detached && candidate.id != entry.id
+			&& mount_descends_locked(table, candidate, entry) {
+			table.lock.release()
+			errno.set(errno.ebusy)
+			return none
+		}
+	}
+	table.lock.release()
 	mut filesystem := entry.root.filesystem
 	if filesystem != unsafe { nil } { check_filesystem_unmount(mut filesystem)? }
 	if voidptr(entry.covered) != voidptr(entry.root) {

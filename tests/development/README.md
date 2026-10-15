@@ -109,7 +109,7 @@ writeback worker. A seven-second control snapshots between those two releases;
 its unlinked socket inode does not establish a permanent leak. An initial
 immediate-unmount run also left orphaned inode/block allocations. The backend
 guard below addresses premature success by refusing unmount until those orphans
-have retired. Full descriptor/mapping/submount busy accounting, power-loss
+have retired. Full descriptor/mapping/cwd busy accounting, power-loss
 recovery, graphical interaction and a complete installed root/login/session
 startup remain outside this gate's acceptance.
 
@@ -157,7 +157,9 @@ the attachment and propagate their error. Read-only backends and explicit lazy
 detach retain their existing behavior.
 This volume-wide metadata scan includes bind aliases and preserves existing
 resource lifetimes. Its cost grows with filesystem inode
-metadata; comprehensive open-file/mapping/submount busy accounting remains open.
+metadata. Separate [child-mount checks](../mount-lifecycle/unmount-busy.md)
+qualify `EBUSY` while active descendants remain in the caller's namespace;
+comprehensive open-file/mapping/cwd busy accounting remains open.
 
 The immediate-attempt gate uses `persistent 0 30` and the new isolated kernels.
 An ARM64 control with the preceding kernel reports success on its first attempt,

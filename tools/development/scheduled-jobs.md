@@ -225,5 +225,6 @@ retry. The native gate's `persistent 0 30` mode checks immediate attempts and
 bounded busy-only retries, with attempt counts and elapsed time in the shutdown
 proof. The extended gate passes three boots on both architectures, with six
 clean read-only filesystem checks, using the guarded kernels recorded there.
-Broader open-file/mapping/submount busy accounting, power-loss recovery
-and complete installed boot/login remain open.
+Separate [child-mount checks](../../tests/mount-lifecycle/unmount-busy.md)
+qualify namespace-local descendant refusal. Broader open-file/mapping/cwd busy
+accounting, power-loss recovery and complete installed boot/login remain open.

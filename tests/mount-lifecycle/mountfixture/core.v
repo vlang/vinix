@@ -359,6 +359,8 @@ pub fn run(argc i32, argv &&char) i32 {
 		count := C.read(fd, &name[0], 31)
 		check(fd >= 0 && count > 0 && C.close(fd) == 0, 4)
 		selected := &char(&name[0])
+		unmount_case := if count == 4 && name[0] == `u` && name[1] == `m` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		exec_relative := if count == 4 && name[0] == `e` && name[1] == `r` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		exec_cloexec := if count == 4 && name[0] == `e` && name[1] == `c` && name[2] == `-`
@@ -426,6 +428,7 @@ pub fn run(argc i32, argv &&char) i32 {
 		writer_case := if count == 4 && name[0] == `w` && name[1] == `r` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		check(C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'move') == 0
+			|| C.strcmp(selected, c'unmounts') == 0 || unmount_case >= 0
 			|| C.strcmp(selected, c'move-reference') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'identities') == 0 || identity >= 0
 			|| C.strcmp(selected, c'admission') == 0 || admission >= 0
@@ -461,6 +464,9 @@ pub fn run(argc i32, argv &&char) i32 {
 			|| C.strcmp(selected, c'execcloexec') == 0 || exec_cloexec >= 0
 			|| C.strcmp(selected, c'execrel') == 0 || exec_relative >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
+		if C.strcmp(selected, c'unmounts') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { unmount_busy_cases(-1) }
+		if unmount_case >= 0 { unmount_busy_cases(unmount_case) }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
 		if C.strcmp(selected, c'identities') == 0 || C.strcmp(selected, c'all') == 0

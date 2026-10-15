@@ -21,6 +21,9 @@ V_C_ERROR_BUG_REPORT_DISABLED=1 USE_TCG=1 build-support/run-v-tool.sh \
 The default `--case all` requires every positive marker. `--case flags`,
 `--case move` and `--case identities` select a group; `--case id-0` through
 `id-6` select one identity case. The timeout defaults to 180 seconds.
+`--case unmounts` selects the [child-mount busy checks](unmount-busy.md);
+`um-0` through `um-7` select individual cases. Native `all` and Linux
+`move-reference` include them.
 `--case admission` selects the new-filesystem/bind/devpts admission group;
 `ad-0` through `ad-7` select its individual cases.
 `--case propagation` selects propagation request validation; `pr-0` through

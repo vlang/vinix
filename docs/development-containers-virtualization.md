@@ -53,7 +53,7 @@ kernels. Ordinary ext2 unmount now checks for allocated orphan inodes before
 detaching, returns `EBUSY` while their owners/deferred cleanup remain, and flushes
 the volume on success. Immediate attempts with bounded busy-only retries pass
 three cold boots on both architectures, with six clean filesystem checks.
-Comprehensive descriptor/mapping/submount busy accounting,
+Comprehensive descriptor/mapping/cwd busy accounting,
 complete installed boot/login, graphical interaction and power-loss recovery
 remain open; see the
 [cold-boot evidence](../tests/development/README.md).
@@ -490,6 +490,12 @@ refusal of unsupported force/expiry unmount modes and cycle-safe mount moves,
 including namespace copies and holders whose ancestors were reparented. Moves
 reserve a step within the existing bounded mount cursor before publication
 and check existing descendant attachments against the resulting depth.
+The [child-mount busy checks](../tests/mount-lifecycle/unmount-busy.md) require
+ordinary unmount to return `EBUSY` before detaching a parent with active
+descendants. Current namespace attachment ancestry handles moved trees, bind
+aliases and namespace copies; refusal preserves mount identities and contents.
+Child-first removal and recursive lazy detach remain available. This adds no
+mount reclamation or descriptor/mapping/cwd ownership accounting.
 The [attachment identity checks](../tests/mount-lifecycle/identities.md) qualify
 unmount, remount and move refusal through detached/foreign mount descriptors
 and cwd, while valid local operations remain available. Retained read-only
