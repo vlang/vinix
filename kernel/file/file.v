@@ -89,6 +89,9 @@ pub mut:
 	mount         lib.MountContext
 	// One writer pin belongs to this shared open description, not each FD.
 	mount_writer  voidptr
+	// One actual-attachment pin for this description's entire retained lifetime.
+	// Dup/fork, in-flight lookups, mappings and queued rights share the pin.
+	mount_description voidptr
 	refcount      int
 	loc           i64
 	flags         int
@@ -158,6 +161,11 @@ fn (mut this Handle) unref() {
 	}
 	if this.node != unsafe { nil } && voidptr(handle_released) != unsafe { nil } {
 		handle_released(this.node)
+	}
+	// Keep unmount busy until every filesystem/resource close callback above
+	// has finished. The remaining bookkeeping only frees this handle's memory.
+	if this.mount_description != unsafe { nil } && mount_description_released != unsafe { nil } {
+		mount_description_released(this.mount_description)
 	}
 	unsafe {
 		this.dirlist.free()

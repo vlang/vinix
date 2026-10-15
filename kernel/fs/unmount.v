@@ -9,7 +9,7 @@ import errno
 fn begin_mount_unmount(mut entry Mount) ? {
 	entry.lock.acquire()
 	defer { entry.lock.release() }
-	if entry.writers != 0 {
+	if entry.writers != 0 || entry.descriptions != 0 {
 		errno.set(errno.ebusy)
 		return none
 	}

@@ -85,6 +85,8 @@ is not established. The identical final probe's isolated `ef-8` passes on both
 previous and corrected kernels (`exec8-old`/`exec8-new`), and the final full ARM64
 suite passes. These earlier failures are retained in the artifact audit.
 
-Concurrent mapping, executable and cwd/root publication, in-flight operations
-after descriptor removal, queued descriptor passing, mount reclamation and full
-OCI/rootless acceptance remain open.
+The subsequent [description lifetime checks](unmount-handles.md) cover published
+descriptions retained by in-flight operations after descriptor removal, mappings
+and queued descriptor passing. Unpublished blocking opens, executable and
+cwd/root publication, mount reclamation and full OCI/rootless acceptance remain
+open.

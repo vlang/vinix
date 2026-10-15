@@ -72,6 +72,9 @@ pub mut:
 	// Open regular-file descriptions and in-flight opens on this object.
 	// Namespace copies start with zero writers; inherited FDs keep the old pin.
 	writers u64
+	// Published file descriptions retain this actual attachment until their
+	// final Handle reference and filesystem close callbacks have been released.
+	descriptions u64
 	// Under lock: ordinary unmount closes regular-file writer admission before
 	// checking the backend. Lazy detach leaves retained routes writable.
 	unmount_closed bool

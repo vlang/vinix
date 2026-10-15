@@ -526,9 +526,9 @@ description's actual mount, including read-only, private writable and executable
 views after descriptor closure. Split ranges and fork retain that busy state;
 unmapping the final view or completing process teardown releases it. Copied
 namespace mounts, sibling bind aliases and anonymous mappings remain independent.
-The scan borrows ranges under their page-map lock and allocates nothing. New
-mapping publication, detached address spaces still being destroyed and other
-in-flight descriptions still need complete admission and ownership accounting.
+The scan borrows ranges under their page-map lock and allocates nothing.
+Published descriptions that outlive the scan also retain the lifetime pin
+described below.
 The [descriptor unmount checks](../tests/mount-lifecycle/unmount-descriptors.md)
 also refuse ordinary detach while existing descriptor tables retain the selected
 attachment, covering read-only files and `O_PATH` files/directories. The scan
@@ -537,9 +537,8 @@ Duplication and fork preserve the original attachment across namespace copies;
 bind aliases and lazy replacement mounts remain independent. Closing the final
 descriptor or completing process teardown releases this busy state. The writer
 fixture's former native-only stale-route case now qualifies retained-descriptor
-refusal on both Vinix and Linux. Concurrent descriptor publication, in-flight
-operations after table removal and queued descriptor passing still need complete
-admission and ownership accounting.
+refusal on both Vinix and Linux. Publication admission and description lifetime
+accounting below also cover references outside descriptor tables.
 The [descriptor publication checks](../tests/mount-lifecycle/unmount-publication.md)
 close ordinary-unmount admission before scanning existing descriptors. Both
 single and paired table insertions validate the actual mount under the table
@@ -549,9 +548,19 @@ detach return `EBUSY` through existing failure cleanup; refusals reopen the gate
 Lazy detach, bind aliases and copied namespace mounts retain separate behavior.
 New cwd/root path walks resolve saved directory contexts to current namespace
 copies; inherited descriptors retain their original open attachments.
-This closes descriptor-table publication, while Linux-compatible busy accounting
-for the entire duration of a blocked open remains open, along with mappings,
-cwd/root and executable publication and descriptions retained outside tables.
+The [description lifetime checks](../tests/mount-lifecycle/unmount-handles.md)
+add one busy pin to the actual attachment at the first successful descriptor
+admission. Duplication, fork, in-flight I/O, mappings and queued `SCM_RIGHTS`
+share that description's pin. Final release follows all filesystem/resource
+close callbacks, so closing its descriptor cannot prematurely admit ordinary
+unmount. Ten cases qualify blocked FIFO reads/writes after descriptor removal,
+queued read-only/O_PATH rights, truncated delivery, receiver disposal, bind
+identity, namespace copies, authorization and lazy replacement on both native
+architectures and Linux using identical probe executables. The callbacks add no
+allocation or object freeing and have independent source/generated-C review.
+Linux-compatible busy accounting before a blocked open first publishes remains
+open, along with cwd/root and executable publication, handles without attachment
+identity, mount reclamation and complete OCI/rootless acceptance.
 The [attachment identity checks](../tests/mount-lifecycle/identities.md) qualify
 unmount, remount and move refusal through detached/foreign mount descriptors
 and cwd, while valid local operations remain available. Retained read-only

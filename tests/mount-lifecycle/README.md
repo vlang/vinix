@@ -44,6 +44,10 @@ The default `--case all` requires every positive marker. `--case flags`,
 Linux `move-reference` includes `uo-2` through `uo-9`. The native-only cases
 qualify refusal after ordinary unmount of an in-flight FIFO open; Linux instead
 keeps that mount busy until the open finishes.
+`--case unmount-handles` selects [description lifetime checks](unmount-handles.md);
+`uh-0` through `uh-9` select individual cases. Native `all` and Linux
+`move-reference` include all ten, covering blocked I/O after descriptor close
+and queued `SCM_RIGHTS` delivery or disposal.
 `--case admission` selects the new-filesystem/bind/devpts admission group;
 `ad-0` through `ad-7` select its individual cases.
 `--case propagation` selects propagation request validation; `pr-0` through

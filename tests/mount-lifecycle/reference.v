@@ -93,6 +93,7 @@ fn run() ! {
 		&& result.text.contains('MOUNT UNMOUNT MAPPINGS: PASS')
 		&& result.text.contains('MOUNT UNMOUNT DESCRIPTORS: PASS')
 		&& result.text.contains('MOUNT UNMOUNT PUBLICATION: PASS')
+		&& result.text.contains('MOUNT UNMOUNT HANDLES: PASS')
 		&& result.text.contains('MOUNT IDENTITIES: PASS')
 		&& result.text.contains('MOUNT ADMISSION: PASS')
 		&& result.text.contains('MOUNT PROPAGATION VALIDATION: PASS')
@@ -126,6 +127,7 @@ fn run() ! {
 	mut cases_pass := true
 	for kind in 0 .. 10 { cases_pass = cases_pass && result.text.contains('MOUNT UNMOUNT MAPPING CASE: ${kind} PASS') }
 	for kind in 0 .. 10 { cases_pass = cases_pass && result.text.contains('MOUNT UNMOUNT DESCRIPTOR CASE: ${kind} PASS') }
+	for kind in 0 .. 10 { cases_pass = cases_pass && result.text.contains('MOUNT UNMOUNT HANDLE CASE: ${kind} PASS') }
 	for kind in 2 .. 10 { cases_pass = cases_pass && result.text.contains('MOUNT UNMOUNT PUBLICATION CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT UNMOUNT EXEC CASE: ${kind} PASS') }
 	for kind in 0 .. 10 { cases_pass = cases_pass && result.text.contains('MOUNT UNMOUNT PATH CASE: ${kind} PASS') }

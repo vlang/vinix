@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module file
 
-import lib
-
 __global (
-	mount_publication_allowed fn (&lib.MountContext) bool
+	mount_publication_allowed fn (&Handle) bool
+	mount_description_released fn (voidptr)
 )
 
 // Installed by the VFS module initializer, before descriptors can be published.
-pub fn on_mount_publication(f fn (&lib.MountContext) bool) {
+pub fn on_mount_publication(f fn (&Handle) bool, released fn (voidptr)) {
 	mount_publication_allowed = f
+	mount_description_released = released
 }
 
 // The caller holds the destination's fds_lock until after slot publication.
@@ -17,5 +17,5 @@ pub fn on_mount_publication(f fn (&lib.MountContext) bool) {
 // published descriptor or refuses on contention. Do not call this unlocked.
 fn descriptor_mount_admitted(fd &FD) bool {
 	return mount_publication_allowed == unsafe { nil }
-		|| mount_publication_allowed(&fd.handle.mount)
+		|| mount_publication_allowed(fd.handle)
 }
