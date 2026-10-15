@@ -20,6 +20,8 @@ fn framework_symbol(library string, symbol string) ?u64 {
 			'_$s10Foundation11JSONDecoderC6decode_4fromxxm_AA4DataVtKSeRzlFTj',
 			'_$s10Foundation11JSONDecoderCACycfc', '_$s10Foundation11JSONDecoderCMa',
 			'_$s10Foundation11JSONDecoderCMn',
+			'_$s10Foundation11JSONEncoderCACycfc', '_$s10Foundation11JSONEncoderCMa',
+			'_$s10Foundation11JSONEncoderCMn',
 			'_$s10Foundation11JSONEncoderC20DateEncodingStrategyOMa',
 			'_$s10Foundation11JSONEncoderC20DateEncodingStrategyOMn',
 			'_$s10Foundation11JSONEncoderC20dateEncodingStrategyAC04DatedE0OvsTj',

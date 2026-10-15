@@ -493,7 +493,7 @@ fn test_swift_json_date_strategy() {
 			if _ := framework_symbol('/System/Library/Frameworks/UIKit.framework/UIKit', strategy_ma) {
 				assert false
 			}
-			if _ := swift_foundation_symbol('_$s10Foundation11JSONEncoderCACycfc') {
+			if _ := swift_foundation_symbol('_$s10Foundation11JSONEncoderCACycfC') {
 				assert false
 			}
 			arena := ios_runtime.swift_json_date_arena

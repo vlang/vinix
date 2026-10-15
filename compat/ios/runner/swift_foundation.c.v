@@ -259,6 +259,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 	$if !arm64 { return error('iOS: Swift Foundation requires ARM64') }
 	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired { return error('iOS: Swift Foundation outside runtime lifetime') }
 	if address := swift_cocoa_error_symbol(symbol) { return address }
+	if address := swift_json_encoder_symbol(symbol) { return address }
 	if address := swift_json_decoder_symbol(symbol) { return address }
 	if address := swift_json_date_symbol(symbol) { return address }
 	return match symbol {

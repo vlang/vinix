@@ -218,6 +218,9 @@ mut:
 	swift_nsobject_hashable_tables map[u64]u64 // Canonical ObjC wrapper -> sealed Hashable/Equatable specialization page.
 	swift_nsobject_hashable_retired bool
 	swift_foundation_arena u64 // Sealed CVarArg calls and Foundation's concrete String conformance.
+	swift_json_encoder_arena u64 // Sealed base encoder construction and default constants.
+	swift_json_encoder_retired bool
+	swift_json_encoders map[u64]u64 // Initialized base encoder -> owned lock, under the runtime lock.
 	swift_json_decoder_arena u64 // Sealed base class construction entries and default-option constants.
 	swift_json_date_arena u64 // Sealed DateEncodingStrategy metadata and value witnesses.
 	swift_json_date_retired bool

@@ -6155,22 +6155,55 @@ under `build/ios/fortnite/json-encoder-dispatch-checks`.
 Default encoder construction, option storage and JSON encoding remain unsupported.
 Full iOS regression remains unpassed and published runners remain unchanged.
 
-The current IPA startup probe resolves the generic encode dispatch import and
-exits with status 1 at the required import
+That IPA startup probe resolved the generic encode dispatch import and
+exited with status 1 at the required import
 `_$s10Foundation11JSONEncoderCACycfc`.
 Fortnite has not entered application code and remains unplayable.
+
+The JSONEncoder base initializing constructor, metadata accessor and nominal
+descriptor are now exported through both Foundation install names. Native
+Foundation measurements establish a 144-byte instance, alignment eight, two
+stored fields and a class vtable starting at word 12. Vinix constructs the exact
+default options while preserving enum padding, installs a canonical immortal
+empty userInfo Dictionary and owns a separate 20-byte lock context. Initializing
+Self is borrowed in x20, returned in x0 and the x21 register is preserved.
+Private metadata uses native ARC and separately sealed code/data pages; the
+class is not registered with Objective-C. Option mutation, subclasses, ObjC
+exposure and actual JSON encoding remain explicitly unsupported.
+
+Twelve ASan/UBSan runs and six Vinix ARM64 guest suites pass for encoder and
+decoder construction, generic encode/setter dispatch, date-strategy metadata
+and its formatted-case export. The initializer fixture compares native default
+writes and padding, accessor requests, ARC copy/destroy witnesses and independent
+lock retention. Eight concurrent workers repeatedly construct and release base
+instances; registries drain completely. Invalid, short, duplicate, nonunique and
+retired owners are rejected, concurrent publication is canonical, and both arena
+lifetimes end in verified unmapping. Fifteen final C streams/programs and four
+joined, retired VM phases are retained under
+`build/ios/fortnite/json-encoder-initializer-checks`.
+Full iOS regression remains unpassed and published runners remain unchanged.
+
+The current IPA startup probe resolves the encoder constructor and metadata
+imports, then exits with status 1 at the required import
+`_$s10Foundation14LocalizedErrorPAAE10helpAnchorSSSgvg`.
+Fortnite has not entered application code and remains unplayable.
+
+The initial guest link stopped because the former ARM64 sysroot was absent.
+The final builds use pinned musl headers/libraries and GCC startup objects
+already present in this checkout. The failed generated C and diagnostics are
+retained separately; no failed guest executable ran.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,487 | 673 | 79 |
+| Fortnite executable | 1,490 | 670 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,322 | 676 | 120 |
+| All images | 2,325 | 673 | 120 |
 
-The C++/GLES/Text variant reports 2,335 resolved imports, 663 unresolved strong
+The C++/GLES/Text variant reports 2,338 resolved imports, 660 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
