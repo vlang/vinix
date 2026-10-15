@@ -105,6 +105,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	if library == '/System/Library/Frameworks/Foundation.framework/Foundation' && symbol == '_NSLogv' { return u64(unsafe { voidptr(ns_logv) }) }
 	if symbol == '_NSGetSizeAndAlignment' { return u64(unsafe { voidptr(ns_get_size_alignment) }) }
 	if library == '/System/Library/Frameworks/Foundation.framework/Foundation' && symbol == '_NSProtocolFromString' { return u64(unsafe { voidptr(ns_protocol_from_string) }) }
+	if library == '/System/Library/Frameworks/Foundation.framework/Foundation' && symbol == '_NSStringFromProtocol' { return u64(unsafe { voidptr(ns_string_from_protocol) }) }
 	if library == '/System/Library/Frameworks/Foundation.framework/Foundation' {
 		if symbol == '_NSSetUncaughtExceptionHandler' { return u64(unsafe { voidptr(ns_set_uncaught_handler) }) }
 		if symbol == '_NSGetUncaughtExceptionHandler' { return u64(unsafe { voidptr(ns_get_uncaught_handler) }) }

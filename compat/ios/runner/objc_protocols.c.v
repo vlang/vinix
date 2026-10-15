@@ -71,10 +71,25 @@ fn ns_protocol_from_string_checked(name u64) !u64 {
 	return ios_runtime.protocol_names[text]
 }
 fn ns_protocol_from_string(name u64) u64 { return ns_protocol_from_string_checked(name) or { panic(err) } }
+
+// Foundation returns a +0 NSString, including the literal "nil" for a nil
+// protocol. Copy the registry-owned name while holding the metadata lock so
+// the result has its own byte storage and follows the calling thread's pool.
+fn ns_string_from_protocol_checked(protocol u64) !u64 {
+	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired { return objc_protocol_failure() }
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	if protocol == 0 { return objc_autorelease(owned_string('nil')) }
+	info := ios_runtime.protocols[objc_protocol_canonical(protocol)] or { return objc_protocol_failure() }
+	return objc_autorelease(owned_string(info.name))
+}
+fn ns_string_from_protocol(protocol u64) u64 { return ns_string_from_protocol_checked(protocol) or { panic(err) } }
+
 fn objc_protocol_name(protocol u64) &char {
 	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired { return unsafe { nil } }
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
+	if protocol == 0 { return c'nil' }
 	info := ios_runtime.protocols[objc_protocol_canonical(protocol)] or { return unsafe { nil } }
 	return unsafe { &char(info.name.str) }
 }

@@ -7260,21 +7260,48 @@ inputs and four retired VM phases are retained under
 allocation-free registration/retrieval and explicit callback retirement.
 Published runners remain unchanged; the full iOS regression remains unpassed.
 
-The current IPA probe links past handler registration and exits with status 1
-at `_NSStringFromProtocol`. Fortnite has not entered application code and
-remains unplayable.
+The handler-registration IPA probe links past that import and exits with
+status 1 at `_NSStringFromProtocol`.
+
+V now supplies Foundation's `NSStringFromProtocol`. Native comparison verifies
+the borrowed Protocol argument in x0, a +0 NSString result, exact UTF-8 names
+and the literal `"nil"` for a nil protocol. The libobjc `protocol_getName(nil)`
+result is also corrected to `"nil"`. Fortnite's calls at `0x100042b54`,
+`0x100042ef8` and `0x100042fcc` retain the autoreleased result.
+
+The implementation resolves canonical and image-alias protocol identities
+under the runtime lock and copies the registry-owned name into an autoreleased
+NSString. It rejects foreign pointers without dereferencing them and retains
+the existing 1023-byte registry name limit. Native Foundation also accepts
+longer names; the private registry's bound remains explicit.
+
+Eight normal/deterministic host sanitizer runs and four ARM64 guest suites
+pass: protocol-name conversion, protocol lookup, handler registration and
+autorelease pools. Coverage includes nil, Unicode, spaces, 1023-byte names,
+guarded C arguments and preserved contexts, round trips, strings retained
+across pool drains, copied image names erased after registration, eight
+concurrent readers and two completely drained registries. The eleven final
+generated C streams and executables, native measurements, actual IPA calls,
+pinned inputs and four retired VM phases are retained under
+`build/ios/fortnite/protocol-name-checks`. Generated C inspection checks copied
+string storage and allocation-free protocol lookup. Published runners remain
+unchanged; the full iOS regression remains unpassed.
+
+The current IPA probe links past protocol-name conversion and exits with
+status 1 at `_NSTemporaryDirectory`. Fortnite has not entered application code
+and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,546 | 614 | 79 |
+| Fortnite executable | 1,547 | 613 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,381 | 617 | 120 |
+| All images | 2,382 | 616 | 120 |
 
-The C++/GLES/Text variant reports 2,394 resolved imports, 604 unresolved strong
+The C++/GLES/Text variant reports 2,395 resolved imports, 603 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
