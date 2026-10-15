@@ -41,15 +41,24 @@ enum SettingsCategory {
 	session
 	shortcuts
 	gestures
+	taskbar
 }
 
+// Category IDs remain stable when the sidebar gains a page: running desktops
+// also send these selectors to a newer Settings process.
 const settings_categories = [SettingsCategory.appearance, .date_time, .language, .theme, .wallpaper,
 	.wifi, .display, .battery, .power, .keyboard, .about, .sound, .bluetooth, .printers,
-	.users, .network, .privacy, .storage, .updates, .accessibility, .clock, .session, .shortcuts, .gestures]
+	.users, .network, .privacy, .storage, .updates, .accessibility, .clock, .session, .shortcuts, .gestures, .taskbar]
+
+const settings_sidebar_categories = [SettingsCategory.appearance, .taskbar, .date_time, .language,
+	.theme, .wallpaper, .wifi, .display, .battery, .power, .keyboard, .about, .sound, .bluetooth,
+	.printers, .users, .network, .privacy, .storage, .updates, .accessibility, .clock, .session,
+	.shortcuts, .gestures]
 
 fn (c SettingsCategory) title() string {
 	return match c {
 		.appearance { tr('settings.category.appearance') }
+		.taskbar { tr('settings.category.taskbar') }
 		.date_time { tr('settings.category.date_time') }
 		.language { tr('settings.category.language') }
 		.theme { tr('settings.category.theme') }
@@ -199,7 +208,7 @@ fn (mut d Desktop) open_settings() !NativeApp {
 fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
-	if int(a.category) >= int(SettingsCategory.sound) && !a.searching() { a.refresh_session_settings(false) }
+	if a.category.service_name().len > 0 && !a.searching() { a.refresh_session_settings(false) }
 	if a.search_language != desktop_language { a.refilter_search() }
 
 	mut children := frame_elements(3)
@@ -256,7 +265,7 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 // the same way. The remaining panes are desktop preferences and have nothing
 // to show without one.
 fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
-	if int(a.category) >= int(SettingsCategory.sound) { return a.session_settings_pane(width,height) }
+	if a.category.service_name().len > 0 { return a.session_settings_pane(width,height) }
 	match a.category {
 		.about { return a.about.pane(width) }
 		.wifi {
@@ -278,6 +287,7 @@ fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 	}
 	return match a.category {
 		.appearance { a.appearance_pane(width) }
+		.taskbar { a.taskbar_pane(width) }
 		.date_time { a.date_time_pane(width) }
 		.language { a.language_pane(width) }
 		.theme { a.theme_pane(width) }
@@ -290,7 +300,7 @@ fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 fn (a &SettingsApp) category_rows() []ui2.Element {
 	mut rows := frame_elements(settings_categories.len + 1)
 	rows << a.search_field()
-	for index, category in settings_categories {
+	for index, category in settings_sidebar_categories {
 		if index / 11 != a.category_page { continue }
 		selected := category == a.category
 		y := 56 + (index % 11) * settings_category_pitch
@@ -300,7 +310,7 @@ fn (a &SettingsApp) category_rows() []ui2.Element {
 			size: 13
 			bold: selected
 		})
-		rows << ui2.clickable_view(settings_category_actions[index], ui2.rect(0, f64(y), f64(settings_sidebar_width), 28), ui2.BoxStyle{
+		rows << ui2.clickable_view(settings_category_actions[settings_categories.index(category)], ui2.rect(0, f64(y), f64(settings_sidebar_width), 28), ui2.BoxStyle{
 			bg: settings_category_selected
 			transparent: !selected
 		}, label)
@@ -358,7 +368,7 @@ fn (a &SettingsApp) appearance_pane(width int) []ui2.Element {
 	inner := width - 2 * settings_padding
 	half := (inner - settings_row_gap) / 2
 
-	mut out := frame_elements(18)
+	mut out := frame_elements(4)
 	mut y := settings_padding
 
 	out << settings_heading(tr('settings.appearance.buttons'), y, width)
@@ -367,7 +377,15 @@ fn (a &SettingsApp) appearance_pane(width int) []ui2.Element {
 	y += 22
 	out << settings_choice('settings.side.0', tr('settings.appearance.right'), settings_padding, y, half, settings.button_side == .right)
 	out << settings_choice('settings.side.1', tr('settings.appearance.left'), settings_padding + half + settings_row_gap, y, half, settings.button_side == .left)
-	y += 28 + 22
+	return out
+}
+
+fn (a &SettingsApp) taskbar_pane(width int) []ui2.Element {
+	settings := a.desktop.settings
+	inner := width - 2 * settings_padding
+	half := (inner - settings_row_gap) / 2
+	mut out := frame_elements(12)
+	mut y := settings_padding
 
 	out << settings_heading(tr('settings.appearance.taskbar'), y, width)
 	y += 22

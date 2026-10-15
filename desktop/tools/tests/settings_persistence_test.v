@@ -25,6 +25,7 @@ fn test_settings_actions_save_and_restore_one_complete_snapshot() {
 		images: [WallpaperImage{ name: 'Test wallpaper', file: '/not-loaded.vwp' }]
 	}
 	app.handle('${settings_action_side}1')!
+	app.choose_category(.taskbar)
 	app.handle('${settings_action_taskbar}1')!
 	app.handle('${settings_action_taskbar_overview}0')!
 	app.handle('${settings_action_taskbar_workspaces}0')!

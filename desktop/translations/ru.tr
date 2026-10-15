@@ -958,6 +958,9 @@ settings.category.keyboard
 settings.category.language
 Язык
 -----
+settings.category.taskbar
+Панель задач
+-----
 settings.category.theme
 Тема
 -----

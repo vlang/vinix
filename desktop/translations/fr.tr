@@ -958,6 +958,9 @@ Clavier
 settings.category.language
 Langue
 -----
+settings.category.taskbar
+Barre des tâches
+-----
 settings.category.theme
 Thème
 -----

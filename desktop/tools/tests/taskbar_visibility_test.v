@@ -13,7 +13,7 @@ fn visibility_element(root ui2.Element, id string) ?ui2.Element {
 
 fn test_optional_taskbar_buttons_start_hidden_and_settings_restore_them_independently() {
 	mut desktop := Desktop{ canvas: Canvas{ width: 1024, height: 768 } }
-	mut app := SettingsApp{ desktop: &desktop }
+	mut app := SettingsApp{ desktop: &desktop, category: .taskbar }
 	initial := desktop.taskbar_layout(0)
 	assert initial.workspace_width == 0
 	defaults := desktop.build_tree()
@@ -94,7 +94,20 @@ fn test_settings_offers_visibility_choices_only_when_the_compositor_supports_the
 	mut desktop := Desktop{}
 	mut app := SettingsApp{ desktop: &desktop }
 	defer { app_compositor_extended = app_extended }
+	appearance := app.build(ui2.rect(0, 0, 720, 400))!
+	assert visibility_element(appearance, 'settings.side.0') != none
+	assert visibility_element(appearance, 'settings.taskbar.0') == none
+	assert visibility_element(appearance, 'settings.overview.0') == none
+	category_action := settings_category_actions[settings_categories.index(SettingsCategory.taskbar)]
+	assert visibility_element(appearance, category_action) != none
+	assert settings_category_actions[settings_categories.index(SettingsCategory.keyboard)] == 'settings.category.9'
+	free_tree(appearance)
+	app.handle(category_action)!
+	assert app.category == .taskbar
+	assert app.category_page == 0
 	root := app.build(ui2.rect(0, 0, 720, 400))!
+	assert visibility_element(root, 'settings.taskbar.0') != none
+	assert visibility_element(root, 'settings.side.0') == none
 	for id in ['settings.overview.1', 'settings.workspaces.1'] {
 		choice := visibility_element(root, id) or { panic('missing visibility choice') }
 		assert choice.checked
@@ -118,7 +131,8 @@ fn test_taskbar_visibility_choices_are_translated_searchable_and_have_baked_glyp
 	defer { app.close_app() }
 	for language in desktop_languages {
 		set_desktop_language(language)
-		for key in ['settings.appearance.overview', 'settings.appearance.workspaces'] {
+		assert tr('settings.category.taskbar') == tr('settings.appearance.taskbar')
+		for key in ['settings.appearance.overview', 'settings.appearance.workspaces', 'settings.appearance.taskbar'] {
 			text := tr(key)
 			assert text.len > 0 && text != key
 			for point in text.runes() {
@@ -126,11 +140,14 @@ fn test_taskbar_visibility_choices_are_translated_searchable_and_have_baked_glyp
 			}
 			app.key_input('\x06')
 			app.paste_input(text)
-			mut found := false
+			mut found := -1
 			for i in 0 .. app.search_count {
-				if settings_search_entries[app.search_results[i]].title == key { found = true }
+				if settings_search_entries[app.search_results[i]].title == key { found = i }
 			}
-			assert found
+			assert found >= 0
+			app.open_search_result(found)
+			assert app.category == .taskbar
+			assert app.category_page == 0
 		}
 	}
 }

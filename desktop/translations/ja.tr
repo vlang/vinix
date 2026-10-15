@@ -958,6 +958,9 @@ settings.category.keyboard
 settings.category.language
 言語
 -----
+settings.category.taskbar
+タスクバー
+-----
 settings.category.theme
 テーマ
 -----

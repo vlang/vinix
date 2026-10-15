@@ -958,6 +958,9 @@ Teclado
 settings.category.language
 Idioma
 -----
+settings.category.taskbar
+Barra de tareas
+-----
 settings.category.theme
 Tema
 -----

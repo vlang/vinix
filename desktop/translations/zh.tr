@@ -958,6 +958,9 @@ settings.category.keyboard
 settings.category.language
 语言
 -----
+settings.category.taskbar
+任务栏
+-----
 settings.category.theme
 主题
 -----

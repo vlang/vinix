@@ -958,6 +958,9 @@ Keyboard
 settings.category.language
 Language
 -----
+settings.category.taskbar
+Taskbar
+-----
 settings.category.theme
 Theme
 -----

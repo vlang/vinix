@@ -116,9 +116,10 @@ record.
 
 ## Taskbar controls
 
-In **Appearance**, **Window Overview button** and **Workspace buttons** each
-have a **Show** / **Hide** choice. Both default to hidden, including when an
-older preferences file omits the keys. Hiding them gives their space back to
+The **Taskbar** category contains window grouping plus **Window Overview button**
+and **Workspace buttons**. The two optional controls each have a **Show** / **Hide**
+choice. Both default to hidden, including when an older preferences file omits
+the keys. Hiding them gives their space back to
 the window buttons. **Super+Ctrl+Up** still opens Window Overview, and
 **Super+1..4** still switches workspaces.
 
