@@ -521,6 +521,24 @@ fn empty_waitid_result(infop u64, error u64) (u64, u64) {
 	return 0, 0
 }
 
+// Linux writes only the six child-event fields. Padding and the unused payload
+// stay untouched, including when the mapped prefix ends after those fields.
+fn write_waitid_siginfo(infop u64, info &SigInfoChld) bool {
+	if !usercopy.user_range(infop, sizeof(SigInfoChld)) {
+		return false
+	}
+	for index in 0 .. 6 {
+		offset := u64(if index < 3 { index } else { index + 1 }) * 4
+		address := infop + offset
+		// Resolve a complete field before copying it across a stable page edge.
+		if !usercopy.writable(address) || !usercopy.writable(address + 3)
+			|| !usercopy.copy_to_user(address, unsafe { voidptr(u64(info) + offset) }, sizeof(u32)) {
+			return false
+		}
+	}
+	return true
+}
+
 // waitid(idtype, id, infop, options, rusage).
 pub fn syscall_waitid(_ voidptr, idtype_word u64, id_word u64, infop u64, options_word u64, rusage_ptr u64) (u64, u64) {
 	idtype := int(i32(idtype_word))
@@ -586,7 +604,7 @@ pub fn syscall_waitid(_ voidptr, idtype_word u64, id_word u64, infop u64, option
 		info.si_status = i32(status & 0x7f)
 	}
 
-	if infop != 0 && !usercopy.copy_to_user(infop, voidptr(&info), sizeof(SigInfoChld)) {
+	if infop != 0 && !write_waitid_siginfo(infop, unsafe { &info }) {
 		finish_child_change(mut current_process, change, false)
 		return errno.err, errno.efault
 	}

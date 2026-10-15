@@ -1013,6 +1013,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   storage for root/ordinary callers in initial/one-level PID namespaces.
   See [the child real-UID receipts](docs/linux-posix-qualification.md#native-waitid-child-real-uid).
 
+- [x] Match native waitid child-event siginfo field writes and preserve padding
+  and unused payload. Qualify aligned/unaligned and guard-page results, ordered
+  field faults, NULL/valid outputs, four child states and credential profiles,
+  raw/musl calls and flat storage in initial/one-level PID namespaces.
+  See [the child-event output receipts](docs/linux-posix-qualification.md#native-waitid-child-event-siginfo-writes).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

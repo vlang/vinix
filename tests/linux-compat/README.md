@@ -1738,3 +1738,17 @@ original failures, native/reference results, whole-C scope, compiler/SDK/input
 pins, initial host-helper refusal and executing audit controls. Mapped user
 IDs, credential races, siginfo padding, accounting and consuming copyout faults
 retain separate limits. See the [child real-UID report](../../docs/linux-posix-qualification.md#native-waitid-child-real-uid).
+
+The `waitevent` case qualifies successful child-event siginfo fields and
+preserved padding/tail, plus stable ordered copyout faults. Four root/UID1000
+initial/one-level PID namespace cohorts run 156,800 controls per architecture
+across four credential profiles and stop/continuation/exit37/SIGKILL, three
+selectors, eight raw/musl forms, WNOWAIT with/without WNOHANG, mapped offsets,
+NULL/valid rusage, all guard cuts 0..32 plus 64/127/128, invalid pointers and
+consuming/cleared controls. Four warmed 200-cycle storage cohorts stay flat.
+`waitevent-reference.v` boots the unchanged native ELF on Linux. Compile
+`waitevent-check.v` without `-prod` and supply its evidence area to verify
+original failures, native/reference results, whole-C scope, compiler/SDK/input
+pins and executing audit controls. Consuming copyout faults, rusage-fault
+ordering/aliasing/accounting and mapping/credential races retain separate
+limits. See the [event-field report](../../docs/linux-posix-qualification.md#native-waitid-child-event-siginfo-writes).

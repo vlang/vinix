@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "dc61cca5d779a177ff26d05a7f7dce6d7a0e4963f44611e38feaf6d27e44484f",
+    "results": [
+        {
+            "name": "waitevent",
+            "source_sha256": "46ca08e9f1d5342a5fee64605cb74648514f8d585331f31525f68e81f9281228",
+            "init_sha256": "04646468f07165bbbdfac9da59ec3e26cbd6079cdef4a850436159989a0db3d0",
+            "iso_sha256": "8eb0e036ea5ca268021975c7b42bff9ffd85619ee88534107bb367cce5086ac9",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

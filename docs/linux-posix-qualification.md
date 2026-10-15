@@ -7915,3 +7915,95 @@ this bounded contract. The three broad section 15 gates remain open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/waituid-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waituid-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waituid-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waituid-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/waituid-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waituid-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waituid-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waituid-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/waituid-check.v), [verdict](../tests/linux-compat/results/2026-10-15/waituid-audit.log), [initial helper refusal](../tests/linux-compat/results/2026-10-15/waituid-initial-helper-refusal.log), [initial helper source](../tests/linux-compat/results/2026-10-15/waituid-initial-helper-source.v).
+
+## Native waitid child-event siginfo writes
+
+Native AArch64 and x86-64 waitid now write only the six Linux child-event
+siginfo fields, preserving padding and the unused payload. Previously event
+results copied the complete 128-byte structure, overwriting bytes Linux
+leaves unchanged and rejecting protected tails beyond the six fields.
+The new synchronous helper checks the full 128-byte numeric range and writes
+the fields at offsets 0/4/8/16/20/24 in order. It resolves both ends of each
+32-bit field before copying, so a stable split-field fault preserves that
+field while retaining earlier complete fields. A buffer with only its first
+28 bytes mapped can receive an event successfully; bytes 12..15 remain untouched.
+The error/no-event helper and its qualification remain unchanged.
+
+The pinned
+[Linux v6.12 waitid implementation](https://github.com/torvalds/linux/blob/v6.12/kernel/exit.c)
+and unchanged native probe ELFs on Linux 6.12.51 provide the oracle on both
+architectures. Four fresh production builds use committed base
+`069496c074d754da81848031d8e28c062b22f70e`. Only the owned `linux_task.v` patch
+enters corrected worktrees. Probe source, emitted C and ELF match across
+original/corrected Vinix and Linux for each architecture. Complete production
+C differs only in `syscall_waitid` and the added field-copy helper, including
+its declaration, without compiler normalization. The helper adds no allocation,
+free, pin or stack-allocation calls. Existing child claims, pins, credential
+snapshots, rusage ordering, release and event consumption remain unchanged.
+
+Four cohorts cover root and ordinary UID 1000 callers in the initial and a
+one-level PID namespace. Four child real/effective/saved UID profiles per
+cohort include 1001/0/1002, 0/1003/0 and 4294967294/1004/0 for root callers,
+and ordinary saved-ID transitions between 1000/1000/1002 and 1000/1002/1002.
+Pipe readiness validates child PID, parent, PGID, SID and all three UIDs.
+Children occupy their own groups in the caller's fresh session. One child per
+profile supplies SIGSTOP, SIGCONT and normal exit status 37; another dies from SIGKILL.
+Thirty-two topology records bind these children on each architecture.
+
+Each architecture runs 156,800 controls. Counts below are per cohort:
+
+| Class | Controls | Original failures |
+| --- | ---: | ---: |
+| Mapped output, six fields and untouched padding/tail; NULL rusage | 3,072 | 3,072 |
+| Every guard cut 0..32, plus 64/127/128 accessible bytes | 27,648 | 24,576 |
+| Two wrapping, low unmapped, read-only and PROT_NONE pointers | 3,840 | 0 |
+| NULL infop with NULL/valid rusage | 1,536 | 0 |
+| Consuming event followed by cleared no-event/ECHILD | 32 | 0 |
+| Mapped output, six fields and untouched padding/tail; valid rusage | 3,072 | 3,072 |
+
+All four event kinds run through three selectors, eight raw-register/musl
+forms and WNOWAIT with/without WNOHANG. Mapped offsets 0/1/3/7 cover aligned
+and unaligned structures. Every guard cut checks all accessible bytes and a
+sixteen-byte leading canary. Both field values and preserved bytes are compared
+byte-for-byte, including nonzero child PIDs, causes, UIDs and statuses.
+Cuts below 28 return EFAULT; earlier complete fields remain written, and a
+split field remains poisoned. Cuts 28 and above return success even when the
+remaining siginfo bytes are protected. Read-only memory stays poisoned.
+NULL/valid rusage controls check surrounding canaries without asserting exact
+accounting. Genuine musl calls cover NULL rusage; raw calls cover the fifth
+argument. All failing output trials use WNOWAIT, and the child event remains
+available for subsequent queries. A final consuming wait validates identity
+and event, then WNOHANG verifies cleared output or ECHILD after reaping.
+
+Original kernels fail exactly 122,880 controls per architecture. Corrected
+Vinix and the unchanged-ELF Linux references pass all 156,800 on each native
+architecture. The guard contract covers stable mappings; concurrent mprotect,
+unmap, alias and credential changes remain outside this qualification.
+
+Four warmed 200-cycle storage cohorts retain a stopped child and the three
+mappings outside the measured interval. Every cycle repeats three selectors
+and eight raw/musl forms, alternates NULL/valid rusage, tests a 28-byte success
+and 25-byte split-field fault, then checks read-only EFAULT. All slab object
+counts and big-page totals stay flat after settling. Fork, mappings, protection,
+signals, exit and reap remain outside the interval. The probe C uses five
+explicit stack allocas and no malloc/memdup/dynamic-array/fixed-index calls.
+AArch64 uses 16 KiB Vinix pages; x86-64 and both Linux references use 4 KiB pages.
+Raw storage totals remain in the linked logs.
+
+Runtime and the 13,952-control child-UID regressions pass on both architectures;
+all eight host test files pass. Allocation diagnostics remain byte-identical,
+including existing allowance-file refusals. The audit binds 67 inventory inputs,
+15,146 compiler inputs, all 2,014 private SDK files, fifteen final ARM compiler
+command receipts, source/C/ELF/ISO/kernel identities, 84 retained regular files
+across eight native profiles, exact source/whole-C scope and executing
+false-assertion and passing-Linux-as-original controls. Compile it without `-prod`.
+
+Consuming copyout faults, rusage-fault ordering, aliased output buffers, exact
+accounting, mapped user IDs, credential/mapping/lifecycle races, P_PIDFD,
+__W flags, ptrace/cross-thread waits, interrupted/restarted waits, GNU libc
+and translated/ELF32 paths remain outside this bounded contract. The three
+broad section 15 gates remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/waitevent-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitevent-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitevent-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitevent-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/waitevent-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitevent-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitevent-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitevent-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/waitevent-check.v), [verdict](../tests/linux-compat/results/2026-10-15/waitevent-audit.log).

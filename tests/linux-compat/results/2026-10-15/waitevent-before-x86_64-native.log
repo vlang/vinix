@@ -1,0 +1,169 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=80744
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91000
+initramfs: Done (9 entries)
+LINUX WAITEVENT TOPOLOGY: ordinary=0 namespace=0 profile=0 killed=0 self=13276 pid=51821 real=0 effective=0 saved=0
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=28
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=28
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=29
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=29
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=31
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=31
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=35
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=35
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=16
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=2 bad_byte=16
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=3 bad_byte=16
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=5 bad_byte=20
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=6 bad_byte=20
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=7 bad_byte=20
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=28
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=28
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=29
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=29
+LINUX WAITEVENT TOPOLOGY: ordinary=0 namespace=0 profile=0 killed=1 self=13276 pid=8722 real=0 effective=0 saved=0
+LINUX WAITEVENT TOPOLOGY: ordinary=0 namespace=0 profile=1 killed=0 self=13276 pid=40218 real=1001 effective=0 saved=1002
+LINUX WAITEVENT TOPOLOGY: ordinary=0 namespace=0 profile=1 killed=1 self=13276 pid=51451 real=1001 effective=0 saved=1002
+LINUX WAITEVENT TOPOLOGY: ordinary=0 namespace=0 profile=2 killed=0 self=13276 pid=48480 real=0 effective=1003 saved=0
+LINUX WAITEVENT TOPOLOGY: ordinary=0 namespace=0 profile=2 killed=1 self=13276 pid=7807 real=0 effective=1003 saved=0
+LINUX WAITEVENT TOPOLOGY: ordinary=0 namespace=0 profile=3 killed=0 self=13276 pid=62468 real=4294967294 effective=1004 saved=0
+LINUX WAITEVENT TOPOLOGY: ordinary=0 namespace=0 profile=3 killed=1 self=13276 pid=9746 real=4294967294 effective=1004 saved=0
+LINUX WAITEVENT CASES: ordinary=0 namespace=0 kind=0 calls=3072 failures=3072
+LINUX WAITEVENT CASES: ordinary=0 namespace=0 kind=1 calls=27648 failures=24576
+LINUX WAITEVENT CASES: ordinary=0 namespace=0 kind=2 calls=3840 failures=0
+LINUX WAITEVENT CASES: ordinary=0 namespace=0 kind=3 calls=1536 failures=0
+LINUX WAITEVENT CASES: ordinary=0 namespace=0 kind=4 calls=32 failures=0
+LINUX WAITEVENT CASES: ordinary=0 namespace=0 kind=5 calls=3072 failures=3072
+LINUX WAITEVENT FINAL: ordinary=0 namespace=0 kind=0 calls=3072 failures=3072
+LINUX WAITEVENT FINAL: ordinary=0 namespace=0 kind=1 calls=27648 failures=24576
+LINUX WAITEVENT FINAL: ordinary=0 namespace=0 kind=2 calls=3840 failures=0
+LINUX WAITEVENT FINAL: ordinary=0 namespace=0 kind=3 calls=1536 failures=0
+LINUX WAITEVENT FINAL: ordinary=0 namespace=0 kind=4 calls=32 failures=0
+LINUX WAITEVENT FINAL: ordinary=0 namespace=0 kind=5 calls=3072 failures=3072
+LINUX WAITEVENT TOPOLOGY: ordinary=1 namespace=0 profile=0 killed=0 self=59188 pid=7195 real=1000 effective=1000 saved=1002
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=28
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=28
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=29
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=29
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=31
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=31
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=35
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=35
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=16
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=2 bad_byte=16
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=3 bad_byte=16
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=5 bad_byte=20
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=6 bad_byte=20
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=7 bad_byte=20
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=28
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=28
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=29
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=29
+LINUX WAITEVENT TOPOLOGY: ordinary=1 namespace=0 profile=0 killed=1 self=59188 pid=47466 real=1000 effective=1000 saved=1002
+LINUX WAITEVENT TOPOLOGY: ordinary=1 namespace=0 profile=1 killed=0 self=59188 pid=30775 real=1000 effective=1002 saved=1002
+LINUX WAITEVENT TOPOLOGY: ordinary=1 namespace=0 profile=1 killed=1 self=59188 pid=19935 real=1000 effective=1002 saved=1002
+LINUX WAITEVENT TOPOLOGY: ordinary=1 namespace=0 profile=2 killed=0 self=59188 pid=48568 real=1000 effective=1000 saved=1002
+LINUX WAITEVENT TOPOLOGY: ordinary=1 namespace=0 profile=2 killed=1 self=59188 pid=6521 real=1000 effective=1000 saved=1002
+LINUX WAITEVENT TOPOLOGY: ordinary=1 namespace=0 profile=3 killed=0 self=59188 pid=9249 real=1000 effective=1002 saved=1002
+LINUX WAITEVENT TOPOLOGY: ordinary=1 namespace=0 profile=3 killed=1 self=59188 pid=64323 real=1000 effective=1002 saved=1002
+LINUX WAITEVENT CASES: ordinary=1 namespace=0 kind=0 calls=3072 failures=3072
+LINUX WAITEVENT CASES: ordinary=1 namespace=0 kind=1 calls=27648 failures=24576
+LINUX WAITEVENT CASES: ordinary=1 namespace=0 kind=2 calls=3840 failures=0
+LINUX WAITEVENT CASES: ordinary=1 namespace=0 kind=3 calls=1536 failures=0
+LINUX WAITEVENT CASES: ordinary=1 namespace=0 kind=4 calls=32 failures=0
+LINUX WAITEVENT CASES: ordinary=1 namespace=0 kind=5 calls=3072 failures=3072
+LINUX WAITEVENT FINAL: ordinary=1 namespace=0 kind=0 calls=3072 failures=3072
+LINUX WAITEVENT FINAL: ordinary=1 namespace=0 kind=1 calls=27648 failures=24576
+LINUX WAITEVENT FINAL: ordinary=1 namespace=0 kind=2 calls=3840 failures=0
+LINUX WAITEVENT FINAL: ordinary=1 namespace=0 kind=3 calls=1536 failures=0
+LINUX WAITEVENT FINAL: ordinary=1 namespace=0 kind=4 calls=32 failures=0
+LINUX WAITEVENT FINAL: ordinary=1 namespace=0 kind=5 calls=3072 failures=3072
+LINUX WAITEVENT TOPOLOGY: ordinary=0 namespace=1 profile=0 killed=0 self=2 pid=3 real=0 effective=0 saved=0
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=28
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=28
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=29
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=29
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=31
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=31
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=35
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=35
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=16
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=2 bad_byte=16
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=3 bad_byte=16
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=5 bad_byte=20
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=6 bad_byte=20
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=7 bad_byte=20
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=28
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=28
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=29
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=29
+LINUX WAITEVENT TOPOLOGY: ordinary=0 namespace=1 profile=0 killed=1 self=2 pid=4 real=0 effective=0 saved=0
+LINUX WAITEVENT TOPOLOGY: ordinary=0 namespace=1 profile=1 killed=0 self=2 pid=5 real=1001 effective=0 saved=1002
+LINUX WAITEVENT TOPOLOGY: ordinary=0 namespace=1 profile=1 killed=1 self=2 pid=6 real=1001 effective=0 saved=1002
+LINUX WAITEVENT TOPOLOGY: ordinary=0 namespace=1 profile=2 killed=0 self=2 pid=7 real=0 effective=1003 saved=0
+LINUX WAITEVENT TOPOLOGY: ordinary=0 namespace=1 profile=2 killed=1 self=2 pid=8 real=0 effective=1003 saved=0
+LINUX WAITEVENT TOPOLOGY: ordinary=0 namespace=1 profile=3 killed=0 self=2 pid=9 real=4294967294 effective=1004 saved=0
+LINUX WAITEVENT TOPOLOGY: ordinary=0 namespace=1 profile=3 killed=1 self=2 pid=10 real=4294967294 effective=1004 saved=0
+LINUX WAITEVENT CASES: ordinary=0 namespace=1 kind=0 calls=3072 failures=3072
+LINUX WAITEVENT CASES: ordinary=0 namespace=1 kind=1 calls=27648 failures=24576
+LINUX WAITEVENT CASES: ordinary=0 namespace=1 kind=2 calls=3840 failures=0
+LINUX WAITEVENT CASES: ordinary=0 namespace=1 kind=3 calls=1536 failures=0
+LINUX WAITEVENT CASES: ordinary=0 namespace=1 kind=4 calls=32 failures=0
+LINUX WAITEVENT CASES: ordinary=0 namespace=1 kind=5 calls=3072 failures=3072
+LINUX WAITEVENT FINAL: ordinary=0 namespace=1 kind=0 calls=3072 failures=3072
+LINUX WAITEVENT FINAL: ordinary=0 namespace=1 kind=1 calls=27648 failures=24576
+LINUX WAITEVENT FINAL: ordinary=0 namespace=1 kind=2 calls=3840 failures=0
+LINUX WAITEVENT FINAL: ordinary=0 namespace=1 kind=3 calls=1536 failures=0
+LINUX WAITEVENT FINAL: ordinary=0 namespace=1 kind=4 calls=32 failures=0
+LINUX WAITEVENT FINAL: ordinary=0 namespace=1 kind=5 calls=3072 failures=3072
+LINUX WAITEVENT TOPOLOGY: ordinary=1 namespace=1 profile=0 killed=0 self=2 pid=3 real=1000 effective=1000 saved=1002
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=28
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=28
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=29
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=29
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=31
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=31
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=35
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=35
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=16
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=2 bad_byte=16
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=3 bad_byte=16
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=5 bad_byte=20
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=6 bad_byte=20
+LINUX WAITEVENT DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=7 bad_byte=20
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=28
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=28
+LINUX WAITEVENT DETAIL: kind=0 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=29
+LINUX WAITEVENT DETAIL: kind=5 event=0 profile=0 form=0 actual=0/0 available=128 bad_byte=29
+LINUX WAITEVENT TOPOLOGY: ordinary=1 namespace=1 profile=0 killed=1 self=2 pid=4 real=1000 effective=1000 saved=1002
+LINUX WAITEVENT TOPOLOGY: ordinary=1 namespace=1 profile=1 killed=0 self=2 pid=5 real=1000 effective=1002 saved=1002
+LINUX WAITEVENT TOPOLOGY: ordinary=1 namespace=1 profile=1 killed=1 self=2 pid=6 real=1000 effective=1002 saved=1002
+LINUX WAITEVENT TOPOLOGY: ordinary=1 namespace=1 profile=2 killed=0 self=2 pid=7 real=1000 effective=1000 saved=1002
+LINUX WAITEVENT TOPOLOGY: ordinary=1 namespace=1 profile=2 killed=1 self=2 pid=8 real=1000 effective=1000 saved=1002
+LINUX WAITEVENT TOPOLOGY: ordinary=1 namespace=1 profile=3 killed=0 self=2 pid=9 real=1000 effective=1002 saved=1002
+LINUX WAITEVENT TOPOLOGY: ordinary=1 namespace=1 profile=3 killed=1 self=2 pid=10 real=1000 effective=1002 saved=1002
+LINUX WAITEVENT CASES: ordinary=1 namespace=1 kind=0 calls=3072 failures=3072
+LINUX WAITEVENT CASES: ordinary=1 namespace=1 kind=1 calls=27648 failures=24576
+LINUX WAITEVENT CASES: ordinary=1 namespace=1 kind=2 calls=3840 failures=0
+LINUX WAITEVENT CASES: ordinary=1 namespace=1 kind=3 calls=1536 failures=0
+LINUX WAITEVENT CASES: ordinary=1 namespace=1 kind=4 calls=32 failures=0
+LINUX WAITEVENT CASES: ordinary=1 namespace=1 kind=5 calls=3072 failures=3072
+LINUX WAITEVENT FINAL: ordinary=1 namespace=1 kind=0 calls=3072 failures=3072
+LINUX WAITEVENT FINAL: ordinary=1 namespace=1 kind=1 calls=27648 failures=24576
+LINUX WAITEVENT FINAL: ordinary=1 namespace=1 kind=2 calls=3840 failures=0
+LINUX WAITEVENT FINAL: ordinary=1 namespace=1 kind=3 calls=1536 failures=0
+LINUX WAITEVENT FINAL: ordinary=1 namespace=1 kind=4 calls=32 failures=0
+LINUX WAITEVENT FINAL: ordinary=1 namespace=1 kind=5 calls=3072 failures=3072
+LINUX WAITEVENT FAIL: waitid event siginfo fields, padding or copyout faults
+QEMU: Terminated
+
