@@ -56,6 +56,7 @@ fn unmount_paths_in_use(entry &Mount) bool {
 				owner.ns.mnt, entry, boot_root)
 		owner.fs_lock.release()
 		if held { return true }
+		if unmount_descriptors_in_use(owner, entry) { return true }
 		if unmount_mappings_in_use(owner, entry) { return true }
 		if !owner.threads_lock.test_and_acquire() { return true }
 		for task in owner.threads {

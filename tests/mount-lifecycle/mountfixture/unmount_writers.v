@@ -108,32 +108,23 @@ fn unmount_writer_case(kind int) {
 				}
 				check(C.close(writer) == 0, 2911)
 			} else {
-				// Native-only admission control for the existing read-only/O_PATH
-				// busy-accounting gap. A stale route cannot start a writer or
-				// truncate after ordinary unmount has closed admission.
-				check(C.umount2(c'/tmp/mount-lifecycle/uw/a', 0) == 0, 2912)
-				for _ in 0 .. 200 {
-					for flags in [int(C.O_WRONLY), int(C.O_RDWR), int(C.O_WRONLY | C.O_TRUNC), int(C.O_RDONLY | C.O_TRUNC)]! {
-						result := C.openat(held, c'marker', flags)
-						check(result == -1 && *C.__errno_location() == C.EBUSY, 2912)
-					}
-					mut after := C.stat{}
-					mut bytes := [8]u8{}
-					check(C.fstat(reader, &after) == 0 && after.st_size == 8
-						&& C.syscall(int(C.SYS_pread64), i32(reader), &bytes[0], usize(8), i64(0)) == 8
-						&& C.memcmp(&bytes[0], c'MOUNT-OK', 8) == 0, 2912)
-				}
+				// Retained read-only and O_PATH descriptions now prevent ordinary
+				// detach. A refused attempt leaves writer admission usable.
+				unmount_writer_busy(c'/tmp/mount-lifecycle/uw/a', c'/tmp/mount-lifecycle/uw/a/marker')
+				check(C.close(held) == 0, 2912)
+				unmount_writer_busy(c'/tmp/mount-lifecycle/uw/a', c'/tmp/mount-lifecycle/uw/a/marker')
+				check(C.close(reader) == 0, 2912)
 			}
-			check(C.close(held) == 0 && C.close(reader) == 0, 2911)
+			if kind == 7 { check(C.close(held) == 0 && C.close(reader) == 0, 2911) }
 		}
-		if kind !in [5, 7, 8] { check(C.umount2(c'/tmp/mount-lifecycle/uw/a', 0) == 0, 2913) }
+		if kind !in [5, 7] { check(C.umount2(c'/tmp/mount-lifecycle/uw/a', 0) == 0, 2913) }
 		check(C.umount2(c'/tmp/mount-lifecycle/uw', 0) == 0, 2913)
 	}
 }
 
-fn unmount_writer_cases(selected int, portable bool) {
+fn unmount_writer_cases(selected int) {
 	unsafe { directory(c'/tmp/mount-lifecycle/uw') }
-	for kind in 0 .. if portable { 8 } else { 9 } {
+	for kind in 0 .. 9 {
 		if selected >= 0 && kind != selected { continue }
 		child := C.fork()
 		check(child >= 0, 2914)

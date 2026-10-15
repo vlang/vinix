@@ -14,9 +14,10 @@ descriptions and writable opens through retained routes. Authorization,
 child-mount refusal and backend flush/error propagation keep their order.
 
 Run `--case unmount-writers`, or select `uw-0` through `uw-8` using the
-[V mount controller](README.md). Native `all` requires all nine cases. The
-portable Linux suite requires `uw-0` through `uw-7`; `uw-8` exercises a remaining
-Vinix read-only/O_PATH accounting gap which prevents a direct Linux comparison.
+[V mount controller](README.md). Native `all` and the portable Linux suite
+require all nine cases. The [descriptor busy checks](unmount-descriptors.md)
+close the read-only/O_PATH accounting gap; `uw-8` now requires ordinary unmount
+to refuse until both retained descriptions close.
 
 | Case | Qualified behavior |
 | --- | --- |
@@ -27,13 +28,14 @@ Vinix read-only/O_PATH accounting gap which prevents a direct Linux comparison.
 | `uw-5` | A writer pins its selected bind attachment in both directions. The sibling alias can unmount independently. |
 | `uw-6` | A copied namespace's attachment starts without the inherited description's pin. Removing that copy leaves the original mount busy until the child releases the original description. |
 | `uw-7` | Lazy detach permits retained writers and new writable opens through a saved directory route. |
-| `uw-8` | After ordinary detach, a saved route refuses writable opens and read-only `O_TRUNC` with `EBUSY`, preserving the file's size and contents. |
+| `uw-8` | An O_PATH directory and a read-only file keep the mount busy. Closing one leaves the other pin; refusals leave writer admission usable. |
 
 Each busy scenario repeats 200 refusals while checking mount identity and file
 contents. Each refusal is followed by another writable open/close, requiring
 admission to remain usable. Ordinary removal succeeds after the final writer
-or mapping releases its pin. The native stale-route case repeats 800 refusals
-and verifies unchanged data after every set of four attempts.
+or mapping releases its pin. The retained-descriptor case repeats 200 refusals
+before and after closing its directory, checking unchanged contents and fresh
+writer admission each time.
 
 The [persistent Services cold-boot gate](../development/README.md) additionally
 checks rollback after the ext2 backend refuses shutdown for deferred orphan
@@ -42,7 +44,10 @@ existing linked probe file; successful shutdown still requires clean read-only
 filesystem checks. The probe is reused across boots and creates no orphan of
 its own. No credential or schedule state is stored in it.
 
-Evidence is retained under `build/development-unmount-writers-20261015`.
+Historical writer-admission evidence is retained under
+`build/development-unmount-writers-20261015`. That version of `uw-8` qualified
+stale-route refusal after ordinary detach and was native-only. Current `uw-8`
+and same-executable Linux evidence are documented with the descriptor checks.
 Frozen kernels use the existing isolated `e42b3946c` worktree, saved typed-null
 adaptation and the four unmount/policy sources matching this change. Other
 sessions' kernel edits are excluded. Builds use V `be2eb40`, clang, LLD and
@@ -70,8 +75,8 @@ ext2 refusals. `before-admission` separately reproduces the old kernel accepting
 a stale-route writer; `single-x86` passes the corrected `uw-8` selection, and
 `stale-cache` refuses the pre-change probe before image construction or boot.
 
-This qualifies existing regular-file writer pins and writer admission only.
-Read-only/O_PATH descriptions, mappings made from read-only descriptions,
-executable mappings, cwd/root references, full concurrent namespace behavior,
-mount reclamation and OCI/rootless acceptance remain open. Mount objects and
+The original change qualified existing regular-file writer pins and writer
+admission only. Retained descriptors, mappings, executable images and cwd/root
+now have separate checks. Full concurrent namespace behavior, mount reclamation
+and OCI/rootless acceptance remain open. Mount objects and
 cached filesystem trees keep their existing permanent lifetimes.

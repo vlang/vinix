@@ -91,6 +91,7 @@ fn run() ! {
 		&& result.text.contains('MOUNT UNMOUNT PATHS: PASS')
 		&& result.text.contains('MOUNT UNMOUNT EXEC: PASS')
 		&& result.text.contains('MOUNT UNMOUNT MAPPINGS: PASS')
+		&& result.text.contains('MOUNT UNMOUNT DESCRIPTORS: PASS')
 		&& result.text.contains('MOUNT IDENTITIES: PASS')
 		&& result.text.contains('MOUNT ADMISSION: PASS')
 		&& result.text.contains('MOUNT PROPAGATION VALIDATION: PASS')
@@ -123,9 +124,10 @@ fn run() ! {
 		&& result.text.contains('MOUNT EXECCLOEXEC: PASS')
 	mut cases_pass := true
 	for kind in 0 .. 10 { cases_pass = cases_pass && result.text.contains('MOUNT UNMOUNT MAPPING CASE: ${kind} PASS') }
+	for kind in 0 .. 10 { cases_pass = cases_pass && result.text.contains('MOUNT UNMOUNT DESCRIPTOR CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT UNMOUNT EXEC CASE: ${kind} PASS') }
 	for kind in 0 .. 10 { cases_pass = cases_pass && result.text.contains('MOUNT UNMOUNT PATH CASE: ${kind} PASS') }
-	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT UNMOUNT WRITER CASE: ${kind} PASS') }
+	for kind in 0 .. 9 { cases_pass = cases_pass && result.text.contains('MOUNT UNMOUNT WRITER CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT UNMOUNT BUSY CASE: ${kind} PASS') }
 	for kind in 0 .. 7 { cases_pass = cases_pass && result.text.contains('MOUNT IDENTITY CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT ADMISSION CASE: ${kind} PASS') }

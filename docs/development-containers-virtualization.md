@@ -529,6 +529,17 @@ namespace mounts, sibling bind aliases and anonymous mappings remain independent
 The scan borrows ranges under their page-map lock and allocates nothing. New
 mapping publication, detached address spaces still being destroyed and other
 in-flight descriptions still need complete admission and ownership accounting.
+The [descriptor unmount checks](../tests/mount-lifecycle/unmount-descriptors.md)
+also refuse ordinary detach while existing descriptor tables retain the selected
+attachment, covering read-only files and `O_PATH` files/directories. The scan
+borrows descriptors under a table try-lock and adds no allocation or ownership.
+Duplication and fork preserve the original attachment across namespace copies;
+bind aliases and lazy replacement mounts remain independent. Closing the final
+descriptor or completing process teardown releases this busy state. The writer
+fixture's former native-only stale-route case now qualifies retained-descriptor
+refusal on both Vinix and Linux. Concurrent descriptor publication, in-flight
+operations after table removal and queued descriptor passing still need complete
+admission and ownership accounting.
 The [attachment identity checks](../tests/mount-lifecycle/identities.md) qualify
 unmount, remount and move refusal through detached/foreign mount descriptors
 and cwd, while valid local operations remain available. Retained read-only

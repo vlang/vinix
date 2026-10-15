@@ -25,8 +25,8 @@ The default `--case all` requires every positive marker. `--case flags`,
 `um-0` through `um-7` select individual cases. Native `all` and Linux
 `move-reference` include them.
 `--case unmount-writers` selects [writable-description busy checks](unmount-writers.md);
-`uw-0` through `uw-8` select individual cases. Native `all` includes all nine;
-Linux `move-reference` includes the eight portable cases (`uw-0` through `uw-7`).
+`uw-0` through `uw-8` select individual cases. Native `all` and Linux
+`move-reference` include all nine, including retained read-only/O_PATH descriptors.
 `--case unmount-paths` selects [working/root-directory busy checks](unmount-paths.md);
 `ud-0` through `ud-9` select individual cases. Native `all` and Linux
 `move-reference` include all ten cases.
@@ -35,6 +35,9 @@ Linux `move-reference` includes the eight portable cases (`uw-0` through `uw-7`)
 `move-reference` include all eight cases.
 `--case unmount-mappings` selects [file-mapping busy checks](unmount-mappings.md);
 `uv-0` through `uv-9` select individual cases. Native `all` and Linux
+`move-reference` include all ten cases.
+`--case unmount-descriptors` selects [descriptor busy checks](unmount-descriptors.md);
+`uf-0` through `uf-9` select individual cases. Native `all` and Linux
 `move-reference` include all ten cases.
 `--case admission` selects the new-filesystem/bind/devpts admission group;
 `ad-0` through `ad-7` select its individual cases.
