@@ -313,7 +313,7 @@ const bundled_icon_paths = ['asset:firefox', 'asset:chromium', 'asset:blender', 
 	'asset:calculator', 'asset:disk_usage', 'asset:editor', 'asset:files', 'asset:clock',
 	'asset:calendar', 'asset:capture', 'asset:vlc', 'asset:vscodium', 'asset:zed', 'asset:neovim',
 	'asset:keepassxc', 'asset:discord', 'asset:telegram', 'asset:slack', 'asset:spotify', 'asset:obs',
-	'asset:ios']
+	'asset:ios', 'asset:voffice']
 
 // How many scaled icons are kept. The desktop draws each icon at a handful of
 // sizes; the limit only matters if something keeps asking for new ones.

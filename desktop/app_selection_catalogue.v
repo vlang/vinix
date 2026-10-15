@@ -68,7 +68,7 @@ const first_run_app_catalogue = [
 	},
 	FirstRunApp{
 		title:           'VOffice'
-		icon:            'builtin:editor'
+		icon:            'asset:voffice'
 		package_name:    'voffice'
 		action:          'apps.toggle.voffice'
 		installed_paths: ['/usr/bin/voffice-writer']

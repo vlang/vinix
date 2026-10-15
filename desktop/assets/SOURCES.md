@@ -9,6 +9,7 @@ its framebuffer compositor.
 - Firefox: [Alpine Firefox ESR package](https://dl-cdn.alpinelinux.org/alpine/v3.22/community/aarch64/firefox-esr-140.12.0-r0.apk), `usr/share/icons/hicolor/scalable/apps/firefox-esr.svg`
 - Blender: [Alpine Blender package](https://dl-cdn.alpinelinux.org/alpine/v3.21/community/aarch64/blender-4.3.0-r0.apk), `usr/share/icons/hicolor/scalable/apps/blender.svg`
 - Minecraft: [official Minecraft client asset](https://resources.download.minecraft.net/f0/f00657542252858a721e715a2e888a9226404e35), `minecraft.icns` (1024 × 1024)
+- VOffice: [official website logo](https://office.vlang.io/assets/logo.png?v=20260915-1), resampled from 1254 × 1254 to 512 × 512 with transparency preserved
 - DOOM: `M_DOOM` menu logo from a locally supplied DOOM WAD, decoded with its `PLAYPAL` palette and scaled without smoothing.
 - Steam: [Valve's Steam installer package](https://cdn.fastly.steamstatic.com/client/installer/steam.deb), `usr/share/icons/hicolor/256x256/apps/steam.png`, resampled to 512 × 512
 - VLC: [VideoLAN application icon](https://raw.githubusercontent.com/videolan/vlc/master/share/icons/256x256/vlc.png)
@@ -45,6 +46,9 @@ source bytes, before color assignment/rasterization and QOI conversion:
 | Slack | `fff0ab554a4dc202afd1cbf2033a3ad340cf25b4991035d2d31407b5e7e4c366` |
 | Spotify | `b9ec9bec7769c35643981586d6ea0d675aaf3871b32f8a291bcac7a87fff0bc1` |
 | OBS Studio | `043b35b8ebb6238d0dd9171c5437635f6266825ce028d2f79363f705cf7d6be5` |
+
+The VOffice logo was fetched on 2026-10-15. Its unmodified PNG source SHA-256
+is `e765434460a97da61f540231b61c4c9d9118eb41e546db51db095edaf95e5af5`.
 
 Artwork was fetched and converted with V tooling invoking curl and ImageMagick;
 SVGs were rasterized at sufficient density before scaling. PNG source colors

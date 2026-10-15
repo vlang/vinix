@@ -117,7 +117,7 @@ fn test_app_selection_offers_the_optional_apps_this_machine_can_install() {
 	for category in first_run_categories {
 		for i, app in first_run_apps {
 			if app.category == category {
-				state.scroll_to(app_selection_row_y(i) - app_selection_heading_height)
+				state.scroll_to(app_selection_row_y(i, state.columns) - app_selection_heading_height)
 				break
 			}
 		}
@@ -269,7 +269,7 @@ fn test_app_selection_retains_choices_while_scrolling_and_counts_many_apps() {
 	}
 	assert state.selected_count() == 6
 	assert app_selection_test_button_label(mut state) == 'Install selected apps'
-	state.scroll_to(app_selection_content_height())
+	state.scroll_to(app_selection_content_height(state.columns))
 	state.handle_action('apps.toggle.discord')
 	state.handle_action('apps.toggle.slack')
 	state.handle_action('apps.toggle.spotify')
@@ -284,8 +284,9 @@ fn test_app_selection_scrolling_keeps_rows_and_hit_targets_inside_the_list() {
 	mut state := app_selection_test_state()
 	for size in [[1024, 720]!, [640, 480]!] {
 		desktop := Desktop{ canvas: Canvas{ width: size[0], height: size[1], scale: 1 } }
-		state.prepare_viewport(app_selection_layout(size[0], size[1]).list_height)
-		for offset in [0, 45, 350, app_selection_content_height()] {
+		layout := app_selection_layout(size[0], size[1])
+		state.prepare_viewport(layout.list_height, layout.columns)
+		for offset in [0, 45, 350, app_selection_content_height(state.columns)] {
 			state.scroll_to(offset)
 			begin_frame_elements()
 			tree := state.element(&desktop)
@@ -352,7 +353,7 @@ fn test_app_selection_wheel_and_scrollbar_reach_the_bottom_without_losing_choice
 	desktop.hover = action_apps_scrollbar
 	desktop.pointer_y = layout.y + app_selection_row_top + layout.list_height - 1
 	state.pointer_input(PointerPacket{ pressed: button_left, buttons: button_left }, &desktop)
-	assert state.scroll == app_selection_content_height() - layout.list_height
+	assert state.scroll == app_selection_content_height(state.columns) - layout.list_height
 	assert state.scroll_drag
 	state.pointer_input(PointerPacket{ released: button_left }, &desktop)
 	assert !state.scroll_drag
@@ -362,6 +363,56 @@ fn test_app_selection_wheel_and_scrollbar_reach_the_bottom_without_losing_choice
 	assert app_selection_test_element(tree, action_apps_install) != none
 	free_tree(tree)
 	assert state.packages() == ['firefox']
+}
+
+fn test_app_selection_pairs_apps_under_headers_and_stacks_them_on_narrow_screens() {
+	mut state := app_selection_test_state()
+	for width in [1024, 640] {
+		desktop := Desktop{ canvas: Canvas{ width: width, height: 720, scale: 1 } }
+		begin_frame_elements()
+		tree := state.element(&desktop)
+		firefox := app_selection_test_element(tree, 'apps.toggle.firefox') or { panic('missing Firefox') }
+		chromium := app_selection_test_element(tree, 'apps.toggle.chromium') or { panic('missing Chromium') }
+		browsers := app_selection_test_element(tree, 'apps.heading.browsers') or { panic('missing heading') }
+		assert browsers.frame.x == firefox.frame.x
+		assert browsers.frame.y + browsers.frame.height < firefox.frame.y
+		if width == 1024 {
+			assert firefox.frame.y == chromium.frame.y
+			assert firefox.frame.x + firefox.frame.width < chromium.frame.x
+		} else {
+			assert firefox.frame.x == chromium.frame.x
+			assert firefox.frame.y + firefox.frame.height < chromium.frame.y
+		}
+		$if arm64 {
+			voffice := app_selection_test_element(tree, 'apps.toggle.voffice') or { panic('missing VOffice') }
+			assert app_selection_test_has_image(voffice, 'asset:voffice')
+		}
+		free_tree(tree)
+	}
+}
+
+fn test_app_selection_vertical_arrows_follow_grid_columns_and_skip_unavailable_apps() {
+	mut state := app_selection_test_state()
+	state.prepare_viewport(452, 2)
+	state.set_focus(1) // Chromium, in the second column.
+	state.key_input('\x1b[B')
+	assert first_run_apps[state.focus].package_name == 'keepassxc'
+	state.key_input('\x1b[A')
+	$if arm64 {
+		assert first_run_apps[state.focus].package_name == 'chromium'
+	} $else {
+		assert first_run_apps[state.focus].package_name == 'firefox'
+	}
+	for i, app in first_run_apps {
+		if app.package_name == 'keepassxc' { state.available[i] = false }
+	}
+	state.set_focus(1)
+	state.key_input('\x1b[B')
+	$if arm64 {
+		assert first_run_apps[state.focus].package_name == 'voffice'
+	} $else {
+		assert first_run_apps[state.focus].category == .development
+	}
 }
 
 fn test_first_run_install_command_uses_alpine_names_and_never_installs_external_clients() {

@@ -130,8 +130,9 @@ What it does:
   utility window is backed by its own OS process, PID and memory accounting
 - a **first-run app picker** shown right after the user is created, offering
   browsers, productivity tools, development tools, communication apps, media,
-  games and runtimes on one scrollable page with category headings; the chosen
-  apps install in a Terminal window through `pkg`
+  games and runtimes on one scrollable page with category headings and two
+  columns (one on narrow screens); the chosen apps install in a Terminal
+  window through `pkg`
 - optional **VOffice Writer and Calc** (`pkg install voffice`), downloaded from
   the VOffice releases and running as native ui2 clients inside ordinary Vinix
   windows

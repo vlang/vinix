@@ -27,6 +27,7 @@ const action_apps_install = 'apps.install'
 const app_selection_row_height = 64
 const app_selection_row_top = 104
 const app_selection_row_gap = 8
+const app_selection_column_gap = 12
 const app_selection_heading_height = 32
 const app_selection_category_gap = 16
 const action_apps_scrollbar = 'apps.scrollbar'
@@ -162,6 +163,7 @@ mut:
 	complete           bool
 	scroll             int
 	viewport_height    int
+	columns            int = 1
 	reveal_focus       bool = true
 	scroll_drag        bool
 	scroll_drag_offset int
@@ -244,6 +246,25 @@ fn (s &AppSelectionState) next_available(from int, step int) int {
 	return -1
 }
 
+fn (s &AppSelectionState) next_vertical(step int) int {
+	if s.focus < 0 { return s.next_available(-1, step) }
+	y := app_selection_row_y(s.focus, s.columns)
+	column := app_selection_column(s.focus, s.columns)
+	mut best := -1
+	mut distance := int(0x7fffffff)
+	for i in 0 .. first_run_apps.len {
+		if s.installed[i] || !s.available[i] { continue }
+		delta := (app_selection_row_y(i, s.columns) - y) * step
+		if delta <= 0 { continue }
+		score := delta * s.columns + abs_int(app_selection_column(i, s.columns) - column)
+		if score < distance {
+			best = i
+			distance = score
+		}
+	}
+	return if best >= 0 { best } else { s.next_available(-1, step) }
+}
+
 fn (mut s AppSelectionState) toggle(index int) {
 	if index < 0 || index >= first_run_apps.len || s.installed[index] || !s.available[index] {
 		return
@@ -280,8 +301,10 @@ fn (mut s AppSelectionState) key_input(keys string) {
 		if ch == 0x1b {
 			if i + 2 < keys.len && (keys[i + 1] == `[` || keys[i + 1] == `O`) {
 				match keys[i + 2] {
-					`A`, `D` { s.set_focus(s.next_available(s.focus, -1)) }
-					`B`, `C` { s.set_focus(s.next_available(s.focus, 1)) }
+					`A` { s.set_focus(s.next_vertical(-1)) }
+					`B` { s.set_focus(s.next_vertical(1)) }
+					`D` { s.set_focus(s.next_available(s.focus, -1)) }
+					`C` { s.set_focus(s.next_available(s.focus, 1)) }
 					`H` { s.set_focus(s.next_available(-1, 1)) }
 					`F` { s.set_focus(s.next_available(-1, -1)) }
 					else {}
@@ -337,7 +360,8 @@ fn app_selection_row(app FirstRunApp, installed bool, available bool, selected b
 		}
 	}
 	title_color := if installed || !available { body_muted } else { body_heading }
-	children << ui2.label('', app.title, ui2.rect(63, 9, f64(width - 76), 22),
+	title_width := width - 76 - if installed { 98 } else if available { 28 } else { 0 }
+	children << ui2.label('', app.title, ui2.rect(63, 9, f64(title_width), 22),
 		ui2.TextStyle{
 			color: title_color
 			size:  14
@@ -394,6 +418,7 @@ struct AppSelectionLayout {
 	width       int
 	height      int
 	list_height int
+	columns     int
 }
 
 fn app_selection_layout(width int, height int) AppSelectionLayout {
@@ -417,39 +442,64 @@ fn app_selection_layout(width int, height int) AppSelectionLayout {
 		width: card_width
 		height: card_height
 		list_height: math.max(1, card_height - app_selection_row_top - 116)
+		columns: if card_width >= 720 { 2 } else { 1 }
 	}
 }
 
-fn app_selection_content_height() int {
-	return first_run_categories.len * (app_selection_heading_height + app_selection_category_gap)
-		+ first_run_apps.len * (app_selection_row_height + app_selection_row_gap)
-		- app_selection_row_gap - app_selection_category_gap
+fn app_selection_category_rows(category FirstRunCategory, columns int) int {
+	mut count := 0
+	for app in first_run_apps {
+		if app.category == category { count++ }
+	}
+	return (count + columns - 1) / columns
 }
 
-fn app_selection_row_y(index int) int {
+fn app_selection_content_height(columns int) int {
+	mut height := 0
+	for category in first_run_categories {
+		height += app_selection_heading_height + app_selection_category_gap
+		height += app_selection_category_rows(category, columns) * (app_selection_row_height + app_selection_row_gap)
+	}
+	return height - app_selection_row_gap - app_selection_category_gap
+}
+
+fn app_selection_column(index int, columns int) int {
+	mut position := 0
+	for i, app in first_run_apps {
+		if i == index { return position % columns }
+		if app.category == first_run_apps[index].category { position++ }
+	}
+	return 0
+}
+
+fn app_selection_row_y(index int, columns int) int {
 	mut y := 0
 	for category in first_run_categories {
 		y += app_selection_heading_height
+		mut position := 0
 		for i, app in first_run_apps {
 			if app.category != category { continue }
-			if i == index { return y }
-			y += app_selection_row_height + app_selection_row_gap
+			if i == index { return y + position / columns * (app_selection_row_height + app_selection_row_gap) }
+			position++
 		}
+		y += app_selection_category_rows(category, columns) * (app_selection_row_height + app_selection_row_gap)
 		y += app_selection_category_gap
 	}
 	return -1
 }
 
 fn (mut s AppSelectionState) scroll_to(offset int) {
-	s.scroll = math.max(0, math.min(offset, app_selection_content_height() - s.viewport_height))
+	s.scroll = math.max(0, math.min(offset, app_selection_content_height(s.columns) - s.viewport_height))
 	s.reveal_focus = false
 }
 
-fn (mut s AppSelectionState) prepare_viewport(height int) {
+fn (mut s AppSelectionState) prepare_viewport(height int, columns int) {
+	s.reveal_focus = s.reveal_focus || s.columns != columns || s.viewport_height != height
 	s.viewport_height = height
-	s.scroll = math.max(0, math.min(s.scroll, app_selection_content_height() - height))
+	s.columns = columns
+	s.scroll = math.max(0, math.min(s.scroll, app_selection_content_height(columns) - height))
 	if s.reveal_focus && s.focus >= 0 {
-		y := app_selection_row_y(s.focus)
+		y := app_selection_row_y(s.focus, columns)
 		if y < s.scroll {
 			// Keep the category heading when moving to its first app.
 			s.scroll = math.max(0, y - app_selection_heading_height)
@@ -461,7 +511,7 @@ fn (mut s AppSelectionState) prepare_viewport(height int) {
 }
 
 fn (s &AppSelectionState) scrollbar_thumb() (int, int) {
-	content := app_selection_content_height()
+	content := app_selection_content_height(s.columns)
 	height := s.viewport_height
 	thumb := math.min(height, math.max(24, height * height / content))
 	travel := height - thumb
@@ -475,8 +525,9 @@ fn (mut s AppSelectionState) element(d &Desktop) ui2.Element {
 	card_x := layout.x
 	card_y := layout.y
 	inner := card_width - 48
-	row_width := inner - 16
-	s.prepare_viewport(layout.list_height)
+	grid_width := inner - 16
+	row_width := (grid_width - (layout.columns - 1) * app_selection_column_gap) / layout.columns
+	s.prepare_viewport(layout.list_height, layout.columns)
 
 	mut card_children := frame_elements(24)
 	card_children << ui2.label('apps.title', tr('app_selection.heading'), ui2.rect(24, 24, f64(inner),
@@ -494,39 +545,43 @@ fn (mut s AppSelectionState) element(d &Desktop) ui2.Element {
 	mut y := -s.scroll
 	for category_index, category in first_run_categories {
 		list_children << ui2.label(first_run_category_headers[category_index], category.text(),
-			ui2.rect(1, f64(y), f64(row_width), 24), ui2.TextStyle{
+			ui2.rect(1, f64(y), f64(grid_width), 24), ui2.TextStyle{
 				color: body_heading
 				size: 14
 				bold: true
 			})
 		y += app_selection_heading_height
+		mut position := 0
 		for i, app in first_run_apps {
 			if app.category != category { continue }
-			if y < layout.list_height && y + app_selection_row_height > 0 {
+			x := 1 + position % layout.columns * (row_width + app_selection_column_gap)
+			row_y := y + position / layout.columns * (app_selection_row_height + app_selection_row_gap)
+			position++
+			if row_y < layout.list_height && row_y + app_selection_row_height > 0 {
 				if s.focus == i {
-					list_children << ui2.view('apps.focus', ui2.rect(0, f64(y - 1), f64(row_width + 2),
+					list_children << ui2.view('apps.focus', ui2.rect(f64(x - 1), f64(row_y - 1), f64(row_width + 2),
 						app_selection_row_height + 2), ui2.BoxStyle{ bg: app_accent, radius: 9 }, []ui2.Element{})
 				}
 				// Crop the hit target as well as its pixels at the viewport edges.
-				top := math.max(0, y)
-				bottom := math.min(layout.list_height, y + app_selection_row_height)
+				top := math.max(0, row_y)
+				bottom := math.min(layout.list_height, row_y + app_selection_row_height)
 				row := app_selection_row(app, s.installed[i], s.available[i], s.selected[i],
-					d.hover == app.action, 0, y - top, row_width, app_selection_row_height)
+					d.hover == app.action, 0, row_y - top, row_width, app_selection_row_height)
 				content := ui2.Element{ ...row, id: '', clickable: false }
 				list_children << ui2.Element{
-					...ui2.view(app.action, ui2.rect(1, f64(top), f64(row_width), f64(bottom - top)),
+					...ui2.view(app.action, ui2.rect(f64(x), f64(top), f64(row_width), f64(bottom - top)),
 						ui2.BoxStyle{ transparent: true }, frame_child(content))
 					clickable: row.clickable
 					enabled: row.enabled
 				}
 			}
-			y += app_selection_row_height + app_selection_row_gap
 		}
+		y += app_selection_category_rows(category, layout.columns) * (app_selection_row_height + app_selection_row_gap)
 		y += app_selection_category_gap
 	}
 	card_children << ui2.view('apps.list', ui2.rect(24, app_selection_row_top, f64(inner),
 		f64(layout.list_height)), ui2.BoxStyle{ bg: registration_card }, list_children)
-	if app_selection_content_height() > layout.list_height {
+	if app_selection_content_height(s.columns) > layout.list_height {
 		thumb_y, thumb_height := s.scrollbar_thumb()
 		thumb := ui2.view('', ui2.rect(0, f64(thumb_y), 6, f64(thumb_height)),
 			ui2.BoxStyle{ bg: body_muted, radius: 3 }, []ui2.Element{})
@@ -586,7 +641,7 @@ fn (mut s AppSelectionState) poll_pointer(mut d Desktop, mut pointer PointerDevi
 
 fn (mut s AppSelectionState) pointer_input(packet PointerPacket, d &Desktop) {
 	layout := app_selection_layout(d.canvas.width, d.canvas.height)
-	s.prepare_viewport(layout.list_height)
+	s.prepare_viewport(layout.list_height, layout.columns)
 	list_y := layout.y + app_selection_row_top
 	if packet.released & button_left != 0 || packet.buttons & button_left == 0 {
 		s.scroll_drag = false
@@ -616,7 +671,7 @@ fn (mut s AppSelectionState) pointer_input(packet PointerPacket, d &Desktop) {
 		travel := layout.list_height - thumb_height
 		if travel > 0 {
 			position := d.pointer_y - list_y - s.scroll_drag_offset
-			s.scroll_to(position * (app_selection_content_height() - layout.list_height) / travel)
+			s.scroll_to(position * (app_selection_content_height(s.columns) - layout.list_height) / travel)
 		}
 	}
 }
