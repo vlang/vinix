@@ -1,0 +1,39 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "3e3491368239425b377f581d2f52826e0a63b68dea48ae3bf772e36280d5d564",
+    "results": [
+        {
+            "name": "niceadmit",
+            "source_sha256": "57f90e5804106216ca0ff5f26274cd1002e3496a96f5cf4714431be4fddafc39",
+            "init_sha256": "7f7964754c422868c3d35cfcafd841c3c9bf21d99f83b88dcdf98c793085181a",
+            "iso_sha256": "704a776afe7f5809b2f5f91e58145489b3048c0d4aa46b068933f6bd2072878e",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "bbc5ee7c90cc6bf931886937ec7b4dcb0181ef43d5010e4f56adc76ae9aa0cb7",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "niceabi",
+            "source_sha256": "2252f4c64891af9262d704738ce8c4a8205f8fd3cc50b52ff4c402c710169194",
+            "init_sha256": "3d3554f514a7992748027210626c350148a46732965b0e9443184cb80fcefcc6",
+            "iso_sha256": "06c685fc250f2a63eff345ada67082ee656224a37da5548c3c15c0eca9f6ff1d",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "attrnice",
+            "source_sha256": "42f45edd6322c95037aa848404275527503570ab70929f9678c60db82701fb59",
+            "init_sha256": "cc88302a486072416ef3c9b193a008ed10d1b074f23d0ed032e586200e20afeb",
+            "iso_sha256": "ea4266b681543593f65ba63c3b991431bd758157e0712a73751b0281bc47a35e",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

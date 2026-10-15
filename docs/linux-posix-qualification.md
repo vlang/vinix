@@ -6771,3 +6771,109 @@ An aborted transfer supplies no qualified success.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/niceabi-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/niceabi-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/niceabi-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/niceabi-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/niceabi-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/niceabi-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/niceabi-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/niceabi-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/niceabi-check.v), [verdict](../tests/linux-compat/results/2026-10-15/niceabi-audit.log), [failed preparation](../tests/linux-compat/results/2026-10-15/niceabi-preflight-failure.log), [independent review](../tests/linux-compat/results/2026-10-15/niceabi-lifetime-review.md).
+
+## Native priority capability and target-limit admission
+
+The 2026-10-15 qualification covers PRIO_PROCESS setpriority on stable native
+process leaders. Admission now uses effective CAP_SYS_NICE and the target's
+RLIMIT_NICE. UID0 without that effective capability receives the same owner and
+nice-lowering checks as an ordinary owner. A non-root caller with the effective
+capability can lower nice or update the tested cross-owner peer. Cross-owner
+EPERM precedes lowering EACCES; failed admission retains actual task state.
+
+The retained [Linux v6.12 priority implementation](https://raw.githubusercontent.com/torvalds/linux/v6.12/kernel/sys.c)
+and [scheduler admission helper](https://raw.githubusercontent.com/torvalds/linux/v6.12/kernel/sched/syscalls.c)
+provide the ownership/error ordering and the target RLIMIT_NICE conversion.
+The soft limit must admit `20 - clamped_nice` for an unprivileged reduction.
+Equal or increased nice does not require a lowering allowance. The existing
+MAC check, signed32 argument decoding, clamp, guarded lookup, PID-table lock
+and scalar nice update remain unchanged.
+
+Both UID/GID0 and UID/GID1000 qualifiers exercise capability off/on, with
+OTHER/BATCH/IDLE targets at actual nice -20/-1/0/1/19. Live targets are PID0,
+explicit self, a same-owner peer and a UID/GID1001 peer. Each requested value
+INT_MIN/-21/-20/-1/0/1/19/20/INT_MAX is tested against target soft limits
+0/1/20/21/40/infinity with hard infinity. Peer cases install the opposite
+caller limit (40 for target0, otherwise0), distinguishing target admission
+from a caller-limit shortcut.
+
+| Group | Controls per cohort | Contract |
+| --- | --- | --- |
+| 0 | 6,480 | Canonical signed64 raw words across both capability modes, three policies, four live targets, five current values, six limits and nine requested values |
+| 1 | 6,480 | The same matrix with simultaneous upper selector/target/nice words |
+| 2 | 6,480 | The same matrix through genuine musl setpriority calls |
+| 3 | 658 | 648 absent/reaped/negative-target and invalid-selector errors plus ten initial/final capability, limit, identity and state observations |
+
+Every live control reads actual raw and musl getpriority, including legitimate
+nice -1 with errno zero, and actual policy/priority. Nonselected leaders remain
+OTHER/nice0. A privileged parent installs and independently queries each real
+target limit, avoiding unprivileged cross-owner prlimit query restrictions. Its
+24-byte scalar-only Message protocol whitelists registered positive PIDs,
+policies, nice and limits; setup acknowledges only observed actual state. The
+qualifier toggles only the effective CAP_SYS_NICE bit and compares the complete
+final capability snapshot. Disposable PR_SET_KEEPCAPS and the raised hard limit
+are setup state, not a claim of complete process restoration.
+
+| Architecture | Controls | Original failures | Corrected failures | Same-ELF Linux failures |
+| --- | --- | --- | --- | --- |
+| AArch64 | 40,196 | 10,692 | 0 | 0 |
+| x86-64 | 40,196 | 10,692 | 0 | 0 |
+
+The original root failure vector is 1377/1377/1377/0; ordinary failures are
+2187/2187/2187/0. Independent source derivation matches the captured vectors.
+Root failures expose 567 disallowed same-owner reductions and 810 cross-owner
+updates per call form while capability is off. Ordinary failures expose 405
+permitted unprivileged reductions, 972 privileged same-owner reductions and
+810 privileged cross-owner updates per form. Supplied Linux 6.12.51 kernels run
+the exact original native ELF for each architecture; no reference oracle is
+substituted for execution. CASES/FINAL identities and counts are exact.
+
+Each corrected native cohort warms 32 cycles then runs 200 cycles across both
+capability states, all three setter forms and four live targets, plus missing
+target errors. The leaders retain nice19 and soft20 during repeated lower/raise
+operations. All 18 ARM/14 x86 slab classes and positive large-page counts stay
+flat across 13-second settling intervals: 85/85 ARM and 216/216 x86 pages in
+both cohorts. This measures repeated admission paths with retained leaders;
+process churn and whole-kernel storage are separate.
+Peers are released and reaped before count transfer, and the parent always
+waits for the qualifier even if the transfer fails.
+
+Four fresh production builds use isolated worktrees at
+`9969135689c8ca354631d3ce46257d20b1bd3b20`. Complete generated C differs only in
+the existing setpriority body, with no compiler identifier normalization, new
+allocation/free or pointer escape. Before/after allocation diagnostics remain
+byte-identical at 398 ARM/290 x86 sites, including existing allowance refusals.
+Eight host files and both before/after generated inventories pass. The public
+dispatch inventory uses the committed parent plus this owned fix; it does not
+upgrade the historical guest kernel.
+
+The first ARM preflight ran out of disk space before C/ELF generation. Its
+actual stdout and absence of a probe remain bound; it supplies no guest result.
+Fresh preflight2 C/ELFs match both native phases and the Linux references, with
+five explicit stack allocas and no heap, dynamic-array or fixed-index helpers.
+The initial ARM production build's detached stdout is empty; its actual build
+log/C/ELF remain retained. Its C is identical to the fresh original C, but the
+initial ELF differs in both size and hash. Its declared section table starts
+at byte 33,206,288, beyond its 17,776,640-byte file; independent boundary
+validation fails, and its third load segment's declared payload also exceeds
+the file. It is structurally incomplete, is not a byte prefix of the fresh ELF,
+and supplies no qualified guest identity. The fresh original build produces
+genuine passing stdout and the complete ELF used by the original native run;
+its segment and section boundaries pass. No missing verdict is reconstructed.
+
+Corrected niceadmit/runtime/niceabi/attrnice cases pass on both architectures.
+The maintained V auditor checks complete source/C scope, all 15,146 compiler
+inputs, frozen inventories, actual build stdout, kernels/probes/ISOs, receipts
+and the exact 90-file retained walk of ten completed native captures. Cleanup
+retires only disposable staging after hash/recheck. False-assertion and
+passing-Linux-as-failing-original controls execute and exit 1 without -prod.
+Independent lifetime/provenance review gates publication.
+
+Nice remains process-wide natively. Worker-thread nice, PRIO_PGRP/PRIO_USER,
+concurrent target/credential/limit races, user-namespace capability distinctions,
+other security configurations, glibc and translated/ELF32 priority paths remain
+unqualified. The three broad section 15 gates and ARM CPU1 QoS blocker stay open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/niceadmit-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/niceadmit-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/niceadmit-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/niceadmit-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/niceadmit-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/niceadmit-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/niceadmit-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/niceadmit-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/niceadmit-check.v), [verdict](../tests/linux-compat/results/2026-10-15/niceadmit-audit.log), [initial failed preparation](../tests/linux-compat/results/2026-10-15/niceadmit-preflight1-arm.log), [independent review](../tests/linux-compat/results/2026-10-15/niceadmit-lifetime-review.md).

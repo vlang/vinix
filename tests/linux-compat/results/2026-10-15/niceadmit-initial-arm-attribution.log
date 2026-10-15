@@ -1,0 +1,6 @@
+initial-before-arm.c bytes=10842748 sha256=fa65c6310df280b37e038e81a129330832dbdbd8b1a574cd7217eab05a5901d1
+before-arm.c bytes=10842748 sha256=fa65c6310df280b37e038e81a129330832dbdbd8b1a574cd7217eab05a5901d1
+common_prefix_bytes=10842748 equal=true initial_is_complete_prefix=true
+initial-before-arm.elf bytes=17776640 sha256=f78c4fae503fe2b9035f8331dbb24af8e982eba023e8acf42452ec7cd378b8a4
+baseline-arm/kernel/bin/vinix bytes=33207632 sha256=ab4602da6a4741f0636d70863dd9fd1fd3dc9353a7f3be4da003d4d3527fa135
+common_prefix_bytes=24 equal=false initial_is_complete_prefix=false

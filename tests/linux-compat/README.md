@@ -1586,3 +1586,19 @@ receipt and initial watcher assertion remain bound alongside a fresh runtime-onl
 completion with unchanged kernel/source/C/ELF. Passing cases are retained.
 PRIO_PGRP/PRIO_USER, full capability/limit admission, worker nice/races/security,
 GNU/translated/ELF32 priority paths and the three broad gates remain open.
+
+The `niceadmit` case qualifies PRIO_PROCESS setpriority effective CAP_SYS_NICE
+and target RLIMIT_NICE admission for stable process leaders. Root and UID1000
+cohorts exercise both capability states, six target limits, opposite caller
+limits, four live target forms, three policies and raw/upper-word/genuine musl
+setters. Each architecture runs 40,196 controls; originals fail 10,692, corrected
+Vinix and identical ELFs on Linux 6.12.51 pass. Two warmed 200-cycle cohorts stay
+flat. Run `--cases niceadmit,runtime,niceabi,attrnice --timeout 900` with a fresh
+state directory. `niceadmit-reference.v` uses the preceding reference arguments;
+compile `niceadmit-check.v` without `-prod` and supply the retained evidence area.
+[The report](../../docs/linux-posix-qualification.md#native-priority-capability-and-target-limit-admission)
+binds the actual failed initial preflight separately from final five-alloca
+probe identities, fresh builds, both Linux references and independent review.
+Nice remains process-wide; group/user selectors, worker nice, concurrent
+credential/limit/target races, namespace/security configurations and GNU/foreign
+priority paths remain separate. The three broad gates remain open.

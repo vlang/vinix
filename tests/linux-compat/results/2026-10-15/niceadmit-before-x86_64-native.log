@@ -1,0 +1,59 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=80272
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX NICEADMIT TOPOLOGY: ordinary=0 uid=0 self=59928 same=5446 cross=61018 reaped=51216 cap_sys_nice=1
+LINUX NICEADMIT DETAIL: ordinary=0 kind=0 pid=0 nice=-2147483648 current=-1 limit=0 cap=0 form=0 result=0/0 expected_errno=13
+LINUX NICEADMIT DETAIL: ordinary=0 kind=1 pid=0 nice=-2147483648 current=-1 limit=0 cap=0 form=1 result=0/0 expected_errno=13
+LINUX NICEADMIT DETAIL: ordinary=0 kind=2 pid=0 nice=-2147483648 current=-1 limit=0 cap=0 form=2 result=0/0 expected_errno=13
+LINUX NICEADMIT DETAIL: ordinary=0 kind=0 pid=0 nice=-21 current=-1 limit=0 cap=0 form=0 result=0/0 expected_errno=13
+LINUX NICEADMIT DETAIL: ordinary=0 kind=1 pid=0 nice=-21 current=-1 limit=0 cap=0 form=1 result=0/0 expected_errno=13
+LINUX NICEADMIT DETAIL: ordinary=0 kind=2 pid=0 nice=-21 current=-1 limit=0 cap=0 form=2 result=0/0 expected_errno=13
+LINUX NICEADMIT DETAIL: ordinary=0 kind=0 pid=0 nice=-20 current=-1 limit=0 cap=0 form=0 result=0/0 expected_errno=13
+LINUX NICEADMIT DETAIL: ordinary=0 kind=1 pid=0 nice=-20 current=-1 limit=0 cap=0 form=1 result=0/0 expected_errno=13
+LINUX NICEADMIT DETAIL: ordinary=0 kind=2 pid=0 nice=-20 current=-1 limit=0 cap=0 form=2 result=0/0 expected_errno=13
+LINUX NICEADMIT DETAIL: ordinary=0 kind=0 pid=0 nice=-2147483648 current=-1 limit=1 cap=0 form=0 result=0/0 expected_errno=13
+LINUX NICEADMIT DETAIL: ordinary=0 kind=1 pid=0 nice=-2147483648 current=-1 limit=1 cap=0 form=1 result=0/0 expected_errno=13
+LINUX NICEADMIT DETAIL: ordinary=0 kind=2 pid=0 nice=-2147483648 current=-1 limit=1 cap=0 form=2 result=0/0 expected_errno=13
+LINUX NICEADMIT CASES: ordinary=0 kind=0 calls=6480 failures=1377
+LINUX NICEADMIT CASES: ordinary=0 kind=1 calls=6480 failures=1377
+LINUX NICEADMIT CASES: ordinary=0 kind=2 calls=6480 failures=1377
+LINUX NICEADMIT CASES: ordinary=0 kind=3 calls=658 failures=0
+LINUX NICEADMIT FINAL: ordinary=0 kind=0 calls=6480 failures=1377
+LINUX NICEADMIT FINAL: ordinary=0 kind=1 calls=6480 failures=1377
+LINUX NICEADMIT FINAL: ordinary=0 kind=2 calls=6480 failures=1377
+LINUX NICEADMIT FINAL: ordinary=0 kind=3 calls=658 failures=0
+LINUX NICEADMIT TOPOLOGY: ordinary=1 uid=1000 self=62976 same=43674 cross=36602 reaped=16718 cap_sys_nice=0
+LINUX NICEADMIT DETAIL: ordinary=1 kind=0 pid=0 nice=-2147483648 current=-1 limit=40 cap=0 form=0 result=-1/13 expected_errno=0
+LINUX NICEADMIT DETAIL: ordinary=1 kind=1 pid=0 nice=-2147483648 current=-1 limit=40 cap=0 form=1 result=-1/13 expected_errno=0
+LINUX NICEADMIT DETAIL: ordinary=1 kind=2 pid=0 nice=-2147483648 current=-1 limit=40 cap=0 form=2 result=-1/13 expected_errno=0
+LINUX NICEADMIT DETAIL: ordinary=1 kind=0 pid=0 nice=-21 current=-1 limit=40 cap=0 form=0 result=-1/13 expected_errno=0
+LINUX NICEADMIT DETAIL: ordinary=1 kind=1 pid=0 nice=-21 current=-1 limit=40 cap=0 form=1 result=-1/13 expected_errno=0
+LINUX NICEADMIT DETAIL: ordinary=1 kind=2 pid=0 nice=-21 current=-1 limit=40 cap=0 form=2 result=-1/13 expected_errno=0
+LINUX NICEADMIT DETAIL: ordinary=1 kind=0 pid=0 nice=-20 current=-1 limit=40 cap=0 form=0 result=-1/13 expected_errno=0
+LINUX NICEADMIT DETAIL: ordinary=1 kind=1 pid=0 nice=-20 current=-1 limit=40 cap=0 form=1 result=-1/13 expected_errno=0
+LINUX NICEADMIT DETAIL: ordinary=1 kind=2 pid=0 nice=-20 current=-1 limit=40 cap=0 form=2 result=-1/13 expected_errno=0
+LINUX NICEADMIT DETAIL: ordinary=1 kind=0 pid=0 nice=-2147483648 current=-1 limit=18446744073709551615 cap=0 form=0 result=-1/13 expected_errno=0
+LINUX NICEADMIT DETAIL: ordinary=1 kind=1 pid=0 nice=-2147483648 current=-1 limit=18446744073709551615 cap=0 form=1 result=-1/13 expected_errno=0
+LINUX NICEADMIT DETAIL: ordinary=1 kind=2 pid=0 nice=-2147483648 current=-1 limit=18446744073709551615 cap=0 form=2 result=-1/13 expected_errno=0
+LINUX NICEADMIT CASES: ordinary=1 kind=0 calls=6480 failures=2187
+LINUX NICEADMIT CASES: ordinary=1 kind=1 calls=6480 failures=2187
+LINUX NICEADMIT CASES: ordinary=1 kind=2 calls=6480 failures=2187
+LINUX NICEADMIT CASES: ordinary=1 kind=3 calls=658 failures=0
+LINUX NICEADMIT FINAL: ordinary=1 kind=0 calls=6480 failures=2187
+LINUX NICEADMIT FINAL: ordinary=1 kind=1 calls=6480 failures=2187
+LINUX NICEADMIT FINAL: ordinary=1 kind=2 calls=6480 failures=2187
+LINUX NICEADMIT FINAL: ordinary=1 kind=3 calls=658 failures=0
+LINUX NICEADMIT FAIL: priority words, errors or state
+QEMU: Terminated
+

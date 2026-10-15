@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "ab4602da6a4741f0636d70863dd9fd1fd3dc9353a7f3be4da003d4d3527fa135",
+    "results": [
+        {
+            "name": "niceadmit",
+            "source_sha256": "57f90e5804106216ca0ff5f26274cd1002e3496a96f5cf4714431be4fddafc39",
+            "init_sha256": "7f7964754c422868c3d35cfcafd841c3c9bf21d99f83b88dcdf98c793085181a",
+            "iso_sha256": "51e2c737629f1ce55263d1b2f81f4a6e0074bc8e8e7fd2349d79b7e7af753aa3",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

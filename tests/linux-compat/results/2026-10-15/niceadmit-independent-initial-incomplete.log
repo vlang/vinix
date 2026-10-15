@@ -1,0 +1,10 @@
+initial-before-arm.c SHA256=fa65c6310df280b37e038e81a129330832dbdbd8b1a574cd7217eab05a5901d1
+before-arm.c SHA256=fa65c6310df280b37e038e81a129330832dbdbd8b1a574cd7217eab05a5901d1
+initial-before-arm.elf SHA256=f78c4fae503fe2b9035f8331dbb24af8e982eba023e8acf42452ec7cd378b8a4
+baseline-arm/kernel/bin/vinix SHA256=ab4602da6a4741f0636d70863dd9fd1fd3dc9353a7f3be4da003d4d3527fa135
+after-arm.c SHA256=5b2af268213009c3856e292cee7873362b5060a844e5715b4da51e3ba6dbf9d8
+kernel-arm/kernel/bin/vinix SHA256=3e3491368239425b377f581d2f52826e0a63b68dea48ae3bf772e36280d5d564
+initial/rebuilt C byte equal=true
+initial-before-arm.elf bytes=17776640 machine=183 entry=ffffffff8013d624 phoff=64 phnum=3 shoff=33206288 shnum=21 header_tables_complete=false
+/Users/alex/.cache/vinix-linux-compat/niceadmit-20261015/independent-initial.v:23: FAIL: fn main.elf: assert table_complete
+V panic: Assertion failed...

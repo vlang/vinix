@@ -1,0 +1,3 @@
+tests/linux-compat/niceadmit-check.v:361: FAIL: fn main.main: assert false, 'niceadmit assertions must execute'
+      message: niceadmit assertions must execute
+V panic: Assertion failed...

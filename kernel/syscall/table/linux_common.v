@@ -1089,10 +1089,12 @@ fn syscall_linux_setpriority(_ voidptr, raw_which int, raw_local_who int, raw_pr
 		return errno.err, errno.esrch
 	}
 	if !proc.mac_peer_allowed(caller, target) { return errno.err, errno.eperm }
-	if caller.euid != 0 && caller.euid != target.euid && caller.euid != target.uid {
+	privileged := proc.has_capability(caller, proc.cap_sys_nice)
+	if !privileged && caller.euid != target.euid && caller.euid != target.uid {
 		return errno.err, errno.eperm
 	}
-	if wanted < target.nice && caller.euid != 0 {
+	if wanted < target.nice && !privileged
+		&& !proc.limit_allows(target, proc.rlimit_nice, u64(20 - wanted)) {
 		return errno.err, errno.eacces
 	}
 	target.nice = wanted

@@ -1,0 +1,1 @@
+arm/x86: whole generated production C differs only in table__syscall_linux_setpriority; no compiler identifier normalization, allocation/free or pointer escape; existing locked target lookup, MAC check, error returns and nice mutation retained

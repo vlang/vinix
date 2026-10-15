@@ -937,6 +937,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   exact errors and flat repeated-call storage, with independent lifetime review.
   See [the priority-word contract](docs/linux-posix-qualification.md#native-priority-argument-words-and-missing-target-errors).
 
+- [x] Enforce PRIO_PROCESS setpriority using effective CAP_SYS_NICE and the
+  target's RLIMIT_NICE; qualify UID0/no-capability restrictions, non-root
+  capability grants, owner/error ordering, genuine musl calls, retained state,
+  upper argument words and flat repeated-path storage against Linux on
+  both native architectures. See the
+  [capability/limit receipts](docs/linux-posix-qualification.md#native-priority-capability-and-target-limit-admission).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
