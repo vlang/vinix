@@ -11,7 +11,7 @@ fn C.mkdtemp(&char) &char
 fn C.rename(&char, &char) int
 
 const fixture_modules = ['cachefixture', 'i915policyfixture', 'pciconfigfixture',
-	'runtimefixture', 'taskfixture', 'timefixture', 'timerfixture', 'syncfixture', 'rwsemfixture',
+	'runtimefixture', 'taskfixture', 'timefixture', 'timerfixture', 'syncfixture', 'rwsemfixture', 'conststringfixture',
 	'wwfixture', 'iofixture', 'seqfixture', 'srcufixture', 'workerfixture',
 	'workfixture', 'usleepfixture', 'waitbitfixture', 'printkfixture', 'smpfixture',
 	'workirqfixture', 'rcufixture', 'rcufreefixture', 'irqworkfixture', 'dmafencefixture', 'fencecontainerfixture', 'resvfixture', 'swfencefixture', 'cpubugfixture', 'migrationfixture', 'tscfixture', 'aggregatefixture']

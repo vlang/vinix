@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-16 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Latest kernel build baseline: **`a55cf6540`**, with the thirteen frozen rwsem integration inputs described below. Recheck HEAD and the worktree before
+Latest kernel build baseline: **`8b423eba5`**, with the fourteen frozen constant-string integration inputs described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -81,7 +81,7 @@ global fault-lease rewrite was not applied.
 
 Ordinary RCU, deferred page-backed frees, native IRQ work and the DMA-fence
 synchronization core are implemented and validated. The latest normal/SSE/
-four-level guests pass 55 markers and 37 strict allocation equalities.
+four-level guests pass 56 markers and 38 strict allocation equalities.
 Fence containers, reservation ownership and unchanged i915 software fences are
 implemented and validated. Original boot-CPU L1TF queries are also implemented
 and validated, with native positive-MSR execution still pending. Task-owned migration pins now preserve CPU identity through sleep and yield; final validation is recorded below. Continue through the remaining task/MM, device,
@@ -91,6 +91,7 @@ memory and DRM services; complete i915 support is still pending.
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `8b423eba5` | Native sleeping reader/writer semaphores, original layout and measured handoff lifetimes |
 | `a55cf6540` | Original grouped-field and flexible-array declaration wrappers |
 | `3d4be91a6` | Worker priority Process pointer ownership and actual IRQ-frame rejection before mutation |
 | `219a33d6f` | Task-owned migration pins across sleep/yield, post-lock eligibility and coherent affinity release snapshots |
@@ -2882,4 +2883,68 @@ prerequisites for genuine unpublished kobjects and later PCI device references.
 ```sh
 build-support/run-v-tool.sh tests/linuxkpi/rwsem.v --keep-dir NEW_DIRECTORY
 # Add --timeout 600 to tests/linuxkpi/run_vm invocations for this full suite.
+```
+
+## Native constant-string ownership (2026-10-16)
+
+`kstrdup_const` and `kfree_const` now have native V implementations with the
+original const-qualified Linux interfaces. Only addresses inside the actual
+kernel image `rodata_start <= address < rodata_end` interval are borrowed. The
+classifier reads no candidate bytes and allocates nothing. Borrowed duplicates
+preserve pointer identity before consulting GFP flags; freeing them does
+nothing. Other inputs use the existing checked page-backed string duplication
+and free services. NULL retains their existing behavior. Read-only mappings
+outside the image require an owned copy; arbitrary pointers outside the image
+retain ordinary `kfree` ownership requirements. This supplies no object
+registration, formatted-name allocation, Linux MM or GPU service.
+
+The unchanged host fixture passes six strict GNU99/GNU11 O0/O1/O2 ASan/UBSan
+profiles: 24 scenarios and 12,852 assertions, with 18 genuine freestanding
+production objects and 24 sanitizer objects. Protected inaccessible image
+intervals verify that classification and borrowing never read candidate bytes.
+Independent external read-only mappings, stack/heap/empty inputs, source
+mutation and release, boundary NULs, GFP rejection, OOM and repeated multipage
+copies exercise ownership through the real existing allocator/string chain.
+Host endpoint/page transports do not establish native linker placement.
+Final host result SHA256:
+`9bfe6cd7f6516a3cc6cc756281c765a0404fdd174a24945417c5ddbf691a4346`;
+unchanged four-path host manifest SHA256:
+`fa996047d9b2c4667d92f1e815d14e04f3670689cebd20a4fa40c50d97baff37`.
+
+Fresh isolated enabled/default x86 and disabled ARM builds pass at
+`8b423eba5` plus fourteen frozen integration inputs. Final native freeze SHA256:
+`8abc13c763d6b038ea43d4fde047fc41d208491d4e07e77413a31881f66bdb4f`.
+The first full x86 compile caught an exported-wrapper const-pointer mismatch
+caused by a raw C import in V. The corrected import preserves the original
+const-qualified ABI everywhere; original failed C/logs and freeze remain
+retained separately. No failed build is completion evidence.
+
+The final enabled ELF SHA256 is
+`8989e6dcef5916d3d0b7833c22cf5408636713866d911243c51bb556e237ce89`;
+the default ELF SHA256 is
+`9043e1eb63834dcfbb9d51c2c8838dad11962c4a0abe3ede3f9e5532c4803323`.
+Normal, original-SSE4.1, four-level and default guests complete Linux ABI
+startup. Every enabled guest passes all 56 markers and 38 strict page/live-heap
+equalities. The new test performs three full warmups and a measured fourth
+batch of 200 owned-copy operations, plus real image-boundary and pointer
+identity checks with IRQs disabled and nested preemption pins. It checks exact
+CPU/task/IF/depth and allocation-failure-gate preservation. These atomic
+context checks are not a claim of hardware-IRQ dispatch testing. The new
+measured baseline in normal/SSE guests is 378286080 bytes before and after,
+with every live heap class equal. This is feature-specific recovery.
+
+Independent host/native consumer review SHA256:
+`effec7bc9155c993197e9348c5764666852f8074201b8a98f815b07f53a0ccdc`;
+independent actual native ABI/C/O2 review SHA256:
+`b5c4f74e26547875d972dfeb9b0fb4d34ef8a4b3fcd25d38fca59549a85f99fd`;
+final guest/artifact review SHA256:
+`ebdfb57d8c5d7d4cba6a1ccfe734ba2891ee7482e0fa35b8d3d807f927dfd7e5`.
+The full unchanged-driver syntax audit remains **6/269**, with real task/MM
+and entry-stack dependencies unresolved. All 7,668 imported files remain
+unchanged. Continue through formatted-name and genuine object/device
+ownership; complete driver/core linking and Tiger Lake validation are pending.
+
+```sh
+build-support/run-v-tool.sh tests/linuxkpi/const_string.v --keep-dir NEW_DIRECTORY
+# Use --timeout 600 for the full tests/linuxkpi/run_vm suite.
 ```

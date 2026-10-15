@@ -524,6 +524,10 @@ pub fn initialise() {
 		C.kprintf(c'linuxkpi: Linux string matching, sysfs newlines and replacement passed; no pages retained\n')
 		C.kprintf(c'linuxkpi: kernel integer and Boolean parsing, range errors and result ownership passed; no pages retained\n')
 		C.kprintf(c'linuxkpi: borrowed string tokens, character search and whitespace trimming passed; no pages retained\n')
+		if !const_string_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Native constant string ownership self-test failed')
+		}
+		C.kprintf(c'linuxkpi: constant string ownership, native rodata bounds and checked duplication passed; no pages or heap objects retained\n')
 		C.kprintf(c'linuxkpi: original i915 timeout and DSC table helpers, Linux device encodings passed; no pages retained\n')
 		if !uaccess_native_selftest() {
 			lib.kpanic(unsafe { nil }, c'Linux user-copy remaining-count self-test failed')
