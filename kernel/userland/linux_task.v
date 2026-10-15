@@ -562,11 +562,17 @@ pub fn syscall_waitid(_ voidptr, idtype_word u64, id_word u64, infop u64, option
 	}
 
 	child := change.child
+	// Credentials can change while a stopped/continued child remains alive.
+	// Copy its real UID under the credential lock; the wait claim already pins it.
+	proc.lock_table()
+	uid := child.uid
+	proc.unlock_table()
 	status := change.status
 	mut info := SigInfoChld{
 		si_signo:  i32(sigchld)
 		si_code:   i32(cld_exited)
 		si_pid:    i32(proc.pid_in(child, current_process.numbered_in))
+		si_uid:    uid
 		si_status: i32((status >> 8) & 0xff)
 	}
 	if change.kind == wstopped {

@@ -1,0 +1,31 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "f812fc41d1470f54b20c0b0b3675f13c03fe7578398729c5bd25ab930cd15ab0",
+    "results": [
+        {
+            "name": "waituid",
+            "source_sha256": "5c7176ffed56a2aa6e5af8ba1b23042fcccc20a2663aebb95dd429af98f3e6a5",
+            "init_sha256": "0217b5c23dc079ea2c02f05b292732284f351d6643e544732e61779dca53e2a0",
+            "iso_sha256": "2e0fa0655a678a163da098f2f647b07641598bcfdb7d560a188c4c4ce9de8034",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "3c22f6e44700a031e0c6e9bd04427095e423d595d3f9b81e09f07539d1ea3b9f",
+            "iso_sha256": "4a66f18f3bf9a7b0ec9691e7a03ebb1b1a99029ea366c995ded1a0700a870503",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "waitempty",
+            "source_sha256": "aa77d59845bd4da3e038ba92127f70ccf5235e64535af777919f471862cc56fc",
+            "init_sha256": "7160465c6cd564cfe75292cb8b0c679719d27a2c720300f42bcfc35a2514b4c5",
+            "iso_sha256": "75f8c9cfc5968521a8e07f71cfd18ac366741b62443d90dd7845d7e4327605e2",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

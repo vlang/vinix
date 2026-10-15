@@ -1,0 +1,6 @@
+/Users/alex/.cache/vinix-linux-compat/waituid-20261015/manage.v:42: FAIL: fn main.run: assert code == expected, data
+   left value: code = 2
+  right value: expected = 0
+      message: kernel must be a matching little-endian ELF64
+
+V panic: Assertion failed...

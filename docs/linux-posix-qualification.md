@@ -7811,3 +7811,107 @@ The three broad section 15 gates remain open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/waitempty-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitempty-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitempty-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitempty-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/waitempty-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitempty-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitempty-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitempty-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/waitempty-check.v), [verdict](../tests/linux-compat/results/2026-10-15/waitempty-audit.log), [compiler diagnostic notes](../tests/linux-compat/results/2026-10-15/waitempty-diagnostic-note.txt), [diagnostic pins](../tests/linux-compat/results/2026-10-15/waitempty-diagnostic-inputs.json).
+
+## Native waitid child real UID
+
+Native AArch64 and x86-64 waitid now report the selected child's real UID in
+`si_uid` for stopped, continued, normally exited and signal-killed events.
+Previously the field was always zero. A parent with UID 0 must still receive
+its child's nonzero real UID, and a child with real UID 0 must report zero even
+when its effective UID differs. The result retains the full unsigned 32-bit UID.
+The existing wait claim pins the child; the patch snapshots its scalar real
+UID under the credential table lock and releases the lock before user copyout.
+No allocation, free, pin, reference ownership or event-consumption rule changes.
+Complete production C differs only in `syscall_waitid`, without normalization.
+
+The oracle is the pinned
+[Linux v6.12 wait implementation](https://github.com/torvalds/linux/blob/v6.12/kernel/exit.c),
+which uses `task_uid` for zombie, stopped and continued waits. The same native
+probe source, emitted C and ELF run against original/corrected Vinix and
+Linux 6.12.51 on each architecture. Four fresh production kernel builds use
+committed base `b3d1ebcb8ea58a266d09982db5f525bbd445593a`; only the owned
+`linux_task.v` change enters corrected worktrees.
+
+Four cohorts cover root and ordinary UID 1000 callers, each in the initial and
+a one-level PID namespace. Each caller creates a fresh session. Pipe readiness
+checks the child's PID, parent, process group, session, real/effective/saved
+UIDs before signals or exit. Children occupy their own process groups.
+The root caller's four child credential triples are 0/0/0, 1001/0/1002,
+0/1003/0 and 4294967294/1004/0. Ordinary callers retain saved UID 1002;
+their children alternate 1000/1000/1002 and 1000/1002/1002. These ordinary
+changes use the saved identity without root capabilities. PID namespaces
+change reported child PIDs while leaving these initial-user-namespace UIDs intact.
+Thirty-two topology records per architecture bind the two children used for
+each profile: one supplies stop, continuation and exit status 37; the other dies from
+SIGKILL. Readiness checks event cause/status/PID while excluding the UID under
+test, so original kernels finish every failing control and child cleanup.
+
+Each architecture runs 13,952 controls. Counts below are per cohort:
+
+| Class | Controls | Original failures, root / ordinary |
+| --- | ---: | ---: |
+| CLD_STOPPED / SIGSTOP | 772 | 386 / 772 |
+| CLD_CONTINUED / SIGCONT | 772 | 386 / 772 |
+| CLD_EXITED / status37 | 772 | 386 / 772 |
+| CLD_KILLED / SIGKILL | 772 | 386 / 772 |
+| Cleared no-event or ECHILD after consuming each event | 16 | 0 / 0 |
+| NULL infop with WNOWAIT for all four event kinds | 384 | 0 / 0 |
+
+For each event/profile, 192 repeated WNOWAIT controls vary P_ALL/P_PID/P_PGID,
+eight raw-register/musl forms, mapped output offsets 0/1/3/7 and NULL/valid
+rusage. Raw forms vary high register words; genuine musl calls cover NULL
+rusage. A final consuming musl wait verifies the same identity and event,
+then an immediate WNOHANG check verifies cleared si_pid/si_uid or ECHILD
+after reaping. Canary bytes surround both output structures. These controls
+qualify identity and event fields; siginfo padding and rusage accounting retain
+separate limits. Originals fail exactly 9,264 controls on each architecture.
+Corrected Vinix and the unchanged-ELF Linux references pass every control.
+
+Four warmed 200-cycle storage cohorts retain one stopped child outside the
+measurement interval. Every cycle repeats the three selectors and eight
+raw/musl forms, alternating NULL/valid rusage. Fork, credential changes,
+signals, exit and reap remain outside this interval. Slab object counts and
+big-page totals stay flat after settling. The emitted probe C has five
+explicit stack allocas and no malloc/memdup/dynamic-array/fixed-index calls.
+AArch64 uses 16 KiB Vinix pages; x86-64 and both Linux references use 4 KiB pages.
+Raw storage totals remain in the linked guest logs.
+
+The runtime and 38,400-control waitempty regressions pass on both native
+architectures, and all eight host test files pass. Allocation diagnostics stay
+byte-identical, retaining existing allowance-file refusals. The maintained
+audit verifies 67 inventory inputs, 15,146 compiler inputs, all 2,014 private SDK
+files, fifteen final ARM compiler-command receipts, source/C/ELF/ISO/kernel
+identity, 84 retained regular files across eight native profiles, exact source
+and whole-C scope, and executing false-assertion/passing-reference-as-original
+negative controls. Compile the audit without `-prod`.
+
+An initial host-helper substitution accidentally renamed dup2 to dup1 and
+failed compilation before worktree preparation, kernel builds or guest tests.
+Its source and failed compiler output are retained separately. The corrected
+helper preserves dup2; original and Linux-reference results use p1 profiles.
+The host rebooted at 18:24:19 while both corrected p1 runs were in their final waitempty case.
+Their partial receipts record passing UID/runtime cases; no waitempty serial
+verdict exists, and no aggregate completion is claimed. These profiles retain
+every regular file, including incomplete staging, under separate input pins.
+Fresh p2 corrected profiles rerun all three cases against the unchanged
+production kernels and supply final corrected results.
+
+The first post-reboot launch refused both working kernel files because their
+headers had become zero. Their full damaged copies and separate refusal logs
+remain pinned. The read-back guest kernel snapshots still match their
+pre-reboot receipt digests. Those complete snapshots restore both working
+files byte-for-byte, and the final p2 kernels match the same receipt digests.
+No fresh post-reboot production compilation is claimed. See the
+[kernel restoration record](../tests/linux-compat/results/2026-10-15/waituid-kernel-restoration.json)
+and [interrupted input pins](../tests/linux-compat/results/2026-10-15/waituid-interrupted-inputs.json).
+
+New user namespaces are explicitly unsupported by the current kernel, so
+UID mapping/overflow between user namespaces remains unqualified. Concurrent
+credential changes, successful-event siginfo padding, exact rusage accounting,
+consuming copyout faults, P_PIDFD, __W flags, ptrace/cross-thread waits,
+interrupted/restarted waits, GNU libc and translated/ELF32 paths remain outside
+this bounded contract. The three broad section 15 gates remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/waituid-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waituid-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waituid-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waituid-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/waituid-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waituid-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waituid-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waituid-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/waituid-check.v), [verdict](../tests/linux-compat/results/2026-10-15/waituid-audit.log), [initial helper refusal](../tests/linux-compat/results/2026-10-15/waituid-initial-helper-refusal.log), [initial helper source](../tests/linux-compat/results/2026-10-15/waituid-initial-helper-source.v).

@@ -1,0 +1,3 @@
+/Users/alex/code/vinix/tests/linux-compat/waituid-check.v:194: FAIL: fn main.failure: assert log.contains('LINUX WAITUID DETAIL:'), 'waituid baseline failure markers required'
+      message: waituid baseline failure markers required
+V panic: Assertion failed...

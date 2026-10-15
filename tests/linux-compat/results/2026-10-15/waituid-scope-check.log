@@ -1,0 +1,1 @@
+arm/x86: complete production C differs only in waitid: snapshot child real UID under the credential table lock, release it before copyout, set si_uid; existing wait claim pins the child; copyout, event consumption, claims, pins, ownership, allocations and frees unchanged; no normalization

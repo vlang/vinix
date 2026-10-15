@@ -1007,6 +1007,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   root/UID1000 in initial/one-level PID namespaces on both architectures.
   See [the empty/error output receipts](docs/linux-posix-qualification.md#native-waitid-empty-and-error-siginfo-output).
 
+- [x] Report the child real UID in native waitid stop, continuation, exit and
+  signal-death results. Qualify distinct real/effective/saved identities, high
+  unsigned UIDs, selectors, raw/musl calls, WNOWAIT/consuming controls and flat
+  storage for root/ordinary callers in initial/one-level PID namespaces.
+  See [the child real-UID receipts](docs/linux-posix-qualification.md#native-waitid-child-real-uid).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

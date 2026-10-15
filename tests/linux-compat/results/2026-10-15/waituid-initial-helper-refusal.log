@@ -1,0 +1,20 @@
+/Users/alex/.cache/vinix-linux-compat/waituid-20261015/manage.v:16:7: notice: unused constant: `old`
+   14 | const root = '/Users/alex/code/vinix'
+   15 | const area = '/Users/alex/.cache/vinix-linux-compat/waituid-20261015'
+   16 | const old = '/Users/alex/.cache/vinix-linux-compat/attrclass-20261015'
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   17 | const compiler = '/Users/alex/.cache/vinix-linux-compat/proctask-20261014/compiler/v'
+   18 |
+C compiler output from the default V compiler:
+src.c:7483:22: error: call to undeclared function 'dup1'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 7483 |                                 if ((fd < 0) || (dup1(fd, 1) < 0) || (dup1(fd, 2) < 0)) {
+      |                                                  ^
+1 error generated.
+V compilation failed (c_compilation_error); retrying with `/Users/alex/.cache/v/v1-fallback/0.5.2/v`.
+/Users/alex/.cache/vinix-linux-compat/waituid-20261015/manage.v:45:60: error: invalid expression: unexpected token `...`
+   43 | }
+   44 | fn git(folder string, args []string) string {
+   45 |     mut p := os.new_process('git'); p.set_args(['-C', folder, ...args]); p.set_redirect_stdio_merged(); p.run()
+      |                                                               ~~~
+   46 |     data := p.stdout_slurp(); p.wait(); code := p.code; p.close(); assert code == 0, data; return data.trim_space()
+   47 | }

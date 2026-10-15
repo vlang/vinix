@@ -1,0 +1,20 @@
+{
+    "arm-after": {
+        "damaged_copy": "/Users/alex/.cache/vinix-linux-compat/waituid-20261015/post-reboot-after-arm-kernel",
+        "damaged_header": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "damaged_sha256": "77146c7e2ea04547729e6472434f58ee90aa6d8cbb920b202115add70eae86bb",
+        "restored_header": "7f454c460201010000000000000000000200b7000100000078791b80ffffffff4000000000000000988ffb010000000000000000400038000300400015001300",
+        "restored_sha256": "97481dd11335f5cd40068d4d2c6a8dfb72edc1b97d394664386e5542763caa4e",
+        "snapshot": "/Users/alex/.cache/vinix-linux-compat/waituid-20261015/states/p1-after-arm/kernel/bin/vinix",
+        "working_file": "/Users/alex/.cache/vinix-linux-compat/waituid-20261015/kernel-arm/kernel/bin/vinix"
+    },
+    "x86-after": {
+        "damaged_copy": "/Users/alex/.cache/vinix-linux-compat/waituid-20261015/post-reboot-after-x86-kernel",
+        "damaged_header": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "damaged_sha256": "238176149b698c50867f45c87f5fe741d23630506476b0bb5a32fc3b0cebc6b5",
+        "restored_header": "7f454c4602010100000000000000000002003e000100000060da0c80ffffffff4000000000000000c03d70010000000000000000400038000300400015001300",
+        "restored_sha256": "f812fc41d1470f54b20c0b0b3675f13c03fe7578398729c5bd25ab930cd15ab0",
+        "snapshot": "/Users/alex/.cache/vinix-linux-compat/waituid-20261015/states/p1-after-x86/kernel/bin/vinix",
+        "working_file": "/Users/alex/.cache/vinix-linux-compat/waituid-20261015/kernel-x86/kernel/bin/vinix"
+    }
+}

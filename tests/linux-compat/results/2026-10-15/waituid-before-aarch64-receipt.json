@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "7e7d0339c8667a33288b40ca60e461cc998b91a2aec803c57250ff12bf4c0559",
+    "results": [
+        {
+            "name": "waituid",
+            "source_sha256": "5c7176ffed56a2aa6e5af8ba1b23042fcccc20a2663aebb95dd429af98f3e6a5",
+            "init_sha256": "6bc6ecb6507acc25f90017d861be72c766a20812d722b9a6328df47f13e83293",
+            "iso_sha256": "8143fc29091d7498e69fc89e759393c72b0e051ae2a5e1de265ca17cda9e034f",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

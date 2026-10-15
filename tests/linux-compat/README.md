@@ -1725,3 +1725,16 @@ and supply its evidence area to verify guest failures/results, whole-C scope,
 compiler/SDK/inventory pins, retained hidden-allocation compile refusals and
 executing audit controls. Successful-event output and consuming faults retain
 separate limits. See the [empty/error output report](../../docs/linux-posix-qualification.md#native-waitid-empty-and-error-siginfo-output).
+
+The `waituid` case qualifies child real UIDs for stopped, continued, exit37
+and SIGKILL events. Four credential profiles per root/UID1000 cohort in
+initial/one-level PID namespaces include different real/effective/saved IDs
+and UID4294967294. Its 13,952 controls per architecture cover three selectors,
+eight raw/musl forms, unaligned output, NULL/valid rusage, WNOWAIT, consuming
+waits, cleared no-event/ECHILD and NULL infop, plus four flat200-cycle cohorts.
+`waituid-reference.v` boots the unchanged native ELF on Linux. Compile
+`waituid-check.v` without `-prod` and supply its evidence area to verify
+original failures, native/reference results, whole-C scope, compiler/SDK/input
+pins, initial host-helper refusal and executing audit controls. Mapped user
+IDs, credential races, siginfo padding, accounting and consuming copyout faults
+retain separate limits. See the [child real-UID report](../../docs/linux-posix-qualification.md#native-waitid-child-real-uid).

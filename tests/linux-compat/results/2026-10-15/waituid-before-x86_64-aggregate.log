@@ -1,0 +1,227 @@
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/waituid-20261015/states/p1-before-x86/waituid/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/waituid-20261015/states/p1-before-x86/waituid/.vinix-amd64.iso.b8UOkg'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 3918m free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/waituid-20261015/states/p1-before-x86/waituid/iso-build/.iso-staging.srH1Bg/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :  68.52% done
+ISO image produced: 13706 sectors
+Written to medium : 13706 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/waituid-20261015/states/p1-before-x86/waituid/.vinix-amd64.iso.b8UOkg' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd627.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/waituid-20261015/states/p1-before-x86/waituid/test.iso (28069888 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/waituid-20261015/states/p1-before-x86/waituid
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=76112
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX WAITUID TOPOLOGY: ordinary=0 namespace=0 profile=0 killed=0 self=63065 pid=53809 real=0 effective=0 saved=0
+LINUX WAITUID TOPOLOGY: ordinary=0 namespace=0 profile=0 killed=1 self=63065 pid=8130 real=0 effective=0 saved=0
+LINUX WAITUID TOPOLOGY: ordinary=0 namespace=0 profile=1 killed=0 self=63065 pid=22570 real=1001 effective=0 saved=1002
+LINUX WAITUID DETAIL: kind=0 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=0 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=0 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=0 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=0 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=0 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=1 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=1 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=1 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=1 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=1 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=1 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=2 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=2 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=2 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=2 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=2 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=2 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID TOPOLOGY: ordinary=0 namespace=0 profile=1 killed=1 self=63065 pid=16 real=1001 effective=0 saved=1002
+LINUX WAITUID DETAIL: kind=3 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=3 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=3 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=3 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=3 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=3 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID TOPOLOGY: ordinary=0 namespace=0 profile=2 killed=0 self=63065 pid=4901 real=0 effective=1003 saved=0
+LINUX WAITUID TOPOLOGY: ordinary=0 namespace=0 profile=2 killed=1 self=63065 pid=49815 real=0 effective=1003 saved=0
+LINUX WAITUID TOPOLOGY: ordinary=0 namespace=0 profile=3 killed=0 self=63065 pid=63121 real=4294967294 effective=1004 saved=0
+LINUX WAITUID TOPOLOGY: ordinary=0 namespace=0 profile=3 killed=1 self=63065 pid=59413 real=4294967294 effective=1004 saved=0
+LINUX WAITUID CASES: ordinary=0 namespace=0 kind=0 calls=772 failures=386
+LINUX WAITUID CASES: ordinary=0 namespace=0 kind=1 calls=772 failures=386
+LINUX WAITUID CASES: ordinary=0 namespace=0 kind=2 calls=772 failures=386
+LINUX WAITUID CASES: ordinary=0 namespace=0 kind=3 calls=772 failures=386
+LINUX WAITUID CASES: ordinary=0 namespace=0 kind=4 calls=16 failures=0
+LINUX WAITUID CASES: ordinary=0 namespace=0 kind=5 calls=384 failures=0
+LINUX WAITUID FINAL: ordinary=0 namespace=0 kind=0 calls=772 failures=386
+LINUX WAITUID FINAL: ordinary=0 namespace=0 kind=1 calls=772 failures=386
+LINUX WAITUID FINAL: ordinary=0 namespace=0 kind=2 calls=772 failures=386
+LINUX WAITUID FINAL: ordinary=0 namespace=0 kind=3 calls=772 failures=386
+LINUX WAITUID FINAL: ordinary=0 namespace=0 kind=4 calls=16 failures=0
+LINUX WAITUID FINAL: ordinary=0 namespace=0 kind=5 calls=384 failures=0
+LINUX WAITUID TOPOLOGY: ordinary=1 namespace=0 profile=0 killed=0 self=28003 pid=15308 real=1000 effective=1000 saved=1002
+LINUX WAITUID DETAIL: kind=0 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=0 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=0 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=0 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=0 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=0 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=1 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=1 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=1 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=1 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=1 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=1 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=2 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=2 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=2 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=2 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=2 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=2 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID TOPOLOGY: ordinary=1 namespace=0 profile=0 killed=1 self=28003 pid=50644 real=1000 effective=1000 saved=1002
+LINUX WAITUID DETAIL: kind=3 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=3 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=3 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=3 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=3 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=3 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID TOPOLOGY: ordinary=1 namespace=0 profile=1 killed=0 self=28003 pid=24332 real=1000 effective=1002 saved=1002
+LINUX WAITUID TOPOLOGY: ordinary=1 namespace=0 profile=1 killed=1 self=28003 pid=47339 real=1000 effective=1002 saved=1002
+LINUX WAITUID TOPOLOGY: ordinary=1 namespace=0 profile=2 killed=0 self=28003 pid=63554 real=1000 effective=1000 saved=1002
+LINUX WAITUID TOPOLOGY: ordinary=1 namespace=0 profile=2 killed=1 self=28003 pid=55199 real=1000 effective=1000 saved=1002
+LINUX WAITUID TOPOLOGY: ordinary=1 namespace=0 profile=3 killed=0 self=28003 pid=56451 real=1000 effective=1002 saved=1002
+LINUX WAITUID TOPOLOGY: ordinary=1 namespace=0 profile=3 killed=1 self=28003 pid=27569 real=1000 effective=1002 saved=1002
+LINUX WAITUID CASES: ordinary=1 namespace=0 kind=0 calls=772 failures=772
+LINUX WAITUID CASES: ordinary=1 namespace=0 kind=1 calls=772 failures=772
+LINUX WAITUID CASES: ordinary=1 namespace=0 kind=2 calls=772 failures=772
+LINUX WAITUID CASES: ordinary=1 namespace=0 kind=3 calls=772 failures=772
+LINUX WAITUID CASES: ordinary=1 namespace=0 kind=4 calls=16 failures=0
+LINUX WAITUID CASES: ordinary=1 namespace=0 kind=5 calls=384 failures=0
+LINUX WAITUID FINAL: ordinary=1 namespace=0 kind=0 calls=772 failures=772
+LINUX WAITUID FINAL: ordinary=1 namespace=0 kind=1 calls=772 failures=772
+LINUX WAITUID FINAL: ordinary=1 namespace=0 kind=2 calls=772 failures=772
+LINUX WAITUID FINAL: ordinary=1 namespace=0 kind=3 calls=772 failures=772
+LINUX WAITUID FINAL: ordinary=1 namespace=0 kind=4 calls=16 failures=0
+LINUX WAITUID FINAL: ordinary=1 namespace=0 kind=5 calls=384 failures=0
+LINUX WAITUID TOPOLOGY: ordinary=0 namespace=1 profile=0 killed=0 self=2 pid=3 real=0 effective=0 saved=0
+LINUX WAITUID TOPOLOGY: ordinary=0 namespace=1 profile=0 killed=1 self=2 pid=4 real=0 effective=0 saved=0
+LINUX WAITUID TOPOLOGY: ordinary=0 namespace=1 profile=1 killed=0 self=2 pid=5 real=1001 effective=0 saved=1002
+LINUX WAITUID DETAIL: kind=0 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=0 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=0 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=0 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=0 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=0 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=1 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=1 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=1 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=1 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=1 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=1 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=2 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=2 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=2 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=2 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=2 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=2 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID TOPOLOGY: ordinary=0 namespace=1 profile=1 killed=1 self=2 pid=6 real=1001 effective=0 saved=1002
+LINUX WAITUID DETAIL: kind=3 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=3 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=3 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=3 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=3 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID DETAIL: kind=3 profile=1 form=0 actual=0/0 uid=0 expected=1001
+LINUX WAITUID TOPOLOGY: ordinary=0 namespace=1 profile=2 killed=0 self=2 pid=7 real=0 effective=1003 saved=0
+LINUX WAITUID TOPOLOGY: ordinary=0 namespace=1 profile=2 killed=1 self=2 pid=8 real=0 effective=1003 saved=0
+LINUX WAITUID TOPOLOGY: ordinary=0 namespace=1 profile=3 killed=0 self=2 pid=9 real=4294967294 effective=1004 saved=0
+LINUX WAITUID TOPOLOGY: ordinary=0 namespace=1 profile=3 killed=1 self=2 pid=10 real=4294967294 effective=1004 saved=0
+LINUX WAITUID CASES: ordinary=0 namespace=1 kind=0 calls=772 failures=386
+LINUX WAITUID CASES: ordinary=0 namespace=1 kind=1 calls=772 failures=386
+LINUX WAITUID CASES: ordinary=0 namespace=1 kind=2 calls=772 failures=386
+LINUX WAITUID CASES: ordinary=0 namespace=1 kind=3 calls=772 failures=386
+LINUX WAITUID CASES: ordinary=0 namespace=1 kind=4 calls=16 failures=0
+LINUX WAITUID CASES: ordinary=0 namespace=1 kind=5 calls=384 failures=0
+LINUX WAITUID FINAL: ordinary=0 namespace=1 kind=0 calls=772 failures=386
+LINUX WAITUID FINAL: ordinary=0 namespace=1 kind=1 calls=772 failures=386
+LINUX WAITUID FINAL: ordinary=0 namespace=1 kind=2 calls=772 failures=386
+LINUX WAITUID FINAL: ordinary=0 namespace=1 kind=3 calls=772 failures=386
+LINUX WAITUID FINAL: ordinary=0 namespace=1 kind=4 calls=16 failures=0
+LINUX WAITUID FINAL: ordinary=0 namespace=1 kind=5 calls=384 failures=0
+LINUX WAITUID TOPOLOGY: ordinary=1 namespace=1 profile=0 killed=0 self=2 pid=3 real=1000 effective=1000 saved=1002
+LINUX WAITUID DETAIL: kind=0 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=0 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=0 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=0 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=0 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=0 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=1 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=1 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=1 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=1 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=1 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=1 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=2 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=2 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=2 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=2 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=2 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=2 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID TOPOLOGY: ordinary=1 namespace=1 profile=0 killed=1 self=2 pid=4 real=1000 effective=1000 saved=1002
+LINUX WAITUID DETAIL: kind=3 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=3 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=3 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=3 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=3 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID DETAIL: kind=3 profile=0 form=0 actual=0/0 uid=0 expected=1000
+LINUX WAITUID TOPOLOGY: ordinary=1 namespace=1 profile=1 killed=0 self=2 pid=5 real=1000 effective=1002 saved=1002
+LINUX WAITUID TOPOLOGY: ordinary=1 namespace=1 profile=1 killed=1 self=2 pid=6 real=1000 effective=1002 saved=1002
+LINUX WAITUID TOPOLOGY: ordinary=1 namespace=1 profile=2 killed=0 self=2 pid=7 real=1000 effective=1000 saved=1002
+LINUX WAITUID TOPOLOGY: ordinary=1 namespace=1 profile=2 killed=1 self=2 pid=8 real=1000 effective=1000 saved=1002
+LINUX WAITUID TOPOLOGY: ordinary=1 namespace=1 profile=3 killed=0 self=2 pid=9 real=1000 effective=1002 saved=1002
+LINUX WAITUID TOPOLOGY: ordinary=1 namespace=1 profile=3 killed=1 self=2 pid=10 real=1000 effective=1002 saved=1002
+LINUX WAITUID CASES: ordinary=1 namespace=1 kind=0 calls=772 failures=772
+LINUX WAITUID CASES: ordinary=1 namespace=1 kind=1 calls=772 failures=772
+LINUX WAITUID CASES: ordinary=1 namespace=1 kind=2 calls=772 failures=772
+LINUX WAITUID CASES: ordinary=1 namespace=1 kind=3 calls=772 failures=772
+LINUX WAITUID CASES: ordinary=1 namespace=1 kind=4 calls=16 failures=0
+LINUX WAITUID CASES: ordinary=1 namespace=1 kind=5 calls=384 failures=0
+LINUX WAITUID FINAL: ordinary=1 namespace=1 kind=0 calls=772 failures=772
+LINUX WAITUID FINAL: ordinary=1 namespace=1 kind=1 calls=772 failures=772
+LINUX WAITUID FINAL: ordinary=1 namespace=1 kind=2 calls=772 failures=772
+LINUX WAITUID FINAL: ordinary=1 namespace=1 kind=3 calls=772 failures=772
+LINUX WAITUID FINAL: ordinary=1 namespace=1 kind=4 calls=16 failures=0
+LINUX WAITUID FINAL: ordinary=1 namespace=1 kind=5 calls=384 failures=0
+LINUX WAITUID FAIL: waitid real child UID or event controls
+QEMU: Terminated
+Missing verdicts: ['LINUX WAITUID: PASS']; failures: ['FAIL:', 'LINUX WAITUID FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/waituid-20261015/states/p1-before-x86/receipt.json
