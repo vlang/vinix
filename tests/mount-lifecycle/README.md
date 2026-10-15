@@ -100,6 +100,9 @@ through `de-7` select individual cases. Native `all` and Linux
 `--case execfd` selects the signed descriptor ABI checks; `ed-0` through
 `ed-7` select individual cases. Native `all` and Linux `move-reference`
 include them.
+`--case execcloexec` selects [close-on-exec script checks](exec-cloexec.md);
+`ec-0` through `ec-7` select individual cases. Native `all` and Linux
+`move-reference` include them.
 
 The [execveat descriptor checks](exec-fd.md) ignore unused upper register bits
 when selecting an executable description and constructing its script name.

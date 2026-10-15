@@ -844,6 +844,12 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 	if shebang[0] == char(`#`) && shebang[1] == char(`!`) {
 		if !grow_exec_scratch(exec_strings_size(argv) * 4 + u64(argv.len) * 256 + 4096) { return none }
   real_path, arg := parse_shebang(mut prog)?
+		if description && exec_descriptor_cloexec() {
+			// A valid script cannot outlive the descriptor naming it.
+			unsafe { real_path.free(); arg.free() }
+			errno.set(errno.enoent)
+			return none
+		}
 		// Room for the interpreter, its argument and the script. `<<` copies
 		// a string, so the list owns all of its strings.
 		mut final_argv := []string{cap: argv.len + 2} @[freed]

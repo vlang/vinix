@@ -1,5 +1,10 @@
 # Execution and device mount policy
 
+An empty-path `execveat` of a valid script returns `ENOENT` when its descriptor
+has `FD_CLOEXEC`, before starting the interpreter. Native ELF execution still
+accepts the descriptor and closes it in the new image. Clearing the flag
+allows script execution. See [the close-on-exec checks](../tests/mount-lifecycle/exec-cloexec.md).
+
 `execveat` reads `dirfd` as a signed 32-bit C `int`, including for empty-path
 execution. Unused upper register bits cannot change the selected descriptor
 or the `/proc/self/fd/N` name passed to a script interpreter. Absolute paths

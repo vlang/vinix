@@ -572,6 +572,12 @@ descriptor, its mount and authorization. The fixture covers linked/unlinked
 native images, read-only/`O_PATH` descriptions, scripts, ordinary UID/GID 1000,
 relative directories, `AT_FDCWD`, invalid descriptors and `noexec` refusal.
 General inherited-directory mount routing remains open.
+The [close-on-exec script checks](../tests/mount-lifecycle/exec-cloexec.md)
+refuse empty-path execution of valid scripts through `FD_CLOEXEC` descriptors
+with `ENOENT` before interpreter launch. ELF execution, flag clearing and
+duplicate-descriptor independence remain usable; existing authorization and
+descriptor releases remain in place. Relative pathname scripts through
+close-on-exec directory descriptions remain outside this qualification.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,
