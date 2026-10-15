@@ -6877,3 +6877,78 @@ unqualified. The three broad section 15 gates and ARM CPU1 QoS blocker stay open
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/niceadmit-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/niceadmit-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/niceadmit-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/niceadmit-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/niceadmit-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/niceadmit-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/niceadmit-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/niceadmit-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/niceadmit-check.v), [verdict](../tests/linux-compat/results/2026-10-15/niceadmit-audit.log), [initial failed preparation](../tests/linux-compat/results/2026-10-15/niceadmit-preflight1-arm.log), [independent review](../tests/linux-compat/results/2026-10-15/niceadmit-lifetime-review.md).
+
+## Native getrandom flag validation
+
+The 2026-10-15 qualification covers seeded native getrandom calls. Requests
+combining GRND_RANDOM and GRND_INSECURE now return EINVAL, with or without
+GRND_NONBLOCK. The check precedes zero-count handling, entropy readiness and
+user copies. Unknown low-word flag bits retain their existing EINVAL behavior.
+The retained [Linux v6.12 implementation](https://raw.githubusercontent.com/torvalds/linux/v6.12/drivers/char/random.c)
+validates the same incompatible combination before readiness and buffer import.
+
+Root and UID/GID1000 cohorts each run the following groups through three raw
+flag-word forms and genuine musl getrandom: canonical low32, arbitrary upper32,
+all-one upper32 and the libc wrapper. Each cohort first demonstrates seeded
+readiness through an actual successful 32-byte nonblocking request.
+
+| Group | Controls per cohort | Contract |
+| --- | --- | --- |
+| 0 | 432 | Flags6/7, four call forms, six destinations and nine counts must return EINVAL without writing |
+| 1 | 2,376 | Eleven unknown-bit masks retain EINVAL across the same forms, destinations and counts |
+| 2 | 144 | All six accepted flag combinations return zero for count0, including inaccessible destinations |
+| 3 | 576 | Six accepted flag combinations, four call forms, six destinations and counts1/255/256/257 preserve success/EFAULT and output guards |
+
+Destinations are aligned and unaligned writable buffers, NULL, address1,
+PROT_NONE and a read-only page. Invalid-flag counts include zero, 1, 255, 256,
+257, native page/page+1, 2GiB and SIZE_MAX. Writable pages are bounded by a
+read-only page and guard pages so even the original erroneous large requests
+terminate at a fault. Corrected invalid/error calls preserve all sentinel bytes;
+successful controls preserve bytes outside their requested output ranges.
+Random output content is not compared with a deterministic oracle.
+
+| Architecture | Controls | Original failures | Corrected failures | Same-ELF Linux failures |
+| --- | --- | --- | --- | --- |
+| AArch64 | 7,056 | 864 | 0 | 0 |
+| x86-64 | 7,056 | 864 | 0 | 0 |
+
+Both original cohorts fail exactly group0, with 432 failures each; all other
+controls pass. CASES and FINAL match exactly. Supplied Linux 6.12.51 kernels
+run the original native probe ELF for each architecture, without rebuilding
+or substituting results. Native ARM uses 16KiB pages; the Linux references
+and native x86 use 4KiB pages.
+
+Each corrected cohort warms 32 cycles and measures 200 repeated invalid-flag
+and valid-zero-count cycles with 13-second settling intervals. All 18 ARM/14
+x86 slab classes and positive large-page counts remain flat. The observer
+closes and the five-page mapping is unmapped before Counts transfer. The
+parent closes the pipe and waits for the qualifier even after failed transfer.
+Fatal setup/controller abort cleanup and process churn remain separate.
+
+Four fresh production builds use isolated worktrees at
+`f056137579217e5938bb83b500c86c75f7975dce`. Complete generated C differs only
+in the getrandom definition; the exact source change is the three-line guard.
+The existing bounce-buffer lifetime, erasure and user copies remain unchanged,
+with no new allocation/free or compiler-identifier normalization. Artifact
+captures read back and verify complete copied bytes before a build passes.
+Allocation diagnostics remain byte-identical at 398 ARM/290 x86 existing sites,
+including existing allowance refusals. Eight host files and both frozen
+before/after 64-input dispatch inventories pass. Public fingerprints use the
+committed parent plus this owned change, separately from historical test kernels.
+
+Probe preflight/native/reference C/ELF identities agree. Probe C has four
+explicit stack allocas and no heap, dynamic-array or fixed-index helpers.
+Corrected randomflags/runtime/niceadmit cases pass on both architectures.
+The maintained V auditor checks compiler pins, complete C/source scope,
+actual build stdout, receipts and the exact 72-file walk of eight completed
+native captures. False-assertion and passing-Linux-as-failing-original controls
+execute and exit 1 without -prod; completed staging is retired only after hashes
+and rechecks. There is no new kernel pointer lifetime in the early scalar check.
+
+Entropy quality, unseeded blocking/interruption, partial-copy faults, large
+valid transfers, glibc and translated/ELF32 getrandom paths remain unqualified.
+The three broad section 15 gates remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/randomflags-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/randomflags-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/randomflags-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/randomflags-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/randomflags-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/randomflags-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/randomflags-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/randomflags-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/randomflags-check.v), [verdict](../tests/linux-compat/results/2026-10-15/randomflags-audit.log).

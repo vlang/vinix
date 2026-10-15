@@ -1027,6 +1027,9 @@ fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) 
 	if flags & ~u32(grnd_nonblock | grnd_random | grnd_insecure) != 0 {
 		return errno.err, errno.einval
 	}
+	if flags & u32(grnd_random | grnd_insecure) == u32(grnd_random | grnd_insecure) {
+		return errno.err, errno.einval
+	}
 	if count == 0 {
 		return 0, 0
 	}

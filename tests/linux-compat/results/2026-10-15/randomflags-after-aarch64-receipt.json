@@ -1,0 +1,31 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "52afa26686d00477d1f71c6718a5c3967fdd2fd6fb7594aca2871be13978a2e4",
+    "results": [
+        {
+            "name": "randomflags",
+            "source_sha256": "f83b0e17a64213de21e348c25a5e1146035ca20862ed9edab3834db935049eec",
+            "init_sha256": "f8c4f7b39779c0b30dca9702b711224166cda1db52b5064a615269244dc76aa8",
+            "iso_sha256": "55eed6127456d54e5b2cd5a095f735d00eb2efb423ffe7562a2c71ff9c8bc868",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "843aeb156c6bc82fea9124f605c6b8ab10171d5853f17cfafa8278054b439c18",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "niceadmit",
+            "source_sha256": "57f90e5804106216ca0ff5f26274cd1002e3496a96f5cf4714431be4fddafc39",
+            "init_sha256": "7f7964754c422868c3d35cfcafd841c3c9bf21d99f83b88dcdf98c793085181a",
+            "iso_sha256": "8e3b860b11277186ca95b1d2966c76a5677d5d942cf201dfe9f1f96816c23042",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

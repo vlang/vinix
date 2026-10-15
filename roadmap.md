@@ -944,6 +944,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   both native architectures. See the
   [capability/limit receipts](docs/linux-posix-qualification.md#native-priority-capability-and-target-limit-admission).
 
+- [x] Reject incompatible getrandom RANDOM/INSECURE flags with EINVAL before
+  zero-count handling or user copies; qualify raw/musl calls, guarded buffers,
+  exact errors and valid controls against identical-ELF Linux on both native
+  architectures, with flat repeated-path storage. See the
+  [random-flag receipts](docs/linux-posix-qualification.md#native-getrandom-flag-validation).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

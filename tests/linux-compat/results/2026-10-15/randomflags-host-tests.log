@@ -1,0 +1,53 @@
+---- Testing... ----------------------------------------------------------------
+OK    [1/8] C: 7742.358 ms, R:   950.867 ms /Users/alex/code/vinix/tools/linux-compat/applications/audit_test.v
+OK    [2/8] C: 7757.318 ms, R:  2021.657 ms /Users/alex/code/vinix/tools/linux-compat/coverage_test.v
+tools/linux-compat/workloads/browsers.v:106:2: notice: variable `stop` shadows a function declaration
+  104 |         + '<p id="verdict">pending</p><script>const answer=6*7;document.getElementById("verdict").textContent=answer;'
+  105 |         + 'const proof=new Image();proof.src="/result/' + nonce + '/"+answer;document.body.appendChild(proof);</script>'
+  106 |     stop := chan bool{cap: 1}
+      |     ~~~~
+  107 |     worker := spawn browser_http(mut listener, page, verdict, stop)
+  108 |     mut finished := false
+tools/linux-compat/workloads/browsers.v:106:2: notice: variable `stop` shadows a function declaration
+  104 |         + '<p id="verdict">pending</p><script>const answer=6*7;document.getElementById("verdict").textContent=answer;'
+  105 |         + 'const proof=new Image();proof.src="/result/' + nonce + '/"+answer;document.body.appendChild(proof);</script>'
+  106 |     stop := chan bool{cap: 1}
+      |     ~~~~
+  107 |     worker := spawn browser_http(mut listener, page, verdict, stop)
+  108 |     mut finished := false
+OK    [3/8] C: 11205.774 ms, R:   554.466 ms /Users/alex/code/vinix/tools/linux-compat/workloads/browsers_test.v
+OK    [4/8] C: 11215.556 ms, R:  1927.143 ms /Users/alex/code/vinix/tools/linux-compat/workloads/diagnostics_test.v
+tools/linux-compat/workloads/browsers.v:106:2: notice: variable `stop` shadows a function declaration
+  104 |         + '<p id="verdict">pending</p><script>const answer=6*7;document.getElementById("verdict").textContent=answer;'
+  105 |         + 'const proof=new Image();proof.src="/result/' + nonce + '/"+answer;document.body.appendChild(proof);</script>'
+  106 |     stop := chan bool{cap: 1}
+      |     ~~~~
+  107 |     worker := spawn browser_http(mut listener, page, verdict, stop)
+  108 |     mut finished := false
+OK    [5/8] C: 10952.52 ms, R:   573.406 ms /Users/alex/code/vinix/tools/linux-compat/workloads/games_test.v
+tools/linux-compat/workloads/browsers.v:106:2: notice: variable `stop` shadows a function declaration
+  104 |         + '<p id="verdict">pending</p><script>const answer=6*7;document.getElementById("verdict").textContent=answer;'
+  105 |         + 'const proof=new Image();proof.src="/result/' + nonce + '/"+answer;document.body.appendChild(proof);</script>'
+  106 |     stop := chan bool{cap: 1}
+      |     ~~~~
+  107 |     worker := spawn browser_http(mut listener, page, verdict, stop)
+  108 |     mut finished := false
+OK    [6/8] C: 10806.194 ms, R:   513.561 ms /Users/alex/code/vinix/tools/linux-compat/workloads/jit_test.v
+tools/linux-compat/workloads/browsers.v:106:2: notice: variable `stop` shadows a function declaration
+  104 |         + '<p id="verdict">pending</p><script>const answer=6*7;document.getElementById("verdict").textContent=answer;'
+  105 |         + 'const proof=new Image();proof.src="/result/' + nonce + '/"+answer;document.body.appendChild(proof);</script>'
+  106 |     stop := chan bool{cap: 1}
+      |     ~~~~
+  107 |     worker := spawn browser_http(mut listener, page, verdict, stop)
+  108 |     mut finished := false
+OK    [7/8] C: 11093.836 ms, R:  1370.551 ms /Users/alex/code/vinix/tools/linux-compat/workloads/runner_test.v
+tools/linux-compat/workloads/browsers.v:106:2: notice: variable `stop` shadows a function declaration
+  104 |         + '<p id="verdict">pending</p><script>const answer=6*7;document.getElementById("verdict").textContent=answer;'
+  105 |         + 'const proof=new Image();proof.src="/result/' + nonce + '/"+answer;document.body.appendChild(proof);</script>'
+  106 |     stop := chan bool{cap: 1}
+      |     ~~~~
+  107 |     worker := spawn browser_http(mut listener, page, verdict, stop)
+  108 |     mut finished := false
+OK    [8/8] C: 11095.277 ms, R:   303.151 ms /Users/alex/code/vinix/tools/linux-compat/workloads/runtime_sources_test.v
+--------------------------------------------------------------------------------
+Summary for all V _test.v files: 8 passed, 8 total. Elapsed time: 24544 ms, on 4 parallel jobs. Comptime: 81868 ms. Runtime: 8214 ms.

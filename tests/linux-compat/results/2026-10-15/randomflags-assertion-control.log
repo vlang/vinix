@@ -1,0 +1,3 @@
+tests/linux-compat/randomflags-check.v:334: FAIL: fn main.main: assert false, 'randomflags assertions must execute'
+      message: randomflags assertions must execute
+V panic: Assertion failed...

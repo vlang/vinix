@@ -1602,3 +1602,18 @@ probe identities, fresh builds, both Linux references and independent review.
 Nice remains process-wide; group/user selectors, worker nice, concurrent
 credential/limit/target races, namespace/security configurations and GNU/foreign
 priority paths remain separate. The three broad gates remain open.
+
+The `randomflags` case qualifies seeded native getrandom flag rejection and
+buffer/error precedence. Root/UID1000 each exercise canonical/upper-word/raw
+and genuine musl requests, six destination forms, zero/huge invalid counts and
+accepted bounded requests with preserved guards. Each architecture runs 7,056
+controls; originals fail exactly 864, corrected kernels and identical ELFs on
+Linux 6.12.51 pass. Two warmed 200-cycle invalid/zero paths remain flat. Run
+`--cases randomflags,runtime,niceadmit --timeout 900` in a fresh state directory.
+`randomflags-reference.v` uses the preceding reference arguments; compile
+`randomflags-check.v` without `-prod` and supply the retained evidence area.
+[The report](../../docs/linux-posix-qualification.md#native-getrandom-flag-validation)
+binds complete source/C scope, real errno/data guards, four-alloca probe identity,
+Linux references and exact retained inputs. Entropy quality, unseeded blocking,
+interruption, partial faults, large valid requests and GNU/foreign paths remain
+separate; the three broad section 15 gates stay open.

@@ -1,0 +1,1 @@
+arm/x86: complete generated production C differs only in table__syscall_linux_getrandom; exact three-line source guard before zero count, readiness and copy; existing bounce lifetime, erasure and copies remain unchanged, with no compiler normalization or added allocation/free
