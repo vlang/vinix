@@ -1,0 +1,8 @@
+{
+    "build-output-only-arm.log": "715b8f1a30271da759666449ca2b5073b430b5d4803a7163a1ab69a91e0856d8",
+    "build-output-only-x86.log": "26ddb9593958c96a6cfc1c01151ab13ac8d0e32c3aa016033a4c219185a325fc",
+    "output-only-arm.c": "fde5202a21a9e6857d324c7e30ec3b574cde952d8f867641fbadb6f765b1445a",
+    "output-only-arm.elf": "bd0b352b65821e9a702d06a4434b25d5a7947ab56bdcfc4cdda55859847e4f8c",
+    "output-only-x86.c": "34eff025c39b117ad5c52df03157ebbda51da87c1d342fa4cfa8284279a2828d",
+    "output-only-x86.elf": "3bb17ac6d0359e3f1b481e04e26350dd2852161e4f079e9b0abb0d651bcacbca"
+}

@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "16e862d55f2bbb007a4a0a017d251459bbae0e23406e3c9535b4d23b9fbaf23f",
+    "results": [
+        {
+            "name": "robustquery",
+            "source_sha256": "2d817288f8e815d0b34be3e725b138706e09748a0aa1d59f1238a97af2b12550",
+            "init_sha256": "d9ec6b568f41a09e0b452148fc79180d856d2c36e2d275d0656468ee97d4aae5",
+            "iso_sha256": "c74a5905cbd51157ed8a0d90623fc40000735b8fc19913ceae1e65eef60a7a9d",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

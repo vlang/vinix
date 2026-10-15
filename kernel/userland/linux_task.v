@@ -160,7 +160,9 @@ pub fn syscall_set_robust_list(_ voidptr, head u64, len u64) (u64, u64) {
 	return 0, 0
 }
 
-pub fn syscall_get_robust_list(_ voidptr, tid int, head_ptr u64, len_ptr u64) (u64, u64) {
+pub fn syscall_get_robust_list(_ voidptr, tid_word u64, head_ptr u64, len_ptr u64) (u64, u64) {
+	// pid_t is imported from the low 32 register bits on both native ABIs.
+	tid := int(i32(tid_word))
 	mut head := proc.current_thread().robust_list_head
 	if tid != 0 {
 		global := proc.kernel_id(tid)
@@ -181,16 +183,18 @@ pub fn syscall_get_robust_list(_ voidptr, tid int, head_ptr u64, len_ptr u64) (u
 		proc.unlock_table()
 	}
 
-	if head_ptr == 0 || len_ptr == 0 {
-		return errno.err, errno.efault
-	}
-
+	// Linux publishes the size before the head, including when outputs overlap
+	// or the later head store faults. Resolve each complete scalar first so a
+	// stable split-page fault leaves that scalar untouched.
 	len := robust_list_head_size
-
-	if !usercopy.copy_to_user(head_ptr, voidptr(&head), sizeof(u64)) {
+	if !usercopy.user_range(len_ptr, sizeof(u64))
+		|| !usercopy.writable(len_ptr) || !usercopy.writable(len_ptr + 7)
+		|| !usercopy.copy_to_user(len_ptr, voidptr(&len), sizeof(u64)) {
 		return errno.err, errno.efault
 	}
-	if !usercopy.copy_to_user(len_ptr, voidptr(&len), sizeof(u64)) {
+	if !usercopy.user_range(head_ptr, sizeof(u64))
+		|| !usercopy.writable(head_ptr) || !usercopy.writable(head_ptr + 7)
+		|| !usercopy.copy_to_user(head_ptr, voidptr(&head), sizeof(u64)) {
 		return errno.err, errno.efault
 	}
 

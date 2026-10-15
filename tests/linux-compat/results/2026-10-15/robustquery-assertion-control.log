@@ -1,0 +1,3 @@
+tests/linux-compat/robustquery-check.v:221: FAIL: fn main.main: assert false, 'robustquery assertions must execute'
+      message: robustquery assertions must execute
+V panic: Assertion failed...

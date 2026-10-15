@@ -1,0 +1,6 @@
+V panic: unclosed definition
+ v hash: f6358ec
+    pid: 0x10a69
+    tid: 0x10a69
+0   create-audit                        0x0000000100f2951c main + 492
+1   dyld                                0x00000001802ebe00 start + 6992

@@ -8369,3 +8369,113 @@ this bounded contract. The three broad section 15 gates remain open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/waitstatus-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitstatus-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitstatus-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitstatus-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/waitstatus-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitstatus-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitstatus-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitstatus-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/waitstatus-check.v), [verdict](../tests/linux-compat/results/2026-10-15/waitstatus-audit.log).
+
+## Native robust-list query PID words and ordered scalar output
+
+The 2026-10-15 `robustquery` qualification fixes `get_robust_list` on native
+AArch64 and x86-64. The syscall now imports a signed32 PID from the low register
+word, writes the eight-byte length before the eight-byte head, and resolves each
+complete scalar range and both writable endpoints before its existing copy.
+A stable split-page fault preserves that scalar. A later head fault preserves
+the preceding length write; a length fault skips the head. Overlapping outputs
+observe the same length-then-head order. Target lookup and existing inspection
+permissions still precede user outputs.
+
+The primary contract is [Linux v6.12 futex/syscalls.c](https://github.com/torvalds/linux/blob/v6.12/kernel/futex/syscalls.c#L43).
+The retained source was obtained from the kernel.org Git mirror after local
+GitHub downloads returned HTTP429; its base64, decoder, decoded bytes and exact
+URL/hash are pinned. Separately, unchanged native probe ELFs execute against
+Linux 6.12.51 on both architectures. This tests the scalar guard behavior instead
+of inferring it solely from `put_user` source.
+
+The frozen kernel base is `5f06416c1c05afbfa4ae4ae48222b4b298e26c97`.
+Each architecture has 6,048 controls: four root/UID1000 and initial/one-level
+PID namespace cohorts, each with 1,512 controls. A live pthread publishes its
+own distinct registration through command/acknowledgment pipes, then blocks
+without a polling timer. Queries select zero/current-thread, the process leader
+PID and the live worker TID, with ordinary and poisoned upper register words.
+Four profiles deliberately register NULL, arbitrary high/noncanonical values,
+24 and distinct bit patterns in the two threads. The getter must return the
+stored value without dereferencing it. Both original musl registrations are
+restored and queried before the worker joins and all four pipe ends close.
+
+| Class | Per cohort | Required behavior |
+| --- | ---: | --- |
+| Mapped scalar output | 264 | Four aligned/unaligned offsets and seven positions crossing two writable pages; exact eight-byte values and surrounding canaries |
+| Overlapping outputs | 360 | Fifteen head offsets from seven bytes before length through seven bytes after it, including exact alias; model length first, head second |
+| Faulting length | 288 | NULL, low/unmapped, wrapping, read-only, PROT_NONE and seven writable guard prefixes; unchanged head and no partial length store |
+| Faulting head | 288 | Same twelve pointer shapes; length already 24, head scalar and guards unchanged |
+| Both outputs fault | 288 | Independent guard arenas prove length failure skips the head |
+| Missing targets | 24 | Negative, INT_MIN, absent positive and joined/retired worker TIDs; ESRCH before valid or invalid outputs, with untouched bytes |
+
+Each original kernel fails 5,236 controls. Per cohort the failure vector is
+`[132,337,276,288,276,0]`; corrected kernels and identical-ELF Linux references
+have zero failures. All 24 local case rows must equal the 24 parent summaries.
+Topology records verify current/worker identities, credentials and namespace
+views. Native AArch64 uses 16KiB pages; x86-64 and both Linux references use 4KiB.
+
+Four warmed 200-call cohorts per corrected architecture rotate five output
+classes, targets, register forms and output positions. Threads, mappings and
+pipes are established before measurement. All 18 ARM and 14 x86 live slab classes
+remain exactly flat, as do the measured big-heap pages: ARM 75/75 in the initial
+view and 87/87 in the PID namespace; x86-64 198/198 and 220/220. These measurements
+cover the repeated query path, not thread creation, general physical user-page
+retention or every robust-futex operation.
+
+Both corrected architectures also pass the existing runtime and futex guests.
+The runtime retains actual atomic/SIMD/TLS, JIT/page-size and wide-offset/time64
+checks; the futex regression retains its exact wake/WAKE_OP and 108 timed-waiter
+checks. Eight host test files pass. Allocation scanner output remains byte
+identical at 398 ARM/290 x86 sites, including its existing allowance refusals;
+this does not claim that all allocation checks are green.
+
+Six isolated production builds are retained: both originals, two intermediate
+output-order-only images, and both final PID/output fixes. The intermediate
+images are not boot-qualified. Whole generated C comparisons allow only the
+`get_robust_list` prototype and body changes; there is no normalization and no
+added allocation, free, Process/Thread pin, interface box or stack promotion.
+The existing table-locked target/credential snapshot is unchanged. No lifetime
+is introduced or shortened by the kernel change. Probe C has six explicit
+stack allocas and no dynamic allocation/index helper. The auditor binds 67
+inventory inputs, 2,014 private SDK files, 15,146 compiler pins and 15 final ARM
+compiler command receipts. Its false-assertion and passing-reference-as-original
+negative controls must execute, so compile it without `-prod`.
+
+The final `p4` before/after source, C and ELF are identical per architecture,
+and each Linux reference uses that same ELF. The final watcher retains all 84
+regular files across eight native case profiles, removing only completed boot
+staging after readback. Earlier attempts remain separately visible:
+
+- `p1` stops before ELF creation on two probe syntax errors; neither receipt is
+  accepted as an original semantic failure. The original probe and compiler
+  output are retained.
+- `p2` records actual original-kernel failures and passing Linux references.
+  `p3` changes only the final failure-description string, with exact C comparison.
+- `p3` passes every semantic control and both regressions on both corrected
+  architectures. Its x86 storage check refuses two root snapshots: one size48
+  object changes `+1` initially and `-1` in the PID namespace, while all other
+  slabs and big pages remain flat. The worker was waking every millisecond.
+  `p4` replaces that polling exchange with pipe blocking and reruns original,
+  corrected and Linux profiles. The raw `p3` failure is retained; it is not
+  promoted to a successful storage verdict. No allocation call-site trace was
+  taken to attribute the varying object conclusively.
+- Primary-download, host coordinator and auditor-generation/compilation
+  refusals retain their sources/logs and are distinct from guest verdicts.
+
+To preserve evidence on the nearly full host, 36 prior retained C/ISO artifacts
+and 65 prior kernel images were transparently compressed. Their regular-file
+paths and SHA-256 remain unchanged; the auditor rehashes every manifest entry.
+No pinned evidence was deleted.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-15/robustquery-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-15/robustquery-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-15/robustquery-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-15/robustquery-diagnostic-pins.json).
+Raw native/reference, production, regression, scanner and refusal logs accompany
+these receipts. The V auditor is `tests/linux-compat/robustquery-check.v`.
+
+Concurrent mapping changes/store atomicity, concurrent list registration or
+target retirement, new cross-process inspection/LSM policy, robust owner-death
+and PI semantics, GNU libc and foreign/translated ABI calls remain separate.
+This bounded query contract does not close the three broad libc, installation/
+sandbox/portal and translated/32-bit roadmap acceptance gates.

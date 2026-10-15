@@ -1,0 +1,6 @@
+/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/manage.v:42: FAIL: fn main.run: assert code == expected, data
+   left value: code = 1
+  right value: expected = 0
+      message: os: failed to execute "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/preflight"; code: 2
+
+V panic: Assertion failed...

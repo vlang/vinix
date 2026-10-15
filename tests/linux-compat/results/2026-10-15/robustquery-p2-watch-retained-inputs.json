@@ -1,0 +1,23 @@
+{
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-arm/robustquery/fixture.c": "1c39201432e67c7250b34b2d97f762014d2d2e883eebb6a97df497f39a74530b",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-arm/robustquery/fixture.o": "5683382a65bbfe9eb2235e948ede64eb6c5146c4f6f4ff9072c2ab817c0b0f4f",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-arm/robustquery/fixture.o.compiler.json": "4a497a842022875dd51adfce16e6f8ede2f8700b6db6d3a2c3c24b661ca62df1",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-arm/robustquery/init": "d9ec6b568f41a09e0b452148fc79180d856d2c36e2d275d0656468ee97d4aae5",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-arm/robustquery/init.compiler.json": "429e1239e7b3ba907d3a4d1100ab22d22d7ff9c6a415e60c22816ea2965172a0",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-arm/robustquery/initramfs.tar": "8583b572b5713ce399bd19c6d271af0d7e5d1c3ce7c7a909d471946ebd41b284",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-arm/robustquery/rootfs/sbin/init": "d9ec6b568f41a09e0b452148fc79180d856d2c36e2d275d0656468ee97d4aae5",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-arm/robustquery/serial.c": "c49ac2e66ea0cd147fbe54a25564b5af26363f8905a8217ad65303d563093cd2",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-arm/robustquery/serial.log": "93f3c7e228ae1b3035c57d1790b7db9d01d8390e080e1926ed25c3d7528f24b2",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-arm/robustquery/serial.o": "7488c6d09fb771cd848ba0ac868125a75a8ce243f213139a4a265318e5436e08",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-arm/robustquery/serial.o.compiler.json": "c6be6919e870101b42a47dcc24fcdb96395ab5bca8fcb2df11893b9980be3144",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-arm/robustquery/test.iso": "c74a5905cbd51157ed8a0d90623fc40000735b8fc19913ceae1e65eef60a7a9d",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-x86/robustquery/fixture.c": "1c39201432e67c7250b34b2d97f762014d2d2e883eebb6a97df497f39a74530b",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-x86/robustquery/fixture.o": "ee055d44a200bbf45290eaf94b94a5e662ae6c7898b4a5e00cc85b2c114ef619",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-x86/robustquery/init": "b8f11e99b6f3109f74204e263c7242d9efa5e113785abfcd565f2b257b9a0e75",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-x86/robustquery/initramfs.tar": "6f0513d3a76f22d129ed71b8cdf5f5d3794f231cc9a3bb1219b825eb1961f372",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-x86/robustquery/rootfs/sbin/init": "b8f11e99b6f3109f74204e263c7242d9efa5e113785abfcd565f2b257b9a0e75",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-x86/robustquery/serial.c": "f32deebe2af4585e8ba8b413f3623c0e7627bf67412e081c533d8bdc18e2bd16",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-x86/robustquery/serial.log": "b89215d969d112f2f757f6d4f6f48fb1005588d94fdc95ecc97652c4af05e3f6",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-x86/robustquery/serial.o": "2903ce60d7cce04fb69e5374d9ca66a37f667bef16f0344354113a8040860ab7",
+    "/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-x86/robustquery/test.iso": "9bf9ce7db29c162817acd0fa4e67180ee0ab5aca384d4c0ce8539c9dc4b3d879"
+}

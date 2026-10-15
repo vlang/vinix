@@ -1,0 +1,1 @@
+arm/x86: exact whole production C differs only in get_robust_list prototype/body: signed32 PID import, length-before-head order, per-scalar full range and writable endpoints; existing lookup/credential locking, copying and error behavior retained; no allocation/free/pin/stack promotion or normalization

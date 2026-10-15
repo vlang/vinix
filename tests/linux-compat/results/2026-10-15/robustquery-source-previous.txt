@@ -1,0 +1,10 @@
+	if head_ptr == 0 || len_ptr == 0 {
+		return errno.err, errno.efault
+	}
+
+	len := robust_list_head_size
+
+	if !usercopy.copy_to_user(head_ptr, voidptr(&head), sizeof(u64)) {
+		return errno.err, errno.efault
+	}
+	if !usercopy.copy_to_user(len_ptr, voidptr(&len), sizeof(u64)) {

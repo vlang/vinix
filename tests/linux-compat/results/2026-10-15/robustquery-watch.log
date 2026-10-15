@@ -1,0 +1,8 @@
+Completed /Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p4-before-x86/robustquery: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p4-before-arm/robustquery: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p4-after-arm/robustquery: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p4-after-x86/robustquery: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p4-after-arm/runtime: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p4-after-x86/runtime: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p4-after-arm/futex: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p4-after-x86/futex: captured files byte-identical; disposable boot staging retired

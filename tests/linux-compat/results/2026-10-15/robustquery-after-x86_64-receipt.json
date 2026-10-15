@@ -1,0 +1,31 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "4fa3daadc6683d16a4668d3a3f303a9144b3a82740f61110ac7f5f68ecc7c470",
+    "results": [
+        {
+            "name": "robustquery",
+            "source_sha256": "41775df12bcb502e1736af202c696c0c40f21dd9b9715bacb436f7bb81ca3236",
+            "init_sha256": "e454abd3b6522052b8e6f10c221f848a004b0edf4eb029ee32110d66a1ef2729",
+            "iso_sha256": "91ffaf61156c7f4c660a7cb22fed4c878863f174a7f196f10ce4ff293a17dd81",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "3c22f6e44700a031e0c6e9bd04427095e423d595d3f9b81e09f07539d1ea3b9f",
+            "iso_sha256": "017fa0dc2dd4d1943d5762a37e8f66a5a796e101800c568c2f3fbc27d1b799a1",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futex",
+            "source_sha256": "2319eb993ee19d6abf7cc94e5f5921ae2c98d45640e9061584e2cfcad4872743",
+            "init_sha256": "326cab9c0cc00dd79496f10e04aa2b440e3a12a3fe0dca0f0914d7cfc188a135",
+            "iso_sha256": "c4a00d717c598358f9ec69f61d7673af9aaf1bcbb72a354a60242df2655be39d",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

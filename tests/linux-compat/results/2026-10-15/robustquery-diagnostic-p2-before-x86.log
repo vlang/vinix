@@ -1,0 +1,163 @@
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-x86/robustquery/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-x86/robustquery/.vinix-amd64.iso.MzeArr'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data,  284m free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-x86/robustquery/iso-build/.iso-staging.Z9PE10/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :  19.02% done
+ISO image produced: 13710 sectors
+Written to medium : 13710 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-x86/robustquery/.vinix-amd64.iso.MzeArr' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd637.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-x86/robustquery/test.iso (28078080 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-x86/robustquery
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=81376
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91200
+initramfs: Done (9 entries)
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=0 kind=0 profile=0 choice=0 form=1 position=0 ret=-1 errno=3 byte=8
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=0 kind=0 profile=0 choice=0 form=1 position=1 ret=-1 errno=3 byte=9
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=0 kind=0 profile=0 choice=0 form=1 position=2 ret=-1 errno=3 byte=11
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=0 kind=1 profile=0 choice=0 form=0 position=0 ret=0 errno=0 byte=-2
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=0 kind=1 profile=0 choice=0 form=0 position=1 ret=0 errno=0 byte=-2
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=0 kind=1 profile=0 choice=0 form=0 position=2 ret=0 errno=0 byte=-2
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=0 kind=2 profile=0 choice=0 form=0 position=1 ret=-1 errno=14 byte=24
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=0 kind=2 profile=0 choice=0 form=0 position=2 ret=-1 errno=14 byte=24
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=0 kind=2 profile=0 choice=0 form=0 position=3 ret=-1 errno=14 byte=24
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=0 kind=3 profile=0 choice=0 form=0 position=0 ret=-1 errno=14 byte=88
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=0 kind=3 profile=0 choice=0 form=0 position=1 ret=-1 errno=14 byte=88
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=0 kind=3 profile=0 choice=0 form=0 position=2 ret=-1 errno=14 byte=88
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=0 kind=4 profile=0 choice=0 form=0 position=1 ret=-1 errno=14 byte=-3
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=0 kind=4 profile=0 choice=0 form=0 position=2 ret=-1 errno=14 byte=-3
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=0 kind=4 profile=0 choice=0 form=0 position=3 ret=-1 errno=14 byte=-3
+LINUX ROBUSTQUERY COHORT: ordinary=0 namespace=0 self=46878 thread=21548 uid=0 page=4096 profiles=4 targets=3 forms=2
+LINUX ROBUSTQUERY CASES: ordinary=0 namespace=0 kind=0 calls=264 failures=132
+LINUX ROBUSTQUERY CASES: ordinary=0 namespace=0 kind=1 calls=360 failures=337
+LINUX ROBUSTQUERY CASES: ordinary=0 namespace=0 kind=2 calls=288 failures=276
+LINUX ROBUSTQUERY CASES: ordinary=0 namespace=0 kind=3 calls=288 failures=288
+LINUX ROBUSTQUERY CASES: ordinary=0 namespace=0 kind=4 calls=288 failures=276
+LINUX ROBUSTQUERY CASES: ordinary=0 namespace=0 kind=5 calls=24 failures=0
+LINUX ROBUSTQUERY FINAL: ordinary=0 namespace=0 kind=0 calls=264 failures=132
+LINUX ROBUSTQUERY FINAL: ordinary=0 namespace=0 kind=1 calls=360 failures=337
+LINUX ROBUSTQUERY FINAL: ordinary=0 namespace=0 kind=2 calls=288 failures=276
+LINUX ROBUSTQUERY FINAL: ordinary=0 namespace=0 kind=3 calls=288 failures=288
+LINUX ROBUSTQUERY FINAL: ordinary=0 namespace=0 kind=4 calls=288 failures=276
+LINUX ROBUSTQUERY FINAL: ordinary=0 namespace=0 kind=5 calls=24 failures=0
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=0 kind=0 profile=0 choice=0 form=1 position=0 ret=-1 errno=3 byte=8
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=0 kind=0 profile=0 choice=0 form=1 position=1 ret=-1 errno=3 byte=9
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=0 kind=0 profile=0 choice=0 form=1 position=2 ret=-1 errno=3 byte=11
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=0 kind=1 profile=0 choice=0 form=0 position=0 ret=0 errno=0 byte=-2
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=0 kind=1 profile=0 choice=0 form=0 position=1 ret=0 errno=0 byte=-2
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=0 kind=1 profile=0 choice=0 form=0 position=2 ret=0 errno=0 byte=-2
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=0 kind=2 profile=0 choice=0 form=0 position=1 ret=-1 errno=14 byte=24
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=0 kind=2 profile=0 choice=0 form=0 position=2 ret=-1 errno=14 byte=24
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=0 kind=2 profile=0 choice=0 form=0 position=3 ret=-1 errno=14 byte=24
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=0 kind=3 profile=0 choice=0 form=0 position=0 ret=-1 errno=14 byte=88
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=0 kind=3 profile=0 choice=0 form=0 position=1 ret=-1 errno=14 byte=88
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=0 kind=3 profile=0 choice=0 form=0 position=2 ret=-1 errno=14 byte=88
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=0 kind=4 profile=0 choice=0 form=0 position=1 ret=-1 errno=14 byte=-3
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=0 kind=4 profile=0 choice=0 form=0 position=2 ret=-1 errno=14 byte=-3
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=0 kind=4 profile=0 choice=0 form=0 position=3 ret=-1 errno=14 byte=-3
+LINUX ROBUSTQUERY COHORT: ordinary=1 namespace=0 self=57376 thread=14389 uid=1000 page=4096 profiles=4 targets=3 forms=2
+LINUX ROBUSTQUERY CASES: ordinary=1 namespace=0 kind=0 calls=264 failures=132
+LINUX ROBUSTQUERY CASES: ordinary=1 namespace=0 kind=1 calls=360 failures=337
+LINUX ROBUSTQUERY CASES: ordinary=1 namespace=0 kind=2 calls=288 failures=276
+LINUX ROBUSTQUERY CASES: ordinary=1 namespace=0 kind=3 calls=288 failures=288
+LINUX ROBUSTQUERY CASES: ordinary=1 namespace=0 kind=4 calls=288 failures=276
+LINUX ROBUSTQUERY CASES: ordinary=1 namespace=0 kind=5 calls=24 failures=0
+LINUX ROBUSTQUERY FINAL: ordinary=1 namespace=0 kind=0 calls=264 failures=132
+LINUX ROBUSTQUERY FINAL: ordinary=1 namespace=0 kind=1 calls=360 failures=337
+LINUX ROBUSTQUERY FINAL: ordinary=1 namespace=0 kind=2 calls=288 failures=276
+LINUX ROBUSTQUERY FINAL: ordinary=1 namespace=0 kind=3 calls=288 failures=288
+LINUX ROBUSTQUERY FINAL: ordinary=1 namespace=0 kind=4 calls=288 failures=276
+LINUX ROBUSTQUERY FINAL: ordinary=1 namespace=0 kind=5 calls=24 failures=0
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=1 kind=0 profile=0 choice=0 form=1 position=0 ret=-1 errno=3 byte=8
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=1 kind=0 profile=0 choice=0 form=1 position=1 ret=-1 errno=3 byte=9
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=1 kind=0 profile=0 choice=0 form=1 position=2 ret=-1 errno=3 byte=11
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=1 kind=1 profile=0 choice=0 form=0 position=0 ret=0 errno=0 byte=-2
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=1 kind=1 profile=0 choice=0 form=0 position=1 ret=0 errno=0 byte=-2
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=1 kind=1 profile=0 choice=0 form=0 position=2 ret=0 errno=0 byte=-2
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=1 kind=2 profile=0 choice=0 form=0 position=1 ret=-1 errno=14 byte=24
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=1 kind=2 profile=0 choice=0 form=0 position=2 ret=-1 errno=14 byte=24
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=1 kind=2 profile=0 choice=0 form=0 position=3 ret=-1 errno=14 byte=24
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=1 kind=3 profile=0 choice=0 form=0 position=0 ret=-1 errno=14 byte=88
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=1 kind=3 profile=0 choice=0 form=0 position=1 ret=-1 errno=14 byte=88
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=1 kind=3 profile=0 choice=0 form=0 position=2 ret=-1 errno=14 byte=88
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=1 kind=4 profile=0 choice=0 form=0 position=1 ret=-1 errno=14 byte=-3
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=1 kind=4 profile=0 choice=0 form=0 position=2 ret=-1 errno=14 byte=-3
+LINUX ROBUSTQUERY DETAIL: ordinary=0 namespace=1 kind=4 profile=0 choice=0 form=0 position=3 ret=-1 errno=14 byte=-3
+LINUX ROBUSTQUERY COHORT: ordinary=0 namespace=1 self=2 thread=3 uid=0 page=4096 profiles=4 targets=3 forms=2
+LINUX ROBUSTQUERY CASES: ordinary=0 namespace=1 kind=0 calls=264 failures=132
+LINUX ROBUSTQUERY CASES: ordinary=0 namespace=1 kind=1 calls=360 failures=337
+LINUX ROBUSTQUERY CASES: ordinary=0 namespace=1 kind=2 calls=288 failures=276
+LINUX ROBUSTQUERY CASES: ordinary=0 namespace=1 kind=3 calls=288 failures=288
+LINUX ROBUSTQUERY CASES: ordinary=0 namespace=1 kind=4 calls=288 failures=276
+LINUX ROBUSTQUERY CASES: ordinary=0 namespace=1 kind=5 calls=24 failures=0
+LINUX ROBUSTQUERY FINAL: ordinary=0 namespace=1 kind=0 calls=264 failures=132
+LINUX ROBUSTQUERY FINAL: ordinary=0 namespace=1 kind=1 calls=360 failures=337
+LINUX ROBUSTQUERY FINAL: ordinary=0 namespace=1 kind=2 calls=288 failures=276
+LINUX ROBUSTQUERY FINAL: ordinary=0 namespace=1 kind=3 calls=288 failures=288
+LINUX ROBUSTQUERY FINAL: ordinary=0 namespace=1 kind=4 calls=288 failures=276
+LINUX ROBUSTQUERY FINAL: ordinary=0 namespace=1 kind=5 calls=24 failures=0
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=1 kind=0 profile=0 choice=0 form=1 position=0 ret=-1 errno=3 byte=8
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=1 kind=0 profile=0 choice=0 form=1 position=1 ret=-1 errno=3 byte=9
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=1 kind=0 profile=0 choice=0 form=1 position=2 ret=-1 errno=3 byte=11
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=1 kind=1 profile=0 choice=0 form=0 position=0 ret=0 errno=0 byte=-2
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=1 kind=1 profile=0 choice=0 form=0 position=1 ret=0 errno=0 byte=-2
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=1 kind=1 profile=0 choice=0 form=0 position=2 ret=0 errno=0 byte=-2
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=1 kind=2 profile=0 choice=0 form=0 position=1 ret=-1 errno=14 byte=24
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=1 kind=2 profile=0 choice=0 form=0 position=2 ret=-1 errno=14 byte=24
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=1 kind=2 profile=0 choice=0 form=0 position=3 ret=-1 errno=14 byte=24
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=1 kind=3 profile=0 choice=0 form=0 position=0 ret=-1 errno=14 byte=88
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=1 kind=3 profile=0 choice=0 form=0 position=1 ret=-1 errno=14 byte=88
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=1 kind=3 profile=0 choice=0 form=0 position=2 ret=-1 errno=14 byte=88
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=1 kind=4 profile=0 choice=0 form=0 position=1 ret=-1 errno=14 byte=-3
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=1 kind=4 profile=0 choice=0 form=0 position=2 ret=-1 errno=14 byte=-3
+LINUX ROBUSTQUERY DETAIL: ordinary=1 namespace=1 kind=4 profile=0 choice=0 form=0 position=3 ret=-1 errno=14 byte=-3
+LINUX ROBUSTQUERY COHORT: ordinary=1 namespace=1 self=2 thread=3 uid=1000 page=4096 profiles=4 targets=3 forms=2
+LINUX ROBUSTQUERY CASES: ordinary=1 namespace=1 kind=0 calls=264 failures=132
+LINUX ROBUSTQUERY CASES: ordinary=1 namespace=1 kind=1 calls=360 failures=337
+LINUX ROBUSTQUERY CASES: ordinary=1 namespace=1 kind=2 calls=288 failures=276
+LINUX ROBUSTQUERY CASES: ordinary=1 namespace=1 kind=3 calls=288 failures=288
+LINUX ROBUSTQUERY CASES: ordinary=1 namespace=1 kind=4 calls=288 failures=276
+LINUX ROBUSTQUERY CASES: ordinary=1 namespace=1 kind=5 calls=24 failures=0
+LINUX ROBUSTQUERY FINAL: ordinary=1 namespace=1 kind=0 calls=264 failures=132
+LINUX ROBUSTQUERY FINAL: ordinary=1 namespace=1 kind=1 calls=360 failures=337
+LINUX ROBUSTQUERY FINAL: ordinary=1 namespace=1 kind=2 calls=288 failures=276
+LINUX ROBUSTQUERY FINAL: ordinary=1 namespace=1 kind=3 calls=288 failures=288
+LINUX ROBUSTQUERY FINAL: ordinary=1 namespace=1 kind=4 calls=288 failures=276
+LINUX ROBUSTQUERY FINAL: ordinary=1 namespace=1 kind=5 calls=24 failures=0
+LINUX ROBUSTQUERY FAIL: wait4 scalar status stores, stable guard faults or unused-output controls
+QEMU: Terminated
+Missing verdicts: ['LINUX ROBUSTQUERY: PASS']; failures: ['FAIL:', 'LINUX ROBUSTQUERY FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p2-before-x86/receipt.json

@@ -1,0 +1,12 @@
+	// Linux publishes the size before the head, including when outputs overlap
+	// or the later head store faults. Resolve each complete scalar first so a
+	// stable split-page fault leaves that scalar untouched.
+	len := robust_list_head_size
+	if !usercopy.user_range(len_ptr, sizeof(u64))
+		|| !usercopy.writable(len_ptr) || !usercopy.writable(len_ptr + 7)
+		|| !usercopy.copy_to_user(len_ptr, voidptr(&len), sizeof(u64)) {
+		return errno.err, errno.efault
+	}
+	if !usercopy.user_range(head_ptr, sizeof(u64))
+		|| !usercopy.writable(head_ptr) || !usercopy.writable(head_ptr + 7)
+		|| !usercopy.copy_to_user(head_ptr, voidptr(&head), sizeof(u64)) {

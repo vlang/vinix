@@ -1,0 +1,3 @@
+pub fn syscall_get_robust_list(_ voidptr, tid_word u64, head_ptr u64, len_ptr u64) (u64, u64) {
+	// pid_t is imported from the low 32 register bits on both native ABIs.
+	tid := int(i32(tid_word))

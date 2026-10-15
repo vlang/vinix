@@ -1,0 +1,17 @@
+Compiler output from the default V compiler:
+/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/tmp/vinix-v-module-Mm5IqY/robustqueryfixture/core.v:75:3: error: cannot dereference a function call on the left side of an assignment, use a temporary variable
+   73 |  unsafe {
+   74 |   word := u64(u32(pid)) | if form == 0 {u64(0)} else {u64(0xd35ab79100000000)}
+   75 |   *C.__errno_location() = 0
+      |   ^
+   76 |   ret := C.syscall(C.SYS_get_robust_list,isize(word),voidptr(head),voidptr(len))
+   77 |   return Result{ret,*C.__errno_location()}
+/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/tmp/vinix-v-module-Mm5IqY/robustqueryfixture/core.v:215:7: error: invalid use of reserved type `thread` as a variable name
+  213 |   if C.mprotect(voidptr(u64(head_guard)+page),usize(page),C.PROT_NONE) != 0 || C.mprotect(voidptr(u64(len_guard)+page),usize(page),C.PROT_NONE) != 0 || C.mprotect(readonly,usize(page),C.PROT_READ) != 0 {fatal(9)}
+  214 |   original := saved_head(); worker := &Worker(C.alloca(usize(sizeof(Worker)))); *worker = Worker{}
+  215 |   mut thread := C.pthread_t{}
+      |       ~~~~~~
+  216 |   if C.pthread_create(&thread,nil,worker_entry,worker) != 0 {fatal(10)}; await_ready(worker,-1)
+  217 |   if worker.tid <= 0 || worker.tid == C.getpid() {fatal(11)}
+
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/robustquery-20261015/states/p1-before-arm/receipt.json

@@ -1800,3 +1800,19 @@ failures, exact source/C scope, input/compiler/SDK pins, preserved prior evidenc
 clones and executing audit negatives. Concurrent stores/mapping changes and
 exact accounting or partial-rusage counts remain separate. See the
 [scalar-status report](../../docs/linux-posix-qualification.md#native-wait4-scalar-status-copyout).
+
+The `robustquery` case qualifies native get_robust_list signed32 PID imports
+and length-before-head scalar copyout. It checks 6,048 controls per architecture:
+self/leader/pipe-blocked worker queries, distinct stored registrations, upper
+register words, aligned/unaligned/cross-page outputs, 15 overlap positions, NULL
+and guarded faults in either/both outputs, retired/missing targets and exact
+canaries. Four root/UID1000 initial/one-level PID namespace cohorts restore
+both original musl heads before join, then close every pipe/mapping. Four
+warmed 200-call query cohorts measure all slab classes and big-heap pages.
+`robustquery-reference.v` boots the unchanged native ELF against Linux. Compile
+`robustquery-check.v` without `-prod`: it validates actual original failures,
+source/C/ELF identity, final native/reference/regression verdicts, exact whole-C
+scope, compiler/SDK/inventory pins, earlier refused/diagnostic profiles and
+executing audit negatives. Concurrent mappings/list registration/teardown,
+inspection-policy changes, robust owner death and GNU/foreign paths remain
+separate. See [the robust-list query report](../../docs/linux-posix-qualification.md#native-robust-list-query-pid-words-and-ordered-scalar-output).

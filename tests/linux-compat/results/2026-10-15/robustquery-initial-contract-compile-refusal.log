@@ -1,0 +1,14 @@
+Compiler output from the default V compiler:
+tests/linux-compat/robustquery-check.v:2:8: warning: module 'sha256 (crypto.sha256)' is imported but never used. Use `import sha256 (crypto.sha256) as _`, to silence this warning, or just remove the unused import line
+    1 | // Compile without -prod: both deliberately failing controls must execute.
+    2 | import crypto.sha256
+      |        ~~~~~~~~~~~~~
+    3 | import json2
+    4 | import os
+tests/linux-compat/robustquery-check.v:589:5: error: redefinition of `row`
+  587 |    rows := object(state+'/receipt.json')!['results']!.as_array(); assert rows.len == names.len
+  588 |    for index,row_any in rows {
+  589 |     row := row_any.as_map(); name := row['name']!.str(); assert name == names[index] && row['detail']!.str() == ''
+      |     ~~~
+  590 |     assert row['exit_code']!.int() == if phase == 'before' || (suffix == 'x86' && name == 'robustquery') {1} else {0}
+  591 |     assert row['source_sha256']!.str() == digest(state+'/sources/'+name+'fixture/core.v') && row['init_sha256']!.str() == digest(state+'/'+name+'/init') && row['iso_sha256']!.str() == digest(state+'/'+name+'/test.iso')
