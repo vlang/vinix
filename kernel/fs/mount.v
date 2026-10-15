@@ -69,6 +69,9 @@ pub mut:
 	source  string
 	fstype  string
 	flags   u64
+	// Open regular-file descriptions and in-flight opens on this object.
+	// Namespace copies start with zero writers; inherited FDs keep the old pin.
+	writers u64
 	options string
 }
 
@@ -1075,6 +1078,10 @@ fn remount(parent &VFSNode, target string, flags u64, options string) ? {
 	}
 	entry.lock.acquire()
 	defer { entry.lock.release() }
+	if flags & ms_rdonly != 0 && entry.flags & ms_rdonly == 0 && entry.writers != 0 {
+		errno.set(errno.ebusy)
+		return none
+	}
 	entry.flags = flags & ms_per_mount
 	if flags & ms_bind == 0 && options.len > 0 && options != entry.options {
 		// The old options may be another namespace's too, so they stay.

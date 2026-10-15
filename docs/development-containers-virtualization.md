@@ -436,8 +436,21 @@ attachment while backend read-only state and existing authorization still
 apply. Retained fds, copied namespaces, chroot/cwd aliases and private thread
 views pass on both architectures and the same-ELF Linux reference. Internal
 inode-only creators keep their conservative fallback. The subsequent checks
-extend coverage to metadata, hard links and rename; descriptor truncation and
+extend coverage to metadata, hard links, rename and descriptor truncation;
 broader policy combinations still need qualification.
+The [writer lifetime checks](../tests/mount-lifecycle/writer-policy.md) qualify
+regular-file descriptions holding a writer count on their actual mount object.
+A read-only bind remount returns `EBUSY` until the shared description's final
+release, including dup, fork and mmap retention. Temporary pins cover copy-up,
+truncation and descriptor construction, with failed-open rollback. Namespace
+copies start with no writers; inherited fds still address their original mount
+and may truncate after the copied mount becomes read-only. Both architectures
+and same-ELF Linux checks cover size/data/error semantics and inherited-fd
+authority after dropping privileges, while pathname access and remount remain
+denied. Independent lifetime/generated-C review covers lock ordering and
+balanced pins. General mutation/remount serialization, divergent inherited-fd
+policy lookup, filesystem-wide remount semantics and persistent/overlay
+integration remain open.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,

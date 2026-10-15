@@ -163,6 +163,7 @@ pub fn initialise() {
 	file.on_handle_released(release_handle_node)
 	proc.on_directory_released(directory_releasing)
 	file.on_mount_flags(mount_flags)
+	file.on_mount_writer_released(release_mount_writer)
 
 	filesystems = map[string]&FileSystem{}
 
@@ -937,6 +938,15 @@ fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool,
  node_transferred = true
  if !origin_transferred { fd.handle.origin_resource = node_resource }
  origin_transferred = true
+	access := flags & resource.o_accmode
+	if flags & resource.o_path == 0 && stat.isreg(node.resource.stat.mode)
+		&& (access == resource.o_wronly || access == resource.o_rdwr) {
+		writer := retain_mount_writer(identity) or {
+			fd.unref()
+			return none
+		}
+		fd.handle.mount_writer = writer
+	}
 	return file.fdnum_create_from_fd(current_process, fd, oldfd, specific) or {
 		// In particular, roll back a /dev/ptmx allocation or slave-open count if
 		// the process descriptor table is full.
@@ -1284,6 +1294,15 @@ pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, requested_fl
 			return errno.err, errno.get()
 		}
 	}
+	// Hold a temporary writer before copy-up/truncation and through descriptor
+	// construction. A writable Handle takes its own pin before publication;
+	// read-only O_TRUNC and every failure release this temporary pin here.
+	write_mount := if stat.isreg(node.resource.stat.mode) && flags & resource.o_path == 0
+		&& (access_mode == resource.o_wronly || access_mode == resource.o_rdwr
+		|| flags & resource.o_trunc != 0) {
+		retain_mount_writer(open_mount) or { return errno.err, errno.get() }
+	} else { unsafe { nil } }
+	defer { release_mount_writer(write_mount) }
 	// A file on an overlay opened to be written is copied up first, so the
 	// writes land in the upper layer.
 	if node.overlay != unsafe { nil } && stat.isreg(node.resource.stat.mode)

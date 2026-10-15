@@ -77,6 +77,29 @@ pub fn mount_flags(identity &lib.MountContext) u64 {
 	return attachment_flags(lib.mount_context_top(identity))
 }
 
+// Writer ownership follows the actual open mount, including inherited FDs.
+// Mapping it by namespace ID would pin a different mount after unshare.
+fn retain_mount_writer(identity &lib.MountContext) ?voidptr {
+	mut entry := unsafe { &Mount(lib.mount_context_top(identity)) }
+	if entry == unsafe { nil } { return unsafe { nil } }
+	entry.lock.acquire()
+	defer { entry.lock.release() }
+	if entry.flags & ms_rdonly != 0 {
+		errno.set(errno.erofs)
+		return none
+	}
+	entry.writers++
+	return voidptr(entry)
+}
+
+fn release_mount_writer(identity voidptr) {
+	if identity == unsafe { nil } { return }
+	mut entry := unsafe { &Mount(identity) }
+	entry.lock.acquire()
+	entry.writers--
+	entry.lock.release()
+}
+
 // An explicit route selects one attachment even when bind aliases share the
 // inode. Backend read-only state still applies to every route to that inode.
 fn read_only_on_mount(node &VFSNode, identity &lib.MountContext) bool {

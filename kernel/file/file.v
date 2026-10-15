@@ -87,6 +87,8 @@ pub mut:
 	// Identity of the mount traversed at open, rather than the inode's aliases.
 	// Mount entries are permanent; fs resolves namespace copies by mount id.
 	mount         lib.MountContext
+	// One writer pin belongs to this shared open description, not each FD.
+	mount_writer  voidptr
 	refcount      int
 	loc           i64
 	flags         int
@@ -112,6 +114,7 @@ pub mut:
 __global (
 	handle_released fn (voidptr)
 	mount_policy_flags fn (&lib.MountContext) u64
+	mount_writer_released fn (voidptr)
 )
 
 // on_handle_released has `f` called with a handle's node as the handle is
@@ -122,6 +125,10 @@ pub fn on_handle_released(f fn (voidptr)) {
 
 pub fn on_mount_flags(f fn (&lib.MountContext) u64) {
 	mount_policy_flags = f
+}
+
+pub fn on_mount_writer_released(f fn (voidptr)) {
+	mount_writer_released = f
 }
 
 // A Handle is the open-file description shared by dup() and fork(). Its
@@ -146,6 +153,9 @@ fn (mut this Handle) unref() {
   mut origin := this.origin_resource
   resource.release_resource(mut origin)
  }
+	if this.mount_writer != unsafe { nil } && mount_writer_released != unsafe { nil } {
+		mount_writer_released(this.mount_writer)
+	}
 	if this.node != unsafe { nil } && voidptr(handle_released) != unsafe { nil } {
 		handle_released(this.node)
 	}

@@ -10,7 +10,7 @@ import os
 struct ReferenceReceipt {
 	architecture string
 	timeout_seconds int
-	context string = 'Linux QEMU reference; same native musl probe ELF; portable mount lifecycle, pivot admission, teardown, alias, private-thread, bind policy, pathname truncation, mode/ownership, timestamp, extended-attribute, symlink creation, removal, hard-link and rename checks; networking disabled'
+	context string = 'Linux QEMU reference; same native musl probe ELF; portable mount lifecycle, pivot admission, teardown, alias, private-thread, bind policy, pathname truncation, mode/ownership, timestamp, extended-attribute, symlink creation, removal, hard-link, rename and mount-writer checks; networking disabled'
 	artifacts map[string]string
 	command []string
 	passed bool
@@ -102,6 +102,7 @@ fn run() ! {
 		&& result.text.contains('MOUNT UNLINK: PASS')
 		&& result.text.contains('MOUNT LINK: PASS')
 		&& result.text.contains('MOUNT RENAME: PASS')
+		&& result.text.contains('MOUNT WRITERS: PASS')
 	mut cases_pass := true
 	for kind in 0 .. 7 { cases_pass = cases_pass && result.text.contains('MOUNT IDENTITY CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT ADMISSION CASE: ${kind} PASS') }
@@ -119,6 +120,7 @@ fn run() ! {
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT UNLINK CASE: ${kind} PASS') }
 	for kind in 0 .. 10 { cases_pass = cases_pass && result.text.contains('MOUNT LINK CASE: ${kind} PASS') }
 	for kind in 0 .. 10 { cases_pass = cases_pass && result.text.contains('MOUNT RENAME CASE: ${kind} PASS') }
+	for kind in 0 .. 10 { cases_pass = cases_pass && result.text.contains('MOUNT WRITER CASE: ${kind} PASS') }
 	artifacts := {
 		'kernel': digest(state + '/linux')!
 		'probe': digest(state + '/probe')!

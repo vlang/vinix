@@ -56,6 +56,15 @@ through `sp-7` select its individual cases. Native `all` and Linux
 `--case renames` selects rename source and destination attachment policy;
 `rp-0` through `rp-9` select its individual cases. Native `all` and Linux
 `move-reference` include them.
+`--case writers` selects regular-file writer lifetime and read-only bind-remount
+checks; `wr-0` through `wr-9` select individual cases. Native `all` and Linux
+`move-reference` include them.
+
+The [writer checks](writer-policy.md) cover descriptor truncation, exact-mount
+writer ownership, dup/fork/mmap retention, failed-open rollback and namespace
+copies/retirement. Read-only remount stays busy until the last writable
+description reference disappears. Inherited descriptors keep their original
+mount and remain usable when a copied mount becomes read-only.
 
 The [rename checks](rename-policy.md) cover replacement, no-replace, exchange,
 literal symlinks, directory moves, held descriptions, read-only routes and
@@ -138,7 +147,7 @@ iterations, verifies capability denial and finishes with valid local operations.
 
 Use `--probe-state /path/to/prior-native-result` to reuse its probe ELF and
 generated C with a different kernel or case. The controller requires a matching
-architecture and identical current/copied hashes of all eighteen fixture files,
+architecture and identical current/copied hashes of all nineteen fixture files,
 verifies both artifact hashes against the prior receipt and checks the ELF
 architecture before boot.
 The prior result may be a failed control; its receipt hash is pinned in the new
@@ -190,7 +199,7 @@ all five pivot alias cases, all seven private-thread cases, all five bind-policy
 cases, all six pathname truncation cases, all seven mode/ownership cases,
 all eight timestamp cases, all eight extended-attribute cases, all eight symlink
 creation cases, all eight removal cases, all ten hard-link cases and all ten
-rename cases. Vinix's cursor
+rename cases and all ten writer-lifetime cases. Vinix's cursor
 limit and unsupported unmount modes are excluded. Supply a matching Linux kernel and
 the ELF preserved by a native run:
 
@@ -243,7 +252,7 @@ and link shuffle seed 17. `mount-lifecycle-evidence.log` independently verifies
 the receipts, source versions, controls, copied ELF identity, selected positive
 markers and generated move/validation/parent functions without allocations.
 
-These checks do not qualify busy-reference accounting, mount-object reclamation,
+These checks do not qualify general unmount busy-reference accounting, mount-object reclamation,
 overlay cache teardown, concurrent mount publication/namespace switching,
 propagation or complete bind-alias attachment isolation. Mount identities and
 cached filesystem trees retain their existing permanent ownership; no allocation-flatness claim is
