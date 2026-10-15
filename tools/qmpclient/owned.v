@@ -6,6 +6,18 @@ import net.unix
 import os
 import time
 
+// Test transport liveness without negotiating QMP. A silent or malformed
+// service is still live: only an absent path or refused connection is stale.
+// Other failures, including cancellation and timeouts, remain errors.
+pub fn socket_in_use(path string, deadline u64, cancel fn () bool) !bool {
+	mut connection := owned_connection(path, deadline, cancel) or {
+		if err.code() in [C.ENOENT, C.ECONNREFUSED] { return false }
+		return err
+	}
+	connection.close()!
+	return true
+}
+
 // The SDK's connect_stream leaves its socket open when connect fails. Retain
 // this descriptor until connection succeeds and the monitor takes ownership.
 fn owned_connection(path string, deadline u64, cancel fn () bool) !&unix.StreamConn {

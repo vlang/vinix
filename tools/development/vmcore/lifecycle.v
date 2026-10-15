@@ -10,6 +10,8 @@ import sourcecommand
 import sync.stdatomic
 import time
 
+#include <errno.h>
+
 __global stopping = u64(0)
 
 pub fn request_stop(_signal os.Signal) {
@@ -98,12 +100,19 @@ pub fn start(path string) !int {
 // A manager can be killed while QEMU survives. Keep that live monitor usable
 // and refuse a replacement even after the dead manager's record lock vanishes.
 fn ensure_stopped(state string) ! {
-	if !os.exists(state + '/qmp.sock') { return }
-	mut monitor := qmpclient.connect_checked(state + '/qmp.sock',
-		time.sys_mono_now() + u64(time.second), unsafe { nil }) or { return }
-	defer { monitor.close() }
-	monitor.request('query-status', {})!
-	return error('QEMU is still running; stop it through its existing monitor')
+	path := state + '/qmp.sock'
+	st := os.lstat(path) or {
+		if err.code() == C.ENOENT { return }
+		return err
+	}
+	if st.get_filetype() != .socket {
+		return error('VM monitor path is not a socket; inspect it before restarting')
+	}
+	// A failed greeting says nothing about whether the listener is alive.
+	// Preserve it even when QEMU is hung or its protocol is unavailable.
+	if qmpclient.socket_in_use(path, time.sys_mono_now() + u64(time.second), unsafe { nil })! {
+		return error('QEMU is still running or its monitor is occupied; stop it through its existing monitor')
+	}
 }
 
 pub fn control(action string, path string) !json2.Any {

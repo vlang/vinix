@@ -70,6 +70,16 @@ numeric-name disk/firmware pairing and partial publication/cleanup. This
 process-interruption recovery does not establish power-loss atomicity,
 corrupt-image repair or Vinix-hosted QEMU acceptance.
 
+The subsequent monitor guard refuses restart and offline snapshots whenever
+the existing socket accepts connections, without depending on a working QMP
+greeting. It preserves unexpected monitor paths and propagates access and
+connection errors. Host VM/QMP checks reproduce the former silent-listener
+acceptance, check descriptor retirement over repeated probes, and kill a real
+QEMU manager while preserving control of its surviving VM. Replacement and
+snapshot attempts leave the original monitor inode and disk/firmware hashes
+unchanged after the manager's record lock is released. This does not add a
+force-stop mechanism or qualify installed-Vinix VM hosting.
+
 Native hypervisor memory validation on the same date built isolated kernels
 from `1c2e33ce` plus the memory changes. The x86 memory fixture allocated and
 released 1 GiB, checked EPT entries and zeroed frames, injected failures through

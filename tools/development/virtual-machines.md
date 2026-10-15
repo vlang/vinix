@@ -19,6 +19,16 @@ then quit and retire the owned process group. Exit status is saved in
 `exit.json`. A file lock prevents a second manager or offline snapshot operation
 from opening a running VM. A failed or killed manager never signals a saved PID.
 
+A monitor that still accepts connections blocks restart and every offline
+snapshot operation, including recovery, even after the manager has died. The
+one-second transport probe does not require a QMP greeting or status reply:
+a silent or malformed service is still occupied. Only a missing socket or an
+explicit connection refusal counts as inactive. Other connection errors and
+timeouts keep the operation blocked. Unexpected files, directories and symlinks
+at `qmp.sock` are preserved for inspection. Use the existing monitor to stop a
+surviving VM; an unresponsive monitor requires manual inspection rather than
+automatic socket removal or PID-based signaling.
+
 Example configuration (supply actual hashes from `vinix-build hash`):
 
 ```json
@@ -192,3 +202,20 @@ and x86_64, with both machine IDs checked. Build logs, source/compiler/binary
 hashes and the receipt are retained locally in
 `/tmp/vinix-vm-recovery-build-51315`; those cross-builds do not establish
 installed-Vinix execution or guest OS qualification.
+
+The monitor-liveness regression reproduced acceptance of a listening socket
+that never sent its QMP greeting. The corrected host VM and QMP suites passed
+on the same QEMU/V versions. Restart and all four snapshot operations preserve
+the socket inode, disk, firmware, logs and pending marker while that listener is
+occupied. Missing/refused sockets pass the offline guard; unexpected
+monitor paths and access errors refuse without being treated as stale. One
+hundred successful, failed and cancelled transport probes retain their exact
+descriptor baseline. A real QEMU run kills its owning manager, confirms the
+record lock is released, and still refuses replacement and snapshots while
+preserving monitor control and disk/firmware hashes. It stops that VM through
+QMP and waits for the image lock to be released, without signaling a saved
+QEMU PID. These remain host lifecycle checks rather than Vinix-hosted QEMU
+acceptance.
+The updated CLI also builds as static Linux ELF64 for AArch64 and x86_64.
+The checked machine IDs, source/compiler/binary hashes and build logs are
+retained locally in `/tmp/vinix-vm-monitor-build-62727`.

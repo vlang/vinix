@@ -33,6 +33,60 @@ fn pin(path string) !devcore.Pin {
 	return devcore.Pin{os.real_path(path), devcore.file_hash(path)!}
 }
 
+fn check_orphaned_vm(cli string, state string, image_tool string) ! {
+	mut manager := os.new_process(cli)
+	manager.set_args(['start', state])
+	manager.set_redirect_stdio()
+	manager.run()
+	defer {
+		control('stop', state) or {}
+		manager.signal_kill()
+		manager.wait()
+		manager.close()
+	}
+	deadline := time.sys_mono_now() + u64(30 * time.second)
+	for {
+		control('status', state) or {
+			assert time.sys_mono_now() < deadline, err.msg()
+			time.sleep(20 * time.millisecond)
+			continue
+		}
+		break
+	}
+	// Kill only the process we own. The surviving VM must remain controllable
+	// through its existing monitor after the manager's record lock disappears.
+	manager.signal_kill()
+	manager.wait()
+	assert manager.code != 0
+	mut guard := lease(state)!
+	guard.release()
+	inode := os.lstat(state + '/qmp.sock')!.inode
+	disk := devcore.file_hash(state + '/disk.qcow2')!
+	vars := devcore.file_hash(state + '/vars.fd')!
+	for args in [['start', state], ['snapshot-create', state, 'orphan'],
+		['snapshot-restore', state, 'orphan'], ['snapshot-delete', state, 'orphan'],
+		['snapshot-recover', state]] {
+		refused := sourcecommand.capture([cli, ...args], os.environ(), 10, 4096, unsafe { nil })!
+		assert refused.status != 0 && refused.stderr.contains('still running'), refused.stderr
+		assert os.lstat(state + '/qmp.sock')!.inode == inode
+		assert !control('status', state)!.as_map()['running']!.bool()
+	}
+	assert devcore.file_hash(state + '/disk.qcow2')! == disk
+	assert devcore.file_hash(state + '/vars.fd')! == vars
+	assert !os.exists(state + '/snapshot.pending.json') && !os.exists(state + '/vars.restore')
+	control('stop', state)!
+	// The manager cannot reap this orphan. Wait for QEMU to release its image
+	// before the next offline test, without signaling a remembered QEMU PID.
+	stopped := time.sys_mono_now() + u64(30 * time.second)
+	for {
+		check := sourcecommand.capture([image_tool, 'check', '-f', 'qcow2', state + '/disk.qcow2'],
+			os.environ(), 10, 4096, unsafe { nil })!
+		if check.status == 0 { break }
+		assert time.sys_mono_now() < stopped, check.stderr
+		time.sleep(20 * time.millisecond)
+	}
+}
+
 fn test_real_qemu_lifecycle_isolated_state_offline_snapshots_and_locking() {
 	qemu := os.find_abs_path_of_executable('qemu-system-aarch64') or {
 		println('SKIP: real QEMU lifecycle requires qemu-system-aarch64')
@@ -100,6 +154,7 @@ fn test_real_qemu_lifecycle_isolated_state_offline_snapshots_and_locking() {
 	control('stop', state)!
 	owner.wait()
 	assert owner.code == 0, owner.stdout_read() + owner.stderr_read()
+	check_orphaned_vm(root + '/vinix-vm', state, image_tool)!
 	snapshot('snapshot-create', state, 'baseline')!
 	baseline_vars := devcore.file_hash(state + '/vars.fd')!
 	write := sourcecommand.capture([io_tool, '-f', 'qcow2', '-c', 'write -P 0x56 0 4096',
