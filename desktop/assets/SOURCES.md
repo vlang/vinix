@@ -10,6 +10,7 @@ its framebuffer compositor.
 - Blender: [Alpine Blender package](https://dl-cdn.alpinelinux.org/alpine/v3.21/community/aarch64/blender-4.3.0-r0.apk), `usr/share/icons/hicolor/scalable/apps/blender.svg`
 - Minecraft: [official Minecraft client asset](https://resources.download.minecraft.net/f0/f00657542252858a721e715a2e888a9226404e35), `minecraft.icns` (1024 × 1024)
 - VOffice: [official website logo](https://office.vlang.io/assets/logo.png?v=20260915-1), resampled from 1254 × 1254 to 512 × 512 with transparency preserved
+- LibreOffice: [upstream 512px Start Center application icon](https://raw.githubusercontent.com/LibreOffice/core/master/sysui/desktop/icons/hicolor/512x512/apps/startcenter.png), with transparency preserved
 - DOOM: `M_DOOM` menu logo from a locally supplied DOOM WAD, decoded with its `PLAYPAL` palette and scaled without smoothing.
 - Steam: [Valve's Steam installer package](https://cdn.fastly.steamstatic.com/client/installer/steam.deb), `usr/share/icons/hicolor/256x256/apps/steam.png`, resampled to 512 × 512
 - VLC: [VideoLAN application icon](https://raw.githubusercontent.com/videolan/vlc/master/share/icons/256x256/vlc.png)
@@ -53,6 +54,9 @@ is `e765434460a97da61f540231b61c4c9d9118eb41e546db51db095edaf95e5af5`.
 
 The mpv logo was fetched on 2026-10-16. Its unmodified SVG source SHA-256
 is `03e9c5e45e4c87009fb6ce1aa6c88bc65b5a3ce7d396800fa072cec5dde0f666`.
+
+The LibreOffice icon was fetched on 2026-10-16. Its unmodified PNG source SHA-256
+is `1956ca9d8489c661605c1c850ae6a121833529d165b4bd94bb0d305c97a8ffaf`.
 
 Artwork was fetched and converted with V tooling invoking curl and ImageMagick;
 SVGs were rasterized at sufficient density before scaling. PNG source colors

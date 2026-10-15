@@ -728,6 +728,7 @@ fn first_run_install_command(request string) string {
 		'case "\$app" in ios-runtime) /usr/bin/vinix-desktop --install-ios-runtime && ' +
 		'{ if [ -x /usr/libexec/vinix-persist-packages ]; then /usr/libexec/vinix-persist-packages save; fi; } ;; ' +
 		'vscodium|zed|discord|slack|spotify|steam) /usr/bin/vinix-desktop --install-setup-app "\$app" ;; ' +
+		'libreoffice) pkg install "\$app" libreoffice-gtk libreoffice-lang-en_us ttf-liberation font-dejavu adwaita-icon-theme ;; ' +
 		'vlc-qt|keepassxc) pkg install "\$app" qt5-qtbase-x11 font-dejavu ;; ' +
 		'telegram-desktop) pkg install "\$app" qt6-qtbase-x11 font-dejavu ;; ' +
 		'*) pkg install "\$app" ;; esac || failed="\$failed \$app"; done; echo; ' +

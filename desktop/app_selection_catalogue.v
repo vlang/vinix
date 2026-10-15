@@ -137,6 +137,14 @@ const first_run_app_catalogue = [
 		category:        .productivity
 	},
 	FirstRunApp{
+		title:           'LibreOffice'
+		icon:            'asset:libreoffice'
+		package_name:    'libreoffice'
+		action:          'apps.toggle.libreoffice'
+		installed_paths: ['/usr/lib/libreoffice/program/soffice.bin', '/usr/bin/libreoffice']
+		category:        .productivity
+	},
+	FirstRunApp{
 		title:           'Discord'
 		icon:            'asset:discord'
 		package_name:    'discord'

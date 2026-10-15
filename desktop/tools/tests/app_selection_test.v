@@ -81,13 +81,14 @@ fn app_selection_test_button_label(mut state AppSelectionState) string {
 
 fn test_app_selection_offers_the_optional_apps_this_machine_can_install() {
 	assert first_run_app_catalogue.map(it.title) == ['Firefox', 'Chromium', 'VOffice', 'Minecraft',
-		'Blender', 'VLC', 'VSCodium', 'Zed', 'Neovim', 'KeePassXC', 'Discord', 'Telegram', 'Slack',
+		'Blender', 'VLC', 'VSCodium', 'Zed', 'Neovim', 'KeePassXC', 'LibreOffice', 'Discord', 'Telegram', 'Slack',
 		'mpv', 'Spotify', 'OBS Studio', 'Steam', 'iOS']
 	assert first_run_app_catalogue.map(it.package_name) == ['firefox', 'chromium', 'voffice',
-		'minecraft', 'blender', 'vlc-qt', 'vscodium', 'zed', 'neovim', 'keepassxc', 'discord',
+		'minecraft', 'blender', 'vlc-qt', 'vscodium', 'zed', 'neovim', 'keepassxc', 'libreoffice', 'discord',
 		'telegram-desktop', 'slack', 'mpv', 'spotify', 'obs-studio', 'steam', 'ios-runtime']
 	assert first_run_app_catalogue.filter(it.category == .media).map(it.title) == ['VLC', 'mpv', 'Spotify']
 	assert first_run_app_catalogue.filter(it.category == .creation).map(it.title) == ['Blender', 'OBS Studio']
+	assert first_run_app_catalogue.filter(it.category == .productivity).map(it.title) == ['VOffice', 'KeePassXC', 'LibreOffice']
 	$if arm64 {
 		assert first_run_apps.len == first_run_app_catalogue.len
 	} $else {
@@ -116,6 +117,7 @@ fn test_app_selection_offers_the_optional_apps_this_machine_can_install() {
 	}
 	assert app_selection_test_element(root, 'apps.toggle.firefox') != none
 	assert app_selection_test_element(root, 'apps.toggle.keepassxc') != none
+	assert app_selection_test_element(root, 'apps.toggle.libreoffice') != none
 	for category in first_run_categories {
 		for i, app in first_run_apps {
 			if app.category == category {
@@ -402,6 +404,12 @@ fn test_app_selection_uses_three_columns_and_adapts_to_narrow_screens() {
 			assert firefox.frame.y + firefox.frame.height < chromium.frame.y
 		}
 		if width == 1024 {
+			keepassxc := app_selection_test_element(tree, 'apps.toggle.keepassxc') or { panic('missing KeePassXC') }
+			libreoffice := app_selection_test_element(tree, 'apps.toggle.libreoffice') or { panic('missing LibreOffice') }
+			assert libreoffice.frame.y == keepassxc.frame.y
+			assert libreoffice.frame.x > keepassxc.frame.x
+			assert libreoffice.clickable && libreoffice.enabled
+			assert app_selection_test_has_image(libreoffice, 'asset:libreoffice')
 			codium := app_selection_test_element(tree, 'apps.toggle.vscodium') or { panic('missing VSCodium') }
 			zed := app_selection_test_element(tree, 'apps.toggle.zed') or { panic('missing Zed') }
 			neovim := app_selection_test_element(tree, 'apps.toggle.neovim') or { panic('missing Neovim') }
@@ -422,22 +430,21 @@ fn test_app_selection_vertical_arrows_follow_grid_columns_and_skip_unavailable_a
 	state.prepare_viewport(452, 3)
 	state.set_focus(1) // Chromium, in the second column.
 	state.key_input('\x1b[B')
-	assert first_run_apps[state.focus].package_name == 'keepassxc'
-	state.key_input('\x1b[A')
 	$if arm64 {
-		assert first_run_apps[state.focus].package_name == 'chromium'
+		assert first_run_apps[state.focus].package_name == 'keepassxc'
 	} $else {
-		assert first_run_apps[state.focus].package_name == 'firefox'
+		assert first_run_apps[state.focus].package_name == 'libreoffice'
 	}
-	for i, app in first_run_apps {
-		if app.package_name == 'keepassxc' { state.available[i] = false }
-	}
+	unavailable := state.focus
+	state.key_input('\x1b[A')
+	assert first_run_apps[state.focus].package_name == 'chromium'
+	state.available[unavailable] = false
 	state.set_focus(1)
 	state.key_input('\x1b[B')
 	$if arm64 {
 		assert first_run_apps[state.focus].package_name == 'voffice'
 	} $else {
-		assert first_run_apps[state.focus].category == .development
+		assert first_run_apps[state.focus].package_name == 'keepassxc'
 	}
 }
 
@@ -543,13 +550,13 @@ fn test_first_run_install_command_reports_failures_and_continues() {
 	}
 	os.chmod(fake_pkg, 0o755) or { panic(err) }
 
-	command := first_run_install_command('firefox chromium')
+	command := first_run_install_command('firefox chromium libreoffice')
 	// Stop where the Terminal would hand over to the interactive shell.
 	script := command.replace('exec /bin/zsh -i', 'exit 0')
 	result := os.execute('PATH="${work}/bin:\$PATH" sh -c ${os.quoted_path(script)}')
 	assert result.exit_code == 0
-	assert os.read_file(log) or { '' } == 'install firefox\ninstall chromium\n'
-	assert result.output.contains('Installing the apps chosen during setup: firefox chromium')
+	assert os.read_file(log) or { '' } == 'install firefox\ninstall chromium\ninstall libreoffice libreoffice-gtk libreoffice-lang-en_us ttf-liberation font-dejavu adwaita-icon-theme\n'
+	assert result.output.contains('Installing the apps chosen during setup: firefox chromium libreoffice')
 	assert result.output.contains('Not installed: chromium. Run vinix-desktop --install-setup-app chromium to try again.')
 
 	success := first_run_install_command('firefox').replace('exec /bin/zsh -i', 'exit 0')

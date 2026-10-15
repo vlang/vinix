@@ -60,6 +60,7 @@ fn test_app_icons_keep_original_artwork_without_an_installed_directory() {
 	assert !os.exists(missing)
 	expected := {
 		'voffice': u32(0x3ae6dcda),
+		'libreoffice': u32(0x345e4ce0),
 		'vlc': u32(0x84b67ad4),
 		'mpv': u32(0x9bd0c357),
 		'vscodium': u32(0x21b3e302),

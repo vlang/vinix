@@ -299,6 +299,9 @@ fn first_run_install_vendor(name string) ! {
 	}
 	if name !in first_run_vendor_names() {
 		mut packages := [name]
+		if name == 'libreoffice' {
+			packages << ['libreoffice-gtk', 'libreoffice-lang-en_us', 'ttf-liberation', 'font-dejavu', 'adwaita-icon-theme']
+		}
 		if name in ['vlc-qt', 'keepassxc'] { packages << ['qt5-qtbase-x11', 'font-dejavu'] }
 		if name == 'telegram-desktop' { packages << ['qt6-qtbase-x11', 'font-dejavu'] }
 		first_run_tool(['pkg', 'install', ...packages])!

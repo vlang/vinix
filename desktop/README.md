@@ -340,19 +340,23 @@ QEMU tests.
 
 First boot offers optional software in Browsers, Productivity, Development,
 Communication, Creation, Media, Games, and Runtimes on one scrollable page.
+Productivity contains VOffice, KeePassXC and LibreOffice.
 Creation contains Blender and OBS Studio; Media contains VLC, mpv and Spotify.
 Choices remain selected when scrolling. Arrows or Tab move between apps, Space
 toggles a choice, and Enter confirms. Existing number shortcuts 1–9 keep their
 catalog identities. Downloads run separately in
 Terminal, so a failed package does not cancel the remaining choices.
 
-The Alpine choices include Blender, VLC's `vlc-qt` desktop frontend, `mpv`, Neovim,
+The Alpine choices include LibreOffice, Blender, VLC's `vlc-qt` desktop frontend, `mpv`, Neovim,
 KeePassXC, Telegram's `telegram-desktop`, and `obs-studio`. All offered apps are
 selectable. VSCodium, Zed, Discord, Slack, Spotify and Steam use official Linux
 downloads when absent from the configured Alpine repositories. Their private
 libraries and x86 translation are installed on demand. Setup keeps the existing
 repositories and recognizes apps already supplied by the image. Neovim runs
 in Terminal.
+
+LibreOffice installs the full Alpine suite together with its GTK plugin,
+English resources, document fonts and icon theme for Vinix's existing launcher.
 
 The **iOS runtime** option installs Vinix's own static ARM64 compatibility
 runner from an optional image payload. To supply that choice, include the
