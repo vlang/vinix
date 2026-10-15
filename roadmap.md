@@ -1019,6 +1019,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   raw/musl calls and flat storage in initial/one-level PID namespaces.
   See [the child-event output receipts](docs/linux-posix-qualification.md#native-waitid-child-event-siginfo-writes).
 
+- [x] Copy native waitid rusage before siginfo, preserving Linux output and
+  EFAULT ordering. Qualify untouched siginfo after rusage faults, preceding
+  rusage after siginfo faults, overlapping layouts, four child states, raw/musl
+  calls and flat storage as root/ordinary callers in both PID namespace views.
+  See [the rusage/siginfo order receipts](docs/linux-posix-qualification.md#native-waitid-rusage-and-siginfo-copyout-order).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

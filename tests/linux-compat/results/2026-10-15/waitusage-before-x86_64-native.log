@@ -1,0 +1,217 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=85016
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037ff5200
+initramfs: Done (9 entries)
+LINUX WAITUSAGE TOPOLOGY: ordinary=0 namespace=0 profile=0 killed=0 self=13377 pid=59923 real=0 effective=0 saved=0
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=2 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=3 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=2 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=3 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=4 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=7 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=8 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=15 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=16 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=2 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=3 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=4 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=5 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=0 bad_byte=16
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=1 bad_byte=17
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=2 bad_byte=56
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=3 bad_byte=57
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=4 bad_byte=80
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=5 bad_byte=81
+LINUX WAITUSAGE TOPOLOGY: ordinary=0 namespace=0 profile=0 killed=1 self=13377 pid=36360 real=0 effective=0 saved=0
+LINUX WAITUSAGE TOPOLOGY: ordinary=0 namespace=0 profile=1 killed=0 self=13377 pid=5688 real=1001 effective=0 saved=1002
+LINUX WAITUSAGE TOPOLOGY: ordinary=0 namespace=0 profile=1 killed=1 self=13377 pid=48243 real=1001 effective=0 saved=1002
+LINUX WAITUSAGE TOPOLOGY: ordinary=0 namespace=0 profile=2 killed=0 self=13377 pid=40932 real=0 effective=1003 saved=0
+LINUX WAITUSAGE TOPOLOGY: ordinary=0 namespace=0 profile=2 killed=1 self=13377 pid=30910 real=0 effective=1003 saved=0
+LINUX WAITUSAGE TOPOLOGY: ordinary=0 namespace=0 profile=3 killed=0 self=13377 pid=9781 real=4294967294 effective=1004 saved=0
+LINUX WAITUSAGE TOPOLOGY: ordinary=0 namespace=0 profile=3 killed=1 self=13377 pid=46488 real=4294967294 effective=1004 saved=0
+LINUX WAITUSAGE CASES: ordinary=0 namespace=0 kind=0 calls=12288 failures=12288
+LINUX WAITUSAGE CASES: ordinary=0 namespace=0 kind=1 calls=15360 failures=15360
+LINUX WAITUSAGE CASES: ordinary=0 namespace=0 kind=2 calls=9984 failures=9984
+LINUX WAITUSAGE CASES: ordinary=0 namespace=0 kind=3 calls=27648 failures=21504
+LINUX WAITUSAGE CASES: ordinary=0 namespace=0 kind=4 calls=6144 failures=5376
+LINUX WAITUSAGE CASES: ordinary=0 namespace=0 kind=5 calls=6176 failures=0
+LINUX WAITUSAGE FINAL: ordinary=0 namespace=0 kind=0 calls=12288 failures=12288
+LINUX WAITUSAGE FINAL: ordinary=0 namespace=0 kind=1 calls=15360 failures=15360
+LINUX WAITUSAGE FINAL: ordinary=0 namespace=0 kind=2 calls=9984 failures=9984
+LINUX WAITUSAGE FINAL: ordinary=0 namespace=0 kind=3 calls=27648 failures=21504
+LINUX WAITUSAGE FINAL: ordinary=0 namespace=0 kind=4 calls=6144 failures=5376
+LINUX WAITUSAGE FINAL: ordinary=0 namespace=0 kind=5 calls=6176 failures=0
+LINUX WAITUSAGE TOPOLOGY: ordinary=1 namespace=0 profile=0 killed=0 self=34794 pid=46485 real=1000 effective=1000 saved=1002
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=2 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=3 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=2 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=3 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=4 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=7 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=8 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=15 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=16 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=2 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=3 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=4 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=5 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=0 bad_byte=16
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=1 bad_byte=17
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=2 bad_byte=56
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=3 bad_byte=57
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=4 bad_byte=80
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=5 bad_byte=81
+LINUX WAITUSAGE TOPOLOGY: ordinary=1 namespace=0 profile=0 killed=1 self=34794 pid=41150 real=1000 effective=1000 saved=1002
+LINUX WAITUSAGE TOPOLOGY: ordinary=1 namespace=0 profile=1 killed=0 self=34794 pid=4382 real=1000 effective=1002 saved=1002
+LINUX WAITUSAGE TOPOLOGY: ordinary=1 namespace=0 profile=1 killed=1 self=34794 pid=1647 real=1000 effective=1002 saved=1002
+LINUX WAITUSAGE TOPOLOGY: ordinary=1 namespace=0 profile=2 killed=0 self=34794 pid=21399 real=1000 effective=1000 saved=1002
+LINUX WAITUSAGE TOPOLOGY: ordinary=1 namespace=0 profile=2 killed=1 self=34794 pid=41490 real=1000 effective=1000 saved=1002
+LINUX WAITUSAGE TOPOLOGY: ordinary=1 namespace=0 profile=3 killed=0 self=34794 pid=15141 real=1000 effective=1002 saved=1002
+LINUX WAITUSAGE TOPOLOGY: ordinary=1 namespace=0 profile=3 killed=1 self=34794 pid=14947 real=1000 effective=1002 saved=1002
+LINUX WAITUSAGE CASES: ordinary=1 namespace=0 kind=0 calls=12288 failures=12288
+LINUX WAITUSAGE CASES: ordinary=1 namespace=0 kind=1 calls=15360 failures=15360
+LINUX WAITUSAGE CASES: ordinary=1 namespace=0 kind=2 calls=9984 failures=9984
+LINUX WAITUSAGE CASES: ordinary=1 namespace=0 kind=3 calls=27648 failures=21504
+LINUX WAITUSAGE CASES: ordinary=1 namespace=0 kind=4 calls=6144 failures=5376
+LINUX WAITUSAGE CASES: ordinary=1 namespace=0 kind=5 calls=6176 failures=0
+LINUX WAITUSAGE FINAL: ordinary=1 namespace=0 kind=0 calls=12288 failures=12288
+LINUX WAITUSAGE FINAL: ordinary=1 namespace=0 kind=1 calls=15360 failures=15360
+LINUX WAITUSAGE FINAL: ordinary=1 namespace=0 kind=2 calls=9984 failures=9984
+LINUX WAITUSAGE FINAL: ordinary=1 namespace=0 kind=3 calls=27648 failures=21504
+LINUX WAITUSAGE FINAL: ordinary=1 namespace=0 kind=4 calls=6144 failures=5376
+LINUX WAITUSAGE FINAL: ordinary=1 namespace=0 kind=5 calls=6176 failures=0
+LINUX WAITUSAGE TOPOLOGY: ordinary=0 namespace=1 profile=0 killed=0 self=2 pid=3 real=0 effective=0 saved=0
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=2 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=3 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=2 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=3 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=4 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=7 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=8 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=15 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=16 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=2 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=3 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=4 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=5 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=0 bad_byte=16
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=1 bad_byte=17
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=2 bad_byte=56
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=3 bad_byte=57
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=4 bad_byte=80
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=5 bad_byte=81
+LINUX WAITUSAGE TOPOLOGY: ordinary=0 namespace=1 profile=0 killed=1 self=2 pid=4 real=0 effective=0 saved=0
+LINUX WAITUSAGE TOPOLOGY: ordinary=0 namespace=1 profile=1 killed=0 self=2 pid=5 real=1001 effective=0 saved=1002
+LINUX WAITUSAGE TOPOLOGY: ordinary=0 namespace=1 profile=1 killed=1 self=2 pid=6 real=1001 effective=0 saved=1002
+LINUX WAITUSAGE TOPOLOGY: ordinary=0 namespace=1 profile=2 killed=0 self=2 pid=7 real=0 effective=1003 saved=0
+LINUX WAITUSAGE TOPOLOGY: ordinary=0 namespace=1 profile=2 killed=1 self=2 pid=8 real=0 effective=1003 saved=0
+LINUX WAITUSAGE TOPOLOGY: ordinary=0 namespace=1 profile=3 killed=0 self=2 pid=9 real=4294967294 effective=1004 saved=0
+LINUX WAITUSAGE TOPOLOGY: ordinary=0 namespace=1 profile=3 killed=1 self=2 pid=10 real=4294967294 effective=1004 saved=0
+LINUX WAITUSAGE CASES: ordinary=0 namespace=1 kind=0 calls=12288 failures=12288
+LINUX WAITUSAGE CASES: ordinary=0 namespace=1 kind=1 calls=15360 failures=15360
+LINUX WAITUSAGE CASES: ordinary=0 namespace=1 kind=2 calls=9984 failures=9984
+LINUX WAITUSAGE CASES: ordinary=0 namespace=1 kind=3 calls=27648 failures=21504
+LINUX WAITUSAGE CASES: ordinary=0 namespace=1 kind=4 calls=6144 failures=5376
+LINUX WAITUSAGE CASES: ordinary=0 namespace=1 kind=5 calls=6176 failures=0
+LINUX WAITUSAGE FINAL: ordinary=0 namespace=1 kind=0 calls=12288 failures=12288
+LINUX WAITUSAGE FINAL: ordinary=0 namespace=1 kind=1 calls=15360 failures=15360
+LINUX WAITUSAGE FINAL: ordinary=0 namespace=1 kind=2 calls=9984 failures=9984
+LINUX WAITUSAGE FINAL: ordinary=0 namespace=1 kind=3 calls=27648 failures=21504
+LINUX WAITUSAGE FINAL: ordinary=0 namespace=1 kind=4 calls=6144 failures=5376
+LINUX WAITUSAGE FINAL: ordinary=0 namespace=1 kind=5 calls=6176 failures=0
+LINUX WAITUSAGE TOPOLOGY: ordinary=1 namespace=1 profile=0 killed=0 self=2 pid=3 real=1000 effective=1000 saved=1002
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=2 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=3 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=0 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=2 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=3 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=4 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=1 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=7 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=8 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=15 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=2 event=0 profile=0 form=0 actual=-1/14 available=16 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=0 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=1 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=2 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=3 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=4 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=3 event=0 profile=0 form=0 actual=-1/14 available=5 bad_byte=-1
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=0 bad_byte=16
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=1 bad_byte=17
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=2 bad_byte=56
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=3 bad_byte=57
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=4 bad_byte=80
+LINUX WAITUSAGE DETAIL: kind=4 event=0 profile=0 form=0 actual=0/0 available=5 bad_byte=81
+LINUX WAITUSAGE TOPOLOGY: ordinary=1 namespace=1 profile=0 killed=1 self=2 pid=4 real=1000 effective=1000 saved=1002
+LINUX WAITUSAGE TOPOLOGY: ordinary=1 namespace=1 profile=1 killed=0 self=2 pid=5 real=1000 effective=1002 saved=1002
+LINUX WAITUSAGE TOPOLOGY: ordinary=1 namespace=1 profile=1 killed=1 self=2 pid=6 real=1000 effective=1002 saved=1002
+LINUX WAITUSAGE TOPOLOGY: ordinary=1 namespace=1 profile=2 killed=0 self=2 pid=7 real=1000 effective=1000 saved=1002
+LINUX WAITUSAGE TOPOLOGY: ordinary=1 namespace=1 profile=2 killed=1 self=2 pid=8 real=1000 effective=1000 saved=1002
+LINUX WAITUSAGE TOPOLOGY: ordinary=1 namespace=1 profile=3 killed=0 self=2 pid=9 real=1000 effective=1002 saved=1002
+LINUX WAITUSAGE TOPOLOGY: ordinary=1 namespace=1 profile=3 killed=1 self=2 pid=10 real=1000 effective=1002 saved=1002
+LINUX WAITUSAGE CASES: ordinary=1 namespace=1 kind=0 calls=12288 failures=12288
+LINUX WAITUSAGE CASES: ordinary=1 namespace=1 kind=1 calls=15360 failures=15360
+LINUX WAITUSAGE CASES: ordinary=1 namespace=1 kind=2 calls=9984 failures=9984
+LINUX WAITUSAGE CASES: ordinary=1 namespace=1 kind=3 calls=27648 failures=21504
+LINUX WAITUSAGE CASES: ordinary=1 namespace=1 kind=4 calls=6144 failures=5376
+LINUX WAITUSAGE CASES: ordinary=1 namespace=1 kind=5 calls=6176 failures=0
+LINUX WAITUSAGE FINAL: ordinary=1 namespace=1 kind=0 calls=12288 failures=12288
+LINUX WAITUSAGE FINAL: ordinary=1 namespace=1 kind=1 calls=15360 failures=15360
+LINUX WAITUSAGE FINAL: ordinary=1 namespace=1 kind=2 calls=9984 failures=9984
+LINUX WAITUSAGE FINAL: ordinary=1 namespace=1 kind=3 calls=27648 failures=21504
+LINUX WAITUSAGE FINAL: ordinary=1 namespace=1 kind=4 calls=6144 failures=5376
+LINUX WAITUSAGE FINAL: ordinary=1 namespace=1 kind=5 calls=6176 failures=0
+LINUX WAITUSAGE FAIL: waitid rusage/siginfo ordering or alias controls
+QEMU: Terminated
+

@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "e4efd78c2e6544c9d7438ec7d729d2308b4faa009a15f00965b11569d7cd9896",
+    "results": [
+        {
+            "name": "waitusage",
+            "source_sha256": "d83f02e08d7e6da54531542303e91988b993976100c83ac0d61d881c828e4c3e",
+            "init_sha256": "bbfbe1f5d549f01d4639c1450b57c5ad4e43b9687c6b648fa66af5ede67c2046",
+            "iso_sha256": "4a089e3f52cbaa16e32cb2c43e1b63ae683c95be6eb77030091ad138a44b4ce8",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

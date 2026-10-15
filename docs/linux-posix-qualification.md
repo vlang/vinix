@@ -8007,3 +8007,110 @@ broad section 15 gates remain open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/waitevent-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitevent-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitevent-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitevent-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/waitevent-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitevent-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitevent-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitevent-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/waitevent-check.v), [verdict](../tests/linux-compat/results/2026-10-15/waitevent-audit.log).
+
+## Native waitid rusage and siginfo copyout order
+
+Native AArch64 and x86-64 waitid now copy child rusage before writing siginfo,
+matching the Linux wrapper. A failed rusage copy returns EFAULT before any
+siginfo stores; with distinct buffers, siginfo stays untouched.
+A later siginfo fault leaves the earlier rusage visible.
+For overlapping buffers, the six siginfo fields are the final writes.
+Previously Vinix copied siginfo first, violating all three observable rules.
+The patch swaps only the existing event-copy branches and adds an explanatory
+comment. It preserves both helpers, the child claim/pin, credential snapshot,
+accounting implementation, error cleanup and event-consumption rules.
+Complete production C differs only in `syscall_waitid`, without normalization;
+allocator, free, pin, stack-allocation and cleanup-call counts remain unchanged.
+
+The pinned
+[Linux v6.12 waitid wrapper](https://github.com/torvalds/linux/blob/v6.12/kernel/exit.c)
+copies rusage before beginning user siginfo access and returns immediately on
+rusage copy failure. Identical native probe source, emitted C and ELF run on
+original/corrected Vinix and Linux 6.12.51 for each architecture. Four fresh
+production builds use committed base `513723b3f0aa81ade15a203e98501d75a380082f`;
+only the owned `linux_task.v` patch enters corrected worktrees.
+
+Four cohorts cover root and ordinary UID 1000 callers in the initial and a
+one-level PID namespace. Each caller creates a fresh session, and every child
+occupies its own process group. Pipe readiness validates PID, parent, group,
+session and real/effective/saved UIDs. Four child credential profiles include
+real/effective differences, saved-ID transitions and UID 4294967294. One child
+per profile supplies SIGSTOP, SIGCONT and normal exit status 37; another dies
+from SIGKILL. Thirty-two topology records per architecture bind these children.
+The probe observes each event before running fault/alias tests, retains it
+with WNOWAIT throughout, then consumes it with a final genuine musl wait.
+An immediate WNOHANG call with unusable rusage checks cleared no-event output
+or ECHILD after reaping; no-event returns must continue to ignore rusage.
+
+Each architecture runs 310,400 controls. Counts below are per cohort:
+
+| Class | Controls | Original failures |
+| --- | ---: | ---: |
+| Wrapping, low unmapped, read-only and PROT_NONE rusage; mapped siginfo stays poisoned | 12,288 | 12,288 |
+| Valid rusage; two wrapping, low unmapped, read-only and PROT_NONE siginfo pointers | 15,360 | 15,360 |
+| Thirteen rusage guard cuts below 144; EFAULT leaves mapped siginfo poisoned | 9,984 | 9,984 |
+| All siginfo cuts 0..32 plus 64/127/128, with preceding valid rusage | 27,648 | 21,504 |
+| Seven overlapping layouts and one adjacent layout | 6,144 | 5,376 |
+| Valid mapped siginfo with NULL/valid rusage; consuming/cleared controls | 6,176 | 0 |
+
+All four event kinds run through P_ALL/P_PID/P_PGID, eight raw-register/musl
+forms and WNOWAIT with/without WNOHANG. Mapped offsets 0/1/3/7 exercise aligned
+and unaligned structures. Genuine musl calls cover NULL rusage; raw calls
+exercise the fifth argument. Basic rusage validation decodes all eighteen
+LP64 fields byte-wise, requires nonnegative values and normalized microseconds,
+and checks surrounding canaries. This rejects untouched poison and does not
+claim exact accounting values.
+
+Rusage guard cuts 0/1/7/8/15/16/31/32/63/64/127/128/143 check EFAULT, completely
+untouched siginfo and a sixteen-byte leading rusage canary. Accessible rusage
+prefix contents and exact partial-copy counts are deliberately unqualified.
+Siginfo guard controls compare every accessible byte and their leading canary,
+including preserved padding and the six ordered fields from the prior event
+qualification. The preceding rusage must be valid even when the siginfo copy
+faults. Cuts below 28 return EFAULT; cuts 28 and above succeed.
+
+Alias layouts place (siginfo,rusage) at offsets (16,16), (17,17), (56,16),
+(57,17), (80,16), (81,17), (16,20) and (16,144) in one 320-byte poisoned buffer.
+These cover exact, unaligned and partial overlaps in both directions plus an
+adjacent control. All six final siginfo fields must match the child's event,
+and every byte outside the rusage span and six siginfo fields stays poisoned.
+Rusage bytes overlapped by siginfo and exact accounting remain outside the
+alias oracle. Original kernels fail exactly 258,048 controls per architecture;
+corrected Vinix and unchanged-ELF Linux references pass all 310,400 each.
+
+Four warmed 200-cycle storage cohorts keep one stopped child and all mappings
+outside the measured interval. Cycles rotate failed rusage with untouched
+siginfo, valid rusage before read-only siginfo refusal, a 25-byte siginfo guard
+fault after valid rusage, and partial alias output. Each mode varies three
+selectors and eight raw/musl forms. Slab objects and big-page totals stay flat
+after settling. Fork, mappings, signals, exit and reap are outside the interval.
+The probe C has five explicit stack allocas and no malloc/memdup/dynamic-array/
+fixed-index calls. AArch64 uses 16 KiB Vinix pages; x86-64 and both Linux
+references use 4 KiB pages. Raw storage totals remain in the linked logs.
+
+Runtime and the 156,800-control child-event output regressions pass on both
+native architectures; all eight host test files pass. Allocation diagnostics
+remain byte-identical, including existing allowance-file refusals. The maintained
+audit binds 67 inventory inputs, 15,146 compiler inputs, all 2,014 private SDK
+files, fifteen final ARM compiler-command receipts, source/C/ELF/ISO/kernel
+identity, 84 retained regular files across eight native profiles, exact source
+and whole-C scope, and executing false-assertion/passing-reference-as-original
+controls. Compile the audit without `-prod`.
+
+The first host auditor compilation refused an option-unwrapping typo in its
+copy-call position checks. Its source and compiler log are retained separately;
+this was a compiler refusal, with no audit verdict. The corrected checker
+unwraps each position explicitly, compares the old and new call order, and
+runs both negative controls. Guest source, C, ELFs and results are unchanged.
+See the [initial auditor compiler log](../tests/linux-compat/results/2026-10-15/waitusage-initial-audit-compile.log)
+and [initial source](../tests/linux-compat/results/2026-10-15/waitusage-initial-audit-source.v).
+
+Consuming copyout faults, exact partial rusage copy counts/accounting, arbitrary
+alias placements, concurrent mappings/credentials/lifecycle changes, mapped
+user IDs, P_PIDFD, __W flags, ptrace/cross-thread waits, interrupted/restarted
+waits, GNU libc and translated/ELF32 paths remain outside this bounded contract.
+The three broad section 15 gates remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/waitusage-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitusage-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitusage-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitusage-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/waitusage-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitusage-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitusage-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitusage-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/waitusage-check.v), [verdict](../tests/linux-compat/results/2026-10-15/waitusage-audit.log).

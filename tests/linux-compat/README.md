@@ -1752,3 +1752,18 @@ original failures, native/reference results, whole-C scope, compiler/SDK/input
 pins and executing audit controls. Consuming copyout faults, rusage-fault
 ordering/aliasing/accounting and mapping/credential races retain separate
 limits. See the [event-field report](../../docs/linux-posix-qualification.md#native-waitid-child-event-siginfo-writes).
+
+The `waitusage` case qualifies rusage-before-siginfo output ordering: failed
+rusage skips siginfo stores, earlier rusage survives later siginfo faults,
+and siginfo fields win in seven overlapping layouts plus an adjacent control.
+Four root/UID1000 initial/one-level PID namespace cohorts and four credential
+profiles run 310,400 controls per architecture across stop/continuation/exit37/
+SIGKILL, three selectors, eight raw/musl forms, WNOWAIT with/without WNOHANG,
+mapped offsets, thirteen partial-rusage cuts, all siginfo cuts0..32 plus64/127/
+128, invalid pointers and consuming/cleared unused-rusage controls. Four warmed
+200-cycle storage cohorts stay flat. `waitusage-reference.v` boots the unchanged
+native ELF on Linux. Compile `waitusage-check.v` without `-prod` and supply its
+evidence area to verify original failures, native/reference results, whole-C
+scope, compiler/SDK/input pins and executing audit controls. Consuming faults,
+exact partial-rusage counts/accounting and arbitrary aliases remain separate.
+See the [copyout-order report](../../docs/linux-posix-qualification.md#native-waitid-rusage-and-siginfo-copyout-order).

@@ -604,11 +604,12 @@ pub fn syscall_waitid(_ voidptr, idtype_word u64, id_word u64, infop u64, option
 		info.si_status = i32(status & 0x7f)
 	}
 
-	if infop != 0 && !write_waitid_siginfo(infop, unsafe { &info }) {
+	// Linux copies rusage first: its faults must leave siginfo untouched.
+	if !write_child_rusage(rusage_ptr, child) {
 		finish_child_change(mut current_process, change, false)
 		return errno.err, errno.efault
 	}
-	if !write_child_rusage(rusage_ptr, child) {
+	if infop != 0 && !write_waitid_siginfo(infop, unsafe { &info }) {
 		finish_child_change(mut current_process, change, false)
 		return errno.err, errno.efault
 	}

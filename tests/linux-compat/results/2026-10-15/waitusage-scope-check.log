@@ -1,0 +1,1 @@
+arm/x86: complete production C differs only in waitid; copy child rusage before siginfo, retain existing helpers and error/claim paths; credentials, accounting implementation, pins, ownership and consumption unchanged; no added allocation/free/pin and no normalization

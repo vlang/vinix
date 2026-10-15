@@ -1,0 +1,35 @@
+Compiler output from the default V compiler:
+tests/linux-compat/waitusage-check.v:2:8: warning: module 'sha256 (crypto.sha256)' is imported but never used. Use `import sha256 (crypto.sha256) as _`, to silence this warning, or just remove the unused import line
+    1 | // Compile without -prod: both deliberately failing controls must execute.
+    2 | import crypto.sha256
+      |        ~~~~~~~~~~~~~
+    3 | import json2
+    4 | import os
+tests/linux-compat/waitusage-check.v:74:53: error: to propagate a Result, the call must also return a Result type
+   72 |  old := body(before,'userland__syscall_waitid'); new := body(after,'userland__syscall_waitid'); assert old != new
+   73 |  for token in ['malloc(','calloc(','realloc(','memdup(','array__','free(','alloca(','vinix_stack_alloc(','pin_process(','unpin_process(','finish_child_change(','proc__lock_table(','proc__unlock_table(','userland__write_child_rusage(','userland__write_waitid_siginfo('] {assert old.count(token) == new.count(token),token}
+   74 |  assert old.index('userland__write_waitid_siginfo(')! < old.index('userland__write_child_rusage(')!
+      |                                                     ^
+   75 |  assert new.index('userland__write_child_rusage(')! < new.index('userland__write_waitid_siginfo(')!
+   76 |  assert before.replace(old,'') == after.replace(new,''),'Whole production C differs outside waitid; no normalization'
+tests/linux-compat/waitusage-check.v:74:99: error: to propagate a Result, the call must also return a Result type
+   72 |  old := body(before,'userland__syscall_waitid'); new := body(after,'userland__syscall_waitid'); assert old != new
+   73 |  for token in ['malloc(','calloc(','realloc(','memdup(','array__','free(','alloca(','vinix_stack_alloc(','pin_process(','unpin_process(','finish_child_change(','proc__lock_table(','proc__unlock_table(','userland__write_child_rusage(','userland__write_waitid_siginfo('] {assert old.count(token) == new.count(token),token}
+   74 |  assert old.index('userland__write_waitid_siginfo(')! < old.index('userland__write_child_rusage(')!
+      |                                                                                                   ^
+   75 |  assert new.index('userland__write_child_rusage(')! < new.index('userland__write_waitid_siginfo(')!
+   76 |  assert before.replace(old,'') == after.replace(new,''),'Whole production C differs outside waitid; no normalization'
+tests/linux-compat/waitusage-check.v:75:51: error: to propagate a Result, the call must also return a Result type
+   73 |  for token in ['malloc(','calloc(','realloc(','memdup(','array__','free(','alloca(','vinix_stack_alloc(','pin_process(','unpin_process(','finish_child_change(','proc__lock_table(','proc__unlock_table(','userland__write_child_rusage(','userland__write_waitid_siginfo('] {assert old.count(token) == new.count(token),token}
+   74 |  assert old.index('userland__write_waitid_siginfo(')! < old.index('userland__write_child_rusage(')!
+   75 |  assert new.index('userland__write_child_rusage(')! < new.index('userland__write_waitid_siginfo(')!
+      |                                                   ^
+   76 |  assert before.replace(old,'') == after.replace(new,''),'Whole production C differs outside waitid; no normalization'
+   77 | }
+tests/linux-compat/waitusage-check.v:75:99: error: to propagate a Result, the call must also return a Result type
+   73 |  for token in ['malloc(','calloc(','realloc(','memdup(','array__','free(','alloca(','vinix_stack_alloc(','pin_process(','unpin_process(','finish_child_change(','proc__lock_table(','proc__unlock_table(','userland__write_child_rusage(','userland__write_waitid_siginfo('] {assert old.count(token) == new.count(token),token}
+   74 |  assert old.index('userland__write_waitid_siginfo(')! < old.index('userland__write_child_rusage(')!
+   75 |  assert new.index('userland__write_child_rusage(')! < new.index('userland__write_waitid_siginfo(')!
+      |                                                                                                   ^
+   76 |  assert before.replace(old,'') == after.replace(new,''),'Whole production C differs outside waitid; no normalization'
+   77 | }
