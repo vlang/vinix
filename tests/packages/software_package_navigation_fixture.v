@@ -6,6 +6,193 @@ import os
 import time
 import ui2
 import tools.packages.pkgprotocol
+import desktop.packagecore
+
+fn package_plan_text(a &SoftwareApp) string {
+	mut bytes := []u8{cap: 20000}
+	unsafe { bytes.flags |= .noslices }
+	defer { unsafe { bytes.free() } }
+	for page in a.details_pages {
+		mut lines := page.text.split_into_lines()
+		for line in lines {
+			start := if line.starts_with('• ') { 4 } else { 2 }
+			for index in start .. line.len { bytes << line[index] }
+		}
+		software_policy_free_lines(mut lines)
+	}
+	return bytes.bytestr()
+}
+
+fn package_plan_cycle(mut app SoftwareApp, exhaustive bool) ! {
+	selected := app.review_selected; scroll := app.review_scroll; catalog := app.selected
+	status := app.status; focused := app.focus; selection := app.select_all
+	fingerprint := app.review_snapshot.fingerprint; rows := app.review_snapshot.rows.data
+	names := app.review_snapshot.names.data; intent := app.review_names.data; path := app.deployment_pending
+	for size in [ui2.rect(0, 0, 640, 610), ui2.rect(0, 0, 320, 240)]! {
+		tree := app.build(size)!; assert tree.children.any(it.id == 'software.report.read'); free_window_tree(tree)
+	}
+	app.handle('software.report.read')!; assert app.report_reader_mode && !app.details_mode
+	if exhaustive {
+		for canonical, full in app.details_pages {
+			mut bytes := []u8{cap: full.text.len}
+			for short in app.details_compact_pages {
+				if short.source_page == canonical { for byte in short.text { if byte != `\n` { bytes << byte } } }
+			}
+			expected := full.text.replace('\n', '')
+			assert editor_bytes_text(bytes) == expected
+			unsafe { bytes.free(); expected.free() }
+		}
+		for index, short in app.details_compact_pages {
+			app.details_compact_page = index; app.details_page = short.source_page
+			for size in [ui2.rect(0, 0, 180, 220), ui2.rect(0, 0, 320, 240)]! {
+				tree := app.build(size)!
+				details_fixture_rendered_lines(&tree, short.text, 14, 118, int(size.width) - 28, 18, 12)
+				assert tree.children.any(it.id == 'software.report.back') && tree.children.any(it.text == short.label)
+				assert !tree.children.any(it.id in ['software.confirm', 'software.cancel', 'software.details', 'software.failure'])
+				for element in tree.children {
+					assert element.frame.x >= 0 && element.frame.x + element.frame.width <= size.width
+					assert element.frame.y >= 0 && element.frame.y + element.frame.height <= size.height
+				}
+				free_window_tree(tree)
+			}
+			app.key_input('\x1b[C'); assert app.details_compact_page == if index + 1 < app.details_compact_pages.len { index + 1 } else { index }
+		}
+		app.key_input('\x1b[5~'); assert app.details_compact_page == app.details_compact_pages.len - 2
+		for app.details_compact_page > 0 { app.key_input('\x1b[D') }
+		app.key_input('\x1b[D'); assert app.details_compact_page == 0
+	}
+	free_window_tree(app.build(ui2.rect(0, 0, 180, 220))!); app.key_input('\x1b[6~')
+	anchor := app.details_compact_page; canonical := app.details_page
+	for size in [ui2.rect(0, 0, 640, 610), ui2.rect(0, 0, 160, 96), ui2.rect(0, 0, 180, 220)]! {
+		tree := app.build(size)!; assert tree.children.any(it.id == 'software.report.back')
+		if size.width >= 640 { details_fixture_rendered_lines(&tree, app.details_pages[canonical].text, 14, 94, 612, 20, 52) }
+		free_window_tree(tree); assert app.details_page == canonical && app.details_compact_page == anchor
+	}
+	request := packagecore.request_prefix + '{"id":"editor"}'
+	defer { unsafe { request.free() } }
+	for action in ['software.confirm', 'software.cancel', 'software.row.1', 'software.up', 'software.down', 'software.details',
+		'software.reload', 'software.refresh', 'software.install', 'software.remove', 'software.upgrade', 'software.rollback', 'software.repair',
+		'software.search', 'software.run', 'software.deployment.path', 'software.deployment.review', 'software.deployment.back',
+		'software.deployment.stop', 'software.review.stop', 'software.failure', 'software.report.read', request]! { app.handle(action)! }
+	app.key_input('typed'); app.key_input('\r'); app.key_input('\x01'); app.key_input('\x08'); app.paste_input('changed'); app.paste_input('\x1b')
+	assert app.report_reader_mode && app.worker == unsafe { nil } && !app.admin_prompt && app.launch_request == ''
+	assert app.review_selected == selected && app.review_scroll == scroll && app.selected == catalog
+	assert app.status == status && app.focus == focused && app.select_all == selection
+	assert app.review_snapshot.fingerprint == fingerprint && app.review_snapshot.rows.data == rows
+	assert app.review_snapshot.names.data == names && app.review_names.data == intent && app.deployment_pending == path
+	app.key_input('\t'); app.key_input('\x1b[Z')
+	app.key_input('\x1b'); assert !app.report_reader_mode && app.review_ready && app.details_pages.len == 0 && app.details_compact_pages.len == 0
+	assert app.review_selected == selected && app.review_scroll == scroll && app.review_read_item == -1
+}
+
+fn check_package_plan_boundaries() ! {
+	padding := '文'.repeat(1363); path := '/media/' + padding
+	description := 'é'.repeat(2048)
+	defer { unsafe { padding.free(); path.free(); description.free() } }
+	for operation in ['install', 'remove', 'upgrade', 'repair', 'rollback', 'deploy']! {
+		for arch in ['aarch64', 'x86_64']! {
+			base := if operation == 'deploy' { deployment_navigation_review(false) } else {
+				package_navigation_review(operation, if operation in ['install', 'remove']! { ['editor'] } else { []string{} }) }
+			mut projected := base.rows.map(pkgprotocol.ReviewPackage{ ...it, architecture: arch })
+			unsafe { projected[0].description.free() }
+			projected[0] = pkgprotocol.ReviewPackage{ ...projected[0], description: description.clone() }
+			unsafe { (&array(&base.rows)).free() }
+			mut review := pkgprotocol.Review{ ...base, architecture: arch, rows: projected,
+				generation: ~u64(0), disk_needed: ~u64(0), disk_available: ~u64(0), disk_reserve: ~u64(0) }
+			review.validate()!
+			encoded := json2.encode(review)
+			mut app := SoftwareApp{ output: encoded.bytes(), review: operation.clone(), deployment_mode: operation == 'deploy',
+				deployment_pending: if operation == 'deploy' { path.clone() } else { '' } }
+			for name in review.names { app.review_names << name.clone() }
+			review.close(); unsafe { encoded.free() }
+			app.load_review(); assert app.review_ready
+			package_plan_cycle(mut app, true)!
+			app.handle('software.report.read')!
+			text := package_plan_text(&app)
+			assert text.contains('Operation: ' + operation) && text.contains('Target architecture: ' + arch)
+			assert text.contains('Active generation: 18446744073709551615') && text.contains('Review fingerprint: ')
+			for label in ['Required disk space', 'Available disk space', 'Reserved disk space']! { assert text.contains(label + ' (bytes): 18446744073709551615') }
+			assert text.contains(description) && text.contains('Publisher key:') && text.contains('Displayed package permission: files')
+			if operation == 'deploy' { assert text.contains('Frozen deployment file: ' + path) && text.contains('replaces the installed application set') }
+			if operation == 'repair' { assert text.contains('Package action: repair') && text.contains('preserves installed versions') }
+			if operation == 'remove' { assert text.contains('Package action: remove') && text.contains('Personal application data stays on disk') }
+			if operation == 'rollback' { assert text.contains('Restore from generation: 2') && text.contains('new generation') }
+			unsafe { text.free() }
+			for app.review_read_item > 0 { app.key_input('\x1b[A') }
+			app.key_input('\x1b[A'); assert app.review_read_item == 0
+			for index in 0 .. app.review_snapshot.names.len + app.review_snapshot.rows.len {
+				assert app.review_read_item == index
+				current := package_plan_text(&app)
+				if index < app.review_snapshot.names.len { assert current.contains('Frozen operation argument: ' + app.review_snapshot.names[index]) }
+				else {
+					row := app.review_snapshot.rows[index - app.review_snapshot.names.len]
+					assert current.contains('Package ID: ' + row.id)
+					if row.kind == 'runtime' { assert current.contains('Proprietary payload: Yes') && current.contains('Firmware payload: Yes') }
+				}
+				unsafe { current.free() }; app.key_input('\x1b[B')
+				assert app.review_read_item == if index + 1 < app.review_snapshot.names.len + app.review_snapshot.rows.len { index + 1 } else { index }
+			}
+			app.handle('software.report.back')!; assert !app.report_reader_mode && app.review_selected == 0
+			app.handle('software.cancel')!; app.handle('software.report.read')!; assert !app.report_reader_mode && app.details_pages.len == 0
+			app.close_app()
+		}
+	}
+	// A removal-only or empty deployment still has an explicit plan overview.
+	mut empty := SoftwareApp{ deployment_mode: true, review: 'deploy'.clone(), deployment_pending: path.clone(), review_ready: true,
+		review_snapshot: pkgprotocol.Review{ format: 1, operation: 'deploy'.clone(), architecture: 'aarch64'.clone(), fingerprint: 'c'.repeat(64) } }
+	package_plan_cycle(mut empty, true)!
+	empty.handle('software.report.read')!; assert !empty.report_has_packages()
+	txt := package_plan_text(&empty); assert txt.contains('Packages including dependencies and removals: 0') && txt.contains('empty plan')
+	unsafe { txt.free() }; empty.key_input('\t'); assert empty.review_read_item == -1
+	empty.key_input('\x1b'); empty.close_app()
+	check_package_plan_maximum()!
+	println('Software package plan reader: six operations on both architectures, complete metadata and Unicode paths/descriptions, exact u64 space/generations, arguments/packages, empty plans, native lines, resize anchors and frozen confirmation passed')
+}
+
+fn check_package_plan_maximum() ! {
+	mut names := []string{cap: 4096}; mut requested := []string{cap: 4096}
+	mut rows := []pkgprotocol.ReviewPackage{cap: 8192}
+	unsafe { names.flags |= .noslices; requested.flags |= .noslices; rows.flags |= .noslices }
+	for index in 0 .. 8192 {
+		number := index.str(); zeros := '0'.repeat(5 - number.len); id := 'p' + zeros + number
+		unsafe { number.free(); zeros.free() }
+		if index < 4096 { names << id.clone(); requested << id.clone() }
+		row := pkgprotocol.ReviewPackage{ id: id, name: id.clone(), version: '1.0.0', architecture: 'aarch64', kind: 'native',
+			repository: 'trusted', public_key: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', license: 'MIT', requested: index < 4096, action: 'keep' }
+		unsafe { rows.push_many(&row, 1) }
+	}
+	mut review := pkgprotocol.Review{ format: 1, operation: 'deploy', architecture: 'aarch64', fingerprint: 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+		names: names, requested: requested, rows: rows }
+	review.validate()!
+	encoded := json2.encode(review); review.close()
+	mut app := SoftwareApp{ deployment_mode: true, review: 'deploy'.clone(), deployment_pending: '/approved.json'.clone(), output: encoded.bytes() }
+	defer { app.close_app(); unsafe { encoded.free() } }
+	app.load_review(); assert app.review_ready && app.review_snapshot.rows.len == 8192 && app.review_snapshot.names.len == 4096
+	app.handle('software.report.read')!
+	for app.review_read_item > 0 { app.key_input('\x1b[A') }
+	for index in 0 .. 12288 {
+		assert app.review_read_item == index
+		assert app.details_pages.len < 16 // only the current argument/package is cached
+		text := package_plan_text(&app)
+		expected := if index < 4096 { 'Frozen operation argument: ' + app.review_snapshot.names[index] }
+			else { 'Package ID: ' + app.review_snapshot.rows[index - 4096].id }
+		assert text.contains(expected)
+		unsafe { text.free(); expected.free() }
+		app.key_input('\t')
+	}
+	assert app.review_read_item == 12287 && app.review_selected == 0 && app.review_scroll == 0
+	app.key_input('\x1b')
+	// Invalid presentation bytes get a diagnostic and never enter pagination.
+	mut broken := app.review_snapshot.rows.clone()
+	// Move the decoded row fields into the replacement container.
+	unsafe { (&array(&app.review_snapshot.rows)).free(); broken[0].description.free() }
+	broken[0] = pkgprotocol.ReviewPackage{ ...broken[0], description: '\xff'.clone() }
+	app.review_snapshot = pkgprotocol.Review{ ...app.review_snapshot, rows: broken }
+	app.handle('software.report.read')!
+	invalid := package_plan_text(&app); assert invalid.contains('invalid UTF-8 or oversized metadata') && !app.details_mode
+	unsafe { invalid.free() }; app.key_input('\x1b')
+	println('Software package plan reader: all 4096 arguments and 8192 packages, bounded per-item caches and invalid-metadata diagnostics passed')
+}
 
 const package_navigation_operations = ['install', 'remove', 'upgrade', 'repair', 'rollback']!
 
@@ -73,9 +260,10 @@ fn check_package_navigation_writer(mut app SoftwareApp) ! {
 	assert !app.package_review_running() && !app.prepare_close()
 	compact := app.build(ui2.rect(0, 0, 320, 240))!
 	assert compact.children.any(it.id == 'software.progress') && compact.children.any(it.text == app.status)
-	assert !compact.children.any(it.id in ['software.review.stop', 'software.cancel', 'software.reload', 'software.confirm'])
+	assert !compact.children.any(it.id in ['software.review.stop', 'software.cancel', 'software.reload', 'software.confirm', 'software.report.read'])
 	free_window_tree(compact)
 	for action in ['software.review.stop', 'software.cancel', 'software.reload', 'software.search']! { app.handle(action)! }
+	app.handle('software.report.read')!; assert !app.report_reader_mode && app.worker.pid == pid
 	app.key_input('\x1b'); app.stop_package_review(); app.key_input('must-not-edit')
 	assert app.worker.pid == pid && C.kill(pid, 0) == 0 && app.query.bytestr() == 'Editor'
 }
@@ -95,6 +283,7 @@ fn check_package_navigation_paste_guard(mut app SoftwareApp) {
 }
 
 fn check_software_package_navigation() ! {
+	check_package_plan_boundaries()!
 	receipt := os.temp_dir() + '/vinix-package-navigation-' + os.getpid().str()
 	os.setenv('VINIX_SOFTWARE_PACKAGE_NAVIGATION_RECEIPT', receipt, true)
 	defer { os.rm(receipt) or {}; os.unsetenv('VINIX_SOFTWARE_PACKAGE_NAVIGATION_RECEIPT'); os.unsetenv('VINIX_SOFTWARE_PACKAGE_NAVIGATION') }
@@ -113,10 +302,11 @@ fn check_software_package_navigation() ! {
 				for size in [ui2.rect(0, 0, 640, 610), ui2.rect(0, 0, 320, 240)]! {
 					tree := app.build(size)!
 					assert tree.children.any(it.id == 'software.review.stop') && tree.children.any(it.text == app.status)
-					assert !tree.children.any(it.id in ['software.confirm', 'software.cancel'])
+					assert !tree.children.any(it.id in ['software.confirm', 'software.cancel', 'software.report.read'])
 					free_window_tree(tree)
 				}
 				app.handle('software.confirm')!; app.handle('software.search')!; app.key_input('must-not-edit')
+				app.handle('software.report.read')!; assert !app.report_reader_mode && app.worker.pid == pid && app.details_pages.len == 0
 				assert !os.exists(receipt) && app.query.bytestr() == 'Editor' && !app.focus
 				if action == 'escape' { app.key_input('\x1b') } else { app.handle(action)! }
 				assert app.worker == unsafe { nil } && C.kill(pid, 0) != 0 && !app.worker_review && !app.review_ready
@@ -128,6 +318,7 @@ fn check_software_package_navigation() ! {
 				assert app.review_ready && app.review_snapshot.operation == operation
 				check_package_navigation_paste_guard(mut app)
 				app.handle('software.row.1')!; assert app.review_selected == 1 && app.selected == 0
+				package_plan_cycle(mut app, false)!
 				compact := app.build(ui2.rect(0, 0, 320, 240))!
 				assert compact.children.any(it.id == 'software.cancel') && !compact.children.any(it.id == 'software.confirm')
 				free_window_tree(compact)
@@ -216,6 +407,7 @@ fn check_software_package_navigation_memory() ! {
 					app.review = operation.clone()
 					if operation in ['install', 'remove']! { app.review_names << 'editor'.clone() }
 					app.output.clear(); for byte in text { app.output << byte }; app.load_review(); assert app.review_ready
+					package_plan_cycle(mut app, false)!
 					free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!); free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
 					app.open_details(); assert app.details_mode
 					free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!); app.key_input('\x1b')
@@ -228,5 +420,6 @@ fn check_software_package_navigation_memory() ! {
 		app.set_status('')
 		kept := C.vinix_heap_end(); assert kept == 0, 'package navigation retained ${kept} bytes'
 		println('Software package navigation: 1000 catalog and five-operation full/compact/review/details/failure/cancel/retirement cycles retain zero tracked bytes')
+		println('Software package plan reader: 1000 five-operation/decode/read/item/page/render/resize/ignored-confirm/Back/cancel/cache-retirement cycles retain zero tracked bytes')
 	}
 }

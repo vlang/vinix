@@ -1129,6 +1129,26 @@ and its corresponding full page. Smaller windows retain Back. No confirmation,
 application action or editable field is active in this view. See
 [compact details checks](../tests/packages/software-details-navigation-check.md).
 
+Admitted install, uninstall, update, repair, rollback and deployment proposals
+also offer **Read plan** in full and compact windows. The plan shows the frozen
+operation/fingerprint, target, active/restore generations, exact disk/reserve
+bytes, argument/root/package counts, deployment filename and operation-specific
+effects on installed packages and retained personal data. Item navigation visits
+every frozen operation argument and then every package, including complete
+descriptions, versions/actions, role, runtime, publisher, permissions, licensing
+and proprietary/firmware declarations. It prepares only the current item's
+pages, including for 4,096 arguments and 8,192 packages. Empty plans retain their
+scope; invalid package presentation metadata has a diagnostic.
+
+Previous/Next item, Up/Down and Tab/Shift-Tab use a separate reader position.
+The review's selected package, list page and captured intent stay fixed.
+Previous/Next page and Left/Right/Page keys browse complete short/full pages;
+Back/Escape returns to the same review and retires the reader cache. Confirmation,
+cancellation, editing and application actions are unavailable inside the reader.
+Active proposal and approved transaction workers cannot enter it. Return to the
+full review to confirm or cancel. See
+[package plan qualification](../tests/packages/software-plan-reader-check.md).
+
 Prepared package, policy, health, deployment-check and saved-receipt pages now
 render each line as a separate monospace label. This makes every prepared line
 visible in the native renderer. Health and deployment-check side panels use

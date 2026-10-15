@@ -1,0 +1,23 @@
+20 successful focused Software compile/run checks:
+PASS ui-compile
+PASS ui-functional
+PASS ui-package-navigation-memory
+PASS ui-deployment-navigation-memory
+PASS ui-mirror-navigation-memory
+PASS ui-snapshot-export-memory
+PASS ui-launch-navigation-memory
+PASS ui-health-memory
+PASS ui-audit-memory
+PASS ui-snapshot-memory
+PASS ui-cleanup-memory
+PASS ui-data-memory
+PASS ui-details-memory
+PASS ui-asan-compile
+PASS ui-asan-functional
+PASS ui-asan-package-navigation-memory
+PASS ui-asan-deployment-navigation-memory
+PASS ui-asan-details-memory
+PASS fonts-compile
+PASS fonts-run
+PASS full desktop typecheck arm64
+PASS full desktop typecheck amd64

@@ -107,11 +107,24 @@ fn software_details_count(mut values []string, label string, count u64) {
 }
 
 fn (mut a SoftwareApp) prepare_details(row SoftwareRow, action string, reviewing bool) {
+	a.prepare_details_context(row, action, reviewing, false)
+}
+
+fn (mut a SoftwareApp) prepare_details_context(row SoftwareRow, action string, reviewing bool, plan bool) {
 	a.clear_details()
 	a.details_review = reviewing
 	a.details_pages = []SoftwareDetailsPage{cap: 32}
 	unsafe { a.details_pages.flags |= .noslices }
 	mut general := []string{cap: 24}
+	unsafe { general.flags |= .noslices }
+	if plan {
+		a.package_plan_values(mut general)
+		if row.id == '' {
+			a.details_values(0, general); software_policy_free_lines(mut general)
+			a.finish_details(true)
+			return
+		}
+	}
 	general << if reviewing { 'Facts from the reviewed package set.'.clone() } else { 'Facts describe the selected catalog/update version; installed launch fields appear separately.'.clone() }
 	general << 'Package ID: ' + row.id
 	general << 'Name: ' + row.name
@@ -161,7 +174,7 @@ fn (mut a SoftwareApp) prepare_details(row SoftwareRow, action string, reviewing
 		software_details_count(mut diagnostics, 'Required disk space (bytes): ', a.review_snapshot.disk_needed)
 		software_details_count(mut diagnostics, 'Available disk space (bytes): ', a.review_snapshot.disk_available)
 		software_details_count(mut diagnostics, 'Reserved disk space (bytes): ', a.review_snapshot.disk_reserve)
-		if a.deployment_pending != '' { diagnostics << 'Deployment file: ' + a.deployment_pending }
+		if !plan && a.deployment_pending != '' { diagnostics << 'Deployment file: ' + a.deployment_pending }
 		if a.mirror_pending != '' { diagnostics << 'Export destination: ' + a.mirror_snapshot.destination }
 		if a.mirror_lock_pending != '' { diagnostics << 'Deployment lock: ' + a.mirror_lock_pending }
 	} else {
@@ -171,19 +184,25 @@ fn (mut a SoftwareApp) prepare_details(row SoftwareRow, action string, reviewing
 	}
 	if diagnostics.len == 0 { diagnostics << 'No package, catalog or update diagnostics.'.clone() }
 	a.details_values(5, diagnostics); software_policy_free_lines(mut diagnostics)
+	a.finish_details(plan)
+}
+
+fn (mut a SoftwareApp) finish_details(plan bool) {
 	mut counts := [6]int{}
 	mut numbers := [6]int{}
 	mut totals := [6]string{}
 	for page in a.details_pages { counts[page.section]++ }
 	for section in 0 .. 6 { totals[section] = counts[section].str() }
+	overall := a.details_pages.len.str()
 	for index in 0 .. a.details_pages.len {
 		section := a.details_pages[index].section
 		numbers[section]++
-		number := numbers[section].str()
-		a.details_pages[index].label = number + ' of ' + totals[section]
+		number := if plan { (index + 1).str() } else { numbers[section].str() }
+		total := if plan { overall } else { totals[section] }
+		a.details_pages[index].label = number + ' of ' + total
 		unsafe { number.free() }
 	}
-	unsafe { for total in totals { total.free() } }
+	unsafe { overall.free(); for total in totals { total.free() } }
 	// Reuse the failure view's UTF-8 pagination and canonical-page anchors.
 	// Prepare owned caches once; every redraw borrows its individual lines.
 	a.details_compact_pages = []SoftwareFailurePage{cap: 32}
@@ -192,7 +211,8 @@ fn (mut a SoftwareApp) prepare_details(row SoftwareRow, action string, reviewing
 		software_failure_paginate(mut a.details_compact_pages, page.text, 12, 3, index)
 	}
 	software_failure_labels(mut a.details_compact_pages)
-	a.details_mode = true; a.focus = false; a.select_all = false
+	a.details_mode = !plan
+	if !plan { a.focus = false; a.select_all = false }
 }
 
 fn (mut a SoftwareApp) open_details() {

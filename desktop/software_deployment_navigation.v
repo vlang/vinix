@@ -20,8 +20,9 @@ fn (mut a SoftwareApp) stop_deployment_review() {
 }
 
 fn (a &SoftwareApp) build_deployment_compact(width int, height int) ui2.Element {
-	mut children := frame_elements(8)
+	mut children := frame_elements(9)
 	available := a.failure_pages.len > 0 && a.worker == unsafe { nil } && !a.details_mode
+	readable := a.package_review_readable() && !a.details_mode
 	children << software_label('Deployment · enlarge for details', 14, 8, width - 28, 28, false)
 	if a.details_mode {
 		children << software_button('software.details.back', 'Back to review', 14, 46, if width > 202 { 174 } else { width - 28 })
@@ -33,12 +34,15 @@ fn (a &SoftwareApp) build_deployment_compact(width int, height int) ui2.Element 
 	} else {
 		children << software_label('Wait for deployment to finish.', 14, 46, width - 28, 28, false)
 	}
+	if readable { children << software_button('software.report.read', 'Read plan', 14, 84, if width > 202 { 174 } else { width - 28 }) }
 	if available {
-		children << software_button('software.failure', 'Failure details', 14, 84, if width > 202 { 174 } else { width - 28 })
+		children << software_button('software.failure', 'Failure details', 14, if readable { 122 } else { 84 }, if width > 202 { 174 } else { width - 28 })
 	}
 	progress := a.progress_seen && height >= 240
 	if progress { children << a.progress_bar(width, height) }
-	y := if height > 230 { height - if progress { 88 } else { 98 } } else if available { 122 } else { 84 }
+	minimum := if readable && available { 160 } else if readable || available { 122 } else { 84 }
+	footer := height - if progress { 88 } else { 98 }
+	y := if footer > minimum { footer } else { minimum }
 	children << software_label(a.status, 14, y, width - 28, if height > y + 8 { height - y - 8 } else { 1 }, false)
 	return ui2.screen(app_surface, children)
 }

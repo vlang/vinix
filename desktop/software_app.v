@@ -47,6 +47,7 @@ mut:
 	review_snapshot pkgprotocol.Review
 	review_ready    bool
 	review_selected int = -1
+	review_read_item int = -1
 	review_scroll   int
 	review_summary  string
 	details_mode    bool
@@ -435,6 +436,7 @@ fn (mut a SoftwareApp) clear_review() {
 	a.deployment_pending = ''
 	a.review_ready = false
 	a.review_selected = -1
+	a.review_read_item = -1
 	a.review_scroll = 0
 }
 
@@ -1253,6 +1255,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 			'Review ${a.review}'
 		}, 170, 8, if a.mirror_pending != '' { width - 340 } else { width - 188 }, 28, true)
 		children << software_label(a.review_summary, 14, 40, width - 28, 44, false)
+		if a.package_review_readable() { children << software_button('software.report.read', 'Read plan', width - 124, 8, 110) }
 	} else {
 		children << console_field('software.search', editor_bytes_text(a.query), 170, 8, width - 492, a.focus)
 		children << software_button('software.mirror', 'Export offline', width - 308, 8, 98)

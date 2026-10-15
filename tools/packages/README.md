@@ -71,6 +71,14 @@ This applies to catalog facts and frozen install, remove, update, repair,
 deployment, rollback and offline-export reviews. See
 [compact detail checks](../../tests/packages/software-details-navigation-check.md).
 
+Install/remove/update/repair/rollback/deployment proposals offer **Read plan**
+in full and compact windows. It shows complete frozen intent, generations,
+source, exact disk requirements and each argument/package's facts. Item
+navigation has its own position, preserving the review's selection, paging and
+confirmation target. Only one item is cached; empty plans retain their scope.
+Return to the full review to confirm or cancel. See
+[plan reader qualification](../../tests/packages/software-plan-reader-check.md).
+
 Software's warning and status paragraphs also use individual wrapped lines.
 Deletion, trust, launch and restore explanations fit their minimum full-window
 frames; long keys and paths can split within a word. Oversized summaries show an

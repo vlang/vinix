@@ -130,10 +130,11 @@ fn check_software_deployment_navigation() ! {
 				for size in [ui2.rect(0, 0, 640, 610), ui2.rect(0, 0, 320, 240)]! {
 					tree := app.build(size)!
 					assert tree.children.any(it.id == 'software.deployment.stop') && tree.children.any(it.text == app.status)
-					assert !tree.children.any(it.id in ['software.confirm', 'software.deployment.review', 'software.deployment.back'])
+					assert !tree.children.any(it.id in ['software.confirm', 'software.deployment.review', 'software.deployment.back', 'software.report.read'])
 					free_window_tree(tree)
 				}
 				app.handle('software.confirm')!; app.paste_input('/must-not-edit.json')
+				app.handle('software.report.read')!; assert !app.report_reader_mode && app.worker.pid == pid && app.details_pages.len == 0
 				for input in ['\x1b', '\r', '\n', '\x01', '\x08', '\x7f']! { app.paste_input(input) }
 				assert app.worker.pid == pid && app.deployment_review_running()
 				assert editor_bytes_text(app.deployment_path) == path && !os.exists(receipt)
@@ -148,6 +149,7 @@ fn check_software_deployment_navigation() ! {
 				for input in ['\x1b', '\r', '\n', '\x01', '\x08', '\x7f']! { app.paste_input(input) }
 				assert app.review_ready && app.deployment_pending == path && app.worker == unsafe { nil }
 				if path == '/empty.json' { assert app.review_snapshot.rows.all(it.action == 'remove') && app.review_snapshot.requested.len == 0 }
+				package_plan_cycle(mut app, false)!
 				tree := app.build(ui2.rect(0, 0, 320, 240))!
 				assert tree.children.any(it.id == 'software.cancel') && !tree.children.any(it.id == 'software.confirm')
 				free_window_tree(tree)
@@ -173,10 +175,11 @@ fn check_software_deployment_navigation() ! {
 			for size in [ui2.rect(0, 0, 640, 610), ui2.rect(0, 0, 320, 240)]! {
 				tree := app.build(size)!
 				assert tree.children.any(it.id == 'software.progress') && tree.children.any(it.text == app.status)
-				assert !tree.children.any(it.id in ['software.deployment.stop', 'software.cancel', 'software.deployment.back', 'software.confirm'])
+				assert !tree.children.any(it.id in ['software.deployment.stop', 'software.cancel', 'software.deployment.back', 'software.confirm', 'software.report.read'])
 				free_window_tree(tree)
 			}
 			for action in ['software.deployment.stop', 'software.cancel', 'software.deployment.back']! { app.handle(action)! }
+			app.handle('software.report.read')!; assert !app.report_reader_mode && app.worker.pid == pid
 			for input in ['\x1b', '\r', '\n', '\x01', '\x08', '\x7f']! { app.paste_input(input) }
 			app.key_input('\x1b'); app.stop_deployment_review()
 			assert app.worker.pid == pid && C.kill(pid, 0) == 0 && !os.exists(receipt)
@@ -238,6 +241,7 @@ fn check_software_deployment_navigation_memory() ! {
 					app.review = 'deploy'.clone(); app.deployment_pending = deployment_navigation_path.clone()
 					app.output.clear(); for byte in text { app.output << byte }
 					app.load_review(); assert app.review_ready
+					package_plan_cycle(mut app, false)!
 					free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!)
 					free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
 					app.open_details(); assert app.details_mode
@@ -255,5 +259,6 @@ fn check_software_deployment_navigation_memory() ! {
 		kept := C.vinix_heap_end(); assert kept == 0, 'deployment navigation retained ${kept} bytes'
 		println('Software deployment navigation: 1000 normal/empty form/review/details/failure render, cancel and retirement cycles retain zero tracked bytes')
 		println('Software deployment path paste: 1000 literal/rejected/selected/empty input cycles retain zero tracked bytes')
+		println('Software deployment plan reader: 1000 normal/removal-only/decode/read/item/page/render/resize/ignored-confirm/Back/cancel/cache-retirement cycles retain zero tracked bytes')
 	}
 }
