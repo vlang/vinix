@@ -16,6 +16,60 @@ fn (a &SoftwareApp) mirror_review_running() bool {
 		&& !a.worker_mirror && a.review == 'mirror'
 }
 
+fn (a &SoftwareApp) mirror_review_readable() bool {
+	return a.mirror_mode && a.worker == unsafe { nil } && a.review_ready
+		&& a.review == 'mirror' && a.mirror_pending != '' && a.mirror_snapshot.format == 1
+}
+
+fn software_mirror_reader_path(mut values []string, label string, path string) {
+	// Canonical filesystem names can contain bytes outside printable UTF-8.
+	text := software_failure_text(path)
+	values << label + text
+	unsafe { text.free() }
+}
+
+fn (mut a SoftwareApp) prepare_mirror_details() {
+	a.clear_details()
+	if !a.mirror_review_readable() { return }
+	a.details_pages = []SoftwareDetailsPage{cap: 32}
+	unsafe { a.details_pages.flags |= .noslices }
+	mut values := ['Read-only offline export proposal. Reading does not approve acquisition or publication.'.clone(),
+		'Architecture: ' + a.review_snapshot.architecture, 'Review fingerprint: ' + a.review_snapshot.fingerprint]
+	unsafe { values.flags |= .noslices }
+	software_mirror_reader_path(mut values, 'Entered destination: ', a.mirror_pending)
+	software_mirror_reader_path(mut values, 'Canonical destination: ', a.mirror_snapshot.destination)
+	if a.mirror_lock_pending != '' {
+		values << 'Source: Exact application and runtime versions from the organization deployment lock.'.clone()
+		software_mirror_reader_path(mut values, 'Deployment source: ', a.mirror_lock_pending)
+		values << 'Deployment SHA-256: ' + a.mirror_lock_sha256
+		if a.mirror_source_sha256 != '' { values << 'Saved receipt SHA-256: ' + a.mirror_source_sha256 }
+		values << 'The exact deployment lock is bundled as _deployment.json with its complete package and runtime closure.'.clone()
+	} else { values << 'Source: Current authenticated catalog versions for the chosen application roots and dependencies.'.clone() }
+	software_details_count(mut values, 'Application roots: ', u64(a.review_snapshot.requested.len))
+	software_details_count(mut values, 'Packages including runtimes: ', u64(a.review_snapshot.rows.len))
+	software_details_count(mut values, 'Destination required space (bytes): ', a.review_snapshot.disk_needed)
+	software_details_count(mut values, 'Destination available space (bytes): ', a.review_snapshot.disk_available)
+	software_details_count(mut values, 'Reserved space per filesystem (bytes): ', a.review_snapshot.disk_reserve)
+	software_details_count(mut values, 'Cache acquisition space (bytes): ', a.mirror_snapshot.cache_needed)
+	software_details_count(mut values, 'Cache available space (bytes): ', a.mirror_snapshot.cache_available)
+	values << if a.mirror_snapshot.shared_disk { 'Cache and destination share a filesystem. Destination required space already includes cache acquisition.'.clone() }
+		else { 'Cache uses a separate filesystem. Its acquisition requirement and the same reserved-space policy apply independently.'.clone() }
+	values << 'Installed applications and personal data stay unchanged. Signed catalogs retain their original expiry; consumers enroll each repository with its original publisher key.'.clone()
+	values << 'Only this dependency closure has payloads on the media. Review every package\'s publisher, permissions, license, proprietary/firmware declarations and runtime before confirming.'.clone()
+	values << 'Invalid or nonprintable path bytes use visible \\xHH escapes. Reading does not mark full-review path parts as visited.'.clone()
+	values << 'Return to the full export review to inspect path parts and packages, cancel or confirm. Publication rechecks the frozen proposal.'.clone()
+	a.details_values(0, values)
+	software_policy_free_lines(mut values)
+	total := a.details_pages.len.str()
+	for index in 0 .. a.details_pages.len {
+		number := (index + 1).str()
+		a.details_pages[index].label = number + ' of ' + total
+		unsafe { number.free() }
+	}
+	unsafe { total.free() }
+	a.prepare_report_reader()
+}
+
 fn (mut a SoftwareApp) stop_mirror_review() {
 	// Only the read-only proposal can be killed. Approved publication keeps
 	// running, including when the user shrinks the window or presses Escape.
@@ -264,9 +318,10 @@ fn (mut a SoftwareApp) mirror_field_paste(mut field []u8, input string) {
 }
 
 fn (a &SoftwareApp) build_mirror_compact(width int, height int) ui2.Element {
-	mut children := frame_elements(8)
+	mut children := frame_elements(9)
 	available := a.failure_pages.len > 0 && a.worker == unsafe { nil } && !a.details_mode
-	children << software_label('Offline export · enlarge for details', 14, 8, width - 28, 28, false)
+	readable := a.mirror_review_readable() && !a.details_mode
+	children << software_label('Offline export · enlarge to confirm', 14, 8, width - 28, 28, false)
 	if a.details_mode {
 		children << software_button('software.details.back', 'Back to review', 14, 46, if width > 202 { 174 } else { width - 28 })
 	} else if a.mirror_review_running() {
@@ -277,12 +332,15 @@ fn (a &SoftwareApp) build_mirror_compact(width int, height int) ui2.Element {
 	} else {
 		children << software_label('Wait for the export to finish.', 14, 46, width - 28, 28, false)
 	}
+	if readable { children << software_button('software.report.read', 'Read review', 14, 84, if width > 202 { 174 } else { width - 28 }) }
 	if available {
-		children << software_button('software.failure', 'Failure details', 14, 84, if width > 202 { 174 } else { width - 28 })
+		children << software_button('software.failure', 'Failure details', 14, if readable { 122 } else { 84 }, if width > 202 { 174 } else { width - 28 })
 	}
 	progress := a.progress_seen && height >= 240
 	if progress { children << a.progress_bar(width, height) }
-	y := if height > 230 { height - if progress { 88 } else { 98 } } else if available { 122 } else { 84 }
+	minimum := if readable && available { 160 } else if readable || available { 122 } else { 84 }
+	footer := height - if progress { 88 } else { 98 }
+	y := if footer > minimum { footer } else { minimum }
 	children << software_label(a.status, 14, y, width - 28, if height > y + 8 { height - y - 8 } else { 1 }, false)
 	return ui2.screen(app_surface, children)
 }
@@ -308,6 +366,7 @@ fn (mut a SoftwareApp) build_mirror(width int, height int) ui2.Element {
 		if a.review_ready && a.mirror_seen + 1 >= a.mirror_pages.len {
 			children << software_button('software.mirror.packages', 'Review packages', 136, height - 138, 170)
 		}
+		if a.mirror_review_readable() { children << software_button('software.report.read', 'Read review', 318, height - 138, 130) }
 	} else {
 		children << software_label('New directory on local disk or mounted offline media', 14, 54, width - 28, 28, false)
 		children << console_field('software.mirror.path', editor_bytes_text(a.mirror_path), 14, 90, width - 28, a.focus && !a.mirror_lock_focus)

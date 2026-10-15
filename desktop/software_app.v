@@ -1356,6 +1356,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 			if a.package_review_running() { 'Stop review' } else { 'Cancel' }, 416, height - 138, 110)
 		if a.mirror_pending != '' {
 			children << software_button('software.mirror.details', 'Export details', width - 150, 8, 136)
+			if a.mirror_review_readable() { children << software_button('software.report.read', 'Read review', width - 110, height - 138, 96) }
 		}
 	} else {
 		children << software_button('software.upgrade', 'Update all', 274, height - 138, 112)

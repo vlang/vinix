@@ -1367,9 +1367,22 @@ for the destination form, Cancel for a completed review, and Back to review from
 package details. Pending read-only reviews offer **Stop review**; Stop, Cancel or
 Escape reaps that worker and discards its output while preserving the chosen
 destination and any saved-source pin for a fresh review. Approved exports keep
-running until completion. Compact windows omit confirmation controls so paths
-and package facts can be inspected after enlarging the window. See
+running until completion. Compact windows omit confirmation controls. See
 [navigation qualification](../tests/packages/software-mirror-navigation-check.md).
+
+An admitted export proposal offers **Read review** in full and compact windows,
+from both the path and package stages. It shows entered/canonical destinations,
+the exact deployment source and digest (including a saved-receipt pin), target
+architecture, review fingerprint, root/package counts, and exact destination,
+cache and reserved-space byte counts. It explains shared/separate filesystems,
+retained installed applications and personal data, catalog expiry and publisher
+enrollment, explicit runtime/licensing review, and lock bundling. Invalid or
+nonprintable filesystem bytes are escaped visibly. Reading keeps the frozen
+intent, package selection and path-review position; it cannot mark path parts
+visited, switch stages, cancel or publish. Return to the full review to inspect
+the required path parts and every package, then confirm. Active review and
+publication workers cannot enter the reader. See
+[export reader qualification](../tests/packages/software-mirror-reader-check.md).
 
 Deployment-file, export-destination and deployment-lock path fields treat paste
 as filename data. Controls, malformed UTF-8 and input exceeding 4096 bytes are

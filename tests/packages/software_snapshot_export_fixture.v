@@ -56,6 +56,7 @@ fn check_software_snapshot_export() ! {
 		wait_for_software(mut app)
 		assert app.review_ready && app.mirror_details && app.mirror_lock_sha256 == 'd'.repeat(64)
 		assert app.review_names == ['editor'] && app.review_snapshot.rows.all(it.version == '1.0.0')
+		mirror_reader_cycle(mut app, false)!
 		app.handle('software.confirm')!; assert app.worker == unsafe { nil }
 		app.handle('software.mirror.packages')!; assert app.mirror_details
 		for app.mirror_seen + 1 < app.mirror_pages.len { app.handle('software.mirror.next')! }
@@ -134,6 +135,7 @@ fn check_software_snapshot_export_memory() ! {
 					app.load_review()
 					assert app.review_ready != mismatched
 					if !mismatched {
+						mirror_reader_cycle(mut app, false)!
 						free_window_tree(app.build(ui2.rect(0, 0, 900, 660))!)
 						for app.mirror_seen + 1 < app.mirror_pages.len { app.handle_mirror('software.mirror.next') }
 						app.handle_mirror('software.mirror.packages')
@@ -148,5 +150,6 @@ fn check_software_snapshot_export_memory() ! {
 		app.set_status('')
 		kept := C.vinix_heap_end(); assert kept == 0, 'saved deployment export retained ${kept} bytes'
 		println('Software saved deployment export: 1000 handoff, decode, path/package render, digest mismatch and retirement cycles retain zero tracked bytes')
+		println('Software saved export reader: 1000 frozen-source/read/page/resize/ignored-publish/Back/cache-retirement cycles retain zero tracked bytes')
 	}
 }

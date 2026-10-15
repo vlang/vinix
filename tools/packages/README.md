@@ -255,6 +255,13 @@ approved exports continue until they finish. Canceling preserves the selected
 destination and saved-source identity for a fresh review. See
 [qualification](../../tests/packages/software-mirror-navigation-check.md).
 
+Loaded offline export proposals offer **Read review** in full and compact
+windows. It discloses complete destination/source paths and digests, target,
+fingerprint, package counts and exact disk/cache requirements. Reading keeps
+the frozen intent and path/package stage, and cannot advance required path
+parts or approve publication. See
+[reader qualification](../../tests/packages/software-mirror-reader-check.md).
+
 `[--json] deployment-audit LOCK.json` compares that exact format-2 lock with
 installed metadata, without catalog, payload or trust-history access. It reports
 missing, unexpected and changed packages, including requested roots, publisher
