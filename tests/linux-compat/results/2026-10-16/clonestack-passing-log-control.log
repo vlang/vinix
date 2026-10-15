@@ -1,0 +1,3 @@
+tests/linux-compat/clonestack-check.v:218: FAIL: fn main.failure: assert log.contains('LINUX CLONESTACK DETAIL:'), 'clonestack baseline failure markers required'
+      message: clonestack baseline failure markers required
+V panic: Assertion failed...

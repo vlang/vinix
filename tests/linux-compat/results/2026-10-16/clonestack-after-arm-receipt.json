@@ -1,0 +1,31 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "cbe68841b05b70e1a86091a6cfa0f9e7bd3a2f9e416f020e4c3fb1e58a1c4ef3",
+    "results": [
+        {
+            "name": "clonestack",
+            "source_sha256": "c20ed060a125cfab29793bdda7a4cd7513db1ec88013594d14d3b6dc34107163",
+            "init_sha256": "b22411510b86644c3956ed6c7016feee75a507b4a7ae21a4f78ac8c9e0ef7716",
+            "iso_sha256": "bdba74a5009670677d21eca0447be0fb931b8867e348f3fc1f2264243dd0ec8c",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "5d06c51b5ded2d2836e5ab383d1ebf5d6a7975236054076ea3402929e0b315ed",
+            "iso_sha256": "5673e3cf8b41c4840e8034f60281bf1f54551be48b6452971d2e864893558e4a",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "clonecgroup",
+            "source_sha256": "beeb24ed36319d5ff8838ef2e5cd20b624aaf0a894b09ed61515329feecda8b9",
+            "init_sha256": "ca5e8fff376d1865f36ed141f2f270d699a6ae7fc9f6f00fe05d641a63e70761",
+            "iso_sha256": "9dbd20fc55f5aecb0372397d7bf6d8b5e63609b364f4c341ee45c9fe477bd0ab",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

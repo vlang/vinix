@@ -1,0 +1,3 @@
+tests/linux-compat/clonestack-check.v:415: FAIL: fn main.main: assert false, 'clonestack assertions must execute'
+      message: clonestack assertions must execute
+V panic: Assertion failed...

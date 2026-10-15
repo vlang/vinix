@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "6076baca2fcf6e5fb2dd9632dc698e9f8b1e7720f909c4cdf6f564be37e9b44e",
+    "results": [
+        {
+            "name": "clonestack",
+            "source_sha256": "e99d5dba948d75d1d67991e880fd7f96fd9db054ccc8859e8fed877df41b7abf",
+            "init_sha256": "d77744418e592d1f21dcdffd11b2d697f2bc3c0921548ccc87b7048ab773abfb",
+            "iso_sha256": "fab0ab378c6d9f8f9e0eb0c66d8610d1467f72446f10a10804fcaf3f2340421c",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

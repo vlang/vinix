@@ -56,7 +56,8 @@ pub fn syscall_clone3(_gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 	// and has to derive the initial stack pointer itself.
 	mut child_sp := u64(0)
 	if args.stack != 0 {
-		if args.stack_size == 0 {
+		// Check the range before adding; Linux does not require mapped pages here.
+		if args.stack_size == 0 || !usercopy.user_range(args.stack, args.stack_size) {
 			return errno.err, errno.einval
 		}
 		child_sp = lib.align_down(args.stack + args.stack_size, 16)

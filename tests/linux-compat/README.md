@@ -1925,3 +1925,18 @@ Use `--cases clonecgroup --timeout 1200` with a fresh state directory.
 `clonecgroup-check.v` without `-prod` to audit exact source/C scope, baseline
 failures, corrected results, flat storage, pins and executing negative controls.
 See [the cgroup descriptor report](../../docs/linux-posix-qualification.md#native-clone3-cgroup-descriptor-range).
+
+The `clonestack` case checks clone3 stack range admission. Wrapping and
+out-of-userspace intervals return EINVAL; valid intervals reach a later EBADF
+control without requiring mapped or writable pages. Four credential/PID
+namespace cohorts run 768 controls per architecture through three protected
+input layouts. Null/size mismatches, input-fault precedence, complete canaries,
+empty-child checks and inherited-stack SIGCHLD fork/reap are included.
+Original and corrected kernels each measure four warmed 200-cycle cleanup
+cohorts on identical inputs. Only this retention loop accepts either original
+EBADF or corrected EINVAL; conformance checks require the exact Linux error.
+Use `--cases clonestack --timeout 1200` with a fresh state directory.
+`clonestack-reference.v` runs the identical ELF on Linux; compile
+`clonestack-check.v` without `-prod` to audit original failures, corrected
+results, exact source/C scope, storage, pins and executing negative controls.
+See [the stack range report](../../docs/linux-posix-qualification.md#native-clone3-stack-range-admission).

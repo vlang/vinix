@@ -9217,3 +9217,91 @@ wait classes, selected TIDs, pidfds, zero-filled extensions, stack-range policy,
 concurrent argument changes, GNU libc and translated/32-bit paths remain
 unqualified. The broad libc, installation/sandbox/portal and translation gates
 remain open.
+
+## Native clone3 stack range admission
+
+Both native clone3 paths now check a nonempty supplied stack range with the
+existing userspace-range predicate before adding its length and aligning the
+stack pointer. Wrapping ranges and ranges outside the architecture's user
+address space return EINVAL. The check is arithmetic: it does not resolve or
+touch the supplied stack pages. The previous implementation added arbitrary
+words and could proceed to later admission or child construction with an
+invalid range. This follows
+[Linux v6.12's clone3 stack validation](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c)
+and its [access_ok range contract](https://github.com/torvalds/linux/blob/v6.12/include/asm-generic/access_ok.h).
+
+The `clonestack` probe runs 768 controls per architecture: 192 in each
+root/UID1000 and initial/one-level PID namespace cohort. Each call uses one of
+three argument layouts: aligned, byte-unaligned or a full 88-byte structure
+ending at the native page boundary. The input page is read-only and the next
+page is PROT_NONE. A later invalid cgroup FD provides a safe admission control
+without executing children on intentionally inaccessible stacks.
+
+| Class | Calls per cohort | Contract |
+| --- | ---: | --- |
+| Wrapping intervals | 36 | Twelve base/length pairs that overflow the stack-top addition return EINVAL, including sums wrapping to zero and small nonzero values. |
+| Kernel intervals | 36 | Twelve high kernel-address intervals return EINVAL. These avoid ambiguous ARM top-byte-only tags. |
+| Valid-range admission | 48 | Sixteen intervals reach EBADF, including zero/zero, low unaligned and unmapped addresses, intervals ending 64KiB below 2^47, read-only/PROT_NONE pages and a range crossing that protection boundary. |
+| Malformed pairs | 24 | Null base with nonzero length and nonnull base with zero length retain EINVAL. |
+| Input precedence | 36 | Short/excessive sizes, null/unmapped/wrapping argument addresses and protected suffixes retain exact EINVAL/E2BIG/EFAULT results, including fully readable invalid stack fields followed by a fault. |
+| Inherited-stack forks | 12 | Zero base/length with sizes 64/72/80/88 admit real SIGCHLD children using the inherited stack. |
+
+Every call restores access and compares the complete two-page input canary.
+A nonblocking empty-child wait must report ECHILD after every case. Successful
+children send checked PID/TID, parent and UID records through a pipe, exit
+with status 37 and are reaped. Originals fail exactly 288 controls per
+architecture, in the first two classes. Corrected kernels and the identical
+original probe ELFs on Linux 6.12.51 pass every control. Native ARM uses 16KiB
+pages; native x86 and both Linux references use 4KiB. Both corrected kernels
+also pass runtime and the 684-control clonecgroup regression.
+
+Original and corrected kernels each measure four cleanup cohorts after 64
+warmup cycles and thirteen seconds of settling. Each cohort measures 200
+cycles and settles again. A cycle runs six invalid-range calls, one valid-range
+admission refusal and one inherited-stack fork/reap, including protections,
+canaries and child cleanup. Inputs are identical on original and corrected
+kernels. Only this retention loop accepts either original EBADF or corrected
+EINVAL; semantic classes always require the exact Linux error. All live slab
+classes and big-heap page totals stay flat. The input mapping and slab observer
+remain open throughout. This is targeted kernel-heap evidence; the earlier
+EXT2 rename observation and general page/cache retention remain separate.
+
+Four isolated original/corrected production builds pass. Exact whole-C
+comparison confines the change to the existing stack-size conditional in each
+clone3 entry point; the shared range predicate is unchanged. No allocation,
+free, reference, ownership transfer or lock changes are introduced. The probe
+has eight explicit stack allocas and no dynamic allocation or fixed-index
+helper. Its successful compiler preflight matches the original ARM guest C.
+
+The first probe assumed intervals ending at 2^47 were valid in every profile.
+Linux x86 excludes the final page below its ceiling and refused 24 such
+controls with EINVAL; the original ARM/Linux ARM profiles admitted them.
+The final shared admission vectors stop at least 64KiB below 2^47. Complete
+preliminary original/reference inputs, receipts and logs remain pinned,
+including that Linux refusal. This corrects a test expectation, not the kernel
+range check. See [Linux's x86 address-space definitions](https://github.com/torvalds/linux/blob/v6.12/arch/x86/include/asm/page_64_types.h).
+
+The auditor checks every case/cohort total and original failure count,
+credentials and page sizes, probe C/ELF identity, Linux reference receipts,
+storage in both phases, all 84 retained native case files, 67 frozen dispatch
+inventory inputs, 2,014 SDK files and 15,146 compiler pins. A false assertion
+and an attempt to use passing Linux output as an original failure must both
+execute and fail; compile the auditor without `-prod`.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/clonestack-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/clonestack-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/clonestack-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/clonestack-diagnostic-pins.json).
+Raw original/corrected/Linux, build, preflight and regression logs accompany
+the receipts. The maintained auditor is `tests/linux-compat/clonestack-check.v`.
+
+This qualifies range rejection and admission, with inherited-stack fork/reap.
+Execution on a newly supplied stack, exact stack-pointer alignment, ARM tagged
+pointers, concurrent argument changes and every architecture-specific address
+boundary remain unqualified. Valid intervals use the common low-address
+domain; 2^47 is the ARM Vinix ceiling, while x86 can admit a larger domain
+under five-level paging and Linux can reserve a final guard page. Alternative
+exit notification, clone-child wait classes, selected TIDs, pidfds, extensible
+sizes, cgroup placement and its authorization/lifetimes, GNU libc and
+translated/32-bit paths remain separate.
+The broad libc, installation/sandbox/portal and translation gates remain open.

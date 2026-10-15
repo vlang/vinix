@@ -1085,6 +1085,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   identical probe ELFs on Linux.
   See [the cgroup descriptor receipts](docs/linux-posix-qualification.md#native-clone3-cgroup-descriptor-range).
 
+- [x] Validate clone3 stack ranges before stack-pointer arithmetic; qualify
+  wrapping/kernel intervals, valid-range admission without page access, input
+  faults, inherited-stack forks and flat cleanup on both native architectures
+  against identical probe ELFs on Linux.
+  See [the stack range receipts](docs/linux-posix-qualification.md#native-clone3-stack-range-admission).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
