@@ -783,6 +783,10 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		a.stop_package_review()
 		return
 	}
+	if a.verification_running() && event_id in ['software.verify.stop', 'software.cancel']! {
+		a.stop_verification()
+		return
+	}
 	if event_id.starts_with(packagecore.request_prefix) {
 		if a.policy_mode { a.set_status('Return to the catalog before opening an application.'); return }
 		if a.data_mode { a.set_status('Return to the catalog before opening an application.'); return }
@@ -929,6 +933,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		}
 		'software.verify' {
 			if a.worker != unsafe { nil } || a.review != '' { return }
+			a.focus = false; a.select_all = false
 			a.start(['verify'], false)
 		}
 		'software.health' {
@@ -1032,6 +1037,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.deployment_mode { a.deployment_key_input(input); return }
 	if input == '\x1b' {
 		if a.package_review_running() { a.stop_package_review(); return }
+		if a.verification_running() { a.stop_verification(); return }
 		if a.worker == unsafe { nil } && a.review != '' {
 			a.clear_review(); a.set_status('Operation cancelled before making changes.'); return
 		}
@@ -1262,7 +1268,8 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		children << software_button('software.upgrade', 'Update all', 274, height - 138, 112)
 		children << software_button('software.rollback', 'Rollback', 394, height - 138, 100)
 		children << software_button('software.data', 'Personal data', 502, height - 138, 124)
-		children << software_button('software.verify', 'Verify installed', 136, height - 176, 110)
+		children << software_button(if a.verification_running() { 'software.verify.stop' } else { 'software.verify' },
+			if a.verification_running() { 'Stop verifying' } else { 'Verify installed' }, 136, height - 176, 110)
 		if a.rows.any(it.installed_version != '') {
 			children << software_button('software.repair', 'Repair installed', 14, height - 214, 110)
 		}

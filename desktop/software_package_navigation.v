@@ -34,6 +34,8 @@ fn (a &SoftwareApp) build_packages_compact(width int, height int) ui2.Element {
 		children << software_button('software.details.back', if a.review != '' { 'Back to review' } else { 'Back to catalog' }, 14, 46, button_width)
 	} else if a.package_review_running() {
 		children << software_button('software.review.stop', 'Stop review', 14, 46, button_width)
+	} else if a.verification_running() {
+		children << software_button('software.verify.stop', 'Stop verifying', 14, 46, button_width)
 	} else if a.worker == unsafe { nil } {
 		children << software_button(if a.review != '' { 'software.cancel' } else { 'software.reload' },
 			if a.review != '' { 'Cancel review' } else { 'Reload catalog' }, 14, 46, button_width)

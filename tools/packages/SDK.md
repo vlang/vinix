@@ -1611,6 +1611,18 @@ and process exit status. Counter progress is sampled approximately every 200 ms
 during HTTPS transfers and local copies, plus initial/final transfer counters;
 package and verification boundaries may emit additional frames.
 
+Software's dedicated Verify worker exposes Stop/Cancel/Escape in full and
+compact views. Cancellation kills/reaps only that read-only scan, discards its
+unaccepted progress, pending bytes and human output, and preserves catalog
+query/filter/selection for a fresh retry. Search focus is left when starting
+the scan; pasted Escape does not trigger cancellation. A `complete` frame keeps
+a waiting status until the worker exits, including when subsequent human output
+claims success. Late failure output remains available for final diagnostics.
+Only successful exit with final completion admits success. Transactions and
+running applications can emit `verify` frames without acquiring these stop
+controls. Service arguments, authorization, scan behavior and progress format
+are unchanged. See [navigation checks](../../tests/packages/software-verify-navigation-check.md).
+
 V administrative clients set `Service.progress` to an optional observer.
 Config-taking transaction fixtures use `TransactionOptions.progress`; the service
 uses its own configured observer when forwarding transaction options. Callbacks

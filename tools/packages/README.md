@@ -39,6 +39,13 @@ including long paths and exit status. It survives catalog reloads until another
 failure, explicit clearing or window close. The view is read-only and marks
 omitted output. See [qualification](../../tests/packages/software-failure-check.md).
 
+**Verify installed** supports Stop/Cancel/Escape in full and compact windows.
+Stopping retires unaccepted progress/output and keeps the catalog for retry.
+Completion and human success output wait for successful worker exit; late
+failures retain their diagnostics. Verification frames from transactions or
+running apps do not make those operations cancellable. See
+[navigation checks](../../tests/packages/software-verify-navigation-check.md).
+
 Software's **Health report**, also available as `vinix-package [--json] health`,
 inspects every installed app, runtime and data dependency. It lists all affected
 packages with installed provenance and paged diagnostics, even when catalogs are

@@ -243,6 +243,8 @@ fn check() ! {
 	os.cp(repository + '/desktop/software_failure.v', work + '/software/software_failure.v')!
 	os.cp(repository + '/tests/packages/software_failure_fixture.v', work + '/software/failure_fixture.v')!
 	os.cp(repository + '/tests/packages/software_verify_fixture.v', work + '/software/verify_fixture.v')!
+	os.cp(repository + '/desktop/software_verify_navigation.v', work + '/software/software_verify_navigation.v')!
+	os.cp(repository + '/tests/packages/software_verify_navigation_fixture.v', work + '/software/verify_navigation_fixture.v')!
 	os.cp(repository + '/desktop/software_deployment.v', work + '/software/software_deployment.v')!
 	os.cp(repository + '/desktop/software_deployment_navigation.v', work + '/software/software_deployment_navigation.v')!
 	os.cp(repository + '/tests/packages/software_deployment_navigation_fixture.v', work + '/software/deployment_navigation_fixture.v')!
@@ -308,6 +310,7 @@ fn check() ! {
 	run(work + '/window-broker-memory', ['data-navigation-memory'])!
 	run(work + '/window-broker-memory', ['launch-navigation-memory'])!
 	run(work + '/window-broker-memory', ['cleanup-navigation-memory'])!
+	run(work + '/window-broker-memory', ['verify-navigation-memory'])!
 	if '--cross' in os.args {
 		run(v, [...helper_flags, '-o', work + '/package-stage', repository + '/tools/packages/stage.v'])!
 		for architecture in ['aarch64', 'x86_64'] {

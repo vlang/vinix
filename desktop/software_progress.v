@@ -38,7 +38,9 @@ fn (mut a SoftwareApp) operation_line(line string) {
 		a.progress_snapshot.close()
 		a.progress_snapshot = event
 		a.progress_seen = true
-		text := software_progress_text(event)
+		text := if a.verification_running() && event.phase == 'complete' {
+			'Verification checks finished; waiting for the service to exit.'.clone()
+		} else { software_progress_text(event) }
 		a.set_status(text)
 		unsafe { text.free() }
 		return
@@ -48,6 +50,10 @@ fn (mut a SoftwareApp) operation_line(line string) {
 	if a.output.len + line.len + 1 > 8192 { a.output.clear(); a.output_truncated = true }
 	for byte in line { a.output << byte }
 	a.output << `\n`
+	// A complete scan frame is still provisional until the worker exits.
+	// Keep human success text/late diagnostics for final admission, without
+	// replacing the waiting status with success-looking output in the meantime.
+	if a.verification_running() && a.progress_seen && a.progress_snapshot.phase == 'complete' { return }
 	tail := software_output_tail(a.output)
 	a.set_status(tail)
 	unsafe { tail.free() }

@@ -595,8 +595,15 @@ launchers without changing packages or requiring a working catalog. It displays
 check progress, keeps the current list/filter/selection, and retains failures and
 repair guidance in **Failure details**. Successful results remain visible;
 publisher trust and organization policy still apply separately at launch.
-Verification runs without an administrator prompt and may be stopped by closing
-the window. The CLI's `--progress verify` uses the existing bounded progress
+Verification runs without an administrator prompt and supports **Stop verifying**,
+Cancel and Escape in full or compact views, as well as closing the window.
+Stopping reaps the read-only worker, discards unaccepted progress/output and
+retains the catalog for a fresh retry. A completion frame and human success
+text remain provisional while the service is running; success requires its
+successful exit. Stop controls do not interrupt package transactions or running
+applications, even when they emit verification progress. See
+[verification navigation checks](../tests/packages/software-verify-navigation-check.md).
+The CLI's `--progress verify` uses the existing bounded progress
 format and reports completion only after a healthy scan. Plain/JSON Verify
 output stays compatible. See [qualification](../tests/packages/verify-progress-check.md).
 
