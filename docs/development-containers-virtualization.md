@@ -540,6 +540,18 @@ fixture's former native-only stale-route case now qualifies retained-descriptor
 refusal on both Vinix and Linux. Concurrent descriptor publication, in-flight
 operations after table removal and queued descriptor passing still need complete
 admission and ownership accounting.
+The [descriptor publication checks](../tests/mount-lifecycle/unmount-publication.md)
+close ordinary-unmount admission before scanning existing descriptors. Both
+single and paired table insertions validate the actual mount under the table
+lock, so a newly published descriptor is observed by the scan or its lock
+contention refuses the attempt. Opens completing after successful ordinary
+detach return `EBUSY` through existing failure cleanup; refusals reopen the gate.
+Lazy detach, bind aliases and copied namespace mounts retain separate behavior.
+New cwd/root path walks resolve saved directory contexts to current namespace
+copies; inherited descriptors retain their original open attachments.
+This closes descriptor-table publication, while Linux-compatible busy accounting
+for the entire duration of a blocked open remains open, along with mappings,
+cwd/root and executable publication and descriptions retained outside tables.
 The [attachment identity checks](../tests/mount-lifecycle/identities.md) qualify
 unmount, remount and move refusal through detached/foreign mount descriptors
 and cwd, while valid local operations remain available. Retained read-only

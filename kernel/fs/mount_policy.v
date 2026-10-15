@@ -260,13 +260,41 @@ fn native_context(node &VFSNode, identity &lib.MountContext) bool {
 	return append_mount_step(identity, entry, entry.move_epoch)
 }
 
+// Shared process/ThreadFS directory snapshots can predate a namespace copy.
+// New path walks start in that namespace's attachments; inherited descriptors
+// keep their actual open attachment instead. Missing ids remain foreign routes.
+fn namespace_directory_context(identity &lib.MountContext) {
+	mut context := unsafe { identity }
+	if context.depth <= 0 || context.depth > 64 { return }
+	mut table := table_of(calling_process())
+	if table == unsafe { nil } { return }
+	table.lock.acquire()
+	defer { table.lock.release() }
+	for i in 0 .. context.depth {
+		original := unsafe { &Mount(context.steps[i].identity) }
+		if original == unsafe { nil } { continue }
+		for candidate in table.mounts {
+			if candidate.id == original.id {
+				context.steps[i].identity = voidptr(candidate)
+				break
+			}
+		}
+	}
+}
+
 fn starting_mount(node &VFSNode, identity &lib.MountContext) bool {
 	process := calling_process()
 	if process != unsafe { nil } {
 		current := proc.snapshot_current_directory(process, identity)
-		if voidptr(node) == current && identity.depth > 0 { return true }
+		if voidptr(node) == current && identity.depth > 0 {
+			namespace_directory_context(identity)
+			return true
+		}
 		root := proc.snapshot_root_directory(process, identity)
-		if voidptr(node) == root && identity.depth > 0 { return true }
+		if voidptr(node) == root && identity.depth > 0 {
+			namespace_directory_context(identity)
+			return true
+		}
 	}
 	return native_context(node, identity)
 }
@@ -275,6 +303,7 @@ fn starting_mount(node &VFSNode, identity &lib.MountContext) bool {
 // the same inode through another alias after chroot.
 fn root_with_context(identity &lib.MountContext) ?&VFSNode {
 	root := proc.snapshot_root_directory(calling_process(), identity)
+	namespace_directory_context(identity)
 	node := if root == unsafe { nil } { vfs_root } else { unsafe { &VFSNode(root) } }
 	if identity.depth == 0 && !native_context(node, identity) { return none }
 	// The boot root is a covered sentinel. Establish the effective root and
@@ -292,6 +321,7 @@ pub fn parent_and_mount_for(dirfd int, path string, identity &lib.MountContext) 
 	}
 	if is_fdcwd(dirfd) {
 		current := proc.snapshot_current_directory(calling_process(), identity)
+		namespace_directory_context(identity)
 		node := if current == unsafe { nil } { vfs_root } else { unsafe { &VFSNode(current) } }
 		if identity.depth == 0 && !native_context(node, identity) { return none }
 		return node

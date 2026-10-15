@@ -39,6 +39,11 @@ The default `--case all` requires every positive marker. `--case flags`,
 `--case unmount-descriptors` selects [descriptor busy checks](unmount-descriptors.md);
 `uf-0` through `uf-9` select individual cases. Native `all` and Linux
 `move-reference` include all ten cases.
+`--case unmount-publication` selects [descriptor publication checks](unmount-publication.md);
+`uo-0` through `uo-9` select individual cases. Native `all` includes all ten;
+Linux `move-reference` includes `uo-2` through `uo-9`. The native-only cases
+qualify refusal after ordinary unmount of an in-flight FIFO open; Linux instead
+keeps that mount busy until the open finishes.
 `--case admission` selects the new-filesystem/bind/devpts admission group;
 `ad-0` through `ad-7` select its individual cases.
 `--case propagation` selects propagation request validation; `pr-0` through

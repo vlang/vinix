@@ -1163,13 +1163,13 @@ fn unmount(parent &VFSNode, target string, flags u64) ? {
 		}
 	}
 	table.lock.release()
+	begin_mount_unmount(mut entry)?
+	mut completed := false
+	defer { if !completed { cancel_mount_unmount(mut entry) } }
 	if unmount_paths_in_use(entry) {
 		errno.set(errno.ebusy)
 		return none
 	}
-	begin_mount_unmount(mut entry)?
-	mut completed := false
-	defer { if !completed { cancel_mount_unmount(mut entry) } }
 	mut filesystem := entry.root.filesystem
 	if filesystem != unsafe { nil } { check_filesystem_unmount(mut filesystem)? }
 	if voidptr(entry.covered) != voidptr(entry.root) {

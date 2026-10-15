@@ -811,6 +811,10 @@ pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific 
 		errno.set(errno.einval)
 		return none
 	}
+	if !descriptor_mount_admitted(fd) {
+		errno.set(errno.ebusy)
+		return none
+	}
 	if specific == false {
 		// The lowest free number from oldfd up: in the table, or the first
 		// one past its end, which the table grows to hold.
@@ -849,6 +853,10 @@ pub fn fdnum_create_pair(_process &proc.Process, first &FD, second &FD, numbers 
 	mut process := if _process == unsafe { nil } { proc.current_thread().process } else { unsafe { _process } }
 	process.fds_lock.acquire()
 	defer { process.fds_lock.release() }
+	if !descriptor_mount_admitted(first) || !descriptor_mount_admitted(second) {
+		errno.set(errno.ebusy)
+		return false
+	}
 	limit := if process.rlimits[proc.rlimit_nofile].cur < u64(proc.max_fds) {
 		int(process.rlimits[proc.rlimit_nofile].cur)
 	} else { proc.max_fds }

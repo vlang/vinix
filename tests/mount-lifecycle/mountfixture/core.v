@@ -360,6 +360,8 @@ pub fn run(argc i32, argv &&char) i32 {
 		count := C.read(fd, &name[0], 31)
 		check(fd >= 0 && count > 0 && C.close(fd) == 0, 4)
 		selected := &char(&name[0])
+		unmount_publication := if count == 4 && name[0] == `u` && name[1] == `o` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		unmount_descriptor := if count == 4 && name[0] == `u` && name[1] == `f` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		unmount_mapping := if count == 4 && name[0] == `u` && name[1] == `v` && name[2] == `-`
@@ -439,6 +441,7 @@ pub fn run(argc i32, argv &&char) i32 {
 		writer_case := if count == 4 && name[0] == `w` && name[1] == `r` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		check(C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'move') == 0
+			|| C.strcmp(selected, c'unmount-publication') == 0 || unmount_publication >= 0
 			|| C.strcmp(selected, c'unmount-descriptors') == 0 || unmount_descriptor >= 0
 			|| C.strcmp(selected, c'unmount-mappings') == 0 || unmount_mapping >= 0
 			|| C.strcmp(selected, c'unmount-exec') == 0 || unmount_exec >= 0
@@ -492,6 +495,9 @@ pub fn run(argc i32, argv &&char) i32 {
 		if C.strcmp(selected, c'unmount-exec') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { unmount_exec_cases(-1) }
 		if unmount_exec >= 0 { unmount_exec_cases(unmount_exec) }
+		if C.strcmp(selected, c'unmount-publication') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { unmount_publication_cases(-1, C.strcmp(selected, c'move-reference') == 0) }
+		if unmount_publication >= 0 { unmount_publication_cases(unmount_publication, false) }
 		if C.strcmp(selected, c'unmount-descriptors') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { unmount_descriptor_cases(-1) }
 		if unmount_descriptor >= 0 { unmount_descriptor_cases(unmount_descriptor) }
