@@ -7419,21 +7419,58 @@ consumers, pinned inputs and retired VM phases are retained under
 allocation-free cached lookup and explicit retirement after the owners drain.
 Published runners remain unchanged; the full iOS regression remains unpassed.
 
-The current IPA probe links past these three Foundation globals and exits with
-status 1 at AudioToolbox's `_AudioServicesPlaySystemSound`. Fortnite has not
-entered application code and remains unplayable.
+The Foundation-key IPA probe links past those three globals and exits with
+status 1 at AudioToolbox's `_AudioServicesPlaySystemSound`.
+
+V now supplies the AudioToolbox system-sound entry for devices without
+vibration hardware, plus `CAShow` and `CAShowFile` for live private AUGraphs.
+Fortnite's only system-sound consumer loads the 32-bit vibration ID 4095 at
+`0x10080ded0` and tail-calls the import at `0x10080dee8`. The installed SDK
+specifies that this ID does nothing on devices without vibration capability;
+the current Vinix runtime has no actuator backend. Other sound IDs fail
+explicitly. System-sound registration and audible playback remain unsupported.
+
+The diagnostic consumer at `0x105ea98bc` reads the graph handle from its audio
+object's field at offset 1416. The `NewAUGraph` call at `0x105ea99ac` writes
+that field. The implementation looks up registry-owned graphs under their
+mutation/disposal lock and writes bounded stack buffers containing node IDs,
+component FourCCs, unit handles, connections and initialization/running flags.
+`CAShow` writes to stderr; native macOS uses os_log. `CAShowFile` translates
+Darwin FILE handles to native streams. Foreign/stale graphs, invalid streams
+and output failures are rejected. Other AudioToolbox object kinds still need
+individual diagnostic implementations.
+
+Eight normal/deterministic host sanitizer runs and four ARM64 guest suites
+pass: AudioToolbox services, Foundation keys, URL-error globals and autorelease
+pools. Native comparisons cover the uint32/void vibration ABI, protected unused
+arguments and result-context register, preserved registers, eight concurrent
+callers, graph diagnostics through open/initialize/start/stop/uninitialize and
+concurrent FILE snapshots. Private cases also cover graph connections,
+non-mutating dumps, protected foreign/stale handles, Darwin stream translation,
+write failure, explicit unsupported-call rejection and two drained runtimes.
+
+The eleven final generated C streams and executables, native measurements,
+actual IPA consumers, pinned inputs and retired VM phases are retained under
+`build/ios/fortnite/audio-services-checks`. Generated C inspection checks for
+hidden V allocations in dispatch/serialization, plus registry locking and
+stream translation. Published runners remain unchanged; the full iOS regression
+remains unpassed.
+
+The current IPA probe links past both required AudioToolbox imports and exits
+with status 1 at AVFoundation's `_AVCaptureDeviceTypeBuiltInTelephotoCamera`.
+Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,558 | 602 | 79 |
+| Fortnite executable | 1,560 | 600 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,393 | 605 | 120 |
+| All images | 2,395 | 603 | 120 |
 
-The C++/GLES/Text variant reports 2,406 resolved imports, 592 unresolved strong
+The C++/GLES/Text variant reports 2,408 resolved imports, 590 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

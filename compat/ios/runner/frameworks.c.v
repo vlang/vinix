@@ -87,6 +87,9 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		if address := game_key_symbol(symbol) { return address }
 	}
 	if library in ['/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox', '/System/Library/Frameworks/AudioUnit.framework/AudioUnit'] {
+		if library == '/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox' {
+			if address := audio_services_symbol(symbol) { return address }
+		}
 		if address := audio_symbol(symbol) { return address }
 	}
 	if library in ['/System/Library/Frameworks/UIKit.framework/UIKit', '/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics'] {
