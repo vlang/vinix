@@ -77,6 +77,13 @@ fn swift_foundation_arena() u64 {
 	write32(base + 160, 0xf9400290) // ldr x16, [x20]
 	write32(base + 164, 0xf940a210) // ldr x16, [x16, #320]
 	write32(base + 168, 0xd61f0200) // br x16
+	// JSONEncoder.dateEncodingStrategy's setter receives a consuming indirect
+	// enum in x0 and borrowed Self in x20. The selected override consumes that
+	// value; this thunk performs no ARC, enum access or option mutation. Match
+	// the native thunk's x1 method register and preserve x8 and x21 by tail call.
+	write32(base + 192, 0xf9400290) // ldr x16, [x20]
+	write32(base + 196, 0xf9404201) // ldr x1, [x16, #128]
+	write32(base + 200, 0xd61f0020) // br x1
 	// A concrete specialization of Foundation's retroactive String conformance.
 	// The installed descriptor uses a generic witness cache; this implementation
 	// supplies its already-specialized table, accepted by normal witness lookup.
@@ -95,7 +102,7 @@ fn swift_foundation_arena() u64 {
 	// destructiveInjectEnumTag witness. Native formatted(DateFormatter) is
 	// payload case zero; this does not construct an encoder or format a date.
 	write32(data + 96, 0)
-	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 172) })
+	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 204) })
 	if C.mprotect(unsafe { voidptr(base) }, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(unsafe { voidptr(base) }, usize(page * 2)); panic('iOS: cannot seal Swift Foundation entries')
@@ -252,6 +259,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 		'_$ss5ErrorP10FoundationE20localizedDescriptionSSvg' { swift_foundation_arena() + 96 }
 		'_$s10Foundation10CocoaErrorV19fileWriteFileExistsAC4CodeVvgZ' { swift_foundation_arena() + 128 }
 		'_$s10Foundation11JSONDecoderC6decode_4fromxxm_AA4DataVtKSeRzlFTj' { swift_foundation_arena() + 160 }
+		'_$s10Foundation11JSONEncoderC20dateEncodingStrategyAC04DatedE0OvsTj' { swift_foundation_arena() + 192 }
 		'_$s10Foundation11JSONEncoderC20DateEncodingStrategyO9formattedyAESo15NSDateFormatterCcAEmFWC' {
 			swift_foundation_arena() + u64(C.getpagesize()) + 96
 		}

@@ -22,6 +22,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 			'_$s10Foundation11JSONDecoderCMn',
 			'_$s10Foundation11JSONEncoderC20DateEncodingStrategyOMa',
 			'_$s10Foundation11JSONEncoderC20DateEncodingStrategyOMn',
+			'_$s10Foundation11JSONEncoderC20dateEncodingStrategyAC04DatedE0OvsTj',
 			'_$s10Foundation11JSONEncoderC20DateEncodingStrategyO9formattedyAESo15NSDateFormatterCcAEmFWC'] {
 		return swift_foundation_symbol(symbol) or { return none }
 	}
