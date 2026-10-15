@@ -135,6 +135,13 @@ The file contains no payloads, private data or trust enrollment. A failure after
 publication explicitly reports that the file was saved and needs inspection;
 retry never overwrites it. See [qualification](../../tests/packages/deployment-save-check.md).
 
+Software's **Deployment → Save installed…** saves the complete installed set to
+a new absolute filename as the ordinary user. It waits for publication, displays
+paged receipt details and offers fresh installed checks or deployment review
+using the captured filename. A pending write blocks Back and window closing;
+failure details preserve diagnostics even when publication already occurred.
+See [Software qualification](../../tests/packages/software-deployment-save-check.md).
+
 `[--json] deployment-audit LOCK.json` compares that exact format-2 lock with
 installed metadata, without catalog, payload or trust-history access. It reports
 missing, unexpected and changed packages, including requested roots, publisher

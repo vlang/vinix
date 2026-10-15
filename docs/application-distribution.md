@@ -710,6 +710,17 @@ storage before retrying, since retry will preserve an existing destination.
 Saving remains an export of historical metadata, with no payload backup, trust
 enrollment or installation approval. See [qualification](../tests/packages/deployment-save-check.md).
 
+In Software, **Deployment → Save installed…** saves the complete installed set
+to a new absolute filename in a directory you can write. The service runs as your
+ordinary user and preserves existing files. Software waits for the writer to
+finish before allowing Back or closing the window. A successful receipt shows
+the full destination, captured generation, architecture, SHA-256 and application
+and package counts in paged details. **Check installed** and **Review deployment**
+read the captured filename afresh; restoring still needs a separate review and
+confirmation. Failure details retain storage diagnostics, including failures
+after publication. Inspect the destination before retrying if saving may already
+have created it. See [Software save qualification](../tests/packages/software-deployment-save-check.md).
+
 For read-only organization drift checks, run
 `vinix-package --json deployment-audit /path/to/approved-lock.json`. It compares
 exact installed manifests and provenance with a format-2 lock, including the

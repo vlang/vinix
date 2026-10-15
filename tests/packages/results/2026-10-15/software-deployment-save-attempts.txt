@@ -1,0 +1,16 @@
+The first functional run expected a second receipt page, but the chosen fixture filename fit on one page. The fixture now uses a longer literal Unicode/metacharacter filename to exercise complete paged disclosure. Both desktop architecture typechecks had already passed. No production code was changed for this assertion correction. Final focused, allocation, maintained-driver and sanitizer results supersede this attempt.
+
+Initial functional output:
+Software configured repositories: damaged metadata does not block reviewed revocation; enrollment remains refused PASS
+Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed
+Software Verify: visible control, no administrator/catalog dependency, streamed progress, stable selection, incomplete/failure retention, review isolation and safe close PASS
+Software repair: installed dependency control, exact-version closure disclosure, read-only review, duplicate/modal isolation, frozen confirmation and reviewed administrator apply PASS
+Software health: read-only asynchronous report, issue-first searchable metadata/diagnostics, issues-only filtering, stable visible selection, empty results, bounded Unicode editing, reload retention, compact Back, isolated catalog state, full-set repair review and safe close PASS
+Software health progress: separate bounded stderr, live package names, both-pipe EOF, complete/exit/report/count admission, malformed/partial/late/flood refusal, Stop/Escape kill and reap, retry and compact cancellation PASS
+SOFTWARE CLEANUP read-only review, complete paged disclosure, modal/compact controls, frozen administrator approval, stale refusal, diagnostics and reload PASS
+Software deployment: full closure, frozen literal path, empty removal, cancellation, bounds, stale/error diagnostics and close guard passed
+Software deployment audit: literal ordinary argv, exit 0/3 coherence, complete drift rows, details/paging, frozen reload/review, cancellation, failure diagnostics, bounds and compact navigation passed
+/Users/alex/code/vinix/build/package-software-snapshot-work/software-ui/software_snapshot_fixture.v:71: FAIL: fn main.check_software_snapshot: assert app.details_page == 1
+   left value: app.details_page = 0
+  right value: 1
+V panic: Assertion failed...

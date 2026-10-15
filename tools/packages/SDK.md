@@ -1850,6 +1850,20 @@ authenticated deployment/mirror admission. It is outside the administrator
 mutation transport and can run under an ordinary identity into an owned
 destination. See [snapshot-save qualification](../../tests/packages/deployment-save-check.md).
 
+Software's **Deployment → Save installed…** invokes this command without installed
+IDs, using ordinary literal argv and a newly entered absolute destination. It
+buffers at most 32 KiB and admits a receipt only after exit 0 and complete output,
+with `destination` equal to the independently captured argument. Error exits,
+partial/oversized documents and destination mismatches cannot expose success.
+The worker blocks navigation and ordinary closing until it finishes, because
+publication can occur before a receipt is returned. Receipt strings and paged
+details are retired on Back, Save another or application retirement. Full
+destination, digest, architecture, generation and both counts remain inspectable.
+Fresh audit/review actions reuse the captured filename, never the editable form
+or receipt as authorization. Diagnostics retain postpublication failures; no
+automatic retry or overwrite is attempted. See
+[Software save qualification](../../tests/packages/software-deployment-save-check.md).
+
 `[--json] deployment-audit FILE` compares an exact format-2 document with one
 reader-locked installed generation. It does not resolve against a catalog, read
 objects/replay history, verify installed payloads or apply policy/trust admission.

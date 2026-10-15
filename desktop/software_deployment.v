@@ -57,6 +57,7 @@ fn (mut a SoftwareApp) handle_deployment(event_id string) {
 		}
 		'software.deployment.review' { a.begin_deployment_review() }
 		'software.deployment.audit' { a.begin_deployment_audit() }
+		'software.deployment.snapshot' { a.begin_deployment_snapshot() }
 		'software.deployment.back' {
 			a.deployment_mode = false
 			a.focus = false
@@ -112,6 +113,7 @@ fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
 		children << software_button('software.deployment.review', 'Review deployment', 14, 286, 180)
 		children << software_button('software.deployment.audit', 'Check installed', 210, 286, 160)
 		children << software_button('software.policy', 'Organization policy', 14, 330, 180)
+		children << software_button('software.deployment.snapshot', 'Save installed…', 210, 330, 160)
 	}
 	if a.progress_seen { children << a.progress_bar(width, height) }
 	a.add_status_footer(mut children, width, height, a.progress_seen)
