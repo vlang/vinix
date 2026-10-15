@@ -8479,3 +8479,115 @@ target retirement, new cross-process inspection/LSM policy, robust owner-death
 and PI semantics, GNU libc and foreign/translated ABI calls remain separate.
 This bounded query contract does not close the three broad libc, installation/
 sandbox/portal and translated/32-bit roadmap acceptance gates.
+
+## Native robust futex pending-unlock and selective exit wakes
+
+The 2026-10-15 `robustwake` qualification fixes three native robust-list exit
+wake rules on AArch64 and x86-64. A pending non-PI entry whose owner bits are
+already zero wakes one shared waiter without rewriting the mutex word. An
+owned entry still preserves WAITERS and sets OWNER_DIED, but wakes only one
+ordinary waiter when WAITERS is set. PI-tagged entries leave the ordinary
+queue alone; existing PI-state release remains separate. The ownerless test
+uses the masked owner, including all WAITERS/OWNER_DIED flag combinations.
+
+The primary contract is [Linux v6.12 futex/core.c](https://github.com/torvalds/linux/blob/v6.12/kernel/futex/core.c#L625).
+The full tagged file, obtained as base64 from the kernel.org Git mirror, is
+retained with its decoder, exact URL and SHA-256. The unchanged native probe
+ELF also executes on Linux 6.12.51 for each architecture.
+
+The frozen base is `29d59c0e06b4cfc116777e634f74ca9ac6348ffe`.
+Each architecture runs 608 controls in four root/UID1000 and initial/one-level
+PID namespace cohorts. Each cohort has the following cases:
+
+| Class | Controls | Original failures |
+| --- | ---: | ---: |
+| Pending non-PI entry with zero owner | 16 | 16 |
+| Entry owned by the exiting task | 24 | 12 |
+| PI-tagged ownerless/owned entries | 48 | 12 |
+| Entry owned by another live task | 24 | 0 |
+| Ownerless list-only entry | 8 | 0 |
+| Real musl robust-mutex recovery | 32 | 0 |
+
+Each original kernel fails exactly 160 controls. Corrected kernels and
+identical-ELF Linux references pass all 608. The raw cases rotate signed
+offsets -8/+8, all four flag combinations and list-only, pending-only and
+listed-and-pending layouts. A whole 256-byte expected payload checks the head,
+links, mutex word, neighboring word and canaries. The pending-unlock cases
+construct the exit state explicitly; they do not claim to kill a real unlock
+at an uncontrolled instruction boundary.
+
+Each raw trial forks a fresh owner, registers and queries its head, and holds
+it behind a pipe. Positive FUTEX_CMP_REQUEUE return counts establish three
+shared waiters on the target, one private waiter on that same address and one
+shared waiter on a neighboring word. A sleep or userspace ready flag is not
+accepted as queue admission. Only then does the owner exit with status 37.
+Pidfd POLLIN followed by waitpid establishes completed cleanup. Immediate wake
+drains check the exact remaining queues independently of waiter scheduling;
+private/neighbor queues stay separate and staging queues are empty. All five
+waiters join with successful futex returns. Every cohort reaps 120 owners,
+joins 600 raw waiters and closes each pidfd and pipe before unmapping its page.
+SIGCHLD is blocked during these trials and the original mask is restored.
+
+The additional 32 musl controls per cohort use PTHREAD_MUTEX_ROBUST: a fresh
+pthread locks the mutex, increments a payload and exits while owning it. After
+join, recovery requires EOWNERDEAD, the exact increment, successful
+pthread_mutex_consistent and unlock. The mutex is destroyed after recovery.
+
+Four storage cohorts per corrected architecture include fresh fork, waiter
+creation, confirmed requeue, owner exit, drain, reap, join and descriptor close
+inside 200 measured cycles, after 32 warmups and thirteen-second settling
+periods. These measurements use one shared waiter; the semantic trials cover
+the private and neighboring guards separately. No polling worker remains at
+the snapshots. All 18 ARM and 14 x86 live slab classes stay exactly flat.
+Big-heap pages remain ARM 63/63 initially and 75/75 in the PID namespace,
+x86-64 160/160 and 182/182, for both credential profiles. This is a bounded
+cleanup measurement, not general physical user-page or complete PI retention
+qualification. Native ARM uses 16KiB pages; x86 and both Linux references use
+4KiB pages.
+
+Four fresh isolated production builds retain original and corrected images
+on both architectures. Whole generated C differs only in the robust walker
+calls and the abandon helper's prototype/body. There is no normalization or
+new allocation, free, Process/Thread pin, interface box or stack promotion.
+Existing user copies, traversal, offsets and PI-state ownership are unchanged;
+no lifetime is introduced or shortened. Probe C has ten explicit stack allocas
+and no dynamic allocation or fixed-index helper.
+
+Both corrected architectures also pass the native runtime and futex guests.
+Eight host test files pass. Allocation diagnostics remain byte-identical at
+398 ARM/290 x86 sites, including existing allowance-file refusals; this does
+not claim all allocation checks are green. The maintained auditor binds 67
+inventory inputs, 2,014 private SDK files, 15,146 compiler inputs, fifteen final
+ARM compiler-command receipts and all 84 regular files across eight final
+native case profiles. Final `p3` source/C/ELF identity and actual Linux execution
+are required. Its false-assertion and passing-reference-as-original controls
+must execute, so compile it without `-prod`.
+
+Earlier refusals remain separate from semantic verdicts. `p1` stops before an
+ELF on a nested-unsafe syntax error. `p2` stops before an ELF because a fixed
+literal emits an unavailable `v_fixed_index` helper. Replacing that flags
+expression with a shift changes exactly its function, one unused generated
+typedef and one source-position-derived discard name; all three diagnostic C
+deltas are enumerated. A direct compiler preflight succeeds and matches final
+ARM probe C. The first host audit rejected the two additional diagnostic C
+deltas; its source and refusal are retained before the explicit correction.
+The final production-kernel C comparison remains exact throughout.
+
+To preserve evidence on the nearly full host, 42 prior robustquery artifacts
+and 75 artifacts in four earlier process-group qualifications use transparent
+filesystem compression. Regular-file paths and logical SHA-256 stay unchanged;
+the audit rehashes all 117 ledger entries. No pinned evidence was deleted.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-15/robustwake-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-15/robustwake-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-15/robustwake-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-15/robustwake-diagnostic-pins.json).
+Native/reference, production, regression, scanner and refusal logs accompany
+the receipts. The maintained V auditor is `tests/linux-compat/robustwake-check.v`.
+
+The existing owner-word load/store is not an atomic compare-and-exchange;
+concurrent owner-word, mapping or list mutation remains unqualified. Malformed
+pointers/alignment/list faults, actual PI-state handover, forced sibling exit,
+GNU libc and foreign/translated ABIs also remain separate. These results do
+not close the three broad libc, installation/sandbox/portal and translated/
+32-bit roadmap acceptance gates.

@@ -1,0 +1,3 @@
+/Users/alex/.cache/vinix-linux-compat/robustwake-20261015/retry.v:21: FAIL: fn main.main: assert !os.exists(area+'/states/p2-before-'+suffix+'/receipt.json'),'Final probe compilation refused'
+      message: Final probe compilation refused
+V panic: Assertion failed...

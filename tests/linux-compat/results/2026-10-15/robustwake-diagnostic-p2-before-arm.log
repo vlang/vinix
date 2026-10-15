@@ -1,0 +1,5 @@
+/Users/alex/.cache/vinix-linux-compat/robustwake-20261015/states/p2-before-arm/robustwake/fixture.c:1218:64: error: call to undeclared function 'v_fixed_index'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1218 |         return (u32[4]){(u32)(0), 0x40000000, 0x80000000, 0xc0000000}[v_fixed_index(choice, 4)];
+      |                                                                       ^
+1 error generated.
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/robustwake-20261015/states/p2-before-arm/receipt.json

@@ -1,0 +1,3 @@
+tests/linux-compat/robustwake-check.v:221: FAIL: fn main.main: assert false, 'robustwake assertions must execute'
+      message: robustwake assertions must execute
+V panic: Assertion failed...

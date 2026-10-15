@@ -1,0 +1,6 @@
+{
+    "arguments": "--gcc-install-dir=/Users/alex/.cache/vinix-linux-compat/robustwake-20261015/sdk/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0\n-D_GNU_SOURCE\n-fno-strict-aliasing\n-I\n/Users/alex/.cache/vinix-linux-compat/robustwake-20261015/states/p2-before-arm/sources/robustwakefixture\n--target=aarch64-linux-musl\n--sysroot=/Users/alex/.cache/vinix-linux-compat/robustwake-20261015/sdk\n-pthread\n-O2\n-fno-stack-protector\n-Wall\n-Wextra\n-Werror\n-Wno-unused-function\n-Wno-unused-parameter\n-fPIC\n-I\n/Users/alex/.cache/vinix-linux-compat/robustwake-20261015/states/p2-before-arm/sources/robustwakefixture\n-c\n/Users/alex/.cache/vinix-linux-compat/robustwake-20261015/preflight-probe.c\n-o\n/Users/alex/.cache/vinix-linux-compat/robustwake-20261015/preflight-probe.o",
+    "generated_c": "4196efbe350778b07826ccebc875facb220b1d265ef4690a269c616fc46afffa",
+    "output": "",
+    "status": "0"
+}

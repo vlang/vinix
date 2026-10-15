@@ -1,0 +1,1 @@
+arm/x86: exact whole production C differs only in release_robust_list calls, abandon_robust_futex prototype/body: PI and pending flags, ownerless pending non-PI wake, bounded ordinary wake1; existing user reads/writes, traversal, offsets, PI-state release, process/map ownership and cleanup unchanged; no allocation/free/pin/stack promotion or normalization

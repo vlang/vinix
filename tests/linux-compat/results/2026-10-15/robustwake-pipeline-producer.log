@@ -1,0 +1,8 @@
+Detached owned job 24328
+Detached owned job 24331
+Detached owned job 24334
+Detached owned job 24336
+Detached owned job 24340
+/Users/alex/.cache/vinix-linux-compat/robustwake-20261015/pipeline.v:29: FAIL: fn main.main: assert !os.exists(receipt),'Probe did not compile; retain refusal: '+receipt
+      message: Probe did not compile; retain refusal: /Users/alex/.cache/vinix-linux-compat/robustwake-20261015/states/p1-before-arm/receipt.json
+V panic: Assertion failed...

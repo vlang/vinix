@@ -1,0 +1,8 @@
+Completed /Users/alex/.cache/vinix-linux-compat/robustwake-20261015/states/p3-before-arm/robustwake: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/robustwake-20261015/states/p3-before-x86/robustwake: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/robustwake-20261015/states/p3-after-arm/robustwake: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/robustwake-20261015/states/p3-after-arm/runtime: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/robustwake-20261015/states/p3-after-arm/futex: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/robustwake-20261015/states/p3-after-x86/robustwake: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/robustwake-20261015/states/p3-after-x86/runtime: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/robustwake-20261015/states/p3-after-x86/futex: captured files byte-identical; disposable boot staging retired

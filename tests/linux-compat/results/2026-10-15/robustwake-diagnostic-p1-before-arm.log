@@ -1,0 +1,10 @@
+Compiler output from the default V compiler:
+/Users/alex/.cache/vinix-linux-compat/robustwake-20261015/tmp/vinix-v-module-qReyWc/robustwakefixture/core.v:158:35: error: already inside `unsafe` block
+  156 |   mut expected := [256]u8{}; C.memcpy(&expected[0],voidptr(state.shared),256)
+  157 |   initial := *(&u32(address)); wanted := if selection.owner == 1 {(flags(selection.flags)&0x80000000)|u32(0x40000000)} else {initial}
+  158 |   C.memcpy(&expected[word_offset],unsafe{&wanted},4)
+      |                                   ~~~~~~
+  159 |   sharing := if measure {1} else {3}; total := if measure {1} else {5}
+  160 |   handles := &C.pthread_t(C.alloca(usize(5*sizeof(C.pthread_t)))); requests := &Wait(C.alloca(usize(5*sizeof(Wait))))
+
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/robustwake-20261015/states/p1-before-arm/receipt.json

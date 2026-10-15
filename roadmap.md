@@ -1043,6 +1043,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   identical-ELF Linux comparisons and flat pipe-blocked-worker query storage.
   See [the robust-list query receipts](docs/linux-posix-qualification.md#native-robust-list-query-pid-words-and-ordered-scalar-output).
 
+- [x] Complete pending non-PI robust unlock wakes and select one ordinary exit
+  waiter while preserving PI queue separation and unchanged ownerless words.
+  Qualify confirmed queues, real musl recovery and flat fork/requeue/exit cleanup
+  as root/UID1000 in both PID namespace views, with identical-ELF Linux controls.
+  See [the robust exit receipts](docs/linux-posix-qualification.md#native-robust-futex-pending-unlock-and-selective-exit-wakes).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

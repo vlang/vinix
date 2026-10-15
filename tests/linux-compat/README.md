@@ -1816,3 +1816,18 @@ scope, compiler/SDK/inventory pins, earlier refused/diagnostic profiles and
 executing audit negatives. Concurrent mappings/list registration/teardown,
 inspection-policy changes, robust owner death and GNU/foreign paths remain
 separate. See [the robust-list query report](../../docs/linux-posix-qualification.md#native-robust-list-query-pid-words-and-ordered-scalar-output).
+
+The `robustwake` case qualifies native pending robust-unlock and selective exit
+wakes with 608 controls per architecture. Positive CMP_REQUEUE counts establish
+three shared waiters, one private waiter and one neighboring waiter before
+completed owner exit; exact remaining queues and a 256-byte canary model verify
+wake1, ownerless word preservation and PI queue separation. Four root/UID1000
+initial/one-level PID namespace cohorts rotate flags, offsets and list/pending
+layouts, then require real musl robust-mutex payload recovery. Four warmed
+200-cycle one-waiter cohorts measure fork/requeue/exit/drain/reap/join/close.
+`robustwake-reference.v` boots the unchanged native ELF on Linux. Compile
+`robustwake-check.v` without `-prod` to verify original failures, native/Linux
+results, exact whole production-C scope, input/SDK/compiler pins, retained
+pre-ELF refusals and executing audit negatives. Concurrent owner-word CAS,
+mapping/list mutation, malformed lists, actual PI-state handover, forced sibling
+exit and GNU/foreign paths remain separate. See [the robust-exit report](../../docs/linux-posix-qualification.md#native-robust-futex-pending-unlock-and-selective-exit-wakes).

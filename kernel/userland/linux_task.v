@@ -250,7 +250,7 @@ fn release_robust_list(mut t proc.Thread) {
 			break
 		}
 		if entry & ~u64(1) != pending & ~u64(1) {
-			abandon_robust_futex(proc.own_tid(t), u64(i64(entry & ~u64(1)) + offset))
+			abandon_robust_futex(proc.own_tid(t), u64(i64(entry & ~u64(1)) + offset), entry & 1 != 0, false)
 		}
 		entry = next
 	}
@@ -258,18 +258,25 @@ fn release_robust_list(mut t proc.Thread) {
 	// list_op_pending covers the lock the thread was in the middle of taking
 	// or releasing when it died.
 	if pending != 0 {
-		abandon_robust_futex(proc.own_tid(t), u64(i64(pending & ~u64(1)) + offset))
+		abandon_robust_futex(proc.own_tid(t), u64(i64(pending & ~u64(1)) + offset), pending & 1 != 0, true)
 	}
 }
 
 // `tid` is the thread's own number, which is what userspace stored as the
 // owner.
-fn abandon_robust_futex(tid int, address u64) {
+fn abandon_robust_futex(tid int, address u64, pi bool, pending bool) {
 	mut value := u32(0)
 	if !usercopy.copy_from_user(voidptr(&value), address, sizeof(u32)) {
 		return
 	}
-	if value & futex_tid_mask != u32(tid) {
+	owner := value & futex_tid_mask
+	// A pending non-PI unlock may already have cleared its owner. Complete
+	// the lost wake without changing the consistent user mutex word.
+	if pending && !pi && owner == 0 {
+		futex.wake_n_key(address, 1, false)
+		return
+	}
+	if owner != u32(tid) {
 		return
 	}
 
@@ -278,8 +285,10 @@ fn abandon_robust_futex(tid int, address u64) {
 		return
 	}
 
-	if value & futex_waiters != 0 {
-		futex.wake(address)
+	// PI waiters are handled by release_pi_owner; ordinary robust wakeups
+	// select one waiter, leaving the remaining queue for mutex handover.
+	if !pi && value & futex_waiters != 0 {
+		futex.wake_n_key(address, 1, false)
 	}
 }
 

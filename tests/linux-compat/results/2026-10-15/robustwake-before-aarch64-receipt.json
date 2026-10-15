@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "bc39818b5b8fd65481773b5874476717e3b7439b344ed85a2f905b6dd9d3ec7d",
+    "results": [
+        {
+            "name": "robustwake",
+            "source_sha256": "8c5d33bc5d105a1da68fe07bbf733fb4cd07dc28fec9d1423baa3baf34c5a1ca",
+            "init_sha256": "22628256ff246579becd3a4ebfaa24219f31bcffc55553bf25660eb182f37843",
+            "iso_sha256": "e8883568c4f814f4d55214db93e4c8d6ae11b77ad52df56d39862a4a972ac896",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}
