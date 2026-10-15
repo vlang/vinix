@@ -7,6 +7,9 @@ import os
 // Their API methods are implemented individually; absent methods still fail.
 fn framework_symbol(library string, symbol string) ?u64 {
 	if !library.starts_with('/System/Library/Frameworks/') { return none }
+	if library == '/System/Library/Frameworks/Foundation.framework/Foundation' {
+		if address := ns_url_error_symbol(symbol) { return address }
+	}
 	// Foundation.framework reexports these Swift overlay entries. The main
 	// executable uses this install name, while its bundled frameworks use the
 	// dylib; installed native addresses are identical for these exports.

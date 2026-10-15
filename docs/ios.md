@@ -7321,21 +7321,57 @@ fixture and the initial guest trial are retained separately. Generated C
 inspection checks bounded stack paths and explicit string/failure cleanup.
 Published runners remain unchanged; the full iOS regression remains unpassed.
 
-The current IPA probe links past temporary-directory lookup and exits with
-status 1 at `_NSURLErrorBackgroundTaskCancelledReasonKey`. Fortnite has not
-entered application code and remains unplayable.
+The temporary-directory IPA probe links past that import and exits with
+status 1 at `_NSURLErrorBackgroundTaskCancelledReasonKey`.
+
+V now supplies seven Foundation URL-error string globals: `NSURLErrorDomain`,
+the failing URL, URL-string and peer-trust keys, the deprecated URL-string
+alias, and the background-cancellation and network-unavailable reason keys.
+Native measurements verify pointer-sized data cells, exact NSString values
+and 32-byte ASCII constant-string records with flags `0x7c8`. In particular,
+`NSURLErrorFailingURLErrorKey` contains `NSErrorFailingURLKey`; the two
+URL-string names have distinct cells pointing to the same object containing
+`NSErrorFailingURLStringKey`.
+
+The runtime publishes cells, six immutable string records and copied bytes on
+one sealed page under its recursive lock. Repeated queries allocate no storage.
+These strings remain immortal through pool, constant-dictionary and Swift
+context teardown; shutdown removes their registrations and unmaps the page
+after those owners drain. The background-reason consumer at `0x100801df8` and
+domain consumers including `0x100052cf4` load the exported cell and then its
+NSString pointer, confirming the required indirection in the actual IPA.
+
+Eight normal/deterministic host sanitizer runs and four ARM64 guest suites
+pass: URL-error globals, JSON/NSError, immutable constant dictionaries and
+autorelease pools. Coverage includes concurrent first publication by eight
+readers, stable cells and alias identities, balanced ownership across pool
+drains, NSError domain/userInfo lookup by equal strings, pool-destructor access
+after task entry points retire, and two drained/unmapped lifetimes. Two extra
+Swift heap sanitizer comparisons pass for the common shutdown ordering. The
+eleven main generated C streams and executables, extra Swift heap artifacts,
+native records, actual IPA consumers, pinned inputs and retired VM phases are
+retained under `build/ios/fortnite/url-error-checks`. The initial sanitizer
+failure from marking ordinary NSString storage as a constant record is retained
+with its original source and binaries; the corrected page uses the measured
+record layout. Generated C inspection checks allocation-free cached lookup and
+retirement after pool, dictionary and Swift cleanup. Published runners remain
+unchanged; the full iOS regression remains unpassed.
+
+The current IPA probe links past the URL-error globals and exits with status 1
+at `_NSURLSessionDownloadTaskResumeData`. Fortnite has not entered application
+code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,548 | 612 | 79 |
+| Fortnite executable | 1,550 | 610 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,383 | 615 | 120 |
+| All images | 2,385 | 613 | 120 |
 
-The C++/GLES/Text variant reports 2,396 resolved imports, 602 unresolved strong
+The C++/GLES/Text variant reports 2,398 resolved imports, 600 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

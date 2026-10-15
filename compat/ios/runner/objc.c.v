@@ -283,6 +283,7 @@ mut:
 	load_categories []ObjLoad
 	framework_data map[string]u64
 	framework_objects []u64
+	url_error_arena u64 // Sealed NSString global cells; objects stay immortal until pools drain.
 	file_manager u64 // One owned NSFileManager cache reference, retired at shutdown.
 	process_info u64 // One owned NSProcessInfo singleton reference.
 	process_arguments u64 // Owned app arguments, configured before image initialization.
@@ -674,13 +675,16 @@ fn objc_stop() {
 	objc_constant_dictionaries_stop()
 	objc_protocols_stop()
 	swift_data_bridge_stop()
+	// Swift closure/context destruction can still read Foundation globals.
+	// Drain those owners before retiring the URL-error cells and string objects.
+	swift_buffers_stop()
+	ns_url_error_stop()
 	if ios_runtime.live != 0 {
 		eprintln('iOS: ${ios_runtime.live} Objective-C objects still owned at shutdown')
 	}
 	if ios_runtime.objects.len == 0 { unsafe { ios_runtime.objects.free() } }
 	unsafe { ios_runtime.associations.free() }
 	objc_monitors_stop()
-	swift_buffers_stop()
 	if ios_runtime.block_refs.len != 0 { eprintln('iOS: heap blocks still owned at shutdown') }
 	for _, text in ios_runtime.constant_utf8 { unsafe { text.free() } }
 	for address, info in ios_runtime.classes {
