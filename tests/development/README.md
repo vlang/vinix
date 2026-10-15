@@ -24,6 +24,38 @@ credential files. The payload deliberately writes the synthetic credential to
 both stdout and stderr; the controller fails if it appears in the serial log.
 Successful jobs produce a file, and rejected jobs must produce none.
 
+Every run also checks FIFO private-file paths without creating a writer. As
+UID/GID 1000, the fixture replaces the credential with a mode-0600 FIFO and
+requires the public scheduler to fail within three seconds, preserve the inode,
+settle the reserved attempt and produce no job output. Rotation back to a
+regular private credential must execute the second attempt after the normal
+interval. FIFO stored plans and states must also refuse both `status` and
+`run-due` within that bound. Their original files are restored afterwards.
+The host independently checks two additional receipts against the exact plan
+hash, account, attempt/run counters, failure/recovery statuses and intervals.
+The base workflow now retains 14 records; historical 12-record runs below
+predate these additional cases. Other reference modes also add two records.
+
+On 15 October 2026 the extended base gate passed on ARM64 HVF and x86-64 TCG,
+using V `be2eb40`, QEMU 11.1.1 and the maintained static tool stager. The passing
+14-record receipts, serial logs, fixture/ISO and kernel/tool pins are retained
+in `build/development-fifo-20261015/guest-arm` and `guest-x86`. The controlled
+ARM64 `baseline-arm-b` stage removed only `O_NONBLOCK` from the scheduler's
+private-file open; it reproduced the hang at the fixture's three-second deadline
+after passing the existing account checks. No writer was connected to the FIFO.
+
+Both kernels were built in an isolated worktree from `e42b3946c`. The unadapted
+revision fails this V compiler's check of literal-zero pointer returns in
+`kernel/fs/vfs.v`. The test worktree applies only the recorded typed-null
+compatibility patch, SHA-256
+`c8b114d931b2d6fba0d899c6e0e2340c181128d130ecdee042d7eac417c9f395`.
+The baseline diagnostic, exact patch and build logs remain beside the receipts.
+Native ARM fixture compilation selected the installed musl sysroot through
+`VINIX_AARCH64_SYSROOT`; its retained V `clang-native` wrapper selects the
+matching GCC runtime with Clang's `--gcc-toolchain` option. These checks qualify
+private-file handling and the base runner workflow; compiler-project, complete
+installed self-hosting and broader server/CI acceptance retain their own gates.
+
 The same account also qualifies job lifecycle control with real child groups.
 A one-second deadline must retire a job and its forked descendant. Both SIGINT
 and SIGTERM must stop a watcher during a running job, retire that group and
@@ -116,7 +148,7 @@ commands retain the 600-second budget. The plan uses 1800-second step deadlines
 and the guest receives 2 GiB of RAM. Both input trees are verified before and
 after the build. The fixture checks account ownership and mode-0700 output
 directories. Receipts include the plan, both build receipts and both native
-qualification reports, for 17 records with the baseline account/job/build checks.
+qualification reports, for 19 records with the baseline account/job/build checks.
 
 The host independently checks the exact plan hash, source/SDK/tool pins, epoch,
 account, kernel, command order and complete executed argv. It also checks each
@@ -155,7 +187,7 @@ Unauthenticated requests must not create the CGI's private data artifact.
 
 After protocol checks, the owner retires the server process group; its command
 receipt must record SIGTERM (`-15`). The normal account/job/build checks still
-run. Both native HTTP case records are emitted as well, for 19 records in
+run. Both native HTTP case records are emitted as well, for 21 records in
 this reference mode. The host independently validates the actual server argv,
 loopback/port restrictions, executable/CGI pins, empty JIT overrides, response
 cases, owner, request count and retirement. Each native case record must match
@@ -586,15 +618,16 @@ A prepared ELF check is execution coverage, separate from the native rebuild
 gate above. The receipt records the actual QEMU argv and prepared binary hash.
 
 `receipt.json` records the architecture, UID, kernel/fixture/tool hashes,
-QEMU argv, passing verdict and 12 native plan/state/build receipts. SDK runs
+QEMU argv, passing verdict and 14 native plan/state/build receipts. SDK runs
 also retain the SDK hash and native compiler report. `serial.log`,
 the ISO and compiled fixture remain beside it. Credential values do not enter
 the receipts. The credential in this fixture is public synthetic test data.
 V runs additionally record `v_root_sha256`, `native_source_sha256`, the `v`/`sh`
 executable pins, `native_source_revision`, the build plan, two native build
-receipts and four signed-release proofs, for 20 native receipt records. The
-compiler-rebuild run recorded above predates the six added lifecycle records.
-Reference-SDK runs instead add five records for a total of 17.
+receipts and four signed-release proofs, for 22 native receipt records. The
+compiler-rebuild run recorded above predates the six added lifecycle records
+and two private-file records. Reference-SDK runs instead add five records for
+a total of 19.
 Once the initramfs archive is complete, its duplicate staging tree is removed
 before ISO assembly. The standalone archive is removed once the ISO is complete.
 The ISO, compiled fixture, receipts and transcripts remain; obsolete

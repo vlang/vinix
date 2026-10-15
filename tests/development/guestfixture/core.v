@@ -16,6 +16,7 @@ struct C.stat {
 	st_uid  u32
 	st_mode u32
 	st_size i64
+	st_ino  u64
 }
 
 @[c_extern]
@@ -517,6 +518,7 @@ fn account_checks() {
 		private_receipt(c'/home/developer/link-token/state.json', c'cannot open private file')
 		check(C.open(c'/home/developer/payload.done', C.O_RDONLY) == -1, 143)
 		C.puts(c'DEVELOPMENT ACCOUNT PASS: UID 1000 jobs, credentials, environment, receipts, interval, unsafe-file refusal')
+		private_file_checks()
 		job_lifecycle_checks()
 		build_checks()
 		reference_checks()
@@ -568,7 +570,7 @@ pub fn run() i32 {
 		jit_approved := reference_jit_prepare()
 		check(C.chown(c'/home/developer', 1000, 1000) == 0 && C.chmod(c'/home/developer', 0o700) == 0, 154)
 		for path in [&char(c'/home/developer/token'), &char(c'/home/developer/jobs.json'),
-			&char(c'/home/developer/link-jobs.json'), &char(c'/home/developer/build-template.json')]! {
+			&char(c'/home/developer/link-jobs.json'), &char(c'/home/developer/fifo-jobs.json'), &char(c'/home/developer/build-template.json')]! {
 			check(C.chown(path, 1000, 1000) == 0 && C.chmod(path, 0o600) == 0, 156)
 		}
 		for name in [&char(c'deadline'), &char(c'term'), &char(c'int'), &char(c'watch'), &char(c'interrupted')]! {

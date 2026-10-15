@@ -17,8 +17,12 @@ The scheduler's private-file checks now open without waiting for FIFO writers,
 so invalid credential or stored plan/state paths cannot block before descriptor
 validation. Public CLI tests verify prompt refusal, preserved FIFOs, failed
 attempt accounting and successful credential rotation. The three host scheduler
-test files and both static Linux architecture builds pass; native FIFO
-qualification remains open.
+test files and both static Linux architecture builds pass. The extended native
+account/job/build gate now also passes as UID/GID 1000 on ARM64 HVF and x86-64
+TCG, with 14 independently validated receipts per architecture. A controlled
+blocking-open build reproduced the FIFO hang inside ARM64 Vinix. The
+[native workflow evidence](../tests/development/README.md) records the exact
+kernel/tool pins and the isolated kernel's typed-null compiler adaptation.
 
 | Requirement | Available implementation | Remaining acceptance / implementation |
 | --- | --- | --- |

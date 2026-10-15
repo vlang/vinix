@@ -140,5 +140,18 @@ FIFO inodes, failed-attempt accounting, absence of job output and successful
 execution after rotating back to a private regular credential. All three host
 scheduler test files passed with V `be2eb40`. Static Linux ELF64 builds also
 passed for ARM64 and x86-64, with checked machine IDs and source/compiler/binary
-pins in `/tmp/vinix-jobs-fifo-8042`. This is host and build evidence; the new
-FIFO cases have not been run inside Vinix.
+pins in `/tmp/vinix-jobs-fifo-8042`. Those host results are complemented by the
+native qualification below.
+
+The maintained native fixture now runs the FIFO cases and credential rotation
+as UID/GID 1000 on every workflow check. On 15 October 2026 ARM64 HVF and x86-64
+TCG both passed the extended account/job/build gate, retaining 14 independently
+validated receipts each in `build/development-fifo-20261015/guest-arm` and
+`guest-x86`. The controlled ARM64 build with nonblocking open removed failed
+at the three-second FIFO deadline in `baseline-arm-b`, after passing the normal
+account checks. The fixed builds settled the failed attempt, executed the
+rotated credential's second attempt and retained the original FIFO inodes.
+Deadline/signal retirement, watcher ownership, interrupted-run recovery and
+the two matching build artifacts also passed. The native inputs and recorded
+kernel compiler adaptation are detailed in the
+[guest workflow instructions](../../tests/development/README.md).

@@ -308,20 +308,24 @@ fn run() !int {
 	}
 	os.cp(init, root + '/usr/bin/development-payload')!
 	os.chmod(root + '/usr/bin/development-payload', 0o755)!
-	for name in ['jobs', 'link-jobs'] {
+	mut fifo_plan_sha := ''
+	for name in ['jobs', 'link-jobs', 'fifo-jobs'] {
 		plan := Plan{
 			jobs: [Job{
 				executable:       Pin{'/usr/bin/development-payload', digest(init)!}
+				interval_seconds: if name == 'fifo-jobs' { 1 } else { 3600 }
 				credential_files: {
-					'TEST_TOKEN': '/home/developer/' + if name == 'jobs' {
-						'token'
-					} else {
+					'TEST_TOKEN': '/home/developer/' + if name == 'link-jobs' {
 						'token-link'
+					} else {
+						'token'
 					}
 				}
 			}]
 		}
-		os.write_file(root + '/home/developer/' + name + '.json', json2.encode(plan))!
+		text := json2.encode(plan)
+		if name == 'fifo-jobs' { fifo_plan_sha = sha256.sum(text.bytes()).hex() }
+		os.write_file(root + '/home/developer/' + name + '.json', text)!
 	}
 	os.write_file(root + '/home/developer/token', 'vinix-native-fixture-secret')!
 	mut lifecycle_plans := map[string]string{}
@@ -608,6 +612,7 @@ fn run() !int {
 		'DEVELOPMENT LOG TAIL SENTINEL',
 		'DEVELOPMENT SIGNAL IDENTITY PASS:',
 		'DEVELOPMENT ACCOUNT PASS:',
+		'DEVELOPMENT PRIVATE FILE PASS:',
 		'DEVELOPMENT JOB CONTROL PASS:',
 		'DEVELOPMENT BUILD PASS:',
 		'DEVELOPMENT GUEST PASS',
@@ -632,6 +637,7 @@ fn run() !int {
 		body := entry.all_after(' ')
 		if path !in ['/home/developer/good/state.json', '/home/developer/good/plan.json',
 			'/home/developer/public-token/state.json', '/home/developer/link-token/state.json',
+			'/home/developer/fifo-failed.json', '/home/developer/fifo-token/state.json',
 			'/home/developer/build-a/receipt.json', '/home/developer/build-b/receipt.json',
 			'/home/developer/qualification/report.json', '/home/developer/native-build.json',
 			'/home/developer/native-a/receipt.json', '/home/developer/native-b/receipt.json',
@@ -652,10 +658,24 @@ fn run() !int {
 		json2.decode[json2.Any](body)!
 		receipts[path] = body
 	}
-	if result == 0 && receipts.len != if reference_ci { 22 } else if 'http' in reference.profiles { 19 } else if reference_hash != '' { 17 } else if sdk_hash == '' { 12 } else if v_root_hash == '' { 13 } else { 20 } {
+	if result == 0 && receipts.len != 2 + if reference_ci { 22 } else if 'http' in reference.profiles { 19 } else if reference_hash != '' { 17 } else if sdk_hash == '' { 12 } else if v_root_hash == '' { 13 } else { 20 } {
 		return error('missing native workflow receipts')
 	}
 	if result == 0 {
+		for failed in [true, false] {
+			path := '/home/developer/' + if failed { 'fifo-failed.json' } else { 'fifo-token/state.json' }
+			schedule := json2.decode[NativeSchedule](receipts[path], strict: true)!
+			job := schedule.jobs['fixture'] or { return error('missing native private-file job') }
+			if schedule.schema != 1 || schedule.uid != 1000 || schedule.plan_sha256 != fifo_plan_sha
+				|| schedule.jobs.len != 1 || job.in_flight
+				|| job.attempts != if failed { u64(1) } else { u64(2) }
+				|| job.runs != job.attempts || job.exit_code != if failed { -1 } else { 0 }
+				|| (failed && !job.detail.starts_with('private file must be regular'))
+				|| (!failed && job.detail != 'finished') || job.started <= 0
+				|| job.finished < job.started || job.next_due != job.finished + 1 {
+				return error('native private-file failure/recovery receipt changed')
+			}
+		}
 		if reference_ci {
 			cicore.verify(receipts['/home/developer/ci-state/plan.json'], receipts['/home/developer/ci-completed.json'],
 				receipts['/home/developer/ci-state/state.json'], hashes['vinix-build'])!
