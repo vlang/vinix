@@ -7672,22 +7672,69 @@ root ownership; eleven final C streams and executables are retained under
 `build/ios/fortnite/block-buffer-checks` with the native measurements and IPA
 consumer inspection.
 
-Four more required imports resolve. The actual IPA probe still exits with status
-1 before application entry, now at `_CMSampleBufferCreate`. Sample buffers,
-codec processing and the system Metal device/renderer remain unavailable.
-Fortnite remains unplayable and the full iOS regression remains unpassed.
+Four more required imports resolved. That IPA probe exited with status 1 before
+application entry at `_CMSampleBufferCreate`.
+
+CoreMedia sample buffers now carry block data and format descriptions, copied
+timing/size arrays, sample counts, duration/timestamp queries and CF ownership.
+Creation retains the data and format independently of the caller. The arrays
+use the SDK's four-byte alignment: records are copied as bytes before reading
+64-bit values. One timing or size entry can describe every sample; per-sample
+arrays preserve their individual entries. A buffer without timing has zero
+duration and invalid timestamps. Data can be attached later through its
+write-once setter. Borrowed data and format getters can be retained separately.
+Image-buffer queries return nil for these block-backed samples; image sample
+construction remains unavailable.
+
+Readiness and validity are separate. A ready buffer skips its callback; an
+unready buffer can invoke a supplied callback, preserve its exact error code and
+retry later. Callbacks run without the registry lock and can join another
+reader, mark data ready or invalidate the sample. Recursive readiness on the
+same sample fails explicitly. Invalidation immediately hides all metadata and
+disables readiness, while retaining the backing owners until final release,
+matching native retain-count measurements. Repeated invalidation returns the
+native invalidated error. Final release frees both metadata arrays and releases
+the data and format owners, including after invalidation.
+
+The bounded profile accepts 0..65,536 samples and at most 2,147,483,647 total
+sample bytes, with zero, one or one-per-sample timing/size entries. Numeric
+timescales must be positive; repeated timestamps and duration sums use compatible
+timescales and checked signed 64-bit arithmetic. Canonical invalid, infinity and
+indefinite durations are supported for a single timing entry. Mixed-scale
+arithmetic and unsupported epoch combinations fail explicitly. Callers keep
+sample buffers alive during queries/callbacks and synchronize mutations.
+The inspected IPA helper at `0x101fc6348` creates one ready sample with one
+timing record and no size array; the final four arguments use the stack.
+
+Eight final host sanitizer runs and four ARM64 guest suites cover sample buffers,
+block buffers, format descriptions and autorelease pools. Native comparisons
+exercise copied/unaligned metadata, aggregate time returns, indexed timing,
+retained-owner destruction orders, write-once data association, readiness
+callbacks, invalidation and concurrent readers. Private cases reject arithmetic
+overflow, unsupported time profiles, missing arrays and foreign/stale handles,
+and drain two complete runtime lifetimes. The native missing-array probe raised
+a memory fault; Vinix rejects that input before copying. Eleven final generated
+C streams and executables, native measurements, IPA consumer inspection and
+joined guest evidence are retained under
+`build/ios/fortnite/sample-buffer-checks`.
+
+Eight more required imports resolve. The actual IPA probe still exits with status
+1 before application entry, now at `_CMTimeGetSeconds`. General CMTime operations,
+image sample construction, codec processing and the system Metal device/renderer
+remain unavailable. Fortnite remains unplayable and full iOS regression remains
+unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,624 | 536 | 79 |
+| Fortnite executable | 1,632 | 528 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,459 | 539 | 120 |
+| All images | 2,467 | 531 | 120 |
 
-The C++/GLES/Text variant reports 2,472 resolved imports, 526 unresolved strong
+The C++/GLES/Text variant reports 2,480 resolved imports, 518 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

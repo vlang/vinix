@@ -85,6 +85,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	if library == '/System/Library/Frameworks/CoreMedia.framework/CoreMedia' {
 		if address := coremedia_format_symbol(symbol) { return address }
 		if address := coremedia_block_symbol(symbol) { return address }
+		if address := coremedia_sample_symbol(symbol) { return address }
 		if address := coremedia_constant_symbol(symbol) { return address }
 	}
 	if library == '/System/Library/Frameworks/IOSurface.framework/IOSurface' {

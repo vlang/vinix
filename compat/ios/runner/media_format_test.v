@@ -110,12 +110,12 @@ fn mf_private_failures(){
  objc_release(dict);objc_release(key);objc_release(value)
  format:=AudioFormat{48000,0x6c70636d,12,4,1,4,2,16,0};out=0xfeed;assert cm_audio_create(0,&format,12,0,0,0,0,&out)==-12718&&out==0
  assert (runtime_symbol('/System/Library/Frameworks/CoreMedia.framework/CoreMedia','_CMBlockBufferCreateWithMemoryBlock')or{panic(err)})!=0
- for name in ['_CMSampleBufferCreate','_CMVideoFormatDescriptionCreateFromH264ParameterSets']!{if _:=runtime_symbol('/System/Library/Frameworks/CoreMedia.framework/CoreMedia',name){assert false}}
+ for name in ['_CMVideoFormatDescriptionCreateFromH264ParameterSets']!{if _:=runtime_symbol('/System/Library/Frameworks/CoreMedia.framework/CoreMedia',name){assert false}}
  for name in ['_CMAudioFormatDescriptionGetStreamBasicDescription','_CMFormatDescriptionGetExtensions','_kCMFormatDescriptionTransferFunction_sRGB']!{for lib in ['/System/Library/Frameworks/Foundation.framework/Foundation','/System/Library/Frameworks/CoreVideo.framework/CoreVideo','/usr/lib/libSystem.B.dylib']!{if _:=runtime_symbol(lib,name){assert false}}}
 }
 fn mf_constant_reader(){for _ in 0..32{cell:=coremedia_constant_symbol('_kCMFormatDescriptionTransferFunction_sRGB')or{panic('missing CoreMedia key')};assert string_text(read64(cell))=='IEC_sRGB'}}
 fn test_media_format(){
  $if macos{api:=MFAPI{true,u64(C.dlopen(c'/System/Library/Frameworks/CoreMedia.framework/CoreMedia',2)),u64(C.dlopen(c'/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation',2))};mf_cases(api);println('IOS-MEDIA-FORMAT-NATIVE: generic/audio/video construction,owned ASBD copies,signed dimensions,deep extension snapshots,CF equality/ownership,concurrent readers and exact metadata strings')}
  for _ in 0..2{objc_start();mut readers:=[]thread{};for _ in 0..8{readers<<spawn mf_constant_reader()};readers.wait();unsafe{readers.free()};mf_cases(MFAPI{});mf_private_failures();assert ios_runtime.live==ios_runtime.framework_objects.len&&ios_runtime.objects.len==ios_runtime.framework_objects.len;for object in ios_runtime.framework_objects{assert obj_header(object).refs==1};objc_stop();assert ios_runtime.coremedia_constants_arena==0&&ios_runtime.live==0&&ios_runtime.objects.len==0}
- println('IOS-MEDIA-FORMAT: owned format descriptions,deep immutable extension snapshots,ASBD pointers,signed dimensions,CF equality/ownership,sealed metadata,concurrent readers,two drained runtimes;sample buffers and codecs remain unavailable')
+ println('IOS-MEDIA-FORMAT: owned format descriptions,deep immutable extension snapshots,ASBD pointers,signed dimensions,CF equality/ownership,sealed metadata,concurrent readers,two drained runtimes;image sample buffers and codecs remain unavailable')
 }

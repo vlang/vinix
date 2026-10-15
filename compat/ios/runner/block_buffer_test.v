@@ -89,7 +89,7 @@ fn bb_cases(api BBAPI){
  for flags in [u32(0),1]!{object=0xfeed;assert block_create(0,0,32,null_allocator,0,0,8,flags,&object)==-12701&&object==0}
 }
 fn bb_private(){
- for name in ['_CMBlockBufferCreateEmpty','_CMBlockBufferAppendMemoryBlock','_CMSampleBufferCreate']!{if _:=runtime_symbol('/System/Library/Frameworks/CoreMedia.framework/CoreMedia',name){assert false}}
+ for name in ['_CMBlockBufferCreateEmpty','_CMBlockBufferAppendMemoryBlock']!{if _:=runtime_symbol('/System/Library/Frameworks/CoreMedia.framework/CoreMedia',name){assert false}}
  for name in ['_CMBlockBufferCreateWithMemoryBlock','_CMBlockBufferGetDataPointer','_CMBlockBufferReplaceDataBytes']!{for lib in ['/System/Library/Frameworks/Foundation.framework/Foundation','/usr/lib/libSystem.B.dylib']!{if _:=runtime_symbol(lib,name){assert false}}}
  // Allocation callbacks may join a reader on another thread. A callback that
  // tries to allocate the same block again receives an explicit failure.
@@ -101,5 +101,5 @@ fn bb_private(){
 fn test_block_buffer(){
  $if macos{api:=BBAPI{true,u64(C.dlopen(c'/System/Library/Frameworks/CoreMedia.framework/CoreMedia',2)),u64(C.dlopen(c'/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation',2))};bb_cases(api);println('IOS-BLOCK-BUFFER-NATIVE: owned and borrowed memory,packed custom callbacks,deferred allocation,range errors,write-through slices,CF lifetimes and concurrent readers')}
  for _ in 0..2{objc_start();bb_cases(BBAPI{});bb_private();assert ios_runtime.live==ios_runtime.framework_objects.len&&ios_runtime.objects.len==ios_runtime.framework_objects.len;for object in ios_runtime.framework_objects{assert obj_header(object).refs==1};objc_stop();assert ios_runtime.live==0&&ios_runtime.objects.len==0}
- println('IOS-BLOCK-BUFFER: contiguous owned/borrowed/deferred storage,copied packed callbacks,exact final release,nested shared slices,checked range operations,concurrent readers,two drained runtimes;fragment assembly and sample buffers remain unavailable')
+ println('IOS-BLOCK-BUFFER: contiguous owned/borrowed/deferred storage,copied packed callbacks,exact final release,nested shared slices,checked range operations,concurrent readers,two drained runtimes;fragment assembly and image sample buffers remain unavailable')
 }
