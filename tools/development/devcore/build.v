@@ -60,6 +60,26 @@ fn expand(value string, work string, output string, tools map[string]Pin) !strin
 	return result
 }
 
+fn verify_build_tool(pin Pin) ! {
+	// The command changes directory before exec. A relative path would check
+	// one file here but execute another file (or a PATH match) in the workspace.
+	if !pin.path.starts_with('/') || pin.path.contains('\x00') {
+		return error('build tool requires an absolute path without NUL')
+	}
+	st := os.stat(pin.path)!
+	if st.get_filetype() != .regular || !os.is_executable(pin.path) {
+		return error('tool is not executable: ${pin.path}')
+	}
+	verify(pin)!
+}
+
+fn verify_step_tools(tools map[string]Pin, generated map[string]string, executable string) ! {
+	// An earlier step may have replaced a pinned executable. Check every tool
+	// before launching a step, including compilers passed to a build system.
+	for _, pin in tools { verify_build_tool(pin)! }
+	if expected := generated[executable] { verify_build_tool(Pin{executable, expected})! }
+}
+
 pub fn validate_plan(plan BuildPlan) ! {
 	if plan.schema != 1 || plan.steps.len == 0 || plan.epoch < 0
 		|| plan.timeout_seconds < 1 || plan.timeout_seconds > 86400 {
@@ -75,8 +95,7 @@ pub fn validate_plan(plan BuildPlan) ! {
 		] {
 			return error('invalid tool name: ${name}')
 		}
-		verify(pin)!
-		if !os.is_executable(pin.path) { return error('tool is not executable: ${pin.path}') }
+		verify_build_tool(pin)!
 	}
 	mut names := map[string]bool{}
 	mut generated := map[string]bool{}
@@ -138,10 +157,14 @@ pub fn build(plan_text string, output_path string) !BuildReceipt {
 	for step in plan.steps {
 		check_interrupted()!
 		argv := step.argv.map(expand(it, work, output, plan.tools)!)
-		if expected := generated[argv[0]] { verify(Pin{argv[0], expected})! }
 		cwd := work + '/' + step.directory
 		if !os.is_dir(cwd) || !os.real_path(cwd).starts_with(work + '/') && os.real_path(cwd) != work {
 			return error('step directory escapes workspace: ${step.directory}')
+		}
+		verify_step_tools(plan.tools, generated, argv[0]) or {
+			receipt.steps << StepReceipt{ name: step.name, argv: argv, exit_code: -1, detail: err.msg() }
+			save_receipt(output, receipt)!
+			return err
 		}
 		println('Building ${step.name}')
 		status := run(argv, cwd, env, plan.timeout_seconds, output + '/' + step.name + '.log') or {

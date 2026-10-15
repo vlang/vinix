@@ -323,8 +323,14 @@ add native generators, desktop translation/link commands and package archive
 commands as further steps. `{work}`, `{output}`, and pinned tool names are the
 only substitutions. Artifacts are paths relative to the copied source root.
 JSON uses strict type conversion. Unknown substitutions, escaped paths and
-unpinned top-level executables are errors. A later step can execute `{work}/ARTIFACT` produced by
-an earlier step; its recorded hash is checked before execution. This supports
+unpinned top-level executables are errors. Tool pins require absolute paths to
+regular executable files, so changing to a step's working directory cannot
+select a different file or a PATH match. Every tool's hash and executable status
+are checked again before each step, including tools passed as arguments to a
+build system. A changed or disabled tool stops the build before that step opens
+its execution log; the incomplete receipt records its expanded argv and refusal.
+A later step can execute `{work}/ARTIFACT` produced by an earlier step; its
+recorded hash and executable status are checked before execution. This supports
 building generators, running them and testing the exact resulting binaries.
 Output directories must be new.
 
@@ -342,3 +348,15 @@ checks also compile a `-gc none` hash probe and bound peak-memory growth across
 1,000 full-buffer hashes. The stream-buffer regression measured approximately
 79 MiB of growth before the fix and 1 MiB after it on the Darwin ARM host.
 These host checks do not establish Vinix guest qualification.
+
+On 15 October 2026 the tool-pin regressions reproduced execution of a workspace
+shadow through a relative pin and execution of a tool replaced by an earlier
+step. The corrected public CLI refuses relative pins before creating output.
+Real V fixtures check replacement and removed execute permission for both
+direct tools and tools invoked through another pinned command, preserve the
+failed step in the receipt and prevent later steps. All seven build,
+qualification and scheduler test files passed on the Darwin ARM host with V
+`be2eb40`. Both static Linux ELF64 CLI builds also passed, with checked ARM64
+and x86-64 machine IDs. Source/compiler/binary pins and logs are retained in
+`/tmp/vinix-build-tools-63837`. These results cover host build-runner behavior;
+complete installed kernel/desktop self-hosting remains open.
