@@ -7149,20 +7149,55 @@ hidden V temporaries. The initial successful prefix-only host trial is retained
 separately from the final normalized-path results. Published runners remain
 unchanged; the full iOS regression remains unpassed.
 
-The current IPA probe links past `NSHomeDirectory` and exits with status 1 at
-`_NSLogv`. Fortnite has not entered application code and remains unplayable.
+The home-directory IPA probe links past `NSHomeDirectory` and exits with status
+1 at `_NSLogv`.
+
+V now supplies Foundation's `NSLogv` entry with a borrowed NSString in x0 and
+the Darwin ARM64 stack argument pointer in x1. The IPA calls this entry at
+`0x1000906fc`, forwarding its original anonymous argument slots after building
+an NSString format. Installed Foundation calls and disassembly verify that ABI,
+preserved context registers, reusable input slots, stderr output and newline
+behavior. Native measurements also cover Unicode object text, nil arguments,
+embedded NULs and Foundation's negative dynamic string-width behavior.
+
+The implementation copies the format under the runtime lock, validates its
+complete grammar before accessing arguments, and renders each object description
+once before locking stderr for a complete message write. It supports plain `%@`,
+common integer and double conversions, `%s`, `%c`, `%p`, percent escaping and
+scalar width/precision arguments. Formats are bounded to 64 KiB, argument lists
+to 512 eight-byte slots and messages to 1 MiB. `%n`, positional arguments, wide
+characters, long doubles and decorated `%@` conversions fail explicitly. Caller
+argument/string spans must be readable. The existing variadic `NSLog` entry now
+shares this formatter and writes to stderr. Vinix emits message text without
+Foundation's host timestamp/process prefix.
+
+Eight normal/deterministic sanitizer runs and four ARM64 guest suites pass:
+the new fixture, Swift NSLog, OS logging and autorelease pools. Tests include
+protected spare registers and argument/string boundaries, native formatting
+comparisons, limit/error cases, reentrant descriptions, eight concurrent writers
+and two fully drained runtimes. The eleven generated C streams and executables,
+native measurements, IPA call sites, four retired VM phases and pinned inputs
+are retained under `build/ios/fortnite/nslogv-checks`. Generated C inspection
+checks stack scratch, explicit buffer frees and pool cleanup. The initial native
+width mismatch and private build-list omission are retained with their corrected
+results. Published runners remain unchanged; the full iOS regression remains
+unpassed.
+
+The current IPA probe links past `NSLogv` and exits with status 1 at
+`_NSProtocolFromString`. Fortnite has not entered application code and remains
+unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,542 | 618 | 79 |
+| Fortnite executable | 1,543 | 617 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,377 | 621 | 120 |
+| All images | 2,378 | 620 | 120 |
 
-The C++/GLES/Text variant reports 2,390 resolved imports, 608 unresolved strong
+The C++/GLES/Text variant reports 2,391 resolved imports, 607 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

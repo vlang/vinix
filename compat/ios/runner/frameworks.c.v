@@ -102,6 +102,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	}
 	if symbol == '___CFConstantStringClassReference' { return ios_runtime.names['NSString'] }
 	if symbol == '_NSLog' { return u64(unsafe { voidptr(C.ios_nslog) }) }
+	if library == '/System/Library/Frameworks/Foundation.framework/Foundation' && symbol == '_NSLogv' { return u64(unsafe { voidptr(ns_logv) }) }
 	if symbol == '_NSGetSizeAndAlignment' { return u64(unsafe { voidptr(ns_get_size_alignment) }) }
 	if symbol == '_NSClassFromString' { return u64(unsafe { voidptr(ns_class_from_string) }) }
 	if symbol == '_NSSelectorFromString' { return u64(unsafe { voidptr(ns_selector_from_string) }) }
@@ -211,10 +212,7 @@ fn C.ios_nslog()
 
 @[export: 'ios_nslog_stack']
 fn ns_log(format u64, stack u64) {
-	pool := objc_pool_push()
-	defer { objc_pool_pop(pool) }
-	message := ns_format(format, stack)
-	C.puts(unsafe { &char(string_text(message).str) })
+	ns_logv(format, stack)
 }
 
 fn framework_constant(symbol string) ?u64 {
