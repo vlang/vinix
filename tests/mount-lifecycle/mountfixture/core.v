@@ -388,6 +388,8 @@ pub fn run() int {
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		rename_case := if count == 4 && name[0] == `r` && name[1] == `p` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
+		access_case := if count == 4 && name[0] == `a` && name[1] == `c` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		node_case := if count == 4 && name[0] == `n` && name[1] == `d` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		writer_case := if count == 4 && name[0] == `w` && name[1] == `r` && name[2] == `-`
@@ -412,7 +414,8 @@ pub fn run() int {
 			|| C.strcmp(selected, c'links') == 0 || link_case >= 0
 			|| C.strcmp(selected, c'renames') == 0 || rename_case >= 0
 			|| C.strcmp(selected, c'writers') == 0 || writer_case >= 0
-			|| C.strcmp(selected, c'nodes') == 0 || node_case >= 0, 4)
+			|| C.strcmp(selected, c'nodes') == 0 || node_case >= 0
+			|| C.strcmp(selected, c'access') == 0 || access_case >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
@@ -472,6 +475,9 @@ pub fn run() int {
 		if C.strcmp(selected, c'nodes') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { mount_node_cases(-1) }
 		if node_case >= 0 { mount_node_cases(node_case) }
+		if C.strcmp(selected, c'access') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { mount_access_cases(-1) }
+		if access_case >= 0 { mount_access_cases(access_case) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }

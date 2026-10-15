@@ -62,6 +62,14 @@ checks; `wr-0` through `wr-9` select individual cases. Native `all` and Linux
 `--case nodes` selects `mknodat` attachment policy for regular files, FIFOs and
 device nodes; `nd-0` through `nd-7` select individual cases. Native `all` and
 Linux `move-reference` include them.
+`--case access` selects read-only and `noexec` access-query policy; `ac-0`
+through `ac-9` select individual cases. Native `all` and Linux `move-reference`
+include them.
+
+The [access-query checks](access-policy.md) preserve the selected attachment for
+`faccessat` and `faccessat2`, including empty-path descriptions and cwd. They
+cover read-only write queries, regular-file `noexec`, special-file exceptions,
+symlink no-follow and real/effective credentials.
 
 The [node-creation checks](mknod-policy.md) preserve writable bind aliases while
 refusing creation through read-only aliases, detached mounts and retired
@@ -156,7 +164,7 @@ iterations, verifies capability denial and finishes with valid local operations.
 
 Use `--probe-state /path/to/prior-native-result` to reuse its probe ELF and
 generated C with a different kernel or case. The controller requires a matching
-architecture and identical current/copied hashes of all twenty fixture files,
+architecture and identical current/copied hashes of all twenty-one fixture files,
 verifies both artifact hashes against the prior receipt and checks the ELF
 architecture before boot.
 The prior result may be a failed control; its receipt hash is pinned in the new
@@ -208,7 +216,8 @@ all five pivot alias cases, all seven private-thread cases, all five bind-policy
 cases, all six pathname truncation cases, all seven mode/ownership cases,
 all eight timestamp cases, all eight extended-attribute cases, all eight symlink
 creation cases, all eight removal cases, all ten hard-link cases, all ten
-rename cases, all ten writer-lifetime cases and all eight node-creation cases.
+rename cases, all ten writer-lifetime cases, all eight node-creation cases and
+all ten access-query cases.
 Vinix's cursor limit and unsupported unmount modes are excluded. Supply a matching Linux kernel and
 the ELF preserved by a native run:
 

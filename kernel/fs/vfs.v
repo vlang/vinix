@@ -439,6 +439,11 @@ fn get_node_with_credentials(parent &VFSNode, path string, follow_links bool,
 	effective bool) ?&VFSNode {
 	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	if !starting_mount(parent, identity) { return none }
+	return get_node_with_credentials_on_mount(parent, path, follow_links, effective, identity)
+}
+
+fn get_node_with_credentials_on_mount(parent &VFSNode, path string, follow_links bool,
+	effective bool, identity &lib.MountContext) ?&VFSNode {
 	_, node, _ := walk_path_on_mount(parent, path, 0, effective, identity)
 	if voidptr(node) == unsafe { nil } {
 		return none
@@ -1632,12 +1637,13 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 	if mode & ~u32(7) != 0 || flags & ~(at_eaccess | at_symlink_nofollow | at_empty_path) != 0 {
 		return errno.err, errno.einval
 	}
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 
 	if path.len == 0 {
 		if flags & at_empty_path == 0 { return errno.err, errno.enoent }
 		if is_fdcwd(dirfd) {
-			node := unsafe { &VFSNode(proc.current_directory_of(process)) }
-			return faccess_node(node, mode, flags & at_eaccess != 0)
+			node := parent_and_mount_for(dirfd, '.', identity) or { return errno.err, errno.get() }
+			return faccess_node(node, mode, flags & at_eaccess != 0, identity)
 		}
 		// Hold the description until all metadata and ACL checks finish. An
 		// unlinked file or O_PATH descriptor still names its original inode.
@@ -1646,8 +1652,9 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 		}
 		defer { fd.unref() }
 		if fd.handle.node != unsafe { nil } {
+			lib.copy_mount_context(identity, &fd.handle.mount)
 			return faccess_node(unsafe { &VFSNode(fd.handle.node) }, mode,
-				flags & at_eaccess != 0)
+				flags & at_eaccess != 0, identity)
 		}
 		// Pipes, sockets and anonymous files have metadata but no pathname.
 		// The scratch is borrowed only during these synchronous checks.
@@ -1659,16 +1666,16 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 		return 0, 0
 	}
 
-	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
+	parent := parent_and_mount_for(dirfd, path, identity) or { return errno.err, errno.get() }
 
 	follow_links := flags & at_symlink_nofollow == 0
 
-	node := get_node_with_credentials(parent, path, follow_links,
-		flags & at_eaccess != 0) or { return errno.err, errno.get() }
-	return faccess_node(node, mode, flags & at_eaccess != 0)
+	node := get_node_with_credentials_on_mount(parent, path, follow_links,
+		flags & at_eaccess != 0, identity) or { return errno.err, errno.get() }
+	return faccess_node(node, mode, flags & at_eaccess != 0, identity)
 }
 
-fn faccess_node(node &VFSNode, mode u32, effective bool) (u64, u64) {
+fn faccess_node(node &VFSNode, mode u32, effective bool, identity &lib.MountContext) (u64, u64) {
 	// pledge(2) asks only "rpath" of access(2); unveil(2) the access asked about.
 	mut policy_access := proc.policy_inspect
 	if mode & access_read != 0 {
@@ -1683,8 +1690,17 @@ fn faccess_node(node &VFSNode, mode u32, effective bool) (u64, u64) {
 	if !policy_check(node, policy_access) {
 		return errno.err, errno.get()
 	}
+	// Execute permission on a regular file also depends on its attachment.
+	if mode & access_exec != 0 && stat.isreg(node.resource.stat.mode)
+		&& mount_flags(identity) & ms_noexec != 0 { return errno.err, errno.eacces }
 	if mode != 0 {
 		check_access(node, mode, effective) or { return errno.err, errno.get() }
+	}
+	// Device/FIFO/socket access does not write the containing filesystem.
+	kind := node.resource.stat.mode & stat.ifmt
+	special := kind == stat.ifchr || kind == stat.ifblk || kind == stat.ififo || kind == stat.ifsock
+	if mode & access_write != 0 && !special && read_only_on_mount(node, identity) {
+		return errno.err, errno.erofs
 	}
 
 	return 0, 0
