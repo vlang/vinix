@@ -1,0 +1,1 @@
+arm/x86: complete production C differs only in set_process_group; exit_published under the existing table lock admits completed zombie targets and group members, preserving incomplete-teardown exclusion and existing ownership/notifications; no added allocation/pin/free or compiler normalization; post-exit mutation lifetime independently reviewed

@@ -19,7 +19,7 @@ pub fn set_process_group(pid int, pgid int) (u64, u64) {
 	if target == unsafe { nil } && task_process_in(caller.numbered_in, pid) != unsafe { nil } {
 		return errno.err, errno.einval
 	}
-	if target == unsafe { nil } || target.exiting { return errno.err, errno.esrch }
+	if target == unsafe { nil } || (target.exiting && !target.exit_published) { return errno.err, errno.esrch }
 	if !mac_peer_allowed(caller, target) { return errno.err, errno.eperm }
 	if voidptr(target) != voidptr(caller) && target.ppid != caller.pid { return errno.err, errno.esrch }
 	if target.sid != caller.sid { return errno.err, errno.eperm }
@@ -30,7 +30,7 @@ pub fn set_process_group(pid int, pgid int) (u64, u64) {
 	if group == 0 {
 		for id := 1; id < max_pid; id++ {
 			member := process_at(id)
-			if member == unsafe { nil } || member.exiting { continue }
+			if member == unsafe { nil } || (member.exiting && !member.exit_published) { continue }
 			if numbers_own(caller.numbered_in) {
 				if voidptr(member.numbered_in) != voidptr(caller.numbered_in) || member.ns_pgid != local { continue }
 			} else if member.pgid != local { continue }

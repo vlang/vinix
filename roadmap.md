@@ -989,6 +989,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   on both architectures, with identical-ELF Linux references and flat storage.
   See [the session/exec receipts](docs/linux-posix-qualification.md#native-process-group-session-and-exec-error-precedence).
 
+- [x] Admit completed zombie setpgid targets and zombie-only destination groups
+  until reap, preserving incomplete-teardown exclusion and exact errors. Qualify
+  real mutations, wait-group selection, live joins and reaped identities as
+  root/UID1000 in initial/one-level PID namespaces on both architectures, with
+  flat storage and lifetime review. See [the zombie-group receipts](docs/linux-posix-qualification.md#native-completed-zombie-process-groups).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "2b140f9a85539650c06ff19eacb07d1fc9b058d8aabcbdf69a96a77a67d7d7dc",
+    "results": [
+        {
+            "name": "groupzombie",
+            "source_sha256": "2a8893d7cd6f06cfc8339c66d21b3ab9e2fdf51c19b4267d59133634841ab66d",
+            "init_sha256": "cdacf151cef1be17bf7e78ea8e081d65d1f04ecc7c65d5dfa60bbb667362ca8c",
+            "iso_sha256": "6e3f7232616f492e0e107ed045aa082349ee9bc6d10a6bcbd4f728b20aa34d63",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

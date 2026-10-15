@@ -1688,3 +1688,16 @@ Compile `grouporder-check.v` without `-prod` and pass its evidence area to verif
 original failures, native/reference results, exact one-function C scope,
 compiler/SDK/input pins, initial compile refusals and executing audit controls.
 See the [session/exec report](../../docs/linux-posix-qualification.md#native-process-group-session-and-exec-error-precedence).
+
+The `groupzombie` case qualifies completed zombie setpgid targets and groups
+whose only member is a zombie. Root/UID1000 cohorts in initial and one-level
+PID namespaces run 17,152 controls per architecture. WNOWAIT and pidfd POLLIN
+establish completed exit; real mutations affect wait-group selection, live
+children join/leave the zombie-only group, and reaped identities get exact
+errors. Four warmed 200-cycle cohorts alternate upper-word/raw and real musl
+mutations, joins and refusals. `groupzombie-reference.v` boots the unchanged
+native ELF on Linux. Compile `groupzombie-check.v` without `-prod` and supply
+its evidence area to verify original failures, native/reference results,
+whole-C scope, compiler/SDK/input pins, lifetime review and executing audit
+controls. Incomplete teardown and lifecycle races remain outside this stable
+contract. See the [zombie-group report](../../docs/linux-posix-qualification.md#native-completed-zombie-process-groups).

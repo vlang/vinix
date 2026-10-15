@@ -1,0 +1,831 @@
+==> Assembling /Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/groupzombie/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/groupzombie/.vinix-aarch64.iso.b7iuT5'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 19.8g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/groupzombie/iso-build/.iso-staging.HMxCOD/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 18057 sectors
+Written to medium : 18057 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/groupzombie/.vinix-aarch64.iso.b7iuT5' completed successfully.
+
+    /Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/groupzombie/test.iso (36980736 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/groupzombie
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x772ac000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x772ac000 to 0xffffffff80000000, length: 0x2ec000
+vmm: Kernel: Mapping 0x77598000 to 0xffffffff802ec000, length: 0x2c000
+vmm: Kernel: Mapping 0x775c4000 to 0xffffffff80318000, length: 0xf7e000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x772ac000 +0x318000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff00007727b000
+initramfs: Size:    126464
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=119928
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000077299a00
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212220
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212220
+LINUX GROUPZOMBIE EXEC: kind=1 pid=8898 parent=43397 group=43397 session=43397 uid=0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212220
+LINUX GROUPZOMBIE EXEC: kind=3 pid=59213 parent=43397 group=59213 session=59213 uid=0
+LINUX GROUPZOMBIE EXIT: ordinary=0 namespace=0 kind=0 pid=53969 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=0 namespace=0 kind=1 pid=8898 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=0 namespace=0 kind=2 pid=27065 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=0 namespace=0 kind=3 pid=59213 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=0 uid=0 self=43397 kind=0 pid=53969 group=53969 session=43397 executed=0 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=0 uid=0 self=43397 kind=1 pid=8898 group=43397 session=43397 executed=1 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=0 uid=0 self=43397 kind=2 pid=27065 group=27065 session=27065 executed=0 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=0 uid=0 self=43397 kind=3 pid=59213 group=59213 session=59213 executed=1 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=0 uid=0 self=43397 kind=4 pid=63309 group=43397 session=43397 executed=0 zombie=0
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=16 live=1058/1058 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=32 live=101/101 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=48 live=68/68 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=64 live=119/119 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=96 live=20/20 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=128 live=5/5 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=192 live=352/352 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=256 live=646/646 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=384 live=454/454 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=512 live=403/403 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=768 live=26/26 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=1024 live=4/4 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=1536 live=20/20 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=2048 live=0/0 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=2688 live=0/0 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=4048 live=0/0 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=5392 live=0/0 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=0 size=8096 live=0/0 cycles=200
+LINUX GROUPZOMBIE STORAGE: ordinary=0 namespace=0 cycles=200 big_pages=105/105 PASS
+LINUX GROUPZOMBIE REAP: ordinary=0 namespace=0 kind=0 pid=53969 status=0
+LINUX GROUPZOMBIE REAP: ordinary=0 namespace=0 kind=1 pid=8898 status=0
+LINUX GROUPZOMBIE REAP: ordinary=0 namespace=0 kind=2 pid=27065 status=0
+LINUX GROUPZOMBIE REAP: ordinary=0 namespace=0 kind=3 pid=59213 status=0
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=0 kind=0 calls=448 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=0 kind=1 calls=448 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=0 kind=2 calls=448 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=0 kind=3 calls=448 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=0 kind=4 calls=512 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=0 kind=5 calls=1984 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=0 kind=0 calls=448 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=0 kind=1 calls=448 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=0 kind=2 calls=448 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=0 kind=3 calls=448 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=0 kind=4 calls=512 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=0 kind=5 calls=1984 failures=0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212220
+LINUX GROUPZOMBIE EXEC: kind=1 pid=20644 parent=39458 group=39458 session=39458 uid=1000
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212220
+LINUX GROUPZOMBIE EXEC: kind=3 pid=16637 parent=39458 group=16637 session=16637 uid=1000
+LINUX GROUPZOMBIE EXIT: ordinary=1 namespace=0 kind=0 pid=2357 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=1 namespace=0 kind=1 pid=20644 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=1 namespace=0 kind=2 pid=38196 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=1 namespace=0 kind=3 pid=16637 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=39458 kind=0 pid=2357 group=2357 session=39458 executed=0 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=39458 kind=1 pid=20644 group=39458 session=39458 executed=1 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=39458 kind=2 pid=38196 group=38196 session=38196 executed=0 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=39458 kind=3 pid=16637 group=16637 session=16637 executed=1 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=39458 kind=4 pid=11823 group=39458 session=39458 executed=0 zombie=0
+random: reseeded from 6065 events, 0 hardware words
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=16 live=1077/1077 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=32 live=106/106 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=48 live=71/71 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=64 live=126/126 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=96 live=20/20 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=128 live=5/5 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=192 live=367/367 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=256 live=662/662 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=384 live=462/462 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=512 live=410/410 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=768 live=25/25 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=1024 live=5/5 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=1536 live=20/20 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=2048 live=0/0 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=2688 live=0/0 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=4048 live=0/0 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=5392 live=0/0 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=0 size=8096 live=0/0 cycles=200
+LINUX GROUPZOMBIE STORAGE: ordinary=1 namespace=0 cycles=200 big_pages=105/105 PASS
+LINUX GROUPZOMBIE REAP: ordinary=1 namespace=0 kind=0 pid=2357 status=0
+LINUX GROUPZOMBIE REAP: ordinary=1 namespace=0 kind=1 pid=20644 status=0
+LINUX GROUPZOMBIE REAP: ordinary=1 namespace=0 kind=2 pid=38196 status=0
+LINUX GROUPZOMBIE REAP: ordinary=1 namespace=0 kind=3 pid=16637 status=0
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=0 kind=0 calls=448 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=0 kind=1 calls=448 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=0 kind=2 calls=448 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=0 kind=3 calls=448 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=0 kind=4 calls=512 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=0 kind=5 calls=1984 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=0 kind=0 calls=448 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=0 kind=1 calls=448 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=0 kind=2 calls=448 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=0 kind=3 calls=448 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=0 kind=4 calls=512 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=0 kind=5 calls=1984 failures=0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212220
+LINUX GROUPZOMBIE EXEC: kind=1 pid=4 parent=2 group=2 session=2 uid=0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212220
+LINUX GROUPZOMBIE EXEC: kind=3 pid=6 parent=2 group=6 session=6 uid=0
+LINUX GROUPZOMBIE EXIT: ordinary=0 namespace=1 kind=0 pid=3 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=0 namespace=1 kind=1 pid=4 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=0 namespace=1 kind=2 pid=5 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=0 namespace=1 kind=3 pid=6 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=0 pid=3 group=3 session=2 executed=0 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=1 pid=4 group=2 session=2 executed=1 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=2 pid=5 group=5 session=5 executed=0 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=3 pid=6 group=6 session=6 executed=1 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=4 pid=7 group=2 session=2 executed=0 zombie=0
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=16 live=1108/1108 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=32 live=111/111 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=48 live=93/93 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=64 live=143/143 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=96 live=22/22 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=128 live=5/5 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=192 live=403/403 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=256 live=685/685 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=384 live=473/473 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=512 live=419/419 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=768 live=39/39 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=1024 live=5/5 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=1536 live=20/20 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=2048 live=0/0 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=2688 live=0/0 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=4048 live=0/0 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=5392 live=0/0 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=0 namespace=1 size=8096 live=0/0 cycles=200
+LINUX GROUPZOMBIE STORAGE: ordinary=0 namespace=1 cycles=200 big_pages=117/117 PASS
+LINUX GROUPZOMBIE REAP: ordinary=0 namespace=1 kind=0 pid=3 status=0
+LINUX GROUPZOMBIE REAP: ordinary=0 namespace=1 kind=1 pid=4 status=0
+LINUX GROUPZOMBIE REAP: ordinary=0 namespace=1 kind=2 pid=5 status=0
+LINUX GROUPZOMBIE REAP: ordinary=0 namespace=1 kind=3 pid=6 status=0
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=1 kind=0 calls=448 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=1 kind=1 calls=448 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=1 kind=2 calls=448 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=1 kind=3 calls=448 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=1 kind=4 calls=512 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=1 kind=5 calls=1984 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=1 kind=0 calls=448 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=1 kind=1 calls=448 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=1 kind=2 calls=448 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=1 kind=3 calls=448 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=1 kind=4 calls=512 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=1 kind=5 calls=1984 failures=0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212220
+LINUX GROUPZOMBIE EXEC: kind=1 pid=4 parent=2 group=2 session=2 uid=1000
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212220
+LINUX GROUPZOMBIE EXEC: kind=3 pid=6 parent=2 group=6 session=6 uid=1000
+LINUX GROUPZOMBIE EXIT: ordinary=1 namespace=1 kind=0 pid=3 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=1 namespace=1 kind=1 pid=4 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=1 namespace=1 kind=2 pid=5 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=1 namespace=1 kind=3 pid=6 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=0 pid=3 group=3 session=2 executed=0 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=1 pid=4 group=2 session=2 executed=1 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=2 pid=5 group=5 session=5 executed=0 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=3 pid=6 group=6 session=6 executed=1 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=4 pid=7 group=2 session=2 executed=0 zombie=0
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=16 live=1133/1133 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=32 live=118/118 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=48 live=94/94 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=64 live=155/155 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=96 live=22/22 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=128 live=5/5 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=192 live=427/427 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=256 live=708/708 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=384 live=481/481 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=512 live=429/429 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=768 live=39/39 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=1024 live=4/4 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=1536 live=21/21 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=2048 live=0/0 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=2688 live=0/0 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=4048 live=0/0 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=5392 live=0/0 cycles=200
+LINUX GROUPZOMBIE SLAB: ordinary=1 namespace=1 size=8096 live=0/0 cycles=200
+LINUX GROUPZOMBIE STORAGE: ordinary=1 namespace=1 cycles=200 big_pages=117/117 PASS
+LINUX GROUPZOMBIE REAP: ordinary=1 namespace=1 kind=0 pid=3 status=0
+LINUX GROUPZOMBIE REAP: ordinary=1 namespace=1 kind=1 pid=4 status=0
+LINUX GROUPZOMBIE REAP: ordinary=1 namespace=1 kind=2 pid=5 status=0
+LINUX GROUPZOMBIE REAP: ordinary=1 namespace=1 kind=3 pid=6 status=0
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=1 kind=0 calls=448 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=1 kind=1 calls=448 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=1 kind=2 calls=448 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=1 kind=3 calls=448 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=1 kind=4 calls=512 failures=0
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=1 kind=5 calls=1984 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=1 kind=0 calls=448 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=1 kind=1 calls=448 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=1 kind=2 calls=448 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=1 kind=3 calls=448 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=1 kind=4 calls=512 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=1 kind=5 calls=1984 failures=0
+LINUX GROUPZOMBIE: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/runtime/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/runtime/.vinix-aarch64.iso.2kRy9P'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 19.5g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/runtime/iso-build/.iso-staging.ecwZiu/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 18033 sectors
+Written to medium : 18033 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/runtime/.vinix-aarch64.iso.2kRy9P' completed successfully.
+
+    /Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/runtime/test.iso (36931584 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/runtime
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x772ac000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x772ac000 to 0xffffffff80000000, length: 0x2ec000
+vmm: Kernel: Mapping 0x77598000 to 0xffffffff802ec000, length: 0x2c000
+vmm: Kernel: Mapping 0x775c4000 to 0xffffffff80318000, length: 0xf7e000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x772ac000 +0x318000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff000077287000
+initramfs: Size:    76288
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=69696
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000077299600
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x2117c0
+LINUX RUNTIME page_size=16384 pointer_bits=64
+LINUX RUNTIME PASS: atomics SIMD TLS
+LINUX RUNTIME PASS: JIT page sizes
+LINUX RUNTIME PASS: wide offsets time64
+LINUX RUNTIME: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/grouporder/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/grouporder/.vinix-aarch64.iso.5WcEtx'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 18.9g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/grouporder/iso-build/.iso-staging.IUAIEV/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 18055 sectors
+Written to medium : 18055 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/grouporder/.vinix-aarch64.iso.5WcEtx' completed successfully.
+
+    /Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/grouporder/test.iso (36976640 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/groupzombie-20261015/states/p1-after-arm/grouporder
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x772ac000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x772ac000 to 0xffffffff80000000, length: 0x2ec000
+vmm: Kernel: Mapping 0x77598000 to 0xffffffff802ec000, length: 0x2c000
+vmm: Kernel: Mapping 0x775c4000 to 0xffffffff80318000, length: 0xf7e000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x772ac000 +0x318000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff00007727c000
+initramfs: Size:    122368
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=115752
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000077299a00
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212000
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212000
+LINUX GROUPORDER EXEC: kind=1 pid=27800 parent=46637 group=46637 session=46637 uid=0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212000
+LINUX GROUPORDER EXEC: kind=3 pid=14436 parent=46637 group=14436 session=14436 uid=0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212000
+LINUX GROUPORDER EXEC: kind=5 pid=61053 parent=56019 group=61053 session=61053 uid=0
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=0 uid=0 self=46637 kind=0 pid=40729 parent=46637 reaper=40729 group=46637 session=46637 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=0 uid=0 self=46637 kind=1 pid=27800 parent=46637 reaper=27800 group=46637 session=46637 executed=1
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=0 uid=0 self=46637 kind=2 pid=10235 parent=46637 reaper=10235 group=10235 session=10235 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=0 uid=0 self=46637 kind=3 pid=14436 parent=46637 reaper=14436 group=14436 session=14436 executed=1
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=0 uid=0 self=46637 kind=4 pid=24238 parent=16088 reaper=16088 group=46637 session=46637 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=0 uid=0 self=46637 kind=5 pid=61053 parent=56019 reaper=56019 group=61053 session=61053 executed=1
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=16 live=1086/1086 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=32 live=108/108 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=48 live=116/116 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=64 live=181/181 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=96 live=26/26 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=128 live=6/6 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=192 live=406/406 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=256 live=658/658 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=384 live=464/464 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=512 live=409/409 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=768 live=74/74 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=1024 live=5/5 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=1536 live=26/26 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=2048 live=0/0 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=2688 live=0/0 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=4048 live=0/0 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=5392 live=0/0 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=0 size=8096 live=0/0 cycles=200
+LINUX GROUPORDER STORAGE: ordinary=0 namespace=0 cycles=200 big_pages=111/111 PASS
+LINUX GROUPORDER CASES: ordinary=0 namespace=0 kind=0 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=0 kind=1 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=0 kind=2 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=0 kind=3 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=0 kind=4 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=0 kind=5 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=0 kind=6 calls=192 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=0 kind=0 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=0 kind=1 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=0 kind=2 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=0 kind=3 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=0 kind=4 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=0 kind=5 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=0 kind=6 calls=192 failures=0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212000
+LINUX GROUPORDER EXEC: kind=1 pid=33883 parent=52605 group=52605 session=52605 uid=1000
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212000
+LINUX GROUPORDER EXEC: kind=3 pid=7906 parent=52605 group=7906 session=7906 uid=1000
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212000
+LINUX GROUPORDER EXEC: kind=5 pid=41078 parent=12856 group=41078 session=41078 uid=1000
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=52605 kind=0 pid=5354 parent=52605 reaper=5354 group=52605 session=52605 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=52605 kind=1 pid=33883 parent=52605 reaper=33883 group=52605 session=52605 executed=1
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=52605 kind=2 pid=55531 parent=52605 reaper=55531 group=55531 session=55531 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=52605 kind=3 pid=7906 parent=52605 reaper=7906 group=7906 session=7906 executed=1
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=52605 kind=4 pid=44654 parent=30272 reaper=30272 group=52605 session=52605 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=52605 kind=5 pid=41078 parent=12856 reaper=12856 group=41078 session=41078 executed=1
+random: reseeded from 6030 events, 0 hardware words
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=16 live=1119/1119 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=32 live=117/117 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=48 live=119/119 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=64 live=192/192 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=96 live=27/27 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=128 live=6/6 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=192 live=433/433 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=256 live=688/688 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=384 live=476/476 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=512 live=421/421 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=768 live=74/74 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=1024 live=5/5 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=1536 live=26/26 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=2048 live=0/0 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=2688 live=0/0 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=4048 live=0/0 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=5392 live=0/0 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=0 size=8096 live=0/0 cycles=200
+LINUX GROUPORDER STORAGE: ordinary=1 namespace=0 cycles=200 big_pages=111/111 PASS
+LINUX GROUPORDER CASES: ordinary=1 namespace=0 kind=0 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=0 kind=1 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=0 kind=2 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=0 kind=3 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=0 kind=4 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=0 kind=5 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=0 kind=6 calls=192 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=0 kind=0 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=0 kind=1 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=0 kind=2 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=0 kind=3 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=0 kind=4 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=0 kind=5 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=0 kind=6 calls=192 failures=0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212000
+LINUX GROUPORDER EXEC: kind=1 pid=4 parent=2 group=2 session=2 uid=0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212000
+LINUX GROUPORDER EXEC: kind=3 pid=6 parent=2 group=6 session=6 uid=0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212000
+LINUX GROUPORDER EXEC: kind=5 pid=10 parent=9 group=10 session=10 uid=0
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=0 pid=3 parent=2 reaper=3 group=2 session=2 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=1 pid=4 parent=2 reaper=4 group=2 session=2 executed=1
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=2 pid=5 parent=2 reaper=5 group=5 session=5 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=3 pid=6 parent=2 reaper=6 group=6 session=6 executed=1
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=4 pid=8 parent=7 reaper=7 group=2 session=2 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=5 pid=10 parent=9 reaper=9 group=10 session=10 executed=1
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=16 live=1164/1164 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=32 live=125/125 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=48 live=140/140 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=64 live=213/213 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=96 live=32/32 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=128 live=6/6 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=192 live=481/481 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=256 live=724/724 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=384 live=491/491 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=512 live=436/436 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=768 live=88/88 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=1024 live=4/4 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=1536 live=27/27 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=2048 live=0/0 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=2688 live=0/0 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=4048 live=0/0 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=5392 live=0/0 cycles=200
+LINUX GROUPORDER SLAB: ordinary=0 namespace=1 size=8096 live=0/0 cycles=200
+LINUX GROUPORDER STORAGE: ordinary=0 namespace=1 cycles=200 big_pages=123/123 PASS
+LINUX GROUPORDER CASES: ordinary=0 namespace=1 kind=0 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=1 kind=1 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=1 kind=2 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=1 kind=3 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=1 kind=4 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=1 kind=5 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=0 namespace=1 kind=6 calls=192 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=1 kind=0 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=1 kind=1 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=1 kind=2 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=1 kind=3 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=1 kind=4 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=1 kind=5 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=0 namespace=1 kind=6 calls=192 failures=0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212000
+LINUX GROUPORDER EXEC: kind=1 pid=4 parent=2 group=2 session=2 uid=1000
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212000
+LINUX GROUPORDER EXEC: kind=3 pid=6 parent=2 group=6 session=6 uid=1000
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212000
+LINUX GROUPORDER EXEC: kind=5 pid=10 parent=9 group=10 session=10 uid=1000
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=0 pid=3 parent=2 reaper=3 group=2 session=2 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=1 pid=4 parent=2 reaper=4 group=2 session=2 executed=1
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=2 pid=5 parent=2 reaper=5 group=5 session=5 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=3 pid=6 parent=2 reaper=6 group=6 session=6 executed=1
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=4 pid=8 parent=7 reaper=7 group=2 session=2 executed=0
+LINUX GROUPORDER TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=5 pid=10 parent=9 reaper=9 group=10 session=10 executed=1
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=16 live=1203/1203 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=32 live=136/136 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=48 live=143/143 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=64 live=225/225 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=96 live=35/35 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=128 live=6/6 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=192 live=517/517 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=256 live=760/760 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=384 live=505/505 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=512 live=450/450 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=768 live=88/88 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=1024 live=4/4 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=1536 live=27/27 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=2048 live=0/0 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=2688 live=0/0 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=4048 live=0/0 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=5392 live=0/0 cycles=200
+LINUX GROUPORDER SLAB: ordinary=1 namespace=1 size=8096 live=0/0 cycles=200
+LINUX GROUPORDER STORAGE: ordinary=1 namespace=1 cycles=200 big_pages=123/123 PASS
+LINUX GROUPORDER CASES: ordinary=1 namespace=1 kind=0 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=1 kind=1 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=1 kind=2 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=1 kind=3 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=1 kind=4 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=1 kind=5 calls=448 failures=0
+LINUX GROUPORDER CASES: ordinary=1 namespace=1 kind=6 calls=192 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=1 kind=0 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=1 kind=1 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=1 kind=2 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=1 kind=3 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=1 kind=4 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=1 kind=5 calls=448 failures=0
+LINUX GROUPORDER FINAL: ordinary=1 namespace=1 kind=6 calls=192 failures=0
+LINUX GROUPORDER: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+Linux compatibility guest suite: PASS

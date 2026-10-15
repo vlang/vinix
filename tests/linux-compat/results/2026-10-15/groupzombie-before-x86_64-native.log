@@ -1,0 +1,245 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=80864
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91000
+initramfs: Done (9 entries)
+LINUX GROUPZOMBIE EXEC: kind=1 pid=62163 parent=62436 group=62436 session=62436 uid=0
+LINUX GROUPZOMBIE EXEC: kind=3 pid=46889 parent=62436 group=46889 session=46889 uid=0
+LINUX GROUPZOMBIE EXIT: ordinary=0 namespace=0 kind=0 pid=53345 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=0 namespace=0 kind=1 pid=62163 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=0 namespace=0 kind=2 pid=41074 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=0 namespace=0 kind=3 pid=46889 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=0 uid=0 self=62436 kind=0 pid=53345 group=53345 session=62436 executed=0 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=0 uid=0 self=62436 kind=1 pid=62163 group=62436 session=62436 executed=1 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=0 uid=0 self=62436 kind=2 pid=41074 group=41074 session=41074 executed=0 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=0 uid=0 self=62436 kind=3 pid=46889 group=46889 session=46889 executed=1 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=0 uid=0 self=62436 kind=4 pid=25569 group=62436 session=62436 executed=0 zombie=0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=0 pid=53345 group=0 pform=0 gform=0 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=0 pid=53345 group=0 pform=0 gform=1 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=0 pid=53345 group=0 pform=0 gform=2 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=0 pid=53345 group=0 pform=0 gform=3 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=0 pid=53345 group=0 pform=0 gform=4 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=0 pid=53345 group=0 pform=0 gform=5 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=1 pid=62163 group=0 pform=0 gform=0 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=1 pid=62163 group=0 pform=0 gform=1 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=1 pid=62163 group=0 pform=0 gform=2 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=1 pid=62163 group=0 pform=0 gform=3 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=1 pid=62163 group=0 pform=0 gform=4 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=1 pid=62163 group=0 pform=0 gform=5 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=2 pid=41074 group=0 pform=0 gform=0 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=2 pid=41074 group=0 pform=0 gform=1 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=2 pid=41074 group=0 pform=0 gform=2 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=2 pid=41074 group=0 pform=0 gform=3 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=2 pid=41074 group=0 pform=0 gform=4 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=2 pid=41074 group=0 pform=0 gform=5 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=3 pid=46889 group=0 pform=0 gform=0 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=3 pid=46889 group=0 pform=0 gform=1 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=3 pid=46889 group=0 pform=0 gform=2 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=3 pid=46889 group=0 pform=0 gform=3 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=3 pid=46889 group=0 pform=0 gform=4 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=3 pid=46889 group=0 pform=0 gform=5 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=4 pid=25569 group=53345 pform=0 gform=0 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=4 pid=25569 group=53345 pform=0 gform=1 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=4 pid=25569 group=53345 pform=0 gform=2 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=4 pid=25569 group=53345 pform=0 gform=3 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=4 pid=25569 group=53345 pform=0 gform=4 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=4 pid=25569 group=53345 pform=0 gform=5 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE REAP: ordinary=0 namespace=0 kind=0 pid=53345 status=0
+LINUX GROUPZOMBIE REAP: ordinary=0 namespace=0 kind=1 pid=62163 status=0
+LINUX GROUPZOMBIE REAP: ordinary=0 namespace=0 kind=2 pid=41074 status=0
+LINUX GROUPZOMBIE REAP: ordinary=0 namespace=0 kind=3 pid=46889 status=0
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=0 kind=0 calls=448 failures=320
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=0 kind=1 calls=448 failures=320
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=0 kind=2 calls=448 failures=320
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=0 kind=3 calls=448 failures=320
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=0 kind=4 calls=512 failures=64
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=0 kind=5 calls=1984 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=0 kind=0 calls=448 failures=320
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=0 kind=1 calls=448 failures=320
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=0 kind=2 calls=448 failures=320
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=0 kind=3 calls=448 failures=320
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=0 kind=4 calls=512 failures=64
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=0 kind=5 calls=1984 failures=0
+LINUX GROUPZOMBIE EXEC: kind=1 pid=32656 parent=17161 group=17161 session=17161 uid=1000
+LINUX GROUPZOMBIE EXEC: kind=3 pid=61993 parent=17161 group=61993 session=61993 uid=1000
+LINUX GROUPZOMBIE EXIT: ordinary=1 namespace=0 kind=0 pid=23742 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=1 namespace=0 kind=1 pid=32656 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=1 namespace=0 kind=2 pid=19713 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=1 namespace=0 kind=3 pid=61993 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=17161 kind=0 pid=23742 group=23742 session=17161 executed=0 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=17161 kind=1 pid=32656 group=17161 session=17161 executed=1 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=17161 kind=2 pid=19713 group=19713 session=19713 executed=0 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=17161 kind=3 pid=61993 group=61993 session=61993 executed=1 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=17161 kind=4 pid=22107 group=17161 session=17161 executed=0 zombie=0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=0 pid=23742 group=0 pform=0 gform=0 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=0 pid=23742 group=0 pform=0 gform=1 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=0 pid=23742 group=0 pform=0 gform=2 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=0 pid=23742 group=0 pform=0 gform=3 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=0 pid=23742 group=0 pform=0 gform=4 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=0 pid=23742 group=0 pform=0 gform=5 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=1 pid=32656 group=0 pform=0 gform=0 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=1 pid=32656 group=0 pform=0 gform=1 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=1 pid=32656 group=0 pform=0 gform=2 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=1 pid=32656 group=0 pform=0 gform=3 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=1 pid=32656 group=0 pform=0 gform=4 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=1 pid=32656 group=0 pform=0 gform=5 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=2 pid=19713 group=0 pform=0 gform=0 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=2 pid=19713 group=0 pform=0 gform=1 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=2 pid=19713 group=0 pform=0 gform=2 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=2 pid=19713 group=0 pform=0 gform=3 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=2 pid=19713 group=0 pform=0 gform=4 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=2 pid=19713 group=0 pform=0 gform=5 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=3 pid=61993 group=0 pform=0 gform=0 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=3 pid=61993 group=0 pform=0 gform=1 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=3 pid=61993 group=0 pform=0 gform=2 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=3 pid=61993 group=0 pform=0 gform=3 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=3 pid=61993 group=0 pform=0 gform=4 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=3 pid=61993 group=0 pform=0 gform=5 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=4 pid=22107 group=23742 pform=0 gform=0 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=4 pid=22107 group=23742 pform=0 gform=1 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=4 pid=22107 group=23742 pform=0 gform=2 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=4 pid=22107 group=23742 pform=0 gform=3 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=4 pid=22107 group=23742 pform=0 gform=4 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=4 pid=22107 group=23742 pform=0 gform=5 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE REAP: ordinary=1 namespace=0 kind=0 pid=23742 status=0
+LINUX GROUPZOMBIE REAP: ordinary=1 namespace=0 kind=1 pid=32656 status=0
+LINUX GROUPZOMBIE REAP: ordinary=1 namespace=0 kind=2 pid=19713 status=0
+LINUX GROUPZOMBIE REAP: ordinary=1 namespace=0 kind=3 pid=61993 status=0
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=0 kind=0 calls=448 failures=320
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=0 kind=1 calls=448 failures=320
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=0 kind=2 calls=448 failures=320
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=0 kind=3 calls=448 failures=320
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=0 kind=4 calls=512 failures=64
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=0 kind=5 calls=1984 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=0 kind=0 calls=448 failures=320
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=0 kind=1 calls=448 failures=320
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=0 kind=2 calls=448 failures=320
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=0 kind=3 calls=448 failures=320
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=0 kind=4 calls=512 failures=64
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=0 kind=5 calls=1984 failures=0
+LINUX GROUPZOMBIE EXEC: kind=1 pid=4 parent=2 group=2 session=2 uid=0
+LINUX GROUPZOMBIE EXEC: kind=3 pid=6 parent=2 group=6 session=6 uid=0
+LINUX GROUPZOMBIE EXIT: ordinary=0 namespace=1 kind=0 pid=3 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=0 namespace=1 kind=1 pid=4 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=0 namespace=1 kind=2 pid=5 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=0 namespace=1 kind=3 pid=6 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=0 pid=3 group=3 session=2 executed=0 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=1 pid=4 group=2 session=2 executed=1 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=2 pid=5 group=5 session=5 executed=0 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=3 pid=6 group=6 session=6 executed=1 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=4 pid=7 group=2 session=2 executed=0 zombie=0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=0 pid=3 group=0 pform=0 gform=0 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=0 pid=3 group=0 pform=0 gform=1 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=0 pid=3 group=0 pform=0 gform=2 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=0 pid=3 group=0 pform=0 gform=3 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=0 pid=3 group=0 pform=0 gform=4 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=0 pid=3 group=0 pform=0 gform=5 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=1 pid=4 group=0 pform=0 gform=0 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=1 pid=4 group=0 pform=0 gform=1 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=1 pid=4 group=0 pform=0 gform=2 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=1 pid=4 group=0 pform=0 gform=3 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=1 pid=4 group=0 pform=0 gform=4 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=1 pid=4 group=0 pform=0 gform=5 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=2 pid=5 group=0 pform=0 gform=0 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=2 pid=5 group=0 pform=0 gform=1 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=2 pid=5 group=0 pform=0 gform=2 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=2 pid=5 group=0 pform=0 gform=3 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=2 pid=5 group=0 pform=0 gform=4 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=2 pid=5 group=0 pform=0 gform=5 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=3 pid=6 group=0 pform=0 gform=0 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=3 pid=6 group=0 pform=0 gform=1 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=3 pid=6 group=0 pform=0 gform=2 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=3 pid=6 group=0 pform=0 gform=3 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=3 pid=6 group=0 pform=0 gform=4 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=3 pid=6 group=0 pform=0 gform=5 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=4 pid=7 group=3 pform=0 gform=0 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=4 pid=7 group=3 pform=0 gform=1 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=4 pid=7 group=3 pform=0 gform=2 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=4 pid=7 group=3 pform=0 gform=3 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=4 pid=7 group=3 pform=0 gform=4 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=0 kind=4 pid=7 group=3 pform=0 gform=5 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE REAP: ordinary=0 namespace=1 kind=0 pid=3 status=0
+LINUX GROUPZOMBIE REAP: ordinary=0 namespace=1 kind=1 pid=4 status=0
+LINUX GROUPZOMBIE REAP: ordinary=0 namespace=1 kind=2 pid=5 status=0
+LINUX GROUPZOMBIE REAP: ordinary=0 namespace=1 kind=3 pid=6 status=0
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=1 kind=0 calls=448 failures=320
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=1 kind=1 calls=448 failures=320
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=1 kind=2 calls=448 failures=320
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=1 kind=3 calls=448 failures=320
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=1 kind=4 calls=512 failures=64
+LINUX GROUPZOMBIE CASES: ordinary=0 namespace=1 kind=5 calls=1984 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=1 kind=0 calls=448 failures=320
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=1 kind=1 calls=448 failures=320
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=1 kind=2 calls=448 failures=320
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=1 kind=3 calls=448 failures=320
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=1 kind=4 calls=512 failures=64
+LINUX GROUPZOMBIE FINAL: ordinary=0 namespace=1 kind=5 calls=1984 failures=0
+LINUX GROUPZOMBIE EXEC: kind=1 pid=4 parent=2 group=2 session=2 uid=1000
+LINUX GROUPZOMBIE EXEC: kind=3 pid=6 parent=2 group=6 session=6 uid=1000
+LINUX GROUPZOMBIE EXIT: ordinary=1 namespace=1 kind=0 pid=3 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=1 namespace=1 kind=1 pid=4 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=1 namespace=1 kind=2 pid=5 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE EXIT: ordinary=1 namespace=1 kind=3 pid=6 wait=CLD_EXITED poll=POLLIN status=0
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=0 pid=3 group=3 session=2 executed=0 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=1 pid=4 group=2 session=2 executed=1 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=2 pid=5 group=5 session=5 executed=0 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=3 pid=6 group=6 session=6 executed=1 zombie=1
+LINUX GROUPZOMBIE TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=4 pid=7 group=2 session=2 executed=0 zombie=0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=0 pid=3 group=0 pform=0 gform=0 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=0 pid=3 group=0 pform=0 gform=1 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=0 pid=3 group=0 pform=0 gform=2 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=0 pid=3 group=0 pform=0 gform=3 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=0 pid=3 group=0 pform=0 gform=4 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=0 pid=3 group=0 pform=0 gform=5 actual=-1/3 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=1 pid=4 group=0 pform=0 gform=0 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=1 pid=4 group=0 pform=0 gform=1 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=1 pid=4 group=0 pform=0 gform=2 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=1 pid=4 group=0 pform=0 gform=3 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=1 pid=4 group=0 pform=0 gform=4 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=1 pid=4 group=0 pform=0 gform=5 actual=-1/3 expected=-1/13
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=2 pid=5 group=0 pform=0 gform=0 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=2 pid=5 group=0 pform=0 gform=1 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=2 pid=5 group=0 pform=0 gform=2 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=2 pid=5 group=0 pform=0 gform=3 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=2 pid=5 group=0 pform=0 gform=4 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=2 pid=5 group=0 pform=0 gform=5 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=3 pid=6 group=0 pform=0 gform=0 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=3 pid=6 group=0 pform=0 gform=1 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=3 pid=6 group=0 pform=0 gform=2 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=3 pid=6 group=0 pform=0 gform=3 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=3 pid=6 group=0 pform=0 gform=4 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=3 pid=6 group=0 pform=0 gform=5 actual=-1/3 expected=-1/1
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=4 pid=7 group=3 pform=0 gform=0 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=4 pid=7 group=3 pform=0 gform=1 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=4 pid=7 group=3 pform=0 gform=2 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=4 pid=7 group=3 pform=0 gform=3 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=4 pid=7 group=3 pform=0 gform=4 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE DETAIL: ordinary=1 kind=4 pid=7 group=3 pform=0 gform=5 actual=-1/1 expected=0/0
+LINUX GROUPZOMBIE REAP: ordinary=1 namespace=1 kind=0 pid=3 status=0
+LINUX GROUPZOMBIE REAP: ordinary=1 namespace=1 kind=1 pid=4 status=0
+LINUX GROUPZOMBIE REAP: ordinary=1 namespace=1 kind=2 pid=5 status=0
+LINUX GROUPZOMBIE REAP: ordinary=1 namespace=1 kind=3 pid=6 status=0
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=1 kind=0 calls=448 failures=320
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=1 kind=1 calls=448 failures=320
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=1 kind=2 calls=448 failures=320
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=1 kind=3 calls=448 failures=320
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=1 kind=4 calls=512 failures=64
+LINUX GROUPZOMBIE CASES: ordinary=1 namespace=1 kind=5 calls=1984 failures=0
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=1 kind=0 calls=448 failures=320
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=1 kind=1 calls=448 failures=320
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=1 kind=2 calls=448 failures=320
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=1 kind=3 calls=448 failures=320
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=1 kind=4 calls=512 failures=64
+LINUX GROUPZOMBIE FINAL: ordinary=1 namespace=1 kind=5 calls=1984 failures=0
+LINUX GROUPZOMBIE FAIL: zombie target/destination semantics, wait selection or reaped identities
+QEMU: Terminated
+

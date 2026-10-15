@@ -1,0 +1,8 @@
+Independent source review: /root/groupzombie_lifetime_review, 2026-10-15.
+Scope: the two completed-zombie eligibility guards in kernel/proc/job_groups.v.
+No new lifetime, identity or locking issue found.
+Lookup, exit_published checks and mutation hold pid_lock. free_pid removes process and namespace IDs under that lock, so borrowed Process pointers cannot race reclamation.
+Exit publication follows sibling, descriptor, namespace and address-space teardown. Incomplete teardown remains excluded.
+Zombie Process fields and numbered_in stay usable until reaping. The existing namespace-release path does not free namespace objects or PID maps; local IDs are removed under pid_lock.
+Orphan tracking retains scalar group/session identities through delivery. Zombies remain excluded from live orphan/stopped-member checks. The existing target.exiting guard skips former child relationships. Reaping or an emptied group cannot recycle an identity while an orphan-delivery hold remains.
+No allocation, pin or free was added. No source edits or commits by the reviewer. Concurrent teardown/reap stress remains outside this source lifetime review and the stated qualification.

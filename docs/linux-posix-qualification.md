@@ -7499,3 +7499,94 @@ broad section 15 gates remain open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/grouporder-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/grouporder-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/grouporder-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/grouporder-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/grouporder-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/grouporder-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/grouporder-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/grouporder-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/grouporder-check.v), [verdict](../tests/linux-compat/results/2026-10-15/grouporder-audit.log), [initial ARM compile refusal](../tests/linux-compat/results/2026-10-15/grouporder-initial-compile-arm.log), [initial x86-64 compile refusal](../tests/linux-compat/results/2026-10-15/grouporder-initial-compile-x86.log), [initial probe](../tests/linux-compat/results/2026-10-15/grouporder-initial-probe.v).
+
+## Native completed-zombie process groups
+
+`setpgid` now recognizes completed, unreaped children and groups represented
+only by completed zombies. Eligible unexecuted same-session children can change
+groups until reaping; executed children still receive `EACCES`, detached-session
+children `EPERM`, and negative groups take `EINVAL` precedence. After reaping,
+queries and positive-group setters targeting the old PID return `ESRCH`, and
+an empty former group cannot accept a live child.
+
+Two guards now admit an exiting process only when its `exit_published` flag is
+set under the process-table lock. Incomplete teardown remains excluded. This
+is a bounded stable-zombie contract; Linux behavior while exit publication or
+reaping races a caller remains unqualified. The reference follows Linux v6.12's
+[setpgid task/group lookup](https://github.com/torvalds/linux/blob/v6.12/kernel/sys.c)
+and is checked with identical native ELFs on Linux 6.12.51.
+
+An independent source lifetime review confirmed that table locking protects
+borrowed processes through mutation and serializes reaping. Exit publication
+follows sibling, descriptor, namespace and address-space teardown. Zombie
+fields and PID-namespace numbering remain usable until reaping; the existing
+namespace-release path does not free namespace identity objects or PID maps.
+Orphan tracking still ignores zombies as live/stopped members, skips their
+former child relationships and retains scalar group/session IDs through
+delivery. No allocation, pin or free is added. Whole production C differs only
+in the two eligibility conditions within `set_process_group`, without compiler
+identifier normalization.
+
+The `groupzombie` probe runs 17,152 controls per architecture in root and
+UID/GID1000 cohorts in the initial and one-level PID namespaces. Each cohort
+creates four direct children and one held live child. One unexecuted child
+starts as its own group leader in the caller's session. Another child executes
+in the caller's session; the other two create private sessions, with one also
+executing. Executed targets re-enter the same ELF through `/proc/self/exe`.
+Release pipes make the first four exit with status zero. `waitid(WNOWAIT)`
+confirms `CLD_EXITED`, and pidfd `POLLIN` without `POLLHUP` independently confirms
+published exit before the matrix starts. The fifth child stays alive.
+
+| Calls per cohort | Original failures | Controls |
+| --- | --- | --- |
+| 448 | 320 | Same-session unexecuted zombie: real group creation/moves/restoration, foreign/missing groups and negative-group errors. |
+| 448 | 320 | Same-session executed zombie: exact `EACCES` and negative-group `EINVAL`. |
+| 448 | 320 | Detached-session unexecuted zombie: exact `EPERM` and negative-group `EINVAL`. |
+| 448 | 320 | Detached-session executed zombie: session `EPERM` before exec errors, plus negative-group `EINVAL`. |
+| 512 | 64 | Live child joins a zombie-only group before reap; foreign/missing/negative groups; all former-group refusals after reap. |
+| 1,984 | 0 | Before/after zombie queries, reaped-target queries and exact reaped setter errors. |
+
+Seven raw register-word forms and genuine musl calls vary setter PID/group
+arguments independently. Every attempted mutation checks the caller and all
+remaining targets' group/session state. Successful zombie moves also change
+`waitid(P_PGID, WNOWAIT)` selection: the child's own group selects that zombie,
+while moving it out makes the old group return `ECHILD`. Restoring the zombie
+restores that selection. Each successful live join is undone before the next
+attempt, leaving only the zombie to establish group existence. The four
+zombies are explicitly reaped before old-PID and former-group tests, and the
+live child is released/reaped before cohort completion. Eight actual exec
+entries, sixteen exit/readiness edges and sixteen reaping edges per
+architecture are matched to the reported identities.
+
+Original kernels fail exactly 5,376 controls per architecture. Corrected kernels
+and identical native probe ELFs on Linux 6.12.51 pass every control on both
+architectures. Four warmed 200-cycle cohorts alternate raw upper-word and real
+musl calls. They move/restore the zombie, check wait-group selection, join/leave
+its group with the live child, and repeat exec/session/negative-group refusals.
+All live slab classes and big-page totals stay flat after settling. Fork, exec,
+pidfd setup and final reaping are outside the measured interval. The probe C
+uses five explicit stack allocas and no allocation, dynamic-array or fixed-index
+helper calls.
+
+AArch64 compares 18 classes and retains 105/105 big pages initially, 117/117
+in the PID namespace. x86-64 compares 14 classes and retains 267/267 initially,
+289/289 in the namespace, in both credential cohorts.
+
+Four completed production builds qualify original and corrected kernels.
+Runtime and session/exec-order regressions pass on both architectures; eight
+host test files pass. Allocation diagnostics remain byte-identical, including
+existing allowance-file refusals. The audit binds 66 semantic input fingerprints,
+15,146 V compiler inputs, all 2,014 copied SDK files, fresh ARM compiler-command
+receipts, source/C/ELF/ISO/kernel identities, Linux references, independent
+lifetime review and 84 retained regular files across eight native profiles.
+False-assertion and passing-Linux-as-original controls execute without `-prod`.
+
+Concurrent teardown/reap/credential changes, zombie descendants, non-parent
+mutations, groups retained by live members after leader reap, nested or
+cross-namespace observers, MAC policy, terminal/job-control signals, PID reuse,
+GNU libc and translated/ELF32 paths remain unqualified. The three broad section
+15 gates remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/groupzombie-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/groupzombie-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/groupzombie-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/groupzombie-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/groupzombie-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/groupzombie-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/groupzombie-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/groupzombie-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/groupzombie-check.v), [verdict](../tests/linux-compat/results/2026-10-15/groupzombie-audit.log), [lifetime review](../tests/linux-compat/results/2026-10-15/groupzombie-lifetime-review.txt).
