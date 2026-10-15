@@ -31,6 +31,231 @@ type DateEncodingProbe = fn (u64, u64, u64, &u64)
 type DateEncodingSign = fn (u64, u64) u64
 type DateEncodingTable = fn (u64, u64, u64) u64
 type DateEqualWitnessProbe = fn (u64, u64, u64, u64, u64, u64, &u64)
+type DateDecodingBox = fn (u64) SwiftArrayAllocation
+type DateDecodingKeep = fn (u64) u64
+type DateDecodingDrop = fn (u64)
+
+struct DateDecodingScenario {
+	decoder_metadata u64
+	container_metadata u64
+	decoder_table u64
+	container_table u64
+	heap_metadata u64
+	container_boxed bool
+	retained bool
+	failure int
+	error_value u64
+mut:
+	bits u64
+	native_box u64
+	keep DateDecodingKeep = swift_retain
+	drop DateDecodingDrop = swift_release
+	getters int
+	decodes int
+	decoder_drops int
+	container_drops int
+	decoder_self u64
+	container_self u64
+	container_owner u64
+}
+
+fn date_decoding_box(scenario &DateDecodingScenario, metadata u64, heap_metadata u64) SwiftArrayAllocation {
+	if scenario.native_box != 0 {
+		return unsafe { DateDecodingBox(voidptr(scenario.native_box))(metadata) }
+	}
+	owner := swift_heap_allocate(heap_metadata, 48, 7)
+	return SwiftArrayAllocation{owner: owner, bytes: owner + 16}
+}
+
+fn date_decoding_getter(self u64, output u64, metadata u64, table u64, incoming_error u64) u64 {
+	mut scenario := unsafe { &DateDecodingScenario(read64(self)) }
+	assert metadata == scenario.decoder_metadata && table == scenario.decoder_table
+	assert self == scenario.decoder_self && incoming_error == 0
+	assert scenario.getters == 0 && scenario.decodes == 0 && scenario.decoder_drops == 0
+	scenario.getters++
+	if scenario.failure == 1 { return scenario.error_value }
+	mut payload := output
+	mut owner := u64(scenario)
+	if scenario.container_boxed {
+		box := date_decoding_box(scenario, scenario.container_metadata, scenario.heap_metadata)
+		owner = box.owner; payload = box.bytes
+		if scenario.retained { scenario.keep(owner) }
+		scenario.container_owner = owner
+	}
+	scenario.container_self = payload
+	unsafe {
+		*(&u64(payload)) = u64(scenario); *(&u64(payload + 8)) = 0x12345678
+		if scenario.container_boxed { *(&u64(payload + 16)) = 0x87654321; *(&u64(payload + 24)) = 0xabcdef }
+		*(&u64(output)) = owner
+		*(&u64(output + 24)) = scenario.container_metadata
+		*(&u64(output + 32)) = scenario.container_table
+	}
+	return 0
+}
+
+fn date_decoding_double(metadata u64, table u64, self u64, incoming_error u64, output u64) u64 {
+	mut scenario := unsafe { &DateDecodingScenario(read64(self)) }
+	assert metadata == scenario.container_metadata && table == scenario.container_table
+	assert self == scenario.container_self && incoming_error == 0
+	assert scenario.getters == 1 && scenario.decodes == 0 && scenario.decoder_drops == 0 && scenario.container_drops == 0
+	assert read64(self + 8) == 0x12345678
+	scenario.decodes++
+	unsafe { *(&u64(output)) = scenario.bits }
+	return if scenario.failure == 2 { scenario.error_value } else { u64(0) }
+}
+
+fn date_decoding_drop(value u64, metadata u64) {
+	mut scenario := unsafe { &DateDecodingScenario(read64(value)) }
+	assert read64(value + 8) == 0x12345678
+	if metadata == scenario.decoder_metadata {
+		assert value == scenario.decoder_self && scenario.decoder_drops == 0 && scenario.getters == 1
+		assert scenario.decodes == if scenario.failure == 1 { 0 } else { 1 }
+		if !scenario.retained { assert scenario.container_drops == scenario.decodes }
+		scenario.decoder_drops++
+	} else {
+		assert metadata == scenario.container_metadata && value == scenario.container_self
+		assert scenario.getters == 1 && scenario.decodes == 1 && scenario.container_drops == 0
+		if !scenario.retained { assert scenario.decoder_drops == 0 }
+		scenario.container_drops++
+	}
+}
+
+fn date_decoding_box_drop(owner u64) {
+	metadata := read64(read64(owner) + 8)
+	date_decoding_drop(owner + 16, metadata)
+	swift_heap_deallocate(owner, 48, 7)
+}
+
+fn date_decoding_code() u64 {
+	page := usize(C.getpagesize())
+	code := u64(C.mmap(unsafe { nil }, page, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+	assert code != u64(-1)
+	// Ordinary entry/owned Decoder/result/capture -> Swift x0/x8/x21.
+	for i, op in [u32(0xa9bc7bfd), 0xa90153f3, 0xa9025bf5, 0xfd001be8,
+		0xaa0303f3, 0xaa0003f0, 0xaa0203e8, 0xaa0103e0, 0xd28a0414,
+		0xd2800015, 0xd28b54a9, 0x9e670128, 0xd63f0200,
+		0xa9005674, 0xfd000a68, 0xfd401be8, 0xa9425bf5, 0xa94153f3, 0xa8c47bfd, 0xd65f03c0]! {
+		write32(code + u64(i * 4), op)
+	}
+	// Throwing container getter, preserving its incoming error for the check.
+	for i, op in [u32(0xa9bf7bfd), 0xaa1503e4, 0xaa0103e3, 0xaa0003e2, 0xaa0803e1,
+		0xaa1403e0, 0x580000d0, 0xd63f0200, 0xaa0003f5, 0xa8c17bfd, 0xd65f03c0]! {
+		write32(code + 128 + u64(i * 4), op)
+	}
+	unsafe { *(&u64(code + 176)) = u64(voidptr(date_decoding_getter)) }
+	// A separate scratch result permits bit-exact Double + opaque x21 error.
+	for i, op in [u32(0xa9be7bfd), 0xaa1403e2, 0xaa1503e3, 0x910043e4, 0x58000110,
+		0xd63f0200, 0xaa0003f5, 0xfd400be0, 0xa8c27bfd, 0xd65f03c0]! {
+		write32(code + 192 + u64(i * 4), op)
+	}
+	unsafe { *(&u64(code + 240)) = u64(voidptr(date_decoding_double)) }
+	for i, op in [u32(0xaa1403e0), 0x58000070, 0xd61f0200]! { write32(code + 288 + u64(i * 4), op) }
+	unsafe { *(&u64(code + 304)) = u64(voidptr(date_decoding_box_drop)) }
+	write32(code + 384, 0xdac10020); write32(code + 388, 0xd65f03c0)
+	write32(code + 400, 0xdac10820); write32(code + 404, 0xd65f03c0)
+	C.__builtin___clear_cache(voidptr(code), voidptr(code + 408))
+	assert C.mprotect(voidptr(code), page, C.PROT_READ | C.PROT_EXEC) == 0
+	return code
+}
+
+fn date_decoding_case(entry u64, code u64, data u64, native bool, decoder_boxed bool, container_boxed bool, retained bool, at_end bool, failure int) {
+	page := usize(C.getpagesize())
+	span := u64(C.mmap(unsafe { nil }, page * 5, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+	assert span != u64(-1)
+	assert C.mprotect(voidptr(span + u64(page)), page, C.PROT_READ | C.PROT_WRITE) == 0
+	assert C.mprotect(voidptr(span + u64(page * 3)), page, C.PROT_READ | C.PROT_WRITE) == 0
+	decoder := span + u64(page) + if at_end { u64(page) - 40 } else { u64(0) }
+	result := span + u64(page * 3) + if at_end { u64(page) - 8 } else { u64(0) }
+	decoder_metadata := data + if decoder_boxed { u64(368) } else { u64(16) }
+	container_metadata := data + if container_boxed { u64(544) } else { u64(192) }
+	mut scenario := &DateDecodingScenario{decoder_metadata: decoder_metadata, container_metadata: container_metadata,
+		decoder_table: data + 896, container_table: data + 960, heap_metadata: data + 800,
+		container_boxed: container_boxed, retained: retained, failure: failure, error_value: span}
+	$if macos { if native {
+		core := C.dlopen(c'/usr/lib/swift/libswiftCore.dylib', 2)
+		scenario.native_box = u64(C.dlsym(core, c'swift_allocBox'))
+		scenario.keep = unsafe { DateDecodingKeep(C.dlsym(core, c'swift_retain')) }
+		scenario.drop = unsafe { DateDecodingDrop(C.dlsym(core, c'swift_release')) }
+		assert scenario.native_box != 0
+	} }
+	probe := unsafe { DateEncodingProbe(voidptr(code)) }
+	for bits in [u64(0), 0x8000000000000000, 1, 0xc22d63c8c5000000, 0x7ff0000000000000,
+		0xfff0000000000000, 0x7ff8000000000042, 0x7ff0000000000042, ~u64(0)]! {
+		scenario.getters = 0; scenario.decodes = 0; scenario.decoder_drops = 0; scenario.container_drops = 0
+		scenario.bits = bits; scenario.container_owner = 0
+		mut payload := decoder; mut owner := u64(scenario)
+		if decoder_boxed {
+			box := date_decoding_box(scenario, decoder_metadata, data + 752)
+			owner = box.owner; payload = box.bytes
+			if retained { scenario.keep(owner) }
+		}
+		scenario.decoder_self = payload
+		unsafe {
+			*(&u64(payload)) = u64(scenario); *(&u64(payload + 8)) = 0x12345678
+			if decoder_boxed { *(&u64(payload + 16)) = 0x87654321; *(&u64(payload + 24)) = 0xabcdef }
+			*(&u64(decoder)) = owner; *(&u64(decoder + 24)) = decoder_metadata; *(&u64(decoder + 32)) = scenario.decoder_table
+			*(&u64(result)) = 0xfeedface
+		}
+		// The owned existential's storage is readable, and only its value or
+		// box may be destroyed. Failure uses an inaccessible result pointer.
+		assert C.mprotect(voidptr(span + u64(page)), page, C.PROT_READ) == 0
+		mut capture := [u64(0xcafe), 0, 0, 0, 0xbeef]!
+		probe(entry, decoder, if failure == 0 { result } else { span }, unsafe { &capture[1] })
+		assert capture == [u64(0xcafe), 0x5020, if failure == 0 { u64(0) } else { span }, 0x5aa5, 0xbeef]!
+		assert read64(result) == if failure == 0 { bits } else { u64(0xfeedface) }
+		assert scenario.getters == 1 && scenario.decodes == if failure == 1 { 0 } else { 1 }
+		assert scenario.decoder_drops == if retained && decoder_boxed { 0 } else { 1 }
+		assert scenario.container_drops == if failure == 1 || (retained && container_boxed) { 0 } else { 1 }
+		if retained && container_boxed && failure != 1 { scenario.drop(scenario.container_owner) }
+		if retained && decoder_boxed { scenario.drop(owner) }
+		assert scenario.decoder_drops == 1 && scenario.container_drops == scenario.decodes
+		assert C.mprotect(voidptr(span + u64(page)), page, C.PROT_READ | C.PROT_WRITE) == 0
+	}
+	unsafe { free(scenario) }
+	assert C.munmap(voidptr(span), page * 5) == 0
+}
+
+fn date_decoding_suite(entry u64, witness_entry u64, native bool) {
+	code := date_decoding_code(); page := usize(C.getpagesize())
+	data := u64(C.mmap(unsafe { nil }, page, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+	assert data != u64(-1)
+	for i in 0 .. 4 {
+		metadata := data + 16 + u64(i * 176); witness := data + 64 + u64(i * 176)
+		mut witness_pointer := witness; mut destroy := u64(unsafe { voidptr(date_decoding_drop) })
+		$if macos { if native {
+			witness_pointer = unsafe { DateEncodingSign(voidptr(code + 400))(witness, (metadata - 8) | (u64(0x2e3f) << 48)) }
+			destroy = unsafe { DateEncodingSign(voidptr(code + 384))(destroy, (witness + 8) | (u64(0x4f8) << 48)) }
+		} }
+		unsafe {
+			*(&u64(metadata - 8)) = witness_pointer; *(&u64(metadata)) = 0x200
+			*(&u64(witness + 8)) = destroy
+			*(&u64(witness + 64)) = if i < 2 { u64(16) } else { u64(32) }
+			*(&u64(witness + 72)) = if i < 2 { u64(16) } else { u64(32) }
+		}
+		write32(witness + 80, if i < 2 { u32(0x02010007) } else { u32(0x02030007) })
+	}
+	for i, offset in [u64(752), 800]! {
+		unsafe { *(&u64(data + offset - 16)) = code + 288; *(&u64(data + offset)) = 0x400; *(&u64(data + offset + 8)) = data + 368 + u64(i * 176) }
+	}
+	for i, discriminator in [u64(0x3fd3), 0x5f12]! {
+		slot := data + 936 + u64(i * 64)
+		mut callback := code + 128 + u64(i * 64)
+		$if macos { if native { callback = unsafe { DateEncodingSign(voidptr(code + 384))(callback, slot | (discriminator << 48)) } } }
+		unsafe { *(&u64(slot)) = callback }
+	}
+	assert C.mprotect(voidptr(data), page, C.PROT_READ) == 0
+	for target in [entry, witness_entry]! {
+		for decoder_boxed in [false, true]! { for container_boxed in [false, true]! {
+			for retained in [false, true]! { for at_end in [false, true]! { for failure in 0 .. 3 {
+				date_decoding_case(target, code, data, native, decoder_boxed, container_boxed, retained, at_end, failure)
+			} } }
+			mut workers := []thread{}
+			for i in 0 .. 8 { workers << spawn date_decoding_case(target, code, data, native, decoder_boxed, container_boxed, i % 2 == 0, i % 2 != 0, i % 3) }
+			workers.wait(); unsafe { workers.free() }
+		} }
+	}
+	assert C.munmap(voidptr(data), page) == 0 && C.munmap(voidptr(code), page) == 0
+}
 
 fn swift_date_equatable_dispatch(entry u64, metadata u64, table u64, code u64, guard u64) {
 	probe := unsafe { DateEqualWitnessProbe(voidptr(code + 640)) }
@@ -49,11 +274,14 @@ fn swift_date_equatable_publish(framework bool) u64 {
 	library := if framework { '/System/Library/Frameworks/Foundation.framework/Foundation' } else { '/usr/lib/swift/libswiftFoundation.dylib' }
 	mut table := u64(0)
 	for _ in 0 .. 128 {
+		decoding := runtime_symbol(library, '_$s10Foundation4DateVSeAAMc') or { panic(err) }
 		conformance := runtime_symbol(library, '_$s10Foundation4DateVSQAAMc') or { panic(err) }
 		accessor := runtime_symbol(library, '_$s10Foundation4DateVMa') or { panic(err) }
 		response := unsafe { SwiftDateAccess(voidptr(accessor))(0xff) }
 		table = swift_witness_table(conformance, response.metadata, 0)
 		assert read64(table) == conformance && response.state == 0
+		decode_table := swift_witness_table(decoding, response.metadata, 0)
+		assert read64(decode_table) == decoding && read64(decode_table + 8) != 0
 	}
 	return table
 }
@@ -682,6 +910,14 @@ fn test_swift_date() {
 		encoding_table := table_lookup(encoding_conformance, metadata, 0)
 		assert encoding_table != 0 && read64(encoding_table) == encoding_conformance
 		date_encoding_suite(encoding_entry, read64(encoding_table + 8) & 0x0000ffffffffffff, true)
+		decoding_conformance := u64(C.dlsym(foundation, c'$s10Foundation4DateVSeAAMc'))
+		decoding_entry := u64(C.dlsym(foundation, c'$s10Foundation4DateV4fromACs7Decoder_p_tKcfC'))
+		assert decoding_conformance != 0 && decoding_entry != 0
+		assert decoding_conformance == u64(C.dlsym(overlay, c'$s10Foundation4DateVSeAAMc'))
+		assert decoding_entry == u64(C.dlsym(overlay, c'$s10Foundation4DateV4fromACs7Decoder_p_tKcfC'))
+		decoding_table := table_lookup(decoding_conformance, metadata, 0)
+		assert decoding_table != 0 && read64(decoding_table) == decoding_conformance
+		date_decoding_suite(decoding_entry, read64(decoding_table + 8) & 0x0000ffffffffffff, true)
 		equal_conformance := u64(C.dlsym(foundation, c'$s10Foundation4DateVSQAAMc'))
 		assert equal_conformance != 0 && equal_conformance == u64(C.dlsym(overlay, c'$s10Foundation4DateVSQAAMc'))
 		equal_table := table_lookup(equal_conformance, metadata, 0)
@@ -705,7 +941,7 @@ fn test_swift_date() {
 		}
 		value_workers.wait()
 		unsafe { value_workers.free() }
-		println('IOS-SWIFT-DATE-NATIVE: instantiated Date Equatable witness, guarded IEEE equality/aliases and generic dispatch; Encodable/public encoding, borrowed inline/boxed Encoder, owned inline container and success/error cleanup; nominal POD8 metadata, enums, symbolic lookup, distantPast, intervals and Date() measured')
+		println('IOS-SWIFT-DATE-NATIVE: Decodable/public initialization, guarded Double bits, inline/boxed Decoder and container consumption, shared-box lifetime and both throwing paths; instantiated Date Equatable witness, guarded IEEE equality/aliases and generic dispatch; Encodable/public encoding, borrowed inline/boxed Encoder, owned inline container and success/error cleanup; nominal POD8 metadata, enums, symbolic lookup, distantPast, intervals and Date() measured')
 	}
 	if _ := swift_foundation_symbol('_$s10Foundation4DateV11distantPastACvgZ') {
 		assert false
@@ -751,6 +987,20 @@ fn test_swift_date() {
 		assert unsafe { (&char(swift_date_relative(protocol + 8))).vstring() } == 'Encodable'
 		assert (runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sSE6encode2toys7Encoder_p_tKFTq') or { panic(err) }) == protocol + 24
 		date_encoding_suite(encoding_entry, read64(encoding_table + 8), false)
+		decoding_conformance := runtime_symbol('/System/Library/Frameworks/Foundation.framework/Foundation', '_$s10Foundation4DateVSeAAMc') or { panic(err) }
+		decoding_entry := runtime_symbol('/usr/lib/swift/libswiftFoundation.dylib', '_$s10Foundation4DateV4fromACs7Decoder_p_tKcfC') or { panic(err) }
+		decoding_table := swift_witness_table(decoding_conformance, metadata, 0)
+		assert read64(decoding_table) == decoding_conformance && read64(decoding_table + 8) == decoding_entry
+		assert swift_date_relative(decoding_conformance + 4) == descriptor && read32(decoding_conformance + 12) == 0
+		decoding_protocol := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sSeMp') or { panic(err) }
+		assert swift_date_relative(decoding_conformance) == decoding_protocol
+		assert read32(decoding_protocol) == 0x30043 && read32(decoding_protocol + 16) == 1
+		assert read32(decoding_protocol + 24) == 0x8b5e0002
+		assert unsafe { (&char(swift_date_relative(decoding_protocol + 8))).vstring() } == 'Decodable'
+		assert (runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sSe4fromxs7Decoder_p_tKcfCTq') or { panic(err) }) == decoding_protocol + 24
+		swift_date_mapping(decoding_conformance, 80, true, false)
+		swift_date_mapping(decoding_entry, 272, true, true)
+		date_decoding_suite(decoding_entry, read64(decoding_table + 8), false)
 		mut publishers := []thread u64{}
 		for i in 0 .. 8 { publishers << spawn swift_date_publish(i % 2 == 0) }
 		entries := publishers.wait()
@@ -772,6 +1022,8 @@ fn test_swift_date() {
 			assert descriptor == runtime_symbol(library, '_$s10Foundation4DateVMn') or { panic(err) }
 			assert encoding_conformance == runtime_symbol(library, '_$s10Foundation4DateVSEAAMc') or { panic(err) }
 			assert equal_conformance == runtime_symbol(library, '_$s10Foundation4DateVSQAAMc') or { panic(err) }
+			assert decoding_conformance == runtime_symbol(library, '_$s10Foundation4DateVSeAAMc') or { panic(err) }
+			assert decoding_entry == runtime_symbol(library, '_$s10Foundation4DateV4fromACs7Decoder_p_tKcfC') or { panic(err) }
 			assert encoding_entry == runtime_symbol(library, '_$s10Foundation4DateV6encode2toys7Encoder_p_tKF') or { panic(err) }
 			assert equal == runtime_symbol(library, '_$s10Foundation4DateV2eeoiySbAC_ACtFZ') or { panic(err) }
 			assert now == runtime_symbol(library, '_$s10Foundation4DateVACycfC') or { panic(err) }
@@ -792,7 +1044,7 @@ fn test_swift_date() {
 		mut workers := []thread{}
 		for _ in 0 .. 8 { workers << spawn swift_date_worker(entry, probe, guard) }
 		workers.wait()
-		for unsupported in ['_$s10Foundation4DateVN', '_$s10Foundation4DateVSeAAMc', '_$s10Foundation4DateVSHAAMc',
+		for unsupported in ['_$s10Foundation4DateVN', '_$s10Foundation4DateVSHAAMc',
 			'_$s10Foundation4DateV13distantFutureACvgZ']! {
 			if _ := swift_foundation_symbol(unsupported) {
 				assert false
@@ -804,7 +1056,7 @@ fn test_swift_date() {
 		if _ := framework_symbol('/System/Library/Frameworks/UIKit.framework/UIKit', '_$s10Foundation4DateV11distantPastACvgZ') {
 			assert false
 		}
-		for name in ['_$s10Foundation4DateVSQAAMc', '_$s10Foundation4DateVSEAAMc', '_$s10Foundation4DateV6encode2toys7Encoder_p_tKF', '_$s10Foundation4DateVMa', '_$s10Foundation4DateVMn', '_$s10Foundation4DateV2eeoiySbAC_ACtFZ', '_$s10Foundation4DateVACycfC']! {
+		for name in ['_$s10Foundation4DateVSeAAMc', '_$s10Foundation4DateV4fromACs7Decoder_p_tKcfC', '_$s10Foundation4DateVSQAAMc', '_$s10Foundation4DateVSEAAMc', '_$s10Foundation4DateV6encode2toys7Encoder_p_tKF', '_$s10Foundation4DateVMa', '_$s10Foundation4DateVMn', '_$s10Foundation4DateV2eeoiySbAC_ACtFZ', '_$s10Foundation4DateVACycfC']! {
 			if _ := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', name) {
 				assert false
 			}
@@ -819,12 +1071,12 @@ fn test_swift_date() {
 		if _ := swift_foundation_symbol('_$s10Foundation4DateV11distantPastACvgZ') {
 			assert false
 		}
-		for name in ['_$s10Foundation4DateVSQAAMc', '_$s10Foundation4DateVSEAAMc', '_$s10Foundation4DateV6encode2toys7Encoder_p_tKF', '_$s10Foundation4DateVMa', '_$s10Foundation4DateVMn', '_$s10Foundation4DateV2eeoiySbAC_ACtFZ', '_$s10Foundation4DateVACycfC']! {
+		for name in ['_$s10Foundation4DateVSeAAMc', '_$s10Foundation4DateV4fromACs7Decoder_p_tKcfC', '_$s10Foundation4DateVSQAAMc', '_$s10Foundation4DateVSEAAMc', '_$s10Foundation4DateV6encode2toys7Encoder_p_tKF', '_$s10Foundation4DateVMa', '_$s10Foundation4DateVMn', '_$s10Foundation4DateV2eeoiySbAC_ACtFZ', '_$s10Foundation4DateVACycfC']! {
 			if _ := swift_foundation_symbol(name) {
 				assert false
 			}
 		}
 	}
 	assert C.munmap(unsafe { voidptr(code) }, page) == 0 && C.munmap(unsafe { voidptr(guard) }, page * 3) == 0
-	println('IOS-SWIFT-DATE: concrete Equatable table/canonical protocol, native IEEE witness equality/aliases, generic dispatch and eight-worker publication; Encodable/public encoding and error cleanup, nominal POD8 metadata, enums, symbolic lookup, distantPast, intervals/Date(), scoped exports and two drained/unmapped lifetimes')
+	println('IOS-SWIFT-DATE: Decodable/public initialization, owned inline/boxed Decoder and container, shared boxes, both error paths and concurrent publication; concrete Equatable table/canonical protocol, native IEEE witness equality/aliases, generic dispatch and eight-worker publication; Encodable/public encoding and error cleanup, nominal POD8 metadata, enums, symbolic lookup, distantPast, intervals/Date(), scoped exports and two drained/unmapped lifetimes')
 }

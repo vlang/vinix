@@ -6625,22 +6625,53 @@ required IPA conformance/address consumers and inspection of the next native
 Decodable dependency. The builds reuse the previous milestone's verified private
 SDK. Full iOS regression remains unpassed; published runners remain unchanged.
 
-The current IPA probe resolves Date's Equatable conformance, then exits with
-status 1 at `_$s10Foundation4DateVSeAAMc` (the Date Decodable conformance).
-Decodable remains unsupported. Fortnite has not entered application code and
-remains unplayable.
+The following milestone implements Date's Decodable conformance and public
+`init(from:)` in V. Its concrete table uses the canonical Swift Decodable
+descriptor and throwing initializer requirement. The initializer consumes its
+Decoder, obtains an owned single-value container, and reads a Double through
+the container's witness. Either callback can throw: a failed getter leaves no
+container to destroy, while a failed decode still destroys the initialized
+container. Both paths consume the Decoder and forward the owned error through
+x21 without reading its storage or retaining it. Only success initializes the
+indirect eight-byte Date result.
+
+Readonly projection supports inline values and boxed payloads. Destroying a
+boxed existential releases its owner, preserving shared boxes until the final
+reference; inline values use their destroy witness. General Decoder factories,
+JSON parsing, mutable box copying and unsupported existential layouts remain
+outside this profile. The callback dispatch uses the existing sealed arena and
+adds no per-call allocation.
+
+The Date fixture compares native Foundation's public initializer and instantiated
+witness with Vinix's entries. Each runtime runs 1,440 calls across nine Double
+bit patterns, both failure stages, guarded result/input spans, inline and boxed
+Decoder/container combinations, retained boxes and eight workers. It checks
+exact destruction counts and order, unreadable error pointers, preserved Swift
+context and d8, scoped framework/protocol exports and two drained, unmapped
+runtime lifetimes. Evidence is retained under
+`build/ios/fortnite/date-decoding-checks` with the prior verified private SDK.
+Eight ASan/UBSan runs and four Vinix ARM64 suites pass for Date, Data writing,
+Base64 and reference snapshots. Eleven final C streams/programs and four joined,
+retired VM phases are retained. Full iOS regression remains unpassed; published
+runners remain unchanged.
+
+The current IPA probe resolves Date's Decodable conformance, then exits with
+status 1 at `_$s10Foundation6LocaleV10identifierACSS_tcfC`
+(`Locale.init(identifier:)`). Native inspection of that initializer is retained
+for the next step. Fortnite has not entered application code and remains
+unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,517 | 643 | 79 |
+| Fortnite executable | 1,520 | 640 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,352 | 646 | 120 |
+| All images | 2,355 | 643 | 120 |
 
-The C++/GLES/Text variant reports 2,365 resolved imports, 633 unresolved strong
+The C++/GLES/Text variant reports 2,368 resolved imports, 630 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

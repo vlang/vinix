@@ -83,6 +83,7 @@ fn swift_witness_table(conformance u64, metadata u64, arguments u64) u64 {
 
 fn swift_witness_symbol(symbol string) ?u64 {
 	if address := swift_date_encoding_protocol_symbol(symbol) { return address }
+	if address := swift_date_decoding_protocol_symbol(symbol) { return address }
 	if symbol == '_swift_getWitnessTable' { return u64(unsafe { voidptr(swift_witness_table) }) }
 	return none
 }

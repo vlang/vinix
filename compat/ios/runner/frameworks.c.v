@@ -27,6 +27,8 @@ fn framework_symbol(library string, symbol string) ?u64 {
 			'_$s10Foundation4DateVACycfC',
 			'_$s10Foundation4DateVMa', '_$s10Foundation4DateVMn',
 			'_$s10Foundation4DateVSEAAMc', '_$s10Foundation4DateV6encode2toys7Encoder_p_tKF',
+			'_$s10Foundation4DateVSeAAMc',
+			'_$s10Foundation4DateV4fromACs7Decoder_p_tKcfC',
 			'_$s10Foundation4DateVSQAAMc',
 			'_$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF',
 			'_$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ',
