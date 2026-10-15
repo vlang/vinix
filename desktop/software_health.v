@@ -213,7 +213,7 @@ fn (mut a SoftwareApp) prepare_health_details() {
 		'Kind: ' + row.kind, 'Installed repository: ' + row.repository, 'Installed publisher key: ' + row.public_key,
 		'Integrity: ' + if row.issue == '' { 'Verified installed files and registration' } else { row.issue },
 		if row.diagnostic == '' { 'No issue found in this package’s own tree.'.clone() } else { 'Diagnostic: ' + row.diagnostic }]
-	a.details_values(0, values)
+	a.details_values_columns(0, values, 24)
 	software_policy_free_lines(mut values)
 	total := a.details_pages.len.str()
 	for index in 0 .. a.details_pages.len {
@@ -316,7 +316,7 @@ fn (mut a SoftwareApp) build_health_compact(width int, height int) ui2.Element {
 }
 
 fn (mut a SoftwareApp) build_health(width int, height int) ui2.Element {
-	mut children := frame_elements(40)
+	mut children := frame_elements(56)
 	children << software_label('Installed software health', 14, 8, width - 202, 28, false)
 	children << software_button(if a.worker == unsafe { nil } { 'software.health.back' } else { 'software.health.stop' },
 		if a.worker == unsafe { nil } { 'Back to packages' } else { 'Stop inspection' }, width - 174, 8, 160)
@@ -345,8 +345,7 @@ fn (mut a SoftwareApp) build_health(width int, height int) ui2.Element {
 		}
 		if a.details_page >= 0 && a.details_page < a.details_pages.len {
 			page := a.details_pages[a.details_page]
-			children << ui2.label('', page.text, ui2.rect(274, 128, f64(width - 288), f64(height - 342)),
-				ui2.TextStyle{ color: body_text, size: 12, lines: 14 })
+			software_page_lines(mut children, page.text, 274, 128, width - 288, 18)
 			children << software_label(page.label, 274, height - 214, width - 288, 28, false)
 			children << software_button('software.health.previous', 'Previous detail', 274, height - 176, 142)
 			children << software_button('software.health.next', 'Next detail', 428, height - 176, 142)

@@ -44,6 +44,11 @@ Previous/Next and arrow/Page-key navigation. Resizing retains the short page and
 its corresponding full page. Both views use individual monospace line labels;
 smaller windows retain Back. See [navigation qualification](../../tests/packages/software-failure-navigation-check.md).
 
+Package details, policy disclosures, health reports, deployment checks and saved
+receipts also render every prepared line as an individual monospace label. Narrow
+report panels paginate shorter UTF-8 fragments so complete provenance, paths and
+diagnostics remain available. See [disclosure checks](../../tests/packages/software-disclosure-lines-check.md).
+
 **Verify installed** supports Stop/Cancel/Escape in full and compact windows.
 Stopping retires unaccepted progress/output and keeps the catalog for retry.
 Completion and human success output wait for successful worker exit; late

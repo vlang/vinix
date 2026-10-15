@@ -169,15 +169,14 @@ fn (a &SoftwareApp) build_snapshot_compact(width int, height int) ui2.Element {
 
 fn (mut a SoftwareApp) build_deployment_snapshot(width int, height int) ui2.Element {
 	if width < 640 || height < 610 { return a.build_snapshot_compact(width, height) }
-	mut children := frame_elements(14)
+	mut children := frame_elements(28)
 	children << software_label('Save installed deployment', 14, 8, width - 28, 28, false)
 	if a.worker == unsafe { nil } {
 		children << software_button('software.snapshot.back', 'Back to deployment', 14, 46, if width > 202 { 188 } else { width - 28 })
 	}
 	if a.snapshot_ready {
 		if a.details_page >= 0 && a.details_page < a.details_pages.len {
-			children << ui2.label('', a.details_pages[a.details_page].text, ui2.rect(14, 94, f64(width - 28), f64(height - 300)),
-				ui2.TextStyle{ color: body_text, size: 12, lines: 14 })
+			software_page_lines(mut children, a.details_pages[a.details_page].text, 14, 94, width - 28, 20)
 			children << software_label(a.details_pages[a.details_page].label, 14, height - 206, width - 28, 28, false)
 		}
 		children << software_button('software.snapshot.previous', 'Previous detail', 14, height - 168, 160)

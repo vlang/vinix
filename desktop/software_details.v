@@ -68,6 +68,10 @@ fn (mut a SoftwareApp) details_add_page(section int, lines []string) {
 }
 
 fn (mut a SoftwareApp) details_values(section int, values []string) {
+	a.details_values_columns(section, values, 48)
+}
+
+fn (mut a SoftwareApp) details_values_columns(section int, values []string, columns int) {
 	mut lines := []string{cap: 14}
 	unsafe { lines.flags |= .noslices }
 	defer { software_policy_free_lines(mut lines) }
@@ -75,7 +79,7 @@ fn (mut a SoftwareApp) details_values(section int, values []string) {
 		text := software_details_text(value)
 		mut start := 0
 		for start < text.len {
-			mut end := if start + 48 < text.len { start + 48 } else { text.len }
+			mut end := if start + columns < text.len { start + columns } else { text.len }
 			for end > start && end < text.len && text[end] & 0xc0 == 0x80 { end-- }
 			chunk := unsafe { tos(text.str + start, end - start) }
 			lines << (if start == 0 { '• ' } else { '  ' }) + chunk
@@ -212,7 +216,7 @@ fn (mut a SoftwareApp) handle_details(action string) {
 }
 
 fn (mut a SoftwareApp) build_details(width int, height int) ui2.Element {
-	mut children := frame_elements(15)
+	mut children := frame_elements(32)
 	children << software_label('Package details', 14, 8, width - 202, 28, false)
 	children << software_button('software.details.back', if a.details_review { 'Back to review' } else { 'Back to packages' }, width - 174, 8, 160)
 	children << software_label(if a.details_review { 'Reviewed package change' } else { 'Catalog and installed package information' }, 14, 46, width - 28, 28, false)
@@ -222,7 +226,7 @@ fn (mut a SoftwareApp) build_details(width int, height int) ui2.Element {
 	if a.details_page >= 0 && a.details_page < a.details_pages.len {
 		page := a.details_pages[a.details_page]
 		children << software_label(page.title, 14, 132, width - 28, 28, false)
-		children << ui2.label('', page.text, ui2.rect(14, 174, f64(width - 28), f64(height - 328)), ui2.TextStyle{ color: body_text, size: 12, lines: 14 })
+		software_page_lines(mut children, page.text, 14, 174, width - 28, 20)
 		children << software_label(page.label, 238, height - 138, width - 252, 28, false)
 	}
 	children << software_button('software.details.previous', 'Previous', 14, height - 138, 100)

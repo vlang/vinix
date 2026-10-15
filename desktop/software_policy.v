@@ -209,7 +209,7 @@ fn (mut a SoftwareApp) policy_key_input(input string) {
 
 fn (mut a SoftwareApp) build_policy(width int, height int) ui2.Element {
 	a.initialize_policy_path()
-	mut children := frame_elements(24)
+	mut children := frame_elements(40)
 	children << software_label(if a.policy_review_ready { 'Review organization policy' } else { 'Organization policy' }, 14, 8, 360, 28, false)
 	if a.worker == unsafe { nil } {
 		children << software_button(if a.policy_review_ready { 'software.policy.impacts' } else { 'software.policy.back' },
@@ -235,8 +235,7 @@ fn (mut a SoftwareApp) build_policy(width int, height int) ui2.Element {
 		if a.policy_page >= 0 && a.policy_page < a.policy_pages.len {
 			page := a.policy_pages[a.policy_page]
 			children << software_label(page.title, 14, 132, width - 28, 28, false)
-			children << ui2.label('', page.text, ui2.rect(14, 174, f64(width - 28), f64(height - 328)),
-				ui2.TextStyle{ color: body_text, size: 12, lines: 14 })
+			software_page_lines(mut children, page.text, 14, 174, width - 28, 20)
 			children << software_label(page.label, 238, height - 138, if a.policy_review_ready { 100 } else { width - 252 }, 28, false)
 		}
 	}

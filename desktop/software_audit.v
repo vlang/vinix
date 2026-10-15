@@ -65,7 +65,7 @@ fn (mut a SoftwareApp) prepare_deployment_audit_details() {
 		if 'requested' in row.differences { values << 'The explicitly requested application set differs.'.clone() }
 	}
 	values << 'Recorded metadata only. Health checks payload integrity; trust and policy apply during reviewed changes.'.clone()
-	a.details_values(0, values)
+	a.details_values_columns(0, values, 24)
 	software_policy_free_lines(mut values)
 	total := a.details_pages.len.str()
 	for index in 0 .. a.details_pages.len {
@@ -186,7 +186,7 @@ fn (mut a SoftwareApp) build_deployment_audit(width int, height int) ui2.Element
 	a.page_rows = (height - 334) / 30
 	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
 	if a.page_rows != previous_size { a.keep_audit_selection_visible() }
-	mut children := frame_elements(40)
+	mut children := frame_elements(56)
 	children << software_label('Installed deployment check', 14, 8, width - 202, 28, false)
 	children << software_button(if a.worker == unsafe { nil } { 'software.audit.back' } else { 'software.audit.stop' },
 		if a.worker == unsafe { nil } { 'Back to deployment' } else { 'Stop check' }, width - 188, 8, 174)
@@ -215,8 +215,7 @@ fn (mut a SoftwareApp) build_deployment_audit(width int, height int) ui2.Element
 			}
 		}
 		if a.details_page >= 0 && a.details_page < a.details_pages.len {
-			children << ui2.label('', a.details_pages[a.details_page].text, ui2.rect(274, 128, f64(width - 288), f64(height - 334)),
-				ui2.TextStyle{ color: body_text, size: 12, lines: 14 })
+			software_page_lines(mut children, a.details_pages[a.details_page].text, 274, 128, width - 288, 18)
 			children << software_label(a.details_pages[a.details_page].label, 274, height - 206, width - 288, 28, false)
 		}
 		children << software_button('software.audit.previous', 'Previous detail', 274, height - 168, 142)

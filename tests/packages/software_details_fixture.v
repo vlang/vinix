@@ -42,7 +42,106 @@ fn details_fixture_values(app &SoftwareApp, section int) []string {
 	return values
 }
 
+fn details_fixture_rendered_lines(tree &ui2.Element, text string, x int, y int, width int, line_height int, byte_limit int) {
+	mut lines := text.split('\n')
+	defer { software_policy_free_lines(mut lines) }
+	assert lines.len <= 14
+	mut row := 0
+	for element in tree.children {
+		if element.text_style.font_family != 'mono' { continue }
+		assert row < lines.len && element.text == lines[row] && !element.text.contains('\n')
+		assert utf8.validate_str(element.text) && element.text.len <= byte_limit
+		assert element.frame.x == x && element.frame.y == y + row * line_height
+		assert element.frame.width == width && element.frame.height == line_height
+		assert element.text_style.lines == 1 && element.key == ''
+		row++
+	}
+	assert row == lines.len && row > 0
+}
+
+fn details_fixture_check_all_pages(mut app SoftwareApp) ! {
+	page := app.details_page; section := app.details_section
+	for index, value in app.details_pages {
+		app.details_page = index; app.details_section = value.section
+		for size in [ui2.rect(0, 0, 640, 610), ui2.rect(0, 0, 900, 660)]! {
+			tree := app.build(size)!
+			details_fixture_rendered_lines(&tree, value.text, 14, 174, int(size.width) - 28, 20, 52)
+			assert !tree.children.any(it.id == 'software.confirm')
+			for element in tree.children {
+				assert element.frame.y >= 0 && element.frame.y + element.frame.height <= size.height
+			}
+			free_window_tree(tree)
+			assert app.details_page == index && app.details_section == value.section && app.worker == unsafe { nil }
+		}
+	}
+	app.details_page = page; app.details_section = section
+}
+
+fn check_software_report_page_lines() ! {
+	mut app := SoftwareApp{ output: []u8{cap: 8192}, query: []u8{cap: 256} }
+	unsafe { app.output.flags |= .noslices }
+	defer { app.close_app() }
+	health := json2.encode(software_health_fixture())
+	defer { unsafe { health.free() } }
+	metadata_fixture_output(mut app, health); app.health_mode = true; assert app.load_health()
+	for index, page in app.details_pages {
+		app.details_page = index
+		tree := app.build(ui2.rect(0, 0, 640, 610))!
+		details_fixture_rendered_lines(&tree, page.text, 274, 128, 352, 18, 28)
+		assert tree.children.any(it.id == 'software.health.repair')
+		free_window_tree(tree)
+	}
+	assert app.health_ready && app.health_selected == 1 && app.health_snapshot.rows.len == 32
+	app.clear_health()
+	audit := json2.encode(software_audit_fixture_report(false, 31))
+	defer { unsafe { audit.free() } }
+	metadata_fixture_output(mut app, audit); app.audit_mode = true
+	app.audit_path = software_snapshot_fixture_path.clone(); assert app.load_deployment_audit(3)
+	for index, page in app.details_pages {
+		app.details_page = index
+		tree := app.build(ui2.rect(0, 0, 640, 610))!
+		details_fixture_rendered_lines(&tree, page.text, 274, 128, 352, 18, 28)
+		assert tree.children.any(it.id == 'software.audit.review')
+		free_window_tree(tree)
+	}
+	assert app.audit_ready && app.audit_snapshot.rows.len == 31 && app.audit_selected == 0
+	app.clear_deployment_audit()
+	saved := json2.encode(software_snapshot_fixture_receipt(software_snapshot_fixture_path))
+	defer { unsafe { saved.free() } }
+	metadata_fixture_output(mut app, saved); app.snapshot_mode = true
+	app.snapshot_pending = software_snapshot_fixture_path.clone(); assert app.load_deployment_snapshot()
+	for index, page in app.details_pages {
+		app.details_page = index
+		tree := app.build(ui2.rect(0, 0, 640, 610))!
+		details_fixture_rendered_lines(&tree, page.text, 14, 94, 612, 20, 52)
+		assert tree.children.any(it.id == 'software.snapshot.export')
+		free_window_tree(tree)
+	}
+	assert app.snapshot_saved.destination == software_snapshot_fixture_path && app.snapshot_ready
+	app.clear_deployment_snapshot()
+	policy := json2.encode(fixture_policy_document()); review := json2.encode(fixture_policy_review())
+	defer { unsafe { policy.free(); review.free() } }
+	app.policy_mode = true; metadata_fixture_output(mut app, policy); app.load_policy_document(); assert app.policy_ready
+	for reviewing in [false, true]! {
+		if reviewing {
+			app.policy_pending = policy_fixture_path.clone(); metadata_fixture_output(mut app, review); app.load_policy_review()
+			assert app.policy_review_ready
+		}
+		for index, page in app.policy_pages {
+			app.policy_page = index; app.policy_section = page.section
+			tree := app.build(ui2.rect(0, 0, 640, 610))!
+			details_fixture_rendered_lines(&tree, page.text, 14, 174, 612, 20, 52)
+			assert tree.children.any(it.id == 'software.policy.confirm') == reviewing
+			free_window_tree(tree)
+		}
+	}
+	assert app.policy_ready && app.policy_review_ready && app.policy_snapshot.fingerprint == 'c'.repeat(64)
+	assert app.worker == unsafe { nil } && !app.admin_prompt
+	println('Software disclosure lines: complete catalog/review/health/audit/snapshot/policy pages, individual native-renderer labels, narrow UTF-8 columns, geometry and unchanged review state PASS')
+}
+
 fn check_software_details() ! {
+	check_software_report_page_lines()!
 	row := details_fixture_row()
 	mut app := SoftwareApp{ rows: [row], matching: [0], selected: 0, query: []u8{cap: 256}, output: []u8{cap: 8192},
 		catalog_error: 'Catalog error é🚀 '.repeat(100), update_error: 'Update error é🚀 '.repeat(100) }
@@ -55,6 +154,7 @@ fn check_software_details() ! {
 	free_window_tree(tree)
 	app.handle('software.details')!
 	assert app.details_mode && !app.details_review && app.worker == unsafe { nil } && app.prepare_close()
+	details_fixture_check_all_pages(mut app)!
 	assert details_fixture_values(&app, 1) == [row.description]
 	assert 'Publisher key: ' + row.public_key in details_fixture_values(&app, 2)
 	assert 'Displayed package repository: ' + row.repository in details_fixture_values(&app, 2)
@@ -86,9 +186,9 @@ fn check_software_details() ! {
 	free_window_tree(details)
 	app.handle('software.details.back')!
 	assert !app.details_mode && app.details_pages.len == 0 && app.selected == 0
-	for operation in ['install', 'remove', 'upgrade', 'deploy', 'rollback', 'mirror'] {
+	for operation in ['install', 'remove', 'upgrade', 'repair', 'deploy', 'rollback', 'mirror'] {
 		app.review = operation.clone()
-		base := fixture_review(operation, if operation in ['upgrade', 'rollback'] { []string{} } else { ['editor'] })
+		base := fixture_review(operation, if operation in ['upgrade', 'repair', 'rollback'] { []string{} } else { ['editor'] })
 		snapshot := if operation == 'mirror' { pkgprotocol.Review{ ...base, generation: 0, rows: base.rows.map(pkgprotocol.ReviewPackage{ ...it, action: 'export' }) } }
 			else if operation == 'remove' { pkgprotocol.Review{ ...base, requested: [], rows: base.rows.map(pkgprotocol.ReviewPackage{ ...it, requested: false, action: 'remove' }) } }
 			else { base }
@@ -97,6 +197,7 @@ fn check_software_details() ! {
 		if operation == 'deploy' { app.deployment_pending = '/company/' + 'approved é🚀 '.repeat(160) + '.json' }
 		app.handle('software.details')!
 		assert app.details_mode && app.details_review
+		details_fixture_check_all_pages(mut app)!
 		assert 'Package ID: runtime' in details_fixture_values(&app, 0)
 		if operation == 'rollback' { assert 'Restore from generation: 2' in details_fixture_values(&app, 0) }
 		assert 'License: Vendor-EULA' in details_fixture_values(&app, 4)

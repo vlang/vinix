@@ -190,7 +190,7 @@ fn (a &SoftwareApp) add_status_footer(mut children []ui2.Element, width int, hei
 	if available { children << software_button('software.failure', 'Failure details', width - 162, y, 148) }
 }
 
-fn software_failure_lines(mut children []ui2.Element, text string, x int, y int, width int, line_height int) {
+fn software_page_lines(mut children []ui2.Element, text string, x int, y int, width int, line_height int) {
 	// The native renderer draws each label as one line. Separate labels also
 	// prevent backend word wrapping from hiding a prepared diagnostic fragment.
 	mut start := 0
@@ -228,7 +228,7 @@ fn (mut a SoftwareApp) build_failure(size ui2.Rect) ui2.Element {
 		if a.failure_compact_page >= 0 && a.failure_compact_page < a.failure_compact_pages.len {
 			page := a.failure_compact_pages[a.failure_compact_page]
 			children << software_label(page.label, 14, 8, if width > back_width + 42 { width - back_width - 42 } else { 1 }, 28, false)
-			software_failure_lines(mut children, page.text, 14, 110, content_width, 16)
+			software_page_lines(mut children, page.text, 14, 110, content_width, 16)
 		}
 		button_width := if width >= 240 { 90 } else { (width - 42) / 2 }
 		children << software_button('software.failure.previous', 'Previous', 14, height - 36, button_width)
@@ -243,7 +243,7 @@ fn (mut a SoftwareApp) build_failure(size ui2.Rect) ui2.Element {
 		else { 'Retained diagnostic output. Long lines continue on the next line or page.' }, 14, 82, width - 28, 44, false)
 	if a.failure_page >= 0 && a.failure_page < a.failure_pages.len {
 		page := a.failure_pages[a.failure_page]
-		software_failure_lines(mut children, page.text, 14, 142, width - 28, 20)
+		software_page_lines(mut children, page.text, 14, 142, width - 28, 20)
 		children << software_label(page.label, 238, height - 138, width - 430, 28, false)
 	}
 	children << software_button('software.failure.previous', 'Previous', 14, height - 138, 100)

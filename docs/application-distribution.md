@@ -1029,6 +1029,12 @@ present. **Back to review** or Escape returns to the unchanged confirmation and
 selection. Only navigation is active while details are open. See the
 [package-details UI checks](../tests/packages/details-ui-check.md).
 
+Prepared package, policy, health, deployment-check and saved-receipt pages now
+render each line as a separate monospace label. This makes every prepared line
+visible in the native renderer. Health and deployment-check side panels use
+shorter UTF-8 lines for their minimum width; complete values continue across
+pages. See [disclosure rendering checks](../tests/packages/software-disclosure-lines-check.md).
+
 Catalog replies now use a bounded typed reader. Missing/coerced flags, duplicate
 known fields, partial installed launch metadata, incompatible architectures and
 incoherent update actions are refused with a specific diagnostic. Software keeps
