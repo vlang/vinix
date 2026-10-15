@@ -265,6 +265,7 @@ fn check_package_navigation_writer(mut app SoftwareApp) ! {
 	for action in ['software.review.stop', 'software.cancel', 'software.reload', 'software.search']! { app.handle(action)! }
 	app.handle('software.report.read')!; assert !app.report_reader_mode && app.worker.pid == pid
 	app.handle('software.catalog.browse')!; assert !app.catalog_browser_mode && app.worker.pid == pid
+	app.handle('software.status')!; assert !app.status_reader.mode && app.worker.pid == pid
 	app.key_input('\x1b'); app.stop_package_review(); app.key_input('must-not-edit')
 	assert app.worker.pid == pid && C.kill(pid, 0) == 0 && app.query.bytestr() == 'Editor'
 }
@@ -309,6 +310,7 @@ fn check_software_package_navigation() ! {
 				app.handle('software.confirm')!; app.handle('software.search')!; app.key_input('must-not-edit')
 				app.handle('software.report.read')!; assert !app.report_reader_mode && app.worker.pid == pid && app.details_pages.len == 0
 				app.handle('software.catalog.browse')!; assert !app.catalog_browser_mode && app.worker.pid == pid
+				app.handle('software.status')!; assert !app.status_reader.mode && app.worker.pid == pid
 				assert !os.exists(receipt) && app.query.bytestr() == 'Editor' && !app.focus
 				if action == 'escape' { app.key_input('\x1b') } else { app.handle(action)! }
 				assert app.worker == unsafe { nil } && C.kill(pid, 0) != 0 && !app.worker_review && !app.review_ready

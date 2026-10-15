@@ -185,9 +185,118 @@ fn (mut a SoftwareApp) failure_key_input(input string) {
 
 fn (a &SoftwareApp) add_status_footer(mut children []ui2.Element, width int, height int, progress bool) {
 	available := a.failure_pages.len > 0 && a.worker == unsafe { nil }
+	readable := a.status_readable()
 	y := height - if progress { 88 } else { 98 }
-	children << software_label(a.status, 14, y, width - if available { 190 } else { 28 }, if progress { 80 } else { 90 }, false)
+	children << software_label(a.status, 14, y, width - if available || readable { 190 } else { 28 }, if progress { 80 } else { 90 }, false)
 	if available { children << software_button('software.failure', 'Failure details', width - 162, y, 148) }
+	if readable { children << software_button('software.status', 'Read status', width - 162, y + if available { 38 } else { 0 }, 148) }
+}
+
+// Separate storage keeps a local validation/status diagnostic from replacing
+// the retained service failure or a prepared package/report disclosure.
+struct SoftwareStatusReader {
+mut:
+	mode bool
+	compact bool
+	truncated bool
+	page int
+	short_page int
+	pages []SoftwareFailurePage
+	short_pages []SoftwareFailurePage
+}
+
+fn (mut r SoftwareStatusReader) close() {
+	unsafe {
+		for page in r.pages { page.text.free(); page.label.free() }
+		r.pages.free()
+		for page in r.short_pages { page.text.free(); page.label.free() }
+		r.short_pages.free()
+	}
+	r = SoftwareStatusReader{}
+}
+
+fn (a &SoftwareApp) status_readable() bool {
+	return a.worker == unsafe { nil } && a.status != '' && !a.admin_prompt && !a.window_mode
+		&& a.terminal_app == unsafe { nil } && !a.failure_mode && !a.details_mode
+		&& !a.report_reader_mode && !a.policy_reader_mode
+}
+
+fn (mut a SoftwareApp) open_status_reader() {
+	if !a.status_readable() || a.status_reader.mode { return }
+	mut r := &a.status_reader
+	r.close()
+	r.pages = []SoftwareFailurePage{cap: 16}; r.short_pages = []SoftwareFailurePage{cap: 16}
+	unsafe { r.pages.flags |= .noslices; r.short_pages.flags |= .noslices }
+	r.truncated = a.status.len > software_failure_limit
+	start := if r.truncated { a.status.len - software_failure_limit } else { 0 }
+	text := software_failure_text(unsafe { tos(a.status.str + start, a.status.len - start) })
+	defer { unsafe { text.free() } }
+	software_failure_paginate(mut r.pages, text, 48, 14, 0)
+	software_failure_labels(mut r.pages)
+	for index, page in r.pages { software_failure_paginate(mut r.short_pages, page.text, 12, 3, index) }
+	software_failure_labels(mut r.short_pages)
+	r.mode = true
+}
+
+fn (mut r SoftwareStatusReader) anchor() {
+	if r.short_page >= 0 && r.short_page < r.short_pages.len && r.short_pages[r.short_page].source_page == r.page { return }
+	for index, page in r.short_pages { if page.source_page == r.page { r.short_page = index; return } }
+}
+
+fn (mut r SoftwareStatusReader) handle(action string) {
+	if action == 'software.status.back' { r.close(); return }
+	if action !in ['software.status.previous', 'software.status.next']! { return }
+	step := if action == 'software.status.next' { 1 } else { -1 }
+	if r.compact {
+		r.anchor()
+		next := r.short_page + step
+		if next >= 0 && next < r.short_pages.len { r.short_page = next; r.page = r.short_pages[next].source_page }
+	} else {
+		next := r.page + step
+		if next >= 0 && next < r.pages.len { r.page = next }
+	}
+}
+
+fn (mut r SoftwareStatusReader) key_input(input string) {
+	match input {
+		'\x1b' { r.handle('software.status.back') }
+		'\x1b[D', '\x1b[5~' { r.handle('software.status.previous') }
+		'\x1b[C', '\x1b[6~' { r.handle('software.status.next') }
+		else {}
+	}
+}
+
+fn (mut r SoftwareStatusReader) build(size ui2.Rect) ui2.Element {
+	width := int(size.width); height := int(size.height)
+	r.compact = width < 640 || height < 610
+	r.anchor()
+	mut children := frame_elements(24)
+	content_width := if width > 28 { width - 28 } else { 1 }
+	back_width := if width >= 240 { 110 } else if content_width >= 56 { 56 } else { content_width }
+	children << software_button('software.status.back', 'Back', if width > back_width + 28 { width - back_width - 14 } else { 14 }, 8, back_width)
+	if width < 180 || height < 200 {
+		children << software_label('Enlarge to read status.', 14, 46, content_width, 28, false)
+		return ui2.screen(app_surface, children)
+	}
+	children << software_label('Software status', 14, 46, content_width, 28, false)
+	children << software_label(if r.truncated { 'Earlier status omitted.' } else { 'Recorded status.' }, 14, 80, content_width, 20, false)
+	if r.compact {
+		if r.short_page >= 0 && r.short_page < r.short_pages.len {
+			page := r.short_pages[r.short_page]
+			children << software_label(page.label, 14, 8, if width > back_width + 42 { width - back_width - 42 } else { 1 }, 28, false)
+			software_page_lines(mut children, page.text, 14, 110, content_width, 16)
+		}
+	} else if r.page >= 0 && r.page < r.pages.len {
+		page := r.pages[r.page]
+		children << software_label(page.label, 14, 8, width - back_width - 42, 28, false)
+		software_page_lines(mut children, page.text, 14, 142, content_width, 20)
+	}
+	button_width := if width >= 240 { 100 } else { (width - 42) / 2 }
+	y := height - if r.compact { 36 } else { 138 }
+	children << software_button('software.status.previous', 'Previous', 14, y, button_width)
+	children << software_button('software.status.next', 'Next', width - 14 - button_width, y, button_width)
+	if !r.compact { children << software_label('Read-only status. Back returns to the same form or review. Service failure output remains available separately.', 14, height - 98, content_width, 90, false) }
+	return ui2.screen(app_surface, children)
 }
 
 fn software_page_lines(mut children []ui2.Element, text string, x int, y int, width int, line_height int) {

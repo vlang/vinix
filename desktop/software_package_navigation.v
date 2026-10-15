@@ -73,12 +73,16 @@ fn (a &SoftwareApp) build_catalog_browser(width int, height int) ui2.Element {
 	position := a.matching.index(a.selected)
 	if position >= 0 && a.selected >= 0 && a.selected < a.rows.len {
 		number := (position + 1).str(); total := a.matching.len.str()
-		children << software_label(number + ' / ' + total, 14, 118, width - 28, 24, true)
+		if a.catalog_browser_notice && a.status_readable() {
+			children << software_button('software.status', 'Read status', 14, 118, width - 28)
+		} else { children << software_label(number + ' / ' + total, 14, 118, width - 28, 24, true) }
 		unsafe { number.free(); total.free() }
 		children << software_label(if a.catalog_browser_notice { a.status } else { a.rows[a.selected].name }, 14, 146, width - 28, 36, false)
 		children << software_button('software.details', 'Details', 14, height - 36, width - 28)
 	} else {
-		children << software_label('No matches', 14, 118, width - 28, 24, false)
+		if a.catalog_browser_notice && a.status_readable() {
+			children << software_button('software.status', 'Read status', 14, 118, width - 28)
+		} else { children << software_label('No matches', 14, 118, width - 28, 24, false) }
 		children << software_label(if a.catalog_browser_notice { a.status } else { 'Change search or filter. Back returns to catalog status and reload.' }, 14, 146, width - 28, height - 154, false)
 	}
 	return ui2.screen(app_surface, children)
@@ -169,7 +173,8 @@ fn (a &SoftwareApp) build_packages_compact(width int, height int) ui2.Element {
 	available := a.failure_pages.len > 0 && a.worker == unsafe { nil } && !a.details_mode
 	readable := a.package_review_readable() && !a.details_mode
 	browsable := a.catalog_browsable() && !a.details_mode
-	children << software_label('Software', 14, 8, width - 28, 28, false)
+	children << software_label('Software', 14, 8, if a.status_readable() && width >= 180 { 60 } else { width - 28 }, 28, false)
+	if a.status_readable() && width >= 180 { children << software_button('software.status', 'Read status', width - 104, 8, 90) }
 	button_width := if width > 202 { 174 } else { width - 28 }
 	if a.details_mode {
 		children << software_button('software.details.back', if a.review != '' { 'Back to review' } else { 'Back to catalog' }, 14, 46, button_width)

@@ -39,6 +39,13 @@ including long paths and exit status. It survives catalog reloads until another
 failure, explicit clearing or window close. The view is read-only and marks
 omitted output. See [qualification](../../tests/packages/software-failure-check.md).
 
+**Read status** pages local validation errors and current status separately from
+retained service failure output. Full-screen footers and compact catalog screens
+offer it when idle; catalog browser notices link to it directly. It preserves
+the form, search/focus, review and other prepared reports. Text is escaped and
+bounded to the last 8,192 source bytes, with an omission notice when necessary.
+Back/Escape retires its pages. See [status reader checks](../../tests/packages/software-status-reader-check.md).
+
 Compact failure views at least 180 pixels wide and 200 high show short pages with
 Previous/Next and arrow/Page-key navigation. Resizing retains the short page and
 its corresponding full page. Both views use individual monospace line labels;

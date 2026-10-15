@@ -64,6 +64,7 @@ fn check_software_view_reader() ! {
 	app.start(['view'], true); pid := app.worker.pid
 	wait_for_package_navigation_output(mut app, false)
 	app.handle('software.catalog.browse')!; assert !app.catalog_browser_mode && app.worker.pid == pid
+	app.handle('software.status')!; assert !app.status_reader.mode && app.worker.pid == pid
 	app.paste_input('APP-31'); assert app.matching == [31] && app.worker.pid == pid
 	app.paste_input('\x1b'); assert app.focus && app.worker.pid == pid && app.query.bytestr() == 'APP-31'
 	release := u8(`!`); assert C.write(app.worker.stdio_fd[0], &release, 1) == 1
@@ -137,7 +138,9 @@ fn catalog_browser_cycle(mut app SoftwareApp) ! {
 	app.handle('software.search')!; app.key_input('\x01'); app.paste_input('APP-31')
 	assert app.matching.len == 1 && app.matching[0] == 31 && app.selected == 31
 	app.paste_input('\x1b'); assert app.catalog_browser_notice && app.catalog_browser_mode
-	free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
+	preview := app.build(ui2.rect(0, 0, 320, 240))!
+	assert preview.children.any(it.id == 'software.status'); free_window_tree(preview)
+	status_reader_cycle(mut app)!
 	app.key_input('\x01'); app.paste_input('ÉKI'); assert app.matching.len == 32 && !app.catalog_browser_notice
 	app.key_input('\r'); app.key_input('\r'); assert app.details_mode && app.catalog_browser_mode
 	free_window_tree(app.build(ui2.rect(0, 0, 180, 220))!)

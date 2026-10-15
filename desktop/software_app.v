@@ -34,6 +34,7 @@ mut:
 	failure_page int
 	failure_truncated bool
 	status          string
+	status_reader   SoftwareStatusReader
 	catalog_error   string
 	update_error    string
 	selected        int = -1
@@ -792,6 +793,8 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 	if a.details_mode { a.handle_details(event_id); return }
 	if a.policy_mode && a.policy_reader_mode { a.handle_policy_reader(event_id); return }
 	if a.report_reader_mode { a.handle_report_reader(event_id); return }
+	if a.status_reader.mode { a.status_reader.handle(event_id); return }
+	if event_id == 'software.status' { a.open_status_reader(); return }
 	if a.catalog_browser_mode { a.handle_catalog_browser(event_id); return }
 	if event_id == 'software.catalog.browse' { a.open_catalog_browser(); return }
 	if event_id == 'software.report.read' { a.open_report_reader(); return }
@@ -1072,6 +1075,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.window_mode { a.window_key_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
 	if a.failure_mode { a.failure_key_input(input); return }
+	if a.status_reader.mode { a.status_reader.key_input(input); return }
 	if a.report_reader_mode { a.report_reader_key_input(input); return }
 	if a.snapshot_mode { a.snapshot_key_input(input); return }
 	if a.audit_mode { a.audit_key_input(input); return }
@@ -1123,6 +1127,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.window_mode { a.window_paste_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
 	if a.failure_mode { return }
+	if a.status_reader.mode { return }
 	if a.report_reader_mode { return }
 	if a.snapshot_mode { a.snapshot_paste_input(input); return }
 	if a.audit_mode { a.audit_paste_input(input); return }
@@ -1229,6 +1234,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.window_mode { return a.build_window(size) }
 	if a.terminal_app != unsafe { nil } { return a.build_terminal(size) }
 	if a.failure_mode { return a.build_failure(size) }
+	if a.status_reader.mode { return a.status_reader.build(size) }
 	width := int(size.width)
 	height := int(size.height)
 	if a.details_mode { return a.build_details(width, height) }
@@ -1450,6 +1456,7 @@ fn (mut a SoftwareApp) close_app() {
 	a.clear_policy()
 	a.clear_progress()
 	a.clear_failure()
+	a.status_reader.close()
 	a.clear_health()
 	a.clear_cleanup()
 	a.clear_deployment_audit()

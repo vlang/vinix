@@ -1115,6 +1115,15 @@ and selected package. The full list keeps that selection visible after resizing.
 Browsing cannot launch, reload or start a package change; pending work blocks
 entry. See [compact browser qualification](../tests/packages/software-catalog-browser-check.md).
 
+**Read status** opens the current status or local validation diagnostic in a
+separate read-only pager. It is available from idle full-screen footers, compact
+catalog screens and catalog browser notices. Long paths, Unicode and invalid
+bytes remain readable in short pages from 180×200; smaller windows retain Back.
+The last 8,192 source bytes are retained, with an explicit earlier-text omission
+notice for larger status messages. Back/Escape preserves the exact form, focus,
+query, frozen review, prepared report and retained service failure. Pending work
+blocks entry. See [status reader qualification](../tests/packages/software-status-reader-check.md).
+
 Installed package diagnostics follow the active dependency closure: revoked or
 invalid publisher keys, permission restrictions, licenses, firmware policy and
 version pins on a runtime are also shown against its dependent applications.

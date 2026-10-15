@@ -117,10 +117,12 @@ fn check_software_failure_compact() ! {
 }
 
 fn check_software_failure() ! {
+	check_software_status_reader()!
 	check_software_failure_compact()!
 	mut app := SoftwareApp{service_path: os.executable(), output: []u8{cap: 8192}, query: []u8{cap: 256}}
 	defer { app.close_app() }
 	app.start(['install', 'diagnostic-app'], false)
+	app.handle('software.status')!; assert !app.status_reader.mode
 	app.handle('software.failure')!
 	assert !app.failure_mode
 	wait_for_software(mut app)
@@ -220,6 +222,7 @@ fn check_software_failure_memory() ! {
 	$if !track_heap ? { return error('compile failure memory fixture with -d track_heap') }
 	$if track_heap ? {
 		mut app := SoftwareApp{output: []u8{cap: 8192}}
+		app.set_status('Local validation: /private/é🚀/a long source path; restore trusted metadata before retrying.\n\x1b\xff')
 		for byte in 'Cause: é🚀 long path and escaped controls\x1b\xff\n'.repeat(20) { app.output << byte }
 		arguments := ['install', 'diagnostic-app']
 		for warmup in 0 .. 2 {
@@ -243,11 +246,120 @@ fn check_software_failure_memory() ! {
 				app.handle('software.failure.back')!
 				app.clear_failure()
 				assert app.failure_compact_pages.len == 0 && !app.failure_compact_mode
+				status_reader_cycle(mut app)!
 			}
 		}
 		kept := C.vinix_heap_end()
 		app.close_app()
 		assert kept == 0, 'failure details retained ${kept} bytes'
 		println('Software failure details: 1000 capture/full/compact/all-short-pages/keys/resize/back/replace/clear cycles retain zero tracked bytes')
+		println('Software status reader: 1000 capture/native-page/keyboard/resize/ignored-write/Back/cache-retirement cycles retain zero tracked bytes')
 	}
+}
+
+fn status_reader_cycle(mut app SoftwareApp) ! {
+	status := app.status; focus := app.focus; selection := app.select_all; query := editor_bytes_text(app.query)
+	failure := app.failure_pages.data; heading := app.failure_heading; report := app.details_pages.data
+	app.handle('software.status')!; assert app.status_reader.mode && app.status_reader.pages.len > 0
+	for size in [ui2.rect(0, 0, 180, 200), ui2.rect(0, 0, 320, 240), ui2.rect(0, 0, 640, 610)]! {
+		free_window_tree(app.build(size)!)
+		app.key_input('\x1b[C')
+	}
+	free_window_tree(app.build(ui2.rect(0, 0, 180, 200))!)
+	for action in ['software.confirm', 'software.cancel', 'software.failure.clear', 'software.report.read', 'software.catalog.filter',
+		'software.snapshot.save', 'software.launch.run', 'software.reload', 'software.refresh', 'software.install', 'software.run',
+		'software.launch:{"id":"editor"}']! { app.handle(action)! }
+	app.key_input('typed'); app.paste_input('\x1b'); app.paste_input('\x1b[C')
+	assert app.status_reader.mode && app.worker == unsafe { nil } && !app.admin_prompt && app.launch_request == ''
+	assert app.status == status && app.focus == focus && app.select_all == selection && editor_bytes_text(app.query) == query
+	assert app.failure_pages.data == failure && app.failure_heading == heading && app.details_pages.data == report
+	app.key_input('\x1b')
+	assert !app.status_reader.mode && app.status_reader.pages.len == 0 && app.status_reader.short_pages.len == 0
+}
+
+fn check_software_status_reader() ! {
+	mut app := SoftwareApp{ query: 'kept search'.bytes(), focus: true, select_all: true, filter: 1, selected: 7, scroll: 3,
+		output: []u8{cap: 8192}, administration_required: true }
+	defer { app.close_app() }
+	app.handle('software.status')!; assert !app.status_reader.mode // Empty status has no reader.
+	text := 'Local validation: ' + '/private/é🚀; $literal/'.repeat(48) + '\r\n\tControls: \x1b\xff\xc2\x80\nRestore trusted input and retry.'
+	defer { unsafe { text.free() } }
+	app.set_status(text)
+	for byte in 'Retained service failure: previous operation failed.' { app.output << byte }
+	app.capture_failure(['view'], 27)
+	mut review := fixture_review('install', ['editor'])
+	review_text := json2.encode(review); review.close()
+	metadata_fixture_review(mut app, 0, review_text); unsafe { review_text.free() }
+	app.prepare_package_plan(); app.set_status(text)
+	prepared := app.details_pages.data; fingerprint := app.review_snapshot.fingerprint
+	for mode in ['catalog', 'repository', 'deployment', 'mirror', 'policy', 'data', 'launch', 'health', 'cleanup', 'audit', 'snapshot', 'browser']! {
+		app.repository_mode = mode == 'repository'; app.deployment_mode = mode == 'deployment'; app.mirror_mode = mode == 'mirror'
+		app.policy_mode = mode == 'policy'; app.data_mode = mode == 'data'; app.launch_mode = mode == 'launch'
+		app.health_mode = mode == 'health'; app.cleanup_mode = mode == 'cleanup'; app.audit_mode = mode == 'audit'
+		app.snapshot_mode = mode == 'snapshot'; app.catalog_browser_mode = mode == 'browser'
+		mut footer := frame_elements(3)
+		app.add_status_footer(mut footer, 640, 610, false)
+		assert footer.any(it.id == 'software.status') && footer.any(it.id == 'software.failure')
+		free_window_tree(ui2.screen(u32(0), footer))
+		status_reader_cycle(mut app)!
+		assert app.details_pages.data == prepared && app.review_snapshot.fingerprint == fingerprint && app.review_ready
+	}
+	app.repository_mode = false; app.deployment_mode = false; app.mirror_mode = false; app.policy_mode = false; app.data_mode = false
+	app.launch_mode = false; app.health_mode = false; app.cleanup_mode = false; app.audit_mode = false; app.snapshot_mode = false; app.catalog_browser_mode = false
+	app.clear_review(); app.set_status(text)
+	for size in [ui2.rect(0, 0, 180, 220), ui2.rect(0, 0, 320, 240), ui2.rect(0, 0, 640, 610)]! {
+		tree := app.build(size)!
+		assert tree.children.any(it.id == 'software.status') && tree.children.any(it.id == 'software.failure')
+		free_window_tree(tree)
+	}
+	app.handle('software.status')!
+	full := software_failure_fixture_join_pages(app.status_reader.pages)
+	short := software_failure_fixture_join_pages(app.status_reader.short_pages)
+	safe := software_failure_text(text); expected := safe.replace('\n', '')
+	assert full == expected && short == full && full.contains('\\x1b\\xff\\xc2\\x80')
+	unsafe { full.free(); short.free(); safe.free(); expected.free() }
+	assert app.status_reader.short_pages.len > app.status_reader.pages.len
+	for i in 0 .. app.status_reader.short_pages.len {
+		for size in [ui2.rect(0, 0, 180, 200), ui2.rect(0, 0, 320, 240)]! {
+			tree := app.build(size)!
+			assert app.status_reader.short_page == i && app.status_reader.page == app.status_reader.short_pages[i].source_page
+			details_fixture_rendered_lines(&tree, app.status_reader.short_pages[i].text, 14, 110, int(size.width) - 28, 16, 12)
+			for element in tree.children {
+				assert element.frame.x >= 0 && element.frame.y >= 0 && element.frame.x + element.frame.width <= size.width
+				assert element.frame.y + element.frame.height <= size.height
+			}
+			free_window_tree(tree)
+		}
+		app.key_input(if i % 2 == 0 { '\x1b[C' } else { '\x1b[6~' })
+	}
+	last := app.status_reader.short_page; canonical := app.status_reader.page
+	app.handle('software.status.next')!; assert app.status_reader.short_page == last
+	for size in [ui2.rect(0, 0, 640, 610), ui2.rect(0, 0, 160, 180), ui2.rect(0, 0, 180, 200)]! {
+		free_window_tree(app.build(size)!); assert app.status_reader.short_page == last && app.status_reader.page == canonical
+	}
+	for _ in 0 .. app.status_reader.short_pages.len + 2 { app.key_input('\x1b[5~') }
+	assert app.status_reader.page == 0 && app.status_reader.short_page == 0
+	free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!)
+	app.key_input('\x1b[C'); assert app.status_reader.page == 1
+	free_window_tree(app.build(ui2.rect(0, 0, 180, 200))!)
+	assert app.status_reader.short_pages[app.status_reader.short_page].source_page == 1
+	app.handle('software.status.back')!; assert !app.status_reader.mode
+	for bounded in ['x'.repeat(8192), 'prefix' + '界'.repeat(2731) + '\xff'] {
+		app.set_status(bounded); app.open_status_reader()
+		assert app.status_reader.truncated == (bounded.len > 8192)
+		start := if bounded.len > 8192 { bounded.len - 8192 } else { 0 }
+		escaped := software_failure_text(unsafe { tos(bounded.str + start, bounded.len - start) })
+		wanted := escaped.replace('\n', '')
+		actual := software_failure_fixture_join_pages(app.status_reader.short_pages)
+		assert actual == wanted && app.status_reader.short_pages.len < 1024
+		for page in app.status_reader.short_pages { assert utf8.validate_str(page.text) }
+		unsafe { escaped.free(); wanted.free(); actual.free() }
+		app.handle('software.status.back')!
+	}
+	app.admin_prompt = true; app.open_status_reader(); assert !app.status_reader.mode; app.admin_prompt = false
+	app.window_mode = true; app.open_status_reader(); assert !app.status_reader.mode; app.window_mode = false
+	app.failure_mode = true; app.open_status_reader(); assert !app.status_reader.mode; app.failure_mode = false
+	app.details_mode = true; app.open_status_reader(); assert !app.status_reader.mode; app.details_mode = false
+	app.open_status_reader(); assert app.status_reader.mode // Closing the application also retires a reader left open.
+	println('Software status reader: twelve idle contexts, complete Unicode/escaped text, 8192-byte bounds/tail notice, separate failure/report caches, native short lines, modal isolation, resize/keys/Back and worker admission passed')
 }
