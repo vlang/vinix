@@ -280,7 +280,9 @@ mut:
 
 pub fn reserve_shared_mapping(mut res Resource, offset u64, length u64) bool {
 	if mut res is ReservableMapping {
-		return res.reserve_shared_mapping(offset, length)
+		mut backend := ReservableMapping(res)
+		mut stack := unsafe { &backend }
+		return stack.reserve_shared_mapping(offset, length)
 	}
 	return true
 }
@@ -295,7 +297,9 @@ mut:
 
 pub fn lazy_shared_mapping(mut res Resource) bool {
 	if mut res is LazySharedMapping {
-		return res.lazy_shared_mapping()
+		mut backend := LazySharedMapping(res)
+		mut stack := unsafe { &backend }
+		return stack.lazy_shared_mapping()
 	}
 	return false
 }
