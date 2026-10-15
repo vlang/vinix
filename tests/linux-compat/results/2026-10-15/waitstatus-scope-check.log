@@ -1,0 +1,1 @@
+arm/x86: complete production C differs only in wait4 status condition: full four-byte numeric range plus both writable endpoints before existing copy; no stable split-page fault prefix; copying, claiming, pins, event consumption, accounting and cleanup unchanged; no added allocation/free/pin/stack promotion and no normalization

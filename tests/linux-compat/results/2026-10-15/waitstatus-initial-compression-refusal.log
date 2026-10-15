@@ -1,0 +1,101 @@
+/Users/alex/.cache/vinix-linux-compat/waitstatus-20261015/compress-evidence.v:11: FAIL: fn main.command: assert status == 0,output;
+   left value: status = 1
+  right value: 0
+      message: Usage: ditto [ <options> ] src [ ... src ] dst
+
+    <options> are any of:
+    -h, --help                     print full usage
+    -v                             print a status line for each source copied
+    -V                             print a status line for every file copied
+    -X                             do not descend into directories with a
+                                   different device ID
+
+    -c                             create an archive at dst
+                                   The default format will be CPIO
+    -x                             src(s) are archives
+    -z                             Use gzip when compressing a CPIO archive
+    -j                             Use bzip2 when compressing a CPIO archive
+    -k                             create the archive in the PKZip format
+    --keepParent                   Embed the parent directory name of src in the
+                                   destination
+    --arch archVal                 fat files will be thinned to archVal
+                                   multiple --arch options can be specified
+                                   for example "x86_86", "arm64", etc
+    --bom bomFile                  only objects present in index bom are copied
+
+    --lang <lang>                  filter the index bom based on language
+                                   variants
+                                   multiple --lang options can be specified
+    --outBom bomFile               create an output bom representing the paths
+                                   that matched --arch or --lang variants
+
+    --rsrc                         preserve resource data
+    --norsrc                       do not preserve resource data
+    --extattr                      preserve extended attributes
+    --noextattr                    do not preserve extended attributes
+    --qtn                          preserve quarantine information
+    --noqtn                        do not preserve quarantine information
+    --acl                          preserve Access Control Lists (ACLs)
+    --noacl                        do not preserve ACLs
+
+    --sequesterRsrc                copy resources via polite __MACOSX directory
+                                   (this is for PKZip destinations only)
+    --zlibCompressionLevel <num>   use compression level 'num' when creating
+                                   a PKZip archive
+    --password                     request password for reading from encrypted
+                                   PKZip archive
+
+    --hfsCompression               compress files at destination if appropriate
+    --nohfsCompression             do not compress files at destination
+    --preserveHFSCompression       preserve filesystem compression when copying
+                                   files to HFS+ or APFS volumes
+    --nopreserveHFSCompression     do not preserve filesystem compression
+
+    --nocache                      do not use filesystem cache for reads/writes
+    --nonAtomicCopies              do not perform atomic copies when replacing
+                                   existing files
+    --segmentLargeFiles            when copying files to a CPIO archive, segment
+                                   files larger than 8GB into multiple entries
+                                   when copying files from a CPIO archive
+                                   reassemble segmented entries into a lone file
+
+    --persistRootless              persist the SF_RESTRICTED flag or the
+                                   com.apple.rootless extended attribute
+    --nopersistRootless            do not persist the SF_RESTRICTED flag or
+                                   com.apple.rootless extended attribute
+
+    --keepBinaries                 set aside the original Mach-O binary when it
+                                   is replaced by the source
+    --keepBinariesList <path>      record kept binaries in a text file at the
+                                   specified path
+    --keepBinariesPattern <regex>  only keep files that match the specified
+                                   regular expression
+
+    --clone                        attempt to clone files when copying
+    --noclone                      do not attempt to clone files
+
+Environment Variables:
+
+    DITTOABORT                     Abort if the copier encounters a fatal error
+
+    DITTONORSRC                    Do not preserve any filesystem metadata
+
+    DITTOKEEPBINARIESPATTERN       This is the equivalent of -U
+
+    DITTOKEEPBINARIESDIR           Specify an alternate directory for kept files
+
+    DITTO_TEST_OPTIONS             Print the BOMCopier parameters and exit
+
+The following options are enabled by default:
+    --rsrc                         preserve resource data
+    --extattr                      preserve extended attributes
+    --qtn                          preserve quarantine information
+    --acl                          preserve Access Control Lists (ACLs)
+    --preserveHFSCompression       preserve filesystem compression when copying
+                                   files to HFS+ or APFS volumes
+    --persistRootless              persist the SF_RESTRICTED flag or the
+                                   com.apple.rootless extended attribute
+
+Details on these options and their behaviors can be found in the ditto(1) manual
+
+V panic: Assertion failed...

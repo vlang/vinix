@@ -1,0 +1,31 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "510679d051d67f28ce4147b1c722d46e2f4061786098960e5a57413cb83c598f",
+    "results": [
+        {
+            "name": "waitstatus",
+            "source_sha256": "be582a1ebd0b11d909b420d0f006bfa8033f1f7aabacbbfdc53c65f3c7459956",
+            "init_sha256": "ec2ad44eb7252af085c6da22b7872ae07a1bffe85a8f2986037c9c651b633a4a",
+            "iso_sha256": "558e4f0c6618a9ed56defd6839ed84ba537c4135421cb5b80497b4ff005618af",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "5d06c51b5ded2d2836e5ab383d1ebf5d6a7975236054076ea3402929e0b315ed",
+            "iso_sha256": "669cbdf456f9c1063aa31d0466519824da90919666a5fcfd35e262d4def730ce",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "waitconsume",
+            "source_sha256": "6768ef1ce82628139ae0c67057aa3f78e21573bed761fa0b2d7823383d7d2c33",
+            "init_sha256": "c818db59fb89cbe6cda294147992cc5107aa2190a411748f0778dc8b6717b353",
+            "iso_sha256": "7f0898dc740f42e49a0669f924363be39d2693f95e1782f2bc88382bef1930db",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

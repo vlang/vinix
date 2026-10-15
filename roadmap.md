@@ -1031,6 +1031,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   ordinary callers in both PID namespace views, with independent lifetime review.
   See [the consuming-fault receipts](docs/linux-posix-qualification.md#native-wait-copyout-fault-event-consumption).
 
+- [x] Preserve native wait4 status bytes on stable split-page EFAULT, with valid
+  cross-page stores, unaligned outputs, NULL/valid rusage and unused bad pointers.
+  Qualify four child states, raw/musl calls, selectors and flat fork/store/reap
+  storage as root/ordinary callers in both PID namespace views.
+  See [the scalar-status receipts](docs/linux-posix-qualification.md#native-wait4-scalar-status-copyout).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -1,0 +1,130 @@
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/waitstatus-20261015/states/p1-before-x86/waitstatus/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/waitstatus-20261015/states/p1-before-x86/waitstatus/.vinix-amd64.iso.LKoMNg'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data,  823m free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/waitstatus-20261015/states/p1-before-x86/waitstatus/iso-build/.iso-staging.qWjDY5/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13712 sectors
+Written to medium : 13712 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/waitstatus-20261015/states/p1-before-x86/waitstatus/.vinix-amd64.iso.LKoMNg' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd63f.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/waitstatus-20261015/states/p1-before-x86/waitstatus/test.iso (28082176 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/waitstatus-20261015/states/p1-before-x86/waitstatus
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=85264
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037ff5200
+initramfs: Done (9 entries)
+LINUX WAITSTATUS TOPOLOGY: ordinary=0 namespace=0 profile=1 killed=0 self=22924 pid=1977 real=1001 effective=0 saved=1002
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=3 actual=-1/14 available=1 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=3 actual=-1/14 available=2 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=3 actual=-1/14 available=3 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=7 actual=-1/14 available=1 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=7 actual=-1/14 available=2 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=7 actual=-1/14 available=3 bad_byte=16
+LINUX WAITSTATUS COHORT: ordinary=0 namespace=0 self=22924 uid=0 page=4096 prepared=534 cleaned=534 pidfds=252
+LINUX WAITSTATUS CASES: ordinary=0 namespace=0 kind=0 calls=72 failures=72
+LINUX WAITSTATUS CASES: ordinary=0 namespace=0 kind=1 calls=96 failures=0
+LINUX WAITSTATUS CASES: ordinary=0 namespace=0 kind=2 calls=96 failures=0
+LINUX WAITSTATUS CASES: ordinary=0 namespace=0 kind=3 calls=168 failures=0
+LINUX WAITSTATUS CASES: ordinary=0 namespace=0 kind=4 calls=72 failures=0
+LINUX WAITSTATUS CASES: ordinary=0 namespace=0 kind=5 calls=120 failures=0
+LINUX WAITSTATUS FINAL: ordinary=0 namespace=0 kind=0 calls=72 failures=72
+LINUX WAITSTATUS FINAL: ordinary=0 namespace=0 kind=1 calls=96 failures=0
+LINUX WAITSTATUS FINAL: ordinary=0 namespace=0 kind=2 calls=96 failures=0
+LINUX WAITSTATUS FINAL: ordinary=0 namespace=0 kind=3 calls=168 failures=0
+LINUX WAITSTATUS FINAL: ordinary=0 namespace=0 kind=4 calls=72 failures=0
+LINUX WAITSTATUS FINAL: ordinary=0 namespace=0 kind=5 calls=120 failures=0
+LINUX WAITSTATUS TOPOLOGY: ordinary=1 namespace=0 profile=1 killed=0 self=56349 pid=19644 real=1000 effective=1002 saved=1002
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=3 actual=-1/14 available=1 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=3 actual=-1/14 available=2 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=3 actual=-1/14 available=3 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=7 actual=-1/14 available=1 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=7 actual=-1/14 available=2 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=7 actual=-1/14 available=3 bad_byte=16
+LINUX WAITSTATUS COHORT: ordinary=1 namespace=0 self=56349 uid=1000 page=4096 prepared=534 cleaned=534 pidfds=252
+LINUX WAITSTATUS CASES: ordinary=1 namespace=0 kind=0 calls=72 failures=72
+LINUX WAITSTATUS CASES: ordinary=1 namespace=0 kind=1 calls=96 failures=0
+LINUX WAITSTATUS CASES: ordinary=1 namespace=0 kind=2 calls=96 failures=0
+LINUX WAITSTATUS CASES: ordinary=1 namespace=0 kind=3 calls=168 failures=0
+LINUX WAITSTATUS CASES: ordinary=1 namespace=0 kind=4 calls=72 failures=0
+LINUX WAITSTATUS CASES: ordinary=1 namespace=0 kind=5 calls=120 failures=0
+LINUX WAITSTATUS FINAL: ordinary=1 namespace=0 kind=0 calls=72 failures=72
+LINUX WAITSTATUS FINAL: ordinary=1 namespace=0 kind=1 calls=96 failures=0
+LINUX WAITSTATUS FINAL: ordinary=1 namespace=0 kind=2 calls=96 failures=0
+LINUX WAITSTATUS FINAL: ordinary=1 namespace=0 kind=3 calls=168 failures=0
+LINUX WAITSTATUS FINAL: ordinary=1 namespace=0 kind=4 calls=72 failures=0
+LINUX WAITSTATUS FINAL: ordinary=1 namespace=0 kind=5 calls=120 failures=0
+LINUX WAITSTATUS TOPOLOGY: ordinary=0 namespace=1 profile=1 killed=0 self=2 pid=3 real=1001 effective=0 saved=1002
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=3 actual=-1/14 available=1 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=3 actual=-1/14 available=2 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=3 actual=-1/14 available=3 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=7 actual=-1/14 available=1 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=7 actual=-1/14 available=2 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=7 actual=-1/14 available=3 bad_byte=16
+LINUX WAITSTATUS COHORT: ordinary=0 namespace=1 self=2 uid=0 page=4096 prepared=534 cleaned=534 pidfds=252
+LINUX WAITSTATUS CASES: ordinary=0 namespace=1 kind=0 calls=72 failures=72
+LINUX WAITSTATUS CASES: ordinary=0 namespace=1 kind=1 calls=96 failures=0
+LINUX WAITSTATUS CASES: ordinary=0 namespace=1 kind=2 calls=96 failures=0
+LINUX WAITSTATUS CASES: ordinary=0 namespace=1 kind=3 calls=168 failures=0
+LINUX WAITSTATUS CASES: ordinary=0 namespace=1 kind=4 calls=72 failures=0
+LINUX WAITSTATUS CASES: ordinary=0 namespace=1 kind=5 calls=120 failures=0
+LINUX WAITSTATUS FINAL: ordinary=0 namespace=1 kind=0 calls=72 failures=72
+LINUX WAITSTATUS FINAL: ordinary=0 namespace=1 kind=1 calls=96 failures=0
+LINUX WAITSTATUS FINAL: ordinary=0 namespace=1 kind=2 calls=96 failures=0
+LINUX WAITSTATUS FINAL: ordinary=0 namespace=1 kind=3 calls=168 failures=0
+LINUX WAITSTATUS FINAL: ordinary=0 namespace=1 kind=4 calls=72 failures=0
+LINUX WAITSTATUS FINAL: ordinary=0 namespace=1 kind=5 calls=120 failures=0
+LINUX WAITSTATUS TOPOLOGY: ordinary=1 namespace=1 profile=1 killed=0 self=2 pid=3 real=1000 effective=1002 saved=1002
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=3 actual=-1/14 available=1 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=3 actual=-1/14 available=2 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=3 actual=-1/14 available=3 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=7 actual=-1/14 available=1 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=7 actual=-1/14 available=2 bad_byte=16
+LINUX WAITSTATUS DETAIL: kind=0 event=0 selector=0 form=7 actual=-1/14 available=3 bad_byte=16
+LINUX WAITSTATUS COHORT: ordinary=1 namespace=1 self=2 uid=1000 page=4096 prepared=534 cleaned=534 pidfds=252
+LINUX WAITSTATUS CASES: ordinary=1 namespace=1 kind=0 calls=72 failures=72
+LINUX WAITSTATUS CASES: ordinary=1 namespace=1 kind=1 calls=96 failures=0
+LINUX WAITSTATUS CASES: ordinary=1 namespace=1 kind=2 calls=96 failures=0
+LINUX WAITSTATUS CASES: ordinary=1 namespace=1 kind=3 calls=168 failures=0
+LINUX WAITSTATUS CASES: ordinary=1 namespace=1 kind=4 calls=72 failures=0
+LINUX WAITSTATUS CASES: ordinary=1 namespace=1 kind=5 calls=120 failures=0
+LINUX WAITSTATUS FINAL: ordinary=1 namespace=1 kind=0 calls=72 failures=72
+LINUX WAITSTATUS FINAL: ordinary=1 namespace=1 kind=1 calls=96 failures=0
+LINUX WAITSTATUS FINAL: ordinary=1 namespace=1 kind=2 calls=96 failures=0
+LINUX WAITSTATUS FINAL: ordinary=1 namespace=1 kind=3 calls=168 failures=0
+LINUX WAITSTATUS FINAL: ordinary=1 namespace=1 kind=4 calls=72 failures=0
+LINUX WAITSTATUS FINAL: ordinary=1 namespace=1 kind=5 calls=120 failures=0
+LINUX WAITSTATUS FAIL: wait4 scalar status stores, stable guard faults or unused-output controls
+QEMU: Terminated
+Missing verdicts: ['LINUX WAITSTATUS: PASS']; failures: ['FAIL:', 'LINUX WAITSTATUS FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/waitstatus-20261015/states/p1-before-x86/receipt.json

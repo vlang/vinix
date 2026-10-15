@@ -8246,3 +8246,126 @@ bounded contract. The three broad section 15 gates remain open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/waitconsume-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitconsume-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitconsume-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitconsume-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/waitconsume-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitconsume-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitconsume-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitconsume-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/waitconsume-check.v), [verdict](../tests/linux-compat/results/2026-10-15/waitconsume-audit.log).
+
+## Native wait4 scalar status copyout
+
+Native AArch64 and x86-64 wait4 now resolve the full four-byte status range
+and both writable endpoints before its existing copy. A stable mapping that
+ends after one, two or three status bytes returns EFAULT without overwriting
+that accessible prefix. Previously the page-wise copy committed those bytes
+before discovering the inaccessible suffix. Valid unaligned and cross-page
+stores still succeed. Status remains ahead of rusage, and every selected event
+is consumed even when copyout faults, as qualified previously.
+
+The change adds one range check, two endpoint checks and a comment to the
+existing wait4 condition. Claiming, Process pins, event snapshots/consumption,
+accounting, output copying and cleanup stay unchanged. It introduces no new
+ownership or lifetime. Complete generated C differs only in that condition,
+without normalization or an added allocation/free/pin/stack promotion. The
+endpoint checks do not hold a mapping pin across the copy; concurrent mapping
+changes and general store atomicity remain outside this bounded contract.
+
+The pinned [Linux v6.12 implementation](https://github.com/torvalds/linux/blob/v6.12/kernel/exit.c)
+uses put_user for the scalar status after selecting an event, then copies
+rusage only after a positive result. Identical probe source, emitted C and
+native musl ELF run on original/corrected Vinix and Linux 6.12.51 for each
+architecture. Four fresh production builds use committed base
+`6dae4896ea7902c559935cd418d783d6b4deff7c`; only this wait-source change enters
+the corrected worktrees.
+
+Four cohorts cover root and ordinary UID 1000 callers in the initial and a
+one-level PID namespace. Each caller creates a fresh session; every child has
+its own process group. Pipe readiness validates PID, parent, group, session
+and real/effective/saved UIDs. Root children use 1001/0/1002; ordinary children
+use 1000/1002/1002. Each cohort prepares and cleans 534 children, including
+252 exit pidfds. SIGSTOP, SIGCONT, normal exit status 37 and SIGKILL are observed
+with WNOWAIT before the selected wait4. Continued trials consume the preceding
+stop first. Exit/SIGKILL trials require pidfd POLLIN before the tested call.
+
+Each architecture runs 2,496 controls. Counts below are per cohort:
+
+| Class | Controls | Original failures |
+| --- | ---: | ---: |
+| One/two/three-byte status guard prefixes remain poisoned on EFAULT | 72 | 72 |
+| Wrapping, low unmapped, read-only and PROT_NONE status pointers | 96 | 0 |
+| Four mapped aligned/unaligned offsets write exactly four status bytes | 96 | 0 |
+| Seven page-tail/cross-page positions in two writable pages | 168 | 0 |
+| NULL status with NULL, valid or invalid rusage | 72 | 0 |
+| Bad outputs ignored on no-event, invalid options, INT_MIN and missing child | 120 | 0 |
+
+The first five classes cross all four child states, all-child/PID/process-group
+selectors and raw upper-register-word/musl forms. WNOHANG and NULL/valid rusage
+vary with pointer position. Mapped status offsets are 8/9/11/15 in a poisoned
+32-byte buffer. Valid page-tail offsets are one/two/three/four/five/seven/eight
+bytes before the boundary between two writable pages. The first three span
+that boundary; the others remain in the first page. Byte comparisons require
+exactly four little-endian status bytes and untouched surrounding storage,
+including sixteen-byte canaries on both sides of page-tail/cross-page outputs.
+Guard failures preserve the entire accessible prefix and a sixteen-byte
+leading canary. Read-only storage remains poisoned.
+
+Rusage validation decodes all eighteen LP64 fields without aligned loads,
+requires nonnegative fields and normalized microseconds, and checks surrounding
+canaries. A failed status copy must skip a distinct valid rusage buffer. NULL
+status succeeds with NULL/valid rusage and still permits EFAULT from invalid
+rusage; it must not attempt a status access. Exact accounting and partial
+rusage copy lengths remain outside this oracle.
+
+The final class creates a held running child for each selector/form/pointer
+combination. It checks WNOHANG with no event, EINVAL for WEXITED passed to
+wait4, ESRCH for INT_MIN, and ECHILD after normally reaping that child. Bad
+status and rusage pointers must be ignored on these paths; guard and read-only
+bytes stay poisoned. A valid nonblocking waitid query after every selected
+wait4 must find a cleared live-child event or ECHILD after reaping. Live
+children are resumed/released and normally reaped, and exit pidfds are closed.
+Original kernels fail exactly 288 guard controls per architecture; corrected
+Vinix and unchanged-ELF Linux references pass all 2,496 each.
+
+Four warmed 200-cycle storage cohorts include fresh fork, COW preparation of
+the mapped buffers, event readiness, status store/fault, child cleanup and
+pidfd close inside the measured interval. Thirty-two warmup cycles and
+thirteen-second settling periods precede each snapshot. Cycles rotate all
+five selected-event classes, four states, selectors, call forms and positions.
+All eighteen AArch64 and fourteen x86-64 slab classes and big-page totals stay
+flat. The emitted probe C has five explicit stack allocas and no malloc/memdup/
+dynamic-array/fixed-index calls. Native AArch64 uses 16 KiB pages; x86-64 and
+both Linux references use 4 KiB pages. Raw totals remain in the linked logs.
+
+Runtime and the 2,880-control consuming-fault regression pass on both native
+architectures; all eight host test files pass. Allocation diagnostics remain
+byte-identical, including existing allowance-file refusals. The maintained
+audit binds 67 inventory inputs, 15,146 compiler inputs, all 2,014 private SDK
+files, fifteen ARM compiler-command receipts, source/C/ELF/ISO/kernel identity,
+84 retained regular files across eight native profiles, exact source/C scope
+and executing false-assertion/passing-reference-as-original controls. Compile
+the auditor without `-prod`.
+
+To reduce physical duplication before these builds, 49 retained kernel/Linux
+images in six prior qualification areas were replaced by APFS clones. Each
+replacement required the original target, source and temporary clone to have
+the same SHA-256 before atomic rename, then verified the target again. Paths
+and contents remain unchanged; the audit rechecks every source/target pair.
+The private SDK is also cloned and checked against its full existing manifest.
+See the [byte-identity ledger](../tests/linux-compat/results/2026-10-15/waitstatus-prior-byte-identical-clones.json).
+
+Fifty-five completed ISO images in those same prior areas also use transparent
+filesystem compression to recover disk space. Each source, compressed temporary
+and final regular file is checked against its original receipt SHA-256; paths
+and logical bytes stay unchanged. The audit rechecks the
+[compression ledger](../tests/linux-compat/results/2026-10-15/waitstatus-transparent-compression.json).
+The first compression helper treated ditto help exit status 1 as an error and
+stopped before processing images. Its [source](../tests/linux-compat/results/2026-10-15/waitstatus-initial-compression-source.v)
+and [refusal](../tests/linux-compat/results/2026-10-15/waitstatus-initial-compression-refusal.log)
+are retained; the corrected helper changes only that expected help status.
+This host-helper refusal has no guest verdict. Native probe source, C and ELFs
+remain unchanged, and all native/reference profiles use their first p1 attempt.
+
+Concurrent stores, mapping/credential/lifecycle changes, incomplete exit
+publication, exact rusage accounting/partial-copy lengths, arbitrary aliases,
+mapped user IDs, P_PIDFD selectors, __W flags, ptrace/cross-thread waits,
+interrupted/restarted waits, GNU libc and translated/ELF32 paths remain outside
+this bounded contract. The three broad section 15 gates remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/waitstatus-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitstatus-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitstatus-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitstatus-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/waitstatus-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitstatus-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitstatus-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitstatus-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/waitstatus-check.v), [verdict](../tests/linux-compat/results/2026-10-15/waitstatus-audit.log).

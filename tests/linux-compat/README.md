@@ -1784,3 +1784,19 @@ source/whole-C scope, independent lifetime review, retained preboot compiler
 refusals, compiler/SDK pins and executing audit negatives. Exact partial-copy
 counts/accounting, incomplete exit teardown and concurrent waits stay separate.
 See the [event-consumption report](../../docs/linux-posix-qualification.md#native-wait-copyout-fault-event-consumption).
+
+The `waitstatus` case qualifies wait4 scalar status copies: stable guards with
+only one/two/three writable bytes must return EFAULT without changing that
+prefix, while mapped/unaligned and valid cross-page stores write exactly four
+status bytes. It runs 2,496 controls per architecture across four child states,
+three selectors, raw upper-word/musl calls, NULL/valid rusage, NULL/invalid
+status and ignored bad outputs on no-event/EINVAL/ESRCH/ECHILD. Four root/UID1000
+initial/one-level PID namespace cohorts validate child topology, pidfd readiness
+for exits and event consumption after each selected wait. Four warmed 200-cycle
+measurements include fork, COW preparation, status store/fault, reap and close.
+`waitstatus-reference.v` boots the unchanged native ELF on Linux. Compile
+`waitstatus-check.v` without `-prod` to verify native/reference results, original
+failures, exact source/C scope, input/compiler/SDK pins, preserved prior evidence
+clones and executing audit negatives. Concurrent stores/mapping changes and
+exact accounting or partial-rusage counts remain separate. See the
+[scalar-status report](../../docs/linux-posix-qualification.md#native-wait4-scalar-status-copyout).

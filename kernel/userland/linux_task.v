@@ -485,7 +485,10 @@ pub fn syscall_wait4(_ voidptr, pid_word u64, status_ptr u64, options_word u64, 
 	status := i32(change.status)
 	reaped := proc.pid_in(child, current_process.numbered_in)
 	// Selecting an event consumes it even when a later user copy faults.
-	if status_ptr != 0 && !usercopy.copy_to_user(status_ptr, voidptr(&status), sizeof(i32)) {
+	// Resolve the complete scalar before writing any split-page prefix.
+	if status_ptr != 0 && (!usercopy.user_range(status_ptr, sizeof(i32))
+		|| !usercopy.writable(status_ptr) || !usercopy.writable(status_ptr + 3)
+		|| !usercopy.copy_to_user(status_ptr, voidptr(&status), sizeof(i32))) {
 		finish_child_change(mut current_process, change, true)
 		return errno.err, errno.efault
 	}
