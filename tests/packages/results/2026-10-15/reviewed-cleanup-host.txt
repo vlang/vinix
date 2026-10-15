@@ -1,0 +1,33 @@
+29 successful host compile/run checks:
+PASS cleanup-core-core-compile
+PASS cleanup-core-core-run
+PASS cleanup-protocol-core-compile
+PASS cleanup-protocol-core-run
+PASS cleanup-admin-core-compile
+PASS cleanup-admin-core-run
+PASS cli-compile
+PASS probe-compile
+PASS probe-run
+PASS state-compile
+PASS state-run
+PASS collection_limit-compile
+PASS collection_limit-run
+PASS collection_retirement-compile
+PASS collection_retirement-run
+PASS stage_recovery-compile
+PASS stage_recovery-run
+PASS ui-compile
+PASS ui-functional
+PASS ui-cleanup-memory
+PASS cleanup-core-core-asan-compile
+PASS cleanup-core-core-asan-run
+PASS cleanup-protocol-core-asan-compile
+PASS cleanup-protocol-core-asan-run
+PASS cleanup-admin-core-asan-compile
+PASS cleanup-admin-core-asan-run
+PASS ui-asan-compile
+PASS ui-asan-functional
+PASS ui-asan-cleanup-memory
+PASS full desktop typecheck arm64
+PASS full desktop typecheck amd64
+PASS maintained Software-only driver and all twelve allocation modes

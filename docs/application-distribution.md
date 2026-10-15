@@ -655,6 +655,25 @@ remain for rollback. `gc` retains active/previous and leased generations, remove
 older unused generations and unused complete objects, and clears abandoned
 partial downloads.
 
+Software’s **Clean up versions** opens a read-only, paged review of obsolete
+generation IDs, with the architecture and current/rollback identities. Confirming
+**Delete listed versions** uses administrator authorization and deletes only that
+reviewed set. Cached complete/partial downloads, interrupted stages and personal
+data remain available. Versions held by running applications are omitted; reload
+after those applications finish to review newly eligible versions.
+
+The public commands are `cleanup-review` (format-1 JSON) and
+`cleanup-apply FINGERPRINT`. Approval binds configuration, both retained states
+and the complete removable set, including generation-parent, root and lease
+identities. Activation, configuration, eligible-set or identity changes require
+a fresh review before any removal. Every target directory inventory is admitted
+before the first deletion; removal rechecks identities and leases. Filesystem
+errors during deletion can still leave a partially completed cleanup: inspect
+the diagnostic and reload before retrying. Ordinary accounts can review root-owned
+state; only reviewed `cleanup-apply` crosses the administrator transport. Raw
+`gc` remains an administrator CLI operation for broader cache/stage collection.
+See [reviewed cleanup qualification](../tests/packages/reviewed-cleanup-check.md).
+
 Stored generations are decoded strictly with all state envelope fields required.
 Each installed provenance, manifest, dependency and payload record must retain
 every declaration, including false flags and empty lists/bounds. Null and coerced

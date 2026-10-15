@@ -199,9 +199,15 @@ fn check_collection_lease(lease CollectionLease) ! {
 // the next entry. Removal reopens the same filesystem identities and relocks;
 // an existing holder that changes its lock state remains protected there too.
 fn collection_targets(directory string, current State) ![]CollectionTarget {
+	return collection_targets_owned(directory, current, u32(C.geteuid()))
+}
+
+// Ordinary Software clients inspect administrator-owned generations without
+// changing ownership or modes. Mutation still uses the invoking administrator.
+fn collection_targets_owned(directory string, current State, owner u32) ![]CollectionTarget {
 	parent := directory + '/generations'
 	defer { unsafe { parent.free() } }
-	fd := recovery_parent(directory)!
+	fd := recovery_parent_owned(directory, owner)!
 	defer { C.close(fd) }
 	mut folder := C.stat{}
 	if C.fstat(fd, unsafe { &folder }) != 0 { return error('cannot inspect generation parent for collection') }
@@ -219,7 +225,7 @@ fn collection_targets(directory string, current State) ![]CollectionTarget {
 			unsafe { path.free() }
 			return err
 		}
-		check_collection_root(fd, name, lease, u64(folder.st_dev)) or {
+		check_collection_root_owned(fd, name, lease, u64(folder.st_dev), owner) or {
 			close_collection_lease(lease)
 			unsafe { path.free() }
 			return err
@@ -245,6 +251,10 @@ fn collection_targets(directory string, current State) ![]CollectionTarget {
 }
 
 fn remove_collection_target(target CollectionTarget) ! {
+	visit_collection_target(target, true)!
+}
+
+fn visit_collection_target(target CollectionTarget, retire bool) ! {
 	parent_path := os.dir(target.path)
 	store := os.dir(parent_path)
 	name := os.file_name(target.path)
@@ -262,12 +272,15 @@ fn remove_collection_target(target CollectionTarget) ! {
 	}
 	check_collection_root(parent, name, lease, target.parent_device)!
 	if C.flock(lease.lease, C.LOCK_EX | C.LOCK_NB) != 0 {
-		if C.errno == C.EWOULDBLOCK || C.errno == C.EAGAIN { return }
+		if C.errno == C.EWOULDBLOCK || C.errno == C.EAGAIN {
+			if !retire { return error('generation cleanup lease became busy; review cleanup again') }
+			return
+		}
 		return error('cannot lock generation lease for removal')
 	}
 	check_collection_lease(lease)!
 	root := StageTarget{ name: name, device: target.directory_device, inode: target.directory_inode }
 	nodes := inventory_stage_tree(lease.directory, root)!
 	defer { close_stage_inventory(nodes) }
-	remove_collection_tree(parent, root, lease, nodes)!
+	if retire { remove_collection_tree(parent, root, lease, nodes)! }
 }

@@ -42,6 +42,20 @@ removal fails after lease unlink, inspect storage and restore an empty regular
 lease under the writer lock before retrying. See
 [collection retirement qualification](../../tests/packages/collection-retirement-check.md).
 
+`cleanup-review` returns a format-1 `CleanupReview` with `architecture`, current
+`generation`, retained `previous`, `fingerprint` and an ascending unique
+`generations` list (at most 4096 IDs). Both retained IDs are excluded, as are busy
+leases. A fresh image can return an empty review without creating package state.
+`cleanup-apply FINGERPRINT` rechecks configuration, both states, the complete
+eligible set and captured parent/root/lease identities under the writer lock.
+Stale approvals refuse before removal. All directory inventories are admitted
+before deleting the first target; later filesystem failures may leave partial
+cleanup and require a new review. Cached objects, partial downloads, unpublished
+stages and personal data are retained. This reviewed operation is available to
+Software through `packages-change`; raw `gc` is excluded from that transport.
+No publisher refresh, catalog authentication or permission/license admission is
+needed for cleanup. See [qualification](../../tests/packages/reviewed-cleanup-check.md).
+
 State readers, writers and launch admission require ordinary regular lock/lease
 files. Opens and advisory lock acquisition refuse malformed or busy entries
 without waiting on FIFOs or exclusive holders. Read-only requests require the

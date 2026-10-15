@@ -18,6 +18,10 @@ fn owned_generation_directory(fd int, device u64, owner u32) !C.stat {
 }
 
 fn recovery_parent(directory string) !int {
+	return recovery_parent_owned(directory, u32(C.geteuid()))
+}
+
+fn recovery_parent_owned(directory string, owner u32) !int {
 	path := directory + '/generations'
 	defer { unsafe { path.free() } }
 	fd := C.open(path.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
@@ -25,7 +29,7 @@ fn recovery_parent(directory string) !int {
 	mut info := C.stat{}
 	mut named := C.stat{}
 	if C.fstat(fd, unsafe { &info }) != 0 || info.st_mode & 0o170000 != 0o040000
-		|| info.st_uid != u32(C.geteuid()) || info.st_mode & 0o022 != 0
+		|| info.st_uid != owner || info.st_mode & 0o022 != 0
 		|| C.fstatat(C.AT_FDCWD, path.str, unsafe { &named }, C.AT_SYMLINK_NOFOLLOW) != 0
 		|| named.st_mode & 0o170000 != 0o040000 || named.st_dev != info.st_dev || named.st_ino != info.st_ino {
 		C.close(fd)

@@ -49,6 +49,7 @@ pub fn validate_arguments(arguments []string) ! {
 	if command == 'update' && args.len == 1 { return }
 	if args.len < 2 || !hex(args[1], 64) { return error('administrator package changes require their exact review fingerprint') }
 	match command {
+		'cleanup-apply' { if args.len == 2 { return } }
 		'apply' {
 			if args.len >= 4 && args[2] in ['install', 'remove'] && args[3..].all(identifier(it)) { return }
 			if args.len == 3 && args[2] in ['upgrade', 'repair', 'rollback'] { return }
@@ -66,7 +67,7 @@ pub fn validate_arguments(arguments []string) ! {
 }
 
 pub fn administrative(arguments []string) bool {
-	return arguments.len > 0 && arguments[0] in ['update', 'apply', 'repo-apply', 'deployment-apply', 'policy-apply', 'mirror-apply', 'mirror-deployment-apply']
+	return arguments.len > 0 && arguments[0] in ['update', 'apply', 'cleanup-apply', 'repo-apply', 'deployment-apply', 'policy-apply', 'mirror-apply', 'mirror-deployment-apply']
 }
 
 pub fn (request &Request) encode() !string {

@@ -14,8 +14,9 @@ import tools.packages.pkgprotocol
 
 const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progress] COMMAND [ARGS]\n' +
 	'  update | search [QUERY] | info ID | list | status | updates | view\n' +
-	'  admin [--progress] [--offline] update|apply|repo-apply|deployment-apply|policy-apply|mirror-apply|mirror-deployment-apply ...\n' +
+	'  admin [--progress] [--offline] update|apply|cleanup-apply|repo-apply|deployment-apply|policy-apply|mirror-apply|mirror-deployment-apply ...\n' +
 	'  install ID... | remove ID... | upgrade | repair | rollback | gc | verify | health\n' +
+	'  cleanup-review | cleanup-apply REVIEW_FINGERPRINT (obsolete generations only)\n' +
 	'  plan install|remove|upgrade|repair|deploy [ID...] | deploy MANIFEST.json\n' +
 	'  review install|remove|upgrade|repair|deploy|rollback [ID...]\n' +
 	'  repo-list | repo-config | repo-enroll ID URL PUBLIC_KEY_HEX | repo-revoke ID\n' +
@@ -348,6 +349,17 @@ fn checked(arguments []string) !int {
 		'gc' {
 			if names.len != 0 { return error('gc takes no arguments') }
 			service.collect()!
+		}
+		'cleanup-review' {
+			if names.len != 0 { return error('cleanup-review takes no arguments') }
+			mut review := service.review_cleanup()!
+			defer { review.close() }
+			println(json2.encode(review))
+		}
+		'cleanup-apply' {
+			if names.len != 1 { return error('cleanup-apply requires a review fingerprint') }
+			service.apply_cleanup(names[0])!
+			println('Obsolete generation cleanup completed; active, rollback and leased generations, cached downloads and personal data were retained.')
 		}
 		'mirror' {
 			if names.len < 2 {

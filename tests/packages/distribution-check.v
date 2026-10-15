@@ -143,6 +143,9 @@ fn check() ! {
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-o', work + '/cli-check', repository + '/tests/packages/distribution-cli.v'])!
 		run(work + '/cli-check', [work + '/vinix-package'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/cleanup-check', repository + '/tests/packages/cleanup-check.v'])!
+		run(work + '/cleanup-check', [work + '/cleanup-cli', work + '/vinix-package'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/repair-check', repository + '/tests/packages/repair-check.v'])!
 		run(work + '/repair-check', [work + '/repair-service'])!
 		run(work + '/repair-check', [work + '/repair-cli', work + '/vinix-package'])!
@@ -215,6 +218,8 @@ fn check() ! {
 	os.cp(repository + '/desktop/software_app.v', work + '/software/software_app.v')!
 	os.cp(repository + '/desktop/software_details.v', work + '/software/software_details.v')!
 	os.cp(repository + '/desktop/software_health.v', work + '/software/software_health.v')!
+	os.cp(repository + '/desktop/software_cleanup.v', work + '/software/software_cleanup.v')!
+	os.cp(repository + '/tests/packages/software_cleanup_fixture.v', work + '/software/cleanup_fixture.v')!
 	os.cp(repository + '/tests/packages/software_health_fixture.v', work + '/software/health_fixture.v')!
 	os.cp(repository + '/tests/packages/software_details_fixture.v', work + '/software/details_fixture.v')!
 	os.cp(repository + '/tests/packages/software_view_fixture.v', work + '/software/view_fixture.v')!
@@ -259,6 +264,7 @@ fn check() ! {
 	run(work + '/window-broker-memory', ['repair-memory'])!
 	run(work + '/window-broker-memory', ['health-memory'])!
 	run(work + '/window-broker-memory', ['health-progress-memory'])!
+	run(work + '/window-broker-memory', ['cleanup-memory'])!
 	if '--cross' in os.args {
 		run(v, [...helper_flags, '-o', work + '/package-stage', repository + '/tools/packages/stage.v'])!
 		for architecture in ['aarch64', 'x86_64'] {

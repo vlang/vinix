@@ -1,0 +1,17 @@
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (28 bytes)
+Activated package generation 1
+Updating trusted repository trusted
+Installing Application 2.0.0 (1/1) from trusted
+Downloading app/bin/app (28 bytes)
+Activated package generation 2
+Updating trusted repository trusted
+Installing Application 3.0.0 (1/1) from trusted
+Downloading app/bin/app (28 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 4.0.0 (1/1) from trusted
+Downloading app/bin/app (28 bytes)
+Activated package generation 4
+CLEANUP CLI signed install/three upgrades, leased-generation review, stale refusal, offline apply, current/rollback/cache/stage/data retention and empty retry PASS

@@ -73,6 +73,13 @@ mut:
 	health_progress_packages int
 	health_selected int = -1
 	health_scroll int
+	cleanup_mode bool
+	cleanup_ready bool
+	cleanup_snapshot pkgprotocol.CleanupReview
+	cleanup_worker SoftwareCleanupWorker
+	cleanup_scroll int
+	cleanup_summary string
+	cleanup_result string
 	data_mode       bool
 	data_status     pkgprotocol.PersonalDataStatus
 	data_ready      bool
@@ -226,6 +233,7 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	a.repository_worker = .none
 	a.data_worker = .none
 	a.policy_worker = .none
+	a.cleanup_worker = .none
 	a.worker = os.new_process(a.service_path.clone())
 	mut owned := []string{cap: arguments.len + 1}
 	authorized := a.administration_required && pkgadmin.administrative(arguments)
@@ -555,10 +563,12 @@ fn (mut a SoftwareApp) poll() bool {
 	repository_worker := a.repository_worker
 	data_worker := a.data_worker
 	policy_worker := a.policy_worker
+	cleanup_worker := a.cleanup_worker
 	mirroring := a.worker_mirror
 	a.retire_worker()
 	a.clear_admin_prompt()
-	if code != 0 || ((verifying || health) && a.worker_failed) {
+	if code != 0 || ((verifying || health || cleanup_worker != .none) && a.worker_failed) {
+		if cleanup_worker != .none { a.clear_cleanup_review() }
 		if policy_worker == .review { a.clear_policy_review(); a.prepare_policy_pages(false) }
 		if policy_worker == .apply { a.policy_ready = false; a.clear_policy_pages() }
 		if repository_worker == .review { a.clear_repository_review() }
@@ -584,6 +594,12 @@ fn (mut a SoftwareApp) poll() bool {
 		unsafe { diagnostic.free() }
 	} else if health {
 		// The report was admitted only after both pipes drained and exit 0.
+	} else if cleanup_worker == .review {
+		a.load_cleanup_review()
+	} else if cleanup_worker == .apply {
+		unsafe { a.cleanup_result.free() }
+		a.cleanup_result = 'Cleanup finished. Active, rollback and running applications, cached downloads and personal data were retained.'.clone()
+		a.read_cleanup()
 	} else if policy_worker == .list {
 		if !a.worker_failed { a.load_policy_document() }
 	} else if policy_worker == .review {
@@ -701,6 +717,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		else if a.worker == unsafe { nil } { a.handle_health(event_id) }
 		return
 	}
+	if a.cleanup_mode { a.handle_cleanup(event_id); return }
 	if event_id.starts_with(packagecore.request_prefix) {
 		if a.policy_mode { a.set_status('Return to the catalog before opening an application.'); return }
 		if a.data_mode { a.set_status('Return to the catalog before opening an application.'); return }
@@ -724,6 +741,14 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 	if a.policy_mode { a.handle_policy(event_id); return }
 	if a.data_mode { a.handle_personal_data(event_id); return }
 	if a.launch_mode { a.handle_launch_options(event_id); return }
+	if event_id == 'software.cleanup' {
+		a.clear_review(); a.clear_repository_review()
+		a.repository_mode = false; a.deployment_mode = false; a.mirror_mode = false
+		a.focus = false; a.select_all = false
+		a.cleanup_mode = true
+		a.read_cleanup()
+		return
+	}
 	if event_id == 'software.policy' {
 		a.clear_review()
 		a.clear_repository_review()
@@ -926,6 +951,10 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.failure_mode { if input == '\x1b' { a.failure_mode = false }; return }
 	if a.details_mode { if input == '\x1b' { a.clear_details() }; return }
 	if a.health_mode { a.health_key_input(input); return }
+	if a.cleanup_mode {
+		if input == '\x1b' && a.worker == unsafe { nil } { a.clear_cleanup() }
+		return
+	}
 	if a.policy_mode { a.policy_key_input(input); return }
 	if a.data_mode { return }
 	if a.launch_mode { a.launch_key_input(input); return }
@@ -956,6 +985,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.failure_mode { return }
 	if a.details_mode { return }
 	if a.health_mode { a.health_paste_input(input); return }
+	if a.cleanup_mode { return }
 	if a.policy_mode { a.policy_paste_input(input); return }
 	if a.data_mode { return }
 	if a.launch_mode { a.launch_key_input(input); return }
@@ -1007,6 +1037,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
 	if a.health_mode && (width < 640 || height < 610) { return a.build_health_compact(width, height) }
+	if a.cleanup_mode && (width < 640 || height < 610) { return a.build_cleanup_compact(width, height) }
 	if width < 640 || height < 610 {
 		mut compact := frame_elements(2)
 		compact << software_label('Software', 14, 8, width - 28, 28, false)
@@ -1018,6 +1049,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
 	if a.details_mode { return a.build_details(width, height) }
 	if a.health_mode { return a.build_health(width, height) }
+	if a.cleanup_mode { return a.build_cleanup(width, height) }
 	if a.policy_mode { return a.build_policy(width, height) }
 	if a.data_mode { return a.build_personal_data(width, height) }
 	if a.launch_mode { return a.build_launch_options(width, height) }
@@ -1144,6 +1176,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 			children << software_button('software.repair', 'Repair installed', 14, height - 214, 110)
 		}
 		children << software_button('software.health', 'Health report', 136, height - 214, 110)
+		children << software_button('software.cleanup', 'Clean up versions', 274, height - 214, 150)
 	}
 	if a.progress_seen { children << a.progress_bar(width, height) }
 	a.add_status_footer(mut children, width, height, a.progress_seen)
@@ -1196,6 +1229,7 @@ fn (mut a SoftwareApp) close_app() {
 	a.clear_progress()
 	a.clear_failure()
 	a.clear_health()
+	a.clear_cleanup()
 	unsafe {
 		a.launch_request.free()
 		a.service_path.free()

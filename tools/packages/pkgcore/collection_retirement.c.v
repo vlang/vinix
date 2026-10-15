@@ -2,7 +2,11 @@
 module pkgcore
 
 fn check_collection_root(parent int, name string, lease CollectionLease, device u64) ! {
-	info := recovery_directory(lease.directory, device)!
+	check_collection_root_owned(parent, name, lease, device, u32(C.geteuid()))!
+}
+
+fn check_collection_root_owned(parent int, name string, lease CollectionLease, device u64, owner u32) ! {
+	info := owned_generation_directory(lease.directory, device, owner)!
 	if info.st_mode & 0o022 != 0 { return error('unsafe obsolete generation root writable by other accounts; retain state and restore administrator-only write access before collection') }
 	check_stage_name(parent, name, lease.directory_device, lease.directory_inode)!
 }

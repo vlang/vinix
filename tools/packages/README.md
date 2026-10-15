@@ -56,6 +56,15 @@ unchanged JSON on stdout with live progress on stderr. A complete report still
 requires a successful process exit. See
 [progress/cancellation qualification](../../tests/packages/health-progress-check.md).
 
+**Clean up versions** reviews obsolete generation IDs and retains the active,
+rollback and running versions. Only **Delete listed versions** authorizes removal,
+using the exact review fingerprint through the administrator transport. A changed
+eligible set or filesystem identity requires Reload and fresh confirmation.
+Cached downloads, interrupted stages and personal data are retained. CLI clients
+use `cleanup-review` and `cleanup-apply FINGERPRINT`; broader administrator `gc`
+still collects caches/stages. See
+[reviewed cleanup qualification](../../tests/packages/reviewed-cleanup-check.md).
+
 Start, Quick Launch and Open With use bounded installed-state presentation
 decoding with complete fields, explicit ownership and canonical generation
 identities. Damaged metadata is refused before menu replacement; restoring it
