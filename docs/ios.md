@@ -5964,11 +5964,50 @@ fault. A cancelled guest build is retained separately; all final programs were
 rebuilt after correcting the accessor. Full iOS regression remains unpassed and
 published runners remain unchanged.
 
-The actual IPA launch now resolves both new Code imports and exits with status 1
-at Foundation's required
+The Code metadata implementation's IPA launch resolved both new imports and
+exited with status 1 at Foundation's required
 `_$s10Foundation11JSONDecoderC6decode_4fromxxm_AA4DataVtKSeRzlFTj`.
 Installed native Foundation instructions identify its class dispatch slot at
 metadata offset 320, with Self in x20. Fortnite has not entered application code
+and remains unplayable.
+
+The Foundation bridge now exports that generic JSONDecoder virtual dispatch
+entry through the framework and Swift overlay install names. It reads the
+borrowed Self's metadata pointer and method slot at offset 320, then tail-branches
+to the actual class implementation. Integer/vector arguments, the indirect
+result pointer in x8, scalar results and Swift's x21 error channel pass through
+unchanged by the forwarding entry. It performs no allocation, ARC operation or
+callback under a runtime lock. The entry shares the existing sealed Foundation
+arena and its drained shutdown lifetime. The caller owns valid readable Self
+and vtable spans, as required by the Swift dispatch ABI.
+
+This entry forwards an override; JSONDecoder construction, nominal metadata,
+configuration and the default decoding backend still require implementation.
+The pinned IPA's dispatch import cell is `10dc98200`, its stub is `10c63a890`
+and its forwarding branch island is `107c28ae0`. The actual caller at
+`1000710ac` passes Self in x20, a two-word Data value in x1/x2, result storage
+in x8 and the error channel in x21, then tests the returned error before reading
+the result. No application code is executed by this inspection.
+
+Eight ASan/UBSan runs and four Vinix ARM64 guest suites pass across the new
+dispatch entry, CocoaError getter, Foundation logging and CocoaError metadata.
+The differential dispatch fixture signs its native isa and method pointers,
+uses actual method targets, and compares integer/vector arguments, indirect
+and scalar results, and success/error returns through x21. Guarded header and
+slot boundaries verify that dispatch reads no ARC header or unused metadata;
+eight concurrent callers and two unmapped teardowns verify publication/lifetime.
+The guest harness's original directory-setting failure is retained separately:
+it failed before any VM, its new temporary C files were preserved and removed,
+and every recorded artifact/source snapshot in the prior cohort was verified
+unchanged. A later log-write failure while disk space was low is also retained;
+all final guest programs were rebuilt to obtain fresh joined exit records.
+Eleven final generated C streams/programs and the four joined, retired VM phases
+are retained under `build/ios/fortnite/json-decoder-dispatch-checks`.
+Full iOS regression remains unpassed and published runners remain unchanged.
+
+The dispatch implementation's actual IPA startup probe resolves that entry and
+exits with status 1 at Foundation's required JSONDecoder initializing constructor,
+`_$s10Foundation11JSONDecoderCACycfc`. Fortnite has not entered application code
 and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -5976,12 +6015,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,479 | 681 | 79 |
+| Fortnite executable | 1,480 | 680 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,314 | 684 | 120 |
+| All images | 2,315 | 683 | 120 |
 
-The C++/GLES/Text variant reports 2,327 resolved imports, 671 unresolved strong
+The C++/GLES/Text variant reports 2,328 resolved imports, 670 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

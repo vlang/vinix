@@ -16,7 +16,8 @@ fn framework_symbol(library string, symbol string) ?u64 {
 			'_$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ',
 			'_$sSSs7CVarArg10FoundationMc', '_$ss5ErrorP10FoundationE20localizedDescriptionSSvg',
 			'_$s10Foundation10CocoaErrorV19fileWriteFileExistsAC4CodeVvgZ',
-			'_$s10Foundation10CocoaErrorV4CodeVAA01_cD8ProtocolAAMc', '_$s10Foundation10CocoaErrorV4CodeVMa'] {
+			'_$s10Foundation10CocoaErrorV4CodeVAA01_cD8ProtocolAAMc', '_$s10Foundation10CocoaErrorV4CodeVMa',
+			'_$s10Foundation11JSONDecoderC6decode_4fromxxm_AA4DataVtKSeRzlFTj'] {
 		return swift_foundation_symbol(symbol) or { return none }
 	}
 	if library == '/System/Library/Frameworks/CFNetwork.framework/CFNetwork' {

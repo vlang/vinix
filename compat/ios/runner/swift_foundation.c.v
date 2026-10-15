@@ -69,6 +69,14 @@ fn swift_foundation_arena() u64 {
 	write32(base + 128, 0x52804089) // mov w9, #516
 	write32(base + 132, 0xf9000109) // str x9, [x8]
 	write32(base + 136, 0xd65f03c0) // ret
+	// JSONDecoder.decode<T> dispatches through borrowed Self's class metadata.
+	// Preserve argument/result registers, x8 and Swift's x21 error channel by
+	// tail-branching to the actual override. Caller owns the readable Self and
+	// vtable spans, as for other Swift dispatch entries. This is not a decoder
+	// constructor or a replacement for the class's decoding implementation.
+	write32(base + 160, 0xf9400290) // ldr x16, [x20]
+	write32(base + 164, 0xf940a210) // ldr x16, [x16, #320]
+	write32(base + 168, 0xd61f0200) // br x16
 	// A concrete specialization of Foundation's retroactive String conformance.
 	// The installed descriptor uses a generic witness cache; this implementation
 	// supplies its already-specialized table, accepted by normal witness lookup.
@@ -83,7 +91,7 @@ fn swift_foundation_arena() u64 {
 	swift_protocol_relative(conformance + 16, module_descriptor)
 	swift_protocol_relative(module_descriptor + 8, data + 80)
 	C.memcpy(unsafe { voidptr(data + 80) }, c'Foundation', 11)
-	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 140) })
+	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 172) })
 	if C.mprotect(unsafe { voidptr(base) }, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(unsafe { voidptr(base) }, usize(page * 2)); panic('iOS: cannot seal Swift Foundation entries')
@@ -237,6 +245,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 		'_$sSSs7CVarArg10FoundationMc' { swift_foundation_arena() + u64(C.getpagesize()) + 32 }
 		'_$ss5ErrorP10FoundationE20localizedDescriptionSSvg' { swift_foundation_arena() + 96 }
 		'_$s10Foundation10CocoaErrorV19fileWriteFileExistsAC4CodeVvgZ' { swift_foundation_arena() + 128 }
+		'_$s10Foundation11JSONDecoderC6decode_4fromxxm_AA4DataVtKSeRzlFTj' { swift_foundation_arena() + 160 }
 		else { return error('iOS: Swift Foundation symbol is not implemented: ${symbol}') }
 	}
 }
