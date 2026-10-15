@@ -47,7 +47,7 @@ jobs:
 
       - name: Build pinned V compiler and ui2
         id: build_pinned_v_compiler_and_ui2
-        if: ${{ !cancelled() && steps.check_out_vinix.outcome == 'success' }}
+        if: ${{ success() && !cancelled() && steps.check_out_vinix.outcome == 'success' }}
         run: |
           set -euo pipefail
           git clone https://github.com/vlang/v "$RUNNER_TEMP/v"
@@ -58,7 +58,7 @@ jobs:
 
       - name: Test and build the installer app
         id: test_and_build_the_installer_app
-        if: ${{ !cancelled() && steps.build_pinned_v_compiler_and_ui2.outcome == 'success' }}
+        if: ${{ success() && !cancelled() && steps.build_pinned_v_compiler_and_ui2.outcome == 'success' }}
         env:
           V: ${{ runner.temp }}/v/v
         run: |
@@ -73,7 +73,7 @@ jobs:
 
       - name: Create compressed DMG and checksum
         id: create_compressed_dmg_and_checksum
-        if: ${{ !cancelled() && steps.test_and_build_the_installer_app.outcome == 'success' }}
+        if: ${{ success() && !cancelled() && steps.test_and_build_the_installer_app.outcome == 'success' }}
         run: |
           set -euo pipefail
           mkdir -p dist/dmg-root

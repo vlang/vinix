@@ -25,7 +25,7 @@ jobs:
 
       - name: Check if build is necessary
         id: check_if_build_is_necessary
-        if: ${{ !cancelled() && steps.checkout_code.outcome == 'success' }}
+        if: ${{ success() && !cancelled() && steps.checkout_code.outcome == 'success' }}
         run: test "$(git tag --points-at HEAD)" = ""
 
   vinix-build:
@@ -48,12 +48,12 @@ jobs:
 
       - name: Install dependencies
         id: install_dependencies
-        if: ${{ !cancelled() && steps.checkout_code.outcome == 'success' }}
+        if: ${{ success() && !cancelled() && steps.checkout_code.outcome == 'success' }}
         run: sudo apt-get update && sudo apt-get install -y clang lld llvm make diffutils curl git rsync xorriso xz-utils python3 pkg-config meson ninja-build bison flex
 
       - name: Build pinned V compiler and ui2
         id: build_pinned_v_compiler_and_ui2
-        if: ${{ !cancelled() && steps.install_dependencies.outcome == 'success' }}
+        if: ${{ success() && !cancelled() && steps.install_dependencies.outcome == 'success' }}
         run: |
           git clone https://github.com/vlang/v "$RUNNER_TEMP/v"
           git -C "$RUNNER_TEMP/v" checkout "$V_COMMIT"
@@ -87,7 +87,7 @@ jobs:
 
       - name: Rename ISO
         id: rename_iso
-        if: ${{ !cancelled() && steps.build_pinned_v_compiler_and_ui2.outcome == 'success' }}
+        if: ${{ success() && !cancelled() && steps.build_pinned_v_compiler_and_ui2.outcome == 'success' }}
         shell: bash
         run: |
           image=vinix.iso
@@ -100,7 +100,7 @@ jobs:
 
       - name: Upload ISO
         id: upload_iso
-        if: ${{ !cancelled() && steps.rename_iso.outcome == 'success' }}
+        if: ${{ success() && !cancelled() && steps.rename_iso.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: vinix-${{ matrix.release_arch }}-desktop
@@ -120,24 +120,24 @@ jobs:
 
       - name: Download desktop ISOs
         id: download_desktop_isos
-        if: ${{ !cancelled() && steps.checkout_code.outcome == 'success' }}
+        if: ${{ success() && !cancelled() && steps.checkout_code.outcome == 'success' }}
         uses: actions/download-artifact@v4
         with:
           path: nightly-artifacts
 
       - name: Set TAG_DATE variable
         id: set_tag_date_variable
-        if: ${{ !cancelled() && steps.download_desktop_isos.outcome == 'success' }}
+        if: ${{ success() && !cancelled() && steps.download_desktop_isos.outcome == 'success' }}
         run: echo "TAG_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
       - name: Tag new nightly release
         id: tag_new_nightly_release
-        if: ${{ !cancelled() && steps.set_tag_date_variable.outcome == 'success' }}
+        if: ${{ success() && !cancelled() && steps.set_tag_date_variable.outcome == 'success' }}
         run: git tag nightly-$TAG_DATE && git push --tags
 
       - name: Create nightly release
         id: create_nightly_release
-        if: ${{ !cancelled() && steps.tag_new_nightly_release.outcome == 'success' }}
+        if: ${{ success() && !cancelled() && steps.tag_new_nightly_release.outcome == 'success' }}
         uses: softprops/action-gh-release@v3
         with:
           name: Nightly desktop build ${{ env.TAG_DATE }}

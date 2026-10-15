@@ -28,7 +28,7 @@ jobs:
 
       - name: Download the image
         id: download_the_image
-        if: ${{ !cancelled() && steps.uses_checkout_v6.outcome == 'success' }}
+        if: ${{ success() && !cancelled() && steps.uses_checkout_v6.outcome == 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name || inputs.tag }}
@@ -36,7 +36,7 @@ jobs:
 
       - name: Install VirtualBox
         id: install_virtualbox
-        if: ${{ !cancelled() && steps.download_the_image.outcome == 'success' }}
+        if: ${{ success() && !cancelled() && steps.download_the_image.outcome == 'success' }}
         run: |
           set -euo pipefail
           curl -fsSL https://www.virtualbox.org/download/oracle_vbox_2016.asc |
@@ -52,7 +52,7 @@ jobs:
 
       - name: Boot it
         id: boot_it
-        if: ${{ !cancelled() && steps.install_virtualbox.outcome == 'success' }}
+        if: ${{ success() && !cancelled() && steps.install_virtualbox.outcome == 'success' }}
         run: sudo --preserve-env=PATH ./scripts/test-iso.sh --no-qemu --virtualbox --timeout=600 --out=test iso/vinix-amd64.iso
 
       # The test runs as root and leaves root-only files, which the upload
