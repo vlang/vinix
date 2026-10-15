@@ -20,7 +20,7 @@ fn guest_lease(state string) !filelock.FileLock {
 		return error('guest agent lock must be a private regular file owned by this user')
 	}
 	mut guard := filelock.new_file(path, mode: .exclusive)
-	if !guard.try_acquire() { return error('another guest agent query holds its lock') }
+	if !guard.try_acquire() { return error('VM startup or another guest agent query holds its lock') }
 	return guard
 }
 

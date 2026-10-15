@@ -90,6 +90,14 @@ also enables and checks its agent socket. The manager does not grant guest
 permissions or expose mutation RPCs. Packaged-agent guest qualification and
 Vinix's own guest driver/agent implementation remain open.
 
+Startup now shares the query lease until QMP and the configured agent channel
+are ready, and offline checks inspect both endpoint paths. A missing QMP path
+cannot authorize replacing a reachable agent socket. The host startup fixture
+checks refusal during active queries, preservation of existing socket inodes
+and images/logs, query admission after real QEMU readiness, and lease release
+after child failure, startup cancellation and spawn errors. These checks retain
+the ordinary private-state permissions and do not add a forced recovery path.
+
 Native hypervisor memory validation on the same date built isolated kernels
 from `1c2e33ce` plus the memory changes. The x86 memory fixture allocated and
 released 1 GiB, checked EPT entries and zeroed frames, injected failures through

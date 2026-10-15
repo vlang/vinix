@@ -19,15 +19,25 @@ then quit and retire the owned process group. Exit status is saved in
 `exit.json`. A file lock prevents a second manager or offline snapshot operation
 from opening a running VM. A failed or killed manager never signals a saved PID.
 
-A monitor that still accepts connections blocks restart and every offline
-snapshot operation, including recovery, even after the manager has died. The
-one-second transport probe does not require a QMP greeting or status reply:
+A monitor or agent endpoint that still accepts connections blocks restart and
+every offline snapshot operation, including recovery, even after the manager
+has died. The one-second transport probe does not require a QMP greeting or status reply:
 a silent or malformed service is still occupied. Only a missing socket or an
 explicit connection refusal counts as inactive. Other connection errors and
 timeouts keep the operation blocked. Unexpected files, directories and symlinks
-at `qmp.sock` are preserved for inspection. Use the existing monitor to stop a
-surviving VM; an unresponsive monitor requires manual inspection rather than
-automatic socket removal or PID-based signaling.
+at either `qmp.sock` or `agent.sock` are preserved for inspection. Use the
+existing monitor to stop a surviving VM; an unresponsive monitor requires
+manual inspection rather than automatic socket removal or PID-based signaling. A missing monitor path does
+not make a reachable agent channel safe to replace or its VM safe to snapshot.
+
+Startup takes the VM lease and then the agent-query lease before checking or
+replacing either endpoint. An active query refuses startup before sockets or
+execution logs are changed. Queries are refused while QEMU initializes its
+channels. After a successful QMP status check, startup verifies the configured
+agent socket exists and is owned by the caller, then releases the query lease
+while retaining the VM lease. Cancellation, child failure and spawn errors also
+release the query lease. An abandoned socket with an explicit connection
+refusal can still be removed during startup.
 
 Example configuration (supply actual hashes from `vinix-build hash`):
 
@@ -93,9 +103,10 @@ The client follows QEMU's
 it sends a reset sentinel and a random integer nonce, discards stale data until
 the delimited nonce response, then correlates the query response by transaction
 ID. Every query opens a fresh connection and resynchronizes after earlier
-timeouts. A persistent private `agent.lock` serializes query processes without
-taking the running VM's lock. Older state directories acquire that file on
-their first query. The endpoint must be a socket owned by the calling user;
+timeouts. A persistent private `agent.lock` serializes query processes and
+startup channel replacement without taking the running VM's lock for queries.
+Older state directories acquire that file on their first start or query.
+The endpoint must be a socket owned by the calling user;
 symlinks and nonprivate state or lock files are refused.
 
 The guest administrator must install and authorize its agent. The manager's
@@ -273,3 +284,18 @@ and V `be2eb40`. The updated CLI cross-compiled and linked as static Linux
 ELF64 for AArch64 and x86_64; both machine IDs were checked. Source/compiler/
 binary hashes, logs and the build receipt are retained locally in
 `/tmp/vinix-vm-guest-build-86620`.
+
+The channel-lifetime regression reproduced acceptance of a reachable agent
+socket when `qmp.sock` was absent. Both endpoints now receive the same offline
+guard checks, including unexpected files and links. A V startup barrier also
+checks that an active query prevents removal of abandoned socket inodes and
+changes to images/logs, and that guest queries stay blocked before QEMU starts.
+It then exercises real QEMU readiness and verifies the query lease becomes
+available while QEMU remains alive. Early child exit, SIGTERM during
+startup and a nonexecutable emulator all release both leases. No saved QEMU
+PID is signaled. These remain host protocol and lifecycle checks; packaged
+guest-agent and installed-Vinix VM qualification are separate gates.
+All nine host VM/QMP test files pass with QEMU 11.1.1 and V `be2eb40`.
+The updated CLI also builds as static Linux ELF64 for AArch64 and x86_64,
+with both machine IDs checked. Source/compiler/binary hashes, logs and the
+receipt are retained locally in `/tmp/vinix-vm-channels-build-29279`.

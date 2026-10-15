@@ -5,6 +5,7 @@ module vmcore
 import devcore
 import json2
 import os
+import os.filelock
 import qmpclient
 import sourcecommand
 import sync.stdatomic
@@ -24,10 +25,13 @@ fn cancelled() bool {
 
 struct StartContext {
 	state string
+	guest_agent bool
+mut:
+	agent_guard filelock.FileLock
 }
 
 fn monitor_child(pid int, raw voidptr) ! {
-	context := unsafe { &StartContext(raw) }
+	mut context := unsafe { &StartContext(raw) }
 	deadline := time.sys_mono_now() + u64(30 * time.second)
 	mut ready := false
 	for !sourcecommand.child_exited(pid)! {
@@ -51,6 +55,15 @@ fn monitor_child(pid int, raw voidptr) ! {
 		time.sleep(20 * time.millisecond)
 	}
 	if !ready { return error('QEMU exited before its monitor was ready') }
+	if context.guest_agent {
+		st := os.lstat(context.state + '/agent.sock')!
+		if st.get_filetype() != .socket || st.uid != u32(os.getuid()) {
+			return error('QEMU guest agent channel is not a socket owned by this user')
+		}
+	}
+	// Start owns channel replacement until QEMU has initialized its endpoints.
+	// Release only this startup lease; run.lock still protects the live VM.
+	context.agent_guard.release()
 	println('VM started; control it with vinix-vm status|pause|resume|shutdown|stop ${context.state}')
 	for !sourcecommand.child_exited(pid)! {
 		if cancelled() {
@@ -72,6 +85,11 @@ pub fn start(path string) !int {
 	devcore.verify(devcore.Pin{state + '/code.fd', config.firmware_code.sha256})!
 	mut guard := lease(state)!
 	defer { guard.release() }
+	mut context := StartContext{state: state, guest_agent: config.guest_agent,
+		agent_guard: guest_lease(state)!}
+	// Also releases the lease after spawn failure, cancellation or an invalid
+	// startup channel. The monitor clears it on successful startup.
+	defer { context.agent_guard.release() }
 	ensure_stopped(state)!
 	if os.exists(state + '/snapshot.pending.json') {
 		return error('incomplete snapshot operation; recover it before starting')
@@ -81,7 +99,6 @@ pub fn start(path string) !int {
 	for name in ['qmp.sock', 'agent.sock'] {
 		if os.exists(state + '/' + name) { os.rm(state + '/' + name)! }
 	}
-	context := StartContext{state}
 	mut env := devcore.environment(0)
 	if config.jit { env['VINIX_ALLOW_WX'] = '1' }
 	result := sourcecommand.run_logged_owned(arguments(config, state)!, env,
@@ -100,18 +117,22 @@ pub fn start(path string) !int {
 // A manager can be killed while QEMU survives. Keep that live monitor usable
 // and refuse a replacement even after the dead manager's record lock vanishes.
 fn ensure_stopped(state string) ! {
-	path := state + '/qmp.sock'
+	ensure_channel_stopped(state + '/qmp.sock', 'monitor')!
+	ensure_channel_stopped(state + '/agent.sock', 'guest agent channel')!
+}
+
+fn ensure_channel_stopped(path string, label string) ! {
 	st := os.lstat(path) or {
 		if err.code() == C.ENOENT { return }
 		return err
 	}
 	if st.get_filetype() != .socket {
-		return error('VM monitor path is not a socket; inspect it before restarting')
+		return error('VM ${label} path is not a socket; inspect it before restarting')
 	}
 	// A failed greeting says nothing about whether the listener is alive.
 	// Preserve it even when QEMU is hung or its protocol is unavailable.
 	if qmpclient.socket_in_use(path, time.sys_mono_now() + u64(time.second), unsafe { nil })! {
-		return error('QEMU is still running or its monitor is occupied; stop it through its existing monitor')
+		return error('QEMU is still running or its ${label} is occupied; inspect the existing VM before restarting')
 	}
 }
 
