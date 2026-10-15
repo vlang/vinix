@@ -273,10 +273,10 @@ fn test_overview_pages_keep_every_window_reachable_with_bounded_layout() {
 		desktop.spawn('Welcome', .welcome, 120, 80, 400, 260)
 	}
 	desktop.open_window_overview()
-	layout := window_overview_layout(desktop.canvas.width, desktop.canvas.height)
+	layout := window_overview_layout(desktop.canvas.width, desktop.canvas.height, taskbar_height)
 	assert layout.capacity() > 0
 	assert layout.width + layout.x <= desktop.canvas.width
-	assert layout.height + layout.y <= desktop_usable_height(desktop.canvas.height)
+	assert layout.height + layout.y <= desktop_usable_height(desktop.canvas.height, taskbar_height)
 	assert desktop.overview.page == 0
 	desktop.step_window_overview(layout.capacity() - 1)
 	assert desktop.window_overview_pointer_down(window_overview_next, .desktop)
@@ -291,7 +291,7 @@ fn test_overview_pages_keep_every_window_reachable_with_bounded_layout() {
 	}
 	assert visited.len == 25
 	for size in [320, 640, 1024] {
-		checked := window_overview_layout(size, size * 3 / 4)
+		checked := window_overview_layout(size, size * 3 / 4, taskbar_height)
 		assert checked.columns > 0 && checked.rows > 0
 		assert checked.card_width > 0 && checked.card_height > 0
 		assert window_overview_padding + window_overview_header_height +

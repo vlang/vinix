@@ -180,7 +180,7 @@ fn (mut d Desktop) window_actions_right_down(x int, y int) bool {
 fn (d &Desktop) window_actions_bounds() WindowActionsBounds {
 	index := d.window_index(d.window_actions.window_id) or { return WindowActionsBounds{} }
 	window := d.windows[index]
-	available_height := desktop_usable_height(d.canvas.height) - 16
+	available_height := desktop_usable_height(d.canvas.height, d.taskbar_height()) - 16
 	width := if d.canvas.width - 16 < window_actions_width {
 		d.canvas.width - 16
 	} else {
@@ -196,8 +196,8 @@ fn (d &Desktop) window_actions_bounds() WindowActionsBounds {
 	mut y := window.y + d.theme().title_height + 4
 	if x + width > d.canvas.width - 8 { x = d.canvas.width - width - 8 }
 	if x < 8 { x = 8 }
-	if y + height > desktop_usable_height(d.canvas.height) - 8 {
-		y = desktop_usable_height(d.canvas.height) - height - 8
+	if y + height > desktop_usable_height(d.canvas.height, d.taskbar_height()) - 8 {
+		y = desktop_usable_height(d.canvas.height, d.taskbar_height()) - height - 8
 	}
 	if y < 8 { y = 8 }
 	return WindowActionsBounds{
@@ -243,7 +243,7 @@ fn (mut d Desktop) step_window_action_geometry(dx int, dy int, precise bool) {
 		if width < window_min_width { width = window_min_width }
 		if height < min_height { height = min_height }
 		max_width := d.canvas.width - d.windows[index].x
-		max_height := desktop_usable_height(d.canvas.height) - d.windows[index].y
+		max_height := desktop_usable_height(d.canvas.height, d.taskbar_height()) - d.windows[index].y
 		if max_width >= window_min_width && width > max_width { width = max_width }
 		if max_height >= min_height && height > max_height { height = max_height }
 		d.windows[index].width = width

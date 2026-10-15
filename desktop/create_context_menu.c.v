@@ -1312,7 +1312,7 @@ fn (mut d Desktop) open_create_context_menu(x int, y int) bool {
 			return true
 		}
 	}
-	if y >= d.canvas.height - taskbar_height || underlying != '' {
+	if y >= d.canvas.height - d.taskbar_height() || underlying != '' {
 		d.close_create_context_menu()
 		return false
 	}
@@ -1583,7 +1583,7 @@ fn (mut d Desktop) render_desktop_file_icons() {
 	if !desktop_directory_state.loaded && !d.refresh_desktop_directory() {
 		return
 	}
-	rows := shortcut_rows_for_height(d.canvas.height)
+	rows := shortcut_rows_for_height(d.canvas.height, d.taskbar_height())
 	theme := d.theme()
 	rename_name := if desktop_directory_state.rename_path.len > 0 {
 		file_path_name(desktop_directory_state.rename_path)

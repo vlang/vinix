@@ -114,6 +114,7 @@ struct Theme {
 	dock_radius        int
 	dock_padding       int
 	// Taskbar
+	taskbar_height      int = classic_taskbar_height
 	taskbar_bg          u32
 	taskbar_edge        u32
 	taskbar_text        u32
@@ -133,6 +134,7 @@ struct Theme {
 // The desktop's own look: rounded, shadowed, flat-coloured.
 const theme_default = Theme{
 	name: 'Default'
+	taskbar_height: taskbar_height
 	window_body: 0xfbfcfe
 	window_edge: 0xb9c2d0
 	window_radius: 9

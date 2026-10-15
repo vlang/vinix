@@ -119,7 +119,7 @@ fn test_windows7_frame_has_windows7_measurements() {
 	wide := glass_test_child(&maximized, '.body')
 	assert int(wide.frame.x) == 0
 	assert int(wide.frame.width) == 640
-	assert int(wide.frame.height) == 480 - taskbar_height - 30
+	assert int(wide.frame.height) == 480 - classic_taskbar_height - 30
 	assert int(maximized.box.radius) == 0
 	free_tree(maximized)
 }

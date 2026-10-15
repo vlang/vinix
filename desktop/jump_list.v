@@ -359,7 +359,7 @@ fn (d &Desktop) place_jump_list(x int) {
 	if menu_x < 4 {
 		menu_x = 4
 	}
-	mut menu_y := d.canvas.height - taskbar_height - height - 4
+	mut menu_y := d.canvas.height - d.taskbar_height() - height - 4
 	if menu_y < 0 {
 		menu_y = 0
 	}

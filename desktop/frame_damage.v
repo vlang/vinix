@@ -216,7 +216,7 @@ fn (d &Desktop) damage_frame_counters(mut damage FrameDamage) {
 
 // damage_taskbar covers the bar, and the gap under a floating dock.
 fn (mut d Desktop) damage_taskbar() {
-	top := d.canvas.height - taskbar_height - dock_bottom_gap
+	top := d.canvas.height - d.taskbar_height() - dock_bottom_gap
 	d.add_frame_damage(0, top, d.canvas.width, d.canvas.height - top)
 }
 

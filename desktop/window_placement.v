@@ -18,11 +18,11 @@ struct WindowPlacement {
 
 // Only touching a boundary commits placement. Moving one pixel back inside
 // the desktop is enough to cancel a preview and continue a free drag.
-fn window_placement_at(x int, y int, screen_width int, screen_height int) WindowPlacement {
+fn window_placement_at(x int, y int, screen_width int, screen_height int, bar_height int) WindowPlacement {
 	if screen_width <= 0 || screen_height <= 0 {
 		return WindowPlacement{}
 	}
-	usable_height := desktop_usable_height(screen_height)
+	usable_height := desktop_usable_height(screen_height, bar_height)
 	corner_width := if screen_width / 4 < window_placement_corner_extent {
 		screen_width / 4
 	} else {
@@ -71,7 +71,7 @@ fn window_placement_at(x int, y int, screen_width int, screen_height int) Window
 // the opposite boundary. Keep the placement seen while the button was held
 // in that case; an ordinary release inside the desktop still cancels it.
 fn window_placement_on_release(held WindowPlacement, x int, y int, screen_width int,
-	screen_height int) WindowPlacement {
+	screen_height int, bar_height int) WindowPlacement {
 	if held.maximize && y >= screen_height - 1 {
 		return held
 	}
@@ -83,17 +83,17 @@ fn window_placement_on_release(held WindowPlacement, x int, y int, screen_width 
 		|| (top && y >= screen_height - 1) || (bottom && y <= 0) {
 		return held
 	}
-	return window_placement_at(x, y, screen_width, screen_height)
+	return window_placement_at(x, y, screen_width, screen_height, bar_height)
 }
 
 // This frame matches apply_snap_geometry, including the remainder on odd
 // display sizes, and is also the full-size frame for a maximize preview.
-fn window_placement_frame(placement WindowPlacement, screen_width int, screen_height int) DamageRect {
+fn window_placement_frame(placement WindowPlacement, screen_width int, screen_height int, bar_height int) DamageRect {
 	if screen_width <= 0 || screen_height <= 0
 		|| (!placement.maximize && placement.snap == .none_) {
 		return DamageRect{}
 	}
-	usable_height := desktop_usable_height(screen_height)
+	usable_height := desktop_usable_height(screen_height, bar_height)
 	if placement.maximize {
 		return DamageRect{ x: 0, y: 0, w: screen_width, h: usable_height, valid: true }
 	}
@@ -121,7 +121,7 @@ fn (mut d Desktop) update_window_placement(x int, y int) {
 	if d.drag.kind != .move {
 		return
 	}
-	placement := window_placement_at(x, y, d.canvas.width, d.canvas.height)
+	placement := window_placement_at(x, y, d.canvas.width, d.canvas.height, d.taskbar_height())
 	if placement.snap == d.drag.snap_on_release
 		&& placement.maximize == d.drag.maximize_on_release {
 		return
@@ -143,7 +143,7 @@ fn (mut d Desktop) finish_window_placement(x int, y int) {
 		snap:     d.drag.snap_on_release
 		maximize: d.drag.maximize_on_release
 	}
-	placement := window_placement_on_release(held, x, y, d.canvas.width, d.canvas.height)
+	placement := window_placement_on_release(held, x, y, d.canvas.width, d.canvas.height, d.taskbar_height())
 	if placement.maximize {
 		d.maximize(d.drag.window_id)
 	} else if placement.snap != .none_ {
@@ -158,7 +158,7 @@ fn (d &Desktop) window_placement_element() ?ui2.Element {
 	frame := window_placement_frame(WindowPlacement{
 		snap:     d.drag.snap_on_release
 		maximize: d.drag.maximize_on_release
-	}, d.canvas.width, d.canvas.height)
+	}, d.canvas.width, d.canvas.height, d.taskbar_height())
 	if !frame.valid || frame.w <= 2 * window_placement_preview_inset
 		|| frame.h <= 2 * window_placement_preview_inset {
 		return none

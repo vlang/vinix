@@ -29,24 +29,24 @@ fn placement_test_drag(mut desktop Desktop, id int, x int, y int) {
 }
 
 fn test_pointer_placement_targets_corners_edges_and_work_area() {
-	assert window_placement_at(0, 0, 801, 601).snap == .top_left
-	assert window_placement_at(800, 0, 801, 601).snap == .top_right
-	assert window_placement_at(0, 600, 801, 601).snap == .bottom_left
-	assert window_placement_at(800, 600, 801, 601).snap == .bottom_right
-	assert window_placement_at(0, 300, 801, 601).snap == .left
-	assert window_placement_at(800, 300, 801, 601).snap == .right
-	assert window_placement_at(400, 0, 801, 601).maximize
-	assert window_placement_at(40, 0, 801, 601).snap == .top_left
-	assert window_placement_at(760, 0, 801, 601).snap == .top_right
-	bottom := desktop_usable_height(601) - 1
-	assert window_placement_at(40, bottom, 801, 601).snap == .bottom_left
-	assert window_placement_at(760, bottom, 801, 601).snap == .bottom_right
-	assert window_placement_at(400, bottom, 801, 601).snap == .none_
-	assert !window_placement_at(400, bottom, 801, 601).maximize
+	assert window_placement_at(0, 0, 801, 601, taskbar_height).snap == .top_left
+	assert window_placement_at(800, 0, 801, 601, taskbar_height).snap == .top_right
+	assert window_placement_at(0, 600, 801, 601, taskbar_height).snap == .bottom_left
+	assert window_placement_at(800, 600, 801, 601, taskbar_height).snap == .bottom_right
+	assert window_placement_at(0, 300, 801, 601, taskbar_height).snap == .left
+	assert window_placement_at(800, 300, 801, 601, taskbar_height).snap == .right
+	assert window_placement_at(400, 0, 801, 601, taskbar_height).maximize
+	assert window_placement_at(40, 0, 801, 601, taskbar_height).snap == .top_left
+	assert window_placement_at(760, 0, 801, 601, taskbar_height).snap == .top_right
+	bottom := desktop_usable_height(601, taskbar_height) - 1
+	assert window_placement_at(40, bottom, 801, 601, taskbar_height).snap == .bottom_left
+	assert window_placement_at(760, bottom, 801, 601, taskbar_height).snap == .bottom_right
+	assert window_placement_at(400, bottom, 801, 601, taskbar_height).snap == .none_
+	assert !window_placement_at(400, bottom, 801, 601, taskbar_height).maximize
 	// One pixel in from a side, away from a corner, continues a free drag.
-	assert window_placement_at(1, 300, 801, 601).snap == .none_
-	assert window_placement_at(799, 300, 801, 601).snap == .none_
-	assert !window_placement_frame(window_placement_at(0, 0, 0, 0), 0, 0).valid
+	assert window_placement_at(1, 300, 801, 601, taskbar_height).snap == .none_
+	assert window_placement_at(799, 300, 801, 601, taskbar_height).snap == .none_
+	assert !window_placement_frame(window_placement_at(0, 0, 0, 0, taskbar_height), 0, 0, taskbar_height).valid
 }
 
 fn test_pointer_quarter_tiling_preserves_normal_size_and_covers_odd_work_area() {
@@ -58,7 +58,7 @@ fn test_pointer_quarter_tiling_preserves_normal_size_and_covers_odd_work_area() 
 		placement_test_drag(mut desktop, id, x, y)
 		index := desktop.window_index(id) or { panic('missing quarter-tiled window') }
 		window := desktop.windows[index]
-		frame := window_placement_frame(WindowPlacement{ snap: snap }, 801, 601)
+		frame := window_placement_frame(WindowPlacement{ snap: snap }, 801, 601, taskbar_height)
 		assert window.snap == snap
 		assert !window.maximized
 		assert window.x == frame.x
@@ -68,7 +68,7 @@ fn test_pointer_quarter_tiling_preserves_normal_size_and_covers_odd_work_area() 
 		assert window.restore_width == 400
 		assert window.restore_height == 260
 		assert window.x + window.width <= 801
-		assert window.y + window.height <= desktop_usable_height(601)
+		assert window.y + window.height <= desktop_usable_height(601, taskbar_height)
 	}
 	// Moving to the top center maximizes, preserving the same normal frame.
 	placement_test_drag(mut desktop, id, 400, 0)
@@ -96,7 +96,7 @@ fn test_placement_preview_follows_target_without_intercepting_pointer() {
 	assert preview.frame.x == 6
 	assert preview.frame.y == 6
 	assert preview.frame.width == 388
-	assert preview.frame.height == desktop_usable_height(601) - 12
+	assert preview.frame.height == desktop_usable_height(601, taskbar_height) - 12
 	assert !preview.clickable
 	assert !preview.draggable
 	assert preview.action_id == ''
@@ -109,7 +109,7 @@ fn test_placement_preview_follows_target_without_intercepting_pointer() {
 	desktop.drag_damage = DamageRect{}
 	desktop.on_pointer_move(0, 0)
 	quarter := desktop.window_placement_element() or { panic('missing quarter placement preview') }
-	assert quarter.frame.height == desktop_usable_height(601) / 2 - 12
+	assert quarter.frame.height == desktop_usable_height(601, taskbar_height) / 2 - 12
 	assert damage_contains(desktop.drag_damage, desktop.canvas_damage())
 	desktop.drag_damage = DamageRect{}
 	desktop.on_pointer_move(1, 300)
@@ -146,19 +146,19 @@ fn test_placement_preview_requires_titlebar_movement_and_held_button() {
 
 fn test_release_wrap_keeps_half_maximize_and_corner_targets() {
 	assert window_placement_on_release(WindowPlacement{ snap: .left }, 799, 300, 800,
-		600).snap == .left
+		600, taskbar_height).snap == .left
 	assert window_placement_on_release(WindowPlacement{ snap: .right }, 0, 300, 800,
-		600).snap == .right
+		600, taskbar_height).snap == .right
 	assert window_placement_on_release(WindowPlacement{ maximize: true }, 400, 599, 800,
-		600).maximize
+		600, taskbar_height).maximize
 	assert window_placement_on_release(WindowPlacement{ snap: .top_left }, 799, 599,
-		800, 600).snap == .top_left
+		800, 600, taskbar_height).snap == .top_left
 	assert window_placement_on_release(WindowPlacement{ snap: .bottom_right }, 0, 0,
-		800, 600).snap == .bottom_right
+		800, 600, taskbar_height).snap == .bottom_right
 	assert window_placement_on_release(WindowPlacement{ snap: .left }, 1, 300, 800,
-		600).snap == .none_
+		600, taskbar_height).snap == .none_
 	assert window_placement_on_release(WindowPlacement{ maximize: true }, 400, 1, 800,
-		600).snap == .none_
+		600, taskbar_height).snap == .none_
 }
 
 fn test_button_level_corner_release_keeps_the_held_target_after_wrap() {
@@ -178,7 +178,7 @@ fn test_button_level_corner_release_keeps_the_held_target_after_wrap() {
 	assert desktop.windows[index].x == 0
 	assert desktop.windows[index].y == 0
 	assert desktop.windows[index].width == 400
-	assert desktop.windows[index].height == desktop_usable_height(600) / 2
+	assert desktop.windows[index].height == desktop_usable_height(600, taskbar_height) / 2
 	assert desktop.drag.kind == .none_
 }
 

@@ -48,7 +48,7 @@ fn test_layout_arrows_enter_and_atomic_chord_arrange_the_anchored_window() {
 	assert desktop.windows[index].x == 400
 	assert desktop.windows[index].y == 0
 	assert desktop.windows[index].width == 401
-	assert desktop.windows[index].height == desktop_usable_height(601) / 2
+	assert desktop.windows[index].height == desktop_usable_height(601, taskbar_height) / 2
 	assert desktop.windows[index].restore_x == 120
 	assert desktop.windows[index].restore_y == 80
 }
@@ -155,7 +155,7 @@ fn test_layout_no_focus_is_safe_and_panel_stays_above_taskbar() {
 	assert frame.x >= 12
 	assert frame.y >= 12
 	assert frame.x + frame.w <= desktop.canvas.width - 12
-	assert frame.y + frame.h <= desktop_usable_height(desktop.canvas.height) - 12
+	assert frame.y + frame.h <= desktop_usable_height(desktop.canvas.height, taskbar_height) - 12
 	assert desktop.handle_window_layout_action(window_layout_panel_id)
 	assert desktop.window_layout.active
 	assert !desktop.handle_window_layout_action('application.other')
@@ -169,7 +169,7 @@ fn test_layout_compacts_choices_on_small_logical_desktops() {
 	assert panel.frame.x >= 0
 	assert panel.frame.y >= 0
 	assert panel.frame.x + panel.frame.width <= 320
-	assert panel.frame.y + panel.frame.height <= desktop_usable_height(240)
+	assert panel.frame.y + panel.frame.height <= desktop_usable_height(240, taskbar_height)
 	for action in window_layout_actions {
 		choice := layout_test_element(panel, action) or { panic('missing compact layout choice') }
 		assert choice.frame.width >= 16

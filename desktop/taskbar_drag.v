@@ -83,7 +83,7 @@ fn (d &Desktop) taskbar_entry_under(x int) ?TaskbarEntry {
 		return none
 	}
 	layout := d.taskbar_layout(entries.len)
-	stride := layout.item_width + taskbar_item_gap
+	stride := layout.item_width + d.taskbar_gap()
 	if stride <= 0 {
 		return none
 	}
@@ -112,10 +112,10 @@ fn (d &Desktop) taskbar_entry_under(x int) ?TaskbarEntry {
 			break
 		}
 		slot = index
-		if x < left + at + width + taskbar_item_gap {
+		if x < left + at + width + d.taskbar_gap() {
 			break
 		}
-		at += width + taskbar_item_gap
+		at += width + d.taskbar_gap()
 	}
 	if slot < 0 {
 		return none

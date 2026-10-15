@@ -366,7 +366,7 @@ fn test_keyboard_taskbar_menu_lists_and_chooses_input_sources() {
 	assert layout == clock_alone
 	clock_text := d.clock_text_width()
 	assert clock_text > 0 && clock_text < taskbar_clock_width
-	assert button.x + button.width + taskbar_item_gap == layout.status_right - clock_text
+	assert button.x + button.width + d.taskbar_gap() == layout.status_right - clock_text
 	// A 12-hour clock with seconds is wider; the taskbar then makes up only
 	// the difference, and the button still clears the build stamp.
 	d.settings.clock_24_hour = false
@@ -379,10 +379,10 @@ fn test_keyboard_taskbar_menu_lists_and_chooses_input_sources() {
 	wide_layout := d.taskbar_layout(0)
 	assert d.input_menu_span() > 0
 	assert wide_layout.status_width == clock_alone.status_width + d.input_menu_span()
-	assert wide.x + wide.width + taskbar_item_gap == wide_layout.status_right - d.clock_text_width()
+	assert wide.x + wide.width + d.taskbar_gap() == wide_layout.status_right - d.clock_text_width()
 	build_end := wide_layout.status_right - wide_layout.status_width + wide_layout.tray_span +
-		taskbar_build_width
-	assert wide.x >= build_end + taskbar_item_gap
+		24 + d.taskbar_build_box()
+	assert wide.x >= build_end
 	d.settings.clock_24_hour = true
 
 	d.handle_tray_action(action_tray_input)

@@ -421,7 +421,7 @@ fn (mut d Desktop) snap_window(id int, snap WindowSnap) {
 		d.remember_restore_frame(index)
 	}
 	area:=d.window_display_area(index)
-	d.apply_snap_geometry(index, snap, area.w, area.h+taskbar_height)
+	d.apply_snap_geometry(index, snap, area.w, area.h+d.taskbar_height())
 	d.windows[index].x+=area.x; d.windows[index].y+=area.y
 	d.windows[index].maximized = false
 	d.windows[index].snap = snap
@@ -475,6 +475,9 @@ fn (mut d Desktop) build_tree() ui2.Element {
 	// The elements (and their nested child arrays) were copied into children;
 	// only this temporary outer array is no longer needed.
 	unsafe { shortcuts.free() }
+	if d.compact_taskbar() {
+		children << d.wallpaper_build_element()
+	}
 	// Aero Peek keeps one window solid, or none for the desktop, and draws the
 	// rest as glass. A peeked window shows even if it is minimized, or on
 	// another workspace, since a pinned button covers all of its windows.
@@ -1381,7 +1384,7 @@ fn (d &Desktop) app_pointer_changed(window_index int) bool {
 // idle desktop is just the wallpaper and its icons.
 fn (d &Desktop) shortcut_elements() []ui2.Element {
 	mut out := frame_elements(available_apps.len)
-	rows := shortcut_rows_for_height(d.canvas.height)
+	rows := shortcut_rows_for_height(d.canvas.height, d.taskbar_height())
 	for slot in 0 .. available_apps.len {
 		app_index := d.shortcut_app_at_slot(slot)
 		if app_index < 0 {
@@ -1422,8 +1425,8 @@ fn (d &Desktop) shortcut_elements() []ui2.Element {
 // Eight fit in one column on a MacBook's 720 logical pixels; the ninth begins
 // a second column. A deliberately short display still keeps every utility
 // above the taskbar.
-fn shortcut_rows_for_height(height int) int {
-	usable := height - taskbar_height - shortcut_top
+fn shortcut_rows_for_height(height int, bar_height int) int {
+	usable := height - bar_height - shortcut_top
 	mut rows := usable / (shortcut_height + shortcut_gap)
 	if rows < 1 {
 		rows = 1
@@ -1536,6 +1539,34 @@ const taskbar_edge_id = 'taskbar.edge'
 // The panel Luna puts behind the notification area and the clock.
 const taskbar_tray_id = 'taskbar.tray'
 
+fn (d &Desktop) compact_taskbar() bool {
+	return d.settings.theme == .default_
+}
+
+fn (d &Desktop) taskbar_height() int {
+	return d.theme().taskbar_height
+}
+
+fn (d &Desktop) taskbar_gap() int {
+	return if d.compact_taskbar() { 3 } else { taskbar_item_gap }
+}
+
+fn (d &Desktop) taskbar_padding() int {
+	return if d.compact_taskbar() { 4 } else { taskbar_padding }
+}
+
+// The build stamp belongs to the wallpaper, below every application window.
+fn (d &Desktop) wallpaper_build_element() ui2.Element {
+	width := if d.canvas.width - 24 < taskbar_build_width { d.canvas.width - 24 } else { taskbar_build_width }
+	return ui2.view('desktop.build', ui2.rect(f64(d.canvas.width - width - 12), 10, f64(width), 36),
+		ui2.BoxStyle{ transparent: true }, [
+		ui2.label('build.time', d.taskbar_build_time, ui2.rect(0, 0, f64(width), 18),
+			ui2.TextStyle{ color: d.theme().shortcut_label, size: 12, align: .right }),
+		ui2.label('build.date', d.taskbar_build_date, ui2.rect(0, 18, f64(width), 16),
+			ui2.TextStyle{ color: d.theme().shortcut_label, size: 11, align: .right }),
+	])
+}
+
 fn (d &Desktop) taskbar_element() ui2.Element {
 	theme := d.theme()
 	width := d.canvas.width
@@ -1543,7 +1574,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// clear of the screen's edge. A taskbar is the whole width of the bottom.
 	dock := theme.dock
 	icon_only := theme.taskbar_icon_only
-	edge_padding := if dock { theme.dock_padding } else { taskbar_padding }
+	edge_padding := if dock { theme.dock_padding } else { d.taskbar_padding() }
 
 	// Pinned apps stay here after closing. Other apps appear while open:
 	// `standard` gives every window an entry, while `combined` groups them.
@@ -1558,10 +1589,12 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		luna_task_height
 	} else if icon_only {
 		taskbar_icon_item_height
+	} else if !d.compact_taskbar() {
+		30
 	} else {
 		taskbar_item_height
 	}
-	item_y := (taskbar_height - item_height) / 2
+	item_y := (d.taskbar_height() - item_height) / 2
 
 	// The Start button is the taskbar's anchor. Its standalone V is the first
 	// letterform of the wallpaper wordmark, not a font-dependent character.
@@ -1570,7 +1603,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		// Windows XP's is the bar's whole height in the screen's corner, and
 		// says so beside the mark.
 		children << ui2.button_with_image(action_start_toggle, tr('start.button'), 'builtin:vinix',
-			ui2.rect(f64(start_x), 0, f64(start_width), f64(taskbar_height)), ui2.BoxStyle{
+			ui2.rect(f64(start_x), 0, f64(start_width), f64(d.taskbar_height())), ui2.BoxStyle{
 			bg: if d.start_menu_open || d.hover == action_start_toggle {
 				theme.accent
 			} else {
@@ -1595,7 +1628,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		})
 	}
 	children << ui2.button_with_image(action_window_overview, '', 'builtin:overview',
-		ui2.rect(f64(start_x + start_width + 8), f64(item_y),
+		ui2.rect(f64(start_x + start_width + d.taskbar_anchor_gap()), f64(item_y),
 			f64(window_overview_button_width), f64(item_height)), ui2.BoxStyle{
 		bg: if d.overview.active || d.hover == action_window_overview {
 			theme.taskbar_item_hover
@@ -1636,14 +1669,14 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 			d.taskbar_entry_elements(mut children, entry, x, item_y, slot_width, item_height,
 				icon_only, false)
 		}
-		x += slot_width + taskbar_item_gap
+		x += slot_width + d.taskbar_gap()
 	}
 	if dragged >= 0 {
 		slot_width := d.taskbar_slot_width(entries[dragged].pinned, entries[dragged].window_count,
 			item_width)
 		mut drag_x := d.pointer_x - d.taskbar_press.grab_offset
-		if drag_x > x - taskbar_item_gap - slot_width {
-			drag_x = x - taskbar_item_gap - slot_width
+		if drag_x > x - d.taskbar_gap() - slot_width {
+			drag_x = x - d.taskbar_gap() - slot_width
 		}
 		if drag_x < entries_left {
 			drag_x = entries_left
@@ -1691,19 +1724,18 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		}
 	}
 	if dock {
-		x = workspace_x + workspace_width + taskbar_item_gap
+		x = workspace_x + workspace_width + d.taskbar_gap()
 	}
 
-	// The notification area sits left of the build date, then the build date
-	// immediately left of the live clock, as the Windows 7 tray did. The input
-	// source goes right up against the time, in the room its box leaves free.
+	// The notification area precedes the clock. Classic themes also keep the
+	// build stamp here. The input source uses the room left of the time.
 	tray_x := if dock { x } else { status_right - status_width }
 	if theme.chrome == .luna && !dock {
 		// Windows XP sets the notification area and the clock apart in a
 		// lighter blue, from here to the end of the bar. It is behind them, so
 		// it comes first.
-		children << ui2.view(taskbar_tray_id, ui2.rect(f64(tray_x - taskbar_item_gap), 0, f64(width -
-			tray_x + taskbar_item_gap), f64(taskbar_height)), ui2.BoxStyle{
+		children << ui2.view(taskbar_tray_id, ui2.rect(f64(tray_x - d.taskbar_gap()), 0, f64(width -
+			tray_x + d.taskbar_gap()), f64(d.taskbar_height())), ui2.BoxStyle{
 			bg: theme.accent
 		}, [])
 	}
@@ -1711,12 +1743,23 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	center_x := tray_x + tray_span
 	build_x := center_x + 24
 	children << ui2.Element{...ui2.button('session.center','N',ui2.rect(f64(center_x),f64(item_y),20,f64(item_height)),ui2.BoxStyle{transparent:true},ui2.TextStyle{color:theme.taskbar_text_active,size:12}),accessibility_label:'Notifications and session controls'}
-	clock_x := build_x + build_width + taskbar_item_gap + d.input_menu_span()
+	clock_x := build_x + build_width + (if d.compact_taskbar() { 0 } else { d.taskbar_gap() }) + d.input_menu_span()
 	if d.input_menu_shown() {
 		children << d.input_menu_button(clock_x + clock_width - d.clock_text_width() -
-			taskbar_item_gap - tray_input_width, item_y, item_height)
+			d.taskbar_gap() - tray_input_width, item_y, item_height)
 	}
-	if luna {
+	if d.compact_taskbar() {
+		clock_frame := ui2.rect(f64(clock_x), 0, f64(clock_width), f64(d.taskbar_height()))
+		clock_text := d.clock_text_width()
+		children << ui2.button(action_taskbar_clock, '', ui2.rect(f64(clock_x + clock_width - clock_text),
+			0, f64(clock_text), f64(d.taskbar_height())),
+			ui2.BoxStyle{ transparent: true }, ui2.TextStyle{})
+		children << ui2.label('clock.time', d.taskbar_clock_time, clock_frame, ui2.TextStyle{
+			color: theme.taskbar_text_active
+			size: compact_clock_size
+			align: .right
+		})
+	} else if luna {
 		d.luna_taskbar_texts(mut children, build_x, build_width, clock_x, clock_width)
 	} else {
 		children << ui2.label('build.time', d.taskbar_build_time, ui2.rect(f64(build_x), 3, f64(build_width), 21), ui2.TextStyle{
@@ -1743,7 +1786,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		})
 	}
 	if dock {
-		x = clock_x + clock_width + taskbar_item_gap
+		x = clock_x + clock_width + d.taskbar_gap()
 	}
 
 	// A hairline along the top edge separates a full-width bar from the
@@ -1756,7 +1799,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		// Show Desktop fills the lower-right corner, where a pointer pushed
 		// against both edges always lands on it.
 		children << ui2.button(action_show_desktop, '', ui2.rect(f64(width - show_desktop_width), 1,
-			f64(show_desktop_width), f64(taskbar_height - 1)), ui2.BoxStyle{
+			f64(show_desktop_width), f64(d.taskbar_height() - 1)), ui2.BoxStyle{
 			bg: if d.hover == action_show_desktop || d.show_desktop.active {
 				theme.taskbar_item_hover
 			} else {
@@ -1766,17 +1809,17 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	}
 
 	if dock {
-		panel_width := x - taskbar_item_gap + theme.dock_padding
+		panel_width := x - d.taskbar_gap() + theme.dock_padding
 		panel_x := (width - panel_width) / 2
 		// Clear of the bottom edge, the way a dock sits.
-		panel_y := d.canvas.height - taskbar_height - dock_bottom_gap
-		return ui2.view(taskbar_id, ui2.rect(f64(panel_x), f64(panel_y), f64(panel_width), f64(taskbar_height)), ui2.BoxStyle{
+		panel_y := d.canvas.height - d.taskbar_height() - dock_bottom_gap
+		return ui2.view(taskbar_id, ui2.rect(f64(panel_x), f64(panel_y), f64(panel_width), f64(d.taskbar_height())), ui2.BoxStyle{
 			bg:     theme.dock_bg
 			radius: theme.dock_radius
 		}, children)
 	}
 
-	return ui2.view(taskbar_id, ui2.rect(0, f64(d.canvas.height - taskbar_height), f64(width), f64(taskbar_height)), ui2.BoxStyle{
+	return ui2.view(taskbar_id, ui2.rect(0, f64(d.canvas.height - d.taskbar_height()), f64(width), f64(d.taskbar_height())), ui2.BoxStyle{
 		bg: theme.taskbar_bg
 	}, children)
 }
@@ -1800,11 +1843,15 @@ fn (d &Desktop) start_button_span(edge_padding int) (int, int) {
 // clock and for the build stamp: fixed, so the bar holds still whatever they
 // say, or under Windows XP what its smaller type needs.
 fn (d &Desktop) taskbar_clock_box() int {
-	return if d.taskbar_luna() { d.luna_clock_box() } else { taskbar_clock_width }
+	return if d.compact_taskbar() { compact_clock_width } else if d.taskbar_luna() { d.luna_clock_box() } else { taskbar_clock_width }
 }
 
 fn (d &Desktop) taskbar_build_box() int {
-	return if d.taskbar_luna() { d.luna_build_box() } else { taskbar_build_width }
+	return if d.compact_taskbar() { 0 } else if d.taskbar_luna() { d.luna_build_box() } else { taskbar_build_width }
+}
+
+fn (d &Desktop) taskbar_anchor_gap() int {
+	return if d.compact_taskbar() { d.taskbar_gap() } else { 8 }
 }
 
 // TaskbarLayout is where the bar's parts go, in the taskbar's coordinates.
@@ -1824,26 +1871,26 @@ struct TaskbarLayout {
 fn (d &Desktop) taskbar_layout(entry_count int) TaskbarLayout {
 	theme := d.theme()
 	dock := theme.dock
-	edge_padding := if dock { theme.dock_padding } else { taskbar_padding }
+	edge_padding := if dock { theme.dock_padding } else { d.taskbar_padding() }
 	start_x, start_width := d.start_button_span(edge_padding)
-	entries_left := start_x + start_width + 8 + window_overview_button_width + taskbar_item_gap
+	entries_left := start_x + start_width + d.taskbar_anchor_gap() + window_overview_button_width + d.taskbar_gap()
 	// Reserve the status area before sizing entries. The clock therefore stays
 	// in the physical lower-right corner, just inside Show Desktop, after 2x M1
 	// presentation as well as on an unscaled framebuffer.
 	tray_width := d.tray_width()
-	tray_span := if tray_width > 0 { tray_width + taskbar_item_gap } else { 0 }
-	status_width := tray_span + 24 + d.taskbar_build_box() + taskbar_item_gap + d.input_menu_span() +
+	tray_span := if tray_width > 0 { tray_width + d.taskbar_gap() } else { 0 }
+	status_width := tray_span + 24 + d.taskbar_build_box() + (if d.compact_taskbar() { 0 } else { d.taskbar_gap() }) + d.input_menu_span() +
 		d.taskbar_clock_box()
 	status_right := if dock {
 		0
 	} else {
-		d.canvas.width - taskbar_show_desktop_width - taskbar_item_gap
+		d.canvas.width - taskbar_show_desktop_width - d.taskbar_gap()
 	}
 	visible_workspaces := if d.workspace_total() > 4 { 4 } else { d.workspace_total() }
 	workspace_width := visible_workspaces * workspace_button_width +
 		(visible_workspaces - 1) * workspace_button_gap + if d.workspace_total() > 4 { 46 } else { 0 }
-	workspace_x := status_right - status_width - taskbar_item_gap - workspace_width
-	entries_right := if dock { d.canvas.width } else { workspace_x - taskbar_item_gap }
+	workspace_x := status_right - status_width - d.taskbar_gap() - workspace_width
+	entries_right := if dock { d.canvas.width } else { workspace_x - d.taskbar_gap() }
 	// Entries share whatever room is left rather than each taking a fixed
 	// slot: with a fixed one the last window opened simply had no entry, which
 	// is the opposite of what a list of open windows is for. What Windows XP
@@ -1854,7 +1901,7 @@ fn (d &Desktop) taskbar_layout(entry_count int) TaskbarLayout {
 		entries_left:    entries_left
 		entries_right:   entries_right
 		item_width:      d.taskbar_item_width(shared, entries_left + quick * (luna_quick_width +
-			taskbar_item_gap), entries_right)
+			d.taskbar_gap()), entries_right)
 		workspace_x:     workspace_x
 		workspace_width: workspace_width
 		status_right:    status_right
@@ -1885,7 +1932,7 @@ fn (d &Desktop) taskbar_item_width(count int, left int, right int) int {
 		taskbar_item_min_width
 	}
 	if count > 0 {
-		share := (right - left + taskbar_item_gap) / count - taskbar_item_gap
+		share := (right - left + d.taskbar_gap()) / count - d.taskbar_gap()
 		if share < item_width {
 			item_width = share
 		}
@@ -1950,12 +1997,12 @@ fn (d &Desktop) taskbar_entry_elements(mut children []ui2.Element, entry Taskbar
 		children << ui2.button_with_image(entry.id, '', icon, button_frame, button_style, ui2.TextStyle{
 			color: text_color
 		})
-	} else if luna {
-		// Windows XP's button: the window's icon, then its title.
+	} else if luna || d.compact_taskbar() {
+		// Labelled task buttons carry the window's icon before its title.
 		children << ui2.button_with_image(entry.id, entry.label, luna_task_image(entry.icon),
 			button_frame, button_style, ui2.TextStyle{
 			color: text_color
-			size:  luna_task_text_size
+			size:  if luna { luna_task_text_size } else { 12 }
 			align: .left
 		})
 	} else {
@@ -2343,7 +2390,7 @@ fn (mut d Desktop) resize_window_to_pointer(x int, y int) {
 	max_height := if d.drag.resize_top {
 		bottom
 	} else {
-		d.canvas.height - taskbar_height - d.drag.start_y
+		d.canvas.height - d.taskbar_height() - d.drag.start_y
 	}
 	if d.drag.resize_horizontal && max_width >= window_min_width && width > max_width {
 		width = max_width
@@ -2412,7 +2459,7 @@ fn (mut d Desktop) clamp_to_screen(index int) {
 	if d.session.state.display_count>1 { d.clamp_to_display(index); return }
 	margin := 60
 	available_width := d.canvas.width
-	available_height := d.canvas.height - taskbar_height
+	available_height := d.canvas.height - d.taskbar_height()
 	if d.windows[index].width <= available_width {
 		if d.windows[index].x < 0 {
 			d.windows[index].x = 0
@@ -2427,7 +2474,7 @@ fn (mut d Desktop) clamp_to_screen(index int) {
 		}
 	}
 	max_x := d.canvas.width - margin
-	max_y := d.canvas.height - taskbar_height - d.theme().title_height
+	max_y := d.canvas.height - d.taskbar_height() - d.theme().title_height
 	if d.windows[index].x > max_x {
 		d.windows[index].x = max_x
 	}
@@ -2454,7 +2501,7 @@ fn (mut d Desktop) clamp_drag_to_screen(index int) {
 		reachable_width = d.canvas.width
 	}
 	max_x := d.canvas.width - reachable_width
-	max_y := d.canvas.height - taskbar_height - d.theme().title_height
+	max_y := d.canvas.height - d.taskbar_height() - d.theme().title_height
 	if d.windows[index].x > max_x {
 		d.windows[index].x = max_x
 	}
@@ -2558,7 +2605,7 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 
 	if action == '' {
 		// Empty desktop: drop focus so no title bar claims to be active.
-		if y < d.canvas.height - taskbar_height {
+		if y < d.canvas.height - d.taskbar_height() {
 			d.focus = 0
 		}
 		return

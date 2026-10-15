@@ -413,12 +413,11 @@ fn (mut d Desktop) render_element(el &ui2.Element, off_x int, off_y int, depth i
 	if depth == 1 && el.kind == .view && el.id.starts_with('win.') {
 		d.inactive_window = !el.focused
 	}
-	// Under a theme whose chrome is painted for it, the taskbar's controls
-	// know from this that they sit on its bar.
+	// Taskbar controls keep their surface context under every theme.
 	painted := d.walk.kind != .flat
 	was_on_bar := d.walk.on_bar
 	if depth == 1 && el.id == taskbar_id {
-		d.walk.on_bar = painted
+		d.walk.on_bar = true
 	}
 	// A painted title bar's icon is told what is under it rather than reading
 	// the canvas. See surface_under.
@@ -1281,7 +1280,7 @@ fn (mut d Desktop) draw_button(el &ui2.Element, x int, y int, w int, h int) {
 	if (el.kind == .button || el.kind == .toggle_button) && el.native_style
 		&& d.settings.theme == .macos {
 		text_color = d.draw_catalina_button(el, x, y, w, h)
-	} else if !el.box.transparent && (d.walk.on_bar || d.walk.on_menu) {
+	} else if !el.box.transparent && d.walk.kind != .flat && (d.walk.on_bar || d.walk.on_menu) {
 		control_box := if el.kind == .toggle_button && el.checked {
 			el.toggle_down_box
 		} else {
@@ -1323,8 +1322,9 @@ fn (mut d Desktop) draw_button(el &ui2.Element, x int, y int, w int, h int) {
 	// second case a glyph drawn across a wide button swamps its text.
 	// A window's button on Windows XP's bar has a larger icon nearer its edge.
 	luna_task := d.walk.on_bar && d.walk.kind == .luna && el.image_path.len > 0 && el.text.len > 0
-	inset := if luna_task { luna_task_inset } else { text_inset }
-	icon_limit := if luna_task { luna_task_icon } else { button_icon_size }
+	compact_task := d.walk.on_bar && d.compact_taskbar() && el.image_path.len > 0 && el.text.len > 0
+	inset := if compact_task { 6 } else if luna_task { luna_task_inset } else { text_inset }
+	icon_limit := if compact_task { 18 } else if luna_task { luna_task_icon } else { button_icon_size }
 	mut text_x := x + inset
 	mut text_w := w - 2 * inset
 	if el.image_path.len > 0 {

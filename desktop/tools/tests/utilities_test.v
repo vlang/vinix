@@ -946,8 +946,8 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert app_start_jump_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert taskbar_pin_actions.len == available_apps.len
-	assert shortcut_rows_for_height(720) == 8
-	assert shortcut_rows_for_height(600) == 6
+	assert shortcut_rows_for_height(720, taskbar_height) == 8
+	assert shortcut_rows_for_height(600, taskbar_height) == 6
 }
 
 fn test_dota2_search_and_taskbar_pin_preserve_app_identity() {
@@ -1155,7 +1155,7 @@ fn test_start_button_opens_a_windows_7_style_menu_and_searches_programs() {
 	start := utility_element_named(root, action_start_toggle) or { panic('missing Start button') }
 	assert start.text == ''
 	assert start.image_path == 'builtin:vinix'
-	assert int(start.frame.x) == taskbar_padding
+	assert int(start.frame.x) == desktop.taskbar_padding()
 	assert int(start.frame.width) == start_button_width
 	assert !utility_tree_has_text(root, 'New window')
 	free_tree(root)
@@ -1165,7 +1165,7 @@ fn test_start_button_opens_a_windows_7_style_menu_and_searches_programs() {
 	menu := desktop.build_tree()
 	panel := utility_element_named(menu, action_start_panel) or { panic('missing Start menu') }
 	assert panel.clickable
-	assert int(panel.frame.x) == taskbar_padding
+	assert int(panel.frame.x) == desktop.taskbar_padding()
 	assert int(panel.frame.y + panel.frame.height) == 768 - taskbar_height
 	assert utility_tree_has_text(menu, 'All Programs  >')
 	assert utility_tree_has_text(menu, 'Shut down')
@@ -1235,9 +1235,8 @@ fn test_taskbar_keeps_a_bottom_right_clock_and_open_windows() {
 
 	root := desktop.build_tree()
 	taskbar := utility_element_named(root, 'taskbar') or { panic('missing taskbar') }
-	// Start, Overview, two windows, the pager, the tray's overflow chevron and network
-	// icon, build date and clock, the top edge and Show Desktop.
-	assert taskbar.children.len == 12 + workspace_count
+	assert int(taskbar.frame.height) == 32
+	assert int(taskbar.frame.y + taskbar.frame.height) == desktop.canvas.height
 	assert utility_element_named(taskbar, action_window_overview) != none
 	assert utility_element_named(taskbar, action_show_desktop) != none
 	assert utility_element_named(taskbar, 'tray.icon.network') != none
@@ -1246,22 +1245,28 @@ fn test_taskbar_keeps_a_bottom_right_clock_and_open_windows() {
 	assert utility_element_named(taskbar, 'task.1') != none
 	assert utility_element_named(taskbar, 'task.2') != none
 	clock_time := utility_element_named(taskbar, 'clock.time') or { panic('missing taskbar clock') }
-	clock_date := utility_element_named(taskbar, 'clock.date') or { panic('missing taskbar date') }
-	build_time := utility_element_named(taskbar, 'build.time') or { panic('missing desktop build time') }
-	build_date := utility_element_named(taskbar, 'build.date') or { panic('missing desktop build date') }
+	assert utility_element_named(taskbar, 'clock.date') == none
+	assert utility_element_named(taskbar, 'build.time') == none
+	assert utility_element_named(taskbar, 'build.date') == none
+	build_stamp := utility_element_named(root, 'desktop.build') or { panic('missing wallpaper build stamp') }
+	build_time := utility_element_named(build_stamp, 'build.time') or { panic('missing desktop build time') }
+	build_date := utility_element_named(build_stamp, 'build.date') or { panic('missing desktop build date') }
 	assert build_time.text.starts_with('Built ')
 	assert build_date.text.len > 0
-	assert int(build_time.frame.x + build_time.frame.width + taskbar_item_gap) == int(clock_time.frame.x)
+	assert int(build_stamp.frame.x + build_stamp.frame.width) == desktop.canvas.width - 12
+	assert build_stamp.frame.y < 20
 	assert clock_time.text == '00:00:00'
-	assert clock_date.text == 'Thu 1 Jan'
-	assert int(clock_time.frame.x + clock_time.frame.width) == 1280 - taskbar_show_desktop_width - taskbar_item_gap
+	assert desktop.tooltip_text(action_taskbar_clock) == 'Thu 1 Jan'
+	assert utility_element_named(taskbar, action_taskbar_clock) != none
+	assert int(clock_time.frame.x + clock_time.frame.width) == 1280 - taskbar_show_desktop_width - desktop.taskbar_gap()
 	free_tree(root)
 
 	desktop.close_window(2)
 	desktop.close_window(1)
 	empty := desktop.build_tree()
 	empty_taskbar := utility_element_named(empty, 'taskbar') or { panic('missing empty taskbar') }
-	assert empty_taskbar.children.len == 10 + workspace_count
+	assert utility_element_named(empty_taskbar, 'task.1') == none
+	assert utility_element_named(empty_taskbar, 'task.2') == none
 	assert utility_element_named(empty_taskbar, action_start_toggle) != none
 	assert utility_element_named(empty_taskbar, 'clock.time') != none
 	free_tree(empty)
@@ -1541,7 +1546,7 @@ fn test_taskbar_clock_stays_visible_at_m1_200_percent_scale() {
 	root := desktop.build_tree()
 	taskbar := utility_element_named(root, 'taskbar') or { panic('missing taskbar') }
 	clock := utility_element_named(taskbar, 'clock.time') or { panic('missing taskbar clock') }
-	clock_inset := taskbar_show_desktop_width + taskbar_item_gap
+	clock_inset := taskbar_show_desktop_width + desktop.taskbar_gap()
 	assert int(clock.frame.x + clock.frame.width) == desktop.canvas.width - clock_inset
 	assert int(clock.frame.x + clock.frame.width) * desktop_scale_200 == 3024 - 2 * clock_inset
 	assert int(taskbar.frame.y) * desktop_scale_200 == 1964 - 2 * taskbar_height

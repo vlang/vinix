@@ -26,8 +26,10 @@ documented in [SESSION.md](SESSION.md).
 
 What it does:
 
-- a wallpaper, and a taskbar with Start, open windows, the desktop build date
-  and time, and a clock in its bottom-right status area
+- a wallpaper, and a taskbar with Start, open windows and a clock in its
+  bottom-right status area. The default Vinix theme uses a compact 32-pixel bar
+  with app icons beside window titles, a single-line clock with the date on
+  hover, and the desktop build date and time at the wallpaper's top right
 - a **Windows 7-style taskbar**: pinned and running buttons that can be
   dragged into a new order, hover thumbnails with a window picker for grouped
   buttons, Aero Peek, a Show Desktop corner (also Super+D), Jump Lists with

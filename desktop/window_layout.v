@@ -254,8 +254,8 @@ fn (d &Desktop) window_layout_bounds() DamageRect {
 	} else {
 		window_layout_width
 	}
-	height := if desktop_usable_height(d.canvas.height) - 24 < window_layout_height {
-		desktop_usable_height(d.canvas.height) - 24
+	height := if desktop_usable_height(d.canvas.height, d.taskbar_height()) - 24 < window_layout_height {
+		desktop_usable_height(d.canvas.height, d.taskbar_height()) - 24
 	} else {
 		window_layout_height
 	}
@@ -263,8 +263,8 @@ fn (d &Desktop) window_layout_bounds() DamageRect {
 	mut y := window.y + d.theme().title_height + 8
 	if x + width > d.canvas.width - 12 { x = d.canvas.width - width - 12 }
 	if x < 12 { x = 12 }
-	if y + height > desktop_usable_height(d.canvas.height) - 12 {
-		y = desktop_usable_height(d.canvas.height) - height - 12
+	if y + height > desktop_usable_height(d.canvas.height, d.taskbar_height()) - 12 {
+		y = desktop_usable_height(d.canvas.height, d.taskbar_height()) - height - 12
 	}
 	if y < 12 { y = 12 }
 	return DamageRect{ x: x, y: y, w: width, h: height, valid: width > 0 && height > 0 }
@@ -275,7 +275,7 @@ fn window_layout_symbol(choice int, x int, y int, width int, height int) ui2.Ele
 	frame := if choice == 3 {
 		DamageRect{ x: width / 4, y: height / 4, w: width / 2, h: height / 2, valid: true }
 	} else {
-		window_placement_frame(window_layout_placement(choice), width, height + taskbar_height)
+		window_placement_frame(window_layout_placement(choice), width, height + taskbar_height, taskbar_height)
 	}
 	marks << ui2.view('', ui2.rect(f64(frame.x + 2), f64(frame.y + 2),
 		f64(frame.w - 4), f64(frame.h - 4)), ui2.BoxStyle{ bg: app_accent, radius: 2 }, [])

@@ -103,11 +103,11 @@ fn (fb &Framebuffer) present_viewport(canvas &Canvas) {
 fn (mut d Desktop) configure_display_outputs(fb &Framebuffer) {
 	d.session.output_count = 0
 	scale := desktop_current_scale()
-	d.session.outputs[0] = sessioncore.Display{ id: fb.identity, area: sessioncore.Rect{fb.origin_x / scale, fb.origin_y / scale, desktop_scaled_extent(fb.width, scale), desktop_usable_height(desktop_scaled_extent(fb.height, scale))}, primary: true }
+	d.session.outputs[0] = sessioncore.Display{ id: fb.identity, area: sessioncore.Rect{fb.origin_x / scale, fb.origin_y / scale, desktop_scaled_extent(fb.width, scale), desktop_usable_height(desktop_scaled_extent(fb.height, scale), d.taskbar_height())}, primary: true }
 	d.session.output_count = 1
 	for i in 0 .. fb.extra_count {
 		next := fb.extra[i]
-		d.session.outputs[i + 1] = sessioncore.Display{ id: next.identity, area: sessioncore.Rect{next.origin_x / scale, next.origin_y / scale, desktop_scaled_extent(next.width, scale), desktop_usable_height(desktop_scaled_extent(next.height, scale))} }
+		d.session.outputs[i + 1] = sessioncore.Display{ id: next.identity, area: sessioncore.Rect{next.origin_x / scale, next.origin_y / scale, desktop_scaled_extent(next.width, scale), desktop_usable_height(desktop_scaled_extent(next.height, scale), d.taskbar_height())} }
 		d.session.output_count++
 	}
 	d.shell_display_geometry()
@@ -134,7 +134,7 @@ fn (mut d Desktop) recover_display_outputs(fb &Framebuffer) {
 
 fn (d &Desktop) window_display_area(index int) sessioncore.Rect {
 	if d.session.state.display_count == 0 || index < 0 || index >= d.windows.len {
-		return sessioncore.Rect{ w: d.canvas.width, h: desktop_usable_height(d.canvas.height) }
+		return sessioncore.Rect{ w: d.canvas.width, h: desktop_usable_height(d.canvas.height, d.taskbar_height()) }
 	}
 	w := d.windows[index]
 	if w.display.len > 0 { return d.session.state.display_for(w.display.str()).area }
@@ -145,6 +145,33 @@ fn (d &Desktop) window_display_area(index int) sessioncore.Rect {
 		}
 	}
 	return d.session.state.display_for('').area
+}
+
+// A theme change moves the work area's bottom edge as well as the bar.
+fn (mut d Desktop) resize_taskbar_work_area(previous_height int) {
+	for i in 0 .. d.session.output_count {
+		d.session.outputs[i].area.h += previous_height - d.taskbar_height()
+	}
+	d.shell_display_geometry()
+	for i in 0 .. d.windows.len {
+		area := d.window_display_area(i)
+		if d.windows[i].maximized {
+			d.windows[i].x = area.x
+			d.windows[i].y = area.y
+			d.windows[i].width = area.w
+			d.windows[i].height = area.h
+		} else if d.windows[i].snap != .none_ {
+			d.apply_snap_geometry(i, d.windows[i].snap, area.w, area.h + d.taskbar_height())
+			d.windows[i].x += area.x
+			d.windows[i].y += area.y
+		} else {
+			d.clamp_to_screen(i)
+		}
+	}
+	d.close_window_overlays()
+	d.close_taskbar_preview()
+	d.hide_tooltip()
+	d.clear_hit_targets()
 }
 
 fn (mut d Desktop) apply_session_placements() {

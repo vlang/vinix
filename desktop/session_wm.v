@@ -58,7 +58,7 @@ fn (mut d Desktop) shell_display_geometry() {
 	}
 	display := sessioncore.Display{
 		id:      sessioncore.text('/dev/fb0') or { return }
-		area:    sessioncore.Rect{ w: d.canvas.width, h: desktop_usable_height(d.canvas.height) }
+		area:    sessioncore.Rect{ w: d.canvas.width, h: desktop_usable_height(d.canvas.height, d.taskbar_height()) }
 		primary: true
 	}
 	displays := [display]

@@ -52,8 +52,8 @@ fn (layout WindowOverviewLayout) capacity() int {
 	return layout.columns * layout.rows
 }
 
-fn window_overview_layout(screen_width int, screen_height int) WindowOverviewLayout {
-	usable := desktop_usable_height(screen_height)
+fn window_overview_layout(screen_width int, screen_height int, bar_height int) WindowOverviewLayout {
+	usable := desktop_usable_height(screen_height, bar_height)
 	margin := if usable < 300 { 8 } else { window_overview_margin }
 	x := if screen_width > 2 * margin { margin } else { 0 }
 	y := if usable > 2 * margin { margin } else { 0 }
@@ -137,7 +137,7 @@ fn (mut d Desktop) reconcile_window_overview() {
 		d.overview.selected_id = d.window_overview_id_at(0) or { 0 }
 		0
 	}
-	layout := window_overview_layout(d.canvas.width, d.canvas.height)
+	layout := window_overview_layout(d.canvas.width, d.canvas.height, d.taskbar_height())
 	d.overview.page = position / layout.capacity()
 }
 
@@ -251,7 +251,7 @@ fn (mut d Desktop) commit_window_overview(id int) {
 
 fn (mut d Desktop) page_window_overview(direction int) {
 	d.reconcile_window_overview()
-	layout := window_overview_layout(d.canvas.width, d.canvas.height)
+	layout := window_overview_layout(d.canvas.width, d.canvas.height, d.taskbar_height())
 	count := d.window_overview_count()
 	pages := (count + layout.capacity() - 1) / layout.capacity()
 	if pages <= 1 {
@@ -305,7 +305,7 @@ fn (mut d Desktop) window_overview_sequence(sequence string) {
 	if !d.overview.active {
 		return
 	}
-	layout := window_overview_layout(d.canvas.width, d.canvas.height)
+	layout := window_overview_layout(d.canvas.width, d.canvas.height, d.taskbar_height())
 	match sequence {
 		'\x1b[A', '\x1bOA' { d.step_window_overview(-layout.columns) }
 		'\x1b[B', '\x1bOB' { d.step_window_overview(layout.columns) }
@@ -466,7 +466,7 @@ fn (d &Desktop) window_overview_card(index int, x int, y int, width int, height 
 
 fn (mut d Desktop) window_overview_element() ui2.Element {
 	d.reconcile_window_overview()
-	layout := window_overview_layout(d.canvas.width, d.canvas.height)
+	layout := window_overview_layout(d.canvas.width, d.canvas.height, d.taskbar_height())
 	count := d.window_overview_count()
 	mut children := frame_elements(layout.capacity() + workspace_count + 5)
 	children << ui2.label('', tr('desktop.overview.title'),

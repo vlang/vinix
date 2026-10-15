@@ -93,7 +93,7 @@ fn (d &Desktop) start_menu_rect() ui2.Rect {
 		width = d.canvas.width - 2 * start_menu_margin
 	}
 	mut height := start_menu_preferred_height
-	available_height := d.canvas.height - taskbar_height - start_menu_margin
+	available_height := d.canvas.height - d.taskbar_height() - start_menu_margin
 	if height > available_height {
 		height = available_height
 	}
@@ -106,7 +106,7 @@ fn (d &Desktop) start_menu_rect() ui2.Rect {
 	mut x := if d.theme().dock {
 		(d.canvas.width - width) / 2
 	} else {
-		taskbar_padding
+		d.taskbar_padding()
 	}
 	if x + width > d.canvas.width - start_menu_margin {
 		x = d.canvas.width - start_menu_margin - width
@@ -118,7 +118,7 @@ fn (d &Desktop) start_menu_rect() ui2.Rect {
 		// Windows XP's menu rises from the Start button, in the screen's corner.
 		x = 0
 	}
-	return ui2.rect(f64(x), f64(d.canvas.height - taskbar_height - height), f64(width), f64(height))
+	return ui2.rect(f64(x), f64(d.canvas.height - d.taskbar_height() - height), f64(width), f64(height))
 }
 
 // start_menu_pane_height is the height of the program pane: the menu less

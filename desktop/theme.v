@@ -260,9 +260,11 @@ const shortcut_gap = 6
 const shortcut_icon = 30
 
 // ── Taskbar ────────────────────────────────────────────────────────
-const taskbar_height = 46
+// The default theme is compact; the other themes keep their original height.
+const taskbar_height = 32
+const classic_taskbar_height = 46
 // A minimised window's entry, dimmed rather than marked with a character.
-const taskbar_item_height = 30
+const taskbar_item_height = 28
 const taskbar_item_width = 168
 // Entries shrink to share the bar before any of them is dropped, but only
 // down to here — narrower than this and a title says nothing useful.
@@ -271,7 +273,9 @@ const taskbar_item_min_width = 84
 // framebuffer's physical density. At 200% the canvas expands it along with the
 // rest of the desktop, so task buttons can never paint over it on an M1.
 const taskbar_clock_width = 132
-// The clock's two lines, right-aligned in that room.
+const compact_clock_width = 104
+const compact_clock_size = 13
+// Classic themes keep the clock's two lines, right-aligned in that room.
 const taskbar_clock_time_size = 17
 const taskbar_clock_date_size = 11
 const taskbar_build_width = 132

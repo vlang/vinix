@@ -51,8 +51,8 @@ fn window_snap_assist_opposite(snap WindowSnap) WindowSnap {
 }
 
 fn window_snap_assist_layout(target WindowSnap, screen_width int,
-	screen_height int) WindowSnapAssistLayout {
-	frame := window_placement_frame(WindowPlacement{ snap: target }, screen_width, screen_height)
+	screen_height int, bar_height int) WindowSnapAssistLayout {
+	frame := window_placement_frame(WindowPlacement{ snap: target }, screen_width, screen_height, bar_height)
 	margin := if frame.w >= 220 && frame.h >= 200 {
 		12
 	} else if frame.w >= 32 && frame.h >= 32 {
@@ -114,7 +114,7 @@ fn (d &Desktop) window_snap_assist_eligible(index int, anchor_id int) bool {
 	window := &d.windows[index]
 	return window.id != anchor_id && window.workspace == d.current_workspace && !window.minimized
 		&& window.width > 0 && window.height > 0 && window.x < d.canvas.width
-		&& window.y < desktop_usable_height(d.canvas.height) && window.x + window.width > 0
+		&& window.y < desktop_usable_height(d.canvas.height, d.taskbar_height()) && window.x + window.width > 0
 		&& window.y + window.height > 0
 }
 
@@ -179,7 +179,7 @@ fn (mut d Desktop) open_window_snap_assist(id int) {
 	window := &d.windows[index]
 	target := window_snap_assist_opposite(window.snap)
 	if target == .none_ || window.workspace != d.current_workspace || window.minimized
-		|| window.maximized || d.canvas.width < 2 || desktop_usable_height(d.canvas.height) < 1
+		|| window.maximized || d.canvas.width < 2 || desktop_usable_height(d.canvas.height, d.taskbar_height()) < 1
 		|| d.window_snap_assist_occupied(id, target) {
 		return
 	}
@@ -226,7 +226,7 @@ fn (mut d Desktop) reconcile_window_snap_assist() {
 		d.snap_assist.selected_id = d.window_snap_assist_id_at(0) or { 0 }
 		0
 	}
-	layout := window_snap_assist_layout(d.snap_assist.target, d.canvas.width, d.canvas.height)
+	layout := window_snap_assist_layout(d.snap_assist.target, d.canvas.width, d.canvas.height, d.taskbar_height())
 	d.snap_assist.page = position / layout.capacity()
 }
 
@@ -244,7 +244,7 @@ fn (mut d Desktop) step_window_snap_assist(step int) {
 fn (mut d Desktop) page_window_snap_assist(direction int) {
 	d.reconcile_window_snap_assist()
 	if !d.snap_assist.active { return }
-	layout := window_snap_assist_layout(d.snap_assist.target, d.canvas.width, d.canvas.height)
+	layout := window_snap_assist_layout(d.snap_assist.target, d.canvas.width, d.canvas.height, d.taskbar_height())
 	count := d.window_snap_assist_count()
 	pages := (count + layout.capacity() - 1) / layout.capacity()
 	if pages <= 1 { return }
@@ -314,7 +314,7 @@ fn (mut d Desktop) window_snap_assist_sequence(sequence string) {
 		}
 		return
 	}
-	layout := window_snap_assist_layout(d.snap_assist.target, d.canvas.width, d.canvas.height)
+	layout := window_snap_assist_layout(d.snap_assist.target, d.canvas.width, d.canvas.height, d.taskbar_height())
 	match sequence {
 		'\x1b[A', '\x1bOA' { d.step_window_snap_assist(-layout.columns) }
 		'\x1b[B', '\x1bOB' { d.step_window_snap_assist(layout.columns) }
@@ -379,7 +379,7 @@ fn (mut d Desktop) take_window_snap_assist_keys(keys string) string {
 fn (mut d Desktop) window_snap_assist_element() ?ui2.Element {
 	d.reconcile_window_snap_assist()
 	if !d.snap_assist.active { return none }
-	layout := window_snap_assist_layout(d.snap_assist.target, d.canvas.width, d.canvas.height)
+	layout := window_snap_assist_layout(d.snap_assist.target, d.canvas.width, d.canvas.height, d.taskbar_height())
 	mut children := frame_elements(layout.capacity() + 4)
 	children << ui2.label('', tr('window.snap_assist.title'),
 		ui2.rect(f64(layout.padding), f64(layout.padding), f64(layout.width - 2 * layout.padding), f64(layout.header)),

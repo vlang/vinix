@@ -590,6 +590,7 @@ fn (d &Desktop) tray_elements(mut children []ui2.Element, x int, y int, height i
 
 fn (d &Desktop) tooltip_text(action string) string {
 	return match action {
+		action_taskbar_clock { d.taskbar_clock_date }
 		action_window_overview { tr('desktop.overview.title') }
 		action_show_desktop { tr('tray.show_desktop') }
 		action_tray_overflow { tr('tray.show_hidden_icons') }
@@ -929,7 +930,7 @@ fn (mut d Desktop) tray_flyout_element() ?ui2.Element {
 	if x < 6 {
 		x = 6
 	}
-	y := d.canvas.height - taskbar_height - height - 6
+	y := d.canvas.height - d.taskbar_height() - height - 6
 	d.tray.flyout_x = x
 	d.tray.flyout_y = y
 	d.tray.flyout_width = width

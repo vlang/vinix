@@ -14,8 +14,8 @@ fn desktop_rescale_coordinate(value int, old_extent int, new_extent int) int {
 	return int(i64(value) * i64(new_extent) / i64(old_extent))
 }
 
-fn desktop_usable_height(screen_height int) int {
-	usable := screen_height - taskbar_height
+fn desktop_usable_height(screen_height int, bar_height int) int {
+	usable := screen_height - bar_height
 	if usable >= default_title_height {
 		return usable
 	}
@@ -27,7 +27,7 @@ fn desktop_usable_height(screen_height int) int {
 // desktop dimensions change.
 fn (mut d Desktop) apply_snap_geometry(index int, snap WindowSnap, screen_width int, screen_height int) {
 	half_width := screen_width / 2
-	usable_height := desktop_usable_height(screen_height)
+	usable_height := desktop_usable_height(screen_height, d.taskbar_height())
 	half_height := usable_height / 2
 	match snap {
 		.left {
@@ -66,7 +66,7 @@ fn (mut d Desktop) apply_snap_geometry(index int, snap WindowSnap, screen_width 
 	}
 }
 
-fn desktop_clamp_scaled_position(x int, y int, width int, height int, screen_width int, screen_height int) (int, int) {
+fn desktop_clamp_scaled_position(x int, y int, width int, height int, screen_width int, screen_height int, bar_height int) (int, int) {
 	mut next_x := x
 	mut next_y := y
 	margin := 60
@@ -82,7 +82,7 @@ fn desktop_clamp_scaled_position(x int, y int, width int, height int, screen_wid
 		}
 	}
 
-	usable_height := desktop_usable_height(screen_height)
+	usable_height := desktop_usable_height(screen_height, bar_height)
 	if height >= usable_height {
 		next_y = 0
 	} else {
@@ -152,7 +152,7 @@ fn (mut d Desktop) apply_requested_scale() {
 		d.windows[i].restore_x = desktop_rescale_coordinate(d.windows[i].restore_x, old_width, new_width)
 		d.windows[i].restore_y = desktop_rescale_coordinate(d.windows[i].restore_y, old_height, new_height)
 
-		restore_x, restore_y := desktop_clamp_scaled_position(d.windows[i].restore_x, d.windows[i].restore_y, d.windows[i].restore_width, d.windows[i].restore_height, new_width, new_height)
+		restore_x, restore_y := desktop_clamp_scaled_position(d.windows[i].restore_x, d.windows[i].restore_y, d.windows[i].restore_width, d.windows[i].restore_height, new_width, new_height, d.taskbar_height())
 		d.windows[i].restore_x = restore_x
 		d.windows[i].restore_y = restore_y
 
@@ -160,11 +160,11 @@ fn (mut d Desktop) apply_requested_scale() {
 			d.windows[i].x = 0
 			d.windows[i].y = 0
 			d.windows[i].width = new_width
-			d.windows[i].height = desktop_usable_height(new_height)
+			d.windows[i].height = desktop_usable_height(new_height, d.taskbar_height())
 		} else if d.windows[i].snap != .none_ {
 			d.apply_snap_geometry(i, d.windows[i].snap, new_width, new_height)
 		} else {
-			window_x, window_y := desktop_clamp_scaled_position(d.windows[i].x, d.windows[i].y, d.windows[i].width, d.windows[i].height, new_width, new_height)
+			window_x, window_y := desktop_clamp_scaled_position(d.windows[i].x, d.windows[i].y, d.windows[i].width, d.windows[i].height, new_width, new_height, d.taskbar_height())
 			d.windows[i].x = window_x
 			d.windows[i].y = window_y
 		}

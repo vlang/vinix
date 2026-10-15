@@ -137,7 +137,7 @@ fn (d &Desktop) luna_taskbar_texts(mut children []ui2.Element, build_x int, buil
 fn luna_taskbar_text(mut children []ui2.Element, id string, under_id string, text string, under string, x int,
 	width int, color u32) {
 	rows := if under.len > 0 { luna_clock_time_rows + luna_clock_date_rows } else { luna_clock_time_rows }
-	top := (taskbar_height - rows) / 2
+	top := (classic_taskbar_height - rows) / 2
 	children << ui2.label(id, text, ui2.rect(f64(x), f64(top), f64(width), luna_clock_time_rows),
 		ui2.TextStyle{
 		color: color

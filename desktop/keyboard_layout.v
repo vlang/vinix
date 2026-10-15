@@ -612,6 +612,11 @@ fn (d &Desktop) input_menu_shown() bool {
 // covers. Its digits are all one width, so this holds still as the seconds
 // tick and changes only with the date or the clock's format.
 fn (d &Desktop) clock_text_width() int {
+	if d.compact_taskbar() {
+		if d.fonts.len == 0 { return compact_clock_width }
+		width := d.face_for(ui2.TextStyle{ size: compact_clock_size }).text_width(d.taskbar_clock_time)
+		return if width < compact_clock_width { width } else { compact_clock_width }
+	}
 	if d.fonts.len == 0 {
 		return taskbar_clock_width
 	}
@@ -637,7 +642,7 @@ fn (d &Desktop) input_menu_span() int {
 	if !d.input_menu_shown() {
 		return 0
 	}
-	need := tray_input_width + taskbar_item_gap - (d.taskbar_clock_box() - d.clock_text_width())
+	need := tray_input_width + d.taskbar_gap() - (d.taskbar_clock_box() - d.clock_text_width())
 	return if need > 0 { need } else { 0 }
 }
 

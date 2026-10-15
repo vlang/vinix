@@ -136,7 +136,7 @@ fn test_keyboard_resize_anchors_top_left_and_enforces_minimum_and_work_area() {
 	for _ in 0 .. 100 { desktop.step_window_action_geometry(1, 1, false) }
 	maximum := actions_frame(&desktop, id)
 	assert maximum.x + maximum.width == desktop.canvas.width
-	assert maximum.y + maximum.height == desktop_usable_height(desktop.canvas.height)
+	assert maximum.y + maximum.height == desktop_usable_height(desktop.canvas.height, taskbar_height)
 	desktop.accept_window_action_geometry()
 	accepted := actions_frame(&desktop, id)
 	assert accepted.restore_width == accepted.width
@@ -155,7 +155,7 @@ fn test_keyboard_move_keeps_title_bar_reachable_and_cancellation_does_not_focus_
 	for _ in 0 .. 150 { desktop.step_window_action_geometry(-1, 1, false) }
 	frame2 := actions_frame(&desktop, id)
 	assert frame2.x + frame2.width == 60
-	assert frame2.y + desktop.theme().title_height == desktop_usable_height(desktop.canvas.height)
+	assert frame2.y + desktop.theme().title_height == desktop_usable_height(desktop.canvas.height, taskbar_height)
 	desktop.close_window_actions()
 	other := desktop.spawn('System', .system, 220, 80, 400, 260)
 	actions_start(mut desktop, id, .move)
@@ -221,7 +221,7 @@ fn test_titlebar_right_click_and_menu_hit_targets_are_modal_and_page_on_small_sc
 	assert bounds.valid && bounds.rows < window_actions_ids.len
 	assert bounds.x >= 0 && bounds.y >= 0
 	assert bounds.x + bounds.width <= desktop.canvas.width
-	assert bounds.y + bounds.height <= desktop_usable_height(desktop.canvas.height)
+	assert bounds.y + bounds.height <= desktop_usable_height(desktop.canvas.height, taskbar_height)
 	root := desktop.build_tree()
 	desktop.targets.clear()
 	desktop.record_subtree_targets(&root, 0, 0, desktop.canvas.width, desktop.canvas.height)
@@ -302,11 +302,11 @@ fn test_display_scale_cancels_keyboard_geometry_before_translating_original_fram
 				assert frame.snap == .none_ && !frame.maximized
 			} else if arrangement == 3 {
 				assert frame.x == 0 && frame.y == 0
-				assert frame.width == 400 && frame.height == desktop_usable_height(300)
+				assert frame.width == 400 && frame.height == desktop_usable_height(300, taskbar_height)
 				assert frame.maximized && frame.snap == .none_
 			} else {
 				snap := if arrangement == 1 { WindowSnap.right } else { WindowSnap.bottom_right }
-				expected := window_placement_frame(WindowPlacement{ snap: snap }, 400, 300)
+				expected := window_placement_frame(WindowPlacement{ snap: snap }, 400, 300, taskbar_height)
 				assert frame.snap == snap && !frame.maximized
 				assert frame.x == expected.x && frame.y == expected.y
 				assert frame.width == expected.w && frame.height == expected.h

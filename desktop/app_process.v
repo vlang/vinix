@@ -888,6 +888,7 @@ fn app_current_state(desktop &Desktop) AppWireState {
 }
 
 fn apply_app_state(mut desktop Desktop, state AppWireState) {
+	previous_bar_height := desktop.taskbar_height()
 	wallpaper_changed := desktop.settings.wallpaper_color != state.settings.wallpaper_color
 		|| desktop.settings.wallpaper_image != state.settings.wallpaper_image
 	clock_changed := desktop.settings.clock_24_hour != state.settings.clock_24_hour
@@ -908,6 +909,9 @@ fn apply_app_state(mut desktop Desktop, state AppWireState) {
 		desktop.invalidate_wallpaper()
 	}
 	if theme_changed {
+		if previous_bar_height != desktop.taskbar_height() {
+			desktop.resize_taskbar_work_area(previous_bar_height)
+		}
 		desktop.dirty = true
 	}
 	if clock_changed {

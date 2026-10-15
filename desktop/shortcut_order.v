@@ -164,12 +164,12 @@ fn (d &Desktop) shortcut_slot_for_app(app_index int) int {
 	return app_index
 }
 
-fn shortcut_slot_at(x int, y int, screen_height int) ?int {
+fn shortcut_slot_at(x int, y int, screen_height int, bar_height int) ?int {
 	if available_apps.len == 0 || x < shortcut_left || y < shortcut_top
-		|| y >= screen_height - taskbar_height {
+		|| y >= screen_height - bar_height {
 		return none
 	}
-	rows := shortcut_rows_for_height(screen_height)
+	rows := shortcut_rows_for_height(screen_height, bar_height)
 	cell_width := shortcut_width + shortcut_gap
 	cell_height := shortcut_height + shortcut_gap
 	column := (x - shortcut_left) / cell_width
@@ -218,7 +218,7 @@ fn (mut d Desktop) update_shortcut_drag(x int, y int) {
 		}
 		d.shortcut_press.dragging = true
 	}
-	target := shortcut_slot_at(x, y, d.canvas.height) or { return }
+	target := shortcut_slot_at(x, y, d.canvas.height, d.taskbar_height()) or { return }
 	from := d.shortcut_slot_for_app(d.shortcut_press.app_index)
 	if from < 0 || target == from {
 		return

@@ -118,7 +118,7 @@ fn test_windows_xp_frame_has_windows_xp_measurements() {
 	wide := luna_test_child(&maximized, '.body')
 	assert int(wide.frame.x) == 0
 	assert int(wide.frame.width) == 640
-	assert int(wide.frame.height) == 480 - taskbar_height - 30
+	assert int(wide.frame.height) == 480 - classic_taskbar_height - 30
 	free_tree(maximized)
 }
 
@@ -248,18 +248,18 @@ fn test_windows_xp_taskbar_is_the_blue_bar() {
 	desktop.update_taskbar_clock_at(1_760_000_000)
 	id := desktop.spawn('Welcome', .welcome, 100, 60, 300, 220)
 	luna_test_full_frame(mut desktop)
-	top := 600 - taskbar_height
+	top := 600 - classic_taskbar_height
 	layout := desktop.taskbar_layout(1)
 	// Between the last task button and the pager the bar is its own gradient.
 	free_x := layout.workspace_x - 3
-	for row in [0, 5, 20, taskbar_height - 1] {
-		assert luna_test_pixel(&desktop, free_x, top + row) == luna_gradient(luna_bar, row, taskbar_height)
+	for row in [0, 5, 20, classic_taskbar_height - 1] {
+		assert luna_test_pixel(&desktop, free_x, top + row) == luna_gradient(luna_bar, row, classic_taskbar_height)
 	}
 	// The notification area and the clock sit in the lighter panel, which
 	// begins with its dark line.
 	tray_x := layout.status_right - layout.status_width - taskbar_item_gap
 	assert luna_test_pixel(&desktop, tray_x, top + 20) == luna_tray_edge
-	assert luna_test_pixel(&desktop, tray_x + 3, top + 2) == luna_gradient(luna_tray, 2, taskbar_height)
+	assert luna_test_pixel(&desktop, tray_x + 3, top + 2) == luna_gradient(luna_tray, 2, classic_taskbar_height)
 	// The Start button is green, and the focused window's button is pressed in.
 	start := desktop.hit_target_named(action_start_toggle) or { panic('no Start button') }
 	green := luna_test_pixel(&desktop, start.x + 4, start.y + start.height / 2)
@@ -352,7 +352,7 @@ fn test_windows_xp_start_menu_is_laid_out_as_windows_xps() {
 		mut desktop := luna_menu_test_desktop(scale)
 		desktop.spawn('Welcome', .welcome, 520, 60, 300, 220)
 		luna_test_full_frame(mut desktop)
-		top := 600 - taskbar_height
+		top := 600 - classic_taskbar_height
 		rect := desktop.start_menu_rect()
 		y := int(rect.y)
 		width := int(rect.width)
@@ -490,12 +490,12 @@ fn test_windows_xp_start_button_is_green_in_the_corner() {
 	for scale in [1, 2] {
 		mut desktop := luna_menu_test_desktop(scale)
 		luna_test_full_frame(mut desktop)
-		top := 600 - taskbar_height
-		middle := top + taskbar_height / 2
+		top := 600 - classic_taskbar_height
+		middle := top + classic_taskbar_height / 2
 		start := desktop.hit_target_named(action_start_toggle) or { panic('no Start button') }
 		// The whole height of the bar from the screen's corner, as wide as its
 		// mark and its word need.
-		assert start.x == 0 && start.y == top && start.height == taskbar_height
+		assert start.x == 0 && start.y == top && start.height == classic_taskbar_height
 		assert start.width == desktop.luna_start_width()
 		assert start.width > start_button_width
 		tree := desktop.build_tree()
@@ -507,13 +507,13 @@ fn test_windows_xp_start_button_is_green_in_the_corner() {
 		// other end, where the bar shows in the corners.
 		rest := luna_test_pixel(&desktop, 3, middle)
 		for corner in [luna_test_pixel(&desktop, 0, top + 1), rest,
-			luna_test_pixel(&desktop, 0, top + taskbar_height - 2)] {
+			luna_test_pixel(&desktop, 0, top + classic_taskbar_height - 2)] {
 			assert luna_test_green(corner) > luna_test_red(corner) + 0x30
 			assert luna_test_green(corner) > luna_test_blue(corner) + 0x30
 		}
-		assert luna_test_pixel(&desktop, start.width - 1, top) == luna_gradient(luna_bar, 0, taskbar_height)
-		assert luna_test_pixel(&desktop, start.width - 1, top + taskbar_height - 1) == luna_gradient(luna_bar,
-			taskbar_height - 1, taskbar_height)
+		assert luna_test_pixel(&desktop, start.width - 1, top) == luna_gradient(luna_bar, 0, classic_taskbar_height)
+		assert luna_test_pixel(&desktop, start.width - 1, top + classic_taskbar_height - 1) == luna_gradient(luna_bar,
+			classic_taskbar_height - 1, classic_taskbar_height)
 		// Its mark and its word are white.
 		mut white := 0
 		for x in 0 .. start.width {
@@ -548,7 +548,7 @@ fn test_windows_xp_start_button_is_green_in_the_corner() {
 			luna_test_full_frame(mut desktop)
 			plain := desktop.hit_target_named(action_start_toggle) or { panic('no Start button') }
 			assert plain.x > 0 && plain.width == start_button_width
-			assert plain.height < taskbar_height
+			assert plain.height < classic_taskbar_height
 			assert !desktop.start_menu_luna()
 			own := desktop.start_menu_rect()
 			assert int(own.x) > 0 && int(own.width) == start_menu_preferred_width
@@ -622,12 +622,12 @@ fn test_windows_xp_start_menu_partial_frames_match_full_ones() {
 		desktop.set_hover(action_start_documents)
 		luna_test_full_frame(mut desktop)
 		before := luna_test_pixels(&desktop)
-		top := 600 - taskbar_height
+		top := 600 - classic_taskbar_height
 		y := int(desktop.start_menu_rect().y)
 		// The header's corner and the line under it, the two columns, the
 		// menu's edge over a window, and the foot with the Start button.
 		for area in [[0, y - 4, 90, 100], [100, y + 50, 200, 40], [200, y + 200, 120, 90],
-			[400, y + 30, 80, 300], [0, top - 60, 300, 60 + taskbar_height],
+			[400, y + 30, 80, 300], [0, top - 60, 300, 60 + classic_taskbar_height],
 			[luna_menu_width - 150, top - 44, 200, 50]] {
 			luna_test_partial_frame(mut desktop, area[0], area[1], area[2], area[3])
 			luna_test_same(&desktop, luna_test_pixels(&desktop), before)
@@ -657,12 +657,12 @@ fn test_windows_xp_task_buttons_are_raised_with_an_icon_and_a_title() {
 		first := desktop.spawn('Welcome', .welcome, 100, 60, 300, 220)
 		second := desktop.spawn('Notes', .notes, 200, 150, 300, 200)
 		luna_test_full_frame(mut desktop)
-		top := 600 - taskbar_height
+		top := 600 - classic_taskbar_height
 		raised := desktop.hit_target_named('task.${first}') or { panic('no task button') }
 		pressed := desktop.hit_target_named('task.${second}') or { panic('no task button') }
 		// Nearly the height of the bar, in its middle, one after the other.
 		assert raised.height == luna_task_height && pressed.height == luna_task_height
-		assert raised.y == top + (taskbar_height - luna_task_height) / 2
+		assert raised.y == top + (classic_taskbar_height - luna_task_height) / 2
 		assert pressed.x == raised.x + raised.width + taskbar_item_gap
 		// A button is the window's icon and then its title, in plain type. A
 		// window with no icon of its own has the mark its title bar has.
@@ -690,7 +690,7 @@ fn test_windows_xp_task_buttons_are_raised_with_an_icon_and_a_title() {
 		assert luna_test_green(luna_test_pixel(&desktop, x, raised.y + 3)) > luna_test_green(luna_bar_button)
 		assert luna_test_green(luna_test_pixel(&desktop, x, raised.y + raised.height - 4)) < luna_test_green(luna_bar_button)
 		assert luna_test_pixel(&desktop, raised.x, raised.y) == luna_gradient(luna_bar, raised.y - top,
-			taskbar_height)
+			classic_taskbar_height)
 		// Pressed in, for the window in front: the other way about.
 		px := pressed.x + pressed.width - 8
 		assert luna_test_pixel(&desktop, px, middle) == luna_bar_button_pressed
@@ -713,7 +713,7 @@ fn test_windows_xp_quick_launch_is_icons_alone() {
 	desktop.pinned_apps = [0, 3]
 	window := desktop.spawn('Welcome', .welcome, 100, 60, 300, 220)
 	luna_test_full_frame(mut desktop)
-	top := 600 - taskbar_height
+	top := 600 - classic_taskbar_height
 	layout := desktop.taskbar_layout(3)
 	files := desktop.hit_target_named(taskbar_pin_actions[0]) or { panic('no pinned Files') }
 	terminal := desktop.hit_target_named(taskbar_pin_actions[3]) or { panic('no pinned Terminal') }
@@ -733,7 +733,7 @@ fn test_windows_xp_quick_launch_is_icons_alone() {
 	assert luna_test_pictured(&tree, available_apps[0].icon)
 	assert luna_test_pictured(&tree, available_apps[3].icon)
 	free_tree(tree)
-	corner := luna_gradient(luna_bar, files.y + 1 - top, taskbar_height)
+	corner := luna_gradient(luna_bar, files.y + 1 - top, classic_taskbar_height)
 	assert luna_test_pixel(&desktop, files.x + 1, files.y + 1) == corner
 	// Under the pointer it is in a raised square.
 	desktop.set_hover(taskbar_pin_actions[0])
@@ -791,7 +791,7 @@ fn test_windows_xp_clock_is_small_plain_and_in_the_middle() {
 	assert time.text_style.size == luna_clock_time_size && !time.text_style.bold
 	assert date.text_style.size == luna_clock_date_size && !date.text_style.bold
 	assert time.text_style.color == 0xffffff && date.text_style.color == 0xffffff
-	assert int(time.frame.y) == (taskbar_height - luna_clock_time_rows - luna_clock_date_rows) / 2
+	assert int(time.frame.y) == (classic_taskbar_height - luna_clock_time_rows - luna_clock_date_rows) / 2
 	assert int(date.frame.y) == int(time.frame.y) + luna_clock_time_rows
 	assert !built.text_style.bold && built.text_style.size == luna_clock_time_size
 	// Its box is what its type needs, at the end of the notification area.
@@ -817,7 +817,7 @@ fn test_windows_xp_clock_is_small_plain_and_in_the_middle() {
 	under := luna_test_find(&alone_tree, 'clock.date') or { panic('no date') }
 	assert under.text.len == 0
 	assert alone.text.ends_with('M')
-	assert int(alone.frame.y) == (taskbar_height - luna_clock_time_rows) / 2
+	assert int(alone.frame.y) == (classic_taskbar_height - luna_clock_time_rows) / 2
 	assert int(alone.frame.width) == desktop.luna_clock_box() && desktop.luna_clock_box() <= box
 	free_tree(alone_tree)
 
@@ -833,11 +833,11 @@ fn test_windows_xp_clock_is_small_plain_and_in_the_middle() {
 	assert input.x >= int(stamp.frame.x + stamp.frame.width)
 	free_tree(badge_tree)
 
-	// The other themes keep the boxes the bar has always given them.
+	// The default bar only reserves its time; the classic themes keep both boxes.
 	for kind in [ThemeKind.default_, ThemeKind.windows7, ThemeKind.macos] {
 		desktop.settings.theme = kind
-		assert desktop.taskbar_clock_box() == taskbar_clock_width
-		assert desktop.taskbar_build_box() == taskbar_build_width
+		assert desktop.taskbar_clock_box() == if kind == .default_ { compact_clock_width } else { taskbar_clock_width }
+		assert desktop.taskbar_build_box() == if kind == .default_ { 0 } else { taskbar_build_width }
 		assert !desktop.taskbar_luna()
 	}
 }
@@ -847,7 +847,7 @@ fn test_windows_xp_bar_boxes_only_what_is_pressed_or_under_the_pointer() {
 		mut desktop := luna_menu_test_desktop(scale)
 		desktop.spawn('Welcome', .welcome, 100, 60, 300, 220)
 		luna_test_full_frame(mut desktop)
-		top := 600 - taskbar_height
+		top := 600 - classic_taskbar_height
 		tree := desktop.build_tree()
 		overview := luna_test_find(&tree, action_window_overview) or { panic('no overview button') }
 		current := luna_test_find(&tree, workspace_action_ids[0]) or { panic('no pager') }
@@ -860,12 +860,12 @@ fn test_windows_xp_bar_boxes_only_what_is_pressed_or_under_the_pointer() {
 		free_tree(tree)
 		beside := desktop.hit_target_named(workspace_action_ids[1]) or { panic('no pager') }
 		assert luna_test_pixel(&desktop, beside.x + 1, beside.y + 1) == luna_gradient(luna_bar, beside.y +
-			1 - top, taskbar_height)
+			1 - top, classic_taskbar_height)
 		shown := desktop.hit_target_named(workspace_action_ids[0]) or { panic('no pager') }
 		assert luna_test_pixel(&desktop, shown.x + shown.width - 3, shown.y + shown.height / 2) == luna_bar_button_pressed
 		grid := desktop.hit_target_named(action_window_overview) or { panic('no overview button') }
 		assert luna_test_pixel(&desktop, grid.x + 1, grid.y + 1) == luna_gradient(luna_bar, grid.y +
-			1 - top, taskbar_height)
+			1 - top, classic_taskbar_height)
 
 		// The round button: a blue disc, brighter under the pointer, with the
 		// notification area's own blue outside it.
@@ -875,7 +875,7 @@ fn test_windows_xp_bar_boxes_only_what_is_pressed_or_under_the_pointer() {
 		disc := luna_test_pixel(&desktop, center_x + 4, center_y + 3)
 		assert luna_test_blue(disc) > luna_test_red(disc) + 0x40
 		assert luna_test_pixel(&desktop, chevron.x, chevron.y) == luna_gradient(luna_tray, chevron.y - top,
-			taskbar_height)
+			classic_taskbar_height)
 		desktop.set_hover(action_tray_overflow)
 		luna_test_full_frame(mut desktop)
 		lit := luna_test_pixel(&desktop, center_x + 4, center_y + 3)
@@ -896,11 +896,11 @@ fn test_windows_xp_taskbar_partial_frames_match_full_ones() {
 		desktop.spawn('Notes', .notes, 200, 150, 300, 200)
 		luna_test_full_frame(mut desktop)
 		before := luna_test_pixels(&desktop)
-		top := 600 - taskbar_height
+		top := 600 - classic_taskbar_height
 		// The Start button with Quick Launch, part of two buttons, the pager
 		// with the notification area, and the whole bar.
-		for area in [[0, top - 6, 200, taskbar_height + 6], [230, top + 10, 220, 20],
-			[640, top, 384, taskbar_height], [0, top, 1024, taskbar_height]] {
+		for area in [[0, top - 6, 200, classic_taskbar_height + 6], [230, top + 10, 220, 20],
+			[640, top, 384, classic_taskbar_height], [0, top, 1024, classic_taskbar_height]] {
 			luna_test_partial_frame(mut desktop, area[0], area[1], area[2], area[3])
 			luna_test_same(&desktop, luna_test_pixels(&desktop), before)
 		}

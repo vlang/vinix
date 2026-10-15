@@ -78,7 +78,7 @@ fn test_snap_assist_offers_visible_workspace_candidates_without_moving_them() {
 	panel := snap_assist_named(root, window_snap_assist_panel) or { panic('missing assist panel') }
 	assert panel.frame.x >= 400
 	assert panel.frame.x + panel.frame.width <= 801
-	assert panel.frame.y + panel.frame.height <= desktop_usable_height(601)
+	assert panel.frame.y + panel.frame.height <= desktop_usable_height(601, taskbar_height)
 	assert snap_assist_named(root, desktop.windows[index].id_preview) != none
 	free_tree(root)
 	assert desktop.window_snap_assist_pointer_down(window_snap_assist_dismiss, .desktop)
@@ -130,7 +130,7 @@ fn test_snap_assist_keyboard_selects_opposite_half_and_preserves_restore_frame()
 	assert desktop.windows[index].x == 0
 	assert desktop.windows[index].y == 0
 	assert desktop.windows[index].width == 400
-	assert desktop.windows[index].height == desktop_usable_height(601)
+	assert desktop.windows[index].height == desktop_usable_height(601, taskbar_height)
 	assert desktop.windows[index].restore_x == 250
 	assert desktop.windows[index].restore_y == 140
 	assert desktop.windows[index].restore_width == 340
@@ -281,11 +281,11 @@ fn test_snap_assist_pages_keep_every_candidate_reachable_on_small_screen() {
 	for _ in 0 .. 12 { desktop.spawn('Candidate', .welcome, 30, 30, 220, 130) }
 	desktop.snap_window(anchor, .left)
 	desktop.open_window_snap_assist(anchor)
-	layout := window_snap_assist_layout(.right, 320, 240)
+	layout := window_snap_assist_layout(.right, 320, 240, taskbar_height)
 	assert layout.capacity() == 1
 	assert layout.x >= 160
 	assert layout.x + layout.width <= 320
-	assert layout.y + layout.height <= desktop_usable_height(240)
+	assert layout.y + layout.height <= desktop_usable_height(240, taskbar_height)
 	first := desktop.snap_assist.selected_id
 	for page in 0 .. 12 {
 		assert desktop.snap_assist.page == page

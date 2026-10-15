@@ -25,6 +25,7 @@ const action_show_desktop = 'taskbar.showdesktop'
 const window_thumbnail_image_prefix = 'thumbnail:'
 const peek_ghost_id = 'peek.ghost'
 const taskbar_tooltip_id = 'taskbar.tooltip'
+const action_taskbar_clock = 'taskbar.clock'
 const key_super_d = '\x1b[100;9u'
 
 const taskbar_show_desktop_width = 12
@@ -401,7 +402,7 @@ fn rects_overlap(ax int, ay int, aw int, ah int, bx int, by int, bw int, bh int)
 fn (d &Desktop) window_in_clear_view(index int) bool {
 	window := &d.windows[index]
 	if window.x < 0 || window.y < 0 || window.x + window.width > d.canvas.width
-		|| window.y + window.height > d.canvas.height - taskbar_height {
+		|| window.y + window.height > d.canvas.height - d.taskbar_height() {
 		return false
 	}
 	for above in index + 1 .. d.windows.len {
@@ -582,7 +583,7 @@ fn (mut d Desktop) taskbar_preview_element() ?ui2.Element {
 		ids.len * (tile_width + taskbar_preview_gap) + taskbar_preview_gap
 	}
 	mut rows := ids.len
-	max_rows := (d.canvas.height - taskbar_height - 2 * taskbar_preview_margin - 2 * taskbar_preview_gap) / taskbar_preview_list_row
+	max_rows := (d.canvas.height - d.taskbar_height() - 2 * taskbar_preview_margin - 2 * taskbar_preview_gap) / taskbar_preview_list_row
 	if list_mode && rows > max_rows {
 		rows = max_rows
 	}
@@ -598,7 +599,7 @@ fn (mut d Desktop) taskbar_preview_element() ?ui2.Element {
 	if panel_x < taskbar_preview_margin {
 		panel_x = taskbar_preview_margin
 	}
-	panel_y := d.canvas.height - taskbar_height - panel_height - 6
+	panel_y := d.canvas.height - d.taskbar_height() - panel_height - 6
 	d.taskbar_preview.panel_x = panel_x
 	d.taskbar_preview.panel_y = panel_y
 	d.taskbar_preview.panel_width = panel_width
@@ -747,7 +748,7 @@ fn (mut d Desktop) taskbar_tooltip_element() ?ui2.Element {
 	if x < 4 {
 		x = 4
 	}
-	y := d.canvas.height - taskbar_height - height - 6
+	y := d.canvas.height - d.taskbar_height() - height - 6
 	d.taskbar_preview.tooltip_x = x
 	d.taskbar_preview.tooltip_y = y
 	d.taskbar_preview.tooltip_width = width
