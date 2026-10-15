@@ -129,6 +129,8 @@ fn read_generation_state(directory string, architecture string, generation u64) 
 
 struct CollectionTarget {
 	path string
+	parent_device u64
+	parent_inode u64
 	directory_device u64
 	directory_inode u64
 	lease_device u64
@@ -156,6 +158,16 @@ fn close_collection_lease(lease CollectionLease) {
 
 fn open_collection_generation(path string) !CollectionLease {
 	directory := C.open(path.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
+	return capture_collection_lease(directory)
+}
+
+fn open_collection_entry(parent int, name string) !CollectionLease {
+	directory := C.openat(parent, name.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
+	return capture_collection_lease(directory)
+}
+
+// Takes ownership of directory, including on refusal.
+fn capture_collection_lease(directory int) !CollectionLease {
 	if directory < 0 { return error('collection generation must be an ordinary directory') }
 	mut folder := C.stat{}
 	if C.fstat(directory, unsafe { &folder }) != 0 || u32(folder.st_mode) & 0o170000 != 0o040000 {
@@ -189,6 +201,10 @@ fn check_collection_lease(lease CollectionLease) ! {
 fn collection_targets(directory string, current State) ![]CollectionTarget {
 	parent := directory + '/generations'
 	defer { unsafe { parent.free() } }
+	fd := recovery_parent(directory)!
+	defer { C.close(fd) }
+	mut folder := C.stat{}
+	if C.fstat(fd, unsafe { &folder }) != 0 { return error('cannot inspect generation parent for collection') }
 	names := os.ls(parent)!
 	defer { unsafe { for name in names { name.free() }; (&array(&names)).free() } }
 	mut targets := []CollectionTarget{cap: names.len}
@@ -199,7 +215,12 @@ fn collection_targets(directory string, current State) ![]CollectionTarget {
 		generation := generation_number(name)!
 		if generation in [current.generation, current.previous]! { continue }
 		path := parent + '/' + name
-		lease := open_collection_generation(path) or {
+		lease := open_collection_entry(fd, name) or {
+			unsafe { path.free() }
+			return err
+		}
+		check_collection_root(fd, name, lease, u64(folder.st_dev)) or {
+			close_collection_lease(lease)
 			unsafe { path.free() }
 			return err
 		}
@@ -215,7 +236,7 @@ fn collection_targets(directory string, current State) ![]CollectionTarget {
 			unsafe { path.free() }
 			return err
 		}
-		targets << CollectionTarget{ path: path, directory_device: lease.directory_device,
+		targets << CollectionTarget{ path: path, parent_device: u64(folder.st_dev), parent_inode: u64(folder.st_ino), directory_device: lease.directory_device,
 			directory_inode: lease.directory_inode, lease_device: lease.lease_device, lease_inode: lease.lease_inode }
 		close_collection_lease(lease)
 	}
@@ -224,16 +245,29 @@ fn collection_targets(directory string, current State) ![]CollectionTarget {
 }
 
 fn remove_collection_target(target CollectionTarget) ! {
-	lease := open_collection_generation(target.path)!
+	parent_path := os.dir(target.path)
+	store := os.dir(parent_path)
+	name := os.file_name(target.path)
+	defer { unsafe { parent_path.free(); store.free(); name.free() } }
+	parent := recovery_parent(store)!
+	defer { C.close(parent) }
+	mut folder := C.stat{}
+	if C.fstat(parent, unsafe { &folder }) != 0 || u64(folder.st_dev) != target.parent_device
+		|| u64(folder.st_ino) != target.parent_inode { return error('generation parent changed after collection preflight; retain state and retry after inspection') }
+	lease := open_collection_entry(parent, name)!
 	defer { close_collection_lease(lease) }
 	if lease.directory_device != target.directory_device || lease.directory_inode != target.directory_inode
 		|| lease.lease_device != target.lease_device || lease.lease_inode != target.lease_inode {
 		return error('collection generation or lease changed after preflight; retry collection')
 	}
+	check_collection_root(parent, name, lease, target.parent_device)!
 	if C.flock(lease.lease, C.LOCK_EX | C.LOCK_NB) != 0 {
 		if C.errno == C.EWOULDBLOCK || C.errno == C.EAGAIN { return }
 		return error('cannot lock generation lease for removal')
 	}
 	check_collection_lease(lease)!
-	os.rmdir_all(target.path)!
+	root := StageTarget{ name: name, device: target.directory_device, inode: target.directory_inode }
+	nodes := inventory_stage_tree(lease.directory, root)!
+	defer { close_stage_inventory(nodes) }
+	remove_collection_tree(parent, root, lease, nodes)!
 }

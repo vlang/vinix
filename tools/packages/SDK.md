@@ -30,6 +30,18 @@ The writer lock excludes new launch admission throughout both phases; an already
 admitted holder that becomes busy remains protected. See
 [descriptor-limit qualification](../../tests/packages/collection-limit-check.md).
 
+Collection also captures the generation parent identity and validates obsolete
+roots as ordinary administrator-owned directories on that filesystem, without
+write access for other accounts. Every root/lease passes preflight before any
+stage, generation or cache removal. Removal inventories directories and reopens
+components relative to captured descriptors without following aliases; it unlinks
+leaf names without opening special files or changing hard-link targets. The named
+lease remains until all other generation contents are retired. Earlier failures
+can be retried after trusted entries are restored. If the final empty-directory
+removal fails after lease unlink, inspect storage and restore an empty regular
+lease under the writer lock before retrying. See
+[collection retirement qualification](../../tests/packages/collection-retirement-check.md).
+
 State readers, writers and launch admission require ordinary regular lock/lease
 files. Opens and advisory lock acquisition refuse malformed or busy entries
 without waiting on FIFOs or exclusive holders. Read-only requests require the

@@ -1,0 +1,53 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=31
+!>+ [11] ./sbin/init sz=210832
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/collection-retirement-core sz=1053504
+!>+ [15] ./usr/share/package-fixtures/collection-retirement-lifecycle sz=1610952
+!>+ [16] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e8a600
+initramfs: Done (16 entries)
+HWTEST START packages-collection-retirement
+COLLECTION RETIREMENT writable-root refused=true preserved=true
+COLLECTION RETIREMENT unsafe root preserves all generations, interrupted stages and cache; restored root retries PASS
+COLLECTION RETIREMENT changed parent refuses even with unchanged generation and lease inodes; restored parent retries PASS
+COLLECTION RETIREMENT ten changed nested/ancestor directories preserve data and the named lease; restored inventories retry PASS
+COLLECTION RETIREMENT ten post-inventory root/lease replacements refuse before deletion; restored identities retry PASS
+COLLECTION RETIREMENT 128-generation batch, 64-level tree, 1024 long-name files and 128 success/refusal loops pass below 32 descriptors; live lease protected PASS
+COLLECTION PROCESS collection-retirement-core PASS
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 2
+Rolled back to generation 1; application data was retained
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Rolled back to generation 3; application data was retained
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Updating trusted repository fixture
+COLLECTION PROCESS collection-retirement-lifecycle PASS
+HWTEST PASS packages-collection-retirement

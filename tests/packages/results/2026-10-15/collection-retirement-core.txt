@@ -1,0 +1,30 @@
+COLLECTION RETIREMENT writable-root refused=true preserved=true
+COLLECTION RETIREMENT unsafe root preserves all generations, interrupted stages and cache; restored root retries PASS
+COLLECTION RETIREMENT changed parent refuses even with unchanged generation and lease inodes; restored parent retries PASS
+COLLECTION RETIREMENT ten changed nested/ancestor directories preserve data and the named lease; restored inventories retry PASS
+COLLECTION RETIREMENT ten post-inventory root/lease replacements refuse before deletion; restored identities retry PASS
+COLLECTION RETIREMENT 128-generation batch, 64-level tree, 1024 long-name files and 128 success/refusal loops pass below 32 descriptors; live lease protected PASS
+
+Distribution lifecycle:
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 2
+Rolled back to generation 1; application data was retained
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Rolled back to generation 3; application data was retained
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Updating trusted repository fixture

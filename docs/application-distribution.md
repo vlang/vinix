@@ -653,6 +653,21 @@ The [collection descriptor qualification](../tests/packages/collection-limit-che
 reproduces the previous failure with 128 obsolete generations under a 32-FD limit
 and checks successful cleanup with bounded descriptor use and protected live leases.
 
+Collection captures the generation parent too: moving an unchanged generation
+and lease into a replacement parent refuses removal. Obsolete roots must be
+ordinary administrator-owned directories on the parent's filesystem without
+write access for other accounts. Root/lease preflight completes before stage,
+generation or cache removal. Retirement inventories the directory tree, then
+reopens each component without following aliases and checks captured identities.
+Leaf symlinks, hard links and FIFOs lose only their generation names; targets are
+neither opened nor chmodded. Names are enumerated before unlinking to avoid
+directory-cursor skips. The exclusive lease remains named until other contents
+are gone, so earlier failures remain retryable after restoring trusted entries.
+An error after the final lease unlink reports the remaining empty directory;
+inspect storage and restore an empty regular lease under the writer lock before
+retrying. Active and rollback generations and busy leases remain protected.
+See [collection retirement checks](../tests/packages/collection-retirement-check.md).
+
 Readers, writers and launch admission also check the captured lock/lease file
 type. FIFO replacements refuse promptly, without opening a blocking read or
 changing the FIFO's permissions. Directory, socket and symbolic replacements

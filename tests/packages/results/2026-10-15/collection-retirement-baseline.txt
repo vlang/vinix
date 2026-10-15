@@ -1,0 +1,5 @@
+Baseline 02ff97233 accepts an obsolete root writable by other accounts and removes generations, stages and cache; the new admission regression exits 1.
+
+COLLECTION RETIREMENT writable-root refused=false preserved=false
+tools/packages/pkgcore/collection_retirement_test.v:66: fn test_collection_refuses_writable_obsolete_roots_before_any_retirement
+    assert refused && preserved
