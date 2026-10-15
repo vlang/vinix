@@ -11,6 +11,22 @@ fn (mut a SoftwareApp) clear_mirror_source() {
 	a.mirror_source = ''; a.mirror_source_sha256 = ''
 }
 
+fn (a &SoftwareApp) mirror_review_running() bool {
+	return a.mirror_mode && a.worker != unsafe { nil } && a.worker_review
+		&& !a.worker_mirror && a.review == 'mirror'
+}
+
+fn (mut a SoftwareApp) stop_mirror_review() {
+	// Only the read-only proposal can be killed. Approved publication keeps
+	// running, including when the user shrinks the window or presses Escape.
+	if !a.mirror_review_running() { return }
+	if a.worker.is_alive() { a.worker.signal_kill(); a.worker.wait() }
+	a.retire_worker(); a.worker_review = false
+	a.clear_review(); a.output.clear(); a.output_truncated = false
+	a.focus = false; a.select_all = false
+	a.set_status('Offline export review stopped. No export was started. Review again to continue.')
+}
+
 fn (mut a SoftwareApp) export_deployment_snapshot() {
 	if !a.snapshot_ready || a.snapshot_saved.packages == 0 { return }
 	// Capture receipt identity before retiring it. Choosing a destination does
@@ -204,6 +220,13 @@ fn (mut a SoftwareApp) handle_mirror(event_id string) {
 }
 
 fn (mut a SoftwareApp) mirror_key_input(input string) {
+	if input == '\x1b' {
+		if a.mirror_review_running() { a.stop_mirror_review(); return }
+		if a.worker == unsafe { nil } {
+			if a.review != '' { a.handle_mirror('software.cancel'); return }
+			if !a.focus { a.handle_mirror('software.mirror.back'); return }
+		}
+	}
 	if !a.focus || a.review != '' || a.worker != unsafe { nil } { return }
 	if a.mirror_locked && a.mirror_lock_focus {
 		if a.mirror_source == '' { a.mirror_field_input(mut a.mirror_lock_path, input) }
@@ -229,6 +252,30 @@ fn (mut a SoftwareApp) mirror_field_input(mut field []u8, input string) {
 	}
 }
 
+fn (a &SoftwareApp) build_mirror_compact(width int, height int) ui2.Element {
+	mut children := frame_elements(8)
+	available := a.failure_pages.len > 0 && a.worker == unsafe { nil } && !a.details_mode
+	children << software_label('Offline export · enlarge for details', 14, 8, width - 28, 28, false)
+	if a.details_mode {
+		children << software_button('software.details.back', 'Back to review', 14, 46, if width > 202 { 174 } else { width - 28 })
+	} else if a.mirror_review_running() {
+		children << software_button('software.mirror.stop', 'Stop review', 14, 46, if width > 202 { 174 } else { width - 28 })
+	} else if a.worker == unsafe { nil } {
+		children << software_button(if a.review != '' { 'software.cancel' } else { 'software.mirror.back' },
+			if a.review != '' { 'Cancel review' } else { 'Back to catalog' }, 14, 46, if width > 202 { 174 } else { width - 28 })
+	} else {
+		children << software_label('Wait for the export to finish.', 14, 46, width - 28, 28, false)
+	}
+	if available {
+		children << software_button('software.failure', 'Failure details', 14, 84, if width > 202 { 174 } else { width - 28 })
+	}
+	progress := a.progress_seen && height >= 240
+	if progress { children << a.progress_bar(width, height) }
+	y := if height > 230 { height - if progress { 88 } else { 98 } } else if available { 122 } else { 84 }
+	children << software_label(a.status, 14, y, width - 28, if height > y + 8 { height - y - 8 } else { 1 }, false)
+	return ui2.screen(app_surface, children)
+}
+
 fn (mut a SoftwareApp) build_mirror(width int, height int) ui2.Element {
 	a.initialize_mirror_field()
 	mut children := frame_elements(24)
@@ -245,7 +292,8 @@ fn (mut a SoftwareApp) build_mirror(width int, height int) ui2.Element {
 		children << software_label(if a.mirror_lock_pending != '' {
 			'The exact deployment lock is bundled as _deployment.json with its complete package and runtime closure. Signed catalogs retain their expiry; consumers enroll each repository with its original publisher key.'
 		} else { 'Only the selected dependency closure has payloads on this media. Signed catalogs retain their original expiry. Consumers must enroll each file:// repository with its original publisher key.' }, 14, 338, width - 28, 72, false)
-		children << software_button('software.cancel', 'Cancel', 14, height - 138, 110)
+		children << software_button(if a.mirror_review_running() { 'software.mirror.stop' } else { 'software.cancel' },
+			if a.mirror_review_running() { 'Stop review' } else { 'Cancel' }, 14, height - 138, 110)
 		if a.review_ready && a.mirror_seen + 1 >= a.mirror_pages.len {
 			children << software_button('software.mirror.packages', 'Review packages', 136, height - 138, 170)
 		}

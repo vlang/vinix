@@ -1148,6 +1148,15 @@ cache objects when both paths share a filesystem. A separate cache filesystem
 has its own requirement and the same reserved-space policy. Export progress and
 failure diagnostics stay visible, and the window remains open during export.
 
+Small export windows retain status, progress and failure diagnostics, with Back
+for the destination form, Cancel for a completed review, and Back to review from
+package details. Pending read-only reviews offer **Stop review**; Stop, Cancel or
+Escape reaps that worker and discards its output while preserving the chosen
+destination and any saved-source pin for a fresh review. Approved exports keep
+running until completion. Compact windows omit confirmation controls so paths
+and package facts can be inspected after enlarging the window. See
+[navigation qualification](../tests/packages/software-mirror-navigation-check.md).
+
 Cycle the scope button to **Organization deployment lock** to preserve exact
 approved versions, including older runtimes. Enter the absolute path of a
 nonempty format-2 lock; this works without an installed application set or catalog

@@ -149,6 +149,12 @@ requires the full export review and administrator approval. A receipt alone
 cannot authorize payload acquisition or publication. Empty snapshots have no
 payload export. See [qualification](../../tests/packages/software-snapshot-export-check.md).
 
+Offline export retains navigation, status, progress and access to failure
+details in small windows. Read-only reviews can be stopped before publication;
+approved exports continue until they finish. Canceling preserves the selected
+destination and saved-source identity for a fresh review. See
+[qualification](../../tests/packages/software-mirror-navigation-check.md).
+
 `[--json] deployment-audit LOCK.json` compares that exact format-2 lock with
 installed metadata, without catalog, payload or trust-history access. It reports
 missing, unexpected and changed packages, including requested roots, publisher

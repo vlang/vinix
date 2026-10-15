@@ -1881,6 +1881,21 @@ export, leaving for maintenance, or application retirement frees its owned sourc
 and digest. Publication does not change installed applications. See
 [saved export qualification](../../tests/packages/software-snapshot-export-check.md).
 
+Software treats export review and approved publication as separate worker phases.
+Only an active read-only `mirror-review` or `mirror-deployment-review` worker can
+be stopped. Stop, Cancel and Escape kill and reap it, close its pipes, clear the
+pending review and buffered response, and retain the destination and optional
+saved-source/digest intent. Even a complete JSON document is discarded if the
+worker has not exited. Retrying creates a fresh review with no old fingerprint
+or path-page approval. Approved apply workers ignore these cancellation actions
+and keep the existing close guard until they finish.
+
+Compact export screens expose Stop, Cancel, Back, or Back to review according to
+the active phase and nested package-details mode, plus current status, progress
+and failure-detail access. They expose no confirmation button. Resizing preserves
+the review and its page-disclosure state. See
+[navigation qualification](../../tests/packages/software-mirror-navigation-check.md).
+
 `[--json] deployment-audit FILE` compares an exact format-2 document with one
 reader-locked installed generation. It does not resolve against a catalog, read
 objects/replay history, verify installed payloads or apply policy/trust admission.
