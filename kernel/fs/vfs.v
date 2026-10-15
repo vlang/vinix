@@ -2740,9 +2740,9 @@ pub fn syscall_statfs(_ voidptr, _path charptr, buf u64) (u64, u64) {
 		return errno.err, errno.efault
 	}
 
-	mut process := proc.current_thread().process
-
-	node := get_node(proc.current_directory_of(process), path, true) or {
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	parent := parent_and_mount_for(at_fdcwd, path, identity) or { return errno.err, errno.get() }
+	node := get_node_on_mount(parent, path, true, identity) or {
 		return errno.err, errno.get()
 	}
 	if !policy_check(node, proc.policy_inspect) {
@@ -2750,7 +2750,7 @@ pub fn syscall_statfs(_ voidptr, _path charptr, buf u64) (u64, u64) {
 	}
 
 	mut res := node.resource
-	if !fill_statfs_resource(mut res, buf) {
+	if !fill_statfs_resource(mut res, buf, statfs_flags(mount_flags(identity), node.read_only)) {
 		return errno.err, errno.efault
 	}
 
@@ -2765,11 +2765,24 @@ pub fn syscall_fstatfs(_ voidptr, fdnum int, buf u64) (u64, u64) {
 	defer { fd.unref() }
 	fd.handle.mac_check(proc.mac_inspect) or { return errno.err, errno.get() }
 	mut res := fd.handle.resource
-	if !fill_statfs_resource(mut res, buf) { return errno.err, errno.efault }
+	node := unsafe { &VFSNode(fd.handle.node) }
+	backend_readonly := node != unsafe { nil } && node.read_only
+	if !fill_statfs_resource(mut res, buf, statfs_flags(raw_mount_flags(&fd.handle.mount), backend_readonly)) {
+		return errno.err, errno.efault
+	}
 	return 0, 0
 }
 
-fn fill_statfs_resource(mut res resource.Resource, buf u64) bool {
+// Linux statfs flag numbers agree with the low mount bits except RELATIME.
+// STRICTATIME and kernel-private executable policy have no statfs bit.
+fn statfs_flags(policy u64, backend_readonly bool) u64 {
+	mut flags := u64(0x20) | (policy & (ms_rdonly | ms_nosuid | ms_nodev | ms_noexec | ms_noatime | ms_nodiratime))
+	if policy & ms_relatime != 0 { flags |= u64(0x1000) }
+	if backend_readonly { flags |= ms_rdonly }
+	return flags
+}
+
+fn fill_statfs_resource(mut res resource.Resource, buf u64, flags u64) bool {
 	info := resource.filesystem_stat(mut res)
 	mut raw := [15]u64{}
 	raw[0] = info.@type
@@ -2781,7 +2794,7 @@ fn fill_statfs_resource(mut res resource.Resource, buf u64) bool {
 	raw[6] = info.ffree
 	raw[8] = info.namelen
 	raw[9] = info.frsize
-	raw[10] = info.flags
+	raw[10] = info.flags | flags
 
 	return usercopy.copy_to_user(buf, voidptr(&raw[0]), sizeof(u64) * 15)
 }

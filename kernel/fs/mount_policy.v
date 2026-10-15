@@ -77,6 +77,17 @@ pub fn mount_flags(identity &lib.MountContext) u64 {
 	return attachment_flags(lib.mount_context_top(identity))
 }
 
+// Descriptor filesystem reports describe the actual open mount, even when
+// a namespace copy with the same ID now has different flags.
+fn raw_mount_flags(identity &lib.MountContext) u64 {
+	mut entry := unsafe { &Mount(lib.mount_context_top(identity)) }
+	if entry == unsafe { nil } { return 0 }
+	entry.lock.acquire()
+	flags := entry.flags
+	entry.lock.release()
+	return flags
+}
+
 // Writer ownership follows the actual open mount, including inherited FDs.
 // Mapping it by namespace ID would pin a different mount after unshare.
 fn retain_mount_writer(identity &lib.MountContext) ?voidptr {

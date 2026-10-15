@@ -65,6 +65,13 @@ Linux `move-reference` include them.
 `--case access` selects read-only and `noexec` access-query policy; `ac-0`
 through `ac-9` select individual cases. Native `all` and Linux `move-reference`
 include them.
+`--case fsflags` selects filesystem-statistics attachment flags; `sf-0` through
+`sf-9` select individual cases. Native `all` and Linux `move-reference` include
+them.
+
+The [filesystem-statistics checks](statfs-policy.md) cover pathname and saved
+descriptor mount flags, bind remounts, retained mounts and namespace copies
+whose flags differ from an inherited description's original mount.
 
 The [access-query checks](access-policy.md) preserve the selected attachment for
 `faccessat` and `faccessat2`, including empty-path descriptions and cwd. They
@@ -216,8 +223,8 @@ all five pivot alias cases, all seven private-thread cases, all five bind-policy
 cases, all six pathname truncation cases, all seven mode/ownership cases,
 all eight timestamp cases, all eight extended-attribute cases, all eight symlink
 creation cases, all eight removal cases, all ten hard-link cases, all ten
-rename cases, all ten writer-lifetime cases, all eight node-creation cases and
-all ten access-query cases.
+rename cases, all ten writer-lifetime cases, all eight node-creation cases,
+all ten access-query cases and all ten filesystem-statistics cases.
 Vinix's cursor limit and unsupported unmount modes are excluded. Supply a matching Linux kernel and
 the ELF preserved by a native run:
 

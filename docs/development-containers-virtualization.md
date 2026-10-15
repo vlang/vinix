@@ -471,6 +471,15 @@ checks cover all permission combinations, bind/retained/copied routes, symlink
 no-follow and real/effective credential selection without metadata changes.
 These remain advisory queries; divergent inherited-FD flags, concurrent mount
 changes and broader policy/backend combinations need separate qualification.
+The [filesystem-statistics checks](../tests/mount-lifecycle/statfs-policy.md)
+report the selected attachment's flags in `statfs` and the actual saved mount's
+flags in `fstatfs`. A namespace copy can change pathname reports without
+changing inherited descriptor reports. Both architectures and the same Linux
+probe cover supported read-only, privilege/device/execution and atime flags,
+bind remounts, detached/retired mounts and unprivileged metadata queries.
+Existing authorization and descriptor release paths remain. Concurrent remount
+snapshots, other inherited-descriptor policy lookups and persistent/overlay
+integration remain open.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,
