@@ -74,6 +74,12 @@ after a filesystem failure. Mutable build inputs still require isolation.
   references retain their genuine unresolved symbols; no early-MMIO, fixmap or
   kmap runtime is supplied. Configuration-disabled initialization follows the
   original inline behavior.
+- The generated x86 `asm/irq_regs.h` wrapper matches pinned Kbuild and exposes
+  the original per-CPU frame-pointer declaration and getter/setter ABI. Frame
+  storage and translation from native interrupt frames remain unresolved.
+  Scheduler/raw-lock facades restore original timer, CPU-mask, completion and
+  lock-class type visibility; this does not supply Linux kthread workers,
+  high-resolution timers or configured lockdep.
 - Generated x86 `asm/resource.h` forwards to the exact original generic
   resource header selected by UAPI Kbuild. Original resource IDs, infinity
   types and records are available; resource-limit enforcement remains unresolved.
@@ -2154,3 +2160,40 @@ handoff, and a Boehm host analysis build. Evidence is under
 `smp-oct10/conditional-sleep-*` and `conditional-host-probe-oct15/` in the private
 LinuxKPI cache. Focused evidence does not establish the broader host suite or
 global kernel allocation gate.
+
+## Scheduler and IRQ header dependencies, 2026-10-15
+
+The native scheduler facade now includes the original timer and CPU-mask
+headers and exposes completions after its task view and scheduler prototypes,
+preserving wait-header recursion. Raw spinlock types restore the original
+`lockdep_types.h` dependency. The new `asm/irq_regs.h` is byte-identical to the
+wrapper emitted by the exact pinned Kbuild scripts; it forwards to the original
+generic header without defining frame storage or inventing native frame layouts.
+
+Four strict GNU99/GNU11 first-header probes and independent replay compile
+without diagnostics, object symbols or storage. Separate generated-V reference
+objects retain genuine unresolved IRQ/kthread symbols; final links reject the
+missing `__irq_regs` storage. The maintained generated-wrapper test now checks
+this fourth wrapper, repeated inclusion and original getter/setter ABI types.
+Its broader profile stopped at an original `thread_info.h` signedness warning;
+six unchanged-baseline/candidate/include-order controls reproduce that same
+single error. That full profile is not a passing result. No warnings or original
+sources were suppressed or rewritten.
+
+Fresh worktrees at committed `df3389b5` with the four frozen overlays build
+enabled/default x86-64 and default ARM64. These separately saved ELF files have
+no new guest-boot or allocation-measurement claim; the earlier conditional
+annotation guest results remain bound to their exact saved ELF.
+
+A fresh coherent full audit remains **6/269**. Both incomplete timer-record
+first errors and the missing IRQ-register header are gone. Remaining groups
+are 228 task/MM/vfork, 33 CPU-bug policy, one entry-stack record and one missing
+original `irq_hw_number_t` alias. The audit guards all 7,958 inputs; only 11
+units emit dependency files, so it does not claim complete discovered graphs
+for every failed unit. These are include/type results, with no new runtime
+ownership, allocation, IRQ service or working GPU claim.
+
+Evidence is under `smp-oct10/include-closure-*`, including the exact source
+freeze at `df3389b5` plus four header/tool overlays, independently derived Kbuild
+contracts, compiler controls and the full audit. Native build results and the
+separate earlier conditional-annotation guest results have distinct artifacts.

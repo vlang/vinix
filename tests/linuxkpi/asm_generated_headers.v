@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Pinned Kbuild/header compiler controls; no mapping or MMIO runtime is supplied.
+// Pinned Kbuild/header controls; no mapping, MMIO or IRQ-frame runtime is supplied.
 module main
 
 import os
@@ -106,14 +106,14 @@ fn run_profile(keep string) ! {
 	x86_kbuild := os.join_path(linux, 'arch/x86/include/asm/Kbuild')
 	generic_kbuild := os.join_path(linux, 'include/asm-generic/Kbuild')
 	require('early_ioremap.h' in entries(x86_kbuild, 'generic-y')!, 'Pinned x86 Kbuild no longer selects generic early_ioremap')!
-	for name in ['kmap_size.h', 'mmiowb.h'] {
+	for name in ['kmap_size.h', 'mmiowb.h', 'irq_regs.h'] {
 		require(name in entries(generic_kbuild, 'mandatory-y')!, 'Pinned generic Kbuild no longer requires ' + name)!
 	}
-	for name in ['early_ioremap.h', 'kmap_size.h', 'mmiowb.h'] {
+	for name in ['early_ioremap.h', 'kmap_size.h', 'mmiowb.h', 'irq_regs.h'] {
 		require(!os.exists(os.join_path(linux, 'arch/x86/include/asm', name)), 'Pinned x86 now owns the header: ' + name)!
 		require(name !in entries(x86_kbuild, 'generated-y')!, 'Pinned x86 now generates the header itself: ' + name)!
 	}
-	owned := ['early_ioremap.h', 'kmap_size.h', 'mmiowb.h'].map(os.join_path(here, 'include/asm', it))
+	owned := ['early_ioremap.h', 'kmap_size.h', 'mmiowb.h', 'irq_regs.h'].map(os.join_path(here, 'include/asm', it))
 	originals := owned.map(os.join_path(linux, 'include/asm-generic', os.file_name(it)))
 	fixmap := os.join_path(linux, 'arch/x86/include/asm/fixmap.h')
 	compiler := hosttest.env_default('CC', 'clang')
@@ -234,12 +234,13 @@ fn run_profile(keep string) ! {
 	}
 	require(before == hosttest.hashes(guarded)!, 'Production/controller inputs changed during isolated checks')!
 	hosttest.write_json(os.join_path(work, 'result.json'), map[string]json2.Any{
-		'scope':            json2.Any('Compiler-only generated-header forwarding. No early mapping, MMIO cache policy, native fixmap/page ownership or GPU runtime is supplied. Production initialization and MMIOWB tracking are original configuration-disabled no-ops; the additional profile checks declarations only.')
+		'scope':            json2.Any('Compiler-only generated-header forwarding. No early mapping, MMIO cache policy, native fixmap/page ownership, IRQ-frame storage/projection or GPU runtime is supplied. Production initialization and MMIOWB tracking are original configuration-disabled no-ops; the additional profile checks declarations only.')
 		'linux_version':    pin['version']!
 		'kbuild_selection': hosttest.string_map({
 			'early_ioremap.h': 'x86 generic-y'
 			'kmap_size.h':     'mandatory-y with no x86 implementation'
 			'mmiowb.h':        'mandatory-y with no x86 implementation'
+			'irq_regs.h':      'mandatory-y with no x86 implementation'
 		})
 		'original_kbuild':  kbuild
 		'source_sha256':    hosttest.string_map(hosttest.hashes([x86_kbuild, generic_kbuild, fixmap,
@@ -249,7 +250,7 @@ fn run_profile(keep string) ! {
 }
 
 fn main() {
-	keep := hosttest.parse_keep_dir(os.args[1..], 'Usage: asm_generated_headers.v [--keep-dir DIRECTORY]', 'Compile pinned generated asm headers without inventing mapping services.') or {
+	keep := hosttest.parse_keep_dir(os.args[1..], 'Usage: asm_generated_headers.v [--keep-dir DIRECTORY]', 'Compile pinned generated asm headers without inventing mapping or IRQ-frame services.') or {
 		eprintln(err.msg())
 		exit(2)
 	}
@@ -263,12 +264,14 @@ const declarations = '
 #include <linux/threads.h>
 #include <asm/early_ioremap.h>
 #include <asm/kmap_size.h>
+#include <asm/irq_regs.h>
 #include <asm/fixmap.h>
 #include <asm/mmiowb.h>
 /* Repeated use relies on the original headers\' include guards. */
 #include <asm/kmap_size.h>
 #include <asm/early_ioremap.h>
 #include <asm/mmiowb.h>
+#include <asm/irq_regs.h>
 
 #if defined(CONFIG_MMIOWB) || defined(CONFIG_ARCH_HAS_MMIOWB)
 #error production x86 has no MMIO write-barrier tracking configuration
@@ -282,6 +285,8 @@ _Static_assert(CONFIG_MMU == 1 && CONFIG_X86_5LEVEL == 1 &&
 #define FUNCTION_ABI(name, type) \\
     _Static_assert(__builtin_types_compatible_p(__typeof__(&(name)), type), \\
                    "original " #name " ABI")
+FUNCTION_ABI(get_irq_regs, struct pt_regs *(*)(void));
+FUNCTION_ABI(set_irq_regs, struct pt_regs *(*)(struct pt_regs *));
 FUNCTION_ABI(early_ioremap, void *(*)(resource_size_t, unsigned long));
 FUNCTION_ABI(early_memremap, void *(*)(resource_size_t, unsigned long));
 FUNCTION_ABI(early_memremap_ro, void *(*)(resource_size_t, unsigned long));

@@ -5,6 +5,8 @@
 #include <linux/kernel.h>
 #include <linux/limits.h>
 #include <linux/ktime.h>
+#include <linux/timer.h>
+#include <linux/cpumask.h>
 #include <linux/preempt.h>
 #include <linux/spinlock_types_raw.h>
 #include <asm/current.h>
@@ -58,4 +60,7 @@ int task_pid_nr(const struct task_struct *);
 int task_tgid_nr(const struct task_struct *);
 bool need_resched(void);
 int cond_resched(void);
+/* Completion wait-header recursion requires the task view and scheduler
+ * prototypes above to be visible first. */
+#include <linux/completion.h>
 #endif

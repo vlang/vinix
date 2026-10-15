@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-15 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Latest conditional-annotation validation baseline: **`fe594a9c`**, with eight frozen native/tool overlays described below. Recheck HEAD and the worktree before
+Latest include-dependency validation baseline: **`df3389b5`**, with four frozen header/tool overlays described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -1883,3 +1883,40 @@ Focused replay command:
 `build-support/run-v-tool.sh tests/linuxkpi/conditional_sleep.v --keep-dir NEW`.
 Use fresh private compiler caches and the actual SDK selection above. Evidence
 is under `smp-oct10/conditional-sleep-*` and `conditional-host-probe-oct15/`.
+
+## Latest scheduler and IRQ include increment
+
+Conditional annotations are committed as `df3389b5`. The next change restores
+the original timer, CPU-mask and completion includes lost by the native scheduler
+facade, with completion after task/prototype publication to preserve recursion.
+Raw-lock types regain the original unconditional `lockdep_types.h` include.
+The new `asm/irq_regs.h` exactly matches the one-line wrapper produced by pinned
+Kbuild and forwards to original generic getter/setter declarations. It does not
+define `__irq_regs` or translate native interrupt frames. Linux kthread workers,
+high-resolution timers and configured lockdep remain unsupported.
+
+Four strict GNU99/GNU11 first-header controls and an independent replay pass
+without diagnostics or object symbols. Actual generated-V reference objects
+preserve genuine missing IRQ/kthread symbols; final strict links reject frame
+storage. The maintained wrapper test now checks all four wrappers and original
+IRQ accessor ABI types. Its broader run stopped on original `thread_info.h`'s
+signedness warning. Six exact unchanged-baseline/candidate/include-order controls
+reproduce the same sole diagnostic, so preserve this inherited failure and do
+not claim a full profile pass. No original source or warning flag was changed.
+
+The new full audit is `include-closure-final-isolated-audit/i915-audit.json`,
+still **6/269**, with all 7,958 guarded inputs stable. Three previous first
+errors move past the intended timer/header gaps. Remaining groups: 228 task/MM/
+vfork, 33 CPU-bug policy, one entry-stack type and one original IRQ-number typedef.
+Only 11 units emitted dependency files; failed units do not supply a complete
+actual include graph. No new runtime or GPU operation follows from these imports.
+
+Fresh architecture worktrees are detached at `df3389b5` with four exact
+header/tool overlays, architecture-private runtime copies/caches and the
+previously authenticated native/host compiler router. Enabled/default x86 and
+default ARM compile/link pass. Evidence is under
+`smp-oct10/include-closure-*`. Earlier conditional guest passes belong to their
+saved conditional ELF; they are not boots of the new header-build artifacts.
+Continue with the real IRQ-number type, original entry-stack records, CPU-bug
+policy and task/MM ownership, then the remaining IRQ/RCU-free/DMA/device/DRM
+services. Full compile/link and real Tiger Lake validation remain pending.
