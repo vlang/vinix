@@ -1105,6 +1105,16 @@ Each section has **Previous**/**Next** pages, including long UTF-8 text. Control
 bytes appear as `\xHH`. Catalog and update details identify the displayed version
 separately from installed launch permissions and native-window protocol; older
 services report unavailable installed fields explicitly.
+
+In compact catalog windows, **Browse catalog** provides search, a button cycling
+Catalog/Installed/Updates, Previous/Next package and complete **Details** at
+180×220 or larger. Tab focuses search; Enter leaves search and then opens
+details. Arrow/Page keys select packages when search is unfocused. Back/Escape
+returns to catalog status and maintenance controls, retaining the query, filter
+and selected package. The full list keeps that selection visible after resizing.
+Browsing cannot launch, reload or start a package change; pending work blocks
+entry. See [compact browser qualification](../tests/packages/software-catalog-browser-check.md).
+
 Installed package diagnostics follow the active dependency closure: revoked or
 invalid publisher keys, permission restrictions, licenses, firmware policy and
 version pins on a runtime are also shown against its dependent applications.

@@ -51,6 +51,8 @@ mut:
 	review_scroll   int
 	review_summary  string
 	details_mode    bool
+	catalog_browser_mode bool
+	catalog_browser_notice bool
 	report_reader_mode bool
 	details_review  bool
 	details_pages   []SoftwareDetailsPage
@@ -349,10 +351,12 @@ fn software_search_paste(mut bytes []u8, input string, selected bool) bool {
 fn (mut a SoftwareApp) search_paste_input(input string) {
 	if !a.focus || input == '' || a.review != '' || (a.worker != unsafe { nil } && !a.worker_view) { return }
 	if !software_search_paste(mut a.query, input, a.select_all) {
+		if a.catalog_browser_mode { a.catalog_browser_notice = true }
 		a.set_status(software_search_input_error)
 		return
 	}
 	a.select_all = false
+	if a.catalog_browser_mode { a.catalog_browser_notice = false }
 	a.filter_rows()
 }
 
@@ -372,9 +376,11 @@ fn (mut a SoftwareApp) filter_rows() {
 		}
 	}
 	a.scroll = 0
+	if a.catalog_browser_mode { a.catalog_browser_notice = false; a.select_catalog_package(0) }
 }
 
 fn (mut a SoftwareApp) load_view() {
+	a.catalog_browser_mode = false
 	a.clear_details()
 	a.clear_launch_options()
 	a.clear_review()
@@ -786,6 +792,8 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 	if a.details_mode { a.handle_details(event_id); return }
 	if a.policy_mode && a.policy_reader_mode { a.handle_policy_reader(event_id); return }
 	if a.report_reader_mode { a.handle_report_reader(event_id); return }
+	if a.catalog_browser_mode { a.handle_catalog_browser(event_id); return }
+	if event_id == 'software.catalog.browse' { a.open_catalog_browser(); return }
 	if event_id == 'software.report.read' { a.open_report_reader(); return }
 	if event_id == 'software.failure' {
 		if a.worker == unsafe { nil } && a.failure_pages.len > 0 { a.failure_mode = true; a.focus = false }
@@ -1068,6 +1076,19 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.snapshot_mode { a.snapshot_key_input(input); return }
 	if a.audit_mode { a.audit_key_input(input); return }
 	if a.details_mode { a.details_key_input(input); return }
+	if a.catalog_browser_mode {
+		if input == '\x1b' { a.close_catalog_browser(); return }
+		if !a.focus {
+			match input {
+				'\x1b[A', '\x1b[D', '\x1b[5~' { a.select_catalog_package(-1) }
+				'\x1b[B', '\x1b[C', '\x1b[6~' { a.select_catalog_package(1) }
+				'\t' { a.focus = true }
+				'\r', '\n' { a.open_details() }
+				else {}
+			}
+			return
+		}
+	}
 	if a.health_mode { a.health_key_input(input); return }
 	if a.cleanup_mode { a.cleanup_key_input(input); return }
 	if a.policy_mode { a.policy_key_input(input); return }
@@ -1213,6 +1234,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.details_mode { return a.build_details(width, height) }
 	if a.policy_mode && a.policy_reader_mode { return a.build_policy_reader(width, height) }
 	if a.report_reader_mode { return a.build_report_reader(width, height) }
+	if a.catalog_browser_mode { return a.build_catalog_browser(width, height) }
 	if a.snapshot_mode { return a.build_deployment_snapshot(width, height) }
 	if a.mirror_mode && (width < 640 || height < 610) { return a.build_mirror_compact(width, height) }
 	if a.audit_mode && (width < 640 || height < 610) { return a.build_deployment_audit_compact(width, height) }
@@ -1237,6 +1259,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
 		if a.health_mode && a.page_rows != previous_size { a.keep_health_selection_visible() }
 		if a.data_mode && a.data_pending == '' && a.page_rows != previous_size { a.keep_data_selection_visible() }
+		if a.package_screen_active() && a.review == '' && a.page_rows != previous_size { a.keep_catalog_selection_visible() }
 	}
 	if a.audit_mode { return a.build_deployment_audit(width, height) }
 	if a.health_mode { return a.build_health(width, height) }

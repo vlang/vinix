@@ -46,6 +46,7 @@ fn software_view_legacy(text string) string {
 
 fn check_software_view_reader() ! {
 	check_software_search_paste()
+	check_software_catalog_browser()!
 	mut app := SoftwareApp{ service_path: os.executable(), administration_required: true, query: []u8{cap: 256}, output: []u8{cap: 8192} }
 	defer { os.unsetenv('VINIX_SOFTWARE_VIEW_FIXTURE'); app.close_app() }
 	text := json2.encode(software_view_fixture())
@@ -62,6 +63,7 @@ fn check_software_view_reader() ! {
 	os.setenv('VINIX_SOFTWARE_VIEW_FIXTURE', 'held', true)
 	app.start(['view'], true); pid := app.worker.pid
 	wait_for_package_navigation_output(mut app, false)
+	app.handle('software.catalog.browse')!; assert !app.catalog_browser_mode && app.worker.pid == pid
 	app.paste_input('APP-31'); assert app.matching == [31] && app.worker.pid == pid
 	app.paste_input('\x1b'); assert app.focus && app.worker.pid == pid && app.query.bytestr() == 'APP-31'
 	release := u8(`!`); assert C.write(app.worker.stdio_fd[0], &release, 1) == 1
@@ -104,6 +106,7 @@ fn check_software_view_memory() ! {
 				for byte in 'ÉKI' { app.query << byte }
 				app.filter_rows(); assert app.matching.len == 32
 				app.selected = 31
+				catalog_browser_cycle(mut app)!
 				free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!)
 				app.open_details(); free_window_tree(app.build_details(640, 610)); app.clear_details()
 				for invalid in [bad, partial]! {
@@ -121,7 +124,124 @@ fn check_software_view_memory() ! {
 		assert kept == 0, 'Software catalog reloads retained ${kept} bytes'
 		println('Software catalog reader: 1000 wide/partial-invalid/legacy reload, display/details and retirement cycles retain zero tracked bytes')
 		println('Software search paste: 1000 literal/rejected/selected/empty input and catalog retirement cycles retain zero tracked bytes')
+		println('Software compact catalog: 1000 search/filter/select/details/resize/ignored-write/Back and retirement cycles retain zero tracked bytes')
 	}
+}
+
+fn catalog_browser_cycle(mut app SoftwareApp) ! {
+	app.handle('software.catalog.browse')!; assert app.catalog_browser_mode && app.selected == 31
+	free_window_tree(app.build(ui2.rect(0, 0, 180, 220))!)
+	app.key_input('\x1b[D'); assert app.selected == 30
+	app.handle('software.catalog.next')!; assert app.selected == 31
+	for _ in 0 .. 3 { app.handle('software.catalog.filter')! }
+	app.handle('software.search')!; app.key_input('\x01'); app.paste_input('APP-31')
+	assert app.matching.len == 1 && app.matching[0] == 31 && app.selected == 31
+	app.paste_input('\x1b'); assert app.catalog_browser_notice && app.catalog_browser_mode
+	free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
+	app.key_input('\x01'); app.paste_input('ÉKI'); assert app.matching.len == 32 && !app.catalog_browser_notice
+	app.key_input('\r'); app.key_input('\r'); assert app.details_mode && app.catalog_browser_mode
+	free_window_tree(app.build(ui2.rect(0, 0, 180, 220))!)
+	app.key_input('\x1b'); assert !app.details_mode && app.catalog_browser_mode && app.details_pages.len == 0
+	for action in ['software.install', 'software.remove', 'software.upgrade', 'software.reload', 'software.refresh',
+		'software.confirm', 'software.run', 'software.repositories', 'software.deployment']! { app.handle(action)! }
+	assert app.worker == unsafe { nil } && !app.admin_prompt && app.review == '' && app.launch_request == ''
+	free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!)
+	app.key_input('\x1b'); assert !app.catalog_browser_mode && app.selected == 31 && app.filter == 0
+}
+
+fn check_software_catalog_browser() ! {
+	for architecture in ['aarch64', 'x86_64']! {
+		mut view := software_view_fixture()
+		mapped := view.rows.map(SoftwareRow{ ...it, architecture: architecture })
+		text := json2.encode(SoftwareView{ ...view, architecture: architecture,
+			rows: mapped })
+		mut app := SoftwareApp{ query: []u8{cap: 256}, output: []u8{cap: 8192}, administration_required: true }
+		defer { app.close_app(); view.close(); unsafe { (&array(&mapped)).free(); text.free() } }
+		metadata_fixture_output(mut app, text); app.load_view(); app.selected = 31
+		free_window_tree(app.build(ui2.rect(0, 0, 900, 900))!); assert app.page_rows == 16
+		compact := app.build(ui2.rect(0, 0, 180, 220))!
+		assert compact.children.any(it.id == 'software.catalog.browse'); free_window_tree(compact)
+		app.handle('software.catalog.browse')!; assert app.catalog_browser_mode && app.selected == 31
+		for size in [ui2.rect(0, 0, 180, 220), ui2.rect(0, 0, 320, 240), ui2.rect(0, 0, 640, 610)]! {
+			tree := app.build(size)!
+			for id in ['software.catalog.back', 'software.catalog.filter', 'software.search', 'software.catalog.previous', 'software.catalog.next', 'software.details']! {
+				button := tree.children.filter(it.id == id)[0]
+				assert button.frame.x >= 14 && button.frame.y >= 8 && button.frame.x + button.frame.width <= size.width - 14
+				assert button.frame.y + button.frame.height <= size.height
+			}
+			name := tree.children.filter(it.frame.y == 146)[0]
+			assert name.text == app.rows[31].name
+			assert software_paragraph_fixture_text(&name, false) == name.text
+			free_window_tree(tree)
+		}
+		app.handle('software.catalog.next')!; assert app.selected == 31
+		for _ in 0 .. 40 { app.key_input('\x1b[A') }; assert app.selected == 0
+		app.key_input('\x1b[D'); assert app.selected == 0
+		app.handle('software.search')!; app.paste_input('APP-31'); assert app.selected == 31 && app.matching == [31]
+		app.key_input('\x01'); app.paste_input('missing'); assert app.selected == -1 && app.matching.len == 0
+		empty := app.build(ui2.rect(0, 0, 180, 220))!
+		assert empty.children.any(it.text == 'No matches') && !empty.children.any(it.id == 'software.details'); free_window_tree(empty)
+		app.handle('software.details')!; assert !app.details_mode
+		app.key_input('\x01'); app.paste_input('APPLICATION É🚀'); assert app.selected == 0 && app.matching.len == 32
+		app.key_input('\x01'); app.paste_input('\xff')
+		assert app.catalog_browser_notice && app.select_all && app.query.bytestr() == 'APPLICATION É🚀'
+		error_tree := app.build(ui2.rect(0, 0, 180, 220))!
+		assert error_tree.children.any(it.text == software_search_input_error); free_window_tree(error_tree)
+		app.paste_input('ÉKI'); app.key_input('\r'); assert !app.focus
+		for _ in 0 .. 31 { app.key_input('\x1b[C') }; assert app.selected == 31
+		for _ in 0 .. 3 { app.handle('software.catalog.filter')!; assert app.matching.len == 32 && app.selected == 31 }
+		app.handle('software.details')!; assert app.details_mode && app.catalog_browser_mode
+		assert ('Architecture: ' + architecture) in details_fixture_values(&app, 0)
+		app.key_input('\x1b'); assert app.catalog_browser_mode && app.details_pages.len == 0
+		free_window_tree(app.build(ui2.rect(0, 0, 160, 180))!)
+		app.key_input('\x1b'); assert !app.catalog_browser_mode
+		returned := app.build(ui2.rect(0, 0, 640, 610))!
+		assert app.matching.index(app.selected) >= app.scroll && app.matching.index(app.selected) < app.scroll + app.page_rows
+		assert returned.children.any(it.id.starts_with('software.row.') && it.box.bg == settings_choice_bg); free_window_tree(returned)
+		app.handle('software.up')!; scroll := app.scroll
+		free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!); assert app.scroll == scroll
+		app.filter = 0; catalog_browser_cycle(mut app)!
+	}
+	// All supported kinds and the maximum catalog remain reachable through filters.
+	mut rows := []SoftwareRow{cap: 4096}
+	for i in 0 .. 4096 {
+		kind := ['native', 'linux', 'windows', 'apple', 'runtime', 'data']![i % 6]
+		number := i.str()
+		rows << SoftwareRow{ id: 'app-' + number, name: 'Application é🚀', description: 'Description',
+			version: '1.0.0', installed_version: if i % 2 == 0 { '1.0.0' } else { '' },
+			installed_name: if i % 2 == 0 { 'Installed application' } else { '' }, installed_kind: if i % 2 == 0 { kind } else { '' },
+			architecture: 'x86_64', kind: kind, runtime: 'runtime', repository: 'publisher', public_key: 'a'.repeat(64), license: 'MIT',
+			updatable: i % 4 == 0, update_action: if i % 4 == 0 { 'update' } else { '' } }
+		unsafe { number.free() }
+	}
+	mut wide := SoftwareView{ format: 1, generation: 1, architecture: 'x86_64', rows: rows }
+	text := json2.encode(wide)
+	mut app := SoftwareApp{ query: []u8{cap: 256}, output: []u8{cap: 8192} }
+	defer { app.close_app(); wide.close(); unsafe { text.free() } }
+	metadata_fixture_output(mut app, text); app.load_view(); assert app.rows.len == 4096, app.status
+	app.handle('software.catalog.browse')!
+	for i in 0 .. 4096 { assert app.selected == i; app.handle('software.catalog.next')! }
+	assert app.selected == 4095
+	app.handle('software.catalog.filter')!; assert app.filter == 1 && app.matching.len == 2048 && app.selected == 0
+	app.handle('software.catalog.filter')!; assert app.filter == 2 && app.matching.len == 1024
+	for _ in 0 .. 1024 { app.handle('software.catalog.next')! }; assert app.selected == 4092
+	app.key_input('\x1b'); app.query.clear(); app.filter = 0
+	// Empty catalogs are still browsable; loaded proposals and other forms refuse entry.
+	for row in app.rows { software_free_row(row) }; app.rows.clear(); app.filter_rows()
+	app.open_catalog_browser(); assert app.selected == -1 && app.catalog_browser_mode
+	app.key_input('\x1b'); app.review = 'install'.clone(); app.open_catalog_browser(); assert !app.catalog_browser_mode
+	app.clear_review(); app.launch_mode = true; app.open_catalog_browser(); assert !app.catalog_browser_mode; app.launch_mode = false
+	app.update_error = 'The catalog is expired.'.clone(); app.filter = 1
+	app.open_catalog_browser(); app.handle('software.catalog.filter')!
+	assert app.filter == 2 && app.matching.len == 0 && app.catalog_browser_notice && app.status.contains('Updates unavailable:')
+	app.key_input('\x1b')
+	// Unavailable presentation metadata is a visible diagnostic, never a reader.
+	app.rows << SoftwareRow{ id: 'invalid', name: 'Invalid metadata', description: '\xff'.clone() }
+	app.filter = 0; app.filter_rows(); app.open_catalog_browser(); app.handle('software.details')!
+	assert app.catalog_browser_mode && !app.details_mode && app.catalog_browser_notice && app.status.contains('invalid UTF-8')
+	invalid := app.build(ui2.rect(0, 0, 180, 220))!; assert invalid.children.any(it.text == app.status); free_window_tree(invalid)
+	app.key_input('\x1b')
+	println('Software compact catalog: both architectures, all six kinds, 4096 packages, search/filter/empty states, complete Details, native controls, resize selection, read-only actions and Back passed')
 }
 
 fn software_search_fixture_text(a &SoftwareApp) string {

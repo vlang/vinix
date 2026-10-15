@@ -225,8 +225,10 @@ fn (mut a SoftwareApp) open_details() {
 		|| (!reviewing && (!software_details_text_valid(a.catalog_error, 4096) || !software_details_text_valid(a.update_error, 4096)))
 		|| (reviewing && (!software_details_text_valid(a.deployment_pending, 4096)
 			|| !software_details_text_valid(a.mirror_snapshot.destination, 4096) || !software_details_text_valid(a.mirror_lock_pending, 4096))) {
+		if a.catalog_browser_mode { a.catalog_browser_notice = true }
 		a.set_status('Package details contain invalid UTF-8 or exceed supported text limits. Reload the catalog or review again.'); return
 	}
+	if a.catalog_browser_mode { a.catalog_browser_notice = false }
 	action := if reviewing { a.review_snapshot.rows[a.review_selected].action } else { '' }
 	a.prepare_details(row, if a.review == 'repair' && action == 'update' { 'repair' } else { action }, reviewing)
 }

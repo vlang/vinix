@@ -71,6 +71,13 @@ This applies to catalog facts and frozen install, remove, update, repair,
 deployment, rollback and offline-export reviews. See
 [compact detail checks](../../tests/packages/software-details-navigation-check.md).
 
+Compact catalog windows offer **Browse catalog**. Search, a cycling
+Catalog/Installed/Updates filter, Previous/Next package and complete **Details**
+work from 180×220. Back/Escape keeps the query, filter and selected package;
+returning to the full list keeps that package visible. Browsing cannot reload,
+launch or start a transaction. Return to the catalog for status, failure details
+and maintenance controls. See [browser checks](../../tests/packages/software-catalog-browser-check.md).
+
 Install/remove/update/repair/rollback/deployment proposals offer **Read plan**
 in full and compact windows. It shows complete frozen intent, generations,
 source, exact disk requirements and each argument/package's facts. Item
