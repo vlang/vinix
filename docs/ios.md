@@ -7357,21 +7357,52 @@ record layout. Generated C inspection checks allocation-free cached lookup and
 retirement after pool, dictionary and Swift cleanup. Published runners remain
 unchanged; the full iOS regression remains unpassed.
 
-The current IPA probe links past the URL-error globals and exits with status 1
-at `_NSURLSessionDownloadTaskResumeData`. Fortnite has not entered application
-code and remains unplayable.
+The URL-error IPA probe links past those globals and exits with status 1 at
+`_NSURLSessionDownloadTaskResumeData`.
+
+V now supplies Foundation's three `NSURLSessionTaskPriority` globals,
+`NSURLSessionTransferSizeUnknown`, and the download/upload resume-data keys.
+Native Foundation measurements verify 32-bit floats of 0.5, 0.25 and 0.75 for
+default, low and high priority, a signed 64-bit -1 transfer-size sentinel, and
+pointer-sized NSString cells containing the exact exported resume-data names.
+These exports provide data addresses with the measured widths and indirection.
+They do not implement NSURLSession tasks or networking.
+
+The runtime publishes the scalars, pointer cells, two immutable ASCII string
+records and copied bytes on one sealed page under its recursive lock. Cached
+lookups allocate no storage. Shutdown removes the string registrations and
+unmaps the page after pools, dictionaries and Swift contexts drain. Fortnite's
+download-key consumer at `0x100801fa0`, priority consumers including
+`0x1007ff15c` and `0x10836386c`, and transfer-size consumer at `0x100800b74`
+confirm pointer, float32 and 64-bit loads from the exported data.
+
+Eight normal/deterministic host sanitizer runs and four ARM64 guest suites
+pass: session constants, URL-error globals, immutable constant dictionaries
+and autorelease pools. Coverage includes exact scalar bits, concurrent first
+publication by eight readers, stable cells, NSError resume-data bytes retained
+across pool drains, lookup by equal NSString keys, pool-destructor access after
+task entry points retire, and two drained/unmapped lifetimes. The eleven
+generated C streams and executables, native measurements, all five required
+IPA data consumers, pinned inputs and retired VM phases are retained under
+`build/ios/fortnite/session-constants-checks`. Generated C inspection checks
+allocation-free cached lookup and explicit storage retirement. Published
+runners remain unchanged; the full iOS regression remains unpassed.
+
+The current IPA probe links past all five required session constants and exits
+with status 1 at `_NSUbiquityIdentityDidChangeNotification`. Fortnite has not
+entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,550 | 610 | 79 |
+| Fortnite executable | 1,555 | 605 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,385 | 613 | 120 |
+| All images | 2,390 | 608 | 120 |
 
-The C++/GLES/Text variant reports 2,398 resolved imports, 600 unresolved strong
+The C++/GLES/Text variant reports 2,403 resolved imports, 595 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -76,6 +76,7 @@ fn main() {
 		require_child('/opt/ios/home-directory-checks')
 		require_child('/opt/ios/temp-directory-checks')
 		require_child('/opt/ios/url-error-checks')
+		require_child('/opt/ios/session-constants-checks')
 		require_child('/opt/ios/nslogv-checks')
 		require_child('/opt/ios/protocol-lookup-checks')
 		require_child('/opt/ios/uncaught-handler-checks')
@@ -199,7 +200,7 @@ fn main() {
 		require_child('/opt/ios/regression')
 	} else if mode == 'objc' {
 		os.setenv('VINIX_IOS_CONSTANT_DICT_IMAGE', '/opt/ios/constant-dictionary-image', true)
-		for name in ['objc-constant-dictionary', 'layout-constraint', 'json-serialization', 'condition', 'cookie', 'webkit-configuration', 'user-script', 'webview', 'request', 'value', 'response', 'alert', 'set', 'thread', 'auth-session', 'image-view', 'keyboard', 'nsuuid', 'filemanager', 'home-directory', 'temp-directory', 'url-error', 'nslogv', 'protocol-lookup', 'uncaught-handler', 'protocol-name', 'autopool', 'processinfo', 'date', 'inputstream', 'connection', 'type-encoding', 'oslog', 'secure-memory', 'cf-dictionary', 'objc-storage', 'objc-associated', 'objc-property', 'objc-sync'] {
+		for name in ['objc-constant-dictionary', 'layout-constraint', 'json-serialization', 'condition', 'cookie', 'webkit-configuration', 'user-script', 'webview', 'request', 'value', 'response', 'alert', 'set', 'thread', 'auth-session', 'image-view', 'keyboard', 'nsuuid', 'filemanager', 'home-directory', 'temp-directory', 'url-error', 'session-constants', 'nslogv', 'protocol-lookup', 'uncaught-handler', 'protocol-name', 'autopool', 'processinfo', 'date', 'inputstream', 'connection', 'type-encoding', 'oslog', 'secure-memory', 'cf-dictionary', 'objc-storage', 'objc-associated', 'objc-property', 'objc-sync'] {
 			require_child('/opt/ios/' + name + '-checks')
 		}
 		println('VINIX iOS OBJC: PASS')

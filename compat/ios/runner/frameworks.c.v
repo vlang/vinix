@@ -9,6 +9,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	if !library.starts_with('/System/Library/Frameworks/') { return none }
 	if library == '/System/Library/Frameworks/Foundation.framework/Foundation' {
 		if address := ns_url_error_symbol(symbol) { return address }
+		if address := ns_url_session_constant_symbol(symbol) { return address }
 	}
 	// Foundation.framework reexports these Swift overlay entries. The main
 	// executable uses this install name, while its bundled frameworks use the
