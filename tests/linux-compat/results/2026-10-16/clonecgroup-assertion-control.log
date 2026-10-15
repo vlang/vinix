@@ -1,0 +1,3 @@
+tests/linux-compat/clonecgroup-check.v:333: FAIL: fn main.main: assert false, 'clonecgroup assertions must execute'
+      message: clonecgroup assertions must execute
+V panic: Assertion failed...

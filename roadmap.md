@@ -1079,6 +1079,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   against identical probe ELFs on Linux.
   See [the clone3 signal receipts](docs/linux-posix-qualification.md#native-clone3-exit-signal-validation).
 
+- [x] Reject clone3 cgroup descriptor words above INT_MAX with Linux EINVAL;
+  preserve in-range EBADF, input-fault precedence and ignored-field fork/reap,
+  with protected layouts and flat cleanup on both native architectures against
+  identical probe ELFs on Linux.
+  See [the cgroup descriptor receipts](docs/linux-posix-qualification.md#native-clone3-cgroup-descriptor-range).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

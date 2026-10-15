@@ -1,0 +1,4 @@
+tests/linux-compat/clonecgroup-check.v:477: FAIL: fn main.main: assert digest(area + 'precomment-kernel-' + suffix) == digest(area + 'kernel-' + suffix + '/kernel/bin/vinix')
+   left value: digest(area + 'precomment-kernel-' + suffix) = 78d462d335700119fba1688a15f1266d8b8b08c8cb56fc2972b7e3b2ea644ec2
+  right value: digest(area + 'kernel-' + suffix + '/kernel/bin/vinix') = 5c4af3f2d56972f672e0519dbc57a318bb069191edfcabb13206eec55c5a4dc4
+V panic: Assertion failed...

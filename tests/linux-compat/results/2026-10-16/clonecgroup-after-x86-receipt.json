@@ -1,0 +1,31 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "5b0ed55eb32f911740f60fb903897be66962cec58015b9263a1dcab5a025b8ad",
+    "results": [
+        {
+            "name": "clonecgroup",
+            "source_sha256": "beeb24ed36319d5ff8838ef2e5cd20b624aaf0a894b09ed61515329feecda8b9",
+            "init_sha256": "686800083697a1c75d62d6d2794fbe4313c7d4dec2c1c31ddc0604dacb2f6884",
+            "iso_sha256": "deec5ddece090e89d5bf0ab3e5a01a00964929573234eae2f737c1930964cb5a",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "3c22f6e44700a031e0c6e9bd04427095e423d595d3f9b81e09f07539d1ea3b9f",
+            "iso_sha256": "c49a85a1d538cd3cbdf03b5dcd5b551d643951646fb6c08b78ad24f03105e9c3",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "clonesignal",
+            "source_sha256": "f396768df858cc560a98492869348e4bd23696a778a9a1711c4313b088ce2835",
+            "init_sha256": "795634d9b8fecd73aebef252ed650da91f9d91913748c6f1e4cb5e1875722bb4",
+            "iso_sha256": "d1706b146c797eab080a5008d2c1e8ce800be962cc1aadcd6fbaa8394ba285aa",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

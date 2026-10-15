@@ -66,7 +66,8 @@ pub fn syscall_clone3(gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 
 	mut cgroup := voidptr(unsafe { nil })
 	if args.flags & clone_into_cgroup != 0 {
-		if size < sizeof(CloneArgs) {
+		// Linux restricts this 64-bit ABI word to a nonnegative signed 32-bit fd.
+		if size < sizeof(CloneArgs) || args.cgroup > 0x7fffffff {
 			return errno.err, errno.einval
 		}
 		mut cgroup_fd := file.fd_from_fdnum(unsafe { nil }, int(args.cgroup)) or {

@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "4c5c3c570465e1d35c9627cd110acb3fdd7dc85fdd071bf4bfbf61f82c6a6573",
+    "results": [
+        {
+            "name": "clonecgroup",
+            "source_sha256": "beeb24ed36319d5ff8838ef2e5cd20b624aaf0a894b09ed61515329feecda8b9",
+            "init_sha256": "686800083697a1c75d62d6d2794fbe4313c7d4dec2c1c31ddc0604dacb2f6884",
+            "iso_sha256": "d8fe90fddccf616aecc7816703e7058a5d42840f6e8a7483de81dc67434d6617",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

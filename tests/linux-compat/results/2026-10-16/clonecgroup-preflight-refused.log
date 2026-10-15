@@ -1,0 +1,9 @@
+/Users/alex/.cache/vinix-linux-compat/clonecgroup-20261016/states/preflight-arm/serial.c:27:10: fatal error: 'fcntl.h' file not found
+   27 | #include <fcntl.h>
+      |          ^~~~~~~~~
+1 error generated.
+V panic: Command failed
+ v hash: f6358ec
+    pid: 0xeb5b
+    tid: 0xeb5b
+0   dyld                                0x00000001802ebe00 start + 6992

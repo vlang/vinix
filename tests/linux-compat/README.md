@@ -1909,3 +1909,19 @@ Use `--cases clonesignal --timeout 1200` with a fresh state directory.
 `clonesignal-check.v` without `-prod` to audit baseline failures, corrected
 results, exact whole-C scope, flat storage, pins and executing negative controls.
 See [the clone3 signal report](../../docs/linux-posix-qualification.md#native-clone3-exit-signal-validation).
+
+The `clonecgroup` case checks the clone3 cgroup descriptor ABI: values above
+INT_MAX return EINVAL when CLONE_INTO_CGROUP is present, in-range missing FDs
+retain EBADF, and the field is ignored when the flag is absent. Four
+credential/PID-namespace cohorts run 684 controls per architecture through
+aligned, unaligned and page-tail protected input layouts. Version sizes,
+input faults, complete two-page canaries, empty-child checks and actual
+SIGCHLD fork/reap are included. Original and corrected kernels each measure
+four warmed 200-cycle cleanup cohorts with the same descriptor inputs and
+fork/reap workload. Only the retention loop accepts either original EBADF or
+corrected EINVAL; conformance checks require the exact Linux error.
+Use `--cases clonecgroup --timeout 1200` with a fresh state directory.
+`clonecgroup-reference.v` runs the identical ELF on Linux; compile
+`clonecgroup-check.v` without `-prod` to audit exact source/C scope, baseline
+failures, corrected results, flat storage, pins and executing negative controls.
+See [the cgroup descriptor report](../../docs/linux-posix-qualification.md#native-clone3-cgroup-descriptor-range).

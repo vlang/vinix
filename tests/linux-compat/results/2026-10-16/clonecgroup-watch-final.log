@@ -1,0 +1,8 @@
+Completed /Users/alex/.cache/vinix-linux-compat/clonecgroup-20261016/states/before-arm/clonecgroup: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/clonecgroup-20261016/states/before-x86/clonecgroup: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/clonecgroup-20261016/states/after-arm/clonecgroup: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/clonecgroup-20261016/states/after-arm/runtime: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/clonecgroup-20261016/states/after-x86/clonecgroup: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/clonecgroup-20261016/states/after-x86/runtime: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/clonecgroup-20261016/states/after-arm/clonesignal: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/clonecgroup-20261016/states/after-x86/clonesignal: captured files byte-identical; disposable boot staging retired

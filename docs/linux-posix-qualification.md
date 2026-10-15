@@ -9135,3 +9135,85 @@ remain separate. Selected TIDs, pidfds, zero-filled extension sizes, full stack
 range policy, cgroup/namespace authorization, concurrent argument changes,
 GNU libc and translated/32-bit paths are unqualified. The broad libc,
 installation/sandbox/portal and translation roadmap gates remain open.
+
+## Native clone3 cgroup descriptor range
+
+Both native clone3 paths now reject a cgroup word above INT_MAX with EINVAL
+when CLONE_INTO_CGROUP is present, before descriptor lookup. The field is a
+64-bit ABI word with a signed 32-bit descriptor range. Previously the lookup
+returned EBADF for these values. Generated-C inspection established that V's
+kernel int is 64-bit here: this was an errno mismatch, with no demonstrated
+low-word descriptor alias. This follows
+[Linux v6.12's argument import checks](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c).
+
+The `clonecgroup` probe runs 684 controls per architecture: 171 calls in each
+root/UID1000 and initial/one-level PID namespace cohort, through aligned,
+byte-unaligned and native-page-tail layouts. The input page is read-only and
+the following page is PROT_NONE. Every call compares the complete two-page
+canary after restoring access and checks that no unexpected children remain.
+
+| Class | Calls per cohort | Contract |
+| --- | ---: | --- |
+| Descriptor range | 45 | Fifteen words above INT_MAX, including bit 31, bit 32, sign bits and all-ones, return EINVAL. |
+| Open-FD low words | 36 | Twelve nonzero high words combined with the number of an open /dev/null descriptor return EINVAL. This is a range check, without a truncation claim. |
+| In-range missing FDs | 18 | INT_MAX and five other in-range missing descriptor numbers retain EBADF. |
+| Version sizes | 24 | Eight sizes from 64 through 87 lack the complete cgroup field and return EINVAL with CLONE_INTO_CGROUP. |
+| Input precedence | 36 | Short/excessive sizes, null/unmapped/wrapping addresses and protected suffixes retain exact EINVAL/E2BIG/EFAULT results despite an invalid cgroup word. |
+| Ignored field | 12 | Without CLONE_INTO_CGROUP, sizes 64/72/80/88 admit actual SIGCHLD forks despite an out-of-range cgroup word. |
+
+Successful children send PID/TID, parent and UID records through a pipe,
+exit with status 37 and are reaped. An empty nonblocking wait must return
+ECHILD after every case; matching an errno cannot hide a partially created
+child. Originals fail exactly 324 controls per architecture, all in the first
+two classes. Corrected kernels and the identical original ELFs on Linux
+6.12.51 pass every control. Native ARM uses 16KiB pages; native x86 and both
+Linux references use 4KiB. Both corrected kernels also pass runtime and the
+2,652-control clonesignal regression.
+
+Original and corrected kernels each measure four cleanup cohorts: 64 warmup
+cycles, thirteen seconds of settling, 200 measured cycles, then another
+thirteen-second settle. A cycle uses six out-of-range descriptor calls, one
+in-range missing FD and one real ignored-field fork/reap, with the same
+argument words, protections, canaries and child cleanup on both kernels.
+Only this retention loop accepts either original EBADF or corrected EINVAL;
+the conformance classes always require the exact Linux error. Every live slab
+class and big-heap page total stays flat. The input mapping, open descriptor
+and slab observer remain live throughout measurement. This is targeted
+kernel-heap evidence; it does not resolve the earlier EXT2 rename observation
+or qualify general page/cache retention.
+
+Exact whole-C comparison confines the change to one scalar comparison in each
+clone3 entry point. No allocation, free, reference, ownership or lock changes
+are introduced. Four isolated original/final production builds pass. Two
+intermediate builds had the same code with a subsequently clarified comment;
+their generated C is identical to the final builds. Kernel ELFs are pinned
+separately: the build links with section shuffling, so repeated links need not
+produce identical files. The first audit incorrectly required that identity;
+its refusal, source and binary remain pinned, and the claim was corrected.
+The probe uses eight explicit stack allocas with no allocation or fixed-index
+helper. Its successful compiler preflight matches the original ARM guest C.
+The first preflight lacked the SDK environment; the second exposed a fixed
+array membership helper unavailable in the freestanding probe. Both refusals,
+generated inputs and the second refused V source are retained separately.
+
+The auditor checks baseline failure counts, all case/cohort totals, credentials
+and page sizes, original/corrected probe identity, Linux receipts, both phases'
+storage, all 84 retained native case files, 67 frozen dispatch inventory inputs,
+2,014 SDK files and 15,146 compiler pins. A false assertion and an attempt to
+use passing Linux output as an original failure must both execute and fail;
+compile the auditor without `-prod`.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/clonecgroup-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/clonecgroup-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/clonecgroup-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/clonecgroup-diagnostic-pins.json).
+Raw original/corrected/Linux, build, preflight and regression logs accompany
+the receipts. The maintained auditor is `tests/linux-compat/clonecgroup-check.v`.
+
+This qualifies cgroup-word range and adjacent import/ignored-field behavior.
+Successful cgroup placement, permission checks and cgroup descriptor/node
+lifetimes remain separate. Alternative clone exit notification, clone-child
+wait classes, selected TIDs, pidfds, zero-filled extensions, stack-range policy,
+concurrent argument changes, GNU libc and translated/32-bit paths remain
+unqualified. The broad libc, installation/sandbox/portal and translation gates
+remain open.
