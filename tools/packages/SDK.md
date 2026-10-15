@@ -1101,6 +1101,16 @@ termination or storage errors can leave partial cleanup; reload and retry after
 resolving the diagnostic. See the
 [manager qualification](../../tests/packages/personal-data-check.md).
 
+Stopping a Software inventory read with Stop/Cancel/Escape discards partial or
+complete output received before worker exit. A fresh successful inventory is
+required before selecting another deletion, including after a
+stopped post-purge reload. Completed purge results survive that stop. Compact
+windows retain navigation, reload, cancellation and failure access; permanent
+confirmation requires the full view. Escape cancels an idle confirmation or
+returns to the catalog. Approved purge workers remain protected until exit;
+their command arguments and own-account authorization are unchanged. See
+[navigation checks](../../tests/packages/software-data-navigation-check.md).
+
 ### Interactive terminal execution
 
 `run-terminal ID [ABSOLUTE_FILE...]` is an additive SDK 1 command. Standard input

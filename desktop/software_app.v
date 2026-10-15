@@ -759,6 +759,10 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		return
 	}
 	if a.cleanup_mode { a.handle_cleanup(event_id); return }
+	if a.data_read_running() && event_id in ['software.data.stop', 'software.data.cancel']! {
+		a.stop_data_read()
+		return
+	}
 	if a.policy_read_running() && event_id in ['software.policy.stop', 'software.policy.cancel']! {
 		a.stop_policy_read()
 		return
@@ -1024,7 +1028,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 		return
 	}
 	if a.policy_mode { a.policy_key_input(input); return }
-	if a.data_mode { return }
+	if a.data_mode { a.data_key_input(input); return }
 	if a.launch_mode { a.launch_key_input(input); return }
 	if a.repository_mode { a.repository_key_input(input); return }
 	if a.mirror_mode { a.mirror_key_input(input); return }
@@ -1121,6 +1125,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.deployment_mode && (width < 640 || height < 610) { return a.build_deployment_compact(width, height) }
 	if a.repository_mode && (width < 640 || height < 610) { return a.build_repositories_compact(width, height) }
 	if a.policy_mode && (width < 640 || height < 610) { return a.build_policy_compact(width, height) }
+	if a.data_mode && (width < 640 || height < 610) { return a.build_personal_data_compact(width, height) }
 	if width < 640 || height < 610 {
 		if a.package_screen_active() { return a.build_packages_compact(width, height) }
 		mut compact := frame_elements(2)

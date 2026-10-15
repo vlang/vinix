@@ -117,7 +117,13 @@ fn (mut a SoftwareApp) handle_personal_data(event_id string) {
 fn (mut a SoftwareApp) build_personal_data(width int, height int) ui2.Element {
 	mut children := frame_elements(32)
 	children << software_label('Personal application data', 14, 8, width - 28, 28, false)
-	if a.data_pending != '' {
+	if a.worker != unsafe { nil } {
+		if a.data_read_running() {
+			children << software_button('software.data.stop', 'Stop reading', 14, 46, 140)
+		} else {
+			children << software_label('Wait for the confirmed deletion to finish.', 14, 46, width - 28, 28, false)
+		}
+	} else if a.data_pending != '' {
 		children << software_label('Permanently delete data for:', 14, 56, width - 28, 28, false)
 		children << software_label(a.data_pending, 14, 92, width - 28, 48, false)
 		children << software_label('Only this signed-in account’s ~/.local/share/vinix-apps/ID directory is deleted. Documents granted to the application stay in their original locations.', 14, 152, width - 28, 76, false)
@@ -154,6 +160,7 @@ fn (mut a SoftwareApp) build_personal_data(width int, height int) ui2.Element {
 			}
 		}
 	}
-	a.add_status_footer(mut children, width, height, false)
+	if a.progress_seen { children << a.progress_bar(width, height) }
+	a.add_status_footer(mut children, width, height, a.progress_seen)
 	return ui2.screen(app_surface, children)
 }

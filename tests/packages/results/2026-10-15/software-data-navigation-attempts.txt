@@ -1,0 +1,118 @@
+The initial ordinary functional runs passed the new inventory cancellation,
+confirmation, protected purge and post-purge reload cases, then panicked when
+the new root Back/Escape check loaded an empty catalog with a zero-capacity
+query. Diagnostic staging localized this to the maintained fixture's
+editor_bytes_text stub, which called tos(nil, 0) for empty buffers. The real
+desktop helper already returns an empty string in this case. The stub now
+matches that production behavior. Debug print instrumentation was applied only
+to private staged source; the final stages are exact maintained-source copies.
+No production response validation, authorization or purge semantics were
+changed to pass the tests. Final results supersede these initial attempts.
+
+Initial functional output:
+Software package navigation: all five operations, partial and complete-before-exit Stop/Cancel/Escape, fresh retry, frozen catalog state, compact review/details/status/progress/failures, protected apply/refresh and reload passed
+Software configured repositories: damaged metadata does not block reviewed revocation; enrollment remains refused PASS
+Software repository navigation: compact list/review/status/progress/failures, partial and complete-before-exit Stop/Cancel/Escape, retained inputs/list, fresh paged review, protected apply/refresh and retry passed
+Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed
+Software Verify: visible control, no administrator/catalog dependency, streamed progress, stable selection, incomplete/failure retention, review isolation and safe close PASS
+Software repair: installed dependency control, exact-version closure disclosure, read-only review, duplicate/modal isolation, frozen confirmation and reviewed administrator apply PASS
+Software health: read-only asynchronous report, issue-first searchable metadata/diagnostics, issues-only filtering, stable visible selection, empty results, bounded Unicode editing, reload retention, compact Back, isolated catalog state, full-set repair review and safe close PASS
+Software health progress: separate bounded stderr, live package names, both-pipe EOF, complete/exit/report/count admission, malformed/partial/late/flood refusal, Stop/Escape kill and reap, retry and compact cancellation PASS
+SOFTWARE CLEANUP read-only review, complete paged disclosure, modal/compact controls, frozen administrator approval, stale refusal, diagnostics and reload PASS
+Software deployment: full closure, frozen literal path, empty removal, cancellation, bounds, stale/error diagnostics and close guard passed
+Software deployment navigation: compact form/review/details/status/progress/failures, partial and complete-before-exit Stop/Cancel/Escape, fresh literal retry, empty removal, protected apply and subflow routing passed
+Software deployment audit: literal ordinary argv, exit 0/3 coherence, complete drift rows, details/paging, frozen reload/review, cancellation, failure diagnostics, bounds and compact navigation passed
+Software deployment audit search: all 8192 rows, difference-first projection, IDs/status/versions/fields, stable selection/resize, bounded UTF-8 editing, reload/stop/error retention, empty results and full deployment review passed
+Software deployment saving: literal ordinary argv, bounded complete receipt, destination binding, both architectures, empty generation, close guard, fresh audit/review, diagnostics and compact navigation passed
+Software saved deployment export: frozen source/digest, explicit new destination, no catalog selection, full path/package/license review, administrator apply, progress, changed-source refusal, retry and retirement passed
+Software offline export navigation: compact Back/Cancel/Stop/status/progress/failures, partial and complete-before-exit review cancellation/reaping, frozen retry and protected publication passed
+Software offline export: destination paging, dependency provenance, literal confirmation, installed scope, progress, stale diagnostics and close guard passed
+Software locked offline export: exact older runtime, source/digest paging, literal frozen confirmation, invalid responses, stale diagnostics, progress and cancellation passed
+Software launch options: quoted literal arguments, separate file grants, frozen worker input, diagnostics and terminal transfer passed
+Software native windows: bounded frames, namespaced controls, ordinary-service launch, clicks, close acknowledgement and EOF retirement passed
+Software native text: focus, UTF-8 bounds, literal replacement, stale controls, explicit commit/discard, close guard and protocol admission passed
+Software administrator approval: frozen literal request, masked bounded UTF-8 password, hidden-action refusal, credential wiping, cancellation and progress passed
+Software personal data: own-account inventory, installed/unsafe refusal, frozen explicit confirmation, cancellation, paging, live-lease diagnostics, reload and close guard passed
+V panic: tos(): nil string
+ v hash: 826e96f
+    pid: 0x13693
+    tid: 0x1ec829e80
+0   ui-check                            0x0000000102432130 panic_fatal + 608
+1   ui-check                            0x0000000102432338 panic_jump_next + 364
+2   ui-check                            0x000000010220f4cc panic_frame_done + 76
+3   ui-check                            0x000000010229dd34 check_software_data_navigation + 672
+4   ui-check                            0x00000001023f5820 main + 79728
+5   dyld                                0x00000001802ebe00 start + 6992
+
+Debug functional output:
+Software package navigation: all five operations, partial and complete-before-exit Stop/Cancel/Escape, fresh retry, frozen catalog state, compact review/details/status/progress/failures, protected apply/refresh and reload passed
+Software configured repositories: damaged metadata does not block reviewed revocation; enrollment remains refused PASS
+Software repository navigation: compact list/review/status/progress/failures, partial and complete-before-exit Stop/Cancel/Escape, retained inputs/list, fresh paged review, protected apply/refresh and retry passed
+Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed
+Software Verify: visible control, no administrator/catalog dependency, streamed progress, stable selection, incomplete/failure retention, review isolation and safe close PASS
+Software repair: installed dependency control, exact-version closure disclosure, read-only review, duplicate/modal isolation, frozen confirmation and reviewed administrator apply PASS
+Software health: read-only asynchronous report, issue-first searchable metadata/diagnostics, issues-only filtering, stable visible selection, empty results, bounded Unicode editing, reload retention, compact Back, isolated catalog state, full-set repair review and safe close PASS
+Software health progress: separate bounded stderr, live package names, both-pipe EOF, complete/exit/report/count admission, malformed/partial/late/flood refusal, Stop/Escape kill and reap, retry and compact cancellation PASS
+SOFTWARE CLEANUP read-only review, complete paged disclosure, modal/compact controls, frozen administrator approval, stale refusal, diagnostics and reload PASS
+Software deployment: full closure, frozen literal path, empty removal, cancellation, bounds, stale/error diagnostics and close guard passed
+Software deployment navigation: compact form/review/details/status/progress/failures, partial and complete-before-exit Stop/Cancel/Escape, fresh literal retry, empty removal, protected apply and subflow routing passed
+Software deployment audit: literal ordinary argv, exit 0/3 coherence, complete drift rows, details/paging, frozen reload/review, cancellation, failure diagnostics, bounds and compact navigation passed
+Software deployment audit search: all 8192 rows, difference-first projection, IDs/status/versions/fields, stable selection/resize, bounded UTF-8 editing, reload/stop/error retention, empty results and full deployment review passed
+Software deployment saving: literal ordinary argv, bounded complete receipt, destination binding, both architectures, empty generation, close guard, fresh audit/review, diagnostics and compact navigation passed
+Software saved deployment export: frozen source/digest, explicit new destination, no catalog selection, full path/package/license review, administrator apply, progress, changed-source refusal, retry and retirement passed
+Software offline export navigation: compact Back/Cancel/Stop/status/progress/failures, partial and complete-before-exit review cancellation/reaping, frozen retry and protected publication passed
+Software offline export: destination paging, dependency provenance, literal confirmation, installed scope, progress, stale diagnostics and close guard passed
+Software locked offline export: exact older runtime, source/digest paging, literal frozen confirmation, invalid responses, stale diagnostics, progress and cancellation passed
+Software launch options: quoted literal arguments, separate file grants, frozen worker input, diagnostics and terminal transfer passed
+Software native windows: bounded frames, namespaced controls, ordinary-service launch, clicks, close acknowledgement and EOF retirement passed
+Software native text: focus, UTF-8 bounds, literal replacement, stale controls, explicit commit/discard, close guard and protocol admission passed
+Software administrator approval: frozen literal request, masked bounded UTF-8 password, hidden-action refusal, credential wiping, cancellation and progress passed
+Software personal data: own-account inventory, installed/unsafe refusal, frozen explicit confirmation, cancellation, paging, live-lease diagnostics, reload and close guard passed
+DEBUG before app.handle("software.data")!; wait_for_software(mut app)
+DEBUG before app.handle("software.row.1")!
+DEBUG before app.handle("software.data.reload")!; pid := app.worker.pid
+DEBUG before wait_for_data_navigation_output(mut app)
+DEBUG before app.handle("software.row.1")!
+DEBUG before app.handle("software.data.reload")!; pid := app.worker.pid
+DEBUG before wait_for_data_navigation_output(mut app)
+DEBUG before app.handle("software.row.1")!
+DEBUG before app.handle("software.data.reload")!; pid := app.worker.pid
+DEBUG before wait_for_data_navigation_output(mut app)
+DEBUG before app.handle("software.row.1")!
+DEBUG before app.handle("software.data.reload")!; pid := app.worker.pid
+DEBUG before wait_for_data_navigation_output(mut app)
+DEBUG before app.handle("software.row.1")!
+DEBUG before app.handle("software.data.reload")!; pid := app.worker.pid
+DEBUG before wait_for_data_navigation_output(mut app)
+DEBUG before app.handle("software.row.1")!
+DEBUG before app.handle("software.data.reload")!; pid := app.worker.pid
+DEBUG before wait_for_data_navigation_output(mut app)
+DEBUG before app.handle("software.row.1")!
+DEBUG before app.handle("software.row.1")!
+DEBUG before app.handle("software.row.1")!
+DEBUG before wait_for_data_navigation_output(mut app)
+DEBUG before app.stop_data_read()
+DEBUG before app.handle("software.row.1")!
+DEBUG before wait_for_data_navigation_output(mut app)
+DEBUG before app.stop_data_read()
+DEBUG before wait_for_data_navigation_output(mut app)
+DEBUG before app.key_input(""); wait_for_software(mut app)
+DEBUG before root.handle("software.data")!
+================ V panic ================
+   module: builtin
+ function: tos()
+  message: tos(): nil string
+     file: /Users/alex/code/v/.codex-worktrees/no-c-headers-native-fixes/vlib/builtin/string.v:109
+   v hash: 826e96f
+      pid: 0x1b0d
+      tid: 0x1ec829e80
+=========================================
+0   debug-check                         0x0000000102e3fc14 tos + 208
+1   debug-check                         0x0000000102e41468 editor_bytes_text + 36
+2   debug-check                         0x0000000102e65a0c SoftwareApp__filter_rows + 96
+3   debug-check                         0x0000000102e7ec00 SoftwareApp__load_view + 948
+4   debug-check                         0x0000000102e85864 SoftwareApp__poll + 4152
+5   debug-check                         0x0000000102e99aac wait_for_software + 52
+6   debug-check                         0x0000000102edfe94 check_software_data_navigation + 29244
+7   debug-check                         0x0000000102fed3e0 main + 91016
+8   dyld                                0x00000001802ebe00 start + 6992

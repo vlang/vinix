@@ -195,6 +195,12 @@ their filename for retry. Compact windows keep navigation and diagnostics;
 approved saves remain protected. Stopping a reload requires a fresh read before
 another review. See [qualification](../../tests/packages/software-policy-navigation-check.md).
 
+Personal-data inventory reads support Stop/Cancel/Escape. A stopped read
+requires a fresh inventory before deletion review and preserves any completed
+purge result. Compact windows keep Back, reload, confirmation cancellation and
+failure access; approved deletions remain protected until completion. See
+[qualification](../../tests/packages/software-data-navigation-check.md).
+
 Configuration reads reject ambiguous keys, null values and incorrect field
 types while preserving legacy defaults for omitted fields. Policy typos fail
 before acquisition, cleanup or activation; correcting the configuration permits

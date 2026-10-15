@@ -918,6 +918,16 @@ Live-generation failures keep the confirmation available and explain what to
 stop before retrying. A successful purge reloads the inventory. Root desktops
 show a sign-in explanation and cannot choose another account’s data.
 
+Inventory reads support **Stop reading**, Cancel and Escape. Stopped reads
+discard unaccepted output and require a fresh reload before another deletion
+review, including reads following a completed purge. The deletion result is
+retained for the next successful reload. Small windows keep Back, reload,
+confirmation cancellation and failure access; enlarge the window to review
+the permanent-loss warning and confirm. Escape cancels an idle confirmation
+or returns to the catalog. Approved deletions retain their close guard and
+cannot be cancelled through these controls. See the
+[personal-data navigation checks](../tests/packages/software-data-navigation-check.md).
+
 `vinix-package --json data-list` provides the same bounded, read-only inventory;
 it uses installed state without refreshing repositories and works offline. The
 inventory is an observation; deletion rechecks current installation, leases and
