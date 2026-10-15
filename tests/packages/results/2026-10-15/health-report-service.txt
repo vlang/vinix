@@ -1,0 +1,17 @@
+Updating trusted repository trusted
+Installing Package é🚀 app 1.0.0 (1/4) from trusted
+Downloading app/bin/app (22 bytes)
+Installing Package é🚀 assets 1.0.0 (2/4) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing Package é🚀 runtime 1.0.0 (3/4) from trusted
+Downloading runtime/bin/app (26 bytes)
+Installing Package é🚀 utility 1.0.0 (4/4) from trusted
+Downloading utility/bin/app (26 bytes)
+Activated package generation 1
+Installing Package é🚀 app 1.0.0 (1/4) from trusted
+Installing Package é🚀 assets 1.0.0 (2/4) from trusted
+Installing Package é🚀 runtime 1.0.0 (3/4) from trusted
+Installing Package é🚀 utility 1.0.0 (4/4) from trusted
+Activated package generation 2
+Activated package generation 3
+HEALTH REPORT signed service/CLI, all simultaneous app/runtime/data/launcher issues, read-only locking and retained state, trust/catalog independence, malformed state refusal, fresh offline repair and clean uninstall PASS

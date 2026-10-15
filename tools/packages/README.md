@@ -39,6 +39,14 @@ including long paths and exit status. It survives catalog reloads until another
 failure, explicit clearing or window close. The view is read-only and marks
 omitted output. See [qualification](../../tests/packages/software-failure-check.md).
 
+Software's **Health report**, also available as `vinix-package [--json] health`,
+inspects every installed app, runtime and data dependency. It lists all affected
+packages with installed provenance and paged diagnostics, even when catalogs are
+unavailable. A complete report returns zero with issues recorded in its rows;
+`verify` retains its failure exit behavior. **Review repairs** obtains a fresh
+authenticated repair proposal before authorization. See
+[qualification](../../tests/packages/health-report-check.md).
+
 Start, Quick Launch and Open With use bounded installed-state presentation
 decoding with complete fields, explicit ownership and canonical generation
 identities. Damaged metadata is refused before menu replacement; restoring it

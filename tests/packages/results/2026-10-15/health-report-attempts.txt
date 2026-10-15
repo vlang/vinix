@@ -1,0 +1,36 @@
+Initial scanner discovery retained 4096 bytes over 128 damaged scans: the pinned compiler boxed error receivers when returned text was derived from the error message. The final helper copies the message independently and retires both strings/error; generated C and the zero-retention probe are pinned. A private qualification attempt also enabled track_heap in a CLI without a tracker header; final flags apply tracking only to fixtures with hooks. Initial test preprocessor blocks needed multiline include syntax, and a private runtime generator needed explicit optional handling. The final UI additionally preserves a missing-service diagnostic instead of replacing it with a scanning status. Final checks pass.
+
+Initial allocation probe:
+HEALTH REPORT all app/runtime/data packages inspected, sorted owned provenance, namespace/payload/registration classification, empty state and no filesystem mutation PASS
+HEALTH REPORT control/invalid bytes escaped and long UTF-8 diagnostics bounded with truncation disclosure PASS
+tools/packages/pkgcore/health_test.v:83: fn test_health_report_retires_owned_results_and_all_scanner_scratch
+   > assert kept == 0, 'health scans retained ${kept} bytes'
+     Left value (len: 4): `4096`
+    Right value (len: 1): `0`
+        Message: health scans retained 4096 bytes
+
+
+Private CLI flags attempt:
+tools/packages/pkgadmin/socket.c.v:84:2: notice: variable `path` shadows a function declaration
+   82 |     private_directory(directory, uid)!
+   83 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+   84 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+   85 |     mut accepted := false
+   86 |     defer { if !accepted { unsafe { path.free() } } }
+tools/packages/pkgadmin/socket.c.v:103:2: notice: variable `path` shadows a function declaration
+  101 |     private_directory(directory, uid)!
+  102 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+  103 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+  104 |     defer { unsafe { path.free() } }
+  105 |     location := address(path)!
+C compilation error (from cc):
+src.c:16447:2: error: call to undeclared function 'vheap_alloc'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 16447 |         vheap_alloc(p, (u64)(n));
+       |         ^
+src.c:16451:2: error: call to undeclared function 'vheap_free'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 16451 |         vheap_free(p);
+       |         ^
+2 errors generated.
+

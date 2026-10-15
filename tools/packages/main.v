@@ -15,7 +15,7 @@ import tools.packages.pkgprotocol
 const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progress] COMMAND [ARGS]\n' +
 	'  update | search [QUERY] | info ID | list | status | updates | view\n' +
 	'  admin [--progress] [--offline] update|apply|repo-apply|deployment-apply|policy-apply|mirror-apply|mirror-deployment-apply ...\n' +
-	'  install ID... | remove ID... | upgrade | repair | rollback | gc | verify\n' +
+	'  install ID... | remove ID... | upgrade | repair | rollback | gc | verify | health\n' +
 	'  plan install|remove|upgrade|repair|deploy [ID...] | deploy MANIFEST.json\n' +
 	'  review install|remove|upgrade|repair|deploy|rollback [ID...]\n' +
 	'  repo-list | repo-config | repo-enroll ID URL PUBLIC_KEY_HEX | repo-revoke ID\n' +
@@ -299,6 +299,19 @@ fn checked(arguments []string) !int {
 				println('${p.id} ${p.version} ${p.architecture} ${installed.repository}')
 			}
 			if command == 'verify' && progress { println('Installed package files and launchers verified.') }
+		}
+		'health' {
+			if names.len != 0 { return error('health takes no package IDs') }
+			mut report := service.health()!
+			defer { report.close() }
+			if as_json { println(json2.encode(report)) }
+			else {
+				println('Installed integrity report for generation ${report.generation}; trust and policy still apply at launch.')
+				for row in report.rows {
+					println('${row.id} ${row.version}: ${if row.issue == '' { 'verified' } else { row.issue }}${if row.diagnostic == '' { '' } else { ': ' + row.diagnostic }}')
+				}
+				println('Packages inspected: ${report.rows.len}; with issues: ${report.rows.filter(it.issue != '').len}. Use review repair to inspect recovery options.')
+			}
 		}
 		'install', 'remove', 'upgrade', 'repair' {
 			service.transact(command, names, pkgcore.TransactionOptions{})!

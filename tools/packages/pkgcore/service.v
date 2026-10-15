@@ -105,6 +105,27 @@ pub fn (service Service) verify() !State {
 	return service.installed(true)
 }
 
+fn (service Service) health_locked(directory string) !pkgprotocol.HealthReport {
+	// This observation needs configuration/state, not repository metadata. Use
+	// the decoded configuration directly so its independent storage can retire.
+	config := load_config(service.root)!
+	defer { close_decoded_configuration(config) }
+	state := read_state(directory, config.architecture)!
+	defer { if state.generation != 0 { close_decoded_state(state) } }
+	return installed_health_report(directory, state, service.progress)
+}
+
+pub fn (service Service) health() !pkgprotocol.HealthReport {
+	directory := service.directory()!
+	defer { unsafe { directory.free() } }
+	if state_requires_lock(directory) {
+		guard := acquire_reader(directory)!
+		defer { guard.release() }
+		return service.health_locked(directory)
+	}
+	return service.health_locked(directory)
+}
+
 fn (service Service) prepare_launch(id string) !(Config, State, int) {
 	directory := service.directory()!
 	guard := acquire_reader(directory)!

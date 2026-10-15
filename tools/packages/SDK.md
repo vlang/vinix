@@ -1590,6 +1590,42 @@ replaced by a catalog reload. Exit failure or a missing/finally superseded
 completion frame cannot report success. The window may close during a scan;
 closing stops only its verification reader. Review confirmation screens do not
 offer verification. See [verification checks](../../tests/packages/verify-progress-check.md).
+
+`health` inspects every installed package even when earlier packages have issues.
+It takes no IDs and returns exit 0 when the complete report was produced,
+including reports with integrity issues. Configuration/state/lock failures still
+return nonzero. Scripts use `--json health` and inspect the rows, or use `verify`
+when they need a nonzero exit for damaged installed files. `--progress health`
+is refused; the JSON snapshot is a complete response, not a progress stream.
+
+The owned SDK 1 `pkgprotocol.HealthReport` contains required `format:1`,
+`generation`, `architecture` and `rows`. Rows are sorted by unique ID and require
+`id`, `name`, `version`, `kind`, `repository`, `public_key`, `issue` and
+`diagnostic`. `issue` is empty for verified files/registration, or `namespace`,
+`payload`, or `registration` for the first issue in that package. Every package
+gets a row; a clean application row does not assert that its dependencies are
+healthy. Counts are derived from the rows. These are installed provenance
+records, not a current publisher/trust claim or repair approval.
+
+`Service.health()` holds one reader lock, loads configuration/state without
+loading catalogs, and returns independent owned presentation fields. Its optional
+observer emits indeterminate `verify` frames for packages and `complete` when
+the report is finished, even if issues exist. It writes no health cache or state.
+Missing, expired, damaged or revoked repository metadata does not prevent an
+integrity observation. The report does not relax trust or policy for repair or
+launch, and it does not inspect personal data or extraneous generation-global
+names. Existing controlled-parent and same-authority mutation limits apply.
+
+`decode_health` rejects missing/unknown/escaped-duplicate fields, wrong types,
+invalid UTF-8, noncanonical/overflowed counters, unsorted/duplicate IDs and
+incoherent issue/diagnostic pairs. Responses are bounded to 8 MiB and 4,096 rows;
+diagnostics are at most 384 UTF-8 bytes. The scanner escapes unsafe filesystem
+bytes and visibly marks truncation. `HealthReport.close()` retires service-created
+or decoded rows. Software's **Health report** lists problems first and pages the
+complete retained provenance and diagnostic; **Review repairs** obtains a fresh
+version-preserving repair review before administrator confirmation. See
+[health report qualification](../../tests/packages/health-report-check.md).
+
 On a fresh image, status/verification do not initialize package state. Direct
 administrator edits to configuration must honor the same lock or quiesce package
 operations; arbitrary root filesystem writes are outside this contract.
@@ -1688,7 +1724,7 @@ valid configuration under the same package lock before retrying. See
 V administrative clients can use [`pkgcore.Service`](pkgcore/service.v) with
 `root` and a per-command `offline` flag. It retains no configuration snapshot.
 Its `refresh`, `transact`, `deploy`, `plan`, `review`, `rollback`, `collect`,
-`mirror`, `review_mirror`, `apply_mirror`, `state`, `verify` and `run` methods acquire the appropriate lock before
+`mirror`, `review_mirror`, `apply_mirror`, `state`, `verify`, `health` and `run` methods acquire the appropriate lock before
 loading configuration. Config-taking core functions remain explicit snapshot
 operations for isolated fixtures; they do not reload administrator configuration.
 Production clients should use the service or the versioned CLI protocol.

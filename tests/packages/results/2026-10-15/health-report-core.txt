@@ -1,0 +1,8 @@
+HEALTH REPORT all app/runtime/data packages inspected, sorted owned provenance, namespace/payload/registration classification, empty state and no filesystem mutation PASS
+HEALTH REPORT control/invalid bytes escaped and long UTF-8 diagnostics bounded with truncation disclosure PASS
+HEALTH REPORT 128 healthy and 128 multiple-issue scan/retirement cycles retain zero tracked bytes PASS
+
+Protocol:
+HEALTH PROTOCOL complete typed fields, escaped duplicate/unknown keys, canonical numbers, sorted unique rows, issue coherence, UTF-8 and bounds PASS
+HEALTH PROTOCOL 4096 maximally escaped rows fit the reply bound; excess rows refuse PASS
+HEALTH PROTOCOL 1000 complete and partial-invalid decode/retirement cycles retain zero tracked bytes PASS

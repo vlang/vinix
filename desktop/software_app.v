@@ -57,7 +57,15 @@ mut:
 	worker_review   bool
 	worker_run      bool
 	worker_verify   bool
+	worker_health   bool
 	worker_failed   bool
+	health_mode bool
+	health_ready bool
+	health_snapshot pkgprotocol.HealthReport
+	health_matching []int
+	health_summary string
+	health_selected int = -1
+	health_scroll int
 	data_mode       bool
 	data_status     pkgprotocol.PersonalDataStatus
 	data_ready      bool
@@ -206,6 +214,7 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	a.worker_review = false
 	a.worker_run = false
 	a.worker_verify = arguments.len == 1 && arguments[0] == 'verify'
+	a.worker_health = arguments == ['--json', 'health']
 	a.worker_mirror = false
 	a.repository_worker = .none
 	a.data_worker = .none
@@ -514,6 +523,7 @@ fn (mut a SoftwareApp) poll() bool {
 	reviewing := a.worker_review
 	running := a.worker_run
 	verifying := a.worker_verify
+	health := a.worker_health
 	repository_worker := a.repository_worker
 	data_worker := a.data_worker
 	policy_worker := a.policy_worker
@@ -544,6 +554,8 @@ fn (mut a SoftwareApp) poll() bool {
 			'The package service failed. Check administrator access, repository configuration and disk space.'
 		}) }
 		unsafe { diagnostic.free() }
+	} else if health {
+		if !a.worker_failed { a.load_health() }
 	} else if policy_worker == .list {
 		if !a.worker_failed { a.load_policy_document() }
 	} else if policy_worker == .review {
@@ -654,6 +666,10 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 	if a.details_mode { a.handle_details(event_id); return }
 	if event_id == 'software.failure' {
 		if a.worker == unsafe { nil } && a.failure_pages.len > 0 { a.failure_mode = true; a.focus = false }
+		return
+	}
+	if a.health_mode {
+		if a.worker == unsafe { nil } { a.handle_health(event_id) }
 		return
 	}
 	if event_id.starts_with(packagecore.request_prefix) {
@@ -791,6 +807,10 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 			if a.worker != unsafe { nil } || a.review != '' { return }
 			a.start(['verify'], false)
 		}
+		'software.health' {
+			if a.review != '' { return }
+			a.read_health()
+		}
 		'software.repair' {
 			if a.worker != unsafe { nil } || a.review != '' { return }
 			a.begin_review('repair', [])
@@ -876,6 +896,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
 	if a.failure_mode { if input == '\x1b' { a.failure_mode = false }; return }
 	if a.details_mode { if input == '\x1b' { a.clear_details() }; return }
+	if a.health_mode { if input == '\x1b' && a.worker == unsafe { nil } { a.clear_health() }; return }
 	if a.policy_mode { a.policy_key_input(input); return }
 	if a.data_mode { return }
 	if a.launch_mode { a.launch_key_input(input); return }
@@ -905,6 +926,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
 	if a.failure_mode { return }
 	if a.details_mode { return }
+	if a.health_mode { return }
 	if a.policy_mode { a.policy_paste_input(input); return }
 	if a.data_mode { return }
 	if a.launch_mode { a.launch_key_input(input); return }
@@ -965,6 +987,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	a.page_rows = if height > 400 { (height - if a.review != '' { 274 } else { 310 }) / 30 } else { 5 }
 	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
 	if a.details_mode { return a.build_details(width, height) }
+	if a.health_mode { return a.build_health(width, height) }
 	if a.policy_mode { return a.build_policy(width, height) }
 	if a.data_mode { return a.build_personal_data(width, height) }
 	if a.launch_mode { return a.build_launch_options(width, height) }
@@ -1088,8 +1111,9 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		children << software_button('software.data', 'Personal data', 502, height - 138, 124)
 		children << software_button('software.verify', 'Verify installed', 136, height - 176, 110)
 		if a.rows.any(it.installed_version != '') {
-			children << software_button('software.repair', 'Repair installed', 14, height - 214, 232)
+			children << software_button('software.repair', 'Repair installed', 14, height - 214, 110)
 		}
+		children << software_button('software.health', 'Health report', 136, height - 214, 110)
 	}
 	if a.progress_seen { children << a.progress_bar(width, height) }
 	a.add_status_footer(mut children, width, height, a.progress_seen)
@@ -1141,6 +1165,7 @@ fn (mut a SoftwareApp) close_app() {
 	a.clear_policy()
 	a.clear_progress()
 	a.clear_failure()
+	a.clear_health()
 	unsafe {
 		a.launch_request.free()
 		a.service_path.free()

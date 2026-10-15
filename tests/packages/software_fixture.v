@@ -368,11 +368,13 @@ fn main() {
 	if os.args.len == 2 && os.args[1] == 'view-memory' { check_software_view_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'failure-memory' { check_software_failure_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'repair-memory' { check_software_repair_memory() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'health-memory' { check_software_health_memory() or { panic(err) }; return }
 	mut args := os.args.clone()
 	if args.len > 1 && args[1] == '--progress' { args.delete(1) }
 	// This same executable is a literal-argv service fixture for asynchronous
 	// view/run transitions. It deliberately returns useful launch diagnostics.
 	if args.len > 1 {
+		if software_health_service_fixture(args) { return }
 		if software_failure_service_fixture(args) { return }
 		if software_verify_service_fixture(args) { return }
 		if software_view_service_fixture(args) { return }
@@ -557,6 +559,7 @@ fn main() {
 	check_software_progress() or { panic(err) }
 	check_software_verify() or { panic(err) }
 	check_software_repair() or { panic(err) }
+	check_software_health() or { panic(err) }
 	check_software_deployment() or { panic(err) }
 	check_software_mirror() or { panic(err) }
 	check_software_locked_mirror() or { panic(err) }

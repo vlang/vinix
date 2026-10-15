@@ -35,6 +35,7 @@ fn software_failure_operation(arguments []string) string {
 			'upgrade' { 'Update software' }
 			'rollback' { 'Roll back software' }
 			'verify' { 'Verify installed software' }
+			'health' { 'Inspect installed software health' }
 			'repo-list', 'repo-review', 'repo-apply', 'repo-enroll', 'repo-revoke' { 'Repository administration' }
 			'policy', 'policy-review', 'policy-apply' { 'Organization policy' }
 			'deploy', 'deployment-review', 'deployment-apply' { 'Organization deployment' }

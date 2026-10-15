@@ -495,6 +495,19 @@ Software labels these same-version `update` rows as repairs and keeps **Update
 all** separate. Confirmation uses the existing reviewed administrator transport;
 verification diagnostics name both the graphical control and CLI repair command.
 See [explicit repair qualification](../tests/packages/explicit-repair-check.md).
+
+Software's **Health report** checks the complete installed set and lists packages
+with issues first. It records the first namespace, payload or launcher issue for
+each package, with paged installed provenance and bounded diagnostics. Runtimes
+and data dependencies have their own results; a clean application row does not
+assert that its dependency closure can launch. The report remains available
+without usable cached catalogs or currently trusted publishers, and writes no
+package state. **Review repairs** obtains a fresh authenticated repair review;
+the observation itself authorizes no change. `vinix-package health` provides the
+same inspection, with `--json health` for scripts. A complete report returns zero
+even when rows contain issues; `verify` retains its failure exit behavior. See
+[health report qualification](../tests/packages/health-report-check.md).
+
 Installation health also checks payload modes (0755 for executables, 0644 for
 other files) and the exact generated desktop launcher/MIME contents at mode 0644.
 Verify and rollback enforce these checks; launch checks payload permissions
