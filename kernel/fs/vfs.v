@@ -2874,7 +2874,12 @@ pub fn set_file_times(dirfd int, _path charptr, requested [2]time.TimeSpec, flag
 		res = held_path.res
 	}
 	mac_resource(mut res, proc.mac_metadata) or { return errno.err, errno.get() }
-	if node != unsafe { nil } && read_only_on_mount(node, identity) { return errno.err, errno.erofs }
+	if node != unsafe { nil } {
+		readonly := if held_fd != unsafe { nil } {
+			read_only_on_description(node, identity)
+		} else { read_only_on_mount(node, identity) }
+		if readonly { return errno.err, errno.erofs }
+	}
 	if node != unsafe { nil } && !attr_allows_metadata(node) { return errno.err, errno.get() }
 
 	now := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }

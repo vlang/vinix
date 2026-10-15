@@ -489,6 +489,15 @@ cover regular/directory/unlinked descriptions, dup/fork retention and
 unprivileged ownership checks. Existing MAC, attributes, ownership/capability,
 copy-up, persistence and release paths are retained. Other metadata families,
 concurrent remount serialization and persistent/overlay integration remain open.
+The [descriptor timestamp checks](../tests/mount-lifecycle/descriptor-timestamp.md)
+apply the same saved-mount policy to `futimens` and empty-path `utimensat`.
+Pathname and empty-cwd updates retain their namespace-aware policy. Native
+ARM/x86 and the same Linux executables cover opposite copied-mount flags,
+regular/directory/unlinked targets, dup/fork retention, ordinary owners,
+explicit/current times and omission of either field. Existing authorization,
+attribute checks, resource pins, persistence rollback and release remain.
+Concurrent remount serialization and the other inherited-descriptor policy
+families remain open.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,

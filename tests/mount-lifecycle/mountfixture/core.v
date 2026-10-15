@@ -388,6 +388,8 @@ pub fn run() int {
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		rename_case := if count == 4 && name[0] == `r` && name[1] == `p` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
+		descriptor_times := if count == 4 && name[0] == `d` && name[1] == `t` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		descriptor_metadata := if count == 4 && name[0] == `d` && name[1] == `m` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		statfs_case := if count == 4 && name[0] == `s` && name[1] == `f` && name[2] == `-`
@@ -421,7 +423,8 @@ pub fn run() int {
 			|| C.strcmp(selected, c'nodes') == 0 || node_case >= 0
 			|| C.strcmp(selected, c'access') == 0 || access_case >= 0
 			|| C.strcmp(selected, c'fsflags') == 0 || statfs_case >= 0
-			|| C.strcmp(selected, c'descmeta') == 0 || descriptor_metadata >= 0, 4)
+			|| C.strcmp(selected, c'descmeta') == 0 || descriptor_metadata >= 0
+			|| C.strcmp(selected, c'desctimes') == 0 || descriptor_times >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
@@ -490,6 +493,9 @@ pub fn run() int {
 		if C.strcmp(selected, c'descmeta') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { descriptor_metadata_cases(-1) }
 		if descriptor_metadata >= 0 { descriptor_metadata_cases(descriptor_metadata) }
+		if C.strcmp(selected, c'desctimes') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { descriptor_timestamp_cases(-1) }
+		if descriptor_times >= 0 { descriptor_timestamp_cases(descriptor_times) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }
