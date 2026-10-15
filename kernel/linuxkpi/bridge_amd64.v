@@ -572,6 +572,10 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Native DMA fence self-test failed')
 		}
 		C.kprintf(c'linuxkpi: DMA fence synchronization, callbacks, waits and deferred release passed; no pages or heap objects retained\n')
+		if !fence_containers_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Native DMA fence container self-test failed')
+		}
+		C.kprintf(c'linuxkpi: DMA fence arrays, chains, IRQ union reuse and deferred container release passed; no pages or heap objects retained\n')
 		if !work_irq_native_selftest() {
 			lib.kpanic(unsafe { nil }, c'Native workqueue IRQ identity self-test failed')
 		}

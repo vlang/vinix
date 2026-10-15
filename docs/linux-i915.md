@@ -325,8 +325,18 @@ after a filesystem failure. Mutable build inputs still require isolation.
   native page-backed kmalloc base owners. Custom release hooks own storage
   lifetime, including any RCU readers. Callers retain references throughout
   callback registration and waiting. The `seq_file` description sink,
-  reservation producer/iterator ownership, fence arrays/chains and i915's
+  reservation producer/iterator ownership and i915's
   typesafe request cache remain separate dependencies.
+- DMA-fence arrays and timeline chains use the original intrusive records,
+  appended array callbacks, shared chain callback/IRQ-work union and immutable
+  operations tables. Arrays preserve ALL/ANY signaling, signed pending tails,
+  first-error propagation, deadlines and borrowed iteration. Chains preserve
+  consuming traversal, reference-safe RCU predecessor acquisition, concurrent
+  predecessor replacement, context/sequence rules and iterative release.
+  Successful construction transfers the original child/vector references;
+  failed construction leaves them with the caller. Final owner release uses
+  genuine native RCU, retaining storage through the IRQ dispatcher's final CAS.
+  Reservation ownership and the typesafe i915 request cache remain unresolved.
 - Unmodified Linux `wait.h`, `swait.h` and `completion.h` use native-backed
   queues and task wakeups. Ordinary wait queues preserve nonexclusive,
   exclusive and priority order, wake quotas, callback keys and automatic
@@ -2417,8 +2427,8 @@ device binding, memory ownership and Tiger Lake validation remain unfinished.
 The 18 non-lockdep synchronization APIs from pinned `dma-fence.c` now run on
 native locks, task waits, clocks, references and ordinary RCU. Original records
 and typed driver hooks remain intact. `dma_fence_describe` still requires a real
-`seq_file` sink and remains unresolved. Fence containers and reservation
-ownership are separate services.
+`seq_file` sink and remains unresolved. Fence containers were implemented in
+the next increment below; reservation ownership remains pending.
 
 Signal dispatch detaches callbacks onto a stack sentinel before replacing the
 list/timestamp union. It saves the next callback and function before invocation;
@@ -2476,3 +2486,73 @@ Only two substantive services remain missing from that object:
 unused. This is compiler/symbol evidence, with no whole SW-fence link or GPU
 execution claim. Full i915 compilation/linking, device/memory services,
 confirmed PCI identity and physical Tiger Lake validation remain unfinished.
+
+## Native DMA-fence arrays and chains, 2026-10-15
+
+The complete pinned array and chain operations now run over their original
+120-byte/128-byte records, appended 32-byte array callbacks and genuine immutable
+80-byte operations tables. Valid constructor ownership matches Linux: success
+consumes child references and an array's allocated vector; allocation failure
+consumes neither. Invalid array counts, vectors or NULL children produce a
+warning and NULL before ownership transfer. Nested containers retain the
+original warning-and-construction behavior.
+
+Arrays preserve signed ANY tail counts, callback-owned parent references,
+first-error selection, acquire ordering before the enable flag, polling,
+deadlines, context matching and borrowed iteration. Chains preserve context and
+sequence rules, consuming traversal, RCU-safe predecessor references, concurrent
+CAS ownership transfers and iterative final release. Their callback and IRQ-work
+storage deliberately share the original union. A child callback publishes IRQ
+work before its final child put; dispatch may rearm that same union before the
+previous IRQ callback's final BUSY CAS. The original snapshot/CAS logic and real
+RCU backing remain intact. Never call `irq_work_sync` on a union currently holding
+a fence callback.
+
+Fresh enabled/default x86-64 and default ARM64 builds pass. Native container
+tests cover constructor OOM ownership, original operations identities, ALL/ANY
+errors and negative tails, deadlines, chain context/find/walk behavior, 129-node
+iterative release, real target-IRQ child signaling, repeated union transitions
+and a final container free blocked behind an actual remote implicit reader.
+Three complete actor lifecycles warm the runtime before the measured fourth;
+all actors join and leave their stacks before the exact PMM/all-live-heap check.
+Independent source and actual generated-C/object reviews approve the new
+lifetimes; the 145 new function/export bodies contain no hidden V allocation or
+deep pointer equality.
+
+Strict GNU99/GNU11 production host objects and ASan/UBSan pass 26 runs. Of 497
+selected production bodies, 494 match the complete generated modules exactly;
+three disclosed completion adapters serve only existing host RCU bootstrap.
+Eight controlled union lifecycles retain backing after both post-callback CASes
+and pointer-record retirement until the modeled IRQ scope exits. Separate
+gates exercise genuine chain predecessor CAS wins/losses. The suite also covers
+40 concurrent array lifecycles, original warning paths, partial registration,
+nested deadlines and 1,024-node iterative release. Transport limits and the
+terminal callback representation are documented in
+`tests/linuxkpi/fencecontainerfixture/README.md`. Repeat with:
+
+```sh
+build-support/run-v-tool.sh tests/linuxkpi/dma_fence_containers.v \
+  --keep-directory NEW_DIRECTORY
+```
+
+Normal, SSE and four-level guests each pass 50 required markers and 32 strict
+PMM/live-heap rows; default startup passes and default/ARM C and ELF omit the
+feature. ARM evidence is a build and artifact check. Independent guest review
+authenticates each actual ISO kernel and the warmup/measurement chronology.
+
+The isolated baseline is `c136b3209` plus 15 frozen production/tool paths.
+`smp-oct10/fencecontainer-native-freeze-v1.json` SHA256:
+`1c1d8e2f6659915ed75ec280c3f1c1f34da7865af87d5858f0087131e5fa81bd`.
+Saved enabled ELF:
+`0a3fc002078595a35c82dea2accc62788c5a5a7d42e97c35c4a1ef282136254d`.
+Independent actual native review `dmafence-chain-oct15/native-v1-enabled-review/review.json`
+SHA256: `33b0e490595098008ca05be433d1310b8d3ef9974eeee0978b9c7bbf44d231e9`.
+Host result `fencecontainer-host-final-v2/result.json` SHA256:
+`0dde5336ac63cbae761dbd37ec745ef94a7d08f58066e7afb5b90680f756fafa`.
+Independent native/guest aggregate `dmafence-chain-oct15/native-v1-validation-summary.json`
+SHA256: `996c3932b6f8a28f9958e1c2c41e5b4b791d99a3831b6ec5e35119cbbc7c6af7`.
+
+The fresh full i915 syntax audit remains **6/269** with all 7,668 imported files
+unchanged. This increment supplies fence containers; reservation producers and
+iterators, the typesafe request cache, complete driver compile/link and real
+Tiger Lake operation remain unfinished.

@@ -14,7 +14,7 @@ const fixture_modules = ['cachefixture', 'i915policyfixture', 'pciconfigfixture'
 	'runtimefixture', 'taskfixture', 'timefixture', 'timerfixture', 'syncfixture',
 	'wwfixture', 'iofixture', 'seqfixture', 'srcufixture', 'workerfixture',
 	'workfixture', 'usleepfixture', 'waitbitfixture', 'printkfixture', 'smpfixture',
-	'workirqfixture', 'rcufixture', 'rcufreefixture', 'irqworkfixture', 'dmafencefixture', 'tscfixture', 'aggregatefixture']
+	'workirqfixture', 'rcufixture', 'rcufreefixture', 'irqworkfixture', 'dmafencefixture', 'fencecontainerfixture', 'tscfixture', 'aggregatefixture']
 
 fn generate_fixture(name string, output string, arch string, host bool) ! {
 	// Keep the replacement on the destination filesystem. A failed compiler,
