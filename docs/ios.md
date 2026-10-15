@@ -6829,9 +6829,48 @@ and executables and four joined, retired VM phases. Generated C confirms that
 the emitter adds no allocations. Published runners are unchanged; full iOS
 regression remains unpassed.
 
-The current IPA probe links past the start-of-day export and exits with status
+The start-of-day IPA probe links past that export and exits with status
 1 at `_$s10Foundation8CalendarV6localeAA6LocaleVSgvs`
-(`Calendar.locale` setter). Fortnite has not entered application code and
+(`Calendar.locale` setter).
+
+The next milestone implements the Calendar locale getter and consuming setter
+in V for built-in Calendar and fixed Locale values. The setter consumes a
+sixteen-byte indirect optional Locale in x0 and updates the Calendar through
+x20. Assigning nil preserves the current setting, matching the native copy
+operation. An equal fixed locale consumes the supplied owner without changing
+the snapshot; a changed locale transfers that owner to fresh immutable storage.
+Copied Calendars keep their previous settings. Foreign Calendar or Locale
+implementations are rejected by the setter.
+
+Calendar's private heap owner grows to forty bytes to own its Locale pair. Its
+last release drops that locale before deallocating the owner. The borrowed
+getter calls implementation-table slot 32 with the owner's formal metadata and
+table, then maps a missing implementation locale to an owned empty-identifier
+Locale. The ISO 8601 identifier instead starts with `en_001`, as measured for
+all 27 identifiers against installed Foundation. Getter results remain valid
+after Calendar mutation or destruction.
+
+The Calendar fixture exercises 54 guarded mutation cases across all identifiers,
+consuming read-only optional inputs, nil and equal assignments, canonical
+aliases, owned results and preserved copies. Eight workers make 128 mutations
+of separate values copied from one shared Calendar. Two runtime lifetimes must
+drain their heap and Objective-C owners and unmap the sealed metadata arena.
+Timezone mutation, the private day-interval backend and Objective-C Calendar
+bridging remain unsupported.
+
+Evidence is retained under `build/ios/fortnite/calendar-locale-checks`. Twelve
+ASan/UBSan runs pass. The first guest run passed Calendar, Locale and Date, then
+failed during Data-write directory cleanup with `Directory not empty` (39).
+The same executables passed all six suites in a fresh guest. The failed serial
+log and payload hashes remain in `guest-cleanup-trial`; no fixture or production
+code was changed for the retry. Fifteen C streams/programs and four completed
+VM phases are retained; published runners are unchanged. Generated C confirms
+explicit forty-byte owner allocation/deallocation and Locale transfer/release without hidden allocations
+in the new successful paths. Full iOS regression remains unpassed.
+
+The current IPA probe links past Calendar locale assignment and exits with
+status 1 at `_$s10Foundation8CalendarV8timeZoneAA04TimeD0Vvs`
+(`Calendar.timeZone` setter). Fortnite has not entered application code and
 remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -6839,12 +6878,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,530 | 630 | 79 |
+| Fortnite executable | 1,531 | 629 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,365 | 633 | 120 |
+| All images | 2,366 | 632 | 120 |
 
-The C++/GLES/Text variant reports 2,378 resolved imports, 620 unresolved strong
+The C++/GLES/Text variant reports 2,379 resolved imports, 619 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

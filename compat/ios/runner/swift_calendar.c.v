@@ -14,17 +14,23 @@ fn swift_calendar_input_checked(value u64) !u8 {
 fn swift_calendar_initialize(identifier u64, output u64) {
 	which := swift_calendar_input_checked(identifier) or { panic(err) }
 	data := swift_foundation_arena() + u64(C.getpagesize())
-	owner := swift_heap_allocate(data + 1808, 24, 7)
+	owner := swift_heap_allocate(data + 1808, 40, 7)
 	// The consuming Identifier is POD: only its one readable byte is needed.
 	// This owner stores a complete independent snapshot and has no cache retain.
 	unsafe {
 		*(&u64(owner + 16)) = u64(which)
+		*(&u64(owner + 24)) = 0; *(&u64(owner + 32)) = 0
 		*(&SwiftURLWords(output)) = SwiftURLWords{owner: owner, table: data + 2048}
+	}
+	if which == 7 {
+		text := swift_string_literal(c'en_001', 6, true)
+		swift_locale_initialize(text.first, text.second, owner + 24)
 	}
 }
 
 fn swift_calendar_storage_destroy(owner u64) {
-	swift_heap_deallocate(owner, 24, 7)
+	swift_unknown_release(read64(owner + 24))
+	swift_heap_deallocate(owner, 40, 7)
 }
 
 fn swift_calendar_identifier_checked(owner u64) !u8 {
@@ -34,7 +40,7 @@ fn swift_calendar_identifier_checked(owner u64) !u8 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	storage := ios_runtime.swift_heap[owner] or { return error('iOS: Swift Calendar requires registered storage') }
-	if storage.deiniting || storage.size != 24 || storage.mask != 7
+	if storage.deiniting || storage.size != 40 || storage.mask != 7
 		|| ios_runtime.swift_foundation_arena == 0
 		|| storage.metadata != ios_runtime.swift_foundation_arena + u64(C.getpagesize()) + 1808
 		|| read64(owner) != storage.metadata || read64(owner + 16) >= 27 {
@@ -52,6 +58,61 @@ fn swift_calendar_interval_unavailable() {
 	// Identifier snapshots do not yet carry timezone rules. Never manufacture
 	// a UTC midnight for a calendar whose timezone has not been implemented.
 	panic('iOS: Swift Calendar day intervals require a timezone-aware calendar backend')
+}
+
+fn swift_calendar_empty_locale(output u64) {
+	swift_locale_initialize(0, 0xe000000000000000, output)
+}
+
+fn swift_calendar_locale(owner u64, output u64) {
+	swift_calendar_identifier_checked(owner) or { panic(err) }
+	words := unsafe { *(&SwiftURLWords(owner + 24)) }
+	swift_unknown_retain(words.owner)
+	unsafe { *(&SwiftURLWords(output)) = words }
+}
+
+fn swift_calendar_locale_input_checked(value u64) !SwiftURLWords {
+	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired || value == 0 {
+		return error('iOS: Swift Calendar locale outside runtime lifetime or missing value')
+	}
+	words := unsafe { *(&SwiftURLWords(value)) }
+	if words.owner == 0 { return SwiftURLWords{} }
+	if words.table != ios_runtime.swift_foundation_arena + u64(C.getpagesize()) + 1008 {
+		return error('iOS: Swift Calendar requires a built-in fixed Locale')
+	}
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	header := ios_runtime.objects[words.owner] or { return error('iOS: Swift Calendar requires registered Locale storage') }
+	if header.destroyed || read64(words.owner) != ios_runtime.names['NSLocale'] || header.fields[0] == 0 {
+		return error('iOS: Swift Calendar requires initialized NSLocale storage')
+	}
+	return words
+}
+
+fn swift_calendar_set_locale(value u64, self u64) {
+	words := swift_calendar_locale_input_checked(value) or { panic(err) }
+	data := swift_foundation_arena() + u64(C.getpagesize())
+	if self == 0 || read64(self + 8) != data + 2048 { panic('iOS: Swift Calendar locale mutation requires built-in Calendar storage') }
+	previous := read64(self)
+	which := swift_calendar_identifier_checked(previous) or { panic(err) }
+	// A nil override means "preserve the locale" in the native copy operation.
+	// Consuming nil has no owner; its unused table word need not be interpreted.
+	if words.owner == 0 { return }
+	current := read64(previous + 24)
+	if current != 0 && string_text(swift_locale_require_owner(current)) == string_text(swift_locale_require_owner(words.owner)) {
+		swift_unknown_release(words.owner)
+		return
+	}
+	// Owners are immutable after publication. Transfer the consumed Locale to
+	// a fresh snapshot before releasing Self's previous owner; borrowed copies
+	// keep their original settings and independently retained getter results.
+	owner := swift_heap_allocate(data + 1808, 40, 7)
+	unsafe {
+		*(&u64(owner + 16)) = u64(which)
+		*(&SwiftURLWords(owner + 24)) = words
+		*(&SwiftURLWords(self)) = SwiftURLWords{owner: owner, table: data + 2048}
+	}
+	swift_unknown_release(previous)
 }
 
 fn swift_calendar_emit(code u64, data u64) {
@@ -99,7 +160,7 @@ fn swift_calendar_emit(code u64, data u64) {
 		*(&u64(data + 2072)) = code + 2592
 	}
 	write32(data + 1848, 2) // Class flags: native Swift reference counting.
-	write32(data + 1856, 24); write32(data + 1860, 7)
+	write32(data + 1856, 40); write32(data + 1860, 7)
 	write32(data + 1864, 96); write32(data + 1868, 16)
 	write32(data + 2560, 0x50)
 	swift_protocol_relative(data + 2564, data + 64)
@@ -130,4 +191,24 @@ fn swift_calendar_emit(code u64, data u64) {
 		*(&u64(code + 2816)) = 0x42acf8ab468f0000 // 15927175497600 seconds since 2001.
 		*(&u64(data + 2208)) = u64(voidptr(swift_calendar_interval_unavailable))
 	}
+	// Consuming indirect Optional<Locale> in x0; inout Calendar in x20.
+	write32(code + 2832, 0xaa1403e1); write32(code + 2836, 0x58000070); write32(code + 2840, 0xd61f0200)
+	unsafe { *(&u64(code + 2848)) = u64(voidptr(swift_calendar_set_locale)) }
+	// Borrowed generic getter at table +32. A nil implementation locale maps
+	// to an owned empty-identifier Locale, as in native Foundation.
+	for i, op in [u32(0xa9bd57f6), 0xa9014ff4, 0xa9027bfd, 0x910083fd,
+		0xaa0803f3, 0xa9405a95, 0xaa1503e0, 0x580002b0, 0xd63f0200,
+		0xaa1603e9, 0xf8420d2a, 0xaa1303e8, 0xaa1503f4, 0xaa1603e1,
+		0xd63f0140, 0xf9400269, 0xb5000089, 0xaa1303e0, 0x58000190,
+		0xd63f0200, 0xa9427bfd, 0xa9414ff4, 0xa8c357f6, 0xd65f03c0]! {
+		write32(code + 2864 + u64(i * 4), op)
+	}
+	unsafe {
+		*(&u64(code + 2976)) = u64(voidptr(swift_object_type))
+		*(&u64(code + 2984)) = u64(voidptr(swift_calendar_empty_locale))
+		*(&u64(data + 2080)) = code + 3008
+	}
+	write32(code + 3008, 0xaa1403e0); write32(code + 3012, 0xaa0803e1)
+	write32(code + 3016, 0x58000050); write32(code + 3020, 0xd61f0200)
+	unsafe { *(&u64(code + 3024)) = u64(voidptr(swift_calendar_locale)) }
 }

@@ -31,20 +31,86 @@ type CalendarIdentifierLookup = fn (u64, u64, u64, u64, u64) u64
 type CalendarProbe = fn (u64, u64, u64, u64, u64, &u64)
 type CalendarObjectType = fn (u64) u64
 type CalendarSign = fn (u64, u64) u64
+type CalendarLocaleCString = fn (&u8) SwiftStringWords
+type CalendarLocaleUTF8 = fn (u64, u64) u64
+type CalendarLocaleDrop = fn (u64)
+
+struct CalendarLocaleApi {
+	native bool
+	constructor u64
+	identifier u64
+	metadata u64
+	witness u64
+	cstring CalendarLocaleCString
+	utf8 CalendarLocaleUTF8
+	drop CalendarLocaleDrop
+}
+
+fn calendar_locale_cstring(bytes &u8) SwiftStringWords {
+	text := unsafe { (&char(bytes)).vstring() }
+	scratch := u64(C.__builtin_alloca(16))
+	unsafe { *(&SwiftStringWords(scratch)) = swift_interpolation_init(128, 0) }
+	swift_string_append_bytes(scratch, u64(bytes), u64(text.len))
+	return unsafe { *(&SwiftStringWords(scratch)) }
+}
+
+fn calendar_locale_api(native bool) CalendarLocaleApi {
+	library := '/System/Library/Frameworks/Foundation.framework/Foundation'
+	mut entries := [3]u64{}
+	for i, symbol in ['_$s10Foundation6LocaleV10identifierACSS_tcfC', '_$s10Foundation6LocaleV10identifierSSvg', '_$s10Foundation6LocaleVMa']! {
+		$if macos { if native { entries[i] = u64(C.dlsym(C.dlopen(library.str, 2), symbol[1..].str)) } }
+		if !native { entries[i] = runtime_symbol(library, symbol) or { panic(err) } }
+		assert entries[i] != 0
+	}
+	response := unsafe { CalendarCaseAccess(voidptr(entries[2]))(0) }
+	mut cstring := CalendarLocaleCString(calendar_locale_cstring)
+	mut utf8 := CalendarLocaleUTF8(swift_string_utf8_cstring)
+	mut drop := CalendarLocaleDrop(swift_bridge_release)
+	$if macos { if native {
+		core := C.dlopen(c'/usr/lib/swift/libswiftCore.dylib', 2)
+		cstring = unsafe { CalendarLocaleCString(C.dlsym(core, c'$sSS7cStringSSSPys4Int8VG_tcfC')) }
+		utf8 = unsafe { CalendarLocaleUTF8(C.dlsym(core, c'$sSS11utf8CStrings15ContiguousArrayVys4Int8VGvg')) }
+		drop = unsafe { CalendarLocaleDrop(C.dlsym(core, c'swift_bridgeObjectRelease')) }
+	} }
+	return CalendarLocaleApi{native: native, constructor: entries[0], identifier: entries[1], metadata: response.metadata,
+		witness: read64(response.metadata - 8) & 0x0000ffffffffffff, cstring: cstring, utf8: utf8, drop: drop}
+}
+
+fn (locale CalendarLocaleApi) make(api CalendarApi, label string, output u64, guard u64) {
+	text := locale.cstring(unsafe { &u8(label.str) })
+	api.call(locale.constructor, text.first, text.second, guard, output)
+}
+
+fn (locale CalendarLocaleApi) destroy(value u64) {
+	unsafe { CalendarCaseDestroy(voidptr(read64(locale.witness + 8) & 0x0000ffffffffffff))(value, locale.metadata) }
+}
+
+fn (locale CalendarLocaleApi) check(api CalendarApi, value u64, expected string, guard u64) {
+	assert read64(value) != 0
+	mut capture := [4]u64{}
+	api.probe(locale.identifier, guard, guard, value, guard, unsafe { &capture[0] })
+	assert capture[2] == value && capture[3] == 0x5021
+	array := locale.utf8(capture[0], capture[1])
+	assert read64(array + 16) == u64(expected.len + 1)
+	assert C.memcmp(voidptr(array + 32), expected.str, usize(expected.len)) == 0
+	assert unsafe { *(&u8(array + 32 + u64(expected.len))) } == 0
+	locale.drop(array); locale.drop(capture[1])
+}
 
 struct CalendarApi {
 	native bool
-	entries [5]u64
+	entries [7]u64
 	metadata u64
 	witness u64
 	probe CalendarProbe
 }
 
 fn calendar_api(native bool, code u64) CalendarApi {
-	mut entries := [5]u64{}
+	mut entries := [7]u64{}
 	for i, symbol in ['_$s10Foundation8CalendarV10identifierA2C10IdentifierOh_tcfC',
 		'_$s10Foundation8CalendarV10identifierAC10IdentifierOvg', '_$s10Foundation8CalendarVMa', '_$s10Foundation8CalendarVMn',
-		'_$s10Foundation8CalendarV10startOfDay3forAA4DateVAG_tF']! {
+		'_$s10Foundation8CalendarV10startOfDay3forAA4DateVAG_tF',
+		'_$s10Foundation8CalendarV6localeAA6LocaleVSgvs', '_$s10Foundation8CalendarV6localeAA6LocaleVSgvg']! {
 		for library in ['/System/Library/Frameworks/Foundation.framework/Foundation', '/usr/lib/swift/libswiftFoundation.dylib']! {
 			mut address := u64(0)
 			$if macos { if native { handle := C.dlopen(library.str, 2); address = u64(C.dlsym(handle, symbol[1..].str)) } }
@@ -101,7 +167,7 @@ fn calendar_value_case(api CalendarApi, which u8, source_end bool, result_end bo
 		storage := ios_runtime.swift_heap[owner] or { panic('missing Calendar owner') }
 		generation = storage.generation
 		C.ios_objc_initialize_unlock()
-		assert storage.size == 24 && storage.mask == 7 && !storage.deiniting && read64(owner + 8) == 3
+		assert storage.size == 40 && storage.mask == 7 && !storage.deiniting && read64(owner + 8) == 3
 		assert read64(owner + 16) == u64(which)
 	}
 	assert C.mprotect(voidptr(span + u64(page * 3)), page, C.PROT_READ) == 0
@@ -296,6 +362,92 @@ fn calendar_values_suite(api CalendarApi, code u64) {
 			for i in 0 .. 40 { if i < 5 || i >= 5 + length { assert bytes[i] == 0xa5 } }
 		}
 	}
+}
+
+fn calendar_locale_case(api CalendarApi, locale CalendarLocaleApi, which u8, at_end bool) {
+	page := usize(C.getpagesize())
+	span := u64(C.mmap(unsafe { nil }, page * 7, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+	assert span != u64(-1)
+	for index in [1, 3, 5]! {
+		assert C.mprotect(voidptr(span + u64(page * usize(index))), page, C.PROT_READ | C.PROT_WRITE) == 0
+		C.memset(voidptr(span + u64(page * usize(index))), 0xa5, page)
+	}
+	value := span + u64(page) + if at_end { u64(page) - 16 } else { u64(0) }
+	input := span + u64(page * 3) + if at_end { u64(page) - 16 } else { u64(0) }
+	output := span + u64(page * 5) + if at_end { u64(page) - 16 } else { u64(0) }
+	api.call(api.entries[0], u64(unsafe { &which }), span, span, value)
+	mut original := [2]u64{}; backup := u64(unsafe { &original[0] })
+	copy_value := unsafe { CalendarCaseCopy(voidptr(read64(api.witness + 16) & 0x0000ffffffffffff)) }
+	assert copy_value(backup, value, api.metadata) == backup
+	initial := if which == 7 { 'en_001' } else { '' }
+	api.call(api.entries[6], span, span, value, output)
+	mut kept := unsafe { *(&SwiftURLWords(output)) }; held := u64(unsafe { &kept })
+	locale.check(api, held, initial, span)
+	mut expected := initial
+	for index, label in ['<nil>', 'en_US_POSIX', 'en_US_POSIX', 'fr_FR', '<nil>', '', 'sr-Latn_RS_POSIX', 'iw_IL', 'he_IL', '<nil>']! {
+		assert C.mprotect(voidptr(span + u64(page * 3)), page, C.PROT_READ | C.PROT_WRITE) == 0
+		C.memset(voidptr(span + u64(page * 3)), 0xa5, page)
+		mut alias := [2]u64{}; alias_value := u64(unsafe { &alias[0] })
+		if label == '<nil>' {
+			unsafe { *(&u64(input)) = 0; *(&u64(input + 8)) = span }
+		} else {
+			locale.make(api, label, input, span)
+			keep := unsafe { CalendarCaseCopy(voidptr(read64(locale.witness + 16) & 0x0000ffffffffffff)) }
+			assert keep(alias_value, input, locale.metadata) == alias_value
+			expected = if label == 'iw_IL' { 'he_IL' } else { label }
+		}
+		before := unsafe { *(&SwiftURLWords(input)) }
+		assert C.mprotect(voidptr(span + u64(page * 3)), page, C.PROT_READ) == 0
+		owner := read64(value)
+		api.call(api.entries[5], input, span, value, span)
+		assert unsafe { *(&SwiftURLWords(input)) } == before
+		calendar_identifier_padding(span + u64(page * 3), u64(page), input, 16)
+		calendar_identifier_padding(span + u64(page), u64(page), value, 16)
+		if !api.native && (label == '<nil>' || index == 2 || index == 8) { assert read64(value) == owner }
+		if label != '<nil>' { locale.check(api, alias_value, expected, span); locale.destroy(alias_value) }
+		assert C.mprotect(voidptr(span + u64(page)), page, C.PROT_READ) == 0
+		C.memset(voidptr(span + u64(page * 5)), 0xa5, page)
+		api.call(api.entries[6], span, span, value, output)
+		locale.check(api, output, expected, span)
+		calendar_identifier_padding(span + u64(page * 5), u64(page), output, 16)
+		locale.destroy(output)
+		assert C.mprotect(voidptr(span + u64(page)), page, C.PROT_READ | C.PROT_WRITE) == 0
+	}
+	api.destroy(value)
+	api.call(api.entries[6], span, span, backup, output)
+	api.destroy(backup)
+	locale.check(api, output, initial, span); locale.destroy(output)
+	locale.check(api, held, initial, span); locale.destroy(held)
+	assert C.munmap(voidptr(span), page * 7) == 0
+}
+
+fn calendar_locale_worker(api CalendarApi, locale CalendarLocaleApi, seed u64) {
+	mut value := [2]u64{}; self := u64(unsafe { &value[0] })
+	copy_value := unsafe { CalendarCaseCopy(voidptr(read64(api.witness + 16) & 0x0000ffffffffffff)) }
+	assert copy_value(self, seed, api.metadata) == self
+	for _ in 0 .. 8 { for label in ['en_US_POSIX', 'fr_FR']! {
+		mut supplied := [2]u64{}; input := u64(unsafe { &supplied[0] })
+		locale.make(api, label, input, 0)
+		api.call(api.entries[5], input, 0, self, 0)
+		mut got := [2]u64{}; output := u64(unsafe { &got[0] })
+		api.call(api.entries[6], 0, 0, self, output)
+		locale.check(api, output, label, 0); locale.destroy(output)
+	} }
+	api.destroy(self)
+}
+
+fn calendar_locales_suite(api CalendarApi) {
+	locale := calendar_locale_api(api.native)
+	for which in u8(0) .. 27 { for at_end in [false, true]! { calendar_locale_case(api, locale, which, at_end) } }
+	mut value := [2]u64{}; self := u64(unsafe { &value[0] }); which := u8(7)
+	api.call(api.entries[0], u64(unsafe { &which }), 0, 0, self)
+	mut workers := []thread{}
+	for _ in 0 .. 8 { workers << spawn calendar_locale_worker(api, locale, self) }
+	workers.wait()
+	mut got := [2]u64{}; output := u64(unsafe { &got[0] })
+	api.call(api.entries[6], 0, 0, self, output)
+	api.destroy(self)
+	locale.check(api, output, 'en_001', 0); locale.destroy(output)
 }
 
 fn calendar_identifier_relative(address u64) u64 {
@@ -642,7 +794,8 @@ fn test_swift_calendar_case() {
 		calendar_identifier_suite(true, code)
 		calendar_values_suite(calendar_api(true, code), code)
 		calendar_days_suite(calendar_api(true, code), code)
-		println('IOS-SWIFT-CALENDAR-CASE-NATIVE: startOfDay witness dispatch, native bounds/NaNs, optional interval fallback, guarded eight-byte Date results and concurrent borrows; Calendar construction, metadata, ownership, Identifier witnesses and ISO 8601 export measured')
+		calendar_locales_suite(calendar_api(true, code))
+		println('IOS-SWIFT-CALENDAR-CASE-NATIVE: Calendar locale getter/setter, default identifiers for 27 calendars, consuming optional Locale, independent snapshots and getter results, guarded values, concurrent mutation of copied Calendars; startOfDay, construction, ownership, metadata and Identifier witnesses measured')
 	}
 	if _ := swift_foundation_symbol(calendar_case_symbol) {
 		assert false
@@ -672,10 +825,11 @@ fn test_swift_calendar_case() {
 		assert api.metadata == arena + u64(page) + 1896 && api.entries[3] == arena + u64(page) + 1600
 		calendar_values_suite(api, code)
 		calendar_days_suite(api, code)
+		calendar_locales_suite(api)
 		assert read64(arena + u64(page) + 2208) == u64(unsafe { voidptr(swift_calendar_interval_unavailable) })
 		for invalid in [u8(27), 28, 127, 255]! { if _ := swift_calendar_input_checked(u64(unsafe { &invalid })) { assert false } }
 		if _ := swift_calendar_identifier_checked(0) { assert false }
-		for symbol in ['_$s10Foundation8CalendarV10IdentifierO9gregorianyA2EmFWC', '_$s10Foundation8CalendarV6localeAA6LocaleVSgvs']! {
+		for symbol in ['_$s10Foundation8CalendarV10IdentifierO9gregorianyA2EmFWC', '_$s10Foundation8CalendarV8timeZoneAA04TimeD0Vvs']! {
 			if _ := swift_foundation_symbol(symbol) {
 				assert false
 			}
@@ -706,5 +860,5 @@ fn test_swift_calendar_case() {
 		}
 	}
 	assert C.munmap(voidptr(code), page) == 0
-	println('IOS-SWIFT-CALENDAR-CASE: startOfDay witness dispatch, native bounds/NaNs, optional interval fallback, guarded Date results and concurrent borrows; Calendar construction, ownership, metadata, Identifier witnesses and ISO 8601 export, two drained/unmapped runtimes; private timezone-aware interval backend, mutation and Objective-C bridging remain unsupported')
+	println('IOS-SWIFT-CALENDAR-CASE: Calendar locale mutation/getter, consuming optional Locale, 27 default identifiers, independent immutable snapshots and owned getter results, guarded values, concurrent copied-Calendar mutation; startOfDay, construction, ownership, metadata and Identifier witnesses, two drained/unmapped runtimes; timezone mutation, private interval backend and Objective-C bridging remain unsupported')
 }
