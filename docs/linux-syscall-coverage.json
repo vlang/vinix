@@ -3,9 +3,9 @@
     "inputs": {
         "kernel/c/pthread.h": "349a5a9d0b696749923c0632cd28a42e52d41bdc067d31d53fb686ce48f353d2",
         "kernel/event/event.v": "a92daf2add03c5304742ad1b112ca04635b94f49e4279e8316f2bee57da6b708",
-        "kernel/file/file.v": "56b7f0a3bae76958d751466aac95dd523828c308221ad607f9245a0dc73f7866",
-        "kernel/fs/mount.v": "1e183cb32122f19231213f5edaf1028a2d88a5a932ba0069b461feab9f9d815b",
-        "kernel/fs/mount_policy.v": "efc687de9b8764d4b839dd14f55975fbbe5f9145dbd174c0895e14d0604f3445",
+        "kernel/file/file.v": "4bff758a9b65d3ff998736c0363b4a988079e5f60c4f50b8584b721b73df5f00",
+        "kernel/fs/mount.v": "c93cec59402f4c207f58f073850bd1114ca6e71e521f319b163f39aeac7f496e",
+        "kernel/fs/mount_policy.v": "053bcf1f4dcab563c5643f3236d9b3f6de1844e1cea7f86347be9b8f01fa6c61",
         "kernel/fs/procfs.v": "b924f6eee11e596e4abdeaf1816421ed0c2964956f9a75b1c34a3d60fe6ccb86",
         "kernel/fs/tmpfs.v": "99a10d885597ccb745530e639685f282703332667066a28dd79f18195ec3e010",
         "kernel/fs/vfs.v": "6a4f1e7b7c47ce65d5a3b8e8ca88cd81b4c52e2992b2924c1db4ec2711204361",
