@@ -24,9 +24,6 @@ import usercopy
 import x86.cpu.local as cpulocal
 import x86.gdt
 
-// The signal number a clone's low byte carries.
-const clone_exit_signal_mask = u64(0xff)
-
 // clone(flags, child_stack, parent_tid, child_tid, tls). x86-64 is not a
 // CLONE_BACKWARDS architecture: child_tid comes before tls, the reverse of
 // arm64's order.
@@ -51,7 +48,7 @@ pub fn syscall_clone3(gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 	if !usercopy.copy_from_user(voidptr(&args), uargs, size) {
 		return errno.err, errno.efault
 	}
-	if args.exit_signal & ~clone_exit_signal_mask != 0 {
+	if !valid_clone3_exit_signal(args.flags, args.exit_signal) {
 		return errno.err, errno.einval
 	}
 

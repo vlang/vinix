@@ -9053,3 +9053,85 @@ clone child_tid flags, alternate backing types, unaligned/cross-page words,
 GNU libc and translated/32-bit paths remain separate. Process owners and
 inspection pins are not a complete Linux mm_users accounting model. The broad
 libc, application-installation/sandbox/portal and translation gates stay open.
+
+## Native clone3 exit-signal validation
+
+Both native clone3 entry points now validate the complete exit_signal value
+after copying the argument block and before stack/cgroup admission. Values
+outside 0–64 return EINVAL. A nonzero signal combined with CLONE_THREAD or
+CLONE_PARENT also returns EINVAL. The previous ARM path ignored this field;
+the x86 path rejected only bits outside the low byte. Both could return a
+later descriptor error instead of rejecting an invalid request. Legacy clone
+entry points remain separate from the new shared scalar predicate.
+This follows [Linux v6.12's clone3 argument validation](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c#L2762-L2907).
+
+The `clonesignal` probe runs 2,652 controls per architecture across root/UID1000
+and initial/one-level PID namespace views. Each cohort runs 663 calls through
+three input layouts: aligned, byte-unaligned and an 88-byte structure ending
+at the native page boundary. Input pages are read-only, with a PROT_NONE page
+following them. The six classes are:
+
+| Class | Calls per cohort | Contract |
+| --- | ---: | --- |
+| Invalid signal range | 36 | Twelve full-width words from 65 through all-ones return EINVAL before an invalid cgroup FD is looked up. |
+| Thread signal conflict | 192 | Every signal 1–64 conflicts with CLONE_THREAD, even with its ordinary sharing flags present. |
+| Parent signal conflict | 192 | Every signal 1–64 conflicts with CLONE_PARENT. |
+| Valid signal admission | 195 | Every value 0–64 reaches the later invalid-cgroup-FD EBADF control. This checks admission, not delivery of every signal. |
+| Import precedence | 36 | Short sizes, excessive sizes, null/unmapped/wrapping pointers and protected tails retain their exact EINVAL/E2BIG/EFAULT results, including readable invalid-signal prefixes followed by faults. |
+| Successful SIGCHLD forks | 12 | Sizes 64/72/80/88 produce real children with checked PID/TID, parent, UID and exit/reap status. |
+
+Every call compares the full two-page input image after restoring access,
+including surrounding bytes. Each rejected call also verifies ECHILD from a
+nonblocking wait with no other children present; an errno match cannot hide
+a child left behind. Successful children send a fixed record through a pipe
+before exiting with status 37; the parent validates it and reaps the child.
+There are no new shared-VM stacks or thread registrations in the error probe.
+
+Original ARM kernels fail 1,680 controls and original x86 kernels fail 1,608.
+The difference is the x86 path's existing high-bit rejection. Corrected kernels
+and the identical original probe ELFs on Linux 6.12.51 pass every control.
+Native ARM uses 16KiB pages; native x86 and both Linux references use 4KiB pages.
+Both corrected kernels also pass the runtime and tidlast regressions.
+
+Original and corrected kernels each measure four cleanup cohorts. After 64
+warmup cycles and thirteen seconds of settling, each cohort measures 200
+cycles and settles again. Every cycle executes six valid-signal cgroup-FD
+refusals and one complete SIGCHLD fork/reap, including input protections,
+canaries, pipes and the empty-child check. These paths already pass on the
+original kernels, so changed invalid-signal behavior cannot change the
+retention workload. Every live slab class and big-heap page total stays flat.
+The input mapping and slab observer remain open throughout. This is targeted
+kernel-heap retention evidence; the earlier unresolved EXT2 rename observation
+and general page/cache retention remain separate.
+
+Exact whole-C comparison of four isolated production builds confines the
+change to two clone3 call sites, the shared scalar predicate and removal of
+the obsolete x86 byte mask. The existing argument buffer already resides on
+the stack; it was inspected in generated C and needed no lifetime change.
+There is no new allocation, free, pin, ownership transfer or lock operation.
+The probe has eight explicit stack allocas and no dynamic allocation or
+fixed-index helper. Its successful preflight produces the same C as the
+original ARM guest input. The first preflight was refused for a nested unsafe
+block; its exact input and compiler refusal remain pinned separately.
+
+The auditor verifies all case totals and baseline failure counts, cohort
+credentials/page sizes, original/corrected ELF and C identity, Linux reference
+receipts, both phases' storage, all 84 retained native case files, 67 dispatch
+inventory inputs, 2,014 SDK files and 15,146 compiler pins. Both a false
+assertion and passing-Linux-as-original control must execute and fail;
+compile it without `-prod`.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/clonesignal-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/clonesignal-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/clonesignal-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/clonesignal-diagnostic-pins.json).
+Raw original/corrected/Linux, build, preflight and regression logs accompany the
+receipts. The maintained auditor is `tests/linux-compat/clonesignal-check.v`.
+
+This qualifies exit-signal validation and successful SIGCHLD forks. Alternative
+exit notification remains unsupported: current process teardown still sends
+SIGCHLD independently of clone3.exit_signal, and Linux clone-child wait classes
+remain separate. Selected TIDs, pidfds, zero-filled extension sizes, full stack
+range policy, cgroup/namespace authorization, concurrent argument changes,
+GNU libc and translated/32-bit paths are unqualified. The broad libc,
+installation/sandbox/portal and translation roadmap gates remain open.

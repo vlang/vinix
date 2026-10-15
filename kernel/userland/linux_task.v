@@ -107,6 +107,12 @@ mut:
 
 const clone_args_size_ver0 = u64(64)
 
+// clone3 carries the exit signal separately from flags. Linux accepts signal
+// zero through 64, but a thread or CLONE_PARENT child cannot select one.
+fn valid_clone3_exit_signal(flags u64, signal u64) bool {
+	return signal <= 64 && (signal == 0 || flags & (clone_thread | clone_parent) == 0)
+}
+
 // Linux requires shared handlers to share VM and threads to share handlers.
 fn valid_clone_sharing(flags u64) bool {
 	return !(flags & clone_sighand != 0 && flags & clone_vm == 0)

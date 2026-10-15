@@ -1073,6 +1073,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   on both native architectures against the identical ELF on Linux.
   See [the last-user receipts](docs/linux-posix-qualification.md#native-clear-child-tid-last-address-space-user).
 
+- [x] Validate clone3 exit-signal words and reject forbidden thread/parent
+  combinations before later admission errors; qualify import faults, protected
+  layouts, SIGCHLD fork/reap and flat cleanup on both native architectures
+  against identical probe ELFs on Linux.
+  See [the clone3 signal receipts](docs/linux-posix-qualification.md#native-clone3-exit-signal-validation).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

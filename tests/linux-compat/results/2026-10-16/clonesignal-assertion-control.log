@@ -1,0 +1,3 @@
+tests/linux-compat/clonesignal-check.v:374: FAIL: fn main.main: assert false, 'clonesignal assertions must execute'
+      message: clonesignal assertions must execute
+V panic: Assertion failed...

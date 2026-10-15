@@ -1895,3 +1895,17 @@ cleanup. Use `--cases tidlast --timeout 1200` with a fresh state directory.
 without `-prod` to check original failures, corrected results, whole-C scope,
 storage, retained setup/compiler refusals and executing negative controls.
 See [the last-user report](../../docs/linux-posix-qualification.md#native-clear-child-tid-last-address-space-user).
+
+The `clonesignal` case checks native clone3 exit-signal validation. Signals
+outside 0–64 and nonzero signals with CLONE_THREAD/CLONE_PARENT return EINVAL
+before cgroup-FD lookup. All 65 valid signal values reach an EBADF control;
+successful fork/reap controls use SIGCHLD. Protected, unaligned and page-tail
+inputs check import-fault precedence and complete two-page canaries. Four
+credential/PID-namespace cohorts run 2,652 controls per architecture. Both
+original and corrected kernels measure four warmed 200-cycle cleanup cohorts
+using the same six valid-signal FD refusals and one real fork/reap per cycle.
+Use `--cases clonesignal --timeout 1200` with a fresh state directory.
+`clonesignal-reference.v` boots the unchanged ELF on Linux; compile
+`clonesignal-check.v` without `-prod` to audit baseline failures, corrected
+results, exact whole-C scope, flat storage, pins and executing negative controls.
+See [the clone3 signal report](../../docs/linux-posix-qualification.md#native-clone3-exit-signal-validation).

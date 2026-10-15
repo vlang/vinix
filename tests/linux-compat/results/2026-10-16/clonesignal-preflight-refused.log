@@ -1,0 +1,14 @@
+Compiler output from the default V compiler:
+/Users/alex/.cache/vinix-linux-compat/clonesignal-20261016/tmp/vinix-v-module-FAcrFA/clonesignalfixture/core.v:98:58: error: already inside `unsafe` block
+   96 |    }
+   97 |   }
+   98 |   if class == 5 {args.flags = 0; args.cgroup = 0; size = unsafe {[u64(64),72,80,88]![choice]}; wanted = 0}
+      |                                                          ~~~~~~
+   99 |   C.memcpy(voidptr(source),args,88)
+  100 |   // A split input has a readable invalid-signal prefix, followed by a fault.
+
+V panic: Command failed
+ v hash: f6358ec
+    pid: 0x1259a
+    tid: 0x1259a
+0   dyld                                0x00000001802ebe00 start + 6992

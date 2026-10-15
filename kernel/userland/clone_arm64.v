@@ -48,6 +48,9 @@ pub fn syscall_clone3(_gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 	if !usercopy.copy_from_user(voidptr(&args), uargs, size) {
 		return errno.err, errno.efault
 	}
+	if !valid_clone3_exit_signal(args.flags, args.exit_signal) {
+		return errno.err, errno.einval
+	}
 
 	// Unlike clone, clone3 is handed the low end of the stack plus its length
 	// and has to derive the initial stack pointer itself.

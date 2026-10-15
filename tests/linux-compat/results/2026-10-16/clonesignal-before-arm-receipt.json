@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "65ada97a2bfa2820b0deabfc305275627c25ee49682b8c9c2528b7621ae580a8",
+    "results": [
+        {
+            "name": "clonesignal",
+            "source_sha256": "f396768df858cc560a98492869348e4bd23696a778a9a1711c4313b088ce2835",
+            "init_sha256": "61875a5f5b89c93e28e00b4c1718e8cab71a8ca09ef13e2a9dd0c77f3d9b00b0",
+            "iso_sha256": "711587ebb4113f26dd8c31a80dea6f39c77223afa820c71a6db9e8b865a62f07",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}
