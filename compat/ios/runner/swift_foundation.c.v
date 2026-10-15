@@ -139,6 +139,10 @@ fn swift_foundation_arena() u64 {
 	// destructiveInjectEnumTag witness. Native formatted(DateFormatter) is
 	// payload case zero; this does not construct an encoder or format a date.
 	write32(data + 96, 0)
+	// Calendar.Identifier.iso8601 is a resilient enum case discriminator,
+	// read as four-byte data before calling the enum tag injection witness.
+	// Its native case number is 7; this export does not construct a Calendar.
+	write32(data + 800, 7)
 	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 2328) })
 	if C.mprotect(unsafe { voidptr(base) }, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
@@ -331,6 +335,9 @@ fn swift_foundation_symbol(symbol string) !u64 {
 		'_$s10Foundation14LocalizedErrorPAAE13failureReasonSSSgvg' { swift_foundation_arena() + 272 }
 		'_$s10Foundation14LocalizedErrorPAAE18recoverySuggestionSSSgvg' { swift_foundation_arena() + 288 }
 		'_$s10Foundation14LocalizedErrorPAAE10helpAnchorSSSgvg' { swift_foundation_arena() + 304 }
+		'_$s10Foundation8CalendarV10IdentifierO7iso8601yA2EmFWC' {
+			swift_foundation_arena() + u64(C.getpagesize()) + 800
+		}
 		'_$s10Foundation11JSONEncoderC20DateEncodingStrategyO9formattedyAESo15NSDateFormatterCcAEmFWC' {
 			swift_foundation_arena() + u64(C.getpagesize()) + 96
 		}

@@ -55,6 +55,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 			'_$s10Foundation14LocalizedErrorPAAE13failureReasonSSSgvg',
 			'_$s10Foundation14LocalizedErrorPAAE18recoverySuggestionSSSgvg',
 			'_$s10Foundation14LocalizedErrorPAAE10helpAnchorSSSgvg',
+			'_$s10Foundation8CalendarV10IdentifierO7iso8601yA2EmFWC',
 			'_$s10Foundation11JSONEncoderC20DateEncodingStrategyO9formattedyAESo15NSDateFormatterCcAEmFWC'] {
 		return swift_foundation_symbol(symbol) or { return none }
 	}

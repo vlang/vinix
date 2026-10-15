@@ -6687,23 +6687,50 @@ Ten ASan/UBSan runs and five Vinix ARM64 suites pass for Locale, Date, Data
 writing, Base64 and reference snapshots. Thirteen final C streams/programs
 and four joined, retired VM phases are retained; published runners are unchanged.
 
-The current IPA probe resolves the Locale constructor, bridge and nominal
+The Locale milestone's IPA probe resolves the constructor, bridge and nominal
 metadata, then exits with status 1 at
 `_$s10Foundation8CalendarV10IdentifierO7iso8601yA2EmFWC`
-(`Calendar.Identifier.iso8601`). Fortnite has not entered application code and
-remains unplayable.
+(`Calendar.Identifier.iso8601`).
+
+The next milestone supplies that resilient enum case as a read-only, aligned
+four-byte discriminator containing 7, through both Foundation and the Swift
+Foundation overlay. The IPA loads it into w1 and passes it to the identifier
+enum's tag-injection witness at offset 104. Native Foundation constructs the
+one-byte ISO 8601 enum value from this discriminator; the exported data itself
+is four bytes. Calendar construction, identifier metadata and other calendar
+cases remain unsupported.
+
+The `swift-calendar-case-checks` fixture compares native and Vinix data loads,
+guarded four-byte read/write spans, canaries, framework scoping and eight-worker
+publication/readers. On the Mac, the exported value also passes native enum
+injection, tag, copy and destruction checks. Two private runtime lifetimes
+retire and unmap the sealed arena without retaining objects or Swift storage.
+The public V driver registers `build-swift-calendar-case` and includes the
+fixture in its Swift and full-regression inventories.
+
+Evidence is retained under `build/ios/fortnite/calendar-case-checks` using the
+prior verified private SDK. Twelve ASan/UBSan runs and six Vinix ARM64 suites
+pass for the Calendar case, Locale, Date, Data writing, Base64 and reference
+snapshots. Fifteen final C streams/programs and four joined, retired VM phases
+are retained; published runners are unchanged. Full iOS regression remains
+unpassed.
+
+The current IPA probe links past the ISO 8601 case and exits with status 1 at
+`_$s10Foundation8CalendarV10IdentifierOMa`
+(`Calendar.Identifier` metadata). Fortnite has not entered application code
+and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,524 | 636 | 79 |
+| Fortnite executable | 1,525 | 635 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,359 | 639 | 120 |
+| All images | 2,360 | 638 | 120 |
 
-The C++/GLES/Text variant reports 2,372 resolved imports, 626 unresolved strong
+The C++/GLES/Text variant reports 2,373 resolved imports, 625 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
