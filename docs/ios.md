@@ -6348,9 +6348,36 @@ streams/programs and four joined, retired VM phases are retained under
 and indirect nominal type references. The private build reuses the pinned local
 SDK; full iOS regression remains unpassed and published runners remain unchanged.
 
-The current IPA startup probe resolves both URL metadata imports, then exits
+That IPA startup probe resolves both URL metadata imports, then exits
 with status 1 at `_$s10Foundation4DataV11referencingACSo6NSDataCh_tcfC`
 (`Data.init(referencing:)`). Fortnite has not entered application code and
+remains unplayable.
+
+`Data.init(referencing:)` now resolves through both Foundation install names.
+It borrows built-in NSData or NSMutableData and snapshots their bytes, matching
+the installed native constructor: empty data has a fixed tag, up to fourteen
+bytes are stored inline, and larger values hold a compact range and owned Swift
+storage. The source's retain count stays unchanged and releasing or mutating it
+does not change the result. The storage frees its independent byte buffer and
+deallocates through the Swift heap lifetime. This profile supports the existing
+NSData limit of 16 MiB; custom NSData subclasses, large-range values, general
+Data metadata and public Data value witnesses remain unsupported.
+
+Eight ASan/UBSan runs and four Vinix ARM64 suites pass for Data snapshots,
+URL metadata, unknown-object ownership and Swift heap allocation. The Data
+fixture compares empty/inline/slice layouts and storage fields with native
+libraries, including the 14/15-byte boundary and 16 MiB limit, mutable inputs,
+no-copy NSData, independent bytes after source release, exact storage ownership,
+protected byte/result spans, register context, concurrent calls/publication and
+two drained lifetimes with unmapped storage descriptor/destructor pages.
+Eleven final C streams/programs and four joined, retired VM phases are retained
+under `build/ios/fortnite/data-reference-checks`, alongside actual IPA consumers
+and native constructor inspection. Full iOS regression remains unpassed and
+published runners remain unchanged.
+
+The current IPA startup probe resolves the Data referencing constructor, then
+exits with status 1 at `_$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF`
+(`Data._bridgeToObjectiveC()`). Fortnite has not entered application code and
 remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -6358,12 +6385,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,502 | 658 | 79 |
+| Fortnite executable | 1,503 | 657 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,337 | 661 | 120 |
+| All images | 2,338 | 660 | 120 |
 
-The C++/GLES/Text variant reports 2,350 resolved imports, 648 unresolved strong
+The C++/GLES/Text variant reports 2,351 resolved imports, 647 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
