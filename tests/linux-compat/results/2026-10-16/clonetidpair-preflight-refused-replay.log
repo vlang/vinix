@@ -1,0 +1,9 @@
+Compiler output from the default V compiler:
+/Users/alex/.cache/vinix-linux-compat/clonetidpair-20261016/tmp/vinix-v-module-Q8YdOH/clonetidpairfixture/core.v:84:37: error: already inside `unsafe` block
+   82 |   if class == 1 {args.set_tid_size = null_count(choice)}
+   83 |   if class == 2 {args.set_tid = tid_address(state,choice); args.set_tid_size = oversized(choice)}
+   84 |   if class == 3 {args.exit_signal = unsafe {[u64(0),1,9,15,17,31,32,33,63,64,20,11]![choice]}; wanted = C.EBADF}
+      |                                     ~~~~~~
+   85 |   if class == 4 {
+   86 |    args.set_tid = 1
+

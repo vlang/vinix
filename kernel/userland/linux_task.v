@@ -140,6 +140,12 @@ fn import_clone3_args(mut args CloneArgs, address u64, size u64) u64 {
 	return 0
 }
 
+// Linux imports at most MAX_PID_NS_LEVEL selected TIDs, and requires the
+// pointer and count to be either both absent or both present.
+fn valid_clone3_tid_pair(address u64, count u64) bool {
+	return count <= 32 && ((address == 0) == (count == 0))
+}
+
 // CLONE_CLEAR_SIGHAND resets the child's private copy before it can run.
 // Linux preserves SIG_IGN but clears every action's flags, restorer and mask.
 fn reset_clone_sighand(mut child proc.Thread, flags u64) {

@@ -1109,6 +1109,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   against identical probe ELFs on Linux.
   See [the extensible import receipts](docs/linux-posix-qualification.md#native-clone3-extensible-argument-import).
 
+- [x] Validate clone3 selected-TID pointer/count pairs before later admission;
+  reject mismatched/oversized pairs, stop unintended children, and qualify
+  counts 1–32 reaching permission checks, argument-import precedence, ordinary
+  forks and flat cleanup on both native architectures against identical Linux
+  probe ELFs. Requested-TID allocation remains separate.
+  See [the pair validation receipts](docs/linux-posix-qualification.md#native-clone3-selected-tid-pair-validation).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

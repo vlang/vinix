@@ -1989,3 +1989,18 @@ Use `--cases cloneextend --timeout 1200` with a fresh state directory.
 `cloneextend-reference.v` runs the unchanged ELF on Linux; compile
 `cloneextend-check.v` without `-prod` for the executing evidence audit.
 See [the import report](../../docs/linux-posix-qualification.md#native-clone3-extensible-argument-import).
+
+The `clonetidpair` case checks clone3 selected-TID pointer/count validation.
+Nonzero pointers with zero counts, null pointers with positive counts and
+counts above 32 return EINVAL before later admission. Four credential/PID
+namespace cohorts run 1,248 controls per architecture through three protected
+layouts. Well-formed counts 1–32 reach NEWPID permission refusals without
+effective CAP_SYS_ADMIN; empty pairs reach cgroup-FD errors or real forks.
+The probe validates and reaps original unintended children, checks input
+faults and complete canaries, and measures identical original/corrected warmed
+200-cycle cleanup inputs. Only cleanup permits original EBADF instead of
+corrected EINVAL. Use `--cases clonetidpair --timeout 1200` with fresh state.
+`clonetidpair-reference.v` runs the unchanged ELF on Linux; compile
+`clonetidpair-check.v` without `-prod` for the executing evidence audit.
+These admission controls do not qualify vector import or requested-TID allocation.
+See [the pair report](../../docs/linux-posix-qualification.md#native-clone3-selected-tid-pair-validation).

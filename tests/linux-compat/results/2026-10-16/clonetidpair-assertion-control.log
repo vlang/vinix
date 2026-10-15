@@ -1,0 +1,3 @@
+tests/linux-compat/clonetidpair-check.v:388: FAIL: fn main.main: assert false, 'clonetidpair assertions must execute'
+      message: clonetidpair assertions must execute
+V panic: Assertion failed...

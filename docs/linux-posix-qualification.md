@@ -9563,3 +9563,91 @@ notification and clone-child wait classes, supplied-stack execution/alignment,
 cgroup placement and its authorization/lifetimes, GNU libc and translated/
 32-bit paths remain unqualified here. The broad libc, installation/sandbox/
 portal and translation gates remain open.
+
+## Native clone3 selected-TID pair validation
+
+Both native clone3 entry points now validate set_tid/set_tid_size after the
+complete structure import and before later flag, stack and cgroup admission.
+A shared scalar predicate requires pointer and count to be either both zero
+or both nonzero, and rejects counts above 32 without truncating either word.
+Malformed pairs return EINVAL without reading the vector or creating a child.
+This follows [Linux v6.12's clone3 importer](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c)
+and its [MAX_PID_NS_LEVEL limit](https://github.com/torvalds/linux/blob/v6.12/include/linux/pid_namespace.h).
+This limit does not advertise 32 nested PID namespaces in Vinix.
+
+The `clonetidpair` probe runs 1,248 controls per architecture, with 312 in each
+root/UID1000 and initial/one-level PID namespace cohort. Each cohort explicitly
+removes effective CAP_SYS_ADMIN and reads the capability set back. Arguments
+use aligned, byte-unaligned and native-page-tail layouts. The argument page
+is read-only and the following page is PROT_NONE. Native ARM uses 16KiB pages;
+native x86 and both Linux references use 4KiB.
+
+| Class | Calls per cohort | Contract |
+| --- | ---: | --- |
+| Pointer without count | 36 | Twelve nonzero pointers with count zero return EINVAL, including readable, unaligned, protected, high-word and noncanonical values. |
+| Count without pointer | 36 | A null pointer with twelve positive counts returns EINVAL, including 1/31/32/33 and large 64-bit values. |
+| Oversized count | 36 | Twelve counts above 32 with nonzero pointers return EINVAL before vector access or a missing cgroup FD. |
+| Recognized pair admission | 132 | Empty pairs reach EBADF under twelve valid exit signals. Readable aligned/unaligned/page-tail vectors with every count 1–32 reach NEWPID EPERM without effective CAP_SYS_ADMIN. This proves pair admission, not vector import or selected-PID allocation. |
+| Import precedence | 36 | Short/excessive sizes and null/low/wrapping/protected argument addresses retain exact EINVAL/E2BIG/EFAULT, even when a readable prefix contains a malformed pair. |
+| Direct requests | 36 | Empty pairs at sizes 64/72/80/88 create real SIGCHLD children. Eight malformed requests at sizes 72/73/80/88 return EINVAL without children. |
+
+The nonempty admission controls intentionally stop at namespace permission
+checking before requested-PID validation/allocation. Linux imports their
+readable vectors; Vinix still does not import them. The tested arrays can
+overlap the argument block and their contents are not asserted to be valid
+PID selections. Successful requested-TID allocation, vector-fault ordering,
+namespace-depth and capability checks for allocation remain unqualified.
+
+Original kernels fail exactly 528 controls per architecture: all 108 malformed
+admission checks and 24 direct refusals per cohort. The direct malformed calls
+instead create 24 unintended children per cohort. The probe validates their
+PID/TID, parent, UID and exit-37 records, then reaps them. Corrected kernels and
+the identical original probe ELFs on Linux 6.12.51 pass every control, create
+zero unintended children and retain twelve legitimate ordinary fork/reap
+controls per cohort. Both the cohort and supervisor report child totals.
+
+Every call restores protections, compares the complete two-page canary and
+requires ECHILD from an empty nonblocking wait. Original and corrected kernels
+each measure four cleanup cohorts after 64 warmup cycles and thirteen seconds
+of settling, followed by 200 measured cycles and another settle. Every cycle
+repeats three malformed-pair refusals, one empty-pair admission refusal and
+one empty-pair real fork/reap. Inputs and child lifecycles are identical in
+both phases. Only cleanup accepts original EBADF instead of corrected EINVAL;
+semantic cases require exact errors. All live slab classes and big-heap page
+totals stay flat. This is targeted kernel-heap evidence; general page/cache
+retention and the earlier EXT2 rename observation remain separate.
+
+Four isolated original/corrected production builds pass. Exact whole-C
+comparison confines the change to the scalar predicate/prototype and two
+clone3 call sites. No allocation, free, reference, ownership transfer or lock
+changes are introduced. The final probe uses ten explicit stack allocas and
+no dynamic allocation or fixed-index helper. Successful compiler preflight
+matches original ARM guest C. An initial fixture used a nested unsafe block;
+its exact source, partial preflight artifacts and raw reproducer refusal are
+retained and pinned. Both completed preliminary original runs were retained
+with their source, preflight and 21 pinned case files when the positive
+count-admission controls were added; final runs use fresh state directories.
+
+Both corrected architectures pass runtime and the 1,308-control cloneextend
+regression. The auditor verifies all case/cohort totals, original failures,
+valid/unintended child counts, effective-capability records, credentials/page
+sizes, identical probe C/ELFs, Linux receipts, both phases' storage, all 84
+retained final native case files, 67 frozen dispatch inventory inputs, 2,014
+SDK files and 15,146 compiler pins. False-assertion and passing-Linux-as-original
+controls must execute and fail; compile without `-prod`.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/clonetidpair-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/clonetidpair-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/clonetidpair-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/clonetidpair-diagnostic-pins.json).
+Raw original/corrected/Linux, build, preflight and regression logs accompany
+the receipts. The maintained auditor is `tests/linux-compat/clonetidpair-check.v`.
+
+This qualifies selected-TID pointer/count shape and the tested admission
+paths. Well-formed selected-TID requests are still ignored by Vinix after
+this validation; ordinary successful clones must not be interpreted as
+requested-PID support. Concurrent arguments/mappings, selected-TID vector
+import and allocation, pidfds, non-SIGCHLD exit notification and clone-child
+wait classes, supplied-stack execution/alignment, cgroup placement and its
+authorization/lifetimes, GNU libc and translated/32-bit paths remain separate.
+The broad libc, installation/sandbox/portal and translation gates remain open.

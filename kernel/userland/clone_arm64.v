@@ -42,6 +42,9 @@ pub fn syscall_clone3(_gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 	if failure != 0 {
 		return errno.err, failure
 	}
+	if !valid_clone3_tid_pair(args.set_tid, args.set_tid_size) {
+		return errno.err, errno.einval
+	}
 	if !valid_clone3_flags(args.flags) {
 		return errno.err, errno.einval
 	}
