@@ -175,7 +175,7 @@ pub fn syscall_get_robust_list(_ voidptr, tid_word u64, head_ptr u64, len_ptr u6
 		}
 		// The pointer is process layout. Check and copy under the lookup
 		// lock rather than retaining a Thread and borrowing its Process.
-		if !proc.may_inspect_locked(target.process) {
+		if !proc.may_inspect_realcreds_locked(target.process) {
 			proc.unlock_table()
 			return errno.err, errno.eperm
 		}

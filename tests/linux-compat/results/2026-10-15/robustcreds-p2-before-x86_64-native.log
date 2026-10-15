@@ -1,0 +1,517 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=89776
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037ff0400
+initramfs: Done (9 entries)
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=0 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=1 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=1 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=1 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=1 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=1 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=1 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=1 caller_uid=0/2000/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=2 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=2 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=2 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=2 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=2 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=2 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=2 caller_uid=2000/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=3 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=3 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=3 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=3 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=3 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=3 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=3 caller_uid=0/0/0 caller_gid=0/2000/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=4 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=4 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=4 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=4 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=4 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=4 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=4 caller_uid=0/0/0 caller_gid=2000/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=5 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=2000/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=6 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/2000/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=7 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/2000 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=8 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=2000/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=9 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/2000/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=10 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/2000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=11 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=2000/2000/2000 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=12 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=0 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=2 profile=13 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=2 profile=13 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=3 profile=13 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=3 profile=13 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=13 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=0 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=14 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/524288 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=0 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=15 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/524288 target_uid=2000/2000/2000 target_gid=0/0/0 target_caps=0/0 dump=0 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=16 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=1024/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=17 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=17 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=17 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=17 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=17 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=17 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=17 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=1024/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=1024/0 dump=1 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=18 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=1024/1024 target_uid=0/0/0 target_gid=0/0/0 target_caps=1024/0 dump=1 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=19 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=8192/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=1024/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=2 profile=20 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=2 profile=20 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=3 profile=20 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=3 profile=20 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=20 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=1024/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=21 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/524288 target_uid=0/0/0 target_gid=0/0/0 target_caps=1024/0 dump=1 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=22 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=2 profile=23 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=2 profile=23 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=3 profile=23 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=3 profile=23 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=23 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/0 target_uid=2000/2000/2000 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=2 profile=24 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=2 profile=24 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=3 profile=24 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=3 profile=24 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=24 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/0 target_uid=0/0/0 target_gid=2000/2000/2000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=25 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/524288 target_uid=2000/2000/2000 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=26 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/524288 target_uid=0/0/0 target_gid=2000/2000/2000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=27 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=27 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=2 profile=27 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=2 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=3 profile=27 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=3 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=27 caller_uid=2000/0/0 caller_gid=0/0/0 caller_caps=524288/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=28 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=28 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=28 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=28 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=28 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=28 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=28 caller_uid=0/2000/0 caller_gid=0/0/0 caller_caps=524288/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=29 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=29 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=29 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=29 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=29 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=29 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=29 caller_uid=0/2000/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=30 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=30 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=30 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=30 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=30 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=30 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=30 caller_uid=0/2000/0 caller_gid=0/2000/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=31 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=31 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=31 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=31 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=0 profile=31 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=0 kind=1 profile=31 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=0 profile=31 caller_uid=2000/0/0 caller_gid=2000/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS COHORT: ordinary=0 namespace=0 self=39633 page=4096 profiles=32 targets=32 workers=32 callers=32 cleaned=96
+LINUX ROBUSTCREDS CASES: ordinary=0 namespace=0 kind=0 calls=192 failures=60
+LINUX ROBUSTCREDS CASES: ordinary=0 namespace=0 kind=1 calls=192 failures=60
+LINUX ROBUSTCREDS CASES: ordinary=0 namespace=0 kind=2 calls=64 failures=10
+LINUX ROBUSTCREDS CASES: ordinary=0 namespace=0 kind=3 calls=64 failures=10
+LINUX ROBUSTCREDS CASES: ordinary=0 namespace=0 kind=4 calls=384 failures=0
+LINUX ROBUSTCREDS CASES: ordinary=0 namespace=0 kind=5 calls=384 failures=0
+LINUX ROBUSTCREDS FINAL: ordinary=0 namespace=0 kind=0 calls=192 failures=60
+LINUX ROBUSTCREDS FINAL: ordinary=0 namespace=0 kind=1 calls=192 failures=60
+LINUX ROBUSTCREDS FINAL: ordinary=0 namespace=0 kind=2 calls=64 failures=10
+LINUX ROBUSTCREDS FINAL: ordinary=0 namespace=0 kind=3 calls=64 failures=10
+LINUX ROBUSTCREDS FINAL: ordinary=0 namespace=0 kind=4 calls=384 failures=0
+LINUX ROBUSTCREDS FINAL: ordinary=0 namespace=0 kind=5 calls=384 failures=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=0 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=1 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=1 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=1 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=1 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=1 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=1 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=1 caller_uid=1000/2000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=2 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=2 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=2 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=2 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=2 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=2 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=2 caller_uid=2000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=3 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=3 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=3 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=3 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=3 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=3 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=3 caller_uid=1000/1000/1000 caller_gid=1000/2000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=4 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=4 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=4 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=4 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=4 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=4 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=4 caller_uid=1000/1000/1000 caller_gid=2000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=5 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=2000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=6 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/2000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=7 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/2000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=8 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=2000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=9 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/2000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=10 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/2000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=11 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=2000/2000/2000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=12 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=0 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=2 profile=13 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=2 profile=13 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=3 profile=13 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=3 profile=13 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=13 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=0 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=14 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/524288 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=0 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=15 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/524288 target_uid=2000/2000/2000 target_gid=1000/1000/1000 target_caps=0/0 dump=0 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=16 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=1024/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=17 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=17 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=17 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=17 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=17 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=17 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=17 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=1024/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=1024/0 dump=1 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=18 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=1024/1024 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=1024/0 dump=1 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=19 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=8192/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=1024/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=2 profile=20 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=2 profile=20 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=3 profile=20 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=3 profile=20 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=20 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=1024/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=21 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/524288 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=1024/0 dump=1 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=22 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=2 profile=23 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=2 profile=23 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=3 profile=23 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=3 profile=23 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=23 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/0 target_uid=2000/2000/2000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=2 profile=24 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=2 profile=24 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=3 profile=24 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=3 profile=24 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=24 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/0 target_uid=1000/1000/1000 target_gid=2000/2000/2000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=25 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/524288 target_uid=2000/2000/2000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=26 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/524288 target_uid=1000/1000/1000 target_gid=2000/2000/2000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=27 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=27 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=2 profile=27 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=2 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=3 profile=27 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=3 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=27 caller_uid=2000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=28 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=28 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=28 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=28 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=28 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=28 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=28 caller_uid=1000/2000/1000 caller_gid=1000/1000/1000 caller_caps=524288/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=29 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=29 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=29 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=29 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=29 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=29 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=29 caller_uid=1000/2000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=30 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=30 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=30 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=30 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=30 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=30 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=30 caller_uid=1000/2000/1000 caller_gid=1000/2000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=31 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=31 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=31 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=31 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=0 profile=31 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=0 kind=1 profile=31 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=0 profile=31 caller_uid=2000/1000/1000 caller_gid=2000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS COHORT: ordinary=1 namespace=0 self=44832 page=4096 profiles=32 targets=32 workers=32 callers=32 cleaned=96
+LINUX ROBUSTCREDS CASES: ordinary=1 namespace=0 kind=0 calls=192 failures=60
+LINUX ROBUSTCREDS CASES: ordinary=1 namespace=0 kind=1 calls=192 failures=60
+LINUX ROBUSTCREDS CASES: ordinary=1 namespace=0 kind=2 calls=64 failures=10
+LINUX ROBUSTCREDS CASES: ordinary=1 namespace=0 kind=3 calls=64 failures=10
+LINUX ROBUSTCREDS CASES: ordinary=1 namespace=0 kind=4 calls=384 failures=0
+LINUX ROBUSTCREDS CASES: ordinary=1 namespace=0 kind=5 calls=384 failures=0
+LINUX ROBUSTCREDS FINAL: ordinary=1 namespace=0 kind=0 calls=192 failures=60
+LINUX ROBUSTCREDS FINAL: ordinary=1 namespace=0 kind=1 calls=192 failures=60
+LINUX ROBUSTCREDS FINAL: ordinary=1 namespace=0 kind=2 calls=64 failures=10
+LINUX ROBUSTCREDS FINAL: ordinary=1 namespace=0 kind=3 calls=64 failures=10
+LINUX ROBUSTCREDS FINAL: ordinary=1 namespace=0 kind=4 calls=384 failures=0
+LINUX ROBUSTCREDS FINAL: ordinary=1 namespace=0 kind=5 calls=384 failures=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=0 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=1 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=1 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=1 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=1 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=1 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=1 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=1 caller_uid=0/2000/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=2 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=2 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=2 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=2 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=2 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=2 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=2 caller_uid=2000/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=3 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=3 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=3 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=3 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=3 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=3 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=3 caller_uid=0/0/0 caller_gid=0/2000/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=4 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=4 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=4 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=4 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=4 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=4 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=4 caller_uid=0/0/0 caller_gid=2000/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=5 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=2000/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=6 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/2000/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=7 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/2000 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=8 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=2000/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=9 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/2000/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=10 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/2000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=11 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=2000/2000/2000 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=12 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=0 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=2 profile=13 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=2 profile=13 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=3 profile=13 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=3 profile=13 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=13 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=0 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=14 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/524288 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=0 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=15 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/524288 target_uid=2000/2000/2000 target_gid=0/0/0 target_caps=0/0 dump=0 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=16 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=1024/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=17 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=17 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=17 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=17 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=17 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=17 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=17 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=1024/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=1024/0 dump=1 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=18 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=1024/1024 target_uid=0/0/0 target_gid=0/0/0 target_caps=1024/0 dump=1 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=19 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=8192/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=1024/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=2 profile=20 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=2 profile=20 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=3 profile=20 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=3 profile=20 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=20 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=1024/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=21 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/524288 target_uid=0/0/0 target_gid=0/0/0 target_caps=1024/0 dump=1 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=22 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=2 profile=23 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=2 profile=23 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=3 profile=23 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=3 profile=23 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=23 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/0 target_uid=2000/2000/2000 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=2 profile=24 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=2 profile=24 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=3 profile=24 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=3 profile=24 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=24 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/0 target_uid=0/0/0 target_gid=2000/2000/2000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=25 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/524288 target_uid=2000/2000/2000 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=26 caller_uid=0/0/0 caller_gid=0/0/0 caller_caps=524288/524288 target_uid=0/0/0 target_gid=2000/2000/2000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=27 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=27 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=2 profile=27 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=2 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=3 profile=27 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=3 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=27 caller_uid=2000/0/0 caller_gid=0/0/0 caller_caps=524288/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=28 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=28 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=28 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=28 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=28 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=28 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=28 caller_uid=0/2000/0 caller_gid=0/0/0 caller_caps=524288/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=29 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=29 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=29 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=29 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=29 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=29 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=29 caller_uid=0/2000/0 caller_gid=0/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=30 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=30 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=30 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=30 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=30 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=30 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=30 caller_uid=0/2000/0 caller_gid=0/2000/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=31 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=31 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=31 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=31 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=0 profile=31 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=0 namespace=1 kind=1 profile=31 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=0 namespace=1 profile=31 caller_uid=2000/0/0 caller_gid=2000/0/0 caller_caps=0/0 target_uid=0/0/0 target_gid=0/0/0 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS COHORT: ordinary=0 namespace=1 self=2 page=4096 profiles=32 targets=32 workers=32 callers=32 cleaned=96
+LINUX ROBUSTCREDS CASES: ordinary=0 namespace=1 kind=0 calls=192 failures=60
+LINUX ROBUSTCREDS CASES: ordinary=0 namespace=1 kind=1 calls=192 failures=60
+LINUX ROBUSTCREDS CASES: ordinary=0 namespace=1 kind=2 calls=64 failures=10
+LINUX ROBUSTCREDS CASES: ordinary=0 namespace=1 kind=3 calls=64 failures=10
+LINUX ROBUSTCREDS CASES: ordinary=0 namespace=1 kind=4 calls=384 failures=0
+LINUX ROBUSTCREDS CASES: ordinary=0 namespace=1 kind=5 calls=384 failures=0
+LINUX ROBUSTCREDS FINAL: ordinary=0 namespace=1 kind=0 calls=192 failures=60
+LINUX ROBUSTCREDS FINAL: ordinary=0 namespace=1 kind=1 calls=192 failures=60
+LINUX ROBUSTCREDS FINAL: ordinary=0 namespace=1 kind=2 calls=64 failures=10
+LINUX ROBUSTCREDS FINAL: ordinary=0 namespace=1 kind=3 calls=64 failures=10
+LINUX ROBUSTCREDS FINAL: ordinary=0 namespace=1 kind=4 calls=384 failures=0
+LINUX ROBUSTCREDS FINAL: ordinary=0 namespace=1 kind=5 calls=384 failures=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=0 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=1 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=1 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=1 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=1 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=1 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=1 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=1 caller_uid=1000/2000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=2 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=2 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=2 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=2 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=2 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=2 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=2 caller_uid=2000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=3 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=3 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=3 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=3 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=3 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=3 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=3 caller_uid=1000/1000/1000 caller_gid=1000/2000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=4 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=4 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=4 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=4 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=4 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=4 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=4 caller_uid=1000/1000/1000 caller_gid=2000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=5 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=2000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=6 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/2000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=7 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/2000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=8 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=2000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=9 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/2000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=10 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/2000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=11 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=2000/2000/2000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=12 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=0 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=2 profile=13 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=2 profile=13 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=3 profile=13 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=3 profile=13 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=13 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=0 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=14 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/524288 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=0 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=15 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/524288 target_uid=2000/2000/2000 target_gid=1000/1000/1000 target_caps=0/0 dump=0 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=16 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=1024/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=17 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=17 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=17 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=17 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=17 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=17 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=17 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=1024/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=1024/0 dump=1 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=18 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=1024/1024 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=1024/0 dump=1 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=19 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=8192/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=1024/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=2 profile=20 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=2 profile=20 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=3 profile=20 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=3 profile=20 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=20 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=1024/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=21 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/524288 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=1024/0 dump=1 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=22 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=2 profile=23 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=2 profile=23 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=3 profile=23 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=3 profile=23 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=23 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/0 target_uid=2000/2000/2000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=2 profile=24 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=2 profile=24 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=3 profile=24 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=3 profile=24 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=24 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/0 target_uid=1000/1000/1000 target_gid=2000/2000/2000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=25 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/524288 target_uid=2000/2000/2000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=26 caller_uid=1000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/524288 target_uid=1000/1000/1000 target_gid=2000/2000/2000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=27 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=27 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=2 profile=27 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=2 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=3 profile=27 result=16 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=3 profile=27 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=27 caller_uid=2000/1000/1000 caller_gid=1000/1000/1000 caller_caps=524288/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=28 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=28 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=28 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=28 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=28 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=28 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=28 caller_uid=1000/2000/1000 caller_gid=1000/1000/1000 caller_caps=524288/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=29 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=29 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=29 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=29 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=29 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=29 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=29 caller_uid=1000/2000/1000 caller_gid=1000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=30 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=30 result=-1 errno=1 expected=0
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=30 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=30 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=30 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=30 result=-1 errno=1 expected=14
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=30 caller_uid=1000/2000/1000 caller_gid=1000/2000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=31 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=31 result=0 errno=0 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=31 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=31 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=0 profile=31 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS DETAIL: ordinary=1 namespace=1 kind=1 profile=31 result=-1 errno=14 expected=1
+LINUX ROBUSTCREDS PROFILE: ordinary=1 namespace=1 profile=31 caller_uid=2000/1000/1000 caller_gid=2000/1000/1000 caller_caps=0/0 target_uid=1000/1000/1000 target_gid=1000/1000/1000 target_caps=0/0 dump=1 allowed=0
+LINUX ROBUSTCREDS COHORT: ordinary=1 namespace=1 self=2 page=4096 profiles=32 targets=32 workers=32 callers=32 cleaned=96
+LINUX ROBUSTCREDS CASES: ordinary=1 namespace=1 kind=0 calls=192 failures=60
+LINUX ROBUSTCREDS CASES: ordinary=1 namespace=1 kind=1 calls=192 failures=60
+LINUX ROBUSTCREDS CASES: ordinary=1 namespace=1 kind=2 calls=64 failures=10
+LINUX ROBUSTCREDS CASES: ordinary=1 namespace=1 kind=3 calls=64 failures=10
+LINUX ROBUSTCREDS CASES: ordinary=1 namespace=1 kind=4 calls=384 failures=0
+LINUX ROBUSTCREDS CASES: ordinary=1 namespace=1 kind=5 calls=384 failures=0
+LINUX ROBUSTCREDS FINAL: ordinary=1 namespace=1 kind=0 calls=192 failures=60
+LINUX ROBUSTCREDS FINAL: ordinary=1 namespace=1 kind=1 calls=192 failures=60
+LINUX ROBUSTCREDS FINAL: ordinary=1 namespace=1 kind=2 calls=64 failures=10
+LINUX ROBUSTCREDS FINAL: ordinary=1 namespace=1 kind=3 calls=64 failures=10
+LINUX ROBUSTCREDS FINAL: ordinary=1 namespace=1 kind=4 calls=384 failures=0
+LINUX ROBUSTCREDS FINAL: ordinary=1 namespace=1 kind=5 calls=384 failures=0
+LINUX ROBUSTCREDS FAIL: robust-list real credentials, permitted capability subset, effective ptrace override or retained storage
+QEMU: Terminated
+

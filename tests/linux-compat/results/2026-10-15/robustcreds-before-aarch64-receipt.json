@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "7113eb2d70e46ca517bc5cb5e3b25006d7dd679d7a74ca75acf2115f185087ef",
+    "results": [
+        {
+            "name": "robustcreds",
+            "source_sha256": "b8860529d4a6f1ce8f01ec868844137ce0152c0296560b3d30fbfb5aafaf780c",
+            "init_sha256": "8eb368d5a3c43e515949c1eb06f846bb090957a8f44d8a530a67a3ee2800b78e",
+            "iso_sha256": "777bd8930542e9936c3ea47b7e5b1d6109225ac06dd61745fc2477da530ae437",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

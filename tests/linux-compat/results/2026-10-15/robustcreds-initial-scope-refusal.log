@@ -1,0 +1,5 @@
+tests/linux-compat/robustcreds-check.v:23: FAIL: fn main.body: assert rows.len == 1,name
+   left value: rows.len = 2
+  right value: 1
+      message: proc__inspection_capable
+V panic: Assertion failed...

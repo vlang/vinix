@@ -1831,3 +1831,17 @@ results, exact whole production-C scope, input/SDK/compiler pins, retained
 pre-ELF refusals and executing audit negatives. Concurrent owner-word CAS,
 mapping/list mutation, malformed lists, actual PI-state handover, forced sibling
 exit and GNU/foreign paths remain separate. See [the robust-exit report](../../docs/linux-posix-qualification.md#native-robust-futex-pending-unlock-and-selective-exit-wakes).
+
+The `robustcreds` case checks native robust-list READ_REALCREDS and active
+CAP_SYS_PTRACE overrides, including process_vm read/write permission checks.
+It runs 5,120 controls per architecture with 32 caller/target credential profiles
+in each root/ordinary and initial/one-level PID namespace view. Distinct live
+leader/worker heads, verified real/effective/saved IDs and capability sets,
+dumpability, upper PID words, output/payload faults, canaries, target write echoes,
+self-access and missing targets are checked. Four warmed 200-cycle cohorts
+include whole caller/target/worker setup and cleanup. `robustcreds-reference.v`
+boots the unchanged ELF on Linux; compile `robustcreds-check.v` without `-prod`
+to check actual original failures, final results, exact whole-C scope, retained
+refusals, SDK/compiler/inventory pins and executing negative controls. Concurrent
+credentials/mappings/targets, new MAC/LSM/user-namespace policy and GNU/foreign
+paths remain separate. See [the inspection report](../../docs/linux-posix-qualification.md#native-robust-list-and-process-memory-inspection-credentials).

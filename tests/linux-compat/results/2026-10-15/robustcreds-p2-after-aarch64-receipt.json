@@ -1,0 +1,31 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "71702b036cb31b3dd6d6a38a77f29e29b379c8772c1233aa20d2003d3c213eac",
+    "results": [
+        {
+            "name": "robustcreds",
+            "source_sha256": "b2392c4d5c9e21eaa8afd7862404ddc4b9115a755f70354baac95ca2291cda81",
+            "init_sha256": "e561e77eaf5ccd62eb886ef2dcedbcb027419838220ed5708ae82dd82316f633",
+            "iso_sha256": "a8c13909a15e7ef287366320480559e93af01b3523816341bca425caf3d76748",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "5d06c51b5ded2d2836e5ab383d1ebf5d6a7975236054076ea3402929e0b315ed",
+            "iso_sha256": "288c9cea89145280d3d1b2ef2b4885de30b95e51d92779c0bd82be569eb3c6e9",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "robustwake",
+            "source_sha256": "8c5d33bc5d105a1da68fe07bbf733fb4cd07dc28fec9d1423baa3baf34c5a1ca",
+            "init_sha256": "22628256ff246579becd3a4ebfaa24219f31bcffc55553bf25660eb182f37843",
+            "iso_sha256": "9894abab2bd486907f1c1ecef96ceb31b1ffc5638f0b0cb100e01b2a68410b9c",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

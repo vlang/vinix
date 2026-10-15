@@ -7,18 +7,19 @@ import memory
 
 // Capabilities in a new user namespace never grant inspection of its parent.
 // Vinix currently models user namespaces as identities without a parent tree.
-fn inspection_capable(caller &Process, target &Process, permitted bool) bool {
+fn inspection_capable(caller &Process, target &Process) bool {
 	if !is_initial_namespace(caller.ns.user)
 		&& voidptr(caller.ns.user) != voidptr(target.ns.user) {
 		return false
 	}
-	mask := if permitted { caller.caps.permitted } else { caller.caps.effective }
-	return mask & (u64(1) << cap_sys_ptrace) != 0
+	// REALCREDS selects permitted capabilities for the subset check below;
+	// an active CAP_SYS_PTRACE override always requires the effective set.
+	return caller.caps.effective & (u64(1) << cap_sys_ptrace) != 0
 }
 
 fn inspection_allowed(caller &Process, target &Process, real_creds bool) bool {
 	if !mac_peer_allowed(caller, target) { return false }
-	if voidptr(caller) == voidptr(target) || inspection_capable(caller, target, real_creds) {
+	if voidptr(caller) == voidptr(target) || inspection_capable(caller, target) {
 		return true
 	}
 	if dumpability(target) != 1 || voidptr(caller.ns.user) != voidptr(target.ns.user) {
@@ -57,6 +58,16 @@ pub fn may_inspect_locked(target &Process) bool {
 	}
 	current := current_thread().process
 	return inspection_allowed(current, target, false)
+}
+
+// get_robust_list uses READ_REALCREDS, as process_vm_* does. The caller holds
+// the process table lock through the credential check and scalar snapshot.
+pub fn may_inspect_realcreds_locked(target &Process) bool {
+	if target == unsafe { nil } {
+		return false
+	}
+	current := current_thread().process
+	return inspection_allowed(current, target, true)
 }
 
 pub struct ProcessInspection {

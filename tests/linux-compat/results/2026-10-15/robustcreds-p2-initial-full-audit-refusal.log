@@ -1,0 +1,4 @@
+tests/linux-compat/robustcreds-check.v:468: FAIL: fn main.semantics: assert cohorts.len == 4;
+   left value: cohorts.len = 932
+  right value: 4
+V panic: Assertion failed...

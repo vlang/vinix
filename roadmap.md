@@ -1049,6 +1049,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   as root/UID1000 in both PID namespace views, with identical-ELF Linux controls.
   See [the robust exit receipts](docs/linux-posix-qualification.md#native-robust-futex-pending-unlock-and-selective-exit-wakes).
 
+- [x] Use real IDs and permitted capability subsets for native robust-list
+  inspection, requiring effective CAP_SYS_PTRACE for privileged overrides.
+  Qualify split credentials, target dumpability, process_vm payload/error
+  behavior and flat caller/target cleanup in both credential/PID namespace views.
+  See [the inspection receipts](docs/linux-posix-qualification.md#native-robust-list-and-process-memory-inspection-credentials).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

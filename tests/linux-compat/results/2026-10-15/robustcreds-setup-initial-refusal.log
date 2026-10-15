@@ -1,0 +1,8 @@
+Compiler output from the default V compiler:
+/Users/alex/.cache/vinix-linux-compat/robustcreds-20261015/setup.v:22:2: error: `compression` is immutable, declare it with `mut` to make it mutable
+   20 |  }
+   21 |  compression := os.read_file('/Users/alex/.cache/vinix-linux-compat/compress-robustquery-for-wake.v')!.replace("const area = '"+prior+"'","const area = '"+area+"'").replace("const prior = '/Users/alex/.cache/vinix-linux-compat/robustquery-20261015/'","const prior = '"+prior+"'")
+   22 |  compression = compression.replace(",'output-only-arm.c','output-only-x86.c','output-only-arm.elf','output-only-x86.elf'",'').replace('prior robustquery artifacts','prior robustwake artifacts')
+      |  ~~~~~~~~~~~
+   23 |  os.write_file(area+'compress-prior.v',compression)!
+   24 | }

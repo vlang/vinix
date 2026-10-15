@@ -8591,3 +8591,121 @@ pointers/alignment/list faults, actual PI-state handover, forced sibling exit,
 GNU libc and foreign/translated ABIs also remain separate. These results do
 not close the three broad libc, installation/sandbox/portal and translated/
 32-bit roadmap acceptance gates.
+
+## Native robust-list and process-memory inspection credentials
+
+The 2026-10-15 `robustcreds` qualification uses real caller UID/GID and
+permitted capability subsets for native get_robust_list inspection. Its active
+CAP_SYS_PTRACE override requires the effective set. The same override correction
+also closes a process_vm_readv/writev permission bypass: merely retaining
+CAP_SYS_PTRACE in the permitted set no longer grants access to a different
+owner or a nondumpable target. Matching IDs still require all target real,
+effective and saved IDs, dumpability and the selected capability subset.
+Existing MAC and namespace policy remain in place.
+
+The primary contracts are [Linux v6.12 futex/syscalls.c](https://github.com/torvalds/linux/blob/v6.12/kernel/futex/syscalls.c#L43),
+[ptrace.c](https://github.com/torvalds/linux/blob/v6.12/kernel/ptrace.c#L257)
+and [commoncap.c](https://github.com/torvalds/linux/blob/v6.12/security/commoncap.c#L127).
+The complete tagged files are retained from the kernel.org Git mirror with
+base64 downloads, decoded bytes, exact URLs and SHA-256. Unchanged native musl
+probe ELFs independently execute on Linux 6.12.51 for both architectures.
+
+The frozen base is `649619d3ab186043337e4ba237a42970d81a2d30`.
+Each architecture passes 5,120 controls: four initial/one-level PID namespace
+and base-UID0/base-UID1000 cohorts, each with 32 caller/target profiles. A root
+coordinator creates disposable callers and targets; the ordinary profile group
+uses base UID/GID1000. Credentials are configured and independently read back
+before testing. Profiles split caller real/effective UID and GID; vary each
+target real/effective/saved UID/GID independently; use dumpability 0/1; and
+separate zero, permitted-only and effective capabilities. UID0 without an
+effective capability receives no cross-owner override. Target capability
+subsets distinguish CAP_NET_BIND_SERVICE from CAP_NET_RAW and CAP_SYS_PTRACE.
+
+| Class | Per cohort | Original failures |
+| --- | ---: | ---: |
+| Target leader robust-list queries | 192 | 60 |
+| Live target worker robust-list queries | 192 | 60 |
+| Process-memory reads | 64 | 10 |
+| Process-memory writes | 64 | 10 |
+| Nondumpable self robust-list queries | 384 | 0 |
+| Missing-target errors | 384 | 0 |
+
+Both original kernels fail exactly 560 controls; corrected kernels and
+identical-ELF Linux references have zero failures. Queries use canonical and
+poisoned upper PID words, mapped unaligned outputs and NULL head/length errors.
+Permission denial must precede user copies and preserve the full 64-byte output
+canary; admitted head faults retain the preceding length store. Zero/explicit
+self queries succeed despite nondumpability and dropped effective capabilities.
+Negative/INT_MIN targets return ESRCH before valid or invalid outputs.
+
+Each target publishes distinct leader/worker registrations and verified
+credentials through a pipe, then keeps both tasks alive behind blocking pipes.
+The caller checks exact queried heads and length 24. Process-memory controls
+transfer sixteen real bytes inside a 64-byte canary, or use a NULL local payload
+with valid iovec headers. EPERM precedes the payload fault on denied access.
+The target echoes its own resident private buffer after each write, proving
+both successful changes and unchanged denied/faulted data independently of the
+caller's return value. The target owns its writable page; this does not qualify
+remote demand/COW allocation. Both original target musl registrations are
+restored before exit; the worker joins, caller/target processes are reaped and
+every pipe/mapping closes. SIGCHLD is blocked and the original mask restored.
+
+Four storage cohorts per corrected architecture run 200 complete trials after
+32 profile warmups and thirteen-second settling periods. The measured interval
+includes target/caller forks, credential setup, worker creation, all forty
+checks per trial, registration restoration, join, reap and pipe/mapping cleanup.
+Profiles rotate rather than keeping one privileged target alive. All 18 ARM
+and 14 x86 live slab classes and big-heap page totals remain flat; exact totals
+are in the native logs. These measurements do not establish general physical
+user-page retention or every process-memory vector/fault lifetime. Native ARM
+uses 16KiB pages; x86 and both Linux references use 4KiB pages.
+
+Four fresh isolated production builds retain both originals and corrections.
+Whole generated C permits only the inspection-capability prototype/body,
+inspection/getter call changes and a scalar real-credential helper/declaration.
+No normalization, allocation, free, stack promotion, Process/Thread pin or
+inspection-reference change is introduced. Existing table/map locks, retained
+address-space lifetime and copy/release paths stay unchanged. Probe C contains
+fourteen explicit stack allocas and no dynamic allocation or fixed-index helper.
+
+Both corrected architectures pass runtime and robustwake regressions, including
+the preceding selective robust-exit qualification. Eight host test files pass.
+Allocation diagnostics remain byte-identical at 398 ARM/290 x86 sites, including
+existing allowance-file refusals. The auditor binds 67 dispatch inventory inputs,
+both changed source files and exact whole-C scope, 2,014 private SDK files,
+15,146 compiler pins, fifteen final ARM compiler-command receipts and all 84
+regular files across eight native case profiles. Compile it without `-prod`:
+false-assertion and passing-reference-as-original controls must execute.
+
+The first compiler preflight stops before ELF creation because the private SDK
+lacks linux/capability.h. Its source/C and refusal remain retained. The probe
+uses explicit V capability-header/data layouts instead; its profile's fixed
+membership tests also run inside the existing unsafe context to avoid an
+unavailable generated indexing helper. The corrected preflight compiles and
+its C matches the first native ARM input. No native semantic failure is inferred
+from the refused preflight. A host setup compilation refusal and the first
+scope auditor's function/call-row ambiguity are separately retained. The
+corrected auditor selects function-definition rows and compares complete
+production C exactly.
+
+The first full evidence audit refuses the x86 corrected log because its four
+cohort records appear 233 times each: a buffered coordinator line is inherited
+by the 32 warmup and 200 measured caller forks and flushed by each caller.
+All original semantic results and storage measurements remain retained, with
+each of the 932 protocol records checked. An explicit coordinator fflush
+before storage is the only probe source/C change. Fresh p2 originals, corrected
+kernels and identical-ELF Linux references rerun all checks; final evidence
+requires exactly four cohort records. Original refusals, partial publication
+and their pinned raw files are preserved separately from p2 evidence.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-15/robustcreds-p2-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-15/robustcreds-p2-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-15/robustcreds-p2-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-15/robustcreds-p2-diagnostic-pins.json).
+Raw original/corrected/Linux, build, regression and scanner logs accompany the
+receipts. The maintained auditor is `tests/linux-compat/robustcreds-check.v`.
+
+Concurrent credential/target/mapping changes, new MAC/LSM or user-namespace
+policy, general process_vm vector/partial-copy/remote-fault semantics, GNU libc
+and foreign/translated ABIs remain separate. The three broad libc,
+installation/sandbox/portal and translated/32-bit roadmap gates remain open.

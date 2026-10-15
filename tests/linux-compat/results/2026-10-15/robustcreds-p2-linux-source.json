@@ -1,0 +1,5 @@
+{
+    "commoncap": "f8dba4df187cd446bc336dfeed000b41bdd0a9afd8b8d985d9c9d502cec587d7 https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux/+/refs/tags/v6.12/security/commoncap.c?format=TEXT",
+    "ptrace": "ddb8bf50294bac786b3f0ed62f94e0753ec6bd3add6800f65f82e4bd31e730bd https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux/+/refs/tags/v6.12/kernel/ptrace.c?format=TEXT",
+    "syscalls": "e06a96ec7d945a2afbbc2d71af0c39ca27a84030f9d1377b4f33aec3af2c36b9 https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux/+/refs/tags/v6.12/kernel/futex/syscalls.c?format=TEXT"
+}

@@ -1,0 +1,9 @@
+/Users/alex/.cache/vinix-linux-compat/robustcreds-20261015/states/preflight-arm/fixture.c:30:10: fatal error: 'linux/capability.h' file not found
+   30 | #include <linux/capability.h>
+      |          ^~~~~~~~~~~~~~~~~~~~
+1 error generated.
+V panic: Command failed
+ v hash: f6358ec
+    pid: 0x16de2
+    tid: 0x16de2
+0   dyld                                0x00000001802ebe00 start + 6992
