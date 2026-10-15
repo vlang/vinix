@@ -74,6 +74,10 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 			&& xsave_edx & ((u32(1) << 24) | u32(1)) == ((u32(1) << 24) | u32(1))
 			&& xsaves_available && xsaves_eax & (u32(1) << 3) != 0
 		cpu_local.linuxkpi_la57_active = cpu.read_cr4() & (u64(1) << 12) != 0
+		cpu_local.linuxkpi_l1tf_sample = cpu.linuxkpi_sample_l1tf()
+		if cpu_local.linuxkpi_l1tf_sample == 0 {
+			panic('Linux CPU L1TF sample unavailable')
+		}
 	}
 
 	C.kprintf(c'smp: CPU %llu online!\n', u64(cpu_local.cpu_number))

@@ -80,6 +80,8 @@ int vinix_linuxkpi_worker_native_selftest(void);
 int vinix_linuxkpi_delayed_work_native_selftest(void);
 void vinix_linuxkpi_refcount_warning(int kind);
 bool vinix_linuxkpi_cpu_has(unsigned int feature);
+/* The bounded bug query uses the actual bootstrap CPU's immutable policy. */
+bool vinix_linuxkpi_boot_cpu_has_bug(unsigned int bug);
 /* Native LP64 bridge; the public Linux cycle result is unsigned long long. */
 uint64_t vinix_linuxkpi_raw_tsc(void);
 void vinix_linuxkpi_fpu_begin(void);

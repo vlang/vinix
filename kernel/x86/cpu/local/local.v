@@ -101,6 +101,9 @@ pub mut:
 	// records this CPU's installed CR4 mode rather than a capability bit.
 	linuxkpi_shstk_supported bool
 	linuxkpi_la57_active     bool
+	// Zero is unresolved, one observed unaffected, two observed affected.
+	// Only the owning CPU writes this, before its online acknowledgement.
+	linuxkpi_l1tf_sample u32
 }
 
 __global (

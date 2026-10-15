@@ -470,6 +470,7 @@ pub fn initialise() {
 	$if linuxkpi ? {
 		initialise_cpu_features()
 		initialise_cpu_infrastructure_features()
+		initialise_cpu_bugs()
 		initialise_cpu_masks()
 		if !cpu_features_native_selftest() {
 			lib.kpanic(unsafe { nil }, c'Linux CPU feature policy self-test failed')
@@ -584,6 +585,10 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Native i915 software fence self-test failed')
 		}
 		C.kprintf(c'linuxkpi: unchanged i915 software fences, dependency graphs, DMA timeouts and reservation waits passed; no pages or heap objects retained\n')
+		if !cpu_bugs_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Native CPU bug query self-test failed')
+		}
+		C.kprintf(c'linuxkpi: original boot CPU L1TF classification, actual CPU samples and query lifetimes passed; no pages or heap objects retained\n')
 		if !work_irq_native_selftest() {
 			lib.kpanic(unsafe { nil }, c'Native workqueue IRQ identity self-test failed')
 		}

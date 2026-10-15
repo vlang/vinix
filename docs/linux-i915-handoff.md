@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-15 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Latest software-fence build baseline: **`59b1e9ac5`**, with nine frozen production/tool paths described below. Recheck HEAD and the worktree before
+Latest CPU-bug build baseline: **`156ef022a`**, with fifteen frozen production/tool paths described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -81,9 +81,10 @@ global fault-lease rewrite was not applied.
 
 Ordinary RCU, deferred page-backed frees, native IRQ work and the DMA-fence
 synchronization core are implemented and validated. The latest normal/SSE/
-four-level guests now pass 52 markers and 34 strict allocation equalities.
+four-level guests now pass 53 markers and 35 strict allocation equalities.
 Fence containers, reservation ownership and unchanged i915 software fences are
-implemented and validated. Continue through the remaining task/MM, device,
+implemented and validated. Original boot-CPU L1TF queries are also implemented
+and validated, with native positive-MSR execution still pending. Continue through the remaining task/MM, device,
 memory and DRM services; complete i915 support is still pending.
 
 ## Committed progress
@@ -2499,3 +2500,66 @@ page/SG/DMA ownership, mapping pinning/invalidation and MMIO/PCI services.
 Adding placeholder task fields or constant CPU-bug answers is not an
 implementation. Device binding, full driver/core compile/link, confirmed PCI
 identity and physical Tiger Lake validation remain pending.
+
+
+## Original boot-CPU L1TF query (2026-10-15)
+
+Continue from the implemented original BSP-only L1TF observation, not a constant
+answer or all-CPU union. Only `X86_BUG_L1TF` (722) is accepted. Actual IRQ-off
+sampling precedes CPU online publication; advertised ARCH_CAPABILITIES uses the
+native fault-safe MSR helper. Every boot record is validated, then CPU zero is
+published once. Unknown/early/duplicate/unresolved cases fail explicitly. The
+complete pinned whitelist, full-family model decode and original u8 family
+storage are preserved. AP observations are not a migration-immunity guarantee.
+
+Fresh isolated baseline `156ef022a` plus 15 frozen production/tool paths:
+`cpu-bug-native-freeze-v1.json`, SHA256
+`0d10f6dd3dd869c5cbe8629bcf9d8213e0e407f5a5d1ffa0260620f0cf16bbd1`.
+Enabled ELF SHA256:
+`82c7c231a7ed58d4acd91c332edbbc07ba2a71b7c367e4094ed8384e4b34d8d4`.
+Enabled/default x86 and default ARM builds pass. Seven enabled guests each pass
+53 markers/35 exact PMM and live-heap rows; default startup passes. Three full
+CPU-bug warmups precede the measured fourth lifecycle, including all three
+actors' actual sleep, query and off-stack retirement. Actual witnesses cover
+AMD, affected Intel60 and exempt Goldmont92, plus observed Tiger Lake140 without
+ARCH_CAPABILITIES. Requested RDCL0/RDCL1 properties are masked by TCG; both strict
+requested-profile gates reject those intended branches. Native positive-MSR
+execution remains pending. Preserve this limitation when reporting evidence.
+
+Host six GNU99/GNU11 O0/O1/O2 sanitizer profiles each pass 3,460,560 classifier,
+57,600 sampler and 2,380 fatal cases with eight concurrent readers; 54 exact V
+bodies, six exact production bodies and six allocator-free import inventories.
+`cpu-bug-host-final-v1/result.json` SHA256:
+`9ba0ef6c75160fede6d8caf1a02fd3790d10873f622bbb68d54c349229782fe1`;
+host-four-path manifest SHA256:
+`0807141f24014c8a6c19411b6347fe35d4aaa1c6c0f29d12d556e3860b43d994`.
+Independent source review:
+`cpu-bug-independent-source-oct15-v1/review.json`, SHA256
+`129be35c1ed76674d5d994255fad9b44984295ca7fa2bfdb902e93f1c03a245d`.
+Independent actual native C/O2 review:
+`cpu-bug-independent-x86-oct15-v2/review.json`, SHA256
+`bc14c730b2ea0c6599f772fe8c70fef9c45cd5f62d65d6dde3cbe1d5528f930c`.
+Independent host lifetime review SHA256:
+`aacf281d9914d9950290994881f57514be23845e2c9571e163fd0ae582215714`.
+Independent eight-ISO/guest review SHA256:
+`3a03fbc38da99c97a328a178dbe191ad3e01a216618dc61afe4c35fca48ee366`.
+Root eight-guest/ISO/chronology proof map SHA256:
+`fec44da496ab3a0820f828643f44a113d8a6ed69b15bb65a35996c3e01bd46e7`.
+Independent requested-MSR coverage rejection review SHA256:
+`355fc603c5072eb76bab75dcbdd76bfb8a003bf74ce39e6957946017c66a2495`.
+Default C retains dormant backend functions; initialization/sampling/native
+fixture and final public-query ELF export are absent. ARM excludes x86 code.
+
+All evidence is durable below
+`/Users/alex/.cache/vinix-linuxkpi/smp-oct10/cpu-bug-*`; private build worktrees
+are below `/Volumes/HommV66Scratch/vinix-linuxkpi-cpubug-oct15-156ef022a`.
+The last four RAM guest states also have verified durable copies, with source
+states retained. The final audit remains 6/269 and checks 8,042 input/generated/
+dependency paths, including 8,009 guarded inputs:
+`cpu-bug-independent-audit-oct15-v1/review.json`, SHA256
+`2d6069da4912e76f50150f94e8bc5f88a3316fec94e587f2b5acbae95fc19ec9`.
+Next: correct `slab_flags_t`'s original type-header ownership; real task/MM/vfork
+identity and lifetimes; sleep-preserving migration pins if providing those APIs.
+Five migration diagnostics are parsed PREEMPT_RT alternatives, not five executed
+i915 migration sites. Do not add placeholder task fields or claim Linux page,
+MMIO, PCI/DRM ownership from header closure. GPU completion is still pending.

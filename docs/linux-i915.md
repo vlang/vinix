@@ -120,6 +120,12 @@ after a filesystem failure. Mutable build inputs still require isolation.
   every CPU's CR4 and native paging geometry. SHSTK hardware does not supply CET task state or
   configured USER_SHSTK. These immutable queries allocate nothing and preserve
   IRQ/pin state; other unsupported words/bits fail explicitly.
+- `boot_cpu_has_bug(X86_BUG_L1TF)` publishes the original Linux bootstrap-CPU
+  meaning from real pre-online CPUID/MSR observations. Its exact-version
+  whitelist and RDCL_NO policy are implemented in V; AP observations validate
+  boot completion without changing the BSP result. Queries allocate nothing
+  and preserve caller state. Unsupported bug indices fail explicitly. This
+  observation supplies no L1TF mitigation or GPU mapping policy.
 - Raw x86 `rdtsc` uses the native volatile RDTSC instruction and preserves
   the original unsigned-long-long result type. The unchanged `get_cycles`
   header retains its feature/configuration guard. This supplies no ordered
@@ -2727,3 +2733,92 @@ build-support/run-v-tool.sh tests/linuxkpi/i915_sw_fence.v --keep-directory NEW_
 The complete i915 syntax audit remains **6/269**, with all 7,668 imported files
 unchanged. This executes a synchronization component; GPU device binding, full
 driver/core compile/link and physical Tiger Lake validation remain pending.
+
+
+## Original boot-CPU L1TF policy (2026-10-15)
+
+The V backend now implements `boot_cpu_has_bug(X86_BUG_L1TF)` using the pinned
+Linux 6.6.157 vulnerability whitelist and the original bug index 722. Actual
+boot initialization samples each CPU with interrupts disabled before its online
+acknowledgement. Missing CPUID leaves or a faulted advertised ARCH_CAPABILITIES
+read fail initialization. An IRQ-enabled sampler returns unresolved before any
+probe. Only advertised leaf-7 EDX bit 29 permits fault-safe MSR 0x10a reads,
+including on vendors otherwise exempt from L1TF. Unknown bug indices, early
+queries, duplicate initialization and incomplete boot membership fail explicitly.
+
+The published answer means the bootstrap CPU, as in the original forced bug
+policy. Logical CPU zero is the native BSP; AP records validate boot completion
+without forming an all-CPU vulnerability union. Immutable publication has boot
+lifetime; queries borrow no task or CPU and perform no CPUID/MSR access. The
+classifier preserves original first-match exemptions, decoded model behavior
+and the original u8 family storage, including synthetic extended-family aliases.
+Tiger Lake model identity alone is not an L1TF exemption: RDCL_NO is relevant.
+This implements vulnerability observation, without supplying mitigations or GPU
+mapping services.
+
+Six GNU99/GNU11 O0/O1/O2 ASan/UBSan host profiles each pass 3,460,560 classifier
+cases, 57,600 sampler cases, 2,380 fatal controls and eight concurrent readers.
+The independent archive oracle covers all 38 whitelist rows and 15 vendor
+inputs. All 54 selected generated bodies match exactly, including six production
+bodies checked against separately compiled freestanding objects. Those six
+objects have strict import inventories without allocator imports. CPUID, IRQ,
+MSR, atomic, boot-record and fatal transports are explicitly modeled; host tests
+do not prove actual native MSR execution.
+
+Enabled/default x86-64 and default ARM64 build successfully. Seven enabled
+four-CPU guests use one saved ELF and each pass 53 required markers and 35 strict
+page/live-heap equality rows. Three complete CPU-bug warmups precede the measured
+fourth lifecycle. Three retained actors visit every CPU, yield, sleep for 100
+ticks with observed off-queue state, execute repeated original-macro queries,
+and join off stack before measurement. The default guest passes Linux ABI
+startup without compatibility markers. ARM evidence is build/artifact only.
+
+Actual vendor/signature/leaf-7/MSR/sample/query telemetry verifies unaffected AMD,
+affected Intel model 60 and exempt Goldmont model 92. Both requested Tiger Lake
+model-140 RDCL_NO configurations actually expose no ARCH_CAPABILITIES under TCG:
+QEMU reports four unsupported-bit warnings and masks bit 29. Both therefore
+observe sample 2/query 1 without an MSR read. Strict requested-profile validators
+reject both intended MSR branches; separate observed-profile checks pass. Native
+positive-MSR and RDCL_NO execution remain pending. No requested QEMU property is
+counted as an observed capability.
+
+Independent source/lifetime, actual generated-C/O2, host and guest/ISO reviews
+pass. The valid paths retain sampler Options, actor owners and heap snapshots
+on stack. Invalid checked-index diagnostics may allocate outside validated
+membership and are not included in the allocation-free valid-path claim. Default
+x86 C includes dormant backend bodies, while startup sampling, initialization,
+fixture execution and the final public-query ELF export are absent. ARM excludes
+the x86 implementation.
+
+The isolated build baseline is `156ef022a` plus fifteen frozen production/tool
+paths. `cpu-bug-native-freeze-v1.json` SHA256:
+`0d10f6dd3dd869c5cbe8629bcf9d8213e0e407f5a5d1ffa0260620f0cf16bbd1`.
+Enabled ELF:
+`82c7c231a7ed58d4acd91c332edbbc07ba2a71b7c367e4094ed8384e4b34d8d4`.
+Host `cpu-bug-host-final-v1/result.json` SHA256:
+`9ba0ef6c75160fede6d8caf1a02fd3790d10873f622bbb68d54c349229782fe1`.
+Independent native C/O2 review SHA256:
+`bc14c730b2ea0c6599f772fe8c70fef9c45cd5f62d65d6dde3cbe1d5528f930c`.
+Independent host review SHA256:
+`aacf281d9914d9950290994881f57514be23845e2c9571e163fd0ae582215714`.
+Independent eight-ISO/guest review SHA256:
+`3a03fbc38da99c97a328a178dbe191ad3e01a216618dc61afe4c35fca48ee366`.
+Root eight-guest proof manifest `cpu-bug-final-guests-v2.json` SHA256:
+`fec44da496ab3a0820f828643f44a113d8a6ed69b15bb65a35996c3e01bd46e7`.
+It includes two requested-MSR rejection controls; 37 synthetic/known-failure
+validator controls are parsing evidence only. Evidence remains under
+`/Users/alex/.cache/vinix-linuxkpi/smp-oct10/cpu-bug-*`. Repeat host tests with:
+
+```sh
+build-support/run-v-tool.sh tests/linuxkpi/cpu_bugs.v --keep-dir NEW_DIRECTORY
+```
+
+The fresh complete i915 syntax audit remains **6/269**, with all 7,668 imported
+files unchanged and 8,042 input/generated/dependency paths checked, including
+8,009 guarded inputs. The 33 former CPU-bug first
+errors now advance to real dependencies. Remaining first-error groups include
+229 task/MM/vfork ownership, 25 `slab_flags_t` include ownership and five
+`migrate_disable` declarations in a parsed PREEMPT_RT alternative. The configured
+atomic I/O mapping path uses preemption pins; declaring migration APIs alone
+would not implement I/O mapping. Full driver/core compile/link, device binding,
+confirmed PCI identity and physical Tiger Lake validation remain pending.

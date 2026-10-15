@@ -39,4 +39,5 @@
 	(__builtin_constant_p(bit) && DISABLED_MASK_BIT_SET(bit) ? 0 : static_cpu_has(bit))
 #define boot_cpu_has(feature) vinix_linuxkpi_cpu_has(feature)
 #define static_cpu_has(feature) vinix_linuxkpi_cpu_has(feature)
+#define boot_cpu_has_bug(bug) vinix_linuxkpi_boot_cpu_has_bug(bug)
 #endif
