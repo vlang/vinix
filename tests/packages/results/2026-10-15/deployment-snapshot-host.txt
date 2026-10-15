@@ -1,0 +1,17 @@
+16 successful host compile/run checks:
+PASS deployment_snapshot-core-compile
+PASS deployment_snapshot-core-run
+PASS deployment-regressions-compile
+PASS deployment-regressions-run
+PASS review-regressions-compile
+PASS review-regressions-run
+PASS service-regressions-compile
+PASS service-regressions-run
+PASS deployment_snapshot-asan-compile
+PASS deployment_snapshot-asan-run
+PASS cli-compile
+PASS probe-compile
+PASS probe-run
+PASS cli-asan-compile
+PASS probe-asan-compile
+PASS public-asan-run

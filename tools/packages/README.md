@@ -119,6 +119,13 @@ Read [administration/recovery](../../docs/application-distribution.md) and
 [SDK 1](SDK.md) for enrollment, policy, packaging and limits. Release publisher
 enrollment and catalog/runtime guest qualification remain required.
 
+`deployment-snapshot [INSTALLED_ID...]` exports exact installed app/runtime/data
+metadata as an existing format-2 deployment lock, including when catalogs are
+unavailable or a publisher was revoked. It preserves installed versions instead
+of selecting replacements. Applying the document still requires authenticated
+repository metadata and current policy approval; it contains no payloads or
+trust enrollment. See [qualification](../../tests/packages/deployment-snapshot-check.md).
+
 Configuration reads reject ambiguous keys, null values and incorrect field
 types while preserving legacy defaults for omitted fields. Policy typos fail
 before acquisition, cleanup or activation; correcting the configuration permits

@@ -1783,6 +1783,28 @@ whose signed sequence must meet the lock floor and persistent replay history.
 The regular resolver still checks policy, installed publisher ownership, version
 ranges, runtime entrypoints and full closure; unused/missing records fail.
 
+`deployment-snapshot [INSTALLED_ID...]` emits the same format-2 document from
+installed metadata alone. Without IDs it records every explicitly installed
+root; explicit IDs select installed roots and their complete transitive
+dependency/runtime closure. Missing, invalid or duplicate IDs fail. Roots and
+records are sorted; versions, architecture, publisher identity, original sequence
+floor and canonical manifest digest come directly from the captured generation.
+It cannot substitute newer catalog versions. The reader lock protects the
+snapshot, and a fresh empty system returns an empty document without creating
+package state. It requires no repository, catalog, cached object or replay-history
+access and remains available after publisher revocation or a policy change.
+
+This exports historical metadata, rather than backup payloads or evidence that
+the recorded apps are healthy or currently authorized. Deployment review/apply
+and offline mirror export still require the exact manifests in an authenticated
+catalog, current publisher keys, replay floors and policy admission. If a version
+has been withdrawn, restore it in approved repository media before deployment.
+Snapshotting does not enroll a key, accept a license or bypass an expired index.
+Use `Service.snapshot_deployment(names)` from V. Both this method and
+`Service.lock_deployment(names)` return independently owned `DeploymentLock`
+fields; `.close()` retires the returned document. See
+[installed snapshot qualification](../../tests/packages/deployment-snapshot-check.md).
+
 `deployment-review FILE` emits the existing format-1 `pkgprotocol.Review`, with
 operation `deploy`, complete target/removal rows and disk requirements. Its opaque
 fingerprint binds a deployment-specific domain, canonical document, configuration,

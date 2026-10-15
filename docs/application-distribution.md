@@ -682,6 +682,20 @@ Software explains the new generation and undo behavior before confirmation and
 shows the restore source in Details. See
 [qualification](../tests/packages/rollback-check.md).
 
+For organization rollout or recovery records, `deployment-snapshot [INSTALLED_ID...]`
+exports an existing format-2 deployment lock from the installed generation.
+Omitting IDs records the requested application set; explicit IDs select only
+those installed packages and their transitive runtime/data dependencies. Versions,
+manifest digests, publisher identities and sequence floors remain exact even when
+the current catalog has withdrawn a version or cannot be read. The command is
+read-only and does not initialize an empty store.
+
+The exported metadata supplies neither payloads nor trust. To reproduce it on
+another system, provide approved repositories containing the exact manifests,
+then use the existing reviewed deployment flow. Current signatures, replay
+history, policy, permissions, licenses and firmware admission still apply. See
+[qualification](../tests/packages/deployment-snapshot-check.md).
+
 Software’s **Clean up versions** opens a read-only, paged review of obsolete
 generation IDs, with the architecture and current/rollback identities. Confirming
 **Delete listed versions** uses administrator authorization and deletes only that

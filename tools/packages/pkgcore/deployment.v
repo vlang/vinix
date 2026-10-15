@@ -163,20 +163,19 @@ fn deployment_fingerprint(config Config, current State, document DeploymentLock,
 // installed versions. Explicit IDs replace that root set rather than extend it.
 pub fn (service Service) lock_deployment(names []string) !DeploymentLock {
 	directory := service.directory()!
+	defer { unsafe { directory.free() } }
 	guard := acquire_reader(directory)!
 	defer { guard.release() }
 	config := service.configuration()!
+	defer { close_decoded_configuration(config) }
 	current := read_state(directory, config.architecture)!
+	defer { if current.generation != 0 { close_decoded_state(current) } }
 	roots := if names.len == 0 { current.requested } else { names }
-	plan := resolve(load_catalog(config, directory)!, config, current, roots, false)!
-	mut locked := []DeploymentPackage{cap: plan.packages.len}
-	for installed in plan.packages {
-		p := installed.package
-		locked << DeploymentPackage{ id: p.id, version: p.version, architecture: p.architecture,
-			repository: installed.repository, public_key: installed.public_key,
-			minimum_sequence: installed.sequence, metadata_sha256: package_metadata_digest(p)! }
-	}
-	return DeploymentLock{ architecture: config.architecture, packages: plan.requested, locked: locked }
+	catalog := load_catalog(config, directory)!
+	defer { close_authenticated_catalog(catalog) }
+	plan := resolve(catalog, config, current, roots, false)!
+	defer { unsafe { (&array(&plan.requested)).free(); (&array(&plan.packages)).free() } }
+	return owned_deployment_lock(config.architecture, plan)
 }
 
 pub fn (service Service) review_deployment(path string) !pkgprotocol.Review {

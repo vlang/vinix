@@ -24,7 +24,8 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  repo-apply REVIEW_FINGERPRINT enroll ID URL KEY | repo-apply REVIEW_FINGERPRINT revoke ID\n' +
 	'  apply REVIEW_FINGERPRINT OPERATION [ID...]\n' +
 	'  policy | policy-review POLICY.json | policy-apply REVIEW_FINGERPRINT POLICY.json\n' +
-	'  deployment-lock [ID...] | deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE\n' +
+	'  deployment-lock [ID...] | deployment-snapshot [INSTALLED_ID...]\n' +
+	'  deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE\n' +
 	'  run ID [ABSOLUTE_FILE...] | data-list | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  mirror-review NEW_DIRECTORY ID... | mirror-apply REVIEW_FINGERPRINT NEW_DIRECTORY ID...\n' +
 	'  mirror-deployment-review NEW_DIRECTORY LOCK.json | mirror-deployment-apply REVIEW_FINGERPRINT NEW_DIRECTORY LOCK.json\n' +
@@ -167,10 +168,15 @@ fn checked(arguments []string) !int {
 	service := pkgcore.Service{ root: root, offline: offline,
 		progress: if progress && command == 'health' { print_health_progress } else if progress { print_progress } else { ignore_progress } }
 	match command {
-		'deployment-lock', 'deployment-review' {
+		'deployment-lock', 'deployment-snapshot', 'deployment-review' {
 			if command == 'deployment-review' && names.len != 1 { return error('deployment-review requires a deployment document') }
 			text := if command == 'deployment-lock' {
 				json2.encode(service.lock_deployment(names)!)
+			} else if command == 'deployment-snapshot' {
+				mut document := service.snapshot_deployment(names)!
+				encoded := json2.encode(document)
+				document.close()
+				encoded
 			} else {
 				json2.encode(service.review_deployment(names[0])!)
 			}

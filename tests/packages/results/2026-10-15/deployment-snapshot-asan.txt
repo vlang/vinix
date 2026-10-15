@@ -1,0 +1,9 @@
+ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1
+-cflags "-fsanitize=address,undefined -fno-omit-frame-pointer" -ldflags "-fsanitize=address,undefined"
+Core plus signed workflow using instrumented CLI and probe; no whole-service leak claim.
+
+DEPLOYMENT SNAPSHOT exact sorted roots, shared runtime/all-data closure, metadata/provenance/sequence pins, offline revoked policy independence and no mutation on both architectures PASS
+DEPLOYMENT SNAPSHOT independently owned closeable documents and invalid/duplicate/missing/excess roots refusal PASS
+DEPLOYMENT SNAPSHOT fresh empty read without initialization, writer exclusion and malformed state refusal PASS
+
+DEPLOYMENT SNAPSHOT CLI preserves withdrawn installed app/runtime/all-data pins offline with revoked policy, refuses missing roots and unauthenticated apply, and reproduces exact versions from newly authenticated media PASS
