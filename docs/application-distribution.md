@@ -458,6 +458,15 @@ vinix-package verify
 vinix-package gc
 ```
 
+When an installed dependency blocks uninstall, the refusal identifies one
+requested package that would still need the target, including indirect/shared
+dependencies and cycles. Implicit dependencies
+retain the explicit-root removal rule. Names included in a batch removal are
+excluded from the retained-root explanation. Guidance uses installed state and
+works offline, after publisher revocation, or with unavailable catalog/history
+metadata; it does not authorize removing a required package. See
+[removal guidance qualification](../tests/packages/removal-guidance-check.md).
+
 Command-line applications can receive literal flags through
 `vinix-package run-args ID [--file ABSOLUTE_FILE]... -- ARGUMENT...`.
 `run-terminal-args` uses the same syntax in a terminal. Package-declared arguments

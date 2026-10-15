@@ -2342,6 +2342,13 @@ include the complete next generation, missing cached objects and metadata.
 Removal uses installed provenance and remains available after publisher expiry
 or revocation; rollback verifies retained payloads and current trust/policy.
 
+Blocked dependency removals name one retained requested package that needs the
+target, including transitive dependencies and cycles. Batch names are excluded
+from the retained roots. Implicit dependencies still cannot be removed directly;
+review removal of the requested applications first. Guidance reads installed
+state without authenticating a catalog or fetching metadata. See
+[removal guidance checks](../../tests/packages/removal-guidance-check.md).
+
 Rollback restores the source's exact manifests, provenance and requested roots
 in a fresh generation, with `previous` pointing to the set it replaced. It copies
 verified retained files without downloads or cache access, rebuilds registration,

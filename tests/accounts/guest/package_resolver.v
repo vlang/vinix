@@ -66,4 +66,5 @@ fn qualify_package_resolver(mut t Test, architecture string) ! {
 	assert plan.packages.len == 22 && plan.packages.filter(it.package.id == 'base')[0].package.version == '2.0.0'
 	unsafe { (&array(&plan.requested)).free(); (&array(&plan.packages)).free() }
 	t.say('PACKAGE RESOLVER installed-preference single-choice late-version-backtracking PASS')
+	qualify_package_removal_guidance(mut t)!
 }

@@ -522,6 +522,67 @@ fn qualify_install_preference(binary string, directory string) ! {
 	println('Package CLI: signed offline install backtracks past 20 unrelated installed identities; exact installed preference, missing-requirement refusal, reviewed activation and rollback pass on both targets PASS')
 }
 
+fn qualify_removal_guidance(binary string, directory string) ! {
+	os.mkdir_all(directory + '/payload/data')!
+	os.write_file(directory + '/payload/data/value', 'Synthetic dependency-removal payload')!
+	key := success(binary, ['keygen', directory + '/seed'])!.trim_space()
+	repository := directory + '/repository'
+	for id in ['editor', 'bridge', 'shared']! {
+		manifest := pkgcore.Package{id: id, name: id, version: '1.0.0', architecture: 'all', kind: 'data', license: 'MIT',
+			dependencies: if id == 'editor' { [pkgcore.Dependency{id: 'bridge'}] } else if id == 'bridge' { [pkgcore.Dependency{id: 'shared'}] } else { []pkgcore.Dependency{} }}
+		os.write_file(directory + '/manifest.json', json2.encode(manifest))!
+		success(binary, ['pack', directory + '/manifest.json', directory + '/payload', repository])!
+	}
+	success(binary, ['publish', repository, 'fixture', directory + '/seed', '1', (time.now().unix() + 3600).str()])!
+	for architecture in ['aarch64', 'x86_64']! {
+		root := directory + '/' + architecture
+		os.mkdir_all(root + '/etc/vinix-packages')!
+		config := pkgcore.Config{architecture: architecture, repositories: [pkgcore.Repository{id: 'fixture', url: 'file://' + repository, public_key: key}], policy: pkgcore.Policy{offline: true, reserve_bytes: 0}}
+		os.write_file(root + '/etc/vinix-packages/config.json', json2.encode(config))!
+		success(binary, ['--root', root, 'update'])!
+		success(binary, ['--root', root, 'install', 'editor', 'shared'])!
+	}
+	os.rmdir_all(repository)!
+	for architecture in ['aarch64', 'x86_64']! {
+		root := directory + '/' + architecture
+		store := pkgcore.state_directory(root)
+		for revoked in [false, true]! {
+			if revoked {
+				mut review := pkgprotocol.decode_repository_review(success(binary, ['--root', root, 'repo-review', 'revoke', 'fixture'])!)!
+				success(binary, ['--root', root, 'repo-apply', review.fingerprint, 'revoke', 'fixture'])!
+				review.close()
+				os.write_file(store + '/catalog.json', '{unavailable catalog')!
+				os.write_file(store + '/trust-history.json', '{unavailable history')!
+			}
+			before := os.readlink(store + '/current')!
+			state := os.read_file(store + '/' + before + '/state.json')!
+			catalog := os.read_file(store + '/catalog.json')!; history := os.read_file(store + '/trust-history.json')!
+			config := os.read_file(root + '/etc/vinix-packages/config.json')!
+			generations := os.ls(store + '/generations')!.sorted()
+			for id in ['shared', 'bridge']! {
+				for operation in [['plan', 'remove', id], ['review', 'remove', id], ['remove', id]] {
+					reply := command(binary, ['--root', root, ...operation])!
+					assert reply.code == 1 && reply.text.contains('required by requested package editor'), reply.text
+					assert reply.text.contains(if id == 'shared' { 'cannot remove shared' } else { 'bridge is not explicitly installed' }), reply.text
+					assert os.readlink(store + '/current')! == before && os.read_file(store + '/' + before + '/state.json')! == state
+					assert os.read_file(store + '/catalog.json')! == catalog && os.read_file(store + '/trust-history.json')! == history
+					assert os.read_file(root + '/etc/vinix-packages/config.json')! == config && os.ls(store + '/generations')!.sorted() == generations
+				}
+			}
+		}
+		for object in os.ls(store + '/objects')! { os.rm(store + '/objects/' + object)! }
+		mut review := pkgprotocol.decode_review(success(binary, ['--root', root, '--json', 'review', 'remove', 'editor'])!)!
+		success(binary, ['--root', root, 'apply', review.fingerprint, 'remove', 'editor'])!
+		review.close()
+		state := pkgcore.read_state(store, architecture)!
+		assert state.generation == 2 && state.requested == ['shared'] && state.packages.len == 1
+		assert state.packages[0].package.id == 'shared'
+		success(binary, ['--root', root, 'remove', 'shared'])!
+		assert pkgcore.read_state(store, architecture)!.packages.len == 0
+	}
+	println('Package CLI: explicit and implicit removal refusals name a retained requested package on both targets; offline/revoked/damaged-cache refusals preserve state and reviewed dependent removal remains available PASS')
+}
+
 fn qualify(binary string) ! {
 	work := os.real_path(os.temp_dir()) + '/vinix-package-cli-' + os.getpid().str()
 	os.mkdir_all(work + '/root/etc/vinix-packages')!
@@ -530,6 +591,7 @@ fn qualify(binary string) ! {
 	qualify_catalog_cli(binary, work)!
 	qualify_resolver_diagnostics(binary, work + '/resolver-diagnostics')!
 	qualify_install_preference(binary, work + '/install-preference')!
+	qualify_removal_guidance(binary, work + '/removal-guidance')!
 	key := success(binary, ['keygen', work + '/seed'])!.trim_space()
 	assert key.len == 64
 	assert os.stat(work + '/seed')!.mode & 0o777 == 0o600

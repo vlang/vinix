@@ -1,0 +1,4 @@
+All assertions passed in eleven package-core runners: removal, resolve_preference, resolve_search, distribution, release, review, deployment, catalog, composition, policy and service.
+Removal guidance/root ownership and existing resolver preference/oracle/graph-limit assertions passed.
+Removal guidance: transitive/shared/cyclic and batched roots, chain-4096 and dense-512 retain an actual requested blocker PASS
+Resolver preference: 32768 catalog variants and 4096 installed identities retain one choice each and stable fallback order PASS

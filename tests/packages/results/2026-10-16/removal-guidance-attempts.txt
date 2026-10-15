@@ -1,0 +1,20 @@
+Expected guidance regression and pre-change root-memory probe are retained in baseline.txt. Initial extended allocation runners saturated the 16384-record tracker and exited 133. Generated C showed implicit ID/license clones and temporary default permissions; final lists borrow input strings and retire their own buffers/policy scratch.
+
+initial-status.txt:
+The first tracked runner exited 133 before printing the final retained-byte count. The initial native and ASan phase drivers also recorded status 133. The 16384-record heap tracker saturated on retained string clones/default permissions; generated C and the pre-correction sources/binary are retained.
+
+initial-memory.txt:
+PASS resolve-memory-compile
+resolve-memory-run: status 133; see /Users/alex/code/vinix/build/package-removal-work/resolve-memory-run.txt
+
+initial-memory-first-run.txt:
+Removal guidance: transitive/shared/cyclic and batched roots, chain-4096 and dense-512 retain an actual requested blocker PASS
+
+initial-probes.txt:
+PASS removal-sanitize-compile
+removal-sanitize-run: status 133; see /Users/alex/code/vinix/build/package-removal-work/removal-sanitize-run.txt
+
+initial-removal-sanitize-run.txt:
+Removal guidance: transitive/shared/cyclic and batched roots, chain-4096 and dense-512 retain an actual requested blocker PASS
+
+Final native and sanitizer retained-byte checks pass. AArch64 uses the installed musl sysroot and a V GCC adapter for existing generated-C compatibility warnings.

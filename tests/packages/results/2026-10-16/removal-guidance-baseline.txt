@@ -1,0 +1,8 @@
+Pre-change 75c5a0ec9 source with the new implicit-removal assertion: expected refusal omits the retained requested package. The exact baseline module and compiler input are pinned in the ledger.
+
+/Users/alex/code/vinix/build/package-removal-work/baseline-source/removal_test.v:15: fn test_implicit_dependency_removal_names_the_retained_requested_package
+    assert message.contains('shared is not explicitly installed') && message.contains('required by requested package app'), message
+        Message: shared is not explicitly installed; remove its dependents instead
+
+Pre-change tracked root-planning probe:
+Baseline root planning: 100 success/refusal cycles retained 1320400 bytes

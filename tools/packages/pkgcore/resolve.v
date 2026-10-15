@@ -91,27 +91,37 @@ pub fn resolve(catalog Catalog, config Config, current State, requested []string
 }
 
 pub fn desired_roots(state State, operation string, names []string) ![]string {
-	mut roots := state.requested.clone()
+	// Returned arrays own their storage and borrow ID strings, like Plan roots.
+	mut roots := []string{}
 	match operation {
 		'install' {
 			if names.len == 0 { return error('install requires package IDs') }
-			for id in names { if id !in roots { roots << id } }
+			roots = state.requested.clone()
+			unsafe { roots.flags |= .noslices }
+			for id in names {
+				if id in roots { continue }
+				pointer := unsafe { &id }
+				unsafe { roots.push_many(pointer, 1) }
+			}
 		}
 		'remove' {
 			if names.len == 0 { return error('remove requires package IDs') }
 			for id in names {
-				if id !in roots {
+				if id !in state.requested {
+					if blocker := removal_blocker(state, names, id) {
+						return error('${id} is not explicitly installed; required by requested package ${blocker.root}; review removal of dependent applications first')
+					}
 					return error('${id} is not explicitly installed; remove its dependents instead')
 				}
 			}
-			roots = roots.filter(it !in names)
+			roots = state.requested.filter(it !in names)
 		}
 		'upgrade', 'deploy' {
 			if operation == 'deploy' {
 				roots = names.clone()
 			} else if names.len != 0 {
 				return error('upgrade updates the complete installed closure')
-			}
+			} else { roots = state.requested.clone() }
 		}
 		else { return error('unknown package operation: ${operation}') }
 	}

@@ -61,6 +61,7 @@ fn operation_plan(config Config, directory string, current State, operation stri
 		return Plan{ requested: current.requested, packages: current.packages }
 	}
 	roots := desired_roots(current, operation, names)!
+	defer { unsafe { (&array(&roots)).free() } }
 	// Uninstall remains available with expired/revoked publishers or tightened policy.
 	catalog := if operation == 'remove' {
 		Catalog{ packages: current.packages }
@@ -68,9 +69,14 @@ fn operation_plan(config Config, directory string, current State, operation stri
 		load_catalog(config, directory)!
 	}
 	mut licenses := []string{}
+	unsafe { licenses.flags |= .noslices }
+	defer { unsafe { (&array(&licenses)).free() } }
 	if operation == 'remove' {
 		for installed in current.packages {
-			if installed.package.license !in licenses { licenses << installed.package.license }
+			license := installed.package.license
+			if license in licenses { continue }
+			pointer := unsafe { &license }
+			unsafe { licenses.push_many(pointer, 1) }
 		}
 	}
 	resolution_config := if operation == 'remove' {
@@ -78,8 +84,13 @@ fn operation_plan(config Config, directory string, current State, operation stri
 	} else {
 		config
 	}
+	defer { if operation == 'remove' { unsafe { (&array(&resolution_config.policy.permissions)).free() } } }
 	plan := resolve(catalog, resolution_config, current, roots, operation in ['upgrade', 'deploy'])!
 	if operation == 'remove' && plan.packages.any(it.package.id in names) {
+		unsafe { (&array(&plan.requested)).free(); (&array(&plan.packages)).free() }
+		if blocker := removal_blocker(current, names, '') {
+			return error('cannot remove ${blocker.id}: still required by requested package ${blocker.root}; review removal of dependent applications first')
+		}
 		return error('cannot remove a package still required by another installed application')
 	}
 	return plan

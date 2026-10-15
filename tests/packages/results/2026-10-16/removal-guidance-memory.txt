@@ -1,0 +1,3 @@
+Native -gc none -manualfree -d track_heap
+Removal guidance: transitive/shared/cyclic and batched roots, chain-4096 and dense-512 retain an actual requested blocker PASS
+Removal guidance: 1000 root-planning install/remove/upgrade/deploy and removal-plan success/refusal cycles retain zero tracked bytes and preserve borrowed inputs PASS

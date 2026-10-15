@@ -75,6 +75,10 @@ fn check() ! {
 		run(work + '/resolver-preference-memory', [])!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
 			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/removal-memory', repository + '/tools/packages/pkgcore/removal_test.v'])!
+		run(work + '/removal-memory', [])!
+		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/diagnostics-memory', repository + '/tools/packages/pkgcore/view_test.v'])!
 		run(work + '/diagnostics-memory', [])!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
