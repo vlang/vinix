@@ -498,6 +498,29 @@ pub fn syscall_wait4(_ voidptr, pid_word u64, status_ptr u64, options_word u64, 
 	return u64(reaped), 0
 }
 
+// Linux also writes the six siginfo fields on waitid errors. Preserve padding
+// and the unused child payload, and let a copyout fault override that error.
+fn empty_waitid_result(infop u64, error u64) (u64, u64) {
+	if infop != 0 {
+		if !usercopy.user_range(infop, sizeof(SigInfoChld)) {
+			return errno.err, errno.efault
+		}
+		zero := u32(0)
+		for index in 0 .. 6 {
+			offset := u64(if index < 3 { index } else { index + 1 }) * 4
+			address := infop + offset
+			// A faulting field must not commit a split-page prefix. Resolve both
+			// ends before the synchronous store; no process/child borrow escapes.
+			if !usercopy.writable(address) || !usercopy.writable(address + 3)
+				|| !usercopy.copy_to_user(address, unsafe { voidptr(&zero) }, sizeof(u32)) {
+				return errno.err, errno.efault
+			}
+		}
+	}
+	if error != 0 { return errno.err, error }
+	return 0, 0
+}
+
 // waitid(idtype, id, infop, options, rusage).
 pub fn syscall_waitid(_ voidptr, idtype_word u64, id_word u64, infop u64, options_word u64, rusage_ptr u64) (u64, u64) {
 	idtype := int(i32(idtype_word))
@@ -508,7 +531,7 @@ pub fn syscall_waitid(_ voidptr, idtype_word u64, id_word u64, infop u64, option
 	// Linux requires an explicit set of child states to report.
 	if options & (wexited | wstopped | wcontinued) == 0
 		|| options & ~(wnohang | wexited | wstopped | wcontinued | wnowait) != 0 {
-		return errno.err, errno.einval
+		return empty_waitid_result(infop, errno.einval)
 	}
 
 	mut pid := 0
@@ -518,34 +541,24 @@ pub fn syscall_waitid(_ voidptr, idtype_word u64, id_word u64, infop u64, option
 		}
 		p_pid {
 			if id == 0 || id > u64(0x7fffffff) {
-				return errno.err, errno.einval
+				return empty_waitid_result(infop, errno.einval)
 			}
 			pid = int(id)
 		}
 		p_pgid {
 			if id > u64(0x7fffffff) {
-				return errno.err, errno.einval
+				return empty_waitid_result(infop, errno.einval)
 			}
 			pid = if id == 0 { 0 } else { -int(id) }
 		}
 		else {
-			return errno.err, errno.einval
+			return empty_waitid_result(infop, errno.einval)
 		}
 	}
 
 	change := take_child_change(mut current_process, pid, options)
 	if change.child == unsafe { nil } {
-		if change.err != 0 {
-			return errno.err, change.err
-		}
-		// WNOHANG with nothing to report: Linux signals that with si_pid == 0.
-		if infop != 0 {
-			info := SigInfoChld{}
-			if !usercopy.copy_to_user(infop, voidptr(&info), sizeof(SigInfoChld)) {
-				return errno.err, errno.efault
-			}
-		}
-		return 0, 0
+		return empty_waitid_result(infop, change.err)
 	}
 
 	child := change.child

@@ -1,0 +1,1 @@
+arm/x86: complete production C differs only in waitid and its added empty-result helper; fixed six-field output, full numeric range check, per-field endpoint resolution and ordered writes; successful child/event paths, locks, claims, pins and ownership unchanged; no added allocation/free/pin or compiler normalization

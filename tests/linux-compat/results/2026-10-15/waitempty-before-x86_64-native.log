@@ -1,0 +1,197 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=80888
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91000
+initramfs: Done (9 entries)
+LINUX WAITEMPTY TOPOLOGY: ordinary=0 namespace=0 uid=0 self=28889 pid=37045 group=37045 session=28889 page=4096
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=0 position=0 usage=0 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=0 position=0 usage=1 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=0 position=0 usage=2 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=1 position=0 usage=0 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=1 position=0 usage=1 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=1 position=0 usage=2 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=0 position=0 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=0 position=0 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=0 position=0 usage=2 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=1 position=0 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=1 position=0 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=1 position=0 usage=2 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=0 position=0 usage=0 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=0 position=0 usage=1 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=0 position=0 usage=2 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=1 position=0 usage=0 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=1 position=0 usage=1 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=1 position=0 usage=2 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=0 position=1 usage=0 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=0 position=1 usage=2 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=1 position=1 usage=0 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=1 position=1 usage=2 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=2 position=1 usage=0 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=2 position=1 usage=2 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY EXIT: ordinary=0 namespace=0 pid=37045 wait=CLD_EXITED status=37
+LINUX WAITEMPTY REAP: ordinary=0 namespace=0 pid=37045 status=37
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=0 position=1 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=0 position=1 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=1 position=1 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=1 position=1 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=2 position=1 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=2 position=1 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY CASES: ordinary=0 namespace=0 kind=0 calls=864 failures=864
+LINUX WAITEMPTY CASES: ordinary=0 namespace=0 kind=1 calls=288 failures=288
+LINUX WAITEMPTY CASES: ordinary=0 namespace=0 kind=2 calls=1152 failures=864
+LINUX WAITEMPTY CASES: ordinary=0 namespace=0 kind=3 calls=6912 failures=6720
+LINUX WAITEMPTY CASES: ordinary=0 namespace=0 kind=4 calls=288 failures=0
+LINUX WAITEMPTY CASES: ordinary=0 namespace=0 kind=5 calls=96 failures=48
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=0 kind=0 calls=864 failures=864
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=0 kind=1 calls=288 failures=288
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=0 kind=2 calls=1152 failures=864
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=0 kind=3 calls=6912 failures=6720
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=0 kind=4 calls=288 failures=0
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=0 kind=5 calls=96 failures=48
+LINUX WAITEMPTY TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=42023 pid=34917 group=34917 session=42023 page=4096
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=0 position=0 usage=0 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=0 position=0 usage=1 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=0 position=0 usage=2 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=1 position=0 usage=0 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=1 position=0 usage=1 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=1 position=0 usage=2 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=0 position=0 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=0 position=0 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=0 position=0 usage=2 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=1 position=0 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=1 position=0 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=1 position=0 usage=2 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=0 position=0 usage=0 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=0 position=0 usage=1 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=0 position=0 usage=2 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=1 position=0 usage=0 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=1 position=0 usage=1 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=1 position=0 usage=2 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=0 position=1 usage=0 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=0 position=1 usage=2 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=1 position=1 usage=0 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=1 position=1 usage=2 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=2 position=1 usage=0 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=2 position=1 usage=2 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY EXIT: ordinary=1 namespace=0 pid=34917 wait=CLD_EXITED status=37
+LINUX WAITEMPTY REAP: ordinary=1 namespace=0 pid=34917 status=37
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=0 position=1 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=0 position=1 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=1 position=1 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=1 position=1 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=2 position=1 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=2 position=1 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY CASES: ordinary=1 namespace=0 kind=0 calls=864 failures=864
+LINUX WAITEMPTY CASES: ordinary=1 namespace=0 kind=1 calls=288 failures=288
+LINUX WAITEMPTY CASES: ordinary=1 namespace=0 kind=2 calls=1152 failures=864
+LINUX WAITEMPTY CASES: ordinary=1 namespace=0 kind=3 calls=6912 failures=6720
+LINUX WAITEMPTY CASES: ordinary=1 namespace=0 kind=4 calls=288 failures=0
+LINUX WAITEMPTY CASES: ordinary=1 namespace=0 kind=5 calls=96 failures=48
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=0 kind=0 calls=864 failures=864
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=0 kind=1 calls=288 failures=288
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=0 kind=2 calls=1152 failures=864
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=0 kind=3 calls=6912 failures=6720
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=0 kind=4 calls=288 failures=0
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=0 kind=5 calls=96 failures=48
+LINUX WAITEMPTY TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 pid=3 group=3 session=2 page=4096
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=0 position=0 usage=0 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=0 position=0 usage=1 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=0 position=0 usage=2 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=1 position=0 usage=0 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=1 position=0 usage=1 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=1 position=0 usage=2 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=0 position=0 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=0 position=0 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=0 position=0 usage=2 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=1 position=0 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=1 position=0 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=1 position=0 usage=2 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=0 position=0 usage=0 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=0 position=0 usage=1 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=0 position=0 usage=2 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=1 position=0 usage=0 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=1 position=0 usage=1 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=1 position=0 usage=2 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=0 position=1 usage=0 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=0 position=1 usage=2 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=1 position=1 usage=0 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=1 position=1 usage=2 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=2 position=1 usage=0 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=2 position=1 usage=2 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY EXIT: ordinary=0 namespace=1 pid=3 wait=CLD_EXITED status=37
+LINUX WAITEMPTY REAP: ordinary=0 namespace=1 pid=3 status=37
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=0 position=1 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=0 position=1 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=1 position=1 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=1 position=1 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=2 position=1 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=2 position=1 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY CASES: ordinary=0 namespace=1 kind=0 calls=864 failures=864
+LINUX WAITEMPTY CASES: ordinary=0 namespace=1 kind=1 calls=288 failures=288
+LINUX WAITEMPTY CASES: ordinary=0 namespace=1 kind=2 calls=1152 failures=864
+LINUX WAITEMPTY CASES: ordinary=0 namespace=1 kind=3 calls=6912 failures=6720
+LINUX WAITEMPTY CASES: ordinary=0 namespace=1 kind=4 calls=288 failures=0
+LINUX WAITEMPTY CASES: ordinary=0 namespace=1 kind=5 calls=96 failures=48
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=1 kind=0 calls=864 failures=864
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=1 kind=1 calls=288 failures=288
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=1 kind=2 calls=1152 failures=864
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=1 kind=3 calls=6912 failures=6720
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=1 kind=4 calls=288 failures=0
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=1 kind=5 calls=96 failures=48
+LINUX WAITEMPTY TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 pid=3 group=3 session=2 page=4096
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=0 position=0 usage=0 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=0 position=0 usage=1 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=0 position=0 usage=2 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=1 position=0 usage=0 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=1 position=0 usage=1 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=1 query=0 form=1 position=0 usage=2 actual=0/0 expected_errno=0 bad_byte=28
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=0 position=0 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=0 position=0 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=0 position=0 usage=2 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=1 position=0 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=1 position=0 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=0 query=3 form=1 position=0 usage=2 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=0 position=0 usage=0 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=0 position=0 usage=1 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=0 position=0 usage=2 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=1 position=0 usage=0 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=1 position=0 usage=1 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=2 query=3 form=1 position=0 usage=2 actual=-1/10 expected_errno=14 bad_byte=-1
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=0 position=1 usage=0 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=0 position=1 usage=2 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=1 position=1 usage=0 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=1 position=1 usage=2 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=2 position=1 usage=0 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=3 query=0 form=2 position=1 usage=2 actual=-1/14 expected_errno=14 bad_byte=16
+LINUX WAITEMPTY EXIT: ordinary=1 namespace=1 pid=3 wait=CLD_EXITED status=37
+LINUX WAITEMPTY REAP: ordinary=1 namespace=1 pid=3 status=37
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=0 position=1 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=0 position=1 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=1 position=1 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=1 position=1 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=2 position=1 usage=0 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY DETAIL: kind=5 query=0 form=2 position=1 usage=1 actual=-1/10 expected_errno=10 bad_byte=16
+LINUX WAITEMPTY CASES: ordinary=1 namespace=1 kind=0 calls=864 failures=864
+LINUX WAITEMPTY CASES: ordinary=1 namespace=1 kind=1 calls=288 failures=288
+LINUX WAITEMPTY CASES: ordinary=1 namespace=1 kind=2 calls=1152 failures=864
+LINUX WAITEMPTY CASES: ordinary=1 namespace=1 kind=3 calls=6912 failures=6720
+LINUX WAITEMPTY CASES: ordinary=1 namespace=1 kind=4 calls=288 failures=0
+LINUX WAITEMPTY CASES: ordinary=1 namespace=1 kind=5 calls=96 failures=48
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=1 kind=0 calls=864 failures=864
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=1 kind=1 calls=288 failures=288
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=1 kind=2 calls=1152 failures=864
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=1 kind=3 calls=6912 failures=6720
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=1 kind=4 calls=288 failures=0
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=1 kind=5 calls=96 failures=48
+LINUX WAITEMPTY FAIL: waitid empty/error fields, padding, pointer faults or event controls
+QEMU: Terminated
+

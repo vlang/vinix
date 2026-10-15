@@ -1,0 +1,3 @@
+tests/linux-compat/waitempty-check.v:204: FAIL: fn main.failure: assert log.contains('LINUX WAITEMPTY DETAIL:'), 'waitempty baseline failure markers required'
+      message: waitempty baseline failure markers required
+V panic: Assertion failed...

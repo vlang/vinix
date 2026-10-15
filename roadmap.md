@@ -1001,6 +1001,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   in initial/one-level PID namespaces on both architectures, with flat storage.
   See [the wait ABI receipts](docs/linux-posix-qualification.md#native-wait-selectors-and-scalar-argument-words).
 
+- [x] Match native waitid empty/error siginfo writes, preserving padding/tail
+  and giving output EFAULT priority over selector errors. Qualify NULL/unused
+  pointers, mapped and split-field guard output, WNOWAIT/reaped controls as
+  root/UID1000 in initial/one-level PID namespaces on both architectures.
+  See [the empty/error output receipts](docs/linux-posix-qualification.md#native-waitid-empty-and-error-siginfo-output).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

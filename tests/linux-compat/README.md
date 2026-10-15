@@ -1711,5 +1711,17 @@ forms and genuine musl calls, plus four flat 200-cycle storage cohorts.
 `waitabi-check.v` without `-prod` and supply its evidence area to verify
 original failures, final native/reference results, whole-C scope, compiler/SDK/
 input pins, preserved failed exploratory copyout oracles and executing audit
-controls. Error siginfo copyout and consuming wait4 copy faults remain open.
+controls. Empty/error siginfo copyout has separate `waitempty` qualification;
+consuming wait4 copy faults remain open.
 See the [wait ABI report](../../docs/linux-posix-qualification.md#native-wait-selectors-and-scalar-argument-words).
+
+The `waitempty` case qualifies waitid no-event/error output: six cleared fields,
+preserved padding/tail, EFAULT priority, NULL and unused rusage, read-only and
+inaccessible pointers, every guard cut0..32 plus64/127/128, real WNOWAIT/reaped
+controls and flat storage. Four root/UID1000 initial/one-level PID namespace
+cohorts run 38,400 controls per architecture. `waitempty-reference.v` boots
+the unchanged native ELF on Linux. Compile `waitempty-check.v` without `-prod`
+and supply its evidence area to verify guest failures/results, whole-C scope,
+compiler/SDK/inventory pins, retained hidden-allocation compile refusals and
+executing audit controls. Successful-event output and consuming faults retain
+separate limits. See the [empty/error output report](../../docs/linux-posix-qualification.md#native-waitid-empty-and-error-siginfo-output).

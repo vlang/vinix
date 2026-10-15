@@ -1,0 +1,141 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=80336
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX WAITABI TOPOLOGY: ordinary=0 namespace=0 uid=0 self=60661 kind=0 pid=14660 group=14660 session=60661
+LINUX WAITABI TOPOLOGY: ordinary=0 namespace=0 uid=0 self=60661 kind=1 pid=63092 group=60661 session=60661
+LINUX WAITABI EXIT: ordinary=0 namespace=0 pid=14660 wait=CLD_EXITED status=37
+LINUX WAITABI SLAB: ordinary=0 namespace=0 size=16 live=1626/1626 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=0 size=32 live=2878/2878 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=0 size=48 live=332/332 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=0 size=64 live=162/162 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=0 size=96 live=21/21 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=0 size=128 live=19/19 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=0 size=192 live=377/377 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=0 size=256 live=786/786 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=0 size=384 live=550/550 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=0 size=512 live=496/496 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=0 size=768 live=16/16 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=0 size=1024 live=13/13 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=0 size=1536 live=18/18 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=0 size=2048 live=0/0 cycles=200
+LINUX WAITABI STORAGE: ordinary=0 namespace=0 cycles=200 big_pages=195/195 PASS
+LINUX WAITABI REAP: ordinary=0 namespace=0 pid=14660 status=37
+LINUX WAITABI CASES: ordinary=0 namespace=0 kind=0 calls=1152 failures=0
+LINUX WAITABI CASES: ordinary=0 namespace=0 kind=1 calls=576 failures=0
+LINUX WAITABI CASES: ordinary=0 namespace=0 kind=2 calls=8704 failures=0
+LINUX WAITABI CASES: ordinary=0 namespace=0 kind=3 calls=8704 failures=0
+LINUX WAITABI CASES: ordinary=0 namespace=0 kind=4 calls=8704 failures=0
+LINUX WAITABI CASES: ordinary=0 namespace=0 kind=5 calls=1728 failures=0
+LINUX WAITABI FINAL: ordinary=0 namespace=0 kind=0 calls=1152 failures=0
+LINUX WAITABI FINAL: ordinary=0 namespace=0 kind=1 calls=576 failures=0
+LINUX WAITABI FINAL: ordinary=0 namespace=0 kind=2 calls=8704 failures=0
+LINUX WAITABI FINAL: ordinary=0 namespace=0 kind=3 calls=8704 failures=0
+LINUX WAITABI FINAL: ordinary=0 namespace=0 kind=4 calls=8704 failures=0
+LINUX WAITABI FINAL: ordinary=0 namespace=0 kind=5 calls=1728 failures=0
+LINUX WAITABI TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=62995 kind=0 pid=44905 group=44905 session=62995
+LINUX WAITABI TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=62995 kind=1 pid=59263 group=62995 session=62995
+LINUX WAITABI EXIT: ordinary=1 namespace=0 pid=44905 wait=CLD_EXITED status=37
+LINUX WAITABI SLAB: ordinary=1 namespace=0 size=16 live=1626/1626 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=0 size=32 live=2878/2878 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=0 size=48 live=332/332 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=0 size=64 live=162/162 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=0 size=96 live=21/21 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=0 size=128 live=19/19 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=0 size=192 live=377/377 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=0 size=256 live=786/786 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=0 size=384 live=550/550 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=0 size=512 live=496/496 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=0 size=768 live=16/16 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=0 size=1024 live=13/13 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=0 size=1536 live=18/18 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=0 size=2048 live=0/0 cycles=200
+LINUX WAITABI STORAGE: ordinary=1 namespace=0 cycles=200 big_pages=195/195 PASS
+LINUX WAITABI REAP: ordinary=1 namespace=0 pid=44905 status=37
+LINUX WAITABI CASES: ordinary=1 namespace=0 kind=0 calls=1152 failures=0
+LINUX WAITABI CASES: ordinary=1 namespace=0 kind=1 calls=576 failures=0
+LINUX WAITABI CASES: ordinary=1 namespace=0 kind=2 calls=8704 failures=0
+LINUX WAITABI CASES: ordinary=1 namespace=0 kind=3 calls=8704 failures=0
+LINUX WAITABI CASES: ordinary=1 namespace=0 kind=4 calls=8704 failures=0
+LINUX WAITABI CASES: ordinary=1 namespace=0 kind=5 calls=1728 failures=0
+LINUX WAITABI FINAL: ordinary=1 namespace=0 kind=0 calls=1152 failures=0
+LINUX WAITABI FINAL: ordinary=1 namespace=0 kind=1 calls=576 failures=0
+LINUX WAITABI FINAL: ordinary=1 namespace=0 kind=2 calls=8704 failures=0
+LINUX WAITABI FINAL: ordinary=1 namespace=0 kind=3 calls=8704 failures=0
+LINUX WAITABI FINAL: ordinary=1 namespace=0 kind=4 calls=8704 failures=0
+LINUX WAITABI FINAL: ordinary=1 namespace=0 kind=5 calls=1728 failures=0
+LINUX WAITABI TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=0 pid=3 group=3 session=2
+LINUX WAITABI TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=1 pid=4 group=2 session=2
+LINUX WAITABI EXIT: ordinary=0 namespace=1 pid=3 wait=CLD_EXITED status=37
+LINUX WAITABI SLAB: ordinary=0 namespace=1 size=16 live=1630/1630 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=1 size=32 live=2877/2877 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=1 size=48 live=345/345 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=1 size=64 live=172/172 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=1 size=96 live=21/21 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=1 size=128 live=20/20 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=1 size=192 live=385/385 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=1 size=256 live=786/786 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=1 size=384 live=552/552 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=1 size=512 live=496/496 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=1 size=768 live=24/24 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=1 size=1024 live=13/13 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=1 size=1536 live=18/18 cycles=200
+LINUX WAITABI SLAB: ordinary=0 namespace=1 size=2048 live=0/0 cycles=200
+LINUX WAITABI STORAGE: ordinary=0 namespace=1 cycles=200 big_pages=217/217 PASS
+LINUX WAITABI REAP: ordinary=0 namespace=1 pid=3 status=37
+LINUX WAITABI CASES: ordinary=0 namespace=1 kind=0 calls=1152 failures=0
+LINUX WAITABI CASES: ordinary=0 namespace=1 kind=1 calls=576 failures=0
+LINUX WAITABI CASES: ordinary=0 namespace=1 kind=2 calls=8704 failures=0
+LINUX WAITABI CASES: ordinary=0 namespace=1 kind=3 calls=8704 failures=0
+LINUX WAITABI CASES: ordinary=0 namespace=1 kind=4 calls=8704 failures=0
+LINUX WAITABI CASES: ordinary=0 namespace=1 kind=5 calls=1728 failures=0
+LINUX WAITABI FINAL: ordinary=0 namespace=1 kind=0 calls=1152 failures=0
+LINUX WAITABI FINAL: ordinary=0 namespace=1 kind=1 calls=576 failures=0
+LINUX WAITABI FINAL: ordinary=0 namespace=1 kind=2 calls=8704 failures=0
+LINUX WAITABI FINAL: ordinary=0 namespace=1 kind=3 calls=8704 failures=0
+LINUX WAITABI FINAL: ordinary=0 namespace=1 kind=4 calls=8704 failures=0
+LINUX WAITABI FINAL: ordinary=0 namespace=1 kind=5 calls=1728 failures=0
+LINUX WAITABI TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=0 pid=3 group=3 session=2
+LINUX WAITABI TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=1 pid=4 group=2 session=2
+LINUX WAITABI EXIT: ordinary=1 namespace=1 pid=3 wait=CLD_EXITED status=37
+LINUX WAITABI SLAB: ordinary=1 namespace=1 size=16 live=1630/1630 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=1 size=32 live=2877/2877 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=1 size=48 live=345/345 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=1 size=64 live=174/174 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=1 size=96 live=21/21 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=1 size=128 live=21/21 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=1 size=192 live=387/387 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=1 size=256 live=786/786 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=1 size=384 live=552/552 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=1 size=512 live=496/496 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=1 size=768 live=24/24 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=1 size=1024 live=13/13 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=1 size=1536 live=18/18 cycles=200
+LINUX WAITABI SLAB: ordinary=1 namespace=1 size=2048 live=0/0 cycles=200
+LINUX WAITABI STORAGE: ordinary=1 namespace=1 cycles=200 big_pages=217/217 PASS
+LINUX WAITABI REAP: ordinary=1 namespace=1 pid=3 status=37
+LINUX WAITABI CASES: ordinary=1 namespace=1 kind=0 calls=1152 failures=0
+LINUX WAITABI CASES: ordinary=1 namespace=1 kind=1 calls=576 failures=0
+LINUX WAITABI CASES: ordinary=1 namespace=1 kind=2 calls=8704 failures=0
+LINUX WAITABI CASES: ordinary=1 namespace=1 kind=3 calls=8704 failures=0
+LINUX WAITABI CASES: ordinary=1 namespace=1 kind=4 calls=8704 failures=0
+LINUX WAITABI CASES: ordinary=1 namespace=1 kind=5 calls=1728 failures=0
+LINUX WAITABI FINAL: ordinary=1 namespace=1 kind=0 calls=1152 failures=0
+LINUX WAITABI FINAL: ordinary=1 namespace=1 kind=1 calls=576 failures=0
+LINUX WAITABI FINAL: ordinary=1 namespace=1 kind=2 calls=8704 failures=0
+LINUX WAITABI FINAL: ordinary=1 namespace=1 kind=3 calls=8704 failures=0
+LINUX WAITABI FINAL: ordinary=1 namespace=1 kind=4 calls=8704 failures=0
+LINUX WAITABI FINAL: ordinary=1 namespace=1 kind=5 calls=1728 failures=0
+LINUX WAITABI: PASS
+QEMU: Terminated
+

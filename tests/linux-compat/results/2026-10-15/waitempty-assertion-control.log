@@ -1,0 +1,3 @@
+tests/linux-compat/waitempty-check.v:327: FAIL: fn main.main: assert false, 'waitempty assertions must execute'
+      message: waitempty assertions must execute
+V panic: Assertion failed...

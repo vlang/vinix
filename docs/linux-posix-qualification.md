@@ -7651,8 +7651,9 @@ their PID1 then exits and Linux panics. Their original source, C, ELF, receipts
 and serial logs remain retained and pinned. The final probe compares exact
 errors without asserting unchanged error siginfo, and exercises wait4 output
 pointers only on a held child with no event. WNOWAIT waitid retention remains
-required. **Waitid error copyout and wait4 consumption after copyout failure
-remain unsupported semantics**, published separately from this ABI fix. The
+required. This first ABI qualification left waitid error copyout and wait4 consumption
+after copyout failure unsupported. Empty/error siginfo output is now qualified
+[separately below](#native-waitid-empty-and-error-siginfo-output); consuming copyout faults remain open. The
 diagnostic records are never counted as passing references.
 
 The p2 Linux probes pass, but their controller rejects both receipts because
@@ -7706,3 +7707,107 @@ remain open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/waitabi-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitabi-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitabi-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitabi-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/waitabi-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitabi-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitabi-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitabi-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/waitabi-check.v), [verdict](../tests/linux-compat/results/2026-10-15/waitabi-audit.log), [failed diagnostic notes](../tests/linux-compat/results/2026-10-15/waitabi-diagnostic-note.txt), [diagnostic input pins](../tests/linux-compat/results/2026-10-15/waitabi-diagnostic-inputs.json).
+
+## Native waitid empty and error siginfo output
+
+Native AArch64 and x86-64 waitid now write the six Linux siginfo fields for
+option/selector errors, ECHILD and WNOHANG returns without a child event.
+The fields at byte offsets 0/4/8/16/20/24 become zero. Padding, child timing
+payload and all other bytes remain unchanged. An inaccessible output field
+returns EFAULT even when selection would return EINVAL or ECHILD. NULL infop
+retains the original error or no-event success, and rusage stays unused without
+an event. The helper checks the full 128-byte numeric range, then resolves both
+ends of each scalar field before copying it in order. A protected tail beyond
+the six fields does not need to be mapped. These stable split-field fault
+controls leave the incomplete field untouched and retain earlier field writes.
+
+The same native probe ELFs pass on Linux 6.12.51. Its immutable
+[v6.12 waitid implementation](https://github.com/torvalds/linux/blob/v6.12/kernel/exit.c)
+and digest are bound with the evidence. The patch changes waitid's empty/error
+branches and adds one scalar helper. Successful child-event handling, child
+claims, pins, locks, release and event copyout remain byte-identical in the
+source contract. Whole production C differs only in waitid and that helper,
+including the new declaration; no compiler identifier normalization is used.
+There are no added allocator, pin, free or stack-allocation calls in the helper.
+
+Four fresh production builds use committed base
+`0797ec9653a1570603e75ecffecd15145a3dded0`. Only the owned
+`kernel/userland/linux_task.v` patch enters the corrected builds. The probe's
+source, emitted C and ELF are identical across original/corrected Vinix and
+the supplied Linux reference for each architecture.
+
+Root and UID/GID1000 cohorts run in initial and one-level PID namespaces.
+Each creates a fresh session and one pipe-held direct child in a separate
+process group. Readiness validates the child's PID, parent, PGID and SID.
+The twelve query modes include P_ALL, a live PID and group, an empty caller
+group, a missing PID, invalid zero/negative IDs, an invalid type, missing
+state flags and unknown options. Seven raw register forms and genuine musl
+calls exercise each mode. Four poison-buffer offsets cover mapped unaligned
+output. NULL, valid poisoned and invalid rusage pointers are checked wherever
+the return has no event. Musl covers the NULL-rusage forms; raw calls exercise
+the fifth argument.
+
+Each architecture runs 38,400 controls; the following counts are per cohort:
+
+| Class | Controls | Original failures |
+| --- | ---: | ---: |
+| Mapped error output, six fields and untouched padding/tail | 864 | 864 |
+| Mapped no-event output and untouched padding/tail | 288 | 288 |
+| Wrapping, low unmapped, read-only and PROT_NONE output pointers | 1,152 | 864 |
+| Every guard cut 0..32, plus 64/127/128 accessible bytes | 6,912 | 6,720 |
+| NULL infop and unused rusage | 288 | 0 |
+| Real status-37 WNOWAIT events, then the same IDs after reap | 96 | 48 |
+
+Guard controls compare all accessible bytes and a sixteen-byte leading canary.
+Every mode runs at all 36 cuts with both NULL and invalid rusage. Cuts below 28
+return EFAULT, preserving every earlier complete field and leaving a split
+field untouched. Cuts of 28 or more return the selector's original outcome,
+even when the rest of the 128-byte siginfo structure crosses into PROT_NONE.
+Read-only output stays poisoned. The held child stays in its expected group
+and session through these trials. Afterwards it exits with status 37, is observed with
+WNOWAIT, supplies real P_ALL/P_PID/P_PGID events and is explicitly reaped;
+the same queries then return ECHILD with six cleared fields. Four exit and
+four reap records per architecture bind this transition. Successful-event
+padding, UID and accounting are not promoted by these event controls.
+
+Original kernels fail exactly 35,136 controls per architecture. Corrected
+kernels and identical-ELF Linux references pass every control on both native
+architectures. AArch64 uses 16 KiB Vinix pages; both Linux references and
+native x86-64 use 4 KiB pages.
+
+Four warmed 200-cycle cohorts alternate raw upper-word and genuine musl calls.
+They repeat all twelve mapped modes, a 28-byte guard result and read-only
+EFAULT priority while retaining the same live child and mappings. Slab objects
+and big-page totals remain flat after settling. Fork, mappings/protection,
+exit and reap are outside the measured interval. The final probe C uses five
+explicit stack allocas and no malloc/memdup/dynamic-array/fixed-index calls.
+AArch64 compares 18 slab classes and retains 69/69 big pages initially and
+81/81 in the namespace. x86-64 compares 14 classes and retains 171/171 initially
+and 193/193 in the namespace, for both users. Raw totals are linked in the receipts.
+
+The first p1 probe compile exposed a hidden V memdup for an unused guard-call
+rusage buffer. Both freestanding builds refused it, and the watcher refused
+the missing init. These profiles contain no probe ELF, ISO or guest semantic
+result. Their frozen source, emitted C, compiler metadata, kernel, receipts
+and logs remain pinned. Guard tests only need NULL or invalid rusage, so the
+unused buffer and redundant returned predicate were removed. Final p2 profiles
+use the same allocation-free probe on original, corrected and Linux kernels;
+only their guest FINAL rows count towards conformance.
+
+Runtime and native wait-argument regressions pass on both architectures;
+eight host test files pass. Allocation diagnostics remain byte-identical,
+including existing allowance-file refusals. The audit binds 67 inventory inputs,
+15,146 compiler inputs, all 2,014 copied SDK files, fresh ARM command receipts,
+source/C/ELF/ISO/kernel identities, 84 retained regular files in eight final
+native profiles, failed compiler profiles and executing false-assertion and
+passing-Linux-as-original controls. Compile the audit without `-prod`.
+
+Successful-event padding/UID/accounting, consuming copyout faults, P_PIDFD,
+__WCLONE/__WALL/__WNOTHREAD, ptrace/cross-thread waits, concurrent mapping
+changes, exact user-ceiling/tagged-pointer probes, interrupted/restarted waits,
+GNU libc and translated/ELF32 paths remain outside this bounded contract.
+The three broad section 15 gates remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/waitempty-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitempty-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitempty-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitempty-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/waitempty-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitempty-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitempty-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitempty-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/waitempty-check.v), [verdict](../tests/linux-compat/results/2026-10-15/waitempty-audit.log), [compiler diagnostic notes](../tests/linux-compat/results/2026-10-15/waitempty-diagnostic-note.txt), [diagnostic pins](../tests/linux-compat/results/2026-10-15/waitempty-diagnostic-inputs.json).

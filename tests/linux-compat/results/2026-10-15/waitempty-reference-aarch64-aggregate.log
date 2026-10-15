@@ -1,0 +1,260 @@
+[    0.000000] Booting Linux on physical CPU 0x0000000000 [0x610f0000]
+[    0.000000] Linux version 6.12.51-0-virt (buildozer@build-3-22-aarch64) (cc (Alpine 14.2.0) 14.2.0, GNU ld (GNU Binutils) 2.44) #1-Alpine SMP PREEMPT_DYNAMIC 2025-10-07 15:12:03
+[    0.000000] random: crng init done
+[    0.000000] Machine model: linux,dummy-virt
+[    0.000000] efi: UEFI not found.
+[    0.000000] OF: reserved mem: Reserved memory: No reserved-memory node in the DT
+[    0.000000] NUMA: Faking a node at [mem 0x0000000040000000-0x000000005fffffff]
+[    0.000000] NODE_DATA(0) allocated [mem 0x5fcf9440-0x5fcfb8bf]
+[    0.000000] Zone ranges:
+[    0.000000]   DMA      [mem 0x0000000040000000-0x000000005fffffff]
+[    0.000000]   DMA32    empty
+[    0.000000]   Normal   empty
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000040000000-0x000000005fffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000040000000-0x000000005fffffff]
+[    0.000000] psci: probing for conduit method from DT.
+[    0.000000] psci: PSCIv1.1 detected in firmware.
+[    0.000000] psci: Using standard PSCI v0.2 function IDs
+[    0.000000] psci: Trusted OS migration not required
+[    0.000000] psci: SMC Calling Convention v1.0
+[    0.000000] percpu: Embedded 34 pages/cpu s98904 r8192 d32168 u139264
+[    0.000000] Detected PIPT I-cache on CPU0
+[    0.000000] CPU features: detected: Address authentication (IMP DEF algorithm)
+[    0.000000] CPU features: detected: Spectre-v4
+[    0.000000] CPU features: detected: Spectre-BHB
+[    0.000000] alternatives: applying boot alternatives
+[    0.000000] Kernel command line: console=ttyAMA0 rdinit=/init panic=-1
+[    0.000000] Dentry cache hash table entries: 65536 (order: 7, 524288 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 32768 (order: 6, 262144 bytes, linear)
+[    0.000000] Fallback order for Node 0: 0 
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 131072
+[    0.000000] Policy zone: DMA
+[    0.000000] mem auto-init: stack:all(zero), heap alloc:on, heap free:off
+[    0.000000] software IO TLB: SWIOTLB bounce buffer size adjusted to 0MB
+[    0.000000] software IO TLB: area num 2.
+[    0.000000] software IO TLB: mapped [mem 0x000000005f2f7000-0x000000005f377000] (0MB)
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=2, Nodes=1
+[    0.000000] Dynamic Preempt: none
+[    0.000000] rcu: Preemptible hierarchical RCU implementation.
+[    0.000000] rcu: 	RCU restricting CPUs from NR_CPUS=4096 to nr_cpu_ids=2.
+[    0.000000] 	Trampoline variant of Tasks RCU enabled.
+[    0.000000] 	Tracing variant of Tasks RCU enabled.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 100 jiffies.
+[    0.000000] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=2
+[    0.000000] RCU Tasks: Setting shift to 1 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=2.
+[    0.000000] RCU Tasks Trace: Setting shift to 1 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=2.
+[    0.000000] NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[    0.000000] GICv3: 988 SPIs implemented
+[    0.000000] GICv3: 0 Extended SPIs implemented
+[    0.000000] Root IRQ handler: gic_handle_irq
+[    0.000000] GICv3: GICv3 features: 16 PPIs, RSS
+[    0.000000] GICv3: GICD_CTRL.DS=1, SCR_EL3.FIQ=0
+[    0.000000] GICv3: CPU0: found redistributor 0 region 0:0x00000000080a0000
+[    0.000000] GICv2m: range[mem 0x08020000-0x08020fff], SPI[80:143]
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] arch_timer: cp15 timer(s) running at 24.00MHz (virt).
+[    0.000000] clocksource: arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x588fe9dc0, max_idle_ns: 440795202592 ns
+[    0.000000] sched_clock: 56 bits at 24MHz, resolution 41ns, wraps every 4398046511097ns
+[    0.000212] kfence: initialized - using 2097152 bytes for 255 objects at 0x(____ptrval____)-0x(____ptrval____)
+[    0.000262] Console: colour dummy device 80x25
+[    0.000295] Calibrating delay loop (skipped), value calculated using timer frequency.. 48.00 BogoMIPS (lpj=24000)
+[    0.000297] pid_max: default: 32768 minimum: 301
+[    0.000319] LSM: initializing lsm=lockdown,capability,landlock
+[    0.000392] landlock: Up and running.
+[    0.000421] Mount-cache hash table entries: 1024 (order: 1, 8192 bytes, linear)
+[    0.000424] Mountpoint-cache hash table entries: 1024 (order: 1, 8192 bytes, linear)
+[    0.000730] cacheinfo: Unable to detect cache hierarchy for CPU 0
+[    0.000934] rcu: Hierarchical SRCU implementation.
+[    0.000934] rcu: 	Max phase no-delay instances is 400.
+[    0.000966] Timer migration: 1 hierarchy levels; 8 children per group; 1 crossnode level
+[    0.001135] EFI services will not be available.
+[    0.001177] smp: Bringing up secondary CPUs ...
+[    0.001400] Detected PIPT I-cache on CPU1
+[    0.001428] GICv3: CPU1: found redistributor 1 region 0:0x00000000080c0000
+[    0.001489] CPU1: Booted secondary processor 0x0000000001 [0x610f0000]
+[    0.001615] smp: Brought up 1 node, 2 CPUs
+[    0.001616] SMP: Total of 2 processors activated.
+[    0.001616] CPU: All CPU(s) started at EL1
+[    0.001625] CPU features: detected: Branch Target Identification
+[    0.001626] CPU features: detected: ARMv8.4 Translation Table Level
+[    0.001626] CPU features: detected: Data cache clean to the PoU not required for I/D coherence
+[    0.001627] CPU features: detected: Common not Private translations
+[    0.001627] CPU features: detected: CRC32 instructions
+[    0.001627] CPU features: detected: Data independent timing control (DIT)
+[    0.001627] CPU features: detected: E0PD
+[    0.001628] CPU features: detected: Enhanced Privileged Access Never
+[    0.001629] CPU features: detected: Generic authentication (IMP DEF algorithm)
+[    0.001629] CPU features: detected: RCpc load-acquire (LDAPR)
+[    0.001630] CPU features: detected: LSE atomic instructions
+[    0.001630] CPU features: detected: Privileged Access Never
+[    0.001630] CPU features: detected: RAS Extension Support
+[    0.001630] CPU features: detected: Speculation barrier (SB)
+[    0.001631] CPU features: detected: TLB range maintenance instructions
+[    0.001683] alternatives: applying system-wide alternatives
+[    0.002690] Memory: 473248K/524288K available (12608K kernel code, 1962K rwdata, 7780K rodata, 1920K init, 9307K bss, 48188K reserved, 0K cma-reserved)
+[    0.002864] devtmpfs: initialized
+[    0.003229] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1911260446275000 ns
+[    0.003237] futex hash table entries: 512 (order: 3, 32768 bytes, linear)
+[    0.003248] 24304 pages in range for non-PLT usage
+[    0.003248] 515824 pages in range for PLT usage
+[    0.003278] pinctrl core: initialized pinctrl subsystem
+[    0.003305] DMI not present or invalid.
+[    0.004490] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[    0.004721] DMA: preallocated 128 KiB GFP_KERNEL pool for atomic allocations
+[    0.004749] DMA: preallocated 128 KiB GFP_KERNEL|GFP_DMA pool for atomic allocations
+[    0.004831] DMA: preallocated 128 KiB GFP_KERNEL|GFP_DMA32 pool for atomic allocations
+[    0.004842] audit: initializing netlink subsys (disabled)
+[    0.005163] audit: type=2000 audit(0.004:1): state=initialized audit_enabled=0 res=1
+[    0.005209] thermal_sys: Registered thermal governor 'step_wise'
+[    0.005293] cpuidle: using governor ladder
+[    0.005350] cpuidle: using governor menu
+[    0.005372] hw-breakpoint: found 6 breakpoint and 4 watchpoint registers.
+[    0.005416] ASID allocator initialised with 65536 entries
+[    0.005449] Serial: AMBA PL011 UART driver
+[    0.006259] 9000000.pl011: ttyAMA0 at MMIO 0x9000000 (irq = 13, base_baud = 0) is a PL011 rev1
+[    0.006287] printk: legacy console [ttyAMA0] enabled
+[    0.044576] HugeTLB: registered 1.00 GiB page size, pre-allocated 0 pages
+[    0.044939] HugeTLB: 0 KiB vmemmap can be freed for a 1.00 GiB page
+[    0.045272] HugeTLB: registered 32.0 MiB page size, pre-allocated 0 pages
+[    0.045628] HugeTLB: 0 KiB vmemmap can be freed for a 32.0 MiB page
+[    0.045922] HugeTLB: registered 2.00 MiB page size, pre-allocated 0 pages
+[    0.046428] HugeTLB: 0 KiB vmemmap can be freed for a 2.00 MiB page
+[    0.046793] HugeTLB: registered 64.0 KiB page size, pre-allocated 0 pages
+[    0.047213] HugeTLB: 0 KiB vmemmap can be freed for a 64.0 KiB page
+[    0.047819] ACPI: Interpreter disabled.
+[    0.048107] iommu: Default domain type: Translated
+[    0.048431] iommu: DMA domain TLB invalidation policy: lazy mode
+[    0.049470] clocksource: Switched to clocksource arch_sys_counter
+[    0.050006] VFS: Disk quotas dquot_6.6.0
+[    0.050319] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+[    0.050824] pnp: PnP ACPI: disabled
+[    0.051941] NET: Registered PF_INET protocol family
+[    0.052443] IP idents hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[    0.060175] tcp_listen_portaddr_hash hash table entries: 256 (order: 0, 4096 bytes, linear)
+[    0.060642] Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    0.061052] TCP established hash table entries: 4096 (order: 3, 32768 bytes, linear)
+[    0.061458] TCP bind hash table entries: 4096 (order: 5, 131072 bytes, linear)
+[    0.061844] TCP: Hash tables configured (established 4096 bind 4096)
+[    0.062206] MPTCP token hash table entries: 512 (order: 1, 12288 bytes, linear)
+[    0.062607] UDP hash table entries: 256 (order: 1, 8192 bytes, linear)
+[    0.062951] UDP-Lite hash table entries: 256 (order: 1, 8192 bytes, linear)
+[    0.063394] NET: Registered PF_UNIX/PF_LOCAL protocol family
+[    0.063710] NET: Registered PF_XDP protocol family
+[    0.063963] PCI: CLS 0 bytes, default 64
+[    0.064283] kvm [1]: HYP mode not available
+[    0.064291] Unpacking initramfs...
+[    0.064777] Initialise system trusted keyrings
+[    0.064952] Freeing initrd memory: 140K
+[    0.065226] workingset: timestamp_bits=44 max_order=17 bucket_order=0
+[    0.075041] Key type asymmetric registered
+[    0.075254] Asymmetric key parser 'x509' registered
+[    0.075521] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 249)
+[    0.076006] io scheduler mq-deadline registered
+[    0.076214] io scheduler kyber registered
+[    0.076402] io scheduler bfq registered
+[    0.076764] pci-host-generic 4010000000.pcie: host bridge /pcie@10000000 ranges:
+[    0.077111] pci-host-generic 4010000000.pcie:       IO 0x003eff0000..0x003effffff -> 0x0000000000
+[    0.077685] pci-host-generic 4010000000.pcie:      MEM 0x0010000000..0x003efeffff -> 0x0010000000
+[    0.078235] pci-host-generic 4010000000.pcie:      MEM 0x8000000000..0xffffffffff -> 0x8000000000
+[    0.078873] pci-host-generic 4010000000.pcie: Memory resource size exceeds max for 32 bits
+[    0.079381] pci-host-generic 4010000000.pcie: ECAM at [mem 0x4010000000-0x401fffffff] for [bus 00-ff]
+[    0.079883] pci-host-generic 4010000000.pcie: PCI host bridge to bus 0000:00
+[    0.080199] pci_bus 0000:00: root bus resource [bus 00-ff]
+[    0.080541] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+[    0.080953] pci_bus 0000:00: root bus resource [mem 0x10000000-0x3efeffff]
+[    0.081379] pci_bus 0000:00: root bus resource [mem 0x8000000000-0xffffffffff]
+[    0.081919] pci 0000:00:00.0: [1b36:0008] type 00 class 0x060000 conventional PCI endpoint
+[    0.082641] pci 0000:00:01.0: [1af4:1000] type 00 class 0x020000 conventional PCI endpoint
+[    0.083284] pci 0000:00:01.0: BAR 0 [io  0x0000-0x001f]
+[    0.083730] pci 0000:00:01.0: BAR 1 [mem 0x00000000-0x00000fff]
+[    0.084152] pci 0000:00:01.0: BAR 4 [mem 0x00000000-0x00003fff 64bit pref]
+[    0.084557] pci 0000:00:01.0: ROM [mem 0x00000000-0x0003ffff pref]
+[    0.085301] pci 0000:00:01.0: ROM [mem 0x10000000-0x1003ffff pref]: assigned
+[    0.085778] pci 0000:00:01.0: BAR 4 [mem 0x8000000000-0x8000003fff 64bit pref]: assigned
+[    0.086300] pci 0000:00:01.0: BAR 1 [mem 0x10040000-0x10040fff]: assigned
+[    0.086737] pci 0000:00:01.0: BAR 0 [io  0x1000-0x101f]: assigned
+[    0.087070] pci_bus 0000:00: resource 4 [io  0x0000-0xffff]
+[    0.087359] pci_bus 0000:00: resource 5 [mem 0x10000000-0x3efeffff]
+[    0.087647] pci_bus 0000:00: resource 6 [mem 0x8000000000-0xffffffffff]
+[    0.088145] virtio-pci 0000:00:01.0: enabling device (0000 -> 0003)
+[    0.089134] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+[    0.090044] hv_vmbus: registering driver hyperv_keyboard
+[    0.090503] rtc-pl031 9010000.pl031: registered as rtc0
+[    0.090811] rtc-pl031 9010000.pl031: setting system clock to 2026-10-15T14:57:43 UTC (1792076263)
+[    0.091324] NET: Registered PF_INET6 protocol family
+[    0.091852] Segment Routing with IPv6
+[    0.092030] In-situ OAM (IOAM) with IPv6
+[    0.094124] registered taskstats version 1
+[    0.094556] Loading compiled-in X.509 certificates
+[    0.095563] Loaded X.509 cert 'alpinelinux.org: Alpine Linux kernel key: 87fa969a47f3e2a6aa35859eb932a17c95abcd82'
+[    0.097298] Demotion targets for Node 0: null
+[    0.097781] Key type .fscrypt registered
+[    0.098088] Key type fscrypt-provisioning registered
+[    0.101842] clk: Disabling unused clocks
+[    0.102079] PM: genpd: Disabling unused power domains
+[    0.102507] Freeing unused kernel memory: 1920K
+[    0.102908] Run /init as init process
+LINUX WAITEMPTY TOPOLOGY: ordinary=0 namespace=0 uid=0 self=346 pid=347 group=347 session=346 page=4096
+LINUX WAITEMPTY EXIT: ordinary=0 namespace=0 pid=347 wait=CLD_EXITED status=37
+LINUX WAITEMPTY REAP: ordinary=0 namespace=0 pid=347 status=37
+LINUX WAITEMPTY CASES: ordinary=0 namespace=0 kind=0 calls=864 failures=0
+LINUX WAITEMPTY CASES: ordinary=0 namespace=0 kind=1 calls=288 failures=0
+LINUX WAITEMPTY CASES: ordinary=0 namespace=0 kind=2 calls=1152 failures=0
+LINUX WAITEMPTY CASES: ordinary=0 namespace=0 kind=3 calls=6912 failures=0
+LINUX WAITEMPTY CASES: ordinary=0 namespace=0 kind=4 calls=288 failures=0
+LINUX WAITEMPTY CASES: ordinary=0 namespace=0 kind=5 calls=96 failures=0
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=0 kind=0 calls=864 failures=0
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=0 kind=1 calls=288 failures=0
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=0 kind=2 calls=1152 failures=0
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=0 kind=3 calls=6912 failures=0
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=0 kind=4 calls=288 failures=0
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=0 kind=5 calls=96 failures=0
+LINUX WAITEMPTY TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=348 pid=349 group=349 session=348 page=4096
+LINUX WAITEMPTY EXIT: ordinary=1 namespace=0 pid=349 wait=CLD_EXITED status=37
+LINUX WAITEMPTY REAP: ordinary=1 namespace=0 pid=349 status=37
+LINUX WAITEMPTY CASES: ordinary=1 namespace=0 kind=0 calls=864 failures=0
+LINUX WAITEMPTY CASES: ordinary=1 namespace=0 kind=1 calls=288 failures=0
+LINUX WAITEMPTY CASES: ordinary=1 namespace=0 kind=2 calls=1152 failures=0
+LINUX WAITEMPTY CASES: ordinary=1 namespace=0 kind=3 calls=6912 failures=0
+LINUX WAITEMPTY CASES: ordinary=1 namespace=0 kind=4 calls=288 failures=0
+LINUX WAITEMPTY CASES: ordinary=1 namespace=0 kind=5 calls=96 failures=0
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=0 kind=0 calls=864 failures=0
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=0 kind=1 calls=288 failures=0
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=0 kind=2 calls=1152 failures=0
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=0 kind=3 calls=6912 failures=0
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=0 kind=4 calls=288 failures=0
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=0 kind=5 calls=96 failures=0
+LINUX WAITEMPTY TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 pid=3 group=3 session=2 page=4096
+LINUX WAITEMPTY EXIT: ordinary=0 namespace=1 pid=3 wait=CLD_EXITED status=37
+LINUX WAITEMPTY REAP: ordinary=0 namespace=1 pid=3 status=37
+LINUX WAITEMPTY CASES: ordinary=0 namespace=1 kind=0 calls=864 failures=0
+LINUX WAITEMPTY CASES: ordinary=0 namespace=1 kind=1 calls=288 failures=0
+LINUX WAITEMPTY CASES: ordinary=0 namespace=1 kind=2 calls=1152 failures=0
+LINUX WAITEMPTY CASES: ordinary=0 namespace=1 kind=3 calls=6912 failures=0
+LINUX WAITEMPTY CASES: ordinary=0 namespace=1 kind=4 calls=288 failures=0
+LINUX WAITEMPTY CASES: ordinary=0 namespace=1 kind=5 calls=96 failures=0
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=1 kind=0 calls=864 failures=0
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=1 kind=1 calls=288 failures=0
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=1 kind=2 calls=1152 failures=0
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=1 kind=3 calls=6912 failures=0
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=1 kind=4 calls=288 failures=0
+LINUX WAITEMPTY FINAL: ordinary=0 namespace=1 kind=5 calls=96 failures=0
+LINUX WAITEMPTY TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 pid=3 group=3 session=2 page=4096
+LINUX WAITEMPTY EXIT: ordinary=1 namespace=1 pid=3 wait=CLD_EXITED status=37
+LINUX WAITEMPTY REAP: ordinary=1 namespace=1 pid=3 status=37
+LINUX WAITEMPTY CASES: ordinary=1 namespace=1 kind=0 calls=864 failures=0
+LINUX WAITEMPTY CASES: ordinary=1 namespace=1 kind=1 calls=288 failures=0
+LINUX WAITEMPTY CASES: ordinary=1 namespace=1 kind=2 calls=1152 failures=0
+LINUX WAITEMPTY CASES: ordinary=1 namespace=1 kind=3 calls=6912 failures=0
+LINUX WAITEMPTY CASES: ordinary=1 namespace=1 kind=4 calls=288 failures=0
+LINUX WAITEMPTY CASES: ordinary=1 namespace=1 kind=5 calls=96 failures=0
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=1 kind=0 calls=864 failures=0
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=1 kind=1 calls=288 failures=0
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=1 kind=2 calls=1152 failures=0
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=1 kind=3 calls=6912 failures=0
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=1 kind=4 calls=288 failures=0
+LINUX WAITEMPTY FINAL: ordinary=1 namespace=1 kind=5 calls=96 failures=0
+LINUX WAITEMPTY REFERENCE: PASS
+Linux waitempty reference: PASS

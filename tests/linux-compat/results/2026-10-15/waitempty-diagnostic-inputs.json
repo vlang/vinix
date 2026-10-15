@@ -1,0 +1,19 @@
+{
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/helper-watch-producer.log": "a4f529372e2a3665521f817c19f351a3968f3042bb5f007cf432497f5031942d",
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-arm.log": "7ddd2bda3cd7673c84148bdf6b74c9120e91889d68f76912176f82dddf0c360f",
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-arm/kernel/bin/vinix": "1ceb7379b261b75c6aa37c1f6999874289694944940ded45185235be9ea79b86",
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-arm/receipt.json": "de662bd9dbb5f1acefe00b86882b937f6d443b626953d83ceabc22a87c62cb70",
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-arm/sources/waitemptyfixture/core.v": "34c8f38c3dbf029f2407e2d0a7eba831a057affc2b9ac4e10419582cc00aced2",
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-arm/waitempty/fixture.c": "8693df0587576217bc2ba06a360bdaeff5967c21067f33f5f3bfef8a13b792ee",
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-arm/waitempty/fixture.o.compiler.json": "b9219b5c83806b3e82fe7a1527cdb43d2f78a7de9f1f3e094931c54092af2cfc",
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-arm/waitempty/serial.c": "c49ac2e66ea0cd147fbe54a25564b5af26363f8905a8217ad65303d563093cd2",
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-arm/waitempty/serial.o": "7488c6d09fb771cd848ba0ac868125a75a8ce243f213139a4a265318e5436e08",
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-arm/waitempty/serial.o.compiler.json": "cbbe253ebe43a0059d51b7d6d0287946bb7a6a5f5c9691506ce9fd78cf40ddb7",
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-x86.log": "e203f579bf69f81ccf619a9a22f9a2094cb78be6ccb48440f2674e221871ae8c",
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-x86/kernel/bin/vinix": "14144a95b60c316f90783c5421a396179f6fd5ef5f9d9f55f49ad59b26807efb",
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-x86/receipt.json": "ea09c12ce095f277f78c71e6fc8c7259aac854acef2a0f702964d38ffa07fe84",
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-x86/sources/waitemptyfixture/core.v": "34c8f38c3dbf029f2407e2d0a7eba831a057affc2b9ac4e10419582cc00aced2",
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-x86/waitempty/fixture.c": "8693df0587576217bc2ba06a360bdaeff5967c21067f33f5f3bfef8a13b792ee",
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-x86/waitempty/serial.c": "f32deebe2af4585e8ba8b413f3623c0e7627bf67412e081c533d8bdc18e2bd16",
+    "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-x86/waitempty/serial.o": "2903ce60d7cce04fb69e5374d9ca66a37f667bef16f0344354113a8040860ab7"
+}

@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "1ceb7379b261b75c6aa37c1f6999874289694944940ded45185235be9ea79b86",
+    "results": [
+        {
+            "name": "waitempty",
+            "source_sha256": "34c8f38c3dbf029f2407e2d0a7eba831a057affc2b9ac4e10419582cc00aced2",
+            "init_sha256": "",
+            "iso_sha256": "",
+            "exit_code": 1,
+            "detail": "Command failed"
+        }
+    ]
+}

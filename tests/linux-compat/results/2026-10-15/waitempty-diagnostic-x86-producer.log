@@ -1,0 +1,10 @@
+/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-x86/waitempty/fixture.c: In function 'waitemptyfixture__guard_call':
+/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-x86/waitempty/fixture.c:1381:67: error: implicit declaration of function 'memdup'; did you mean 'memcmp'? [-Wimplicit-function-declaration]
+ 1381 |                 Array_fixed_u8_144* usage = (Array_fixed_u8_144*)(memdup(&__esc_0, sizeof(u8[144])));
+      |                                                                   ^~~~~~
+      |                                                                   memcmp
+/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-x86/waitempty/fixture.c:1381:45: error: cast to pointer from integer of different size [-Werror=int-to-pointer-cast]
+ 1381 |                 Array_fixed_u8_144* usage = (Array_fixed_u8_144*)(memdup(&__esc_0, sizeof(u8[144])));
+      |                                             ^
+cc1: all warnings being treated as errors
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-x86/receipt.json

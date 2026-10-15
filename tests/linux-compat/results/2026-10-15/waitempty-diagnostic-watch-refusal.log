@@ -1,0 +1,11 @@
+/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/manage.v:42: FAIL: fn main.run: assert code == expected, data
+   left value: code = 1
+  right value: expected = 0
+      message: V panic: failed to open file "/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-arm/waitempty/init"; code: 2
+ v hash: f6358ec
+    pid: 0x14e07
+    tid: 0x14e07
+0   watch                               0x0000000100801198 main + 3140
+1   dyld                                0x000000018c507e00 start + 6992
+
+V panic: Assertion failed...

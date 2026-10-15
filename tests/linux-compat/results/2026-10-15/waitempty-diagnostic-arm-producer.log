@@ -1,0 +1,12 @@
+/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-arm/waitempty/fixture.c:1381:53: error: call to undeclared function 'memdup'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1381 |                 Array_fixed_u8_144* usage = (Array_fixed_u8_144*)(memdup(&__esc_0, sizeof(u8[144])));
+      |                                                                   ^
+/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-arm/waitempty/fixture.c:1381:53: note: did you mean 'memcmp'?
+/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/sdk/usr/include/string.h:30:5: note: 'memcmp' declared here
+   30 | int memcmp (const void *, const void *, size_t);
+      |     ^
+/Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-arm/waitempty/fixture.c:1381:31: error: cast to 'Array_fixed_u8_144 *' (aka 'unsigned char (*)[144]') from smaller integer type 'int' [-Werror,-Wint-to-pointer-cast]
+ 1381 |                 Array_fixed_u8_144* usage = (Array_fixed_u8_144*)(memdup(&__esc_0, sizeof(u8[144])));
+      |                                             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2 errors generated.
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/waitempty-20261015/states/p1-before-arm/receipt.json
