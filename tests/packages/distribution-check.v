@@ -146,6 +146,9 @@ fn check() ! {
 			'-o', work + '/cleanup-check', repository + '/tests/packages/cleanup-check.v'])!
 		run(work + '/cleanup-check', [work + '/cleanup-cli', work + '/vinix-package'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/rollback-check', repository + '/tests/packages/rollback-check.v'])!
+		run(work + '/rollback-check', [work + '/rollback-cli', work + '/vinix-package'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/launcher-parent-check', repository + '/tests/packages/launcher-parent-check.v'])!
 		run(work + '/launcher-parent-check', [work + '/launcher-parent-cli', work + '/vinix-package'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',

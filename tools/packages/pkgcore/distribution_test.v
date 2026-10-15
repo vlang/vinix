@@ -266,7 +266,8 @@ fn test_transaction_lifecycle_recovery_and_offline_cache() {
 	assert second.packages[0].package.version == '2.0.0'
 	// Actual persistent state is usable after creating another controller.
 	assert json2.decode[State](read_metadata(directory + '/current/state.json')!)!.generation == 2
-	assert rollback(config, directory)!.generation == 1
+	restored := rollback(config, directory)!
+	assert restored.generation == 3 && restored.previous == 2
 	assert read_state(directory, 'aarch64')!.packages[0].package.version == '1.0.0'
 	// Cache permits operation with the repository payload absent.
 	os.rm(repository + '/objects/' + v2.files[0].sha256) or { panic(err) }

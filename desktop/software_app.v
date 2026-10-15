@@ -451,6 +451,8 @@ fn (mut a SoftwareApp) load_review() {
 		unsafe { message.free() }
 	} else if a.review == 'repair' {
 		a.set_status('Repair preserves installed versions, permissions and the application set. Rows marked repair need rebuilding from authenticated payloads. Review every dependency before confirming; personal data stays on disk.')
+	} else if a.review == 'rollback' {
+		a.set_status('Rollback restores the previous package set in a new generation and retains the current set so you can undo it. Review every dependency and removal; personal data stays on disk.')
 	} else {
 		a.set_status('Review every application and dependency, including retained packages and removals. Personal data stays on disk. Confirm applies this exact package set.')
 	}

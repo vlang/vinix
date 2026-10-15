@@ -180,7 +180,9 @@ fn test_generation_complete_admission_preserves_activation_and_retries_offline()
 	os.unsetenv('VINIX_GENERATION_EVENTS')
 	retry := transact(f.config, f.directory, 'upgrade', [], TransactionOptions{})!
 	assert retry.previous == 1 && retry.packages[0].package.version == '2.0.0'
-	assert rollback(f.config, f.directory)!.generation == 1
+	restored := rollback(f.config, f.directory)!
+	assert restored.generation > retry.generation && restored.previous == retry.generation
+	assert restored.packages[0].package.version == '1.0.0'
 	println('GENERATION ADMISSION 90 prepared/staged/published/activate refusals preserve current state, history and outside data; no completion, clean unpublished stages, retained published failures and offline retry PASS')
 }
 
@@ -231,7 +233,8 @@ fn test_generation_rollback_admission_binds_captured_metadata_and_checks_after_p
 		}
 	}
 	os.unsetenv('VINIX_GENERATION_EVENTS')
-	assert rollback(f.config, f.directory)!.generation == 1
+	restored := rollback(f.config, f.directory)!
+	assert restored.generation == 7 && restored.previous == 2 && restored.packages[0].package.version == '1.0.0'
 	assert os.read_file(path)! == text
 	println('GENERATION ADMISSION rollback refuses four late changes without switching current; captured whitespace-compatible metadata retries PASS')
 }

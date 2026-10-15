@@ -122,15 +122,15 @@ pub fn estimate_space(plan Plan, directory string) !u64 {
 }
 
 fn estimate_transaction_space(plan Plan, directory string, current State, operation string) !u64 {
-	if operation != 'remove' || current.generation == 0 { return estimate_space(plan, directory) }
-	number := current.generation.str()
+	if operation !in ['remove', 'rollback'] || current.generation == 0 { return estimate_space(plan, directory) }
+	number := if operation == 'rollback' { current.previous.str() } else { current.generation.str() }
 	retained := directory + '/generations/' + number + '/apps'
 	defer { unsafe { number.free(); retained.free() } }
 	return estimate_space_from(plan, directory, retained)
 }
 
-// Removal copies verified files from the active generation before consulting
-// the object cache. Budget a download only when neither source is usable.
+// Removal copies verified active files before consulting the object cache.
+// Rollback copies the admitted previous generation without consulting the cache.
 fn estimate_space_from(plan Plan, directory string, retained string) !u64 {
 	mut needed := u64(4 * 1024 * 1024)
 	mut cache := map[string]bool{}
@@ -282,10 +282,34 @@ fn activate_plan_locked(config Config, directory string, current State, plan Pla
 }
 
 fn activate_repair_plan_locked(config Config, directory string, current State, plan Plan, operation string, repairs []string, options TransactionOptions) !State {
+	return activate_repair_plan_from_locked(config, directory, current, plan, operation, repairs, RollbackSource{}, options)
+}
+
+// A rollback source is borrowed for the duration of a transaction. Its exact
+// metadata and complete tree are checked before staging and after callbacks at
+// the activation boundary. Never rewrite a retained immutable generation.
+struct RollbackSource {
+	state State
+	text string
+}
+
+fn verify_rollback_source(directory string, source RollbackSource) ! {
+	number := source.state.generation.str()
+	root := directory + '/generations/' + number
+	defer { unsafe { number.free(); root.free() } }
+	verify_generation_tree(root, source.state, source.text, true)!
+}
+
+fn verify_transaction_activation(directory string, published string, state State, encoded string, source RollbackSource) ! {
+	if source.state.generation != 0 { verify_rollback_source(directory, source)! }
+	verify_generation_tree(published, state, encoded, true)!
+}
+
+fn activate_repair_plan_from_locked(config Config, directory string, current State, plan Plan, operation string, repairs []string, source_generation RollbackSource, options TransactionOptions) !State {
 	observed := transaction_repairs(directory, current, plan, operation)
 	defer { close_transaction_repairs(observed) }
 	if observed != repairs { return error('package review is stale: installed payload repair set changed; review again') }
-	if current.requested == plan.requested && current.packages == plan.packages && repairs.len == 0 {
+	if operation != 'rollback' && current.requested == plan.requested && current.packages == plan.packages && repairs.len == 0 {
 		options.progress(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 })
 		return current
 	}
@@ -300,9 +324,9 @@ fn activate_repair_plan_locked(config Config, directory string, current State, p
 	}
 	encoded := encode_generation_state(state)!
 	defer { unsafe { encoded.free() } }
-	// Retire abandoned work only after a supplied review has been accepted.
-	recover_generation_stages(directory)!
+	// Check space before retiring abandoned work, and only after review admission.
 	disk_check(free_bytes(directory)!, estimate_transaction_space(plan, directory, current, operation)!, config.policy.reserve_bytes)!
+	recover_generation_stages(directory)!
 	number := generation.str()
 	stage_name := '.stage-' + number
 	stage := directory + '/generations/' + stage_name
@@ -334,8 +358,13 @@ fn activate_repair_plan_locked(config Config, directory string, current State, p
 		p := installed.package
 		println('Installing ${p.name} ${p.version} (${done + 1}/${plan.packages.len}) from ${installed.repository}')
 		for file in p.files {
-			retained := directory + '/generations/' + current.generation.str() + '/apps/' + p.id + '/' + file.path
-			source := if operation == 'remove' && verified_file(retained, file) {
+			retained_number := if operation == 'rollback' { source_generation.state.generation.str() } else { current.generation.str() }
+			retained := directory + '/generations/' + retained_number + '/apps/' + p.id + '/' + file.path
+			defer { unsafe { retained_number.free(); retained.free() } }
+			source := if operation == 'rollback' {
+				if !verified_installed_file(retained, file) { return error('${p.id}: rollback source changed; review rollback again') }
+				retained
+			} else if operation == 'remove' && verified_file(retained, file) {
 				retained
 			} else {
 				cached_payload_progress(config, installed, file, directory, options.progress)!
@@ -381,7 +410,7 @@ fn activate_repair_plan_locked(config Config, directory string, current State, p
 	sync_directory(directory + '/generations')!
 	options.checkpoint('published')
 	options.progress(pkgprotocol.Progress{ phase: 'activate' })
-	verify_generation_tree(published, state, encoded, true) or {
+	verify_transaction_activation(directory, published, state, encoded, source_generation) or {
 		message := err.msg()
 		defer { unsafe { message.free(); err.free() } }
 		return error('package generation was not activated; retained for inspection at ${published}: ${message}; retry builds a new generation')
@@ -430,11 +459,15 @@ fn rollback_locked(config Config, directory string, expected string) !State {
 }
 
 fn rollback_progress(config Config, directory string, expected string, report fn (pkgprotocol.Progress)) !State {
+	return rollback_transaction_locked(config, directory, TransactionOptions{ expected_review: expected, progress: report })
+}
+
+fn rollback_transaction_locked(config Config, directory string, options TransactionOptions) !State {
 	current := read_state(directory, config.architecture)!
 	old := rollback_target(config, directory, current)!
-	if expected != '' {
-		check_review(expected, review_fingerprint(config, 'rollback', [], current,
-			Plan{ requested: old.requested, packages: old.packages }, old.generation, []))!
+	plan := Plan{ requested: old.requested, packages: old.packages }
+	if options.expected_review != '' {
+		check_review(options.expected_review, review_fingerprint(config, 'rollback', [], current, plan, old.generation, []))!
 	}
 	number := old.generation.str()
 	root := directory + '/generations/' + number
@@ -445,13 +478,12 @@ fn rollback_progress(config Config, directory string, expected string, report fn
 	captured := decode_persistent_state(text, config.architecture)!
 	defer { close_decoded_state(captured) }
 	if captured != old { return error('rollback generation metadata changed; inspect the retained generation and review again') }
-	verify_generation_tree(root, old, text, true)!
-	report(pkgprotocol.Progress{ phase: 'activate' })
-	verify_generation_tree(root, old, text, true)!
-	activate(directory, old.generation)!
-	println('Rolled back to generation ${old.generation}; application data was retained')
-	report(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 })
-	return old
+	source := RollbackSource{ state: old, text: text }
+	verify_rollback_source(directory, source)!
+	options.progress(pkgprotocol.Progress{ phase: 'resolve' })
+	state := activate_repair_plan_from_locked(config, directory, current, plan, 'rollback', [], source, options)!
+	println('Restored packages from generation ${old.generation} in generation ${state.generation}; application data was retained')
+	return state
 }
 
 pub fn collect(config Config, directory string) ! {

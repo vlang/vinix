@@ -6,7 +6,8 @@ import json2
 import tools.packages.pkgprotocol
 
 struct ReviewIdentity {
-	format            int = 1
+	// Opaque identity version 2 invalidates approvals from pointer-only rollback.
+	format            int = 2
 	config            Config
 	operation         string
 	names             []string
@@ -152,8 +153,8 @@ fn review_operation_locked(config Config, directory string, operation string, na
 }
 
 fn review_plan(config Config, directory string, current State, operation string, names []string, plan Plan, target u64, repairs []string, fingerprint string) !pkgprotocol.Review {
-	changed := current.requested != plan.requested || current.packages != plan.packages || repairs.len > 0
-	if operation != 'rollback' && changed {
+	changed := operation == 'rollback' || current.requested != plan.requested || current.packages != plan.packages || repairs.len > 0
+	if changed {
 		encoded := encode_generation_state(State{
 			generation: next_generation(directory)!
 			previous: current.generation
@@ -184,7 +185,7 @@ fn review_plan(config Config, directory string, current State, operation string,
 		}
 	}
 	rows.sort(a.id < b.id)
-	needed := if operation == 'rollback' || !changed {
+	needed := if !changed {
 		u64(0)
 	} else {
 		estimate_transaction_space(plan, directory, current, operation)!

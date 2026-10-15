@@ -666,6 +666,22 @@ remain for rollback. `gc` retains active/previous and leased generations, remove
 older unused generations and unused complete objects, and clears abandoned
 partial downloads.
 
+Rollback copies the retained package set into a fresh generation whose
+`previous` points to the generation it replaced. It checks free space and the
+configured reserve, stages and verifies the complete copy, and activates it
+atomically. The source's manifests, provenance and requested roots are preserved;
+the source tree and personal data remain untouched. Cached objects and repository
+access are unnecessary. Interrupted stages recover on retry; a damaged published
+copy remains for inspection without activation. Cleanup can run before or after
+rollback, and another rollback restores the replaced set.
+
+The review's `target_generation` is the source being restored. Active generation
+IDs now advance on rollback; scripts should inspect `status` for the result and
+obtain fresh approvals after updating from the pointer-only implementation.
+Software explains the new generation and undo behavior before confirmation and
+shows the restore source in Details. See
+[qualification](../tests/packages/rollback-check.md).
+
 Software’s **Clean up versions** opens a read-only, paged review of obsolete
 generation IDs, with the architecture and current/rollback identities. Confirming
 **Delete listed versions** uses administrator authorization and deletes only that

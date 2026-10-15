@@ -66,13 +66,15 @@ fn check_case(directory string, mode string, before bool) ! {
 	mut message := ''
 	service.transact('install', ['app'], pkgcore.TransactionOptions{ expected_review: review.fingerprint }) or { message = err.msg() }
 	if before {
-		assert mode == 'valid-complete' && message == '' && service.verify()!.generation == 3
+		assert mode == 'valid-complete' && message == '' && initial.verify()!.generation == 3
 		assert os.read_file(outside)! == content && os.lstat(outside)!.mode & 0o777 == 0o444
 		println('CACHE PROMOTION BEFORE: complete hard-linked partial installed and changed unrelated file permissions from 0640 to 0444')
 		return
 	}
 	assert message.contains('without hard links'), message
-	assert service.verify()!.generation == 2 && os.read_file(store + '/current/state.json')! == state
+	// Verification has its own progress events; keep them out of the refused
+	// transaction's event log by using the observer-free verification service.
+	assert initial.verify()!.generation == 2 && os.read_file(store + '/current/state.json')! == state
 	assert os.read_file(outside)! == content && os.lstat(outside)!.mode & 0o777 == 0o640
 	assert os.read_file(partial)! == content && !os.exists(object)
 	assert os.read_file(store + '/catalog.json')! == cache && os.read_file(store + '/trust-history.json')! == history
@@ -85,12 +87,13 @@ fn check_case(directory string, mode string, before bool) ! {
 	os.rm(directory + '/repository/objects/' + payload.sha256)!
 	os.write_file(directory + '/events', '')!
 	assert service.transact('install', ['app'], pkgcore.TransactionOptions{ expected_review: review.fingerprint })!.generation == 3
-	assert service.verify()!.packages[0].package == package
+	assert initial.verify()!.packages[0].package == package
 	assert pkgcore.verified_file(object, payload) && os.lstat(object)!.mode & 0o777 == 0o444 && !os.exists(partial)
 	assert os.read_file(outside)! == content && os.lstat(outside)!.mode & 0o777 == 0o640
 	assert !os.read_file(directory + '/events')!.split_into_lines().contains('download')
-	assert service.rollback('')!.generation == 2 && service.rollback('')!.generation == 1
-	assert service.verify()!.generation == 1
+	assert service.rollback('')!.generation == 4 && initial.verify()!.packages.len == 0
+	assert service.rollback('')!.generation == 5 && initial.verify()!.packages[0].package == package
+	assert initial.verify()!.previous == 4
 	println('CACHE PROMOTION ' + mode + ': refused alias with unrelated bytes/mode and state/history preserved; ordinary offline retry and rollback PASS')
 }
 

@@ -117,6 +117,7 @@ fn check_package_review() {
 		app.handle(action) or { panic(err) }
 		wait_for_software(mut app)
 		assert app.review_ready
+		if action == 'software.rollback' { assert app.status.contains('new generation') && app.status.contains('undo it') }
 		app.handle('software.cancel') or { panic(err) }
 		assert app.review_snapshot.rows.len == 0 && app.review_summary == ''
 	}

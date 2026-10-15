@@ -72,6 +72,14 @@ use `cleanup-review` and `cleanup-apply FINGERPRINT`; broader administrator `gc`
 still collects caches/stages. See
 [reviewed cleanup qualification](../../tests/packages/reviewed-cleanup-check.md).
 
+Rollback restores the previous package set in a fresh generation and retains
+the set it replaced, so cleanup cannot strand its rollback link. It uses verified
+local source files without cache or repository access, checks the disk reserve,
+and leaves personal data intact. Another rollback undoes the restoration.
+`review rollback` identifies the source in `target_generation`; read `status`
+for the new active identity. See
+[qualification](../../tests/packages/rollback-check.md).
+
 Start, Quick Launch and Open With use bounded installed-state presentation
 decoding with complete fields, explicit ownership and canonical generation
 identities. Damaged metadata is refused before menu replacement; restoring it

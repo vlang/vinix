@@ -191,7 +191,7 @@ fn test_cache_refusal_preserves_legacy_migration_replay_floor_and_installed_reco
 	assert !os.exists(directory + '/trust-history.json')
 	service.transact('install', ['app'], TransactionOptions{ expected_review: review.fingerprint })!
 	assert service.verify()!.packages.len == 1
-	assert service.rollback('')!.generation == 2
+	assert service.rollback('')!.generation == 4 && service.state()!.packages.len == 0
 	publish(work + '/repository', 'publisher', work + '/seed', 11, time.now().unix() + 3600)!
 	service.refresh()!
 	assert read_history(directory)!.repositories[0].sequence == 11

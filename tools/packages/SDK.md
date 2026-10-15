@@ -2035,7 +2035,7 @@ catalogs and expiry, and supplies payloads only for the exported closure.
 
 `review install|remove|upgrade|repair|deploy|rollback [ID...]` emits a format-1 review
 without downloading payloads or changing installed state. It includes the active
-generation, rollback target generation, operation/IDs, target requested roots,
+generation, rollback source generation (`target_generation`), operation/IDs, target requested roots,
 and every package in the target closure plus removed packages. Rows contain
 `action` (`install`, `update`, `keep`, `remove`), previous/target versions, runtime,
 publisher/key, license/proprietary/firmware flags and declared permissions.
@@ -2043,6 +2043,22 @@ publisher/key, license/proprietary/firmware flags and declared permissions.
 include the complete next generation, missing cached objects and metadata.
 Removal uses installed provenance and remains available after publisher expiry
 or revocation; rollback verifies retained payloads and current trust/policy.
+
+Rollback restores the source's exact manifests, provenance and requested roots
+in a fresh generation, with `previous` pointing to the set it replaced. It copies
+verified retained files without downloads or cache access, rebuilds registration,
+and uses the same disk reserve, staging, flush, publication and activation checks
+as installation. It requires space for the complete restored generation, even
+when both package sets are identical or empty. The source remains immutable.
+Cleanup before or after rollback preserves a usable previous generation; another
+rollback undoes the restoration. Personal data is not restored or removed.
+
+SDK 1 response fields and command arguments are unchanged. `target_generation`
+identifies the retained source, not the newly activated generation. Read the
+returned `State`/`status` for the fresh generation identity; scripts must not
+assume rollback decreases that counter or walks older ancestors. Reviews issued
+by the earlier pointer-only implementation must be obtained again. See
+[transactional rollback qualification](../../tests/packages/rollback-check.md).
 
 After review, call `apply FINGERPRINT OPERATION [ID...]` with the returned
 `fingerprint`, operation and IDs. The service resolves again under its writer

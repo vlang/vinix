@@ -167,8 +167,8 @@ fn check_case(work string, kind string, binary string, before bool) ! {
 	else { if _ := client.command(['rollback']) { assert false } else { assert err.msg().contains('verification failed') } }
 	assert client.state(false)!.generation == 2
 	restore(base, entry_bytes)!
-	if binary == '' { assert setup.rollback('')!.generation == 1 } else { client.command(['rollback'])!; assert client.state(false)!.generation == 1 }
-	assert client.state(true)!.generation == 1
+	if binary == '' { assert setup.rollback('')!.generation == 3 } else { client.command(['rollback'])!; assert client.state(false)!.generation == 3 }
+	assert client.state(true)!.generation == 3 && client.state(false)!.previous == 2
 	setup.transact('remove', ['app'], pkgcore.TransactionOptions{})!
 	assert setup.state()!.packages.len == 0 && !os.exists(store + '/current/share/applications/vinix-app.desktop')
 	assert os.read_file(personal + '/memo')! == 'private notes'

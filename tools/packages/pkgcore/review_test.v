@@ -129,13 +129,14 @@ fn test_review_removal_after_revocation_and_reviewed_rollback() {
 	assert refused
 	rollback_review := review_operation(config, directory, 'rollback', [])!
 	assert rollback_review.target_generation == 1 && rollback_review.rows.all(it.action == 'install')
-	assert rollback_reviewed(config, directory, rollback_review.fingerprint)!.generation == 1
+	assert rollback_review.disk_needed > 4 * 1024 * 1024
+	assert rollback_reviewed(config, directory, rollback_review.fingerprint)!.generation == 3
 	refused = false
 	rollback_reviewed(config, directory, rollback_review.fingerprint) or { refused = true }
-	assert refused && read_state(directory, 'aarch64')!.generation == 1
+	assert refused && read_state(directory, 'aarch64')!.generation == 3
 	// Rollback preview verifies the retained bytes, rather than only their metadata.
 	transact(config, directory, 'remove', ['app'], TransactionOptions{})!
-	os.write_file(directory + '/generations/1/apps/runtime/bin/runner', 'tampered\n')!
+	os.write_file(directory + '/generations/3/apps/runtime/bin/runner', 'tampered\n')!
 	refused = false
 	review_operation(config, directory, 'rollback', []) or { refused = err.msg().contains('verification') }
 	assert refused

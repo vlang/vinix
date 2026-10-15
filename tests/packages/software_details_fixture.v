@@ -98,6 +98,7 @@ fn check_software_details() ! {
 		app.handle('software.details')!
 		assert app.details_mode && app.details_review
 		assert 'Package ID: runtime' in details_fixture_values(&app, 0)
+		if operation == 'rollback' { assert 'Restore from generation: 2' in details_fixture_values(&app, 0) }
 		assert 'License: Vendor-EULA' in details_fixture_values(&app, 4)
 		if operation == 'deploy' { assert 'Deployment file: ' + app.deployment_pending in details_fixture_values(&app, 5) }
 		for hidden in ['software.confirm', 'software.cancel', 'software.row.0', 'software.reload'] { app.handle(hidden)! }

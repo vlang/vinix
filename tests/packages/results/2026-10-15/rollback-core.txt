@@ -1,0 +1,504 @@
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 1
+Updating trusted repository trusted
+Installing Application 2.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 2
+Updating trusted repository trusted
+Installing Application 3.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 4.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 4
+Installing Application 3.0.0 (1/1) from trusted
+Activated package generation 5
+Restored packages from generation 3 in generation 5; application data was retained
+Installing Application 4.0.0 (1/1) from trusted
+Activated package generation 6
+Restored packages from generation 4 in generation 6; application data was retained
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 1
+Updating trusted repository trusted
+Installing Application 2.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 2
+Updating trusted repository trusted
+Installing Application 3.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 4.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 4
+Installing Application 3.0.0 (1/1) from trusted
+Activated package generation 5
+Restored packages from generation 3 in generation 5; application data was retained
+Installing Application 4.0.0 (1/1) from trusted
+Activated package generation 6
+Restored packages from generation 4 in generation 6; application data was retained
+ROLLBACK TRANSACTION cleanup before/after rollback retains a complete reversible history edge on both architectures PASS
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 1
+Updating trusted repository trusted
+Installing Application 2.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 2
+Updating trusted repository trusted
+Installing Application 3.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 4.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 4
+Installing Application 3.0.0 (1/1) from trusted
+Activated package generation 5
+Restored packages from generation 3 in generation 5; application data was retained
+ROLLBACK TRANSACTION exact retained-source disk estimate and reserve refusal preserve activation, rollback and interrupted work PASS
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 1
+Updating trusted repository trusted
+Installing Application 2.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 2
+Updating trusted repository trusted
+Installing Application 3.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 4.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 4
+Installing Application 3.0.0 (1/1) from trusted
+Installing Application 3.0.0 (1/1) from trusted
+Activated package generation 5
+Restored packages from generation 3 in generation 5; application data was retained
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 1
+Updating trusted repository trusted
+Installing Application 2.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 2
+Updating trusted repository trusted
+Installing Application 3.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 4.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 4
+Installing Application 3.0.0 (1/1) from trusted
+Installing Application 3.0.0 (1/1) from trusted
+Activated package generation 6
+Restored packages from generation 3 in generation 6; application data was retained
+ROLLBACK TRANSACTION interrupted staging and damaged published copy preserve current; reviewed retry uses retained source without acquisition PASS
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 1
+Updating trusted repository trusted
+Installing Application 2.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 2
+Updating trusted repository trusted
+Installing Application 3.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 4.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 4
+Activated package generation 5
+Installing Application 4.0.0 (1/1) from trusted
+Activated package generation 6
+Restored packages from generation 4 in generation 6; application data was retained
+Activated package generation 7
+Restored packages from generation 5 in generation 7; application data was retained
+Activated package generation 8
+Restored packages from generation 6 in generation 8; application data was retained
+ROLLBACK TRANSACTION empty and identical package sets still publish a fresh reversible generation PASS
+
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+GENERATION ADMISSION late-state refused=true current_changed=false
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Installing Application 2.0.0 (1/1) from fixture
+Activated package generation 33
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 34
+Restored packages from generation 1 in generation 34; application data was retained
+GENERATION ADMISSION 90 prepared/staged/published/activate refusals preserve current state, history and outside data; no completion, clean unpublished stages, retained published failures and offline retry PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Installing Application 2.0.0 (1/1) from fixture
+Activated package generation 3
+GENERATION ADMISSION exclusive publication preserves raced destination and retries at a fresh identity PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Installing Application 1.0.0 (1/1) from fixture
+Installing Application 1.0.0 (1/1) from fixture
+Installing Application 1.0.0 (1/1) from fixture
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 7
+Restored packages from generation 1 in generation 7; application data was retained
+GENERATION ADMISSION rollback refuses four late changes without switching current; captured whitespace-compatible metadata retries PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (12 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+GENERATION ADMISSION 128 valid and refused scans of 64-level trees retire descriptors under a 32-descriptor limit PASS
+
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 2.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Activated package generation 4
+
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 2
+Installing app 1.0.0 (1/1) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 4
+Activated package generation 5
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 6
+Restored packages from generation 4 in generation 6; application data was retained
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Updating trusted repository fixture
+
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Restarting app/bin/app: resumed payload failed verification
+Activated package generation 3
+Package download recovery: damaged resumed prefix restarted once and verified before activation
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Restarting app/bin/app: resumed payload failed verification
+Installing Application 1.0.0 (1/1) from trusted
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Installing Application 1.0.0 (1/1) from trusted
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Package download recovery: bad source refused after bounded attempts; activation and rollback preserved
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+
+Snapshot probe: null cache accepted=false
+Snapshot probe: unknown field accepted=false
+Snapshot probe: duplicate text accepted=false
+Snapshot probe: missing URL accepted=false
+Snapshot probe: dangling cache accepted=false
+Snapshot schema: complete typed records, ambiguity refusal, exact signed bytes, legacy whitespace and fresh/empty caches passed
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Downloading app/bin/app (14 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Activated package generation 5
+Activated package generation 6
+Snapshot schema: failed migration preserves state/cache/recovery; restored legacy floor rejects replay, authentic renewal and revoked-publisher uninstall passed
+
+REVIEWED CLEANUP both architectures, offline/revoked catalog independence, retained active/rollback/live leases, cache, stages and personal data PASS
+REVIEWED CLEANUP stale configuration/activation/set/root/parent/lease/busy/release approvals and damaged rollback/unsafe roots refuse before removal PASS
+REVIEWED CLEANUP read-only fresh observation, reader/writer exclusion and required approval PASS
+REVIEWED CLEANUP root-owned reader/inventory checks require guest root
+

@@ -1,0 +1,133 @@
+ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1
+
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 1
+Updating trusted repository trusted
+Installing Application 2.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 2
+Updating trusted repository trusted
+Installing Application 3.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 4.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 4
+Installing Application 3.0.0 (1/1) from trusted
+Activated package generation 5
+Restored packages from generation 3 in generation 5; application data was retained
+Installing Application 4.0.0 (1/1) from trusted
+Activated package generation 6
+Restored packages from generation 4 in generation 6; application data was retained
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 1
+Updating trusted repository trusted
+Installing Application 2.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 2
+Updating trusted repository trusted
+Installing Application 3.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 4.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 4
+Installing Application 3.0.0 (1/1) from trusted
+Activated package generation 5
+Restored packages from generation 3 in generation 5; application data was retained
+Installing Application 4.0.0 (1/1) from trusted
+Activated package generation 6
+Restored packages from generation 4 in generation 6; application data was retained
+ROLLBACK TRANSACTION cleanup before/after rollback retains a complete reversible history edge on both architectures PASS
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 1
+Updating trusted repository trusted
+Installing Application 2.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 2
+Updating trusted repository trusted
+Installing Application 3.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 4.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 4
+Installing Application 3.0.0 (1/1) from trusted
+Activated package generation 5
+Restored packages from generation 3 in generation 5; application data was retained
+ROLLBACK TRANSACTION exact retained-source disk estimate and reserve refusal preserve activation, rollback and interrupted work PASS
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 1
+Updating trusted repository trusted
+Installing Application 2.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 2
+Updating trusted repository trusted
+Installing Application 3.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 4.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 4
+Installing Application 3.0.0 (1/1) from trusted
+Installing Application 3.0.0 (1/1) from trusted
+Activated package generation 5
+Restored packages from generation 3 in generation 5; application data was retained
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 1
+Updating trusted repository trusted
+Installing Application 2.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 2
+Updating trusted repository trusted
+Installing Application 3.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 4.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 4
+Installing Application 3.0.0 (1/1) from trusted
+Installing Application 3.0.0 (1/1) from trusted
+Activated package generation 6
+Restored packages from generation 3 in generation 6; application data was retained
+ROLLBACK TRANSACTION interrupted staging and damaged published copy preserve current; reviewed retry uses retained source without acquisition PASS
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 1
+Updating trusted repository trusted
+Installing Application 2.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 2
+Updating trusted repository trusted
+Installing Application 3.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 4.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 4
+Activated package generation 5
+Installing Application 4.0.0 (1/1) from trusted
+Activated package generation 6
+Restored packages from generation 4 in generation 6; application data was retained
+Activated package generation 7
+Restored packages from generation 5 in generation 7; application data was retained
+Activated package generation 8
+Restored packages from generation 6 in generation 8; application data was retained
+ROLLBACK TRANSACTION empty and identical package sets still publish a fresh reversible generation PASS

@@ -29,7 +29,7 @@ pub:
 	names             []string
 	architecture      string
 	generation        u64
-	target_generation u64 // rollback only
+	target_generation u64 // rollback source; restored into a fresh generation
 	fingerprint       string
 	requested         []string
 	rows              []ReviewPackage // target closure and removals, sorted by ID

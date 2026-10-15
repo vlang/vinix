@@ -181,7 +181,7 @@ fn test_service_refuses_ambiguous_configuration_before_mutating_package_state() 
 	assert service.verify()!.packages.len == 0
 	assert service.transact('install', ['app'], TransactionOptions{expected_review: review.fingerprint})!.generation == 3
 	assert service.verify()!.packages.len == 1
-	assert service.rollback('')!.generation == 2
+	assert service.rollback('')!.generation == 4 && service.state()!.packages.len == 0
 }
 
 fn test_service_history_refusal_preserves_state_payloads_and_recovery_stages() {
@@ -220,5 +220,6 @@ fn test_service_history_refusal_preserves_state_payloads_and_recovery_stages() {
 	}
 	os.write_file(path, original)!
 	assert service.transact('install', ['app'], TransactionOptions{expected_review: review.fingerprint})!.generation == 3
-	assert service.verify()!.packages.len == 1 && service.rollback('')!.generation == 2
+	assert service.verify()!.packages.len == 1 && service.rollback('')!.generation == 4
+	assert service.state()!.previous == 3 && service.state()!.packages.len == 0
 }

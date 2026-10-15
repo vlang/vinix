@@ -129,7 +129,8 @@ fn qualify_package_recovery(mut t Test) ! {
 	package_root_cli(['rollback'])!
 	package_root_cli(['verify'])!
 	package_root_cli(['gc'])!
-	assert os.ls(package_state + '/generations')! == ['1']
+	assert os.ls(package_state + '/generations')!.sorted() == ['4', '5']
+	assert pkgcore.read_state(package_state, config.architecture)!.previous == 4
 	data := package_test_root + '/home/alex/.local/share/vinix-apps/recovery-app/personal.txt'
 	assert read_text(data) == 'personal data survives\n' && owner_of(data) == 1000
 	assert mode_of(data) == 0o600

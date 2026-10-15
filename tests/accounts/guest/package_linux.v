@@ -74,7 +74,8 @@ fn qualify_package_download_refusal(root string, architecture string, repository
 	package_success(['--root', root, 'verify'])!
 	package_success(['--root', root, 'rollback'])!
 	package_success(['--root', root, 'verify'])!
-	assert pkgcore.read_state(directory, architecture)!.generation == 1
+	assert pkgcore.read_state(directory, architecture)!.generation == 3
+	assert pkgcore.read_state(directory, architecture)!.previous == 2
 }
 
 fn qualify_package_oversized_offline_source(architecture string, repository string, key string, application pkgcore.Package) ! {
@@ -257,12 +258,14 @@ fn qualify_package_stored_state(root string, architecture string, application_id
 	assert !os.exists(directory + '/generations/3') && !os.exists(orphan)
 	package_success(['--root', root, 'rollback'])!
 	package_success(['--root', root, 'verify'])!
-	os.write_file(path, text.replace('"generation":1', '"generation":1,"generat\\u0069on":1'))!
+	active_path := directory + '/current/state.json'
+	active_text := os.read_file(active_path)!
+	os.write_file(active_path, active_text.replace('"generation":3', '"generation":3,"generat\\u0069on":3'))!
 	for command in ['status', 'verify', 'view', 'gc'] {
 		refused := run(['/usr/bin/vinix-package', '--root', root, command], '', none, none)
 		assert refused.status != 0 && refused.output.contains('duplicate administration document field'), refused.output
 	}
-	os.write_file(path, text)!
+	os.write_file(active_path, active_text)!
 	os.mkdir(directory + '/generations/01')!
 	os.write_file(directory + '/generations/01/state.json', text)!
 	os.rm(directory + '/current')!
@@ -272,6 +275,8 @@ fn qualify_package_stored_state(root string, architecture string, application_id
 	os.rm(directory + '/current')!
 	os.symlink('generations/1', directory + '/current')!
 	os.rmdir_all(directory + '/generations/01')!
+	// Restore the fixture's original root before synthesizing obsolete versions.
+	os.rmdir_all(directory + '/generations/3')!
 	package_success(['--root', root, 'verify'])!
 	// Generation 2 already exists. Add 127 obsolete published directories so
 	// the production CLI must handle 128 candidates under a 32-FD limit.

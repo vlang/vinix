@@ -1,0 +1,34 @@
+30 successful host compile/run checks:
+PASS rollback-core-compile
+PASS rollback-core-run
+PASS generation_admission-regressions-compile
+PASS generation_admission-regressions-run
+PASS review-regressions-compile
+PASS review-regressions-run
+PASS service-regressions-compile
+PASS service-regressions-run
+PASS distribution-regressions-compile
+PASS distribution-regressions-run
+PASS download_recovery-regressions-compile
+PASS download_recovery-regressions-run
+PASS snapshot_schema-regressions-compile
+PASS snapshot_schema-regressions-run
+PASS cleanup-regressions-compile
+PASS cleanup-regressions-run
+PASS rollback-asan-compile
+PASS rollback-asan-run
+PASS cli-compile
+PASS rollback-probe-compile
+PASS rollback-probe-run
+PASS cache-promotion-probe-compile
+PASS cache-promotion-probe-run
+PASS installation-health-probe-compile
+PASS installation-health-probe-run
+PASS installed-namespace-probe-compile
+PASS installed-namespace-probe-run
+PASS https-fixture-compile
+PASS https-check-compile
+PASS https-run
+PASS complete desktop typecheck arm64
+PASS complete desktop typecheck amd64
+PASS maintained Software distribution driver and all twelve allocation modes

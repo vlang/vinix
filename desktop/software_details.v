@@ -116,7 +116,7 @@ fn (mut a SoftwareApp) prepare_details(row SoftwareRow, action string, reviewing
 		general << 'Package action: ' + action
 		general << 'Target role: ' + if row.requested { 'Requested application' } else { 'Dependency or removed package' }
 		software_details_count(mut general, 'Active generation: ', a.review_snapshot.generation)
-		if a.review_snapshot.target_generation != 0 { software_details_count(mut general, 'Rollback generation: ', a.review_snapshot.target_generation) }
+		if a.review_snapshot.target_generation != 0 { software_details_count(mut general, 'Restore from generation: ', a.review_snapshot.target_generation) }
 	} else {
 		general << 'Installed role: ' + if row.installed_version == '' { 'Not installed' } else if row.requested { 'Requested application' } else { 'Dependency/runtime' }
 		general << 'Update status: ' + if a.update_error != '' { 'Updates unavailable; see Diagnostics' } else if row.updatable { row.update_action } else { 'No resolved change' }

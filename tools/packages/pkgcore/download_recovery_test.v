@@ -137,7 +137,8 @@ fn test_bad_repository_stops_after_bounded_recovery_and_preserves_activation_and
 		events := fixture.events()!
 		assert events.filter(it.phase == 'verify').len == if resumed { 2 } else { 1 }
 		assert events.all(it.phase !in ['activate', 'complete'])
-		assert fixture.service().rollback('')!.generation == 1 && fixture.verified_state()!.generation == 1
+		assert fixture.service().rollback('')!.generation == 3 && fixture.verified_state()!.generation == 3
+		assert fixture.verified_state()!.previous == 2 && fixture.verified_state()!.packages.len == 1
 	}
 	println('Package download recovery: bad source refused after bounded attempts; activation and rollback preserved')
 }

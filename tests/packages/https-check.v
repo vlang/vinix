@@ -121,7 +121,8 @@ fn qualify_transaction(work string, base string, mode string, text string, key s
 				return
 			}
 		}
-		assert service.rollback('')!.generation == 1 && service.verify()!.generation == 1
+		assert service.rollback('')!.generation == 3 && service.verify()!.generation == 3
+		assert service.state()!.previous == 2 && service.state()!.packages.len == 1
 	}
 	println('PASS HTTPS signed transaction ' + mode + ' bounded requests, progress and persistent state')
 }

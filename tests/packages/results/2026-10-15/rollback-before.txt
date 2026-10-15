@@ -1,0 +1,27 @@
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 1
+Updating trusted repository trusted
+Installing Application 2.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 2
+Updating trusted repository trusted
+Installing Application 3.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 4.0.0 (1/1) from trusted
+Downloading app/bin/app (16 bytes)
+Activated package generation 4
+Rolled back to generation 3; application data was retained
+V panic: package generation must be an ordinary directory
+ v hash: 826e96f
+    pid: 0x762d
+    tid: 0x762d
+0   rollback-before                     0x0000000104ba6158 panic_fatal + 608
+1   rollback-before                     0x0000000104ba6360 panic_jump_next + 364
+2   rollback-before                     0x0000000104ad054c panic_frame_done + 76
+3   rollback-before                     0x0000000104c5bfbc pkgcore__test_rollback_after_cleanup_preserves_a_complete_reversible_history_edge + 596
+4   rollback-before                     0x0000000104cdec6c main + 224
+5   dyld                                0x000000018c507e00 start + 6992
