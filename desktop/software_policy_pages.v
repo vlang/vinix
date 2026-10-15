@@ -17,7 +17,7 @@ fn (mut a SoftwareApp) add_policy_page(section int, title string, lines []string
 
 // Every value is shown intact across UTF-8 boundaries. Group at most fourteen
 // 48-byte lines per page so long IDs, ranges, filenames and diagnostics remain
-// readable in the compact Software layout, without formatting on redraw.
+// readable in the full Software layout, without formatting on redraw.
 fn (mut a SoftwareApp) policy_values(section int, title string, values []string) {
 	mut lines := []string{cap: 14}
 	unsafe { lines.flags |= .noslices }
@@ -133,4 +133,18 @@ fn (mut a SoftwareApp) prepare_policy_pages(reviewing bool) {
 		unsafe { number.free() }
 	}
 	unsafe { for total in totals { total.free() } }
+	a.policy_compact_pages = []SoftwareFailurePage{cap: 32}
+	unsafe { a.policy_compact_pages.flags |= .noslices }
+	// Group the short pages by topic: previous/proposed settings are interleaved
+	// in the canonical document, and both must remain reachable within a topic.
+	for section in 0 .. 7 {
+		for index, page in a.policy_pages {
+			if page.section == section {
+				text := page.title + '\n' + page.text
+				software_failure_paginate(mut a.policy_compact_pages, text, 12, 3, index)
+				unsafe { text.free() }
+			}
+		}
+	}
+	software_failure_labels(mut a.policy_compact_pages)
 }

@@ -77,6 +77,14 @@ paste does not create an unsent edit or block closing. Keyboard deletion still
 clears fields, and Enter can send an explicitly cleared native field. See
 [empty-paste checks](../../tests/packages/software-empty-paste-check.md).
 
+Compact organization-policy screens offer **Read policy** after a successful
+read or review. The reader shows complete settings, source filenames, licenses
+and installed-app effects in short UTF-8 pages, including previous/proposed
+headings. Left/Right and Page keys turn pages; Up/Down and Tab/Shift-Tab change
+topics. Back or Escape returns to the same policy or frozen review. Resizing
+retains the short-page anchor; tiny windows retain Back. See
+[policy reader checks](../../tests/packages/software-policy-reader-check.md).
+
 **Verify installed** supports Stop/Cancel/Escape in full and compact windows.
 Stopping retires unaccepted progress/output and keeps the catalog for retry.
 Completion and human success output wait for successful worker exit; late

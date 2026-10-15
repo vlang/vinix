@@ -1431,6 +1431,20 @@ sections and pages. Approved saves keep running until they finish, and stopping
 their subsequent read-only reload preserves the saved result. See
 [policy navigation checks](../tests/packages/software-policy-navigation-check.md).
 
+Once a policy or review has loaded, compact windows offer **Read policy**.
+Its read-only disclosure shows complete current/previous/proposed settings,
+source filenames and installed-app effects. At 180×220 or larger, short UTF-8
+pages include canonical headings and preserve every prepared value; separate
+monospace line labels keep them readable in the native renderer. Previous/Next
+turn pages, and topic controls or Up/Down/Tab/Shift-Tab move between available
+categories without wrapping. Left/Right and Page keys also turn pages. Resizing
+keeps the short page and its canonical full-page anchor. Smaller windows retain
+Back. Back or Escape returns to the unchanged current policy or frozen review;
+only disclosure navigation is active while the reader is open. Confirmation
+remains on the full policy review, and pending readers/approved saves retain
+their existing Stop/close guards. See
+[compact policy qualification](../tests/packages/software-policy-reader-check.md).
+
 Documents reject missing/null fields, type coercion, malformed version ranges,
 unknown/duplicate object keys (including escaped spellings), duplicate entries/pin
 IDs and unknown permissions. Keys are checked independently in the document,

@@ -104,6 +104,7 @@ fn check_software_policy_navigation() ! {
 					assert !tree.children.any(it.id in ['software.policy.confirm', 'software.policy.cancel', 'software.policy.back'])
 					free_window_tree(tree)
 				}
+				app.handle('software.policy.read')!; assert !app.policy_reader_mode
 				app.handle('software.policy.confirm')!; app.paste_input('/must-not-edit')
 				assert editor_bytes_text(app.policy_path) == policy_fixture_path && !os.exists(receipt)
 				if action == 'escape' { app.key_input('\x1b') } else { app.handle(action)! }
@@ -157,6 +158,7 @@ fn check_software_policy_navigation() ! {
 			free_window_tree(tree)
 		}
 		for action in ['software.policy.stop', 'software.policy.cancel', 'software.policy.back', 'software.policy.reload']! { app.handle(action)! }
+		app.handle('software.policy.read')!; assert !app.policy_reader_mode
 		app.key_input('\x1b'); app.stop_policy_read(); app.paste_input('/must-not-edit')
 		assert app.worker.pid == pid && C.kill(pid, 0) == 0 && !os.exists(receipt) && app.policy_mode
 		if mode == 'write-complete' { os.setenv('VINIX_SOFTWARE_POLICY_NAVIGATION', 'list-complete', true) }
@@ -213,9 +215,11 @@ fn check_software_policy_navigation_memory() ! {
 				app.initialize_policy_path(); software_repository_text(mut app.policy_path, policy_fixture_path)
 				app.output.clear(); for byte in document_text { app.output << byte }; app.load_policy_document()
 				check_policy_empty_paste(mut app)
+				policy_reader_cycle(mut app)!
 				free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!); free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
 				app.policy_pending = policy_fixture_path.clone()
 				app.output.clear(); for byte in review_text { app.output << byte }; app.load_policy_review(); assert app.policy_review_ready
+				policy_reader_cycle(mut app)!
 				for action in ['software.policy.source', 'software.policy.permissions', 'software.policy.impacts']! {
 					app.handle_policy(action); app.handle_policy('software.policy.next')
 					free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!); free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
@@ -229,5 +233,18 @@ fn check_software_policy_navigation_memory() ! {
 		app.set_status('')
 		kept := C.vinix_heap_end(); assert kept == 0, 'policy navigation retained ${kept} bytes'
 		println('Software policy navigation: 1000 document/review/section/page/full/compact/cancel/failure/retirement cycles retain zero tracked bytes')
+		println('Software policy reader: 1000 current/review/cache/compact/full/keys/back/cancel/retirement cycles retain zero tracked bytes')
 	}
+}
+
+fn policy_reader_cycle(mut app SoftwareApp) ! {
+	app.handle('software.policy.read')!; assert app.policy_reader_mode
+	free_window_tree(app.build(ui2.rect(0, 0, 180, 220))!)
+	app.key_input('\x1b[C'); app.key_input('\t')
+	anchor := app.policy_compact_page; canonical := app.policy_page
+	free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!)
+	free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
+	assert app.policy_compact_page == anchor && app.policy_page == canonical
+	app.handle('software.policy.confirm')!; assert app.worker == unsafe { nil } && !app.admin_prompt
+	app.key_input('\x1b'); assert !app.policy_reader_mode
 }

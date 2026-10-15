@@ -23,8 +23,12 @@ fn (mut a SoftwareApp) clear_policy_pages() {
 	unsafe {
 		for page in a.policy_pages { page.title.free(); page.text.free(); page.label.free() }
 		(&array(&a.policy_pages)).free()
+		for page in a.policy_compact_pages { page.text.free(); page.label.free() }
+		(&array(&a.policy_compact_pages)).free()
 	}
 	a.policy_pages = []SoftwarePolicyPage{}
+	a.policy_compact_pages = []SoftwareFailurePage{}
+	a.policy_compact_page = 0; a.policy_compact_mode = false; a.policy_reader_mode = false
 	a.policy_page = 0; a.policy_section = 0
 	for index in 0 .. 7 { a.policy_starts[index] = -1 }
 }
@@ -123,6 +127,11 @@ fn (mut a SoftwareApp) load_policy_review() {
 
 fn (mut a SoftwareApp) handle_policy(event_id string) {
 	match event_id {
+		'software.policy.read' {
+			if !a.policy_ready || a.policy_pages.len == 0 { return }
+			a.policy_reader_mode = true; a.focus = false; a.select_all = false
+			a.anchor_policy_compact_page()
+		}
 		'software.policy.path' { if !a.policy_review_ready { a.focus = true; a.select_all = false } }
 		'software.policy.review' { if !a.policy_review_ready { a.begin_policy_review() } }
 		'software.policy.reload' { if !a.policy_review_ready { a.read_policy() } }
@@ -161,25 +170,14 @@ fn (mut a SoftwareApp) handle_policy(event_id string) {
 			}
 		}
 		'software.policy.previous', 'software.policy.next' {
-			mut index := a.policy_page + if event_id == 'software.policy.next' { 1 } else { -1 }
-			for index >= 0 && index < a.policy_pages.len {
-				if a.policy_pages[index].section == a.policy_section { a.policy_page = index; break }
-				index += if event_id == 'software.policy.next' { 1 } else { -1 }
-			}
+			a.navigate_policy(event_id)
 		}
-		else {
-			for section, action in software_policy_sections {
-				if event_id == action && a.policy_starts[section] >= 0 {
-					a.policy_section = section; a.policy_page = a.policy_starts[section]; a.focus = false
-					return
-				}
-			}
-		}
+		else { a.navigate_policy(event_id) }
 	}
 }
 
 fn (mut a SoftwareApp) policy_paste_input(input string) {
-	if !a.focus || a.policy_review_ready || a.worker != unsafe { nil } || input == '' { return }
+	if !a.focus || a.policy_reader_mode || a.policy_review_ready || a.worker != unsafe { nil } || input == '' { return }
 	a.initialize_policy_path()
 	length := if a.select_all { 0 } else { a.policy_path.len }
 	if input.len > software_deployment_path_limit - length || !software_deployment_text_valid(input) {
@@ -191,6 +189,7 @@ fn (mut a SoftwareApp) policy_paste_input(input string) {
 }
 
 fn (mut a SoftwareApp) policy_key_input(input string) {
+	if a.policy_reader_mode { a.policy_reader_key_input(input); return }
 	if input == '\x1b' {
 		if a.policy_read_running() { a.stop_policy_read(); return }
 		if a.worker == unsafe { nil } {
@@ -208,6 +207,7 @@ fn (mut a SoftwareApp) policy_key_input(input string) {
 }
 
 fn (mut a SoftwareApp) build_policy(width int, height int) ui2.Element {
+	a.policy_compact_mode = false
 	a.initialize_policy_path()
 	mut children := frame_elements(40)
 	children << software_label(if a.policy_review_ready { 'Review organization policy' } else { 'Organization policy' }, 14, 8, 360, 28, false)

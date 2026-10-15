@@ -122,6 +122,10 @@ mut:
 	policy_pending  string
 	policy_worker   SoftwarePolicyWorker
 	policy_pages    []SoftwarePolicyPage
+	policy_compact_pages []SoftwareFailurePage
+	policy_compact_page int
+	policy_compact_mode bool
+	policy_reader_mode bool
 	policy_page     int
 	policy_section  int
 	policy_starts   [7]int
@@ -775,6 +779,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 	}
 	if a.failure_mode { a.handle_failure(event_id); return }
 	if a.details_mode { a.handle_details(event_id); return }
+	if a.policy_mode && a.policy_reader_mode { a.handle_policy_reader(event_id); return }
 	if event_id == 'software.failure' {
 		if a.worker == unsafe { nil } && a.failure_pages.len > 0 { a.failure_mode = true; a.focus = false }
 		return
@@ -1197,6 +1202,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
 	if a.details_mode { return a.build_details(width, height) }
+	if a.policy_mode && a.policy_reader_mode { return a.build_policy_reader(width, height) }
 	if a.snapshot_mode { return a.build_deployment_snapshot(width, height) }
 	if a.mirror_mode && (width < 640 || height < 610) { return a.build_mirror_compact(width, height) }
 	if a.audit_mode && (width < 640 || height < 610) { return a.build_deployment_audit_compact(width, height) }

@@ -74,6 +74,7 @@ fn check_software_policy() ! {
 	assert app.policy_mode && app.worker.args == ['policy'] && !app.admin_prompt && app.prepare_close()
 	wait_for_software(mut app)
 	assert app.policy_ready && app.policy_document.policy.allow_firmware && app.policy_pages.len >= 5
+	check_software_policy_reader(mut app)!
 	app.handle('software.policy.licenses')!
 	assert app.policy_pages[app.policy_page].text.contains('Vendor')
 	app.handle('software.policy.path')!; app.paste_input(policy_fixture_path)
@@ -81,6 +82,7 @@ fn check_software_policy() ! {
 	assert app.worker.args == ['policy-review', policy_fixture_path] && app.prepare_close() && !app.admin_prompt
 	wait_for_software(mut app)
 	assert app.policy_review_ready && app.policy_snapshot.rows.len == 2 && app.policy_section == 5
+	check_software_policy_reader(mut app)!
 	assert app.policy_pages[app.policy_page].text.contains('company policy; $literal é.json')
 	app.handle('software.policy.path')!; app.key_input('\x01'); app.paste_input('/changed')
 	assert editor_bytes_text(app.policy_path) == policy_fixture_path && app.policy_pending == policy_fixture_path
@@ -162,6 +164,7 @@ fn check_software_policy_long_disclosures() ! {
 	mut app := SoftwareApp{ policy_mode: true, policy_ready: true, policy_review_ready: true,
 		policy_pending: file.clone(), policy_snapshot: pkgprotocol.decode_policy_review(text)! }
 	app.prepare_policy_pages(true)
+	check_software_policy_reader(mut app)!
 	mut shown := []u8{cap: file.len}
 	for page in app.policy_pages {
 		assert utf8.validate_str(page.text)
@@ -177,6 +180,106 @@ fn check_software_policy_long_disclosures() ! {
 	assert app.policy_pages.filter(it.section == 6).len > 4
 	app.close_app()
 	unsafe { file.free(); diagnostic.free(); text.free(); (&array(&shown)).free() }
+}
+
+fn check_software_policy_reader(mut app SoftwareApp) ! {
+	page := app.policy_page; section := app.policy_section; focused := app.focus; selection := app.select_all
+	short_page := app.policy_compact_page
+	path := editor_bytes_text(app.policy_path); pending := app.policy_pending; fingerprint := app.policy_snapshot.fingerprint
+	status := app.status; reviewing := app.policy_review_ready; page_rows := app.page_rows; selected := app.selected
+	storage := app.policy_compact_pages.data
+	assert app.policy_compact_pages.len > app.policy_pages.len
+	for canonical, full in app.policy_pages {
+		mut bytes := []u8{cap: full.title.len + full.text.len}
+		for short in app.policy_compact_pages {
+			if short.source_page != canonical { continue }
+			for byte in short.text { if byte != `\n` { bytes << byte } }
+		}
+		titled := full.title + full.text
+		expected := titled.replace('\n', '')
+		assert editor_bytes_text(bytes) == expected
+		unsafe { bytes.free(); titled.free(); expected.free() }
+	}
+	home := app.build(ui2.rect(0, 0, 320, 240))!
+	assert home.children.any(it.id == 'software.policy.read')
+	assert home.children.any(it.id == if reviewing { 'software.policy.cancel' } else { 'software.policy.back' })
+	free_window_tree(home)
+	app.handle('software.policy.read')!; assert app.policy_reader_mode
+	app.handle('software.policy.general')!
+	for index, short in app.policy_compact_pages {
+		canonical := app.policy_pages[short.source_page]
+		if canonical.section != app.policy_section { app.key_input('\t'); assert app.policy_section == canonical.section }
+		for size in [ui2.rect(0, 0, 180, 220), ui2.rect(0, 0, 320, 240)]! {
+			tree := app.build(size)!
+			assert app.policy_compact_mode && app.policy_compact_page == index && app.policy_page == short.source_page
+			details_fixture_rendered_lines(&tree, short.text, 14, 118, int(size.width) - 28, 18, 12)
+			for id in ['software.policy.reader.back', 'software.policy.previous', 'software.policy.next',
+				'software.policy.section.previous', 'software.policy.section.next']! { assert tree.children.any(it.id == id) }
+			assert tree.children.any(it.text == short.label) && tree.children.any(it.text == software_policy_reader_titles[canonical.section])
+			assert !tree.children.any(it.id in ['software.policy.confirm', 'software.policy.cancel', 'software.policy.reload', 'software.failure'])
+			for element in tree.children {
+				assert element.frame.x >= 0 && element.frame.x + element.frame.width <= size.width
+				assert element.frame.y >= 0 && element.frame.y + element.frame.height <= size.height
+			}
+			free_window_tree(tree)
+		}
+		if index % 3 == 0 { app.key_input('\x1b[C') }
+		else if index % 3 == 1 { app.key_input('\x1b[6~') }
+		else { app.handle('software.policy.next')! }
+		next := if index + 1 < app.policy_compact_pages.len
+			&& app.policy_pages[app.policy_compact_pages[index + 1].source_page].section == canonical.section { index + 1 } else { index }
+		assert app.policy_compact_page == next
+	}
+	last_section := if reviewing { 6 } else { 4 }
+	assert app.policy_section == last_section
+	app.key_input('\t'); assert app.policy_section == last_section
+	last := app.policy_compact_page
+	app.key_input('\x1b[5~'); assert app.policy_compact_page == last - 1
+	app.handle('software.policy.section.previous')!; assert app.policy_section == last_section - 1
+	app.key_input('\x1b[Z'); assert app.policy_section == last_section - 2
+	app.key_input('\x1b[A'); assert app.policy_section == last_section - 3
+	app.key_input('\x1b[B'); assert app.policy_section == last_section - 2
+	app.handle('software.policy.general')!
+	app.key_input('\x1b[D'); assert app.policy_compact_page == 0
+	app.key_input('\x1b[C'); app.key_input('\x1b[C')
+	anchor := app.policy_compact_page; canonical := app.policy_page
+	for size in [ui2.rect(0, 0, 900, 660), ui2.rect(0, 0, 180, 220), ui2.rect(0, 0, 180, 96),
+		ui2.rect(0, 0, 160, 240), ui2.rect(0, 0, 320, 240)]! {
+		tree := app.build(size)!
+		assert app.policy_compact_page == anchor && app.policy_page == canonical && app.policy_section == 0
+		assert tree.children.any(it.id == 'software.policy.reader.back')
+		if size.width < 180 || size.height < 220 {
+			assert !tree.children.any(it.id == 'software.policy.next') && !tree.children.any(it.text_style.font_family == 'mono')
+		} else if size.width >= 640 && size.height >= 610 {
+			details_fixture_rendered_lines(&tree, app.policy_pages[canonical].text, 14, 174, int(size.width) - 28, 20, 52)
+		}
+		for element in tree.children {
+			assert element.frame.x >= 0 && element.frame.x + element.frame.width <= size.width
+			assert element.frame.y >= 0 && element.frame.y + element.frame.height <= size.height
+		}
+		free_window_tree(tree)
+	}
+	free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!)
+	app.key_input('\x1b[6~')
+	free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
+	assert app.policy_compact_pages[app.policy_compact_page].source_page == app.policy_page
+	if app.policy_page != canonical {
+		assert app.policy_compact_page == 0 || app.policy_compact_pages[app.policy_compact_page - 1].source_page != app.policy_page
+	}
+	for action in ['software.policy.confirm', 'software.policy.cancel', 'software.policy.reload', 'software.policy.review',
+		'software.policy.path', 'software.policy.back', 'software.install', 'software.row.0', 'software.failure',
+		packagecore.request_prefix + '{"id":"editor"}'] { app.handle(action)! }
+	app.key_input('typed'); app.key_input('\r'); app.key_input('\x01')
+	app.paste_input('/changed'); app.paste_input('\x1b'); app.paste_input('\x1b[C')
+	assert app.policy_reader_mode && app.policy_review_ready == reviewing && app.policy_snapshot.fingerprint == fingerprint
+	assert editor_bytes_text(app.policy_path) == path && app.policy_pending == pending && app.status == status
+	assert app.page_rows == page_rows && app.selected == selected && app.worker == unsafe { nil } && !app.admin_prompt
+	assert app.policy_compact_pages.data == storage && !app.focus
+	app.key_input('\x1b'); assert !app.policy_reader_mode && app.policy_review_ready == reviewing
+	app.handle('software.policy.read')!; app.handle('software.policy.reader.back')!; assert !app.policy_reader_mode
+	app.policy_page = page; app.policy_section = section; app.policy_compact_page = short_page
+	app.focus = focused; app.select_all = selection
+	println('Software policy reader: complete current/previous/proposed/source/impact titles and text, short UTF-8 pages, native lines, all-topic navigation, resize anchors, tiny Back and frozen modal state passed')
 }
 
 fn check_software_policy_memory() ! {
