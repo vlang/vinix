@@ -1,0 +1,69 @@
+DEPLOYMENT AUDIT exact installed metadata, sorted runtime/all-data closure, captured digest, minimum sequence floors and offline revoked policy on both architectures PASS
+DEPLOYMENT AUDIT missing/unexpected packages, versions, architecture, digests, publisher/repository, floor and requested-root differences PASS
+DEPLOYMENT AUDIT writer exclusion, malformed/roots-only/mismatched/aliased inputs and corrupt state refusal; empty read without initialization PASS
+
+DEPLOYMENT AUDIT PROTOCOL complete typed fields, duplicate/unknown keys, bounded sorted union rows and coherent drift result PASS
+
+DEPLOYMENT SNAPSHOT exact sorted roots, shared runtime/all-data closure, metadata/provenance/sequence pins, offline revoked policy independence and no mutation on both architectures PASS
+DEPLOYMENT SNAPSHOT independently owned closeable documents and invalid/duplicate/missing/excess roots refusal PASS
+DEPLOYMENT SNAPSHOT fresh empty read without initialization, writer exclusion and malformed state refusal PASS
+
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-pins-44872-1792070230657682/locked export; $literal; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-capture-44872-1792070231253592/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-final-lock-44872-1792070231491217/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION locked export binds exact captured deployment bytes through publication; changed staged lock refuses and retry preserves pins PASS
+Updating trusted repository fixture
+Updating trusted repository deployment.json
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-namespace-44872-1792070231719081/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/2) from fixture
+Installing Runtime 2.0.0 (2/2) from fixture
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Offline mirror ready: /private/tmp/vinix-deployment-reproducible-44872-1792070232082419/mirror; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading unused/bin/runner (14 bytes)
+Activated package generation 1
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+
+DEPLOYMENT AUDIT PROTOCOL complete typed fields, duplicate/unknown keys, bounded sorted union rows and coherent drift result PASS
+DEPLOYMENT AUDIT PROTOCOL 1000 complete and partial-invalid decode/close cycles retain zero tracked bytes PASS
+

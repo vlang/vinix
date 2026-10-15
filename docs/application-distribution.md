@@ -696,6 +696,18 @@ then use the existing reviewed deployment flow. Current signatures, replay
 history, policy, permissions, licenses and firmware admission still apply. See
 [qualification](../tests/packages/deployment-snapshot-check.md).
 
+For read-only organization drift checks, run
+`vinix-package --json deployment-audit /path/to/approved-lock.json`. It compares
+exact installed manifests and provenance with a format-2 lock, including the
+requested application set and minimum publisher sequences. The report lists
+missing, extra and changed packages even without catalogs or after revocation.
+Exit status 0 means metadata matches, 3 means drift, and 1 means the check failed.
+The report includes the captured lock's SHA-256 and installed generation so a
+deployment controller can identify its inputs. It neither verifies payload health
+nor authorizes changes. Use **Health report** for installed integrity, and the
+reviewed deployment flow to reconcile drift under current trust and policy. See
+[audit qualification](../tests/packages/deployment-audit-check.md).
+
 Software’s **Clean up versions** opens a read-only, paged review of obsolete
 generation IDs, with the architecture and current/rollback identities. Confirming
 **Delete listed versions** uses administrator authorization and deletes only that

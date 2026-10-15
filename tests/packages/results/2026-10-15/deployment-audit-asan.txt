@@ -1,0 +1,12 @@
+ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1
+-cflags "-fsanitize=address,undefined -fno-omit-frame-pointer" -ldflags "-fsanitize=address,undefined"
+Core plus signed workflow using instrumented CLI and probe; no whole-service leak claim.
+
+DEPLOYMENT AUDIT exact installed metadata, sorted runtime/all-data closure, captured digest, minimum sequence floors and offline revoked policy on both architectures PASS
+DEPLOYMENT AUDIT missing/unexpected packages, versions, architecture, digests, publisher/repository, floor and requested-root differences PASS
+DEPLOYMENT AUDIT writer exclusion, malformed/roots-only/mismatched/aliased inputs and corrupt state refusal; empty read without initialization PASS
+
+DEPLOYMENT AUDIT PROTOCOL complete typed fields, duplicate/unknown keys, bounded sorted union rows and coherent drift result PASS
+
+DEPLOYMENT AUDIT CLI exact offline metadata and sequence-floor matches, missing/changed drift exit 3, no fresh-state initialization and authenticated reproduction PASS
+DEPLOYMENT SNAPSHOT CLI preserves withdrawn installed app/runtime/all-data pins offline with revoked policy, refuses missing roots and unauthenticated apply, and reproduces exact versions from newly authenticated media PASS

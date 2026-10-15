@@ -126,6 +126,14 @@ of selecting replacements. Applying the document still requires authenticated
 repository metadata and current policy approval; it contains no payloads or
 trust enrollment. See [qualification](../../tests/packages/deployment-snapshot-check.md).
 
+`[--json] deployment-audit LOCK.json` compares that exact format-2 lock with
+installed metadata, without catalog, payload or trust-history access. It reports
+missing, unexpected and changed packages, including requested roots, publisher
+identity and sequence floors. Exit status is 0 for a match, 3 for drift, and 1
+for an error. A match describes recorded metadata; `health` checks payloads and
+reviewed deployment still admits current trust and policy. See
+[qualification](../../tests/packages/deployment-audit-check.md).
+
 Configuration reads reject ambiguous keys, null values and incorrect field
 types while preserving legacy defaults for omitted fields. Policy typos fail
 before acquisition, cleanup or activation; correcting the configuration permits

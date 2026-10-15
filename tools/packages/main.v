@@ -25,6 +25,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  apply REVIEW_FINGERPRINT OPERATION [ID...]\n' +
 	'  policy | policy-review POLICY.json | policy-apply REVIEW_FINGERPRINT POLICY.json\n' +
 	'  deployment-lock [ID...] | deployment-snapshot [INSTALLED_ID...]\n' +
+	'  deployment-audit FILE (read-only metadata drift; exit 0 match, 3 drift)\n' +
 	'  deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE\n' +
 	'  run ID [ABSOLUTE_FILE...] | data-list | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  mirror-review NEW_DIRECTORY ID... | mirror-apply REVIEW_FINGERPRINT NEW_DIRECTORY ID...\n' +
@@ -168,6 +169,21 @@ fn checked(arguments []string) !int {
 	service := pkgcore.Service{ root: root, offline: offline,
 		progress: if progress && command == 'health' { print_health_progress } else if progress { print_progress } else { ignore_progress } }
 	match command {
+		'deployment-audit' {
+			if names.len != 1 { return error('deployment-audit requires one exact deployment lock') }
+			mut report := service.audit_deployment(names[0])!
+			defer { report.close() }
+			if as_json { println(json2.encode(report)) }
+			else {
+				println('Deployment metadata audit for generation ${report.generation}: ${if report.matches { 'match' } else { 'drift' }}')
+				println('Captured lock SHA-256: ${report.deployment_sha256}')
+				for row in report.rows {
+					println('${row.id}: ${row.status}; expected ${if row.expected_version == '' { '(absent)' } else { row.expected_version }}, installed ${if row.installed_version == '' { '(absent)' } else { row.installed_version }}${if row.differences.len == 0 { '' } else { '; differences: ' + row.differences.join(', ') }}')
+				}
+				println('Metadata comparison only; use health for payload integrity and reviewed deployment for authorized changes.')
+			}
+			return if report.matches { 0 } else { 3 }
+		}
 		'deployment-lock', 'deployment-snapshot', 'deployment-review' {
 			if command == 'deployment-review' && names.len != 1 { return error('deployment-review requires a deployment document') }
 			text := if command == 'deployment-lock' {

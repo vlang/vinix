@@ -1805,6 +1805,42 @@ Use `Service.snapshot_deployment(names)` from V. Both this method and
 fields; `.close()` retires the returned document. See
 [installed snapshot qualification](../../tests/packages/deployment-snapshot-check.md).
 
+`[--json] deployment-audit FILE` compares an exact format-2 document with one
+reader-locked installed generation. It does not resolve against a catalog, read
+objects/replay history, verify installed payloads or apply policy/trust admission.
+It works offline and after publisher revocation, and observes a fresh store
+without initializing it. Format-1 root requests cannot specify exact desired
+metadata and are refused. Every requested root must have a locked record.
+
+The format-1 report has required `format`, `generation`, `architecture`,
+`deployment_sha256`, `matches` and `rows` fields. The digest identifies the exact
+captured file bytes, including whitespace. Rows are the sorted union of target
+and installed IDs, with required `id`, `status`, `expected_version`,
+`installed_version` and `differences`. Status is `match`, `missing`, `unexpected`
+or `changed`. Absent versions are empty only for missing/unexpected rows, whose
+differences are empty. Changed rows name every differing field, sorted:
+`architecture`, `metadata_sha256`, `public_key`, `repository`, `requested`,
+`sequence`, `version`. `sequence` means the installed sequence is below the lock's
+minimum; a higher sequence satisfies that floor. Requested-root changes count
+even when the complete package set is otherwise identical. Missing/unexpected
+packages remain visible when auditing a subset or an empty deployment.
+
+The CLI emits a complete report with exit 0 for a match or 3 for drift. Errors
+return 1 without a report. `--json` preserves the complete structured report on
+stdout for both 0 and 3; `--progress` is unsupported. V clients use
+`Service.audit_deployment(path)` and `pkgprotocol.decode_deployment_audit(text)`.
+Returned reports own their fields and support repeated `.close()`. Decoding
+requires complete typed fields, canonical unsigned integers, coherent versions,
+status/differences/result, sorted unique IDs/field names, at most 8192 union rows
+and at most 8 MiB. Unknown/duplicate keys and trailing input fail with partial
+allocation cleanup. The maintained signed CLI probe exercises audit as well as
+snapshot export; see [qualification](../../tests/packages/deployment-audit-check.md).
+
+A match is metadata drift detection. It does not authenticate the supplied lock,
+attest filesystem health, reauthorize a revoked package, or prove that current
+repositories can reproduce it. Use `health` for installed integrity and the
+existing authenticated deployment review/apply flow for changes.
+
 `deployment-review FILE` emits the existing format-1 `pkgprotocol.Review`, with
 operation `deploy`, complete target/removal rows and disk requirements. Its opaque
 fingerprint binds a deployment-specific domain, canonical document, configuration,
