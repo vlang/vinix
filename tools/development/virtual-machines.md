@@ -77,6 +77,18 @@ restoration before removing that marker. Disk and variables are separate files,
 so power-loss atomicity across them is not claimed. There is no implicit
 overwrite of an existing snapshot, source image or state directory.
 
+Snapshot restoration resolves the exact name in `qemu-img info` JSON to one
+unique internal ID before preparing variables or publishing a pending operation.
+This keeps numeric names usable: qcow2's
+[restore lookup](https://github.com/qemu/qemu/blob/v11.1.0/block/qcow2-snapshot.c#L573)
+tries IDs before names, so passing a numeric name directly could restore another
+snapshot's disk while loading the intended variables. Existing snapshot receipts
+remain compatible. Missing or duplicate names, invalid/duplicate IDs and failed
+inventory commands refuse restoration before changing disk or variables.
+Inspection uses the pinned image tool under the offline lock, with a 30-second
+deadline and a 1 MiB output limit. `snapshot-info.json` and `snapshot-info.log`
+retain the successful inventory and command diagnostics.
+
 State must be owned by the calling user with mode 0700. QEMU option paths must
 be absolute and contain no comma or newline; state paths are limited to 80 bytes
 for Unix sockets. Start requires the originally pinned QEMU executable. Import
@@ -90,3 +102,14 @@ Set `VINIX_VM_TEST_FIRMWARE` to the QEMU firmware directory if needed. These
 host tests do not qualify a guest OS, hardware virtualization or Vinix-hosted
 QEMU. See QEMU's [QMP specification](https://www.qemu.org/docs/master/interop/qmp-spec.html)
 and [image tool documentation](https://www.qemu.org/docs/master/tools/qemu-img.html).
+
+On 15 October 2026 the snapshot-identity regressions reproduced wrong disk
+restoration and an accepted missing name against the previous implementation.
+The corrected complete `vmcore` suite passed on the Darwin ARM host with
+QEMU 11.1.1 and V `be2eb40`. Real qcow2 tests distinguish the disk bytes and
+firmware variables of `anchor`, `1` and `2`, restore each pair, and retain the
+other snapshot after deletion. Missing/duplicate names and an unreadable
+inventory preserve disk/variables without leaving a pending marker or temporary
+variable image. Metadata checks also cover malformed JSON, incorrect formats,
+empty/NUL-containing IDs and duplicate IDs. The existing real QEMU lifecycle,
+locking, live-snapshot refusal and independent-variable checks also passed.
