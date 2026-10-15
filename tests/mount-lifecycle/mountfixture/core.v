@@ -347,6 +347,7 @@ fn move_cycles(check_depth bool) {
 @[export: 'main']
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		exec_fd_entry(argc, argv)
 		descriptor_wx_entry(argc, argv)
 		descriptor_exec_entry(argc, argv)
 		check(C.mount(c'none', c'/', nil, usize(C.MS_PRIVATE | C.MS_REC), nil) == 0, 4)
@@ -356,6 +357,8 @@ pub fn run(argc i32, argv &&char) i32 {
 		count := C.read(fd, &name[0], 31)
 		check(fd >= 0 && count > 0 && C.close(fd) == 0, 4)
 		selected := &char(&name[0])
+		exec_fd := if count == 4 && name[0] == `e` && name[1] == `d` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		exec_flags := if count == 4 && name[0] == `e` && name[1] == `f` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		identity := if count == 4 && name[0] == `i` && name[1] == `d` && name[2] == `-`
@@ -447,7 +450,8 @@ pub fn run(argc i32, argv &&char) i32 {
 			|| C.strcmp(selected, c'descaccess') == 0 || descriptor_access >= 0
 			|| C.strcmp(selected, c'descexec') == 0 || descriptor_exec >= 0
 			|| C.strcmp(selected, c'descwx') == 0 || descriptor_wx >= 0
-			|| C.strcmp(selected, c'execflags') == 0 || exec_flags >= 0, 4)
+			|| C.strcmp(selected, c'execflags') == 0 || exec_flags >= 0
+			|| C.strcmp(selected, c'execfd') == 0 || exec_fd >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
@@ -539,6 +543,9 @@ pub fn run(argc i32, argv &&char) i32 {
 		if C.strcmp(selected, c'execflags') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { exec_flags_cases(-1) }
 		if exec_flags >= 0 { exec_flags_cases(exec_flags) }
+		if C.strcmp(selected, c'execfd') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { exec_fd_cases(-1) }
+		if exec_fd >= 0 { exec_fd_cases(exec_fd) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }

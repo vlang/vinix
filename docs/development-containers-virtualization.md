@@ -564,6 +564,14 @@ descriptions, legal flags, ignored upper register bits, ordinary UID/GID 1000
 and selected path/flag/descriptor error precedence. Existing mount, MAC, W^X,
 credential and image-loading checks remain in place. General relative-directory
 mount routing and broader combined-error qualification remain open.
+The [execveat descriptor ABI checks](../tests/mount-lifecycle/exec-fd.md)
+normalize `dirfd` as a signed 32-bit argument before direct-image lookup,
+directory lookup and synthesized script-name construction. Both architecture
+implementations ignore unused register bits while preserving the selected
+descriptor, its mount and authorization. The fixture covers linked/unlinked
+native images, read-only/`O_PATH` descriptions, scripts, ordinary UID/GID 1000,
+relative directories, `AT_FDCWD`, invalid descriptors and `noexec` refusal.
+General inherited-directory mount routing remains open.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,

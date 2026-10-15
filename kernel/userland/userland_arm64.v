@@ -1453,7 +1453,8 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 	mut process := proc.current_thread().process
 
 	path := fs.user_path(_path) or { return errno.err, errno.get() }
-	// The syscall ABI supplies a C int, even when its register has high bits.
+	// Both syscall arguments are C ints; unused register bits are not input.
+	call_dirfd := int(i32(dirfd))
 	call_flags := int(u32(flags))
 	if path.len == 0 && call_flags & fs.at_empty_path == 0 {
 		unsafe { path.free() }
@@ -1476,7 +1477,7 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		unsafe { path.free() }
 		// Run the descriptor's image with its actual mount route. A relative
 		// shebang interpreter is resolved from cwd, as for ordinary execve.
-		mut fd := file.fd_from_fdnum(process, dirfd) or { return errno.err, errno.ebadf }
+		mut fd := file.fd_from_fdnum(process, call_dirfd) or { return errno.err, errno.ebadf }
 		mac_thread.exec_descriptor = voidptr(fd)
 		fd.handle.mac_check(proc.mac_execute) or { return errno.err, errno.get() }
 		node := unsafe { &fs.VFSNode(fd.handle.node) }
@@ -1493,10 +1494,10 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		mut name := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
   unsafe { *name = lib.new_text(32) }
 		name.add('/proc/self/fd/')
-		name.add_decimal(i64(dirfd))
+		name.add_decimal(i64(call_dirfd))
 		target = lib.finish_text(*name)
 	} else {
-		directory = fs.parent_and_mount_for(dirfd, path, direct_mount) or {
+		directory = fs.parent_and_mount_for(call_dirfd, path, direct_mount) or {
 			unsafe { path.free() }
 			return errno.err, errno.get()
 		}

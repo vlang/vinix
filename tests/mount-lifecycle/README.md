@@ -97,6 +97,13 @@ through `de-7` select individual cases. Native `all` and Linux
 `--case execflags` selects `execveat` flag and final-symlink validation;
 `ef-0` through `ef-9` select individual cases. Native `all` and Linux
 `move-reference` include them.
+`--case execfd` selects the signed descriptor ABI checks; `ed-0` through
+`ed-7` select individual cases. Native `all` and Linux `move-reference`
+include them.
+
+The [execveat descriptor checks](exec-fd.md) ignore unused upper register bits
+when selecting an executable description and constructing its script name.
+They retain relative-directory, `AT_FDCWD`, mount and error semantics.
 
 The [execveat validation checks](exec-flags.md) reject unsupported flag bits,
 report `ELOOP` for final links left unfollowed, and retain the low-32-bit

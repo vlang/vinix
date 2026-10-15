@@ -1,5 +1,10 @@
 # Execution and device mount policy
 
+`execveat` reads `dirfd` as a signed 32-bit C `int`, including for empty-path
+execution. Unused upper register bits cannot change the selected descriptor
+or the `/proc/self/fd/N` name passed to a script interpreter. Absolute paths
+still ignore `dirfd`. See [the descriptor ABI checks](../tests/mount-lifecycle/exec-fd.md).
+
 `execveat` accepts only `AT_EMPTY_PATH` and `AT_SYMLINK_NOFOLLOW` in the low
 32 bits of its flags argument. Unsupported bits return `EINVAL`; unused upper
 register bits are ignored. A final symlink left unfollowed returns `ELOOP`,
