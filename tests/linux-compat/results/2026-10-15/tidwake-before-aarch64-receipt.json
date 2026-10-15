@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "234721483281ac7be8833fc535ebbd935e6f8ec58fbd503c0d2fe57bcb3f3060",
+    "results": [
+        {
+            "name": "tidwake",
+            "source_sha256": "3ed6b518d6e920d4e2e2bd42a793414efa846e910e213c68925b00ff588b672a",
+            "init_sha256": "670a7f54ec3427cf1de422d048a21558f900021ee8f237b8ced5e1bf66fae805",
+            "iso_sha256": "58ccd7b6091986b8fb2c4b1a43ae4f30f7280b7a2c2c1be15b17e8a5b627e1fa",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

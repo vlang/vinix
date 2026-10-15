@@ -1,0 +1,3 @@
+tests/linux-compat/tidwake-check.v:124: FAIL: fn main.failure: assert log.contains('LINUX TIDWAKE DETAIL:'), 'tidwake baseline failure markers required'
+      message: tidwake baseline failure markers required
+V panic: Assertion failed...

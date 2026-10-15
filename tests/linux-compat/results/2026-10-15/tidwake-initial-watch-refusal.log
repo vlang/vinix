@@ -1,0 +1,6 @@
+Retired completed boot staging: tidwake/arm/before
+Retired completed boot staging: tidwake/x86/before
+Retired completed boot staging: tidwake/arm/after
+Retired completed boot staging: runtime/arm/after
+/Users/alex/.cache/vinix-linux-compat/tidwake-20261015/watch.v:57: FAIL: fn main.main: assert fixture in ['tidwake','futex','runtime']
+V panic: Assertion failed...

@@ -1,0 +1,31 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "3d1708e3a4cfa1592078be4bb018f79d72f0183451721a17b2c11aab408dac43",
+    "results": [
+        {
+            "name": "tidwake",
+            "source_sha256": "3ed6b518d6e920d4e2e2bd42a793414efa846e910e213c68925b00ff588b672a",
+            "init_sha256": "670a7f54ec3427cf1de422d048a21558f900021ee8f237b8ced5e1bf66fae805",
+            "iso_sha256": "7bacdc71a38efa91d6f7836220b67915bf55e9ae1c32b695ff5b0e419182c70c",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "5d06c51b5ded2d2836e5ab383d1ebf5d6a7975236054076ea3402929e0b315ed",
+            "iso_sha256": "6e9d0a730e07a7470ddcd917a6c8c19593ea3949fc78c11b2aaba0dac481937c",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "robustwake",
+            "source_sha256": "8c5d33bc5d105a1da68fe07bbf733fb4cd07dc28fec9d1423baa3baf34c5a1ca",
+            "init_sha256": "22628256ff246579becd3a4ebfaa24219f31bcffc55553bf25660eb182f37843",
+            "iso_sha256": "dd15020a251da9a3fb0578cd485176e0d41600654ad2c5dccd9a93ea170f67ad",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

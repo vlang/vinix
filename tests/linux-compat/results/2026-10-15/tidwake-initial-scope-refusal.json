@@ -1,0 +1,6 @@
+{
+    "audit_source_sha256": "6c3bf75f352c0d7e663275e0e88e608fed629d34f7ef813bf0902ba8db127c56",
+    "first_line": "tests/linux-compat/tidwake-check.v:512: FAIL: fn main.check_c: assert before.replace(old,'') == after.replace(new,''),'Exact whole production C differs only in one wake call; no normalization'",
+    "raw_output": "/Users/alex/.cache/vinix-linux-compat/tidwake-20261015/scope-only.log",
+    "raw_sha256": "d0c7b8e539d2474f352470213a11554da574f976136fc7d516d36e807279ead8"
+}

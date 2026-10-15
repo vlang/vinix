@@ -1,0 +1,3 @@
+tests/linux-compat/tidwake-check.v:221: FAIL: fn main.main: assert false, 'tidwake assertions must execute'
+      message: tidwake assertions must execute
+V panic: Assertion failed...

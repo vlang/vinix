@@ -215,7 +215,9 @@ fn clear_child_tid(mut t proc.Thread) {
 		return
 	}
 
-	futex.wake(address)
+	// Linux's exit notification selects one shared-key waiter. Other waiters
+	// remain queued for their own synchronization or a later explicit wake.
+	futex.wake_n_key(address, 1, false)
 }
 
 // Walk the list registered with set_robust_list(2) and pass on every lock the

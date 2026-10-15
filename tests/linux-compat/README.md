@@ -1845,3 +1845,16 @@ to check actual original failures, final results, exact whole-C scope, retained
 refusals, SDK/compiler/inventory pins and executing negative controls. Concurrent
 credentials/mappings/targets, new MAC/LSM/user-namespace policy and GNU/foreign
 paths remain separate. See [the inspection report](../../docs/linux-posix-qualification.md#native-robust-list-and-process-memory-inspection-credentials).
+
+The `tidwake` case checks native clear-child-tid notification with one shared
+futex wake. It runs 384 controls across root/UID1000 and both PID namespace
+views: five registration modes, four initial words, two offsets, admitted
+one/three shared waiters, private/abandoned queue isolation, complete two-page
+canaries and real musl joins. A raw owner worker exits while its leader stays
+alive; worker ESRCH and leader liveness precede exact queue drains, then the
+leader exits and is reaped. Four warmed 200-cycle cohorts measure complete
+owner/worker/observer cleanup with one shared waiter per trial.
+`tidwake-reference.v` boots the unchanged ELF on Linux; compile
+`tidwake-check.v` without `-prod` to verify original failures, final results,
+whole-C scope, retained refusals, SDK/compiler/inventory pins and executing
+negative controls. See [the TID exit report](../../docs/linux-posix-qualification.md#native-clear-child-tid-selective-exit-wakes) for the raw-exit workflow and qualification limits.

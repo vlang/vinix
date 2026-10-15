@@ -8709,3 +8709,128 @@ Concurrent credential/target/mapping changes, new MAC/LSM or user-namespace
 policy, general process_vm vector/partial-copy/remote-fault semantics, GNU libc
 and foreign/translated ABIs remain separate. The three broad libc,
 installation/sandbox/portal and translated/32-bit roadmap gates remain open.
+
+## Native clear-child-tid selective exit wakes
+
+The 2026-10-15 `tidwake` qualification limits native clear-child-tid exit
+notification to one shared-key futex waiter. A broadcast can release unrelated
+waiters which are still meant to remain queued. The primary contract is
+[Linux v6.12 mm_release](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c#L1523):
+after its clear-tid store the exit path requests a FUTEX_WAKE count of one.
+The complete tagged source is retained from the kernel.org Git mirror with
+its base64 download, decoded bytes, exact URL and SHA-256.
+
+The frozen base is `3d8363a1a0c70075cf470610321c77c10fbfd411`.
+Each native architecture executes 384 controls across four root/UID1000 and
+initial/one-level PID namespace cohorts. Each cohort has eighty raw owner-exit
+trials and sixteen ordinary musl pthread create/join payload and return-value
+controls. The raw trials distinguish the following registration states:
+
+| Registration class | Controls per cohort | Original failures |
+| --- | ---: | ---: |
+| Direct target registration | 16 | 8 |
+| Replace an abandoned address with the target | 16 | 8 |
+| Disable an abandoned registration with NULL | 16 | 0 |
+| Register a different virtual alias of the target backing page | 16 | 8 |
+| Disable and then re-enable a registration | 16 | 8 |
+| Ordinary musl pthread joins | 16 | 0 |
+
+Each raw class crosses four initial words (zero, all ones, a distinct sentinel
+and the actual worker TID), two aligned offsets including the last four bytes
+of a native page, and one/three shared waiters. Every set_tid_address call must
+return the worker's actual TID without changing its registered data. The owner
+keeps its main thread alive while the worker registers and blocks on a pipe.
+This supplies the multiple live address-space users required by Linux's
+clear-tid path. The alias uses a second MAP_SHARED mapping of the same memfd.
+
+Positive CMP_REQUEUE counts prove that all shared waiters, a private-key waiter
+and an abandoned-address waiter have entered their exact queues before the
+owner worker is released. After the worker exits, tgkill(..., 0) must report
+ESRCH for that worker while succeeding for its still-live leader; WNOHANG must
+also show that the owner process has not exited. The parent then drains the
+target queue and requires precisely zero/two shared waiters after an active
+one-waiter notification, or all one/three waiters after a disabled registration.
+The private and abandoned queues must each retain their waiter. Empty park
+queues and successful joins account for every observer waiter.
+
+Both mapped aliases are compared against full two-native-page canaries. Active
+registrations clear exactly the target's four bytes; NULL registration leaves
+the target unchanged, and the abandoned word and all surrounding bytes stay
+intact. The owner leader exits only after these observations, and the parent
+reaps its exact exit status. This avoids treating process termination as proof
+of the earlier worker-exit notification.
+
+The owner worker deliberately calls raw exit after replacing musl's clear-tid
+registration. It does not run libc thread teardown, and the probe does not
+attempt a musl join on that worker. Its stack and libc thread metadata stay
+inside the still-live owner's image until leader exit retires the complete
+image. The separate normal pthread controls and every observer waiter use
+ordinary musl joins. These are distinct tested workflows.
+
+Both original kernels fail exactly 128 controls: every active three-waiter
+trial incorrectly drains the whole shared queue. Corrected kernels and the
+identical native probe ELFs on Linux 6.12.51 have zero failures. Native ARM
+uses 16KiB pages; x86 and both Linux references use 4KiB pages.
+
+Four corrected storage cohorts per architecture warm all eighty raw registration
+variants, settle for thirteen seconds, then run 200 complete trials with one
+shared observer waiter per trial and settle again. Each measured trial includes
+owner fork, worker/observer creation, registration, requeue admission, raw worker
+exit, ESRCH and leader-liveness observations, queue drain, observer join, leader
+exit/reap and all pipe closure. Both aliases and the memfd remain intentionally
+open throughout the interval. All live slab classes and big-heap page totals
+must remain equal; exact class/page values are in the raw logs. These results
+do not establish general physical user-page or page-cache retention.
+
+Four fresh isolated production builds bind both originals and corrections.
+The whole generated kernel C changes clear_child_tid's wake call to shared-key
+maximum one and removes the now-unreachable futex__wake/futex__wake_key wrappers
+and their declarations. The auditor enumerates their exact bodies and both
+declarations; every other emitted byte must match. The pointer retirement,
+four-byte copy/error path, locks and ownership remain the same. No allocation,
+free, map/thread/process pin, stack promotion or normalization is introduced.
+Generated probe C contains twelve explicit stack allocas and no dynamic
+allocation or fixed-index helper.
+
+Both corrected architectures run runtime and robustwake regressions. Eight
+host test files pass. Allocation diagnostics remain byte-identical between
+original and corrected source, including existing allowance refusals. The
+auditor binds 67 dispatch inventory inputs, 2,014 private SDK files, 15,146
+compiler pins, fifteen final ARM compiler-command receipts and all 84 regular
+files across the eight native case profiles. Compile the auditor without
+`-prod`: its false-assertion and passing-Linux-log-as-original controls must
+both execute and fail.
+
+The first preflight refuses the probe before ELF generation because V does
+not allow a function-call dereference on the left side of an assignment. Its
+source and exact refusal remain retained. The corrected source introduces a
+temporary errno pointer; the successful preflight C matches the final native
+ARM input exactly. The first source download's HTTP429 refusal is also retained;
+the tagged kernel.org mirror supplies the independently pinned primary source.
+Neither refusal is counted as a kernel semantic failure.
+
+The first exact whole-C audit also refuses the optimizer's removal of those
+two unused wrappers. Its complete raw output and original auditor source stay
+retained with SHA-256 in the diagnostic ledger. The corrected scope check
+permits precisely those exact removals and the one changed call, without
+normalizing generated C. The [refusal receipt](../tests/linux-compat/results/2026-10-15/tidwake-initial-scope-refusal.json) binds the original output and auditor source.
+
+The initial disposable-staging watcher stops after four completed profiles
+because its copied allowlist still names the old futex case. Its refusal and
+45-file first capture remain pinned. The corrected watcher verifies those
+unchanged files and captures all 84 regular files across eight completed
+profiles, retiring only finished ISO staging and disposable firmware state.
+The native results, kernels and probe ELFs are retained from the same runs.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-15/tidwake-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-15/tidwake-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-15/tidwake-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-15/tidwake-diagnostic-pins.json).
+Raw original/corrected/Linux, build, regression and scanner logs accompany
+the receipts. The maintained auditor is `tests/linux-compat/tidwake-check.v`.
+
+Faulting or unaligned registration pointers, last-address-space-user behavior,
+clone child_tid flag combinations, exec/forced sibling exit, concurrent mapping
+or registration changes, GNU libc and foreign/translated paths remain separate.
+The broad libc, installation/sandbox/portal and translated/32-bit roadmap gates
+remain open.

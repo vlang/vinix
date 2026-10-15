@@ -1,0 +1,154 @@
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/tidwake-20261015/states/p1-before-x86/tidwake/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/tidwake-20261015/states/p1-before-x86/tidwake/.vinix-amd64.iso.RTcTZm'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data,  425g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/tidwake-20261015/states/p1-before-x86/tidwake/iso-build/.iso-staging.wpEIh6/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13720 sectors
+Written to medium : 13720 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/tidwake-20261015/states/p1-before-x86/tidwake/.vinix-amd64.iso.RTcTZm' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd65f.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/tidwake-20261015/states/p1-before-x86/tidwake/test.iso (28098560 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/tidwake-20261015/states/p1-before-x86/tidwake
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=81464
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91400
+initramfs: Done (9 entries)
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=0 kind=0 index=8 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=0 kind=0 index=9 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=0 kind=0 index=10 remaining=0 expected=2 changed=0
+LINUX TIDWAKE TOPOLOGY: ordinary=0 namespace=0 self=57622 child=21136 worker=60242 uid=0 alive_leader=1 observed_ESRCH=1 queued=3 private=1 abandoned=1
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=0 kind=1 index=24 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=0 kind=1 index=25 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=0 kind=1 index=26 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=0 kind=3 index=56 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=0 kind=3 index=57 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=0 kind=3 index=58 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=0 kind=4 index=72 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=0 kind=4 index=73 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=0 kind=4 index=74 remaining=0 expected=2 changed=0
+LINUX TIDWAKE COHORT: ordinary=0 namespace=0 self=57622 uid=0 page=4096 raw=80 libc=16 classes=5 leader_alive=1
+LINUX TIDWAKE CASES: ordinary=0 namespace=0 kind=0 calls=16 failures=8
+LINUX TIDWAKE CASES: ordinary=0 namespace=0 kind=1 calls=16 failures=8
+LINUX TIDWAKE CASES: ordinary=0 namespace=0 kind=2 calls=16 failures=0
+LINUX TIDWAKE CASES: ordinary=0 namespace=0 kind=3 calls=16 failures=8
+LINUX TIDWAKE CASES: ordinary=0 namespace=0 kind=4 calls=16 failures=8
+LINUX TIDWAKE CASES: ordinary=0 namespace=0 kind=5 calls=16 failures=0
+LINUX TIDWAKE FINAL: ordinary=0 namespace=0 kind=0 calls=16 failures=8
+LINUX TIDWAKE FINAL: ordinary=0 namespace=0 kind=1 calls=16 failures=8
+LINUX TIDWAKE FINAL: ordinary=0 namespace=0 kind=2 calls=16 failures=0
+LINUX TIDWAKE FINAL: ordinary=0 namespace=0 kind=3 calls=16 failures=8
+LINUX TIDWAKE FINAL: ordinary=0 namespace=0 kind=4 calls=16 failures=8
+LINUX TIDWAKE FINAL: ordinary=0 namespace=0 kind=5 calls=16 failures=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=0 kind=0 index=8 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=0 kind=0 index=9 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=0 kind=0 index=10 remaining=0 expected=2 changed=0
+LINUX TIDWAKE TOPOLOGY: ordinary=1 namespace=0 self=25430 child=59473 worker=11403 uid=1000 alive_leader=1 observed_ESRCH=1 queued=3 private=1 abandoned=1
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=0 kind=1 index=24 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=0 kind=1 index=25 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=0 kind=1 index=26 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=0 kind=3 index=56 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=0 kind=3 index=57 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=0 kind=3 index=58 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=0 kind=4 index=72 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=0 kind=4 index=73 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=0 kind=4 index=74 remaining=0 expected=2 changed=0
+LINUX TIDWAKE COHORT: ordinary=1 namespace=0 self=25430 uid=1000 page=4096 raw=80 libc=16 classes=5 leader_alive=1
+LINUX TIDWAKE CASES: ordinary=1 namespace=0 kind=0 calls=16 failures=8
+LINUX TIDWAKE CASES: ordinary=1 namespace=0 kind=1 calls=16 failures=8
+LINUX TIDWAKE CASES: ordinary=1 namespace=0 kind=2 calls=16 failures=0
+LINUX TIDWAKE CASES: ordinary=1 namespace=0 kind=3 calls=16 failures=8
+LINUX TIDWAKE CASES: ordinary=1 namespace=0 kind=4 calls=16 failures=8
+LINUX TIDWAKE CASES: ordinary=1 namespace=0 kind=5 calls=16 failures=0
+LINUX TIDWAKE FINAL: ordinary=1 namespace=0 kind=0 calls=16 failures=8
+LINUX TIDWAKE FINAL: ordinary=1 namespace=0 kind=1 calls=16 failures=8
+LINUX TIDWAKE FINAL: ordinary=1 namespace=0 kind=2 calls=16 failures=0
+LINUX TIDWAKE FINAL: ordinary=1 namespace=0 kind=3 calls=16 failures=8
+LINUX TIDWAKE FINAL: ordinary=1 namespace=0 kind=4 calls=16 failures=8
+LINUX TIDWAKE FINAL: ordinary=1 namespace=0 kind=5 calls=16 failures=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=1 kind=0 index=8 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=1 kind=0 index=9 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=1 kind=0 index=10 remaining=0 expected=2 changed=0
+LINUX TIDWAKE TOPOLOGY: ordinary=0 namespace=1 self=2 child=92 worker=93 uid=0 alive_leader=1 observed_ESRCH=1 queued=3 private=1 abandoned=1
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=1 kind=1 index=24 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=1 kind=1 index=25 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=1 kind=1 index=26 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=1 kind=3 index=56 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=1 kind=3 index=57 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=1 kind=3 index=58 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=1 kind=4 index=72 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=1 kind=4 index=73 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=0 namespace=1 kind=4 index=74 remaining=0 expected=2 changed=0
+LINUX TIDWAKE COHORT: ordinary=0 namespace=1 self=2 uid=0 page=4096 raw=80 libc=16 classes=5 leader_alive=1
+LINUX TIDWAKE CASES: ordinary=0 namespace=1 kind=0 calls=16 failures=8
+LINUX TIDWAKE CASES: ordinary=0 namespace=1 kind=1 calls=16 failures=8
+LINUX TIDWAKE CASES: ordinary=0 namespace=1 kind=2 calls=16 failures=0
+LINUX TIDWAKE CASES: ordinary=0 namespace=1 kind=3 calls=16 failures=8
+LINUX TIDWAKE CASES: ordinary=0 namespace=1 kind=4 calls=16 failures=8
+LINUX TIDWAKE CASES: ordinary=0 namespace=1 kind=5 calls=16 failures=0
+LINUX TIDWAKE FINAL: ordinary=0 namespace=1 kind=0 calls=16 failures=8
+LINUX TIDWAKE FINAL: ordinary=0 namespace=1 kind=1 calls=16 failures=8
+LINUX TIDWAKE FINAL: ordinary=0 namespace=1 kind=2 calls=16 failures=0
+LINUX TIDWAKE FINAL: ordinary=0 namespace=1 kind=3 calls=16 failures=8
+LINUX TIDWAKE FINAL: ordinary=0 namespace=1 kind=4 calls=16 failures=8
+LINUX TIDWAKE FINAL: ordinary=0 namespace=1 kind=5 calls=16 failures=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=1 kind=0 index=8 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=1 kind=0 index=9 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=1 kind=0 index=10 remaining=0 expected=2 changed=0
+LINUX TIDWAKE TOPOLOGY: ordinary=1 namespace=1 self=2 child=92 worker=93 uid=1000 alive_leader=1 observed_ESRCH=1 queued=3 private=1 abandoned=1
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=1 kind=1 index=24 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=1 kind=1 index=25 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=1 kind=1 index=26 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=1 kind=3 index=56 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=1 kind=3 index=57 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=1 kind=3 index=58 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=1 kind=4 index=72 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=1 kind=4 index=73 remaining=0 expected=2 changed=0
+LINUX TIDWAKE DETAIL: ordinary=1 namespace=1 kind=4 index=74 remaining=0 expected=2 changed=0
+LINUX TIDWAKE COHORT: ordinary=1 namespace=1 self=2 uid=1000 page=4096 raw=80 libc=16 classes=5 leader_alive=1
+LINUX TIDWAKE CASES: ordinary=1 namespace=1 kind=0 calls=16 failures=8
+LINUX TIDWAKE CASES: ordinary=1 namespace=1 kind=1 calls=16 failures=8
+LINUX TIDWAKE CASES: ordinary=1 namespace=1 kind=2 calls=16 failures=0
+LINUX TIDWAKE CASES: ordinary=1 namespace=1 kind=3 calls=16 failures=8
+LINUX TIDWAKE CASES: ordinary=1 namespace=1 kind=4 calls=16 failures=8
+LINUX TIDWAKE CASES: ordinary=1 namespace=1 kind=5 calls=16 failures=0
+LINUX TIDWAKE FINAL: ordinary=1 namespace=1 kind=0 calls=16 failures=8
+LINUX TIDWAKE FINAL: ordinary=1 namespace=1 kind=1 calls=16 failures=8
+LINUX TIDWAKE FINAL: ordinary=1 namespace=1 kind=2 calls=16 failures=0
+LINUX TIDWAKE FINAL: ordinary=1 namespace=1 kind=3 calls=16 failures=8
+LINUX TIDWAKE FINAL: ordinary=1 namespace=1 kind=4 calls=16 failures=8
+LINUX TIDWAKE FINAL: ordinary=1 namespace=1 kind=5 calls=16 failures=0
+LINUX TIDWAKE FAIL: clear-child-tid wake count, registration replacement, alias keys or retained storage
+QEMU: Terminated
+Missing verdicts: ['LINUX TIDWAKE: PASS']; failures: ['FAIL:', 'LINUX TIDWAKE FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/tidwake-20261015/states/p1-before-x86/receipt.json

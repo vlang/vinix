@@ -1,0 +1,17 @@
+/Users/alex/.cache/vinix-linux-compat/tidwake-20261015/pipeline.v:8: FAIL: fn main.wait_for: assert !text.contains('panic:') && !text.contains('FAIL: fn'),text
+      message: Compiler output from the default V compiler:
+/Users/alex/.cache/vinix-linux-compat/tidwake-20261015/tmp/vinix-v-module-tUJ7Hx/tidwakefixture/core.v:148:4: error: cannot dereference a function call on the left side of an assignment, use a temporary variable
+  146 |   mut retired := false
+  147 |   for _ in 0 .. 20000 {
+  148 |    *C.__errno_location() = 0; result := C.syscall(C.SYS_tgkill,isize(child),isize(reply.tid),isize(0))
+      |    ^
+  149 |    if result == -1 && *C.__errno_location() == C.ESRCH {retired = true; break}
+  150 |    if result != 0 {fatal(15)}; C.usleep(1000)
+
+V panic: Command failed
+ v hash: f6358ec
+    pid: 0x4c5b
+    tid: 0x4c5b
+0   dyld                                0x00000001802ebe00 start + 6992
+
+V panic: Assertion failed...

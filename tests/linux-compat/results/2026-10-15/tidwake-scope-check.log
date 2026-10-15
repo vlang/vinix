@@ -1,0 +1,1 @@
+arm/x86: exact whole production C differs only in clear_child_tid shared-key maximum1 wake call plus exact dead futex__wake/futex__wake_key wrappers and declarations removed by reachability; unchanged pointer retirement, scalar store/error path, locks, ownership, Process/Thread/map refs and release; no allocation/free/pin/stack promotion or normalization

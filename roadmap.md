@@ -1055,6 +1055,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   behavior and flat caller/target cleanup in both credential/PID namespace views.
   See [the inspection receipts](docs/linux-posix-qualification.md#native-robust-list-and-process-memory-inspection-credentials).
 
+- [x] Wake one shared futex waiter after a native thread clears its TID;
+  qualify registration replacement/disable/aliasing, exact remaining queues,
+  untouched guards, real musl joins and flat owner/worker cleanup as root/UID1000
+  in both PID namespace views, with identical-ELF Linux controls.
+  See [the TID exit receipts](docs/linux-posix-qualification.md#native-clear-child-tid-selective-exit-wakes).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

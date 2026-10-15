@@ -1,0 +1,4 @@
+/Users/alex/.cache/vinix-linux-compat/tidwake-20261015/fetch.v:6: FAIL: fn main.main: assert status == 0 && data.starts_with('// SPDX-License-Identifier: GPL-2.0-only'),data
+      message: curl: (56) The requested URL returned error: 429
+
+V panic: Assertion failed...
