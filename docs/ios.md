@@ -7287,21 +7287,55 @@ pinned inputs and four retired VM phases are retained under
 string storage and allocation-free protocol lookup. Published runners remain
 unchanged; the full iOS regression remains unpassed.
 
-The current IPA probe links past protocol-name conversion and exits with
-status 1 at `_NSTemporaryDirectory`. Fortnite has not entered application code
-and remains unplayable.
+The protocol-name IPA probe links past that import and exits with status 1 at
+`_NSTemporaryDirectory`.
+
+V now supplies Foundation's `NSTemporaryDirectory`. Measurements against this
+Mac's Foundation verify a no-argument C entry, a +0 NSString with a trailing
+separator and a path matching NSFileManager's temporary-directory URL.
+Thirteen isolated process environments also confirm that this installed
+Foundation ignores `TMPDIR`, including changes after the first query.
+Fortnite has four direct consumers at `0x100036330`, `0x1000a95c4`,
+`0x104844e10` and `0x105eca510`; one retains the result, constructs a filename
+and passes its bytes to `mkstemp`.
+
+Vinix selects `tmp/` below the same container parent used by `NSHomeDirectory`
+and Documents. It normalizes repeated separators, provisions missing
+directories through the existing file-manager implementation and returns a
+copied autoreleased NSString. It ignores the host's `TMPDIR`. The bounded
+POSIX profile permits 1023 bytes including the trailing separator and rejects
+relative paths, dot components, embedded NUL and invalid UTF-8. Directory
+creation failures release the result before returning an explicit error.
+
+Eight normal/deterministic host sanitizer runs and four ARM64 guest suites
+pass: temporary directory, home directory, file manager and autorelease pools.
+Coverage includes guarded C registers and borrowed path prefixes, Unicode,
+spaces, roots, redundant/trailing separators, the complete 1023-byte path,
+actual file writes, missing-parent creation, non-directory failure cleanup,
+strings retained across pool drains, eight concurrent readers and two drained
+runtime lifetimes. The eleven final generated C streams and executables,
+native comparisons, actual IPA consumers, pinned inputs and retired VM phases
+are retained under `build/ios/fortnite/temp-directory-checks`. The initial Mac
+boundary failure caused by `/tmp` expanding to `/private/tmp`, the corrected
+fixture and the initial guest trial are retained separately. Generated C
+inspection checks bounded stack paths and explicit string/failure cleanup.
+Published runners remain unchanged; the full iOS regression remains unpassed.
+
+The current IPA probe links past temporary-directory lookup and exits with
+status 1 at `_NSURLErrorBackgroundTaskCancelledReasonKey`. Fortnite has not
+entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,547 | 613 | 79 |
+| Fortnite executable | 1,548 | 612 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,382 | 616 | 120 |
+| All images | 2,383 | 615 | 120 |
 
-The C++/GLES/Text variant reports 2,395 resolved imports, 603 unresolved strong
+The C++/GLES/Text variant reports 2,396 resolved imports, 602 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
