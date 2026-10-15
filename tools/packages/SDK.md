@@ -2279,6 +2279,21 @@ The fingerprint is an opaque freshness check, not an authorization credential;
 administrator access is still required. Ordinary install/remove/upgrade/deploy
 and rollback commands remain available for existing scripts.
 
+Software can stop a pending read-only `review install|remove|upgrade|repair|rollback`
+with Stop review, Cancel or Escape. It kills and reaps that child, closes its
+pipes and discards the unaccepted proposal/fingerprint and output, including a
+complete document received before exit. Catalog query, filter, selection and
+scroll survive for fresh retry. Completed reviews can be canceled with Escape
+or Cancel; Escape from nested details returns to the unchanged review first.
+Search input stays inactive throughout a review or approved operation.
+
+Compact package screens retain Stop/Cancel, details Back, catalog reload,
+status, progress and failure access. They expose no confirmation control;
+enlarging preserves the reviewed package selection and proposal. Approved
+`apply` and repository `update` workers ignore these cancellation actions and
+retain their close guard. Other Software subflows keep their own lifecycle
+controls. See [navigation checks](../../tests/packages/software-package-navigation-check.md).
+
 The lightweight [`pkgprotocol` V module](pkgprotocol/review.v) provides `Review`,
 `ReviewPackage`, bounded `decode_review`, validation and explicit `Review.close()`
 for consumers with manual memory management. Service-created and decoded reviews

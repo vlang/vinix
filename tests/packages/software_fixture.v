@@ -368,6 +368,7 @@ fn main() {
 	if os.args.len == 2 && os.args[1] == 'mirror-navigation-memory' { check_software_mirror_navigation_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'deployment-navigation-memory' { check_software_deployment_navigation_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'repository-navigation-memory' { check_software_repository_navigation_memory() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'package-navigation-memory' { check_software_package_navigation_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'admin-memory' { check_software_admin_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'window-memory' { check_window_broker_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'data-memory' { check_software_data_memory() or { panic(err) }; return }
@@ -384,6 +385,7 @@ fn main() {
 	// This same executable is a literal-argv service fixture for asynchronous
 	// view/run transitions. It deliberately returns useful launch diagnostics.
 	if args.len > 1 {
+		if software_package_navigation_service_fixture(args) or { panic(err) } { return }
 		if software_repository_navigation_service_fixture(args) or { panic(err) } { return }
 		if software_deployment_navigation_service_fixture(args) or { panic(err) } { return }
 		if software_audit_search_service_fixture(args) { return }
@@ -534,7 +536,8 @@ fn main() {
 	assert app.terminal_app == unsafe { nil }
 	wait_for_software(mut app)
 	compact := app.build(ui2.rect(0, 0, 480, 300)) or { panic(err) }
-	assert compact.children.len == 2
+	assert compact.children.any(it.id == 'software.reload')
+	assert compact.children.any(it.text == app.status) && !compact.children.any(it.id == 'software.confirm')
 	assert !compact.children.any(it.id == 'software.install')
 	app.worker = os.new_process(os.find_abs_path_of_executable('false') or { panic(err) })
 	app.worker.set_args(['owned worker argument'.clone()])
@@ -576,6 +579,7 @@ fn main() {
 	mut child_status := 0
 	assert C.waitpid(pid, &child_status, 0) == pid
 	check_package_review()
+	check_software_package_navigation() or { panic(err) }
 	check_resolved_updates() or { panic(err) }
 	check_repository_management() or { panic(err) }
 	check_software_repository_navigation() or { panic(err) }

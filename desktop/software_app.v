@@ -771,6 +771,10 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		a.stop_repository_read()
 		return
 	}
+	if a.package_review_running() && event_id in ['software.review.stop', 'software.cancel']! {
+		a.stop_package_review()
+		return
+	}
 	if event_id.starts_with(packagecore.request_prefix) {
 		if a.policy_mode { a.set_status('Return to the catalog before opening an application.'); return }
 		if a.data_mode { a.set_status('Return to the catalog before opening an application.'); return }
@@ -786,7 +790,8 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		a.run_requested()
 		return
 	}
-	if event_id == 'software.search' && !a.policy_mode && !a.data_mode && !a.deployment_mode && !a.mirror_mode {
+	if event_id == 'software.search' && a.review == '' && (a.worker == unsafe { nil } || a.worker_view)
+		&& !a.policy_mode && !a.data_mode && !a.deployment_mode && !a.mirror_mode {
 		a.focus = true
 		return
 	}
@@ -1020,6 +1025,13 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.repository_mode { a.repository_key_input(input); return }
 	if a.mirror_mode { a.mirror_key_input(input); return }
 	if a.deployment_mode { a.deployment_key_input(input); return }
+	if input == '\x1b' {
+		if a.package_review_running() { a.stop_package_review(); return }
+		if a.worker == unsafe { nil } && a.review != '' {
+			a.clear_review(); a.set_status('Operation cancelled before making changes.'); return
+		}
+	}
+	if a.review != '' || (a.worker != unsafe { nil } && !a.worker_view) { return }
 	if !a.focus { return }
 	match input {
 		'\x01' { a.select_all = true }
@@ -1105,6 +1117,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.deployment_mode && (width < 640 || height < 610) { return a.build_deployment_compact(width, height) }
 	if a.repository_mode && (width < 640 || height < 610) { return a.build_repositories_compact(width, height) }
 	if width < 640 || height < 610 {
+		if a.package_screen_active() { return a.build_packages_compact(width, height) }
 		mut compact := frame_elements(2)
 		compact << software_label('Software', 14, 8, width - 28, 28, false)
 		compact << software_label('Enlarge this window to view package details and controls.',
@@ -1232,7 +1245,8 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		if a.review_ready {
 			children << software_button('software.confirm', 'Confirm', 274, height - 138, 130)
 		}
-		children << software_button('software.cancel', 'Cancel', 416, height - 138, 110)
+		children << software_button(if a.package_review_running() { 'software.review.stop' } else { 'software.cancel' },
+			if a.package_review_running() { 'Stop review' } else { 'Cancel' }, 416, height - 138, 110)
 		if a.mirror_pending != '' {
 			children << software_button('software.mirror.details', 'Export details', width - 150, 8, 136)
 		}

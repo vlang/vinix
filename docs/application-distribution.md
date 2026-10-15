@@ -936,6 +936,16 @@ Its **Configured repositories** view remains available when cached indexes or
 replay history need repair. Revocation still requires review and administrator
 approval; the list does not repair metadata or enable acquisition.
 
+Pending install, uninstall, update, repair and rollback reviews support
+**Stop review**, Cancel and Escape before changes start. Stopping reaps the
+read-only worker and discards its proposal, fingerprint and unaccepted output;
+catalog search, filter and selection stay intact for a fresh review. Completed
+reviews support Escape and Cancel. Small windows retain review cancellation,
+Back from package details, catalog reload, status, progress and failure access,
+with confirmation available only in the full review. Approved transactions and
+repository refreshes keep running until completion. See
+[package navigation checks](../tests/packages/software-package-navigation-check.md).
+
 The repository screen keeps Back, Stop, Cancel, status, progress and failure
 access in small windows. Stop or Escape can cancel a pending configuration list
 or trust review, reap the child and discard unaccepted output while preserving

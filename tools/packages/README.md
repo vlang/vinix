@@ -180,6 +180,11 @@ the source filename retained for a fresh review. Small windows keep navigation,
 status, progress and failure access; approved transactions keep running until
 completion. See [qualification](../../tests/packages/software-deployment-navigation-check.md).
 
+Install, uninstall, update, repair and rollback reviews support Stop/Cancel/Escape
+before changes begin. Small windows retain cancellation, package-details Back,
+catalog reload, progress and diagnostics; approved transactions and repository
+refresh remain protected. See [qualification](../../tests/packages/software-package-navigation-check.md).
+
 Repository lists and trust reviews support Stop/Cancel/Escape, retaining entered
 identity fields and the previous valid list for retry. Compact views keep
 navigation and diagnostics; approved trust changes and catalog refreshes remain

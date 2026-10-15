@@ -1,0 +1,7 @@
+The initial functional run stopped at an older fixture assertion that the compact catalog contained exactly two elements. That described the former enlarge-only placeholder. The fixture now checks the intended recovery behavior: catalog Reload and current status are available, without a compact confirmation control. Final functional, maintained-driver, sanitizer and allocation results supersede this obsolete assertion. Both desktop architecture typechecks passed. No production fix was needed for this initial fixture expectation.
+
+Initial functional output:
+/Users/alex/code/vinix/build/package-package-navigation-work/software-ui/main.v:539: FAIL: fn main.main: assert compact.children.len == 2
+   left value: compact.children.len = 3
+  right value: 2
+V panic: Assertion failed...

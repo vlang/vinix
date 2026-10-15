@@ -225,6 +225,8 @@ fn check() ! {
 		run(work + '/terminal-check', [])!
 	}
 	os.cp(repository + '/desktop/software_app.v', work + '/software/software_app.v')!
+	os.cp(repository + '/desktop/software_package_navigation.v', work + '/software/software_package_navigation.v')!
+	os.cp(repository + '/tests/packages/software_package_navigation_fixture.v', work + '/software/package_navigation_fixture.v')!
 	os.cp(repository + '/desktop/software_details.v', work + '/software/software_details.v')!
 	os.cp(repository + '/desktop/software_health.v', work + '/software/software_health.v')!
 	os.cp(repository + '/desktop/software_cleanup.v', work + '/software/software_cleanup.v')!
@@ -293,6 +295,7 @@ fn check() ! {
 	run(work + '/window-broker-memory', ['mirror-navigation-memory'])!
 	run(work + '/window-broker-memory', ['deployment-navigation-memory'])!
 	run(work + '/window-broker-memory', ['repository-navigation-memory'])!
+	run(work + '/window-broker-memory', ['package-navigation-memory'])!
 	if '--cross' in os.args {
 		run(v, [...helper_flags, '-o', work + '/package-stage', repository + '/tools/packages/stage.v'])!
 		for architecture in ['aarch64', 'x86_64'] {

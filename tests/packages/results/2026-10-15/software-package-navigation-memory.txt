@@ -1,0 +1,20 @@
+Software package navigation: 1000 catalog and five-operation full/compact/review/details/failure/cancel/retirement cycles retain zero tracked bytes
+Software repository navigation: 1000 configuration/enrollment/revocation/page/full/compact/failure/cancel/retirement cycles retain zero tracked bytes
+Software deployment navigation: 1000 normal/empty form/review/details/failure render, cancel and retirement cycles retain zero tracked bytes
+Software deployment audit search: 1000 decode/search/filter/select/empty/resize/render/retirement cycles retain zero tracked bytes
+Software offline export navigation: 1000 compact form/path/package/failure render, cancel and retirement cycles retain zero tracked bytes
+Software saved deployment export: 1000 handoff, decode, path/package render, digest mismatch and retirement cycles retain zero tracked bytes
+Software deployment saving: 1000 complete receipt, detail, render, paging, mismatch and retirement cycles retain zero tracked bytes
+Software deployment audit: 1000 complete decode, detail, render, paging and retirement cycles retain zero tracked bytes
+Software health: 1000 decode/order/page/render/select/search/filter/empty/compact/retire cycles retain zero tracked bytes PASS
+Software health progress: 1000 fragmented progress/report/admission/render and invalid-progress/failure/retirement cycles retain zero tracked bytes PASS
+SOFTWARE CLEANUP 1000 owned decode/page/render/compact/retirement cycles retain zero tracked bytes PASS
+Software repair: 1000 decode/disclose/render/cancel cycles retain zero tracked bytes PASS
+Software failure details: 1000 capture/page/render/back/replace/clear cycles retain zero tracked bytes
+Software administrator approval: 1000 prompt/edit/render/wipe cycles retain zero tracked bytes
+Native window broker: 1000 fragmented text frames, focus/edit/discard, UI builds and owned-tree retirements retain zero tracked bytes
+Software personal data: 1000 wide/invalid/valid decode/select/render/confirm/cancel/retire cycles retain zero tracked bytes
+Software organization policy: 1000 wide-document/valid-review/invalid-review/page/redraw/cancel/retire cycles retain zero tracked bytes
+Software package/trust/offline metadata: 1000 valid/partial-invalid review, page/redraw/cancel/retire cycles retain zero tracked bytes
+Software package details: 1000 catalog/review/open/growing-UTF-8-page/redraw/navigate/back/retire cycles retain zero tracked bytes
+Software catalog reader: 1000 wide/partial-invalid/legacy reload, display/details and retirement cycles retain zero tracked bytes
