@@ -434,7 +434,7 @@ fn test_swift_url_path() {
 				}
 			}
 		}
-		if _ := swift_foundation_symbol('_$s10Foundation3URLVMa') {
+		if _ := swift_foundation_symbol('_$s10Foundation3URLV36_unconditionallyBridgeFromObjectiveCyACSo5NSURLCSgFZ') {
 			assert false
 		}
 		objc_stop()

@@ -6320,21 +6320,50 @@ under `build/ios/fortnite/url-path-checks`, with both actual IPA consumers and
 native helper targets. Full iOS regression remains unpassed and published runners
 remain unchanged.
 
-The current IPA startup probe resolves both URL path operations, then exits with
+That IPA startup probe resolves both URL path operations, then exits with
 status 1 at the required metadata accessor `_$s10Foundation3URLVMa`.
 Fortnite has not entered application code and remains unplayable.
+
+Foundation's URL metadata accessor and nominal descriptor now resolve through
+both Foundation install names. The accessor returns canonical, complete
+metadata for the native sixteen-byte inline value. Its eight value witnesses
+copy, move and destroy the implementation owner with unknown-object ARC while
+preserving the inert table word. Native copy assignment publishes the owner
+before releasing the old value, retains the replacement afterwards, then
+publishes the table; take assignment releases before publishing either word.
+Single-payload enum witnesses match the native extra-inhabitant encoding,
+including its seventeenth byte for more than 2,147,483,647 empty cases.
+The private nominal descriptor supports indirect symbolic type lookup through
+its accessor. Constructors, concrete URL backends and field reflection remain
+unsupported; the descriptor does not advertise Apple's compact layout string.
+
+Eight ASan/UBSan runs and four Vinix ARM64 suites pass for URL metadata, path
+operations, URL bridging and unknown-object ownership. The metadata fixture
+compares all eight witnesses with the installed native libraries, checks exact
+Swift/Objective-C ownership and destructor reentry ordering, protected and
+unaligned enum storage, preserved context, concurrent publication and values,
+and two drained lifetimes with unmapped metadata/code pages. Eleven final C
+streams/programs and four joined, retired VM phases are retained under
+`build/ios/fortnite/url-metadata-checks`, including the IPA's accessor consumers
+and indirect nominal type references. The private build reuses the pinned local
+SDK; full iOS regression remains unpassed and published runners remain unchanged.
+
+The current IPA startup probe resolves both URL metadata imports, then exits
+with status 1 at `_$s10Foundation4DataV11referencingACSo6NSDataCh_tcfC`
+(`Data.init(referencing:)`). Fortnite has not entered application code and
+remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,500 | 660 | 79 |
+| Fortnite executable | 1,502 | 658 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,335 | 663 | 120 |
+| All images | 2,337 | 661 | 120 |
 
-The C++/GLES/Text variant reports 2,348 resolved imports, 650 unresolved strong
+The C++/GLES/Text variant reports 2,350 resolved imports, 648 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
