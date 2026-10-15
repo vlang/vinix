@@ -7388,8 +7388,39 @@ IPA data consumers, pinned inputs and retired VM phases are retained under
 allocation-free cached lookup and explicit storage retirement. Published
 runners remain unchanged; the full iOS regression remains unpassed.
 
-The current IPA probe links past all five required session constants and exits
-with status 1 at `_NSUbiquityIdentityDidChangeNotification`. Fortnite has not
+The session-constants IPA probe links past those five required globals and
+exits with status 1 at `_NSUbiquityIdentityDidChangeNotification`.
+
+V now supplies Foundation's `NSUbiquityIdentityDidChangeNotification`,
+`NSUnderlyingErrorKey` and `NSUserActivityTypeBrowsingWeb` string globals.
+Native measurements verify eight-byte pointer cells and immutable ASCII
+NSString records. The underlying-error key's value is `NSUnderlyingError`;
+the other two values match their exported names. The runtime publishes the
+cells, records and copied bytes on one sealed page under its recursive lock.
+Cached queries allocate no storage. Shutdown retires the strings after
+notification registrations, pools, constant dictionaries and Swift contexts.
+The exports supply identifiers; iCloud identity monitoring and NSUserActivity
+behavior still require implementation.
+
+Eight normal/deterministic host sanitizer runs and four ARM64 guest suites
+pass: Foundation keys, URL-error globals, immutable constant dictionaries and
+autorelease pools. Native comparisons cover nested NSError ownership,
+notification delivery through equal NSString names, object filters and observer
+removal, retained notification/userInfo lifetimes, dictionary lookup through
+the browsing-web identifier, eight concurrent first readers and two drained
+runtime lifetimes. Teardown also removes a zeroing-weak observer registration
+while its name remains available to destructors.
+
+Fortnite's consumers at `0x102156568`, `0x10001031c` and `0x100020760`
+load the exported pointer cells and then their NSString objects. The eleven
+final generated C streams and executables, native measurements, actual IPA
+consumers, pinned inputs and retired VM phases are retained under
+`build/ios/fortnite/foundation-keys-checks`. Generated C inspection checks
+allocation-free cached lookup and explicit retirement after the owners drain.
+Published runners remain unchanged; the full iOS regression remains unpassed.
+
+The current IPA probe links past these three Foundation globals and exits with
+status 1 at AudioToolbox's `_AudioServicesPlaySystemSound`. Fortnite has not
 entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -7397,12 +7428,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,555 | 605 | 79 |
+| Fortnite executable | 1,558 | 602 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,390 | 608 | 120 |
+| All images | 2,393 | 605 | 120 |
 
-The C++/GLES/Text variant reports 2,403 resolved imports, 595 unresolved strong
+The C++/GLES/Text variant reports 2,406 resolved imports, 592 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

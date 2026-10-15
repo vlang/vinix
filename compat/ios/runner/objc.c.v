@@ -285,6 +285,7 @@ mut:
 	framework_objects []u64
 	url_error_arena u64 // Sealed NSString global cells; objects stay immortal until pools drain.
 	url_session_constants_arena u64 // Mixed-width Foundation data and immortal resume-data keys.
+	foundation_keys_arena u64 // Sealed ubiquity, underlying-error and web-activity NSString cells.
 	file_manager u64 // One owned NSFileManager cache reference, retired at shutdown.
 	process_info u64 // One owned NSProcessInfo singleton reference.
 	process_arguments u64 // Owned app arguments, configured before image initialization.
@@ -681,6 +682,7 @@ fn objc_stop() {
 	swift_buffers_stop()
 	ns_url_error_stop()
 	ns_url_session_constants_stop()
+	ns_foundation_keys_stop()
 	if ios_runtime.live != 0 {
 		eprintln('iOS: ${ios_runtime.live} Objective-C objects still owned at shutdown')
 	}
