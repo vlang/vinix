@@ -8,6 +8,132 @@ import ui2
 import desktop.packagecore
 import tools.packages.pkgprotocol
 
+// Read the labels the native renderer actually draws, not the container's
+// complete accessibility/ownership text. All line slices must borrow that text.
+fn software_paragraph_fixture_text(element &ui2.Element, truncated bool) string {
+	assert element.kind == .view && element.accessibility_label == element.text
+	mut bytes := []u8{cap: element.text.len}
+	defer { unsafe { bytes.free() } }
+	mut ellipsis := false
+	mut row := 0
+	for child in element.children {
+		assert child.kind == .label && child.text_style.lines == 1 && child.text_style.font_family == 'mono'
+		assert child.id == '' && child.key == '' && child.children.len == 0
+		assert !child.text.contains('\n') && utf8.validate_str(child.text)
+		assert child.frame.height == 18 && child.frame.y + 18 <= element.frame.height
+		if child.text == '…' && child.frame.x != 0 {
+			assert truncated && child.frame.y == (row - 1) * 18, 'Unexpected truncation: ${element.text}'
+			ellipsis = true
+			continue
+		}
+		assert child.frame.x == 0 && child.frame.y == row * 18 && child.frame.width == element.frame.width
+		assert child.text.len <= int(element.frame.width) / 8
+		if child.text.len > 0 {
+			assert usize(child.text.str) >= usize(element.text.str)
+			assert usize(child.text.str) + usize(child.text.len) <= usize(element.text.str) + usize(element.text.len)
+		}
+		for byte in child.text { bytes << byte }
+		row++
+	}
+	assert ellipsis == truncated
+	return bytes.bytestr()
+}
+
+fn software_paragraph_fixture_check(tree &ui2.Element, prefix string) {
+	for element in tree.children {
+		if !element.text.starts_with(prefix) { continue }
+		text := software_paragraph_fixture_text(&element, false)
+		expected := element.text.replace('\n', '')
+		defer { unsafe { text.free(); expected.free() } }
+		assert text == expected
+		return
+	}
+	assert false, 'missing paragraph: ${prefix}'
+}
+
+fn check_software_paragraphs() ! {
+	for text in ['first line\n\nsecond line\n', 'Words wrap at spaces; identifiers-continue-without-spaces.',
+		'é🚀界 '.repeat(12), 'file:///offline/' + 'x'.repeat(80)] {
+		label := software_label(text, 14, 46, 96, 400, false)
+		rendered := software_paragraph_fixture_text(&label, false)
+		expected := text.replace('\n', '')
+		assert rendered == expected
+		unsafe { rendered.free(); expected.free() }
+		free_window_tree(label)
+	}
+	overflow := software_label('Long diagnostic é🚀 '.repeat(40), 14, 46, 96, 54, true)
+	shown := software_paragraph_fixture_text(&overflow, true)
+	assert overflow.text.starts_with(shown) && shown.len < overflow.text.len
+	unsafe { shown.free() }; free_window_tree(overflow)
+	short := software_label('Heading', 14, 8, 120, 28, false)
+	assert short.kind == .label && short.children.len == 0 && short.text_style.font_family == ''
+	free_window_tree(short)
+	mut app := SoftwareApp{ administration_required: true, output: []u8{cap: 8192}, query: []u8{cap: 256},
+		status: 'Enter your own administrator password to approve this package change.'.clone() }
+	defer { app.close_app() }
+	app.admin_prompt = true
+	for size in [ui2.rect(0, 0, 320, 280), ui2.rect(0, 0, 640, 610)]! {
+		tree := app.build(size)!
+		software_paragraph_fixture_check(&tree, 'This package change needs an administrator.')
+		software_paragraph_fixture_check(&tree, app.status)
+		for element in tree.children {
+			if element.text != app.status { continue }
+			assert element.frame.y >= 218 && element.frame.y + element.frame.height <= size.height - 8
+		}
+		free_window_tree(tree)
+	}
+	app.clear_admin_prompt(); app.cleanup_mode = true
+	cleanup := app.build(ui2.rect(0, 0, 640, 610))!
+	software_paragraph_fixture_check(&cleanup, 'Deletion is permanent')
+	free_window_tree(cleanup); app.cleanup_mode = false
+	app.data_mode = true; app.data_pending = 'removed-app'.clone()
+	data := app.build(ui2.rect(0, 0, 640, 610))!
+	software_paragraph_fixture_check(&data, 'Only this signed-in account')
+	software_paragraph_fixture_check(&data, 'This cannot be undone.')
+	assert data.children.any(it.id == 'software.data.confirm')
+	free_window_tree(data); app.clear_personal_data()
+	app.data_mode = true; app.data_ready = true; app.data_status = fixture_personal_data_status(); app.data_selected = 1
+	data_row := app.build(ui2.rect(0, 0, 640, 610))!
+	software_paragraph_fixture_check(&data_row, 'Location: ~/.local/share/vinix-apps/ID')
+	free_window_tree(data_row); app.clear_personal_data(); app.data_mode = false
+	app.repository_mode = true
+	repository := app.build(ui2.rect(0, 0, 640, 610))!
+	software_paragraph_fixture_check(&repository, 'Obtain the publisher key')
+	free_window_tree(repository); app.repository_mode = false
+	app.launch_mode = true
+	for private_data in [false, true]! {
+		app.launch_data_cwd = private_data
+		launch := app.build(ui2.rect(0, 0, 640, 610))!
+		software_paragraph_fixture_check(&launch, 'Quotes group values')
+		software_paragraph_fixture_check(&launch, if private_data { 'Relative output files' } else { 'Installed files are read-only.' })
+		software_paragraph_fixture_check(&launch, 'This application has no document-file permission.')
+		free_window_tree(launch)
+	}
+	app.launch_mode = false
+	app.snapshot_mode = true
+	snapshot := app.build(ui2.rect(0, 0, 640, 610))!
+	software_paragraph_fixture_check(&snapshot, 'Save all installed applications')
+	software_paragraph_fixture_check(&snapshot, 'This saves metadata')
+	free_window_tree(snapshot); app.snapshot_mode = false
+	app.deployment_mode = true
+	deployment := app.build(ui2.rect(0, 0, 640, 610))!
+	software_paragraph_fixture_check(&deployment, 'Use a deployment file supplied by your organization.')
+	software_paragraph_fixture_check(&deployment, 'The review includes installs')
+	free_window_tree(deployment); app.deployment_mode = false
+	app.mirror_mode = true
+	mirror := app.build(ui2.rect(0, 0, 640, 610))!
+	software_paragraph_fixture_check(&mirror, 'Exports current authenticated catalog versions')
+	free_window_tree(mirror); app.mirror_mode = false
+	app.rows = [SoftwareRow{ id: 'editor', name: 'Editor', public_key: 'a'.repeat(64), permissions: ['files', 'network'] }]
+	app.matching = [0]; app.selected = 0
+	catalog := app.build(ui2.rect(0, 0, 640, 610))!
+	software_paragraph_fixture_check(&catalog, 'Publisher key: ')
+	software_paragraph_fixture_check(&catalog, 'Permissions: ')
+	free_window_tree(catalog)
+	assert app.worker == unsafe { nil } && !app.admin_prompt
+	println('Software paragraphs: complete minimum-size destructive/trust/restore/launch warnings, keys and permissions, explicit newlines, UTF-8 wrapping, overflow marks, borrowed lines and unobscured administrator controls PASS')
+}
+
 fn details_fixture_row() SoftwareRow {
 	return SoftwareRow{ id: 'org.' + 'a'.repeat(120), name: 'Long name é🚀 '.repeat(14),
 		description: 'A complete description é🚀 '.repeat(120), version: '2.0.0', installed_version: '1.0.0',
@@ -141,6 +267,7 @@ fn check_software_report_page_lines() ! {
 }
 
 fn check_software_details() ! {
+	check_software_paragraphs()!
 	check_software_report_page_lines()!
 	row := details_fixture_row()
 	mut app := SoftwareApp{ rows: [row], matching: [0], selected: 0, query: []u8{cap: 256}, output: []u8{cap: 8192},
@@ -241,6 +368,8 @@ fn check_software_details_memory() ! {
 		for warmup in 0 .. 2 {
 			if warmup == 1 { C.vinix_heap_begin() }
 			for _ in 0 .. 1000 {
+				free_window_tree(software_label('Owned paragraph é🚀 '.repeat(16), 14, 8, 352, 72, true))
+				free_window_tree(software_label(row.description, 14, 8, 96, 54, false))
 				app.open_details(); assert app.details_mode && app.details_pages.len > 32
 				for section, action in software_details_actions {
 					app.handle_details(action)
@@ -262,5 +391,6 @@ fn check_software_details_memory() ! {
 		unsafe { review_text.free() }
 		assert kept == 0, 'details pages retained ${kept} bytes'
 		println('Software package details: 1000 catalog/review/open/growing-UTF-8-page/redraw/navigate/back/retire cycles retain zero tracked bytes')
+		println('Software paragraphs: 1000 owned/borrowed/wrapped/truncated label retirement cycles retain zero tracked bytes')
 	}
 }

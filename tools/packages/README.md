@@ -49,6 +49,12 @@ receipts also render every prepared line as an individual monospace label. Narro
 report panels paginate shorter UTF-8 fragments so complete provenance, paths and
 diagnostics remain available. See [disclosure checks](../../tests/packages/software-disclosure-lines-check.md).
 
+Software's warning and status paragraphs also use individual wrapped lines.
+Deletion, trust, launch and restore explanations fit their minimum full-window
+frames; long keys and paths can split within a word. Oversized summaries show an
+ellipsis, and administrator status stays below the approval controls. See
+[paragraph checks](../../tests/packages/software-paragraphs-check.md).
+
 **Verify installed** supports Stop/Cancel/Escape in full and compact windows.
 Stopping retires unaccepted progress/output and keeps the catalog for retry.
 Completion and human success output wait for successful worker exit; late

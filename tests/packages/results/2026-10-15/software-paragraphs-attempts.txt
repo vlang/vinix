@@ -1,0 +1,116 @@
+Initial font check compared physical 2x advances with a logical-pixel budget; it now applies the renderer's raster-scale division. Initial functional check expected the installed-folder launch explanation while the fixture used the private-data default; it now explicitly tests both choices. The next functional run detected truncation without a text diagnostic. Adding the diagnostic localized it to the 64-character publisher key: ordinary word wrapping put the short prefix on its own line, consuming one of two available rows. Production wrapping now fills a row when the following identifier is longer than a whole row. The minimum-size complete-key assertion was preserved. Failed logs and relevant source snapshots are pinned. Final focused checks, font check, maintained driver and both full desktop architecture typechecks passed. The initial documentation patch was rejected for a missing patch marker and reapplied before verification; it changed no files on rejection. No guest graphical or wider release acceptance is claimed.
+
+initial-fonts-run.txt
+tests/packages/software-label-font-check.v:33: FAIL: fn main.check: assert advance <= if index < 95 { 8 } else { 16 }, 'paragraph width budget exceeded by mono ${scale} glyph ${index}'
+      message: paragraph width budget exceeded by mono 2x glyph 0
+V panic: Assertion failed...
+
+initial-ui-functional.txt
+Software package navigation: all five operations, partial and complete-before-exit Stop/Cancel/Escape, fresh retry, frozen catalog state, compact review/details/status/progress/failures, protected apply/refresh and reload passed
+Software configured repositories: damaged metadata does not block reviewed revocation; enrollment remains refused PASS
+Software repository navigation: compact list/review/status/progress/failures, partial and complete-before-exit Stop/Cancel/Escape, retained inputs/list, fresh paged review, protected apply/refresh and retry passed
+Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed
+Software Verify: visible control, no administrator/catalog dependency, streamed progress, stable selection, incomplete/failure retention, review isolation and safe close PASS
+Software verification navigation: partial/live/complete-before-exit Stop/Cancel/Escape, pending completion despite human success text, kill/reap and buffer retirement, fresh retry and late failure, compact diagnostics, frozen catalog state and protected verify-phase transactions/launches passed
+Software repair: installed dependency control, exact-version closure disclosure, read-only review, duplicate/modal isolation, frozen confirmation and reviewed administrator apply PASS
+Software health navigation: partial/live/complete-before-exit Stop/Cancel/Escape, compact reload/status/progress/summary/failure, frozen search/filter/selection/paging, late failure and fresh retry PASS
+Software health: read-only asynchronous report, issue-first searchable metadata/diagnostics, issues-only filtering, stable visible selection, empty results, bounded Unicode editing, reload retention, compact Back, isolated catalog state, full-set repair review and safe close PASS
+Software health progress: separate bounded stderr, live package names, both-pipe EOF, complete/exit/report/count admission, malformed/partial/late/flood refusal, Stop/Escape kill and reap, retry and compact cancellation PASS
+SOFTWARE CLEANUP read-only review, complete paged disclosure, modal/compact controls, frozen administrator approval, stale refusal, diagnostics and reload PASS
+Software cleanup navigation: partial and complete-before-exit Stop/Cancel/Escape, fresh review requirement, 4096-generation admission and stable resize anchor, compact diagnostics, approval cancellation, protected deletion, stopped/failed post-cleanup reload and retained result passed
+Software deployment: full closure, frozen literal path, empty removal, cancellation, bounds, stale/error diagnostics and close guard passed
+Software deployment navigation: compact form/review/details/status/progress/failures, partial and complete-before-exit Stop/Cancel/Escape, fresh literal retry, empty removal, protected apply and subflow routing passed
+Software deployment audit: literal ordinary argv, exit 0/3 coherence, complete drift rows, details/paging, frozen reload/review, cancellation, failure diagnostics, bounds and compact navigation passed
+Software deployment audit search: all 8192 rows, difference-first projection, IDs/status/versions/fields, stable selection/resize, bounded UTF-8 editing, reload/stop/error retention, empty results and full deployment review passed
+Software save navigation: literal paste/control refusal, focus-first Escape, full/compact status/failure, frozen receipt paging, partial/complete-before-exit writer guards and late failure PASS
+Software deployment saving: literal ordinary argv, bounded complete receipt, destination binding, both architectures, empty generation, close guard, fresh audit/review, diagnostics and compact navigation passed
+Software saved deployment export: frozen source/digest, explicit new destination, no catalog selection, full path/package/license review, administrator apply, progress, changed-source refusal, retry and retirement passed
+Software offline export navigation: compact Back/Cancel/Stop/status/progress/failures, partial and complete-before-exit review cancellation/reaping, frozen retry and protected publication passed
+Software offline export: destination paging, dependency provenance, literal confirmation, installed scope, progress, stale diagnostics and close guard passed
+Software locked offline export: exact older runtime, source/digest paging, literal frozen confirmation, invalid responses, stale diagnostics, progress and cancellation passed
+Software launch options: quoted literal arguments, separate file grants, frozen worker input, diagnostics and terminal transfer passed
+Software launch navigation: compact Back/status/failures, stable draft and file paging, Escape blur/back, control-paste refusal, installed permission basis, protected literal batch success/failure, retry and exact terminal transfer passed
+Software native windows: bounded frames, namespaced controls, ordinary-service launch, clicks, close acknowledgement and EOF retirement passed
+Software native text: focus, UTF-8 bounds, literal replacement, stale controls, explicit commit/discard, close guard and protocol admission passed
+Software administrator approval: frozen literal request, masked bounded UTF-8 password, hidden-action refusal, credential wiping, cancellation and progress passed
+Software personal data: own-account inventory, installed/unsafe refusal, frozen explicit confirmation, cancellation, paging, live-lease diagnostics, reload and close guard passed
+Software personal data navigation: partial and complete-before-exit inventory Stop/Cancel/Escape, fresh inventory requirement, compact controls and stable selection, protected purge, stopped post-delete reload, retained result and failure diagnostics passed
+Software organization policy: current restrictions, complete settings/impact paging, literal file review, frozen confirmation, administrator approval/cancel/wipe, stale/error refusal, reload and close guard passed
+Software policy navigation: partial and complete-before-exit read/review Stop/Cancel/Escape, fresh policy requirement, literal retry, compact controls and stable pages, approval cancellation, protected save/progress, stopped post-save reload and failure diagnostics passed
+Software metadata review: missing firmware and escaped duplicate flags refuse confirmation before administrator approval
+/Users/alex/code/vinix/build/package-paragraphs-work/software-ui/software_details_fixture.v:51: FAIL: fn main.software_paragraph_fixture_check: assert false, 'missing paragraph: ${prefix}'
+      message: missing paragraph: Installed files are read-only.
+V panic: Assertion failed...
+
+second-ui-functional.txt
+Software package navigation: all five operations, partial and complete-before-exit Stop/Cancel/Escape, fresh retry, frozen catalog state, compact review/details/status/progress/failures, protected apply/refresh and reload passed
+Software configured repositories: damaged metadata does not block reviewed revocation; enrollment remains refused PASS
+Software repository navigation: compact list/review/status/progress/failures, partial and complete-before-exit Stop/Cancel/Escape, retained inputs/list, fresh paged review, protected apply/refresh and retry passed
+Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed
+Software Verify: visible control, no administrator/catalog dependency, streamed progress, stable selection, incomplete/failure retention, review isolation and safe close PASS
+Software verification navigation: partial/live/complete-before-exit Stop/Cancel/Escape, pending completion despite human success text, kill/reap and buffer retirement, fresh retry and late failure, compact diagnostics, frozen catalog state and protected verify-phase transactions/launches passed
+Software repair: installed dependency control, exact-version closure disclosure, read-only review, duplicate/modal isolation, frozen confirmation and reviewed administrator apply PASS
+Software health navigation: partial/live/complete-before-exit Stop/Cancel/Escape, compact reload/status/progress/summary/failure, frozen search/filter/selection/paging, late failure and fresh retry PASS
+Software health: read-only asynchronous report, issue-first searchable metadata/diagnostics, issues-only filtering, stable visible selection, empty results, bounded Unicode editing, reload retention, compact Back, isolated catalog state, full-set repair review and safe close PASS
+Software health progress: separate bounded stderr, live package names, both-pipe EOF, complete/exit/report/count admission, malformed/partial/late/flood refusal, Stop/Escape kill and reap, retry and compact cancellation PASS
+SOFTWARE CLEANUP read-only review, complete paged disclosure, modal/compact controls, frozen administrator approval, stale refusal, diagnostics and reload PASS
+Software cleanup navigation: partial and complete-before-exit Stop/Cancel/Escape, fresh review requirement, 4096-generation admission and stable resize anchor, compact diagnostics, approval cancellation, protected deletion, stopped/failed post-cleanup reload and retained result passed
+Software deployment: full closure, frozen literal path, empty removal, cancellation, bounds, stale/error diagnostics and close guard passed
+Software deployment navigation: compact form/review/details/status/progress/failures, partial and complete-before-exit Stop/Cancel/Escape, fresh literal retry, empty removal, protected apply and subflow routing passed
+Software deployment audit: literal ordinary argv, exit 0/3 coherence, complete drift rows, details/paging, frozen reload/review, cancellation, failure diagnostics, bounds and compact navigation passed
+Software deployment audit search: all 8192 rows, difference-first projection, IDs/status/versions/fields, stable selection/resize, bounded UTF-8 editing, reload/stop/error retention, empty results and full deployment review passed
+Software save navigation: literal paste/control refusal, focus-first Escape, full/compact status/failure, frozen receipt paging, partial/complete-before-exit writer guards and late failure PASS
+Software deployment saving: literal ordinary argv, bounded complete receipt, destination binding, both architectures, empty generation, close guard, fresh audit/review, diagnostics and compact navigation passed
+Software saved deployment export: frozen source/digest, explicit new destination, no catalog selection, full path/package/license review, administrator apply, progress, changed-source refusal, retry and retirement passed
+Software offline export navigation: compact Back/Cancel/Stop/status/progress/failures, partial and complete-before-exit review cancellation/reaping, frozen retry and protected publication passed
+Software offline export: destination paging, dependency provenance, literal confirmation, installed scope, progress, stale diagnostics and close guard passed
+Software locked offline export: exact older runtime, source/digest paging, literal frozen confirmation, invalid responses, stale diagnostics, progress and cancellation passed
+Software launch options: quoted literal arguments, separate file grants, frozen worker input, diagnostics and terminal transfer passed
+Software launch navigation: compact Back/status/failures, stable draft and file paging, Escape blur/back, control-paste refusal, installed permission basis, protected literal batch success/failure, retry and exact terminal transfer passed
+Software native windows: bounded frames, namespaced controls, ordinary-service launch, clicks, close acknowledgement and EOF retirement passed
+Software native text: focus, UTF-8 bounds, literal replacement, stale controls, explicit commit/discard, close guard and protocol admission passed
+Software administrator approval: frozen literal request, masked bounded UTF-8 password, hidden-action refusal, credential wiping, cancellation and progress passed
+Software personal data: own-account inventory, installed/unsafe refusal, frozen explicit confirmation, cancellation, paging, live-lease diagnostics, reload and close guard passed
+Software personal data navigation: partial and complete-before-exit inventory Stop/Cancel/Escape, fresh inventory requirement, compact controls and stable selection, protected purge, stopped post-delete reload, retained result and failure diagnostics passed
+Software organization policy: current restrictions, complete settings/impact paging, literal file review, frozen confirmation, administrator approval/cancel/wipe, stale/error refusal, reload and close guard passed
+Software policy navigation: partial and complete-before-exit read/review Stop/Cancel/Escape, fresh policy requirement, literal retry, compact controls and stable pages, approval cancellation, protected save/progress, stopped post-save reload and failure diagnostics passed
+Software metadata review: missing firmware and escaped duplicate flags refuse confirmation before administrator approval
+/Users/alex/code/vinix/build/package-paragraphs-work/software-ui/software_details_fixture.v:25: FAIL: fn main.software_paragraph_fixture_text: assert truncated && child.frame.y == (row - 1) * 18
+V panic: Assertion failed...
+
+third-ui-functional.txt
+Software package navigation: all five operations, partial and complete-before-exit Stop/Cancel/Escape, fresh retry, frozen catalog state, compact review/details/status/progress/failures, protected apply/refresh and reload passed
+Software configured repositories: damaged metadata does not block reviewed revocation; enrollment remains refused PASS
+Software repository navigation: compact list/review/status/progress/failures, partial and complete-before-exit Stop/Cancel/Escape, retained inputs/list, fresh paged review, protected apply/refresh and retry passed
+Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed
+Software Verify: visible control, no administrator/catalog dependency, streamed progress, stable selection, incomplete/failure retention, review isolation and safe close PASS
+Software verification navigation: partial/live/complete-before-exit Stop/Cancel/Escape, pending completion despite human success text, kill/reap and buffer retirement, fresh retry and late failure, compact diagnostics, frozen catalog state and protected verify-phase transactions/launches passed
+Software repair: installed dependency control, exact-version closure disclosure, read-only review, duplicate/modal isolation, frozen confirmation and reviewed administrator apply PASS
+Software health navigation: partial/live/complete-before-exit Stop/Cancel/Escape, compact reload/status/progress/summary/failure, frozen search/filter/selection/paging, late failure and fresh retry PASS
+Software health: read-only asynchronous report, issue-first searchable metadata/diagnostics, issues-only filtering, stable visible selection, empty results, bounded Unicode editing, reload retention, compact Back, isolated catalog state, full-set repair review and safe close PASS
+Software health progress: separate bounded stderr, live package names, both-pipe EOF, complete/exit/report/count admission, malformed/partial/late/flood refusal, Stop/Escape kill and reap, retry and compact cancellation PASS
+SOFTWARE CLEANUP read-only review, complete paged disclosure, modal/compact controls, frozen administrator approval, stale refusal, diagnostics and reload PASS
+Software cleanup navigation: partial and complete-before-exit Stop/Cancel/Escape, fresh review requirement, 4096-generation admission and stable resize anchor, compact diagnostics, approval cancellation, protected deletion, stopped/failed post-cleanup reload and retained result passed
+Software deployment: full closure, frozen literal path, empty removal, cancellation, bounds, stale/error diagnostics and close guard passed
+Software deployment navigation: compact form/review/details/status/progress/failures, partial and complete-before-exit Stop/Cancel/Escape, fresh literal retry, empty removal, protected apply and subflow routing passed
+Software deployment audit: literal ordinary argv, exit 0/3 coherence, complete drift rows, details/paging, frozen reload/review, cancellation, failure diagnostics, bounds and compact navigation passed
+Software deployment audit search: all 8192 rows, difference-first projection, IDs/status/versions/fields, stable selection/resize, bounded UTF-8 editing, reload/stop/error retention, empty results and full deployment review passed
+Software save navigation: literal paste/control refusal, focus-first Escape, full/compact status/failure, frozen receipt paging, partial/complete-before-exit writer guards and late failure PASS
+Software deployment saving: literal ordinary argv, bounded complete receipt, destination binding, both architectures, empty generation, close guard, fresh audit/review, diagnostics and compact navigation passed
+Software saved deployment export: frozen source/digest, explicit new destination, no catalog selection, full path/package/license review, administrator apply, progress, changed-source refusal, retry and retirement passed
+Software offline export navigation: compact Back/Cancel/Stop/status/progress/failures, partial and complete-before-exit review cancellation/reaping, frozen retry and protected publication passed
+Software offline export: destination paging, dependency provenance, literal confirmation, installed scope, progress, stale diagnostics and close guard passed
+Software locked offline export: exact older runtime, source/digest paging, literal frozen confirmation, invalid responses, stale diagnostics, progress and cancellation passed
+Software launch options: quoted literal arguments, separate file grants, frozen worker input, diagnostics and terminal transfer passed
+Software launch navigation: compact Back/status/failures, stable draft and file paging, Escape blur/back, control-paste refusal, installed permission basis, protected literal batch success/failure, retry and exact terminal transfer passed
+Software native windows: bounded frames, namespaced controls, ordinary-service launch, clicks, close acknowledgement and EOF retirement passed
+Software native text: focus, UTF-8 bounds, literal replacement, stale controls, explicit commit/discard, close guard and protocol admission passed
+Software administrator approval: frozen literal request, masked bounded UTF-8 password, hidden-action refusal, credential wiping, cancellation and progress passed
+Software personal data: own-account inventory, installed/unsafe refusal, frozen explicit confirmation, cancellation, paging, live-lease diagnostics, reload and close guard passed
+Software personal data navigation: partial and complete-before-exit inventory Stop/Cancel/Escape, fresh inventory requirement, compact controls and stable selection, protected purge, stopped post-delete reload, retained result and failure diagnostics passed
+Software organization policy: current restrictions, complete settings/impact paging, literal file review, frozen confirmation, administrator approval/cancel/wipe, stale/error refusal, reload and close guard passed
+Software policy navigation: partial and complete-before-exit read/review Stop/Cancel/Escape, fresh policy requirement, literal retry, compact controls and stable pages, approval cancellation, protected save/progress, stopped post-save reload and failure diagnostics passed
+Software metadata review: missing firmware and escaped duplicate flags refuse confirmation before administrator approval
+/Users/alex/code/vinix/build/package-paragraphs-work/software-ui/software_details_fixture.v:25: FAIL: fn main.software_paragraph_fixture_text: assert truncated && child.frame.y == (row - 1) * 18, 'Unexpected truncation: ${element.text}'
+      message: Unexpected truncation: Publisher key: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+V panic: Assertion failed...

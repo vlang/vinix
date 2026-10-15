@@ -1084,11 +1084,63 @@ fn (mut a SoftwareApp) paste_input(input string) {
 }
 
 fn software_label(text string, x int, y int, width int, height int, owned bool) ui2.Element {
+	if height > 30 {
+		// The native renderer draws one line per label. Borrow slices from the
+		// container's text; free_tree retires children before its owned text.
+		// Eight pixels per UTF-8 byte conservatively fits the mono atlas at both
+		// display scales, including wide glyphs and the fallback character.
+		columns := if width / 8 >= 4 { width / 8 } else { 4 }
+		rows := height / 18
+		mut children := frame_elements(rows + 1)
+		mut position := 0
+		for row in 0 .. rows {
+			if position >= text.len { break }
+			mut end := software_label_line_end(text, position, columns)
+			next := end + if end < text.len && text[end] == `\n` { 1 } else { 0 }
+			truncated := row + 1 == rows && next < text.len
+			if truncated { end = software_label_line_end(text, position, columns - 3) }
+			line := unsafe { tos(text.str + position, end - position) }
+			children << ui2.label('', line, ui2.rect(0, f64(row * 18), f64(width), 18),
+				ui2.TextStyle{ color: body_text, size: 12, font_family: 'mono' })
+			if truncated {
+				children << ui2.label('', '…', ui2.rect(f64(if width > 16 { width - 16 } else { 0 }), f64(row * 18), 16, 18),
+					ui2.TextStyle{ color: body_text, size: 12, font_family: 'mono' })
+			}
+			position = next
+		}
+		return ui2.Element{
+			...ui2.view('', ui2.rect(f64(x), f64(y), f64(width), f64(height)), ui2.BoxStyle{ transparent: true }, children)
+			text: text
+			accessibility_label: text
+			key: if owned { workflow_owned_text_key } else { '' }
+		}
+	}
 	return ui2.Element{
 		...ui2.label('', text, ui2.rect(f64(x), f64(y), f64(width), f64(height)),
-			ui2.TextStyle{ color: body_text, size: 12, lines: if height > 30 { 3 } else { 1 } })
+			ui2.TextStyle{ color: body_text, size: 12 })
 		key: if owned { workflow_owned_text_key } else { '' }
 	}
+}
+
+fn software_label_line_end(text string, start int, columns int) int {
+	mut end := start
+	for end < text.len && end - start < columns && text[end] != `\n` { end++ }
+	for end > start && end < text.len && text[end] & 0xc0 == 0x80 { end-- }
+	// Keep the separating space in the borrowed line so wrapping loses no
+	// content, while long identifiers and paths can still break mid-word.
+	if end < text.len && text[end] != `\n` {
+		mut space := end
+		for space > start && text[space - 1] != ` ` { space-- }
+		if space > start {
+			mut word_end := end
+			for word_end < text.len && word_end - space <= columns
+				&& text[word_end] != ` ` && text[word_end] != `\n` { word_end++ }
+			// A word longer than a whole row must split anyway. Fill this row
+			// instead of spending a separate row on its short field prefix.
+			if word_end - space <= columns { end = space }
+		}
+	}
+	return end
 }
 
 fn software_button(id string, text string, x int, y int, width int) ui2.Element {

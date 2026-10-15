@@ -113,7 +113,7 @@ fn (mut a SoftwareApp) build_admin(size ui2.Rect) ui2.Element {
 		return ui2.screen(app_surface, children)
 	}
 	children << software_label('Administrator approval', 14, 8, width - 28, 32, false)
-	children << software_label('This package change needs an administrator. Enter your own password; the reviewed operation stays fixed.', 14, 56, width - 28, 68, false)
+	children << software_label('This package change needs an administrator. Enter your own password; the reviewed operation stays fixed.', 14, 56, width - 28, 72, false)
 	mut field := frame_elements(1)
 	field << ui2.Element{ ...ui2.text_field('', '', editor_bytes_text(a.admin_mask).clone(), ui2.rect(8, 0, f64(width - 44), 30),
 		ui2.BoxStyle{ transparent: true }, ui2.TextStyle{ color: body_text, size: 12 }, 0), key: workflow_owned_text_key }
@@ -122,6 +122,7 @@ fn (mut a SoftwareApp) build_admin(size ui2.Rect) ui2.Element {
 			border_top: 1, border_bottom: 1, border_left: 1, border_right: 1 }, field)
 	children << software_button('software.admin.approve', 'Approve change', 14, 182, 156)
 	children << software_button('software.admin.cancel', 'Cancel', 182, 182, 110)
-	children << software_label(a.status, 14, height - 98, width - 28, 90, false)
+	status_y := if height >= 316 { height - 98 } else { 218 }
+	children << software_label(a.status, 14, status_y, width - 28, height - status_y - 8, false)
 	return ui2.screen(app_surface, children)
 }

@@ -224,6 +224,8 @@ fn check() ! {
 		run(v, [...helper_flags, '-o', work + '/terminal-check', repository + '/tests/packages/terminal-check.v'])!
 		run(work + '/terminal-check', [])!
 	}
+	run(v, [...helper_flags, '-gc', 'none', '-o', work + '/software-label-font-check', repository + '/tests/packages/software-label-font-check.v'])!
+	run(work + '/software-label-font-check', [repository + '/desktop/font_data.v'])!
 	os.cp(repository + '/desktop/software_app.v', work + '/software/software_app.v')!
 	os.cp(repository + '/desktop/software_package_navigation.v', work + '/software/software_package_navigation.v')!
 	os.cp(repository + '/tests/packages/software_package_navigation_fixture.v', work + '/software/package_navigation_fixture.v')!

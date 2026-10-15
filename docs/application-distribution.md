@@ -1035,6 +1035,14 @@ visible in the native renderer. Health and deployment-check side panels use
 shorter UTF-8 lines for their minimum width; complete values continue across
 pages. See [disclosure rendering checks](../tests/packages/software-disclosure-lines-check.md).
 
+Warning and status paragraphs wrap into individual native labels, preserving
+explicit line breaks and UTF-8 boundaries. Minimum-size checks cover complete
+deletion, repository-trust, launch, saved-deployment and offline-export warnings,
+plus publisher keys and permissions. Longer summaries visibly end with an
+ellipsis; complete package and failure details remain in their paged views.
+Administrator status no longer overlaps approval buttons at the smallest
+supported prompt size. See [paragraph checks](../tests/packages/software-paragraphs-check.md).
+
 Catalog replies now use a bounded typed reader. Missing/coerced flags, duplicate
 known fields, partial installed launch metadata, incompatible architectures and
 incoherent update actions are refused with a specific diagnostic. Software keeps
