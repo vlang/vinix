@@ -9,11 +9,13 @@ Build each kernel in an isolated worktree, then run from the repository root:
 ```sh
 V_C_ERROR_BUG_REPORT_DISABLED=1 USE_TCG=0 build-support/run-v-tool.sh \
   tests/mount-lifecycle/run.v --arch aarch64 \
-  --kernel-dir /path/to/arm-worktree/kernel --state-dir /path/to/fresh-arm-result
+  --kernel-dir /path/to/arm-worktree/kernel --state-dir /path/to/fresh-arm-result \
+  --timeout 900
 
 V_C_ERROR_BUG_REPORT_DISABLED=1 USE_TCG=1 build-support/run-v-tool.sh \
   tests/mount-lifecycle/run.v --arch x86_64 \
-  --kernel-dir /path/to/x86-worktree/kernel --state-dir /path/to/fresh-x86-result
+  --kernel-dir /path/to/x86-worktree/kernel --state-dir /path/to/fresh-x86-result \
+  --timeout 900
 ```
 
 The default `--case all` requires every positive marker. `--case flags`,
@@ -77,6 +79,13 @@ include them.
 `--case descxattrs` selects inherited-descriptor extended-attribute checks;
 `dx-0` through `dx-7` select individual cases. Native `all` and Linux
 `move-reference` include them.
+`--case descflags` selects inherited-descriptor inode-flag checks; `df-0`
+through `df-5` select individual cases. Native `all` includes them. The Linux
+`move-reference` suite excludes these native flag payloads.
+
+The [descriptor inode-flag checks](descriptor-flags.md) keep the saved mount's
+read-only policy for immutable/append-only setters after divergent remounts of
+a copied namespace, including changed and unchanged values.
 
 The [descriptor xattr checks](descriptor-xattr.md) preserve saved-mount policy
 for `fsetxattr` and `fremovexattr`, including binary/empty values, create/replace

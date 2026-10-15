@@ -508,6 +508,16 @@ and ordinary-user/trusted-attribute permissions. MAC, attributes, backend
 read-only state, capabilities, copy-up and resource release remain. Concurrent
 remount serialization, broader policy combinations and persistent/overlay
 integration remain open.
+The [descriptor inode-flag checks](../tests/mount-lifecycle/descriptor-flags.md)
+extend saved-mount policy to `FS_IOC_SETFLAGS`, including requests that repeat
+the current bits. Inherited descriptions retain their original authority when
+a copied mount becomes writable or read-only. Native checks exercise regular
+files, directories, unlinked files, dup/fork retention, immutable/append-only
+transitions and unprivileged capability denials. Existing MAC, argument,
+backend, capability, securelevel, copy-up and persistence checks remain.
+These flag payloads remain outside the portable Linux reference suite;
+filesystem-backed Linux comparison and concurrent remount serialization remain
+open.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,

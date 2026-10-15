@@ -42,9 +42,11 @@ inherited descriptors. Data descriptors are opened read-only.
 The flag payloads in this group are native-only. The same probe's Linux
 `move-reference` suite exercises the existing portable mount cases and excludes
 these flag setters; it must not be presented as Linux flag-ioctl qualification.
-Filesystem-backed Linux flag comparisons, divergent inherited-FD remount flags,
-concurrent remount/setns and the broader securelevel/MAC/capability matrix remain
-open. Full OCI/rootless acceptance and roadmap section 17 remain in progress.
+The [descriptor flag checks](descriptor-flags.md) separately cover inherited
+descriptions whose original mount and namespace copy have divergent remount
+flags. Filesystem-backed Linux flag comparisons, concurrent remount/setns and
+the broader securelevel/MAC/capability matrix remain open. Full OCI/rootless
+acceptance and roadmap section 17 remain in progress.
 
 Evidence from 2026-10-15 is retained under `build/development17-20261013`:
 

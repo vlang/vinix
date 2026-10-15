@@ -66,7 +66,7 @@ fn file_flags_ioctl(mut node VFSNode, request u64, argp voidptr, identity &lib.M
 		errno.set(errno.eperm)
 		return none
 	}
-	if read_only_on_mount(node, identity) {
+	if read_only_on_description(node, identity) {
 		errno.set(errno.erofs)
 		return none
 	}
