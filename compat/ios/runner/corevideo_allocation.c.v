@@ -1,34 +1,40 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
-// These are CPU allocations. Accepting a GPU/surface request here would make
-// callers believe that an otherwise unmappable buffer can be imported by Metal.
-fn cv_allocation_attributes(attributes u64) (u64, u64, i32) {
+// Metal-compatible storage is shared and has a separate surface lifetime.
+// Actual texture creation/coherence still belongs to the supplied Metal device.
+fn cv_allocation_attributes(attributes u64) (u64, u64, bool, i32) {
 	mut row := u64(64)
 	mut plane := u64(64)
-	if attributes == 0 { return row, plane, 0 }
-	if !objc_is_kind(attributes, ios_runtime.names['NSDictionary']) { return 0, 0, -6682 }
+	mut surface := false
+	if attributes == 0 { return row, plane, surface, 0 }
+	if !objc_is_kind(attributes, ios_runtime.names['NSDictionary']) { return 0, 0, false, -6682 }
 	header := obj_header(attributes)
 	for i, key in header.keys {
-		if !objc_is_kind(key, ios_runtime.names['NSString']) { return 0, 0, -6682 }
+		if !objc_is_kind(key, ios_runtime.names['NSString']) { return 0, 0, false, -6682 }
 		name := string_text(key)
 		value := header.items[i]
-		if name == 'IOSurfaceProperties' { return 0, 0, -6663 }
-		if !objc_is_kind(value, ios_runtime.names['NSNumber']) { return 0, 0, -6682 }
+		if name == 'IOSurfaceProperties' {
+			if !objc_is_kind(value, ios_runtime.names['NSDictionary']) { return 0, 0, false, -6682 }
+			if obj_header(value).items.len != 0 { return 0, 0, false, -6663 }
+			surface = true
+			continue
+		}
+		if !objc_is_kind(value, ios_runtime.names['NSNumber']) { return 0, 0, false, -6682 }
 		number := obj_header(value)
-		if number.is_real || number.unsigned_number || number.number < 0 { return 0, 0, -6682 }
+		if number.is_real || number.number < 0 { return 0, 0, false, -6682 }
 		match name {
 			'BytesPerRowAlignment', 'PlaneAlignment' {
-				if number.cf_boolean || number.number == 0 { return 0, 0, -6682 }
-				alignment := cv_alignment_multiple(64, u64(number.number)) or { return 0, 0, -6681 }
+				if number.cf_boolean || number.number == 0 || number.unsigned_number { return 0, 0, false, -6682 }
+				alignment := cv_alignment_multiple(64, u64(number.number)) or { return 0, 0, false, -6681 }
 				if name == 'BytesPerRowAlignment' { row = alignment } else { plane = alignment }
 			}
-			'MetalCompatibility' { if number.number != 0 { return 0, 0, -6684 } }
-			'OpenGLESCompatibility' { if number.number != 0 { return 0, 0, -6683 } }
-			else { return 0, 0, -6682 }
+			'MetalCompatibility' { if number.number > 1 { return 0, 0, false, -6682 }; surface = surface || number.number != 0 }
+			'OpenGLESCompatibility' { if number.number != 0 { return 0, 0, false, -6683 } }
+			else { return 0, 0, false, -6682 }
 		}
 	}
-	return row, plane, 0
+	return row, plane, surface, 0
 }
 
 fn cv_alignment_multiple(a u64, b u64) ?u64 {
@@ -67,7 +73,7 @@ fn cv_pixel_create(allocator u64, width u64, height u64, format u32, attributes 
 	// before format/allocation failures. Publish a +1 object only after success.
 	unsafe { *output = 0 }
 	if format !in [u32(0x42475241), 0x34323076, 0x34323066]! { return -6680 }
-	row_alignment, plane_alignment, status := cv_allocation_attributes(attributes)
+	row_alignment, plane_alignment, shared, status := cv_allocation_attributes(attributes)
 	if status != 0 { return status }
 	packed := format == 0x42475241
 	// Besides preventing arithmetic overflow, this bounds the signed 32-bit
@@ -94,7 +100,12 @@ fn cv_pixel_create(allocator u64, width u64, height u64, format u32, attributes 
 	mut state := unsafe { &CVPixelState(C.calloc(1, sizeof(CVPixelState))) }
 	if state == unsafe { nil } { return -6662 }
 	mut allocation := u64(0)
-	if C.posix_memalign(unsafe { voidptr(&allocation) }, 64, usize(size)) != 0 { C.free(state); return -6662 }
+	if shared {
+		memory := C.mmap(unsafe { nil }, usize(size), C.PROT_READ | C.PROT_WRITE, C.MAP_SHARED | C.MAP_ANONYMOUS, -1, 0)
+		if memory == voidptr(-1) { C.free(state); return -6662 }
+		allocation = u64(memory)
+		state.mapped = true
+	} else if C.posix_memalign(unsafe { voidptr(&allocation) }, 64, usize(size)) != 0 { C.free(state); return -6662 }
 	C.memset(unsafe { voidptr(allocation) }, 0, usize(size))
 	state.allocation = allocation
 	state.width = width; state.height = height; state.format = format
@@ -109,6 +120,15 @@ fn cv_pixel_create(allocator u64, width u64, height u64, format u32, attributes 
 		cv_descriptor_word(allocation + 4, row)
 		cv_descriptor_word(allocation + 8, chroma_offset)
 		cv_descriptor_word(allocation + 12, chroma_row)
+	}
+	if shared {
+		owner := unsafe { &CVPixelState(C.calloc(1, sizeof(CVPixelState))) }
+		if owner == unsafe { nil } { C.munmap(unsafe { voidptr(allocation) }, usize(size)); C.free(state); return -6662 }
+		C.memcpy(owner, state, sizeof(CVPixelState))
+		surface := objc_allocate(ios_runtime.names['VinixIOSurface'])
+		obj_header(surface).cv_pixel = owner
+		state.surface = surface
+		state.allocation = 0 // The surface now owns the mapping; no reference back to the buffer.
 	}
 	object := objc_allocate(cv_pixel_type_id())
 	obj_header(object).cv_pixel = state

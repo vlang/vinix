@@ -80,6 +80,10 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	if library == '/System/Library/Frameworks/CoreVideo.framework/CoreVideo' {
 		if address := corevideo_constant_symbol(symbol) { return address }
 		if address := corevideo_symbol(symbol) { return address }
+		if address := corevideo_metal_symbol(symbol) { return address }
+	}
+	if library == '/System/Library/Frameworks/IOSurface.framework/IOSurface' {
+		if address := iosurface_symbol(symbol) { return address }
 	}
 	if library == '/System/Library/Frameworks/AVFoundation.framework/AVFoundation' {
 		if address := avfoundation_constant_symbol(symbol) { return address }

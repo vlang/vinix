@@ -207,10 +207,10 @@ fn test_corevideo(){
   objc_start();ck_shared(CKApi{});cp_cases(CPApi{})
   assert ios_runtime.live==0&&ios_runtime.objects.len==0
   for name in ck_names(){for lib in ['/System/Library/Frameworks/Foundation.framework/Foundation','/usr/lib/libSystem.B.dylib']!{if _:=runtime_symbol(lib,name){assert false}}}
-  for name in ['_CVMetalTextureCacheCreate','_CVMetalTextureCacheCreateTextureFromImage','_CVMetalTextureGetTexture']!{if _:=runtime_symbol('/System/Library/Frameworks/CoreVideo.framework/CoreVideo',name){assert false}}
+  for name in ['_CVMetalTextureCacheCreate','_CVMetalTextureCacheCreateTextureFromImage','_CVMetalTextureGetTexture']!{assert (runtime_symbol('/System/Library/Frameworks/CoreVideo.framework/CoreVideo',name)or{panic(err)})!=0}
   probe:=objc_allocate_class(ios_runtime.names['NSObject'],c'VinixCoreVideoTeardownProbe',0);assert probe!=0;assert objc_add_method(probe,u64(c'dealloc'),u64(unsafe{voidptr(ck_teardown)}),c'v16@0:8');objc_register_class(probe);objc_autorelease(objc_new(probe))
   before:=corevideo_keys_teardown_calls;objc_stop();assert corevideo_keys_teardown_calls==before+1&&ios_runtime.corevideo_constants_arena==0&&ios_runtime.live==0&&ios_runtime.objects.len==0
   if _:=corevideo_constant_symbol('_kCVImageBufferGammaLevelKey'){assert false}
  }
- println('IOS-COREVIDEO: CPU pixel buffer creation/queries/locking,exact final-release callbacks and copied plane arrays,CF retain/release,stable sealed metadata aliases,concurrent readers,two drained runtimes;Metal textures remain unsupported')
+ println('IOS-COREVIDEO: CPU pixel buffer creation/queries/locking,exact final-release callbacks and copied plane arrays,CF retain/release,stable sealed metadata aliases,concurrent readers,two drained runtimes;Metal texture imports delegate to supplied devices')
 }

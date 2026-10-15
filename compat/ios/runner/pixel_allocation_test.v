@@ -147,7 +147,7 @@ fn pa_private_failures() {
 		mut output := u64(0xfeed)
 		assert cv_pixel_create(0, dimensions[0], dimensions[1], 0x34323076, 0, &output) == -6681 && output == 0
 	}
-	for pair in [['_kCVPixelBufferMetalCompatibilityKey', '-6684']!, ['_kCVPixelBufferOpenGLESCompatibilityKey', '-6683']!, ['_kCVPixelBufferIOSurfacePropertiesKey', '-6663']!]! {
+	for pair in [['_kCVPixelBufferOpenGLESCompatibilityKey', '-6683']!, ['_kCVPixelBufferIOSurfacePropertiesKey', '-6682']!]! {
 		value := pa_number(PAApi{}, 1)
 		attributes := pa_dict(PAApi{}, [pa_global(PAApi{}, pair[0])], [value])
 		mut output := u64(0xfeed)

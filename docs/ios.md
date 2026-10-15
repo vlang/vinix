@@ -7495,8 +7495,8 @@ release invokes the supplied storage-release callback exactly once. Buffers
 without a callback keep caller-owned bytes untouched.
 Geometry, pixel format, base-address/row-stride/data-size and plane accessors use
 that state. Lock/unlock make these permanently mapped CPU bytes accessible;
-they are cache-access operations, not mutual-exclusion locks. GPU coherence,
-IOSurface allocation and other pixel formats remain unsupported. Borrowed-storage
+they are cache-access operations, not mutual-exclusion locks. GPU coherence and
+other pixel formats remain unsupported. Borrowed-storage
 constructors accept nil or empty attributes. Foreign or stale handles fail before
 object memory is read.
 
@@ -7531,10 +7531,10 @@ the allocation. Invalid dimensions leave the output unchanged; format and later
 failures clear it. Plane-alignment and IOSurface-properties keys join the sealed
 metadata globals, bringing their count to nineteen.
 
-This allocation profile rejects unknown attributes and alignment values outside
-that integer profile. Metal/OpenGLES compatibility requests return their
-incompatibility status; IOSurface allocation returns unsupported. False hints
-allow CPU allocation. These results do not advertise a GPU device or shared-surface mapping.
+The CPU allocation profile rejects unknown attributes and alignment values outside
+that integer profile. OpenGLES compatibility requests remain unsupported. False
+compatibility hints allow ordinary CPU allocation. Metal and IOSurface requests
+now use the separate shared-storage profile described below.
 
 Eight normal/deterministic host sanitizer runs and four ARM64 guest suites cover
 owned allocation, borrowed CoreVideo buffers, URL-error globals and autorelease
@@ -7548,26 +7548,64 @@ retained under `build/ios/fortnite/pixel-allocation-checks`.
 V/Mach-O/LLVM inspection found three actual texture-cache creation callers. At
 `0x10a64d6c8`, the game passes a device returned through its renderer interface,
 then imports BGRA storage as Metal pixel format 81 at `0x10a64d71c`. Owned CPU
-allocation is groundwork for this path; it does not satisfy the Metal cache
-imports. The current probe and import counts therefore remain unchanged.
+allocation supplied the initial storage groundwork for this path.
 
-The borrowed-buffer APIs and original metadata group resolve twenty-seven
-required imports. Metal texture-cache creation,
-image-to-texture mapping and texture extraction still require a Metal device and
-shared-surface backend. The current IPA probe therefore still exits with status 1
-at `_CVMetalTextureCacheCreate`, before application entry. Fortnite remains unplayable.
+The borrowed-buffer APIs and original metadata group resolved twenty-seven
+required imports. CoreVideo's three required Metal texture-cache imports now also
+resolve. `CVMetalTextureCacheCreate` retains a supplied device implementing
+`newTextureWithDescriptor:iosurface:plane:`. Image import builds a 2D descriptor
+inheriting `MTLTextureDescriptor`, calls that device, and owns its returned texture
+together with the source pixel buffer. Failed device imports return an error and
+release the temporary descriptor. Views remain valid after cache flush/release;
+the cache retains no idle views. Shared storage mode, usage attributes,
+nonnegative maximum-age
+attributes, type IDs, orientation and clean texture coordinates are supported.
+The three associated CFString keys bring the sealed CoreVideo globals to twenty-two.
+
+Metal compatibility or an empty IOSurface-properties dictionary now requests
+shared anonymous storage. A separate IOSurface object owns the mapping; pixel
+buffers and imported textures can retain it independently. Local surface geometry,
+plane, base-address, allocation-size and pixel-format accessors describe the
+actual portable layout. Final surface release unmaps the storage. Mach-port
+export, global surface IDs and device-specific allocations remain unsupported.
+OpenGLES-compatible allocation and nonempty surface properties still fail
+explicitly. BGRA maps to Metal formats 80/81, and 420v/420f planes map to formats
+10/30. Native measurements additionally establish that packed plane indices
+other than zero fail, despite the older header's wording; the output is preserved.
+Missing image/cache/output arguments likewise fail before publishing a handle.
+CPU-only image import clears the output and returns the native generic error.
+
+Eight final host sanitizer runs and four ARM64 guest suites cover cache/device
+delegation, owned pixel allocation, borrowed CoreVideo buffers and autorelease
+pools. The Mac comparisons use its actual Metal device for surface allocation,
+texture read/write aliasing, plane geometry, orientation, CF ownership and
+concurrent readers. The V test device implements surface texture creation and
+row transfers, exercising the same Objective-C and aggregate-argument ABI. Guest
+checks cover independent device/cache/view/texture/surface lifetimes, failed
+imports, format/size validation, shared writes across fork and two drained
+runtimes. Host Mach VM queries verify final unmapping. Native driver mappings
+are not inherited across fork; that test applies only to the portable profile.
+Eleven final generated C streams/executables, native measurements, actual IPA
+consumers and joined VM evidence are retained under
+`build/ios/fortnite/metal-cache-checks`.
+
+This implements the CoreVideo/device boundary. A system Metal device, shaders,
+command queues and renderer are still unavailable. Fortnite remains unplayable
+and the full iOS regression remains unpassed. The actual IPA probe links past
+the three Metal-cache imports, then exits with status 1 before application entry
+at CoreMedia's `_CMAudioFormatDescriptionGetStreamBasicDescription`.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,604 | 556 | 79 |
+| Fortnite executable | 1,607 | 553 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,439 | 559 | 120 |
+| All images | 2,442 | 556 | 120 |
 
-The C++/GLES/Text variant reports 2,452 resolved imports, 546 unresolved strong
+The C++/GLES/Text variant reports 2,455 resolved imports, 543 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

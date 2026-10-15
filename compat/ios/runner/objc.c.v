@@ -94,6 +94,7 @@ mut:
 	free_data bool
 	swift_data_owner u64 // NSData bridge owns one Swift snapshot storage reference.
 	cv_pixel &CVPixelState = unsafe { nil }
+	cv_metal &CVMetalState = unsafe { nil }
 	provider_info voidptr
 	provider_release u64
 	real_number f64
@@ -350,7 +351,7 @@ fn objc_start() {
 	ios_runtime.observers.flags |= .noslices
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
-	for name in ['NSObject', 'VinixCVPixelBuffer', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
+	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
@@ -375,6 +376,7 @@ fn objc_start() {
 			'OS_dispatch_queue_serial' { ios_runtime.names['OS_dispatch_queue_serial_executor'] }
 			'OS_dispatch_queue_main' { ios_runtime.names['OS_dispatch_queue_serial'] }
 			'VinixCFDate' { ios_runtime.names['NSDate'] }
+			'VinixMetalTextureDescriptor' { ios_runtime.names['MTLTextureDescriptor'] }
 			'NSInputStream' { ios_runtime.names['NSStream'] }
 			'NSNumber', 'NSConcreteValue' { ios_runtime.names['NSValue'] }
 			'_NSUUIDBridge' { ios_runtime.names['NSUUID'] }
@@ -476,6 +478,7 @@ fn objc_start() {
 	}
 	mut http_response := ios_runtime.classes[ios_runtime.names['NSHTTPURLResponse']] or { panic('iOS: missing HTTP response class') }
 	http_response.ivars['_httpInternal'] = &ObjIvar{name:'_httpInternal'.clone(), types:'@"NSHTTPURLResponseInternal"'.clone(), offset:24, size:8}
+	cv_metal_start()
 }
 
 fn read64(address u64) u64 { return unsafe { *(&u64(address)) } }
@@ -714,6 +717,11 @@ fn format_double(destination &char, size usize, format &char, value f64) int {
 }
 
 fn runtime_symbol(library string, symbol string) !u64 {
+	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if symbol in ['_OBJC_CLASS_$_MTLTextureDescriptor', '_OBJC_METACLASS_$_MTLTextureDescriptor']!
+		&& library != '/System/Library/Frameworks/Metal.framework/Metal' {
+		return error('iOS: Metal texture descriptor import requires Metal.framework')
+	}
 	if library == '/usr/lib/swift/libswiftDispatch.dylib' { return swift_dispatch_symbol(symbol) }
 	if library == '/usr/lib/swift/libswiftFoundation.dylib' { return swift_foundation_symbol(symbol) }
 	if library == '/usr/lib/swift/libswiftos.dylib' { return swift_os_symbol(symbol) }

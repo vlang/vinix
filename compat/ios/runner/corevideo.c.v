@@ -3,7 +3,8 @@ module main
 
 // Wrapped CPU storage is borrowed until the final CF/ObjC release invokes its
 // owner. CVPixelBufferCreate instead owns allocation, freed by the same lifetime.
-// No GPU coherence, IOSurface mapping or Metal texture is implied by this type.
+// A surface-backed buffer retains a separate shared-storage owner. GPU cache
+// management is delegated to the Metal device that imports that surface.
 struct CVPixelState {
 mut:
 	width u64
@@ -20,6 +21,8 @@ mut:
 	callback u64
 	context u64
 	allocation u64
+	surface u64
+	mapped bool
 }
 
 fn cv_pixel_type_id() u64 { return ios_runtime.names['VinixCVPixelBuffer'] }
@@ -84,7 +87,12 @@ fn cv_pixel_dispose(mut header ObjHeader) {
 		else { unsafe { CVReleasePlanes(voidptr(callback))(state.context, state.base, state.size, state.planes, &state.addresses[0]) } }
 	}
 	header.cv_pixel = unsafe { nil }
-	if state.allocation != 0 { C.free(unsafe { voidptr(state.allocation) }) }
+	if state.allocation != 0 {
+		if state.mapped {
+			if C.munmap(unsafe { voidptr(state.allocation) }, usize(state.size)) != 0 { panic('iOS: cannot retire shared pixel storage') }
+		} else { C.free(unsafe { voidptr(state.allocation) }) }
+	}
+	if state.surface != 0 { objc_release(state.surface) }
 	C.free(state)
 }
 
@@ -131,6 +139,7 @@ fn cv_pixel_lock(object u64, flags u64) i32 {
 
 fn corevideo_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_CVPixelBufferGetIOSurface' { u64(unsafe { voidptr(cv_pixel_surface) }) }
 		'_CVPixelBufferCreate' { u64(unsafe { voidptr(cv_pixel_create) }) }
 		'_CVPixelBufferGetTypeID' { u64(unsafe { voidptr(cv_pixel_type_id) }) }
 		'_CVPixelBufferCreateWithBytes' { u64(unsafe { voidptr(cv_pixel_create_bytes) }) }
