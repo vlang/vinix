@@ -500,9 +500,18 @@ Software's **Health report** checks the complete installed set and lists package
 with issues first. It records the first namespace, payload or launcher issue for
 each package, with paged installed provenance and bounded diagnostics. Runtimes
 and data dependencies have their own results; a clean application row does not
-assert that its dependency closure can launch. The report remains available
-without usable cached catalogs or currently trusted publishers, and writes no
-package state. **Review repairs** obtains a fresh authenticated repair review;
+assert that its dependency closure can launch. Search matches installed IDs,
+names, versions, kinds, repositories, publisher keys, issue categories and
+diagnostics without rescanning storage; **Issues only** narrows the same snapshot.
+Rows identify their issue category, and the visible count stays separate from
+the complete generation summary. Reload preserves the search and filter, while
+returning to packages preserves the catalog search and selection. **Back to
+packages** remains available in a small window. See
+[search/filter qualification](../tests/packages/health-search-check.md).
+The report remains available without usable cached catalogs or currently trusted
+publishers, and writes no
+package state. **Review all repairs** obtains a fresh authenticated repair review
+for the complete installed set, including packages hidden by report filters;
 the observation itself authorizes no change. `vinix-package health` provides the
 same inspection, with `--json health` for scripts. A complete report returns zero
 even when rows contain issues; `verify` retains its failure exit behavior. See

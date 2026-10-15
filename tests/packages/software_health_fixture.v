@@ -13,8 +13,10 @@ fn software_health_fixture() pkgprotocol.HealthReport {
 	for index in 0 .. 32 {
 		number := index.str()
 		rows << pkgprotocol.PackageHealth{ id: 'app-' + if index < 10 { '0' + number } else { number },
-			name: 'Health é🚀 '.repeat(12), version: '1.0.0', kind: if index == 2 { 'runtime' } else { 'native' },
-			repository: 'publisher-' + 'a'.repeat(110), public_key: 'a'.repeat(64),
+			name: (if index == 5 { 'Zephyr ' } else { '' }) + 'Health é🚀 '.repeat(12),
+			version: if index == 7 { '1.2.3' } else { '1.0.0' }, kind: if index == 2 { 'runtime' } else if index == 8 { 'data' } else { 'native' },
+			repository: if index == 4 { 'organization-mirror' } else { 'publisher-' + 'a'.repeat(110) },
+			public_key: if index == 6 { 'b'.repeat(64) } else { 'a'.repeat(64) },
 			issue: match index { 1 { 'payload' } 2 { 'namespace' } 3 { 'registration' } else { '' } },
 			diagnostic: if index in [1, 2, 3]! { 'A complete diagnostic é🚀 '.repeat(10) } else { '' } }
 	}
@@ -39,9 +41,80 @@ fn software_health_service_fixture(args []string) bool {
 	return true
 }
 
+fn health_fixture_query(mut app SoftwareApp, query string) ! {
+	app.handle('software.health.search')!
+	app.key_input('\x01')
+	// Select-all/backspace also permits a deliberately empty query.
+	app.key_input('\x08')
+	app.paste_input(query)
+	assert editor_bytes_text(app.health_query) == query && app.worker == unsafe { nil }
+}
+
+fn check_health_filters(mut app SoftwareApp) ! {
+	for query, indices in {
+		'APP-23': [23], 'ZEPHYR': [5], '1.2.3': [7], 'RUNTIME': [2], 'DATA': [8],
+		'ORGANIZATION-MIRROR': [4], 'BBBBBBBBBBBBBBBB': [6],
+		'PAYLOAD': [1], 'NAMESPACE': [2], 'LAUNCHER': [3],
+		'COMPLETE DIAGNOSTIC É🚀': [1, 2, 3],
+	} {
+		health_fixture_query(mut app, query)!
+		assert app.health_matching == indices, query
+		assert app.health_selected in indices && app.health_scroll == 0
+		assert app.health_snapshot.rows[app.health_selected].id == 'app-' + (if app.health_selected < 10 { '0' } else { '' }) + app.health_selected.str()
+	}
+	health_fixture_query(mut app, 'APP-23')!
+	health_fixture_query(mut app, '')!
+	assert app.health_matching.len == 32 && app.health_selected == 23
+	assert 23 in app.health_matching[app.health_scroll..app.health_scroll + app.page_rows]
+	app.handle('software.health.issues')!
+	assert app.health_issues_only && app.health_matching == [1, 2, 3] && app.health_selected == 1 && app.health_scroll == 0
+	health_fixture_query(mut app, 'app-02')!
+	app.handle('software.health.reload')!
+	assert !app.health_ready && app.health_snapshot.rows.len == 0 && app.details_pages.len == 0
+	assert editor_bytes_text(app.health_query) == 'app-02' && app.health_issues_only
+	app.key_input('blocked'); app.paste_input('blocked'); app.handle('software.health.issues')!
+	assert editor_bytes_text(app.health_query) == 'app-02' && app.health_issues_only
+	wait_for_software(mut app)
+	assert app.health_matching == [2] && app.health_selected == 2 && app.health_summary.contains('32 packages inspected')
+	health_fixture_query(mut app, 'no such package')!
+	assert app.health_matching.len == 0 && app.health_selected == -1 && app.details_pages.len == 0
+	assert app.health_results == 'Showing 0 of 32' && app.health_summary.contains('3 with issues')
+	empty := app.build(ui2.rect(0, 0, 640, 610))!
+	assert empty.children.any(it.text == 'No packages match this search and filter.')
+	assert empty.children.any(it.id == 'software.health.repair' && it.text == 'Review all repairs')
+	assert !empty.children.any(it.id.starts_with('software.row.'))
+	free_window_tree(empty)
+	app.handle('software.row.0')!; assert app.health_selected == -1
+	os.setenv('VINIX_SOFTWARE_HEALTH_MODE', 'duplicate', true)
+	app.handle('software.health.reload')!; wait_for_software(mut app)
+	assert !app.health_ready && app.health_snapshot.rows.len == 0 && app.details_pages.len == 0
+	assert app.health_issues_only && editor_bytes_text(app.health_query) == 'no such package'
+	os.unsetenv('VINIX_SOFTWARE_HEALTH_MODE')
+	app.handle('software.health.reload')!; wait_for_software(mut app)
+	assert app.health_ready && app.health_matching.len == 0
+	app.handle('software.health.issues')!
+	health_fixture_query(mut app, 'Health É🚀')!
+	assert app.health_matching.len == 32
+	health_fixture_query(mut app, 'é🚀')!
+	app.key_input('\x7f'); assert editor_bytes_text(app.health_query) == 'é'
+	app.key_input('\x08'); assert app.health_query.len == 0
+	health_fixture_query(mut app, 'z'.repeat(console_filter_limit))!
+	app.paste_input('discarded'); assert app.health_query.len == console_filter_limit
+	app.key_input('\x01'); app.key_input('\x7f')
+	assert app.health_query.len == 0 && app.health_matching.len == 32
+	app.key_input('\x1b'); assert app.health_mode && !app.health_focus
+	app.key_input('unfocused'); app.paste_input('unfocused'); assert app.health_query.len == 0
+	small := app.build(ui2.rect(0, 0, 320, 240))!
+	assert small.children.any(it.id == 'software.health.back')
+	assert !small.children.any(it.id == 'software.health.search' || it.id == 'software.health.repair')
+	for element in small.children { assert element.frame.x >= 0 && element.frame.x + element.frame.width <= 320 }
+	free_window_tree(small)
+	assert app.query == 'catalog-search'.bytes() && app.selected == 0 && app.filter == 1
+}
+
 fn check_software_health() ! {
 	mut app := SoftwareApp{ service_path: os.executable(), administration_required: true,
-		query: []u8{cap: 256}, output: []u8{cap: 8192}, matching: [0], selected: 0, filter: 1,
+		query: 'catalog-search'.bytes(), output: []u8{cap: 8192}, matching: [0], selected: 0, filter: 1,
 		catalog_error: 'catalog unavailable'.clone(), rows: [SoftwareRow{ id: 'editor', name: 'Editor', installed_version: '1.0.0' }] }
 	defer { os.unsetenv('VINIX_SOFTWARE_HEALTH_MODE'); app.close_app() }
 	tree := app.build(ui2.rect(0, 0, 640, 610))!
@@ -54,21 +127,29 @@ fn check_software_health() ! {
 	assert app.health_ready && app.health_snapshot.rows.len == 32 && app.health_summary.contains('3 with issues')
 	assert app.health_matching[..4] == [1, 2, 3, 0] && app.health_selected == 1
 	assert 'Installed publisher key: ' + 'a'.repeat(64) in details_fixture_values(&app, 0)
+	assert 'Architecture: aarch64' in details_fixture_values(&app, 0)
 	assert 'Diagnostic: ' + 'A complete diagnostic é🚀 '.repeat(10) in details_fixture_values(&app, 0)
 	assert app.details_pages.len > 1 && !app.details_mode
 	for _ in 0 .. app.details_pages.len + 2 { app.handle('software.health.next')! }
 	assert app.details_page == app.details_pages.len - 1
 	health := app.build(ui2.rect(0, 0, 640, 610))!
 	assert health.children.any(it.id == 'software.health.repair') && !health.children.any(it.id == 'software.confirm')
+	assert health.children.any(it.id == 'software.row.0' && it.text == 'Payload: app-01')
+	assert health.children.any(it.id == 'software.row.2' && it.text == 'Launcher: app-03')
+	for element in health.children {
+		if element.id.starts_with('software.row.') { assert element.frame.y >= 128 && element.frame.y + element.frame.height <= 396 }
+	}
 	free_window_tree(health)
 	for hidden in ['software.confirm', 'software.install', 'software.repair', 'software.upgrade', 'software.verify', packagecore.request_prefix + '{"id":"editor"}'] {
 		app.handle(hidden)!; assert app.health_mode && app.worker == unsafe { nil } && app.review == '' && app.launch_request == ''
 	}
-	app.key_input('changed'); app.paste_input('changed'); assert app.query.len == 0
+	app.key_input('changed'); app.paste_input('changed'); assert app.query == 'catalog-search'.bytes()
 	app.handle('software.health.down')!; assert app.health_scroll > 0
 	app.handle('software.row.0')!; assert app.health_selected == app.health_matching[app.health_scroll] && app.details_page == 0
+	check_health_filters(mut app)!
 	app.handle('software.health.back')!
-	assert !app.health_mode && app.health_snapshot.rows.len == 0 && app.selected == 0 && app.filter == 1 && app.catalog_error == 'catalog unavailable'
+	assert !app.health_mode && app.health_snapshot.rows.len == 0 && app.health_query.len == 0 && !app.health_issues_only
+	assert app.selected == 0 && app.filter == 1 && app.query == 'catalog-search'.bytes() && app.catalog_error == 'catalog unavailable'
 	for mode in ['missing', 'duplicate', 'type', 'trailing', 'failed'] {
 		os.setenv('VINIX_SOFTWARE_HEALTH_MODE', mode, true)
 		app.handle('software.health')!; wait_for_software(mut app)
@@ -79,6 +160,7 @@ fn check_software_health() ! {
 	}
 	os.unsetenv('VINIX_SOFTWARE_HEALTH_MODE')
 	app.handle('software.health')!; wait_for_software(mut app)
+	health_fixture_query(mut app, 'no matching package')!
 	app.handle('software.health.repair')!
 	assert !app.health_mode && app.health_snapshot.rows.len == 0 && app.worker.args == ['review', 'repair'] && !app.admin_prompt
 	wait_for_software(mut app); assert app.review_ready; app.handle('software.cancel')!
@@ -89,7 +171,7 @@ fn check_software_health() ! {
 	missing.handle('software.health')!
 	assert missing.health_mode && missing.worker == unsafe { nil } && missing.status.contains('package service is missing')
 	missing.close_app()
-	println('Software health: read-only asynchronous report, issue-first inventory, full paged provenance/diagnostics, navigation, modal isolation, invalid/failing response refusal, fresh repair review and safe close PASS')
+	println('Software health: read-only asynchronous report, issue-first searchable metadata/diagnostics, issues-only filtering, stable visible selection, empty results, bounded Unicode editing, reload retention, compact Back, isolated catalog state, full-set repair review and safe close PASS')
 }
 
 fn check_software_health_memory() ! {
@@ -107,11 +189,19 @@ fn check_software_health_memory() ! {
 				app.handle_health('software.row.1')
 				app.handle_health('software.health.next')
 				free_window_tree(app.build_health(640, 610))
+				app.handle_health('software.health.search')
+				for query in ['APP-23', 'É🚀', 'COMPLETE DIAGNOSTIC', 'no matching row']! {
+					app.health_key_input('\x01'); app.health_key_input('\x08'); app.health_paste_input(query)
+					free_window_tree(app.build_health(640, 610))
+				}
+				assert app.health_selected == -1 && app.details_pages.len == 0
+				app.handle_health('software.health.issues')
+				free_window_tree(app.build_health_compact(320, 240))
 				app.clear_health()
 			}
 		}
 		app.set_status('')
 		kept := C.vinix_heap_end(); assert kept == 0, 'health views retained ${kept} bytes'
-		println('Software health: 1000 decode/order/prepare/paged-render/select/retire cycles retain zero tracked bytes PASS')
+		println('Software health: 1000 decode/order/page/render/select/search/filter/empty/compact/retire cycles retain zero tracked bytes PASS')
 	}
 }

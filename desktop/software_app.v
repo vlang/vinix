@@ -64,6 +64,11 @@ mut:
 	health_snapshot pkgprotocol.HealthReport
 	health_matching []int
 	health_summary string
+	health_results string
+	health_query []u8
+	health_focus bool
+	health_select_all bool
+	health_issues_only bool
 	health_selected int = -1
 	health_scroll int
 	data_mode       bool
@@ -896,7 +901,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
 	if a.failure_mode { if input == '\x1b' { a.failure_mode = false }; return }
 	if a.details_mode { if input == '\x1b' { a.clear_details() }; return }
-	if a.health_mode { if input == '\x1b' && a.worker == unsafe { nil } { a.clear_health() }; return }
+	if a.health_mode { a.health_key_input(input); return }
 	if a.policy_mode { a.policy_key_input(input); return }
 	if a.data_mode { return }
 	if a.launch_mode { a.launch_key_input(input); return }
@@ -926,7 +931,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
 	if a.failure_mode { return }
 	if a.details_mode { return }
-	if a.health_mode { return }
+	if a.health_mode { a.health_paste_input(input); return }
 	if a.policy_mode { a.policy_paste_input(input); return }
 	if a.data_mode { return }
 	if a.launch_mode { a.launch_key_input(input); return }
@@ -977,6 +982,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.failure_mode { return a.build_failure(size) }
 	width := int(size.width)
 	height := int(size.height)
+	if a.health_mode && (width < 640 || height < 610) { return a.build_health_compact(width, height) }
 	if width < 640 || height < 610 {
 		mut compact := frame_elements(2)
 		compact << software_label('Software', 14, 8, width - 28, 28, false)
@@ -984,7 +990,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 			14, 40, width - 28, 60, false)
 		return ui2.screen(app_surface, compact)
 	}
-	a.page_rows = if height > 400 { (height - if a.review != '' { 274 } else { 310 }) / 30 } else { 5 }
+	a.page_rows = if height > 400 { (height - if a.review != '' { 274 } else if a.health_mode { 348 } else { 310 }) / 30 } else { 5 }
 	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
 	if a.details_mode { return a.build_details(width, height) }
 	if a.health_mode { return a.build_health(width, height) }

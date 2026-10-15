@@ -1,0 +1,17 @@
+The initial functional run crashed when the new empty query passed a nil byte buffer to the fixture text helper. The final filter and renderer use an empty string for a zero-length query; all final functional, allocation and sanitizer checks pass.
+
+Initial output:
+Software configured repositories: damaged metadata does not block reviewed revocation; enrollment remains refused PASS
+Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed
+Software Verify: visible control, no administrator/catalog dependency, streamed progress, stable selection, incomplete/failure retention, review isolation and safe close PASS
+Software repair: installed dependency control, exact-version closure disclosure, read-only review, duplicate/modal isolation, frozen confirmation and reviewed administrator apply PASS
+V panic: tos(): nil string
+ v hash: 826e96f
+    pid: 0x16ffa
+    tid: 0x1f8a45e80
+0   ui-check                            0x00000001047590b8 panic_fatal + 608
+1   ui-check                            0x00000001047592c0 panic_jump_next + 364
+2   ui-check                            0x00000001045d6988 panic_frame_done + 76
+3   ui-check                            0x000000010464cf64 check_software_health + 4624
+4   ui-check                            0x0000000104726a90 main + 68916
+5   dyld                                0x000000018c507e00 start + 6992

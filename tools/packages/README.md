@@ -42,8 +42,11 @@ omitted output. See [qualification](../../tests/packages/software-failure-check.
 Software's **Health report**, also available as `vinix-package [--json] health`,
 inspects every installed app, runtime and data dependency. It lists all affected
 packages with installed provenance and paged diagnostics, even when catalogs are
-unavailable. A complete report returns zero with issues recorded in its rows;
-`verify` retains its failure exit behavior. **Review repairs** obtains a fresh
+unavailable. Search matches installed metadata and diagnostics, and **Issues only**
+filters the loaded snapshot. Reload retains these controls; returning preserves
+the catalog search and selection. See [search/filter qualification](../../tests/packages/health-search-check.md).
+A complete report returns zero with issues recorded in its rows;
+`verify` retains its failure exit behavior. **Review all repairs** obtains a fresh
 authenticated repair proposal before authorization. See
 [qualification](../../tests/packages/health-report-check.md).
 
