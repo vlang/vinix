@@ -219,6 +219,8 @@ mut:
 	swift_nsobject_hashable_retired bool
 	swift_foundation_arena u64 // Sealed CVarArg calls and Foundation's concrete String conformance.
 	swift_json_decoder_arena u64 // Sealed base class construction entries and default-option constants.
+	swift_json_date_arena u64 // Sealed DateEncodingStrategy metadata and value witnesses.
+	swift_json_date_retired bool
 	swift_json_decoder_retired bool
 	swift_json_decoders map[u64]u64 // Initialized base owner -> owned lock context, under the runtime lock.
 	swift_cocoa_error_arena u64 // Sealed Code metadata/conformance and deferred stored-error guard.

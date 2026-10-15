@@ -231,6 +231,7 @@ fn swift_buffers_stop() {
 	swift_array_storage_stop()
 	swift_heap_stop()
 	swift_json_decoder_stop()
+	swift_json_date_stop()
 	swift_main_actor_stop()
 	swift_logger_stop()
 	swift_arc_stop()

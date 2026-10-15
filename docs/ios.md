@@ -6067,12 +6067,43 @@ encoding, generated C, executable, debug symbols and diagnostic are retained
 separately; all final fixtures were regenerated after correcting its observation
 store. Eleven final C streams/programs and four joined, retired VM phases are
 retained under `build/ios/fortnite/json-encoder-date-case-checks`.
-Strategy/encoder metadata, date formatting and JSON encoding remain unsupported.
+At that point, strategy/encoder metadata, date formatting and JSON encoding
+remained unsupported.
 Full iOS regression remains unpassed and published runners remain unchanged.
 
-The current IPA startup probe resolves the enum-case data export and exits with
+The preceding IPA startup probe resolved the enum-case data export and exited with
 status 1 at Foundation's required DateEncodingStrategy metadata accessor,
 `_$s10Foundation11JSONEncoderC20DateEncodingStrategyOMa`.
+Fortnite has not entered application code and remains unplayable.
+
+Vinix now supplies DateEncodingStrategy's complete metadata accessor and a
+private nongeneric enum descriptor through both Foundation install names. Native
+measurements establish a 17-byte value, stride 24, alignment eight, two payload
+cases, four empty cases and 253 extra inhabitants. Its ordinary and enum value
+witnesses preserve exact payload/tag bytes and manage formatter-object or Swift
+closure-context ownership. Copy/take assignment, destructive tag injection,
+projection and optional-tag storage match the measured native behavior for
+distinct source/destination storage. The private descriptor omits reflection and
+Apple's layout-string extension. Metadata and code occupy separately sealed
+read-only/executable pages, retired after Array and heap users drain.
+
+Eight ASan/UBSan runs and four Vinix ARM64 guest suites pass for enum metadata,
+enum-case data, JSONDecoder construction and CocoaError values. The enum fixture
+checks every case transition, reference counts, unchanged padding, guarded tag
+edges, concurrent copies from read-only storage, metadata request ABI, non-POD
+Array destruction and two unmapped retirements. A rejected native comparison
+passed aliased storage to assignment and released the sole formatter owner before
+copying; its source, executed C, executable, debug symbols and diagnostic are
+retained separately. The corrected native comparisons use distinct storage;
+Vinix's defensive self-copy behavior is tested separately. Eleven final C
+streams/programs and four joined, retired VM phases are retained under
+`build/ios/fortnite/json-date-strategy-checks`. Encoder construction/options,
+formatter methods, closure invocation and JSON encoding remain unsupported.
+Full iOS regression remains unpassed and published runners remain unchanged.
+
+The current IPA startup probe resolves DateEncodingStrategy metadata and exits
+with status 1 at the required import
+`_$s10Foundation11JSONEncoderC20dateEncodingStrategyAC04DatedE0OvsTj`.
 Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -6080,12 +6111,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,484 | 676 | 79 |
+| Fortnite executable | 1,485 | 675 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,319 | 679 | 120 |
+| All images | 2,320 | 678 | 120 |
 
-The C++/GLES/Text variant reports 2,332 resolved imports, 666 unresolved strong
+The C++/GLES/Text variant reports 2,333 resolved imports, 665 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -198,9 +198,7 @@ fn test_swift_json_encoder_date_case() {
 		json_date_mapping(arena, true, true)
 		json_date_spans(entry, probe)
 		json_date_native_payload(read32(entry))
-		for symbol in ['_$s10Foundation11JSONEncoderC20DateEncodingStrategyOMa',
-			'_$s10Foundation11JSONEncoderC20DateEncodingStrategyOMn',
-			'_$s10Foundation11JSONEncoderCACycfc']! {
+		for symbol in ['_$s10Foundation11JSONEncoderCACycfc']! {
 			if _ := swift_foundation_symbol(symbol) {
 				assert false
 			}
@@ -221,5 +219,5 @@ fn test_swift_json_encoder_date_case() {
 		}
 	}
 	assert C.munmap(voidptr(code), page) == 0
-	println('IOS-JSON-DATE-CASE: exact read-only u32 enum data export, native payload-case meaning, guarded four-byte consumers, concurrent alias publication/readers and two unmapped retirements; strategy metadata, formatter/encoder methods and default backend remain unsupported')
+	println('IOS-JSON-DATE-CASE: exact read-only u32 enum data export, native payload-case meaning, guarded four-byte consumers, concurrent alias publication/readers and two unmapped retirements; formatter/encoder methods and default backend remain unsupported')
 }
