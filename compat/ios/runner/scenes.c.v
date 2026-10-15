@@ -58,6 +58,7 @@ fn objc_responds(object u64, selector &char) bool {
 	if alert_selector(object, name) { return true }
 	if ns_set_selector(object, name) { return true }
 	if value_selector(object, name) { return true }
+	if swift_data_bridge_selector(object, name) { return true }
 	webkit := webkit_object_name(object)
 	if native_method(read64(object), name) != 0 { return true }
 	if webkit != '' && object !in ios_runtime.classes && name in ['copy', 'copyWithZone:', 'init'] {
@@ -93,6 +94,7 @@ fn objc_responds(object u64, selector &char) bool {
 	if objc_is_kind(object, ios_runtime.names['NSArray']) { return name in ['count', 'firstObject', 'objectAtIndex:', 'objectAtIndexedSubscript:', 'countByEnumeratingWithState:objects:count:'] }
 	if objc_is_kind(object, ios_runtime.names['NSMutableDictionary']) && name == 'setObject:forKey:' { return true }
 	if objc_is_kind(object, ios_runtime.names['NSDictionary']) { return name in ['count', 'objectForKey:', 'objectForKeyedSubscript:', 'countByEnumeratingWithState:objects:count:'] }
+	if objc_is_kind(object, ios_runtime.names['NSMutableData']) && name == 'mutableBytes' { return true }
 	if objc_is_kind(object, ios_runtime.names['NSData']) { return name in ['bytes', 'length'] }
 	if objc_is_kind(object, ios_runtime.names['NSURL']) { return http_url_builtin_types('NSURL', false, name) != none }
 	if objc_is_kind(object, ios_runtime.names['NSLocale']) { return name in ['objectForKey:', 'localeIdentifier'] }

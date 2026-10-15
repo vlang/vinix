@@ -47,6 +47,7 @@ fn objc_pool_free(pointer voidptr) {
 }
 
 fn objc_autorelease(object u64) u64 {
+	if swift_data_bridge_is_zero(object) { return object }
 	ns_pool_reject_ownership(object)
 	if object != 0 { mut pool := objc_pool(); pool.objects << object }
 	return object

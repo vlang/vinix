@@ -6375,22 +6375,54 @@ under `build/ios/fortnite/data-reference-checks`, alongside actual IPA consumers
 and native constructor inspection. Full iOS regression remains unpassed and
 published runners remain unchanged.
 
-The current IPA startup probe resolves the Data referencing constructor, then
+The Data referencing checkpoint resolves that constructor, then
 exits with status 1 at `_$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF`
 (`Data._bridgeToObjectiveC()`). Fortnite has not entered application code and
 remains unplayable.
+
+`Data._bridgeToObjectiveC()` now resolves through both Foundation install names.
+It borrows the two Data words in registers and returns an owned NSData. Empty
+values and empty slices share an immortal `_NSZeroData`; 1–14-byte values copy
+into `_NSInlineData`; registered snapshot storage produces a
+`Foundation.__NSSwiftData` wrapper that retains its Swift owner and shares the
+selected byte range. Copies retain the immutable result, while mutable copies
+and re-referencing constructors make independent byte snapshots. The wrapper
+releases storage before association callbacks, without holding the registry
+lock. Weak loads return nil during teardown; native raw weak slots clear after
+association cleanup. The private snapshot profile retains the 16 MiB bound;
+external storage, large-range Data, metadata and general value witnesses remain
+unsupported.
+
+Eight ASan/UBSan runs and four Vinix ARM64 suites pass for Data bridging, Data
+snapshots, Objective-C supplied storage and Swift heap ownership. The bridge
+fixture checks native class sizes, register preservation and protected x8,
+both destruction orders, slice sharing, independent mutable copies and
+re-referencing snapshots, weak behavior, reentrant association cleanup,
+concurrent first publication, invalid storage rejection and two drained runtime
+lifetimes with unmapped descriptor pages. Eleven final C streams/programs and
+four joined, retired VM phases are retained under
+`build/ios/fortnite/data-bridge-checks`, with actual IPA consumers and native
+bridge/next-import inspection. Earlier test assumptions about empty mutable
+bytes and raw weak slots, and the missing native storage fixture, are retained
+as failed trials. Full iOS regression remains unpassed; published runners are
+unchanged.
+
+The new startup probe resolves the Data bridge and exits with status 1 at
+`_$s10Foundation4DataV19base64EncodedString7optionsSSSo27NSDataBase64EncodingOptionsV_tF`
+(`Data.base64EncodedString(options:)`). Fortnite still has not entered
+application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,503 | 657 | 79 |
+| Fortnite executable | 1,504 | 656 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,338 | 660 | 120 |
+| All images | 2,339 | 659 | 120 |
 
-The C++/GLES/Text variant reports 2,351 resolved imports, 647 unresolved strong
+The C++/GLES/Text variant reports 2,352 resolved imports, 646 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

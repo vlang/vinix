@@ -39,7 +39,9 @@ fn swift_data_reference_checked(object u64) !SwiftDataWords {
 	if object !in ios_runtime.objects {
 		return error('iOS: Swift Data reference requires live registered NSData')
 	}
-	if read64(object) !in [ios_runtime.names['NSData'], ios_runtime.names['NSMutableData']]! {
+	if read64(object) !in [ios_runtime.names['NSData'], ios_runtime.names['NSMutableData'],
+		ios_runtime.names['_NSZeroData'], ios_runtime.names['_NSInlineData'],
+		ios_runtime.names['Foundation.__NSSwiftData']]! {
 		return error('iOS: Swift Data reference requires built-in NSData or NSMutableData')
 	}
 	count := data_length(object)

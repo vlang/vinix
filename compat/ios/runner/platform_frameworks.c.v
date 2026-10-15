@@ -5,6 +5,7 @@ import math.bits
 import os
 
 fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
+	if swift_data_bridge_dispatch(object, selector, mut frame) { return true }
 	if touch_dispatch(object, selector, mut frame) { return true }
 	if display_link_dispatch(object, selector, mut frame) { return true }
 	if defaults_dispatch(object, selector, mut frame) { return true }
@@ -99,7 +100,7 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 	}
 	// Literal strings have no heap metadata. Only look it up after selecting
 	// an instance class handled here, so unrelated messages can reach Foundation.
-	if info.name !in ['NSLocale', 'UIDevice', 'NSBundle', 'NSFileHandle', 'NSData', 'NSURL'] { return false }
+	if info.name !in ['NSLocale', 'UIDevice', 'NSBundle', 'NSFileHandle', 'NSData', 'NSMutableData', 'NSURL'] { return false }
 	mut header := obj_header(object)
 	match info.name {
 		'NSLocale' {
@@ -163,10 +164,11 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 				else { return false }
 			}
 		}
-		'NSData' {
+		'NSData', 'NSMutableData' {
 			match selector {
 				'bytes' { frame.x[0] = data_pointer(object) }
 				'length' { frame.x[0] = data_length(object) }
+				'mutableBytes' { if info.name != 'NSMutableData' { return false }; frame.x[0] = data_pointer(object) }
 				else { return false }
 			}
 		}

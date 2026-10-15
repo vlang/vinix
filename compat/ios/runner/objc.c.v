@@ -91,6 +91,7 @@ mut:
 	external_data u64
 	external_size u64
 	free_data bool
+	swift_data_owner u64 // NSData bridge owns one Swift snapshot storage reference.
 	provider_info voidptr
 	provider_release u64
 	real_number f64
@@ -218,6 +219,7 @@ mut:
 	swift_nsobject_hashable_tables map[u64]u64 // Canonical ObjC wrapper -> sealed Hashable/Equatable specialization page.
 	swift_nsobject_hashable_retired bool
 	swift_foundation_arena u64 // Sealed CVarArg calls and Foundation's concrete String conformance.
+	swift_data_zero u64 // Immortal NSData cache, retired after pool and association drains.
 	swift_json_encoder_arena u64 // Sealed base encoder construction and default constants.
 	swift_json_encoder_retired bool
 	swift_json_encoders map[u64]u64 // Initialized base encoder -> owned lock, under the runtime lock.
@@ -342,7 +344,7 @@ fn objc_start() {
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
-        'NSData', 'NSMutableData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
+        'NSData', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
@@ -379,6 +381,7 @@ fn objc_start() {
 			'NSMutableDictionary', 'NSConstantDictionary' { ios_runtime.names['NSDictionary'] }
 			'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { ios_runtime.names['NSLayoutAnchor'] }
 			'NSMutableData' { ios_runtime.names['NSData'] }
+			'_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData' { ios_runtime.names['NSData'] }
 			'NSMutableURLRequest' { ios_runtime.names['NSURLRequest'] }
 			'NSHTTPURLResponse' { ios_runtime.names['NSURLResponse'] }
 			'UISwipeGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
@@ -396,6 +399,9 @@ fn objc_start() {
 		size := match name {
 			'OS_object', 'OS_dispatch_object', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global' { u32(8) }
 			'NSConstantDictionary' { u32(40) }
+			'_NSZeroData' { u32(8) }
+			'_NSInlineData' { u32(16) }
+			'Foundation.__NSSwiftData' { u32(40) }
 			'NSConcreteValue' { u32(24) }
 			'NSError' { u32(sizeof(AbiNSError)) }
 			'NSCondition' { u32(sizeof(AbiNSCondition)) }
@@ -494,6 +500,7 @@ fn objc_allocate(cls u64) u64 {
 }
 
 fn objc_retain(object u64) u64 {
+	if swift_data_bridge_is_zero(object) { return object }
 	if os_log_is_handle(object) { return object }
 	ns_pool_reject_ownership(object)
 	if object != 0 && dispatch_objc_retain(object) { return object }
@@ -529,6 +536,7 @@ fn objc_release(object u64) {
 }
 
 fn objc_release_regular(object u64) {
+	if swift_data_bridge_is_zero(object) { return }
 	if os_log_is_handle(object) { return }
 	if object == 0 || object in ios_runtime.classes || object in ios_runtime.constants { return }
 	if dispatch_objc_release(object) { return }
@@ -655,6 +663,7 @@ fn objc_stop() {
 		ios_runtime.empty_dictionary = 0
 	}
 	objc_constant_dictionaries_stop()
+	swift_data_bridge_stop()
 	if ios_runtime.live != 0 {
 		eprintln('iOS: ${ios_runtime.live} Objective-C objects still owned at shutdown')
 	}

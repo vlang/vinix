@@ -286,6 +286,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 	if address := swift_json_decoder_symbol(symbol) { return address }
 	if address := swift_json_date_symbol(symbol) { return address }
 	return match symbol {
+		'_$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF' { u64(unsafe { voidptr(swift_data_bridge) }) }
 		'_$s10Foundation4DataV11referencingACSo6NSDataCh_tcfC' { u64(unsafe { voidptr(swift_data_reference) }) }
 		'_$s10Foundation3URLVMa' { swift_foundation_arena() + 928 }
 		'_$s10Foundation3URLVMn' { swift_foundation_arena() + u64(C.getpagesize()) + 176 }
