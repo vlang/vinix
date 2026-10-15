@@ -48,6 +48,12 @@ fn swift_calendar_identifier(owner u64, output u64) {
 	unsafe { *(&u8(output)) = which }
 }
 
+fn swift_calendar_interval_unavailable() {
+	// Identifier snapshots do not yet carry timezone rules. Never manufacture
+	// a UTC midnight for a calendar whose timezone has not been implemented.
+	panic('iOS: Swift Calendar day intervals require a timezone-aware calendar backend')
+}
+
 fn swift_calendar_emit(code u64, data u64) {
 	// Consuming indirect Identifier in x0; owned two-word result through x8.
 	write32(code + 2368, 0xaa0803e1)
@@ -102,4 +108,26 @@ fn swift_calendar_emit(code u64, data u64) {
 	write32(code + 2592, 0xaa1403e0); write32(code + 2596, 0xaa0803e1)
 	write32(code + 2600, 0x58000050); write32(code + 2604, 0xd61f0200)
 	unsafe { *(&u64(code + 2608)) = u64(voidptr(swift_calendar_identifier)) }
+	// startOfDay(for:): borrow Date in x0 and Calendar in x20, return Date
+	// through x8. Clamp the callback's input, preserving the original for the
+	// nil-interval fallback. Component.day is one byte; Optional<DateInterval>
+	// is two Doubles followed by its one-byte discriminator. Borrowed dispatch
+	// passes x2 = formal implementation type, x3 = table, x20 = owner.
+	for i, op in [u32(0xd101c3ff), 0x6d0323e9, 0xa90457f6, 0xa9054ff4,
+		0xa9067bfd, 0x910183fd, 0xaa0803f3, 0xfd400008, 0xa9405696,
+		0x52800068, 0x39005fe8, 0x5c000461, 0x5c000480, 0x1e682000,
+		0x1e684c00, 0x1e602020, 0x1e614c00, 0xfd0007e0, 0xaa1603e0,
+		0x58000330, 0xd63f0200, 0xaa0003e2, 0xf94052aa, 0x910063e8,
+		0x91005fe0, 0x910023e1, 0xaa1603f4, 0xaa1503e3, 0xd63f0140,
+		0x3940a3e8, 0x7100051f, 0x54000081, 0x1e7e1000, 0x1e602900,
+		0x14000002, 0xfd400fe0, 0xfd000260, 0xa9467bfd, 0xa9454ff4,
+		0xa94457f6, 0x6d4323e9, 0x9101c3ff, 0xd65f03c0, 0xd503201f]! {
+		write32(code + 2624 + u64(i * 4), op)
+	}
+	unsafe {
+		*(&u64(code + 2800)) = u64(voidptr(swift_object_type))
+		*(&u64(code + 2808)) = 0xc248a97998e00000 // -211845067200 seconds since 2001.
+		*(&u64(code + 2816)) = 0x42acf8ab468f0000 // 15927175497600 seconds since 2001.
+		*(&u64(data + 2208)) = u64(voidptr(swift_calendar_interval_unavailable))
+	}
 }

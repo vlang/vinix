@@ -6786,9 +6786,52 @@ are retained; published runners are unchanged. Generated C shows the explicit
 getter and emitter paths add no hidden allocations. Full iOS regression remains
 unpassed.
 
-The current IPA probe links past Calendar construction and exits with status 1
+The Calendar-construction IPA probe links past that constructor and exits with status 1
 at `_$s10Foundation8CalendarV10startOfDay3forAA4DateVAG_tF`
-(`Calendar.startOfDay(for:)`). Fortnite has not entered application code and
+(`Calendar.startOfDay(for:)`).
+
+The next milestone implements that method's borrowed implementation-table
+dispatch in V. It passes the one-byte `Component.day` value to slot 160 with
+the owner's formal metadata, implementation table and borrowed owner. The
+callback returns an optional sixteen-byte DateInterval plus a discriminator;
+the method writes exactly one eight-byte Date through x8. A present interval
+returns its start without interpreting the duration. A missing interval returns
+the original input minus one second, matching installed Foundation.
+
+The callback's input is clamped to -211845067200 through 15927175497600 seconds
+since 2001. Native floating-point comparisons send NaNs to the lower bound,
+preserve signed zero, and clamp infinities. The fallback still uses the original
+input. These behaviors, the callback ABI, native pointer authentication and
+the discriminator's byte offset were measured against the Mac's Foundation.
+
+The IPA's setup at `0x100067118` constructs an ISO 8601 calendar, assigns
+`en_US_POSIX`, constructs `TimeZone(secondsFromGMT: 0)` at `0x100067184` and
+assigns that timezone at `0x1000671b4`. Its borrowed start-of-day call is at
+`0x100069094`. The V/Mach-O/LLVM inspection retains the import fixups, branch
+islands and annotated calls under `calendar-day-checks/setup-inspect.log`.
+
+This completes the public forwarding adapter only. Vinix's private Calendar
+storage currently holds an identifier snapshot; its day-interval callback
+explicitly reports that a timezone-aware backend is unavailable. It does not
+invent a UTC day boundary. Calendar locale/timezone mutation, timezone rules,
+the private interval backend and Objective-C bridging remain unsupported.
+
+The Calendar fixture checks native and Vinix dispatch with read-only borrowed
+Date, Calendar and callback-table pages, guarded eight-byte results, bound
+neighbors, infinities, signed zeros, quiet/signaling NaNs, present/missing
+intervals and eight concurrent callers. Callbacks returning no interval leave
+the payload uninitialized so only the discriminator may be read. Each suite makes
+285 calls, and both Vinix runtime lifetimes drain and unmap their arenas.
+
+Evidence is retained under `build/ios/fortnite/calendar-day-checks`. Twelve
+ASan/UBSan runs and six Vinix ARM64 suites pass, with fifteen final C streams
+and executables and four joined, retired VM phases. Generated C confirms that
+the emitter adds no allocations. Published runners are unchanged; full iOS
+regression remains unpassed.
+
+The current IPA probe links past the start-of-day export and exits with status
+1 at `_$s10Foundation8CalendarV6localeAA6LocaleVSgvs`
+(`Calendar.locale` setter). Fortnite has not entered application code and
 remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -6796,12 +6839,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,529 | 631 | 79 |
+| Fortnite executable | 1,530 | 630 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,364 | 634 | 120 |
+| All images | 2,365 | 633 | 120 |
 
-The C++/GLES/Text variant reports 2,377 resolved imports, 621 unresolved strong
+The C++/GLES/Text variant reports 2,378 resolved imports, 620 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

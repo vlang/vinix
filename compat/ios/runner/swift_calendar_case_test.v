@@ -34,16 +34,17 @@ type CalendarSign = fn (u64, u64) u64
 
 struct CalendarApi {
 	native bool
-	entries [4]u64
+	entries [5]u64
 	metadata u64
 	witness u64
 	probe CalendarProbe
 }
 
 fn calendar_api(native bool, code u64) CalendarApi {
-	mut entries := [4]u64{}
+	mut entries := [5]u64{}
 	for i, symbol in ['_$s10Foundation8CalendarV10identifierA2C10IdentifierOh_tcfC',
-		'_$s10Foundation8CalendarV10identifierAC10IdentifierOvg', '_$s10Foundation8CalendarVMa', '_$s10Foundation8CalendarVMn']! {
+		'_$s10Foundation8CalendarV10identifierAC10IdentifierOvg', '_$s10Foundation8CalendarVMa', '_$s10Foundation8CalendarVMn',
+		'_$s10Foundation8CalendarV10startOfDay3forAA4DateVAG_tF']! {
 		for library in ['/System/Library/Frameworks/Foundation.framework/Foundation', '/usr/lib/swift/libswiftFoundation.dylib']! {
 			mut address := u64(0)
 			$if macos { if native { handle := C.dlopen(library.str, 2); address = u64(C.dlsym(handle, symbol[1..].str)) } }
@@ -181,6 +182,99 @@ fn calendar_dispatch_case(api CalendarApi, code u64) {
 		objc_release(owner)
 	}
 	assert C.munmap(voidptr(span), page * 5) == 0
+}
+
+fn calendar_day_clamped_bits(bits u64) u64 {
+	value := unsafe { *(&f64(&bits)) }
+	if !(value > -211845067200.0) { return 0xc248a97998e00000 }
+	if value > 15927175497600.0 { return 0x42acf8ab468f0000 }
+	return bits
+}
+
+fn calendar_spy_day(component u64, date u64, metadata u64, table u64, owner u64, output u64) {
+	assert unsafe { *(&u8(component)) } == 3
+	assert owner == read64(table + 176) && metadata == read64(table + 184)
+	assert read64(date) == read64(table + 192)
+	assert date != read64(table + 216) && output != read64(table + 224)
+	// A nil interval has no initialized payload. The caller must inspect only
+	// the discriminator. Noncanonical tags follow the measured native branch.
+	tag := u8(read64(table + 208))
+	if tag != 1 {
+		unsafe { *(&u64(output)) = read64(table + 200); *(&u64(output + 8)) = 0x7ff8000000001234 }
+	}
+	unsafe { *(&u8(output + 16)) = tag }
+}
+
+fn calendar_day_case(api CalendarApi, code u64, bits u64, tag u8, start u64, at_end bool) {
+	page := usize(C.getpagesize())
+	span := u64(C.mmap(unsafe { nil }, page * 7, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+	assert span != u64(-1)
+	for index in [1, 3, 5]! {
+		assert C.mprotect(voidptr(span + u64(page * usize(index))), page, C.PROT_READ | C.PROT_WRITE) == 0
+		C.memset(voidptr(span + u64(page * usize(index))), 0xa5, page)
+	}
+	source := span + u64(page) + if at_end { u64(page) - 8 } else { u64(0) }
+	table := span + u64(page * 3) + 64; self := table + 256
+	output := span + u64(page * 5) + if at_end { u64(page) - 8 } else { u64(0) }
+	mut original := [2]u64{}
+	mut owner := u64(0); mut metadata := u64(0); mut callback := code + 320
+	$if macos { if api.native {
+		which := u8(7)
+		api.call(api.entries[0], u64(unsafe { &which }), span, span, u64(unsafe { &original[0] }))
+		owner = original[0]
+		core := C.dlopen(c'/usr/lib/swift/libswiftCore.dylib', 2)
+		metadata = unsafe { CalendarObjectType(C.dlsym(core, c'swift_getObjectType'))(owner) }
+		callback = unsafe { CalendarSign(voidptr(code + 288))(callback, (table + 160) | (u64(33412) << 48)) }
+	} }
+	if !api.native { owner = objc_allocate(ios_runtime.names['NSObject']); metadata = swift_object_type(owner) }
+	unsafe {
+		*(&u64(source)) = bits
+		*(&u64(table + 160)) = callback; *(&u64(table + 176)) = owner; *(&u64(table + 184)) = metadata
+		*(&u64(table + 192)) = calendar_day_clamped_bits(bits); *(&u64(table + 200)) = start; *(&u64(table + 208)) = u64(tag)
+		*(&u64(table + 216)) = source; *(&u64(table + 224)) = output
+		*(&SwiftURLWords(self)) = SwiftURLWords{owner: owner, table: table}
+	}
+	assert C.mprotect(voidptr(span + u64(page)), page, C.PROT_READ) == 0
+	assert C.mprotect(voidptr(span + u64(page * 3)), page, C.PROT_READ) == 0
+	api.call(api.entries[4], source, span, self, output)
+	mut expected := start
+	if tag == 1 {
+		value := unsafe { *(&f64(&bits)) } + f64(-1)
+		expected = unsafe { *(&u64(&value)) }
+	}
+	assert read64(output) == expected && read64(source) == bits
+	calendar_identifier_padding(span + u64(page), u64(page), source, 8)
+	calendar_identifier_padding(span + u64(page * 5), u64(page), output, 8)
+	if api.native { api.destroy(u64(unsafe { &original[0] })) } else {
+		assert obj_header(owner).refs == 1
+		objc_release(owner)
+	}
+	assert C.munmap(voidptr(span), page * 7) == 0
+}
+
+fn calendar_days_worker(api CalendarApi, code u64) {
+	for _ in 0 .. 8 {
+		calendar_day_case(api, code, 0x7ff8000000001234, 0, 0x8000000000000000, true)
+		calendar_day_case(api, code, 0x42c0000000000000, 1, 0, false)
+	}
+}
+
+fn calendar_days_suite(api CalendarApi, code u64) {
+	for bits in [u64(0), 0x8000000000000000, 0x3ff0000000000000, 0xbff0000000000000,
+		0x3ff8000000000000, 0xbff8000000000000, 0x7ff0000000000000, 0xfff0000000000000,
+		0x7ff8000000001234, 0xfff8000000001234, 0x7ff0000000001234, 0xfff0000000001234,
+		0xc248a97998e00001, 0xc248a97998e00000, 0xc248a97998dfffff,
+		0x42acf8ab468effff, 0x42acf8ab468f0000, 0x42acf8ab468f0001, 0x42c0000000000000]! {
+		for tag in [u8(0), 1, 2, 255]! { for at_end in [false, true]! {
+			calendar_day_case(api, code, bits, tag, 0x7ff8000000004321, at_end)
+		} }
+	}
+	for start in [u64(0), 0x8000000000000000, 0x3ff8000000000000, 0x7ff0000000000000, 0xfff0000000000000]! {
+		calendar_day_case(api, code, 0x3ff8000000000000, 0, start, true)
+	}
+	mut workers := []thread{}
+	for _ in 0 .. 8 { workers << spawn calendar_days_worker(api, code) }
+	workers.wait()
 }
 
 fn calendar_values_suite(api CalendarApi, code u64) {
@@ -531,7 +625,9 @@ fn test_swift_calendar_case() {
 	for i, op in [u32(0xaa1403e2), 0xaa0803e3, 0x58000050, 0xd61f0200]! { write32(code + 256 + u64(i * 4), op) }
 	unsafe { *(&u64(code + 272)) = u64(voidptr(calendar_spy_identifier)) }
 	write32(code + 288, 0xdac10020); write32(code + 292, 0xd65f03c0)
-	C.__builtin___clear_cache(voidptr(code), voidptr(code + 296))
+	for i, op in [u32(0xaa1403e4), 0xaa0803e5, 0x58000050, 0xd61f0200]! { write32(code + 320 + u64(i * 4), op) }
+	unsafe { *(&u64(code + 336)) = u64(voidptr(calendar_spy_day)) }
+	C.__builtin___clear_cache(voidptr(code), voidptr(code + 344))
 	assert C.mprotect(voidptr(code), page, C.PROT_READ | C.PROT_EXEC) == 0
 	probe := unsafe { CalendarCaseLoad(voidptr(code)) }
 	$if macos {
@@ -545,7 +641,8 @@ fn test_swift_calendar_case() {
 		calendar_case_native_payload(read32(entry))
 		calendar_identifier_suite(true, code)
 		calendar_values_suite(calendar_api(true, code), code)
-		println('IOS-SWIFT-CALENDAR-CASE-NATIVE: Calendar construction/identifier getter for 27 cases, indirect guarded input/result, unknown ARC value lifetime, native metadata, generic witness dispatch and concurrent construction; Identifier witnesses and ISO 8601 export measured')
+		calendar_days_suite(calendar_api(true, code), code)
+		println('IOS-SWIFT-CALENDAR-CASE-NATIVE: startOfDay witness dispatch, native bounds/NaNs, optional interval fallback, guarded eight-byte Date results and concurrent borrows; Calendar construction, metadata, ownership, Identifier witnesses and ISO 8601 export measured')
 	}
 	if _ := swift_foundation_symbol(calendar_case_symbol) {
 		assert false
@@ -574,9 +671,11 @@ fn test_swift_calendar_case() {
 		api := calendar_api(false, code)
 		assert api.metadata == arena + u64(page) + 1896 && api.entries[3] == arena + u64(page) + 1600
 		calendar_values_suite(api, code)
+		calendar_days_suite(api, code)
+		assert read64(arena + u64(page) + 2208) == u64(unsafe { voidptr(swift_calendar_interval_unavailable) })
 		for invalid in [u8(27), 28, 127, 255]! { if _ := swift_calendar_input_checked(u64(unsafe { &invalid })) { assert false } }
 		if _ := swift_calendar_identifier_checked(0) { assert false }
-		for symbol in ['_$s10Foundation8CalendarV10IdentifierO9gregorianyA2EmFWC', '_$s10Foundation8CalendarV10startOfDay3forAA4DateVAG_tF', '_$s10Foundation8CalendarV6localeAA6LocaleVSgvs']! {
+		for symbol in ['_$s10Foundation8CalendarV10IdentifierO9gregorianyA2EmFWC', '_$s10Foundation8CalendarV6localeAA6LocaleVSgvs']! {
 			if _ := swift_foundation_symbol(symbol) {
 				assert false
 			}
@@ -607,5 +706,5 @@ fn test_swift_calendar_case() {
 		}
 	}
 	assert C.munmap(voidptr(code), page) == 0
-	println('IOS-SWIFT-CALENDAR-CASE: Calendar construction/identifier getter for 27 cases, owned heap snapshot and unknown ARC value witnesses, guarded input/results and generic dispatch, canonical parent metadata, concurrent construction/publication, Identifier witnesses and ISO 8601 export, two drained/unmapped runtimes; calendrical operations, mutation and Objective-C bridging remain unsupported')
+	println('IOS-SWIFT-CALENDAR-CASE: startOfDay witness dispatch, native bounds/NaNs, optional interval fallback, guarded Date results and concurrent borrows; Calendar construction, ownership, metadata, Identifier witnesses and ISO 8601 export, two drained/unmapped runtimes; private timezone-aware interval backend, mutation and Objective-C bridging remain unsupported')
 }
