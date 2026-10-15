@@ -5,6 +5,7 @@ import ui2
 
 fn luna_test_desktop(scale int) Desktop {
 	mut desktop := Desktop{
+		settings: Settings{ taskbar_show_overview: true, taskbar_show_workspaces: true }
 		canvas: new_scaled_canvas(640, 480, 640 * scale, 480 * scale, scale)
 		fonts:  load_fonts_for_scale(scale)
 	}
@@ -240,6 +241,7 @@ fn test_windows_xp_partial_frames_match_full_frames() {
 fn test_windows_xp_taskbar_is_the_blue_bar() {
 	// Wide enough for the bar to have room for window buttons.
 	mut desktop := Desktop{
+		settings: Settings{ taskbar_show_overview: true, taskbar_show_workspaces: true }
 		canvas: new_canvas(1024, 600)
 		fonts:  load_fonts_for_scale(1)
 	}
@@ -291,6 +293,7 @@ fn test_luna_gradient_runs_through_its_stops() {
 // A screen wide enough for the bar's buttons, and tall enough for the menu.
 fn luna_menu_test_desktop(scale int) Desktop {
 	mut desktop := Desktop{
+		settings: Settings{ taskbar_show_overview: true, taskbar_show_workspaces: true }
 		canvas: new_scaled_canvas(1024, 600, 1024 * scale, 600 * scale, scale)
 		fonts:  load_fonts_for_scale(scale)
 	}

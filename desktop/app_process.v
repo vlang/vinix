@@ -58,7 +58,8 @@ const app_features = app_feature_toolbar | app_feature_close_guard | app_feature
 // then the bits. A program built before either existed ignores both, and is
 // taken to have none.
 const app_extended_luna = u32(1) // the Windows XP theme
-const app_extended = app_extended_luna
+const app_extended_taskbar_visibility = u32(2)
+const app_extended = app_extended_luna | app_extended_taskbar_visibility
 const app_extended_option = '--app-extended='
 const app_extended_mark = [u8(`V`), `E`, `X`, `T`]!
 
@@ -280,6 +281,23 @@ fn (mut r WireReader) take_string() !string {
 const wire_theme_kind_mask = 0xff
 const wire_theme_glass_shift = 8
 
+// Keep the existing header size: optional taskbar controls travel above the
+// mode. Peers without the feature only receive the plain mode they understand.
+const wire_taskbar_mode_mask = 0xff
+const wire_taskbar_overview = 1 << 8
+const wire_taskbar_workspaces = 1 << 9
+
+fn wire_taskbar(settings Settings) int {
+	return int(settings.taskbar_mode)
+		| (if settings.taskbar_show_overview { wire_taskbar_overview } else { 0 })
+		| (if settings.taskbar_show_workspaces { wire_taskbar_workspaces } else { 0 })
+}
+
+fn wire_taskbar_valid(value int) bool {
+	return value >= 0 && (value & wire_taskbar_mode_mask) <= int(TaskbarMode.combined)
+		&& (value & ~(wire_taskbar_mode_mask | wire_taskbar_overview | wire_taskbar_workspaces)) == 0
+}
+
 fn wire_theme(settings Settings) int {
 	return int(settings.theme) | (settings.glass_color << wire_theme_glass_shift)
 }
@@ -298,13 +316,13 @@ fn app_theme_hidden(theme ThemeKind, peer_features u8, peer_extended u32) bool {
 		|| (theme == .windows_xp && peer_extended & app_extended_luna == 0)
 }
 
-// app_state_for_peer is the state as a program built before a theme can read
-// it: it is told the desktop wears its own look, and one without
-// app_feature_glass is told no glass colour either.
+// Strip theme and taskbar fields a peer cannot read while keeping the same
+// protocol header for applications published before those features existed.
 fn app_state_for_peer(state AppWireState, peer_features u8, peer_extended u32) AppWireState {
 	glass := peer_features & app_feature_glass != 0
+	taskbar := peer_extended & app_extended_taskbar_visibility != 0
 	hidden := app_theme_hidden(state.settings.theme, peer_features, peer_extended)
-	if glass && !hidden {
+	if glass && !hidden && taskbar {
 		return state
 	}
 	return AppWireState{
@@ -313,17 +331,19 @@ fn app_state_for_peer(state AppWireState, peer_features u8, peer_extended u32) A
 			...state.settings
 			theme:       if hidden { ThemeKind.default_ } else { state.settings.theme }
 			glass_color: if glass { state.settings.glass_color } else { 0 }
+			taskbar_show_overview: taskbar && state.settings.taskbar_show_overview
+			taskbar_show_workspaces: taskbar && state.settings.taskbar_show_workspaces
 		}
 	}
 }
 
-// app_state_from_peer undoes that in what such a program answers: the theme
-// it was told is not a choice it made, and the glass colour was never its to
-// change. `current` is what the desktop has.
+// Restore the preferences a legacy peer was not told about. Its other choices
+// still apply; `current` is the compositor's complete settings snapshot.
 fn app_state_from_peer(state AppWireState, peer_features u8, peer_extended u32, current Settings) AppWireState {
 	glass := peer_features & app_feature_glass != 0
+	taskbar := peer_extended & app_extended_taskbar_visibility != 0
 	hidden := app_theme_hidden(current.theme, peer_features, peer_extended)
-	if glass && !hidden {
+	if glass && !hidden && taskbar {
 		return state
 	}
 	return AppWireState{
@@ -336,13 +356,15 @@ fn app_state_from_peer(state AppWireState, peer_features u8, peer_extended u32, 
 				state.settings.theme
 			}
 			glass_color: if glass { state.settings.glass_color } else { current.glass_color }
+			taskbar_show_overview: if taskbar { state.settings.taskbar_show_overview } else { current.taskbar_show_overview }
+			taskbar_show_workspaces: if taskbar { state.settings.taskbar_show_workspaces } else { current.taskbar_show_workspaces }
 		}
 	}
 }
 
 fn wire_put_state(mut out []u8, state AppWireState) {
 	wire_put_i32(mut out, int(state.settings.button_side))
-	wire_put_i32(mut out, int(state.settings.taskbar_mode))
+	wire_put_i32(mut out, wire_taskbar(state.settings))
 	wire_put_i32(mut out, wire_theme(state.settings))
 	wire_put_i32(mut out, if state.settings.clock_24_hour { 1 } else { 0 })
 	wire_put_i32(mut out, if state.settings.clock_show_seconds { 1 } else { 0 })
@@ -409,7 +431,7 @@ fn wire_take_state_flags(mut reader WireReader, state_flags u8) !AppWireState {
 	capture_height := reader.take_i32()!
 	capture_report_fps := reader.take_i32()!
 	if button_side < int(ButtonSide.right) || button_side > int(ButtonSide.left)
-		|| taskbar_mode < int(TaskbarMode.standard) || taskbar_mode > int(TaskbarMode.combined)
+		|| !wire_taskbar_valid(taskbar_mode)
 		|| !wire_theme_valid(theme)
 		|| clock_24_hour < 0 || clock_24_hour > 1
 		|| clock_show_seconds < 0 || clock_show_seconds > 1
@@ -435,7 +457,9 @@ fn wire_take_state_flags(mut reader WireReader, state_flags u8) !AppWireState {
 	return AppWireState{
 		settings:        Settings{
 			button_side:        unsafe { ButtonSide(button_side) }
-			taskbar_mode:       unsafe { TaskbarMode(taskbar_mode) }
+			taskbar_mode:       unsafe { TaskbarMode(taskbar_mode & wire_taskbar_mode_mask) }
+			taskbar_show_overview: taskbar_mode & wire_taskbar_overview != 0
+			taskbar_show_workspaces: taskbar_mode & wire_taskbar_workspaces != 0
 			theme:              unsafe { ThemeKind(theme & wire_theme_kind_mask) }
 			glass_color:        theme >> wire_theme_glass_shift
 			language:           unsafe { DesktopLanguage(language) }
@@ -889,6 +913,8 @@ fn app_current_state(desktop &Desktop) AppWireState {
 
 fn apply_app_state(mut desktop Desktop, state AppWireState) {
 	previous_bar_height := desktop.taskbar_height()
+	taskbar_changed := desktop.settings.taskbar_show_overview != state.settings.taskbar_show_overview
+		|| desktop.settings.taskbar_show_workspaces != state.settings.taskbar_show_workspaces
 	wallpaper_changed := desktop.settings.wallpaper_color != state.settings.wallpaper_color
 		|| desktop.settings.wallpaper_image != state.settings.wallpaper_image
 	clock_changed := desktop.settings.clock_24_hour != state.settings.clock_24_hour
@@ -905,6 +931,11 @@ fn apply_app_state(mut desktop Desktop, state AppWireState) {
 		|| desktop.settings.glass_color != state.settings.glass_color
 	desktop.settings = state.settings
 	desktop.accept_capture_request(state.capture_request)
+	if taskbar_changed {
+		desktop.close_taskbar_preview()
+		desktop.hide_tooltip()
+		desktop.dirty = true
+	}
 	if wallpaper_changed {
 		desktop.invalidate_wallpaper()
 	}

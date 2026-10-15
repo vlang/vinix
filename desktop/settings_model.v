@@ -111,6 +111,9 @@ struct Settings {
 mut:
 	button_side  ButtonSide
 	taskbar_mode TaskbarMode
+	// Optional taskbar navigation controls start hidden; shortcuts remain active.
+	taskbar_show_overview   bool
+	taskbar_show_workspaces bool
 	theme        ThemeKind
 	// Index into glass_colors: what the Windows 7 theme tints its glass with.
 	glass_color int

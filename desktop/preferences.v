@@ -111,6 +111,8 @@ fn desktop_encode_preferences(p DesktopPreferences) ?string {
 	}
 	side := if p.settings.button_side == .left { 'left' } else { 'right' }
 	taskbar := if p.settings.taskbar_mode == .combined { 'combined' } else { 'standard' }
+	show_overview := if p.settings.taskbar_show_overview { 'true' } else { 'false' }
+	show_workspaces := if p.settings.taskbar_show_workspaces { 'true' } else { 'false' }
 	theme := match p.settings.theme {
 		.default_ { 'default' }
 		.macos { 'macos' }
@@ -128,7 +130,7 @@ fn desktop_encode_preferences(p DesktopPreferences) ?string {
 	sleep := desktop_encode_idle_timeout(p.settings.sleep_minutes)
 	lid_action := p.settings.lid_action.code()
 	power_profile := p.settings.power_profile.code()
-	record := 'version=1\nscale=${scale}\nbutton_side=${side}\ntaskbar_mode=${taskbar}\ntheme=${theme}\nglass_color=${p.settings.glass_color}\nlanguage=${language}\nclock_24_hour=${clock_24_hour}\nclock_show_seconds=${clock_show_seconds}\nclock_show_date=${clock_show_date}\nclock_show_weekday=${clock_show_weekday}\nwallpaper_color=${p.settings.wallpaper_color}\nwallpaper_image=${p.settings.wallpaper_image}\nkeyboard_layouts=${keyboard_sources}\nkeyboard_layout=${keyboard_layout}\ndisplay_off_after=${display_off}\nsleep_after=${sleep}\nlid_action=${lid_action}\npower_profile=${power_profile}\n'
+	record := 'version=1\nscale=${scale}\nbutton_side=${side}\ntaskbar_mode=${taskbar}\ntaskbar_show_overview=${show_overview}\ntaskbar_show_workspaces=${show_workspaces}\ntheme=${theme}\nglass_color=${p.settings.glass_color}\nlanguage=${language}\nclock_24_hour=${clock_24_hour}\nclock_show_seconds=${clock_show_seconds}\nclock_show_date=${clock_show_date}\nclock_show_weekday=${clock_show_weekday}\nwallpaper_color=${p.settings.wallpaper_color}\nwallpaper_image=${p.settings.wallpaper_image}\nkeyboard_layouts=${keyboard_sources}\nkeyboard_layout=${keyboard_layout}\ndisplay_off_after=${display_off}\nsleep_after=${sleep}\nlid_action=${lid_action}\npower_profile=${power_profile}\n'
 	unsafe {
 		display_off.free()
 		sleep.free()
@@ -207,6 +209,8 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 			'lid_action' { u32(65536) }
 			'power_profile' { u32(131072) }
 			'glass_color' { u32(262144) }
+			'taskbar_show_overview' { u32(524288) }
+			'taskbar_show_workspaces' { u32(1048576) }
 			else { u32(0) }
 		}
 		if seen & bit != 0 {
@@ -236,6 +240,20 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 				p.settings.taskbar_mode = match value {
 					'standard' { TaskbarMode.standard }
 					'combined' { TaskbarMode.combined }
+					else { return none }
+				}
+			}
+			'taskbar_show_overview' {
+				p.settings.taskbar_show_overview = match value {
+					'true' { true }
+					'false' { false }
+					else { return none }
+				}
+			}
+			'taskbar_show_workspaces' {
+				p.settings.taskbar_show_workspaces = match value {
+					'true' { true }
+					'false' { false }
 					else { return none }
 				}
 			}

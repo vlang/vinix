@@ -23,6 +23,8 @@ fn preference_test_custom() DesktopPreferences {
 		settings: Settings{
 			button_side: .left
 			taskbar_mode: .combined
+			taskbar_show_overview: true
+			taskbar_show_workspaces: true
 			theme: .macos
 			language: .ru
 			clock_24_hour: false
@@ -67,7 +69,7 @@ fn test_preferences_round_trip_every_field_and_both_scale_overrides() {
 	}
 	assert os.ls(home)! == [desktop_preferences_name]
 	record := os.read_file(desktop_preferences_path(home))!
-	assert record == 'version=1\nscale=2\nbutton_side=left\ntaskbar_mode=combined\ntheme=macos\nglass_color=0\nlanguage=ru\nclock_24_hour=false\nclock_show_seconds=false\nclock_show_date=false\nclock_show_weekday=false\nwallpaper_color=4\nwallpaper_image=2\nkeyboard_layouts=us,ru,de\nkeyboard_layout=de\ndisplay_off_after=never\nsleep_after=never\nlid_action=suspend\npower_profile=auto\n'
+	assert record == 'version=1\nscale=2\nbutton_side=left\ntaskbar_mode=combined\ntaskbar_show_overview=true\ntaskbar_show_workspaces=true\ntheme=macos\nglass_color=0\nlanguage=ru\nclock_24_hour=false\nclock_show_seconds=false\nclock_show_date=false\nclock_show_weekday=false\nwallpaper_color=4\nwallpaper_image=2\nkeyboard_layouts=us,ru,de\nkeyboard_layout=de\ndisplay_off_after=never\nsleep_after=never\nlid_action=suspend\npower_profile=auto\n'
 }
 
 fn test_preferences_each_change_preserves_the_rest_of_the_snapshot() {
@@ -76,7 +78,7 @@ fn test_preferences_each_change_preserves_the_rest_of_the_snapshot() {
 	mut p := desktop_load_preferences(home)
 	p.configure_scale(1920, 1080)
 	mut settings := Settings{}
-	for field in 0 .. 12 {
+	for field in 0 .. 14 {
 		match field {
 			0 { settings.button_side = .left }
 			1 { settings.taskbar_mode = .combined }
@@ -89,7 +91,9 @@ fn test_preferences_each_change_preserves_the_rest_of_the_snapshot() {
 			8 { settings.clock_show_weekday = false }
 			9 { settings.keyboard_layouts = preference_test_custom().settings.keyboard_layouts }
 			10 { settings.keyboard_layout = .german }
-			else { settings.language = .ru }
+			11 { settings.language = .ru }
+			12 { settings.taskbar_show_overview = true }
+			else { settings.taskbar_show_workspaces = true }
 		}
 		assert p.save_changes(settings, desktop_current_scale(), home)
 		loaded := desktop_load_preferences(home)
@@ -161,6 +165,8 @@ fn test_preferences_optional_keys_comments_and_unknown_keys() {
 	assert p.settings.theme == .macos
 	assert p.settings.button_side == .right
 	assert p.settings.taskbar_mode == .standard
+	assert !p.settings.taskbar_show_overview
+	assert !p.settings.taskbar_show_workspaces
 	assert p.settings.clock_24_hour
 	assert p.settings.clock_show_seconds
 	assert p.settings.clock_show_date
@@ -202,6 +208,9 @@ fn test_preferences_reject_invalid_versions_fields_duplicates_and_overflow() {
 		'version=1\nscale=0', 'version=1\nscale=200', 'version=1\nscale=2junk',
 		'version=1\nscale=1\nscale=2', 'version=1\nbutton_side=up',
 		'version=1\ntaskbar_mode=9', 'version=1\ntheme=other',
+		'version=1\ntaskbar_show_overview=yes', 'version=1\ntaskbar_show_workspaces=1',
+		'version=1\ntaskbar_show_overview=true\ntaskbar_show_overview=false',
+		'version=1\ntaskbar_show_workspaces=false\ntaskbar_show_workspaces=true',
 		'version=1\nlanguage=zz', 'version=1\nlanguage=RU', 'version=1\nlanguage=',
 		'version=1\nlanguage=en\nlanguage=es',
 		'version=1\nwallpaper_color=-1', 'version=1\nwallpaper_color=${wallpaper_colors.len}',

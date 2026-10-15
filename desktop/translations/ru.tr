@@ -895,6 +895,12 @@ settings.appearance.standard
 settings.appearance.standard_note
 Как в Windows XP: одна кнопка на окно.
 -----
+settings.appearance.overview
+Кнопка обзора окон
+-----
+settings.appearance.workspaces
+Кнопки рабочих столов
+-----
 settings.appearance.taskbar
 Панель задач
 -----

@@ -895,6 +895,12 @@ settings.appearance.standard
 settings.appearance.standard_note
 Windows XP 风格：每个窗口一个按钮。
 -----
+settings.appearance.overview
+窗口概览按钮
+-----
+settings.appearance.workspaces
+工作区按钮
+-----
 settings.appearance.taskbar
 任务栏
 -----

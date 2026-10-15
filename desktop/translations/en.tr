@@ -895,6 +895,12 @@ Standard
 settings.appearance.standard_note
 Windows XP style: one button per window.
 -----
+settings.appearance.overview
+Window Overview button
+-----
+settings.appearance.workspaces
+Workspace buttons
+-----
 settings.appearance.taskbar
 Taskbar
 -----

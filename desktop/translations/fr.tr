@@ -895,6 +895,12 @@ Standard
 settings.appearance.standard_note
 Style Windows XP : un bouton par fenêtre.
 -----
+settings.appearance.overview
+Bouton de vue d’ensemble des fenêtres
+-----
+settings.appearance.workspaces
+Boutons des espaces de travail
+-----
 settings.appearance.taskbar
 Barre des tâches
 -----

@@ -79,6 +79,8 @@ fn (c SettingsCategory) title() string {
 const settings_action_category = 'settings.category.'
 const settings_action_side = 'settings.side.'
 const settings_action_taskbar = 'settings.taskbar.'
+const settings_action_taskbar_overview = 'settings.overview.'
+const settings_action_taskbar_workspaces = 'settings.workspaces.'
 const settings_action_clock_format = 'settings.clock.format.'
 const settings_action_clock_seconds = 'settings.clock.seconds.'
 const settings_action_clock_date = 'settings.clock.date.'
@@ -356,7 +358,7 @@ fn (a &SettingsApp) appearance_pane(width int) []ui2.Element {
 	inner := width - 2 * settings_padding
 	half := (inner - settings_row_gap) / 2
 
-	mut out := frame_elements(12)
+	mut out := frame_elements(18)
 	mut y := settings_padding
 
 	out << settings_heading(tr('settings.appearance.buttons'), y, width)
@@ -380,7 +382,24 @@ fn (a &SettingsApp) appearance_pane(width int) []ui2.Element {
 		tr('settings.appearance.standard_note')
 	}, y, width)
 
+	if settings_taskbar_visibility_offered() {
+		y += 34
+		out << settings_heading(tr('settings.appearance.overview'), y, width)
+		y += 22
+		out << settings_choice('settings.overview.0', tr('settings.date_time.show'), settings_padding, y, half, settings.taskbar_show_overview)
+		out << settings_choice('settings.overview.1', tr('settings.date_time.hide'), settings_padding + half + settings_row_gap, y, half, !settings.taskbar_show_overview)
+		y += 28 + 16
+		out << settings_heading(tr('settings.appearance.workspaces'), y, width)
+		y += 22
+		out << settings_choice('settings.workspaces.0', tr('settings.date_time.show'), settings_padding, y, half, settings.taskbar_show_workspaces)
+		out << settings_choice('settings.workspaces.1', tr('settings.date_time.hide'), settings_padding + half + settings_row_gap, y, half, !settings.taskbar_show_workspaces)
+	}
+
 	return out
+}
+
+fn settings_taskbar_visibility_offered() bool {
+	return app_compositor_extended & app_extended_taskbar_visibility != 0
 }
 
 fn (a &SettingsApp) date_time_pane(width int) []ui2.Element {
@@ -653,6 +672,18 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 			TaskbarMode.combined
 		} else {
 			TaskbarMode.standard
+		}
+		return
+	}
+	if event_id.starts_with(settings_action_taskbar_overview) {
+		if settings_taskbar_visibility_offered() {
+			a.desktop.settings.taskbar_show_overview = !event_id.ends_with('1')
+		}
+		return
+	}
+	if event_id.starts_with(settings_action_taskbar_workspaces) {
+		if settings_taskbar_visibility_offered() {
+			a.desktop.settings.taskbar_show_workspaces = !event_id.ends_with('1')
 		}
 		return
 	}

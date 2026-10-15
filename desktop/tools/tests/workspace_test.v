@@ -9,9 +9,10 @@ import ui2
 
 fn workspace_fixture() Desktop {
 	return Desktop{
+		settings: Settings{ taskbar_show_workspaces: true }
 		canvas: Canvas{
 			width:  801
-			height: 647
+			height: 601 + taskbar_height
 		}
 	}
 }

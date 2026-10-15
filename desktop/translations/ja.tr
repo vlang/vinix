@@ -895,6 +895,12 @@ settings.appearance.standard
 settings.appearance.standard_note
 Windows XP風: ウィンドウごとに1つのボタン。
 -----
+settings.appearance.overview
+ウィンドウ一覧ボタン
+-----
+settings.appearance.workspaces
+ワークスペースボタン
+-----
 settings.appearance.taskbar
 タスクバー
 -----

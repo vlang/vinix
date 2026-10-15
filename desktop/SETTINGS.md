@@ -3,8 +3,8 @@
 ## Saved desktop preferences
 
 All desktop preferences use **one file**, `/root/.vinix-desktop-settings`:
-window-button side, taskbar grouping, taskbar clock format, seconds, date and
-weekday, theme, system language, wallpaper colour and image, keyboard layouts,
+window-button side, taskbar grouping and optional buttons, taskbar clock format,
+seconds, date and weekday, theme, system language, wallpaper colour and image, keyboard layouts,
 the idle timeouts, lid action and power profile, and scale. It is a versioned,
 human-readable snapshot, for example:
 
@@ -13,6 +13,8 @@ version=1
 scale=2
 button_side=left
 taskbar_mode=combined
+taskbar_show_overview=false
+taskbar_show_workspaces=false
 theme=macos
 glass_color=0
 language=ru
@@ -111,6 +113,22 @@ and relaunch with the same volume. All choices should be restored. Change only
 the theme, clock or wallpaper and repeat to verify the scale and other values
 survive. Also check 100%, resetting the file, and migration from a legacy `2\n`
 record.
+
+## Taskbar controls
+
+In **Appearance**, **Window Overview button** and **Workspace buttons** each
+have a **Show** / **Hide** choice. Both default to hidden, including when an
+older preferences file omits the keys. Hiding them gives their space back to
+the window buttons. **Super+Ctrl+Up** still opens Window Overview, and
+**Super+1..4** still switches workspaces.
+
+The choices use `taskbar_show_overview` and `taskbar_show_workspaces` in the
+saved snapshot, each `true` or `false`. They take effect immediately and
+persist across restarts. Settings offers them when the running compositor
+supports them; older application replies preserve the current choices.
+
+Run the focused native checks with
+`v run desktop/tools/test-cursor-rendering.v taskbar_visibility settings_persistence`.
 
 ## Date & Time
 

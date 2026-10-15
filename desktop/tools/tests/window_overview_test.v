@@ -36,7 +36,7 @@ fn (mut app OverviewPointerTestApp) pointer_event(phase AppPointerPhase, button 
 }
 
 fn overview_fixture() Desktop {
-	return Desktop{ canvas: Canvas{ width: 1024, height: 768 } }
+	return Desktop{ canvas: Canvas{ width: 1024, height: 768 }, settings: Settings{ taskbar_show_overview: true } }
 }
 
 fn test_keyboard_opened_modals_cancel_held_app_buttons_and_consume_real_releases() {

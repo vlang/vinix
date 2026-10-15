@@ -1627,19 +1627,21 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 			color: theme.taskbar_text_active
 		})
 	}
-	children << ui2.button_with_image(action_window_overview, '', 'builtin:overview',
-		ui2.rect(f64(start_x + start_width + d.taskbar_anchor_gap()), f64(item_y),
-			f64(window_overview_button_width), f64(item_height)), ui2.BoxStyle{
-		bg: if d.overview.active || d.hover == action_window_overview {
-			theme.taskbar_item_hover
-		} else {
-			theme.taskbar_item_bg
-		}
-		radius: 5
-		// Beside Windows XP's Start button it is an icon alone, as what is
-		// in Quick Launch is, until the pointer is over it.
-		transparent: luna && !d.overview.active && d.hover != action_window_overview
-	}, ui2.TextStyle{ color: theme.taskbar_text_active })
+	if d.settings.taskbar_show_overview {
+		children << ui2.button_with_image(action_window_overview, '', 'builtin:overview',
+			ui2.rect(f64(start_x + start_width + d.taskbar_anchor_gap()), f64(item_y),
+				f64(window_overview_button_width), f64(item_height)), ui2.BoxStyle{
+			bg: if d.overview.active || d.hover == action_window_overview {
+				theme.taskbar_item_hover
+			} else {
+				theme.taskbar_item_bg
+			}
+			radius: 5
+			// Beside Windows XP's Start button it is an icon alone, as what is
+			// in Quick Launch is, until the pointer is over it.
+			transparent: luna && !d.overview.active && d.hover != action_window_overview
+		}, ui2.TextStyle{ color: theme.taskbar_text_active })
+	}
 
 	layout := d.taskbar_layout(entries.len)
 	entries_left := layout.entries_left
@@ -1689,42 +1691,44 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// overview. Numbered buttons match the Super+1..4 shortcuts and dim empty
 	// workspaces while keeping every destination clickable.
 	workspace_x := if dock { x } else { workspace_x_fixed }
-	workspace_start := (d.current_workspace / 4) * 4
-	workspace_end := if workspace_start + 4 > d.workspace_total() { d.workspace_total() } else { workspace_start + 4 }
-	for workspace in workspace_start .. workspace_end {
-		id := workspace_action_ids[workspace]
-		active := workspace == d.current_workspace
-		occupied := d.workspace_window_count(workspace) > 0
-		children << ui2.button(id, workspace_labels[workspace], ui2.rect(f64(workspace_x +
-			(workspace - workspace_start) * (workspace_button_width + workspace_button_gap)), f64(item_y),
-			f64(workspace_button_width), f64(item_height)), ui2.BoxStyle{
-			bg:     if active {
-				theme.accent
-			} else if d.hover == id {
-				theme.taskbar_item_hover
-			} else {
-				theme.taskbar_item_bg
-			}
-			radius: 5
-			// On Windows XP's bar only the workspace on show is a button,
-			// pressed in; the others are their numbers.
-			transparent: luna && !active && d.hover != id
-		}, ui2.TextStyle{
-			color: if active || occupied { theme.taskbar_text_active } else { theme.taskbar_muted }
-			size:  12
-			bold:  active
-			align: .center
-		})
-	}
-	if d.workspace_total() > 4 {
-		for i, action in ['session.workspace.previous', 'session.workspace.next']! {
-			children << ui2.button(action, if i == 0 { '<' } else { '>' },
-				ui2.rect(f64(workspace_x + 4 * (workspace_button_width + workspace_button_gap) + i * 22), f64(item_y), 20, f64(item_height)),
-				ui2.BoxStyle{bg:theme.taskbar_item_bg,radius:5}, ui2.TextStyle{color:theme.taskbar_text_active,size:12,align:.center})
+	if d.settings.taskbar_show_workspaces {
+		workspace_start := (d.current_workspace / 4) * 4
+		workspace_end := if workspace_start + 4 > d.workspace_total() { d.workspace_total() } else { workspace_start + 4 }
+		for workspace in workspace_start .. workspace_end {
+			id := workspace_action_ids[workspace]
+			active := workspace == d.current_workspace
+			occupied := d.workspace_window_count(workspace) > 0
+			children << ui2.button(id, workspace_labels[workspace], ui2.rect(f64(workspace_x +
+				(workspace - workspace_start) * (workspace_button_width + workspace_button_gap)), f64(item_y),
+				f64(workspace_button_width), f64(item_height)), ui2.BoxStyle{
+				bg:     if active {
+					theme.accent
+				} else if d.hover == id {
+					theme.taskbar_item_hover
+				} else {
+					theme.taskbar_item_bg
+				}
+				radius: 5
+				// On Windows XP's bar only the workspace on show is a button,
+				// pressed in; the others are their numbers.
+				transparent: luna && !active && d.hover != id
+			}, ui2.TextStyle{
+				color: if active || occupied { theme.taskbar_text_active } else { theme.taskbar_muted }
+				size:  12
+				bold:  active
+				align: .center
+			})
 		}
-	}
-	if dock {
-		x = workspace_x + workspace_width + d.taskbar_gap()
+		if d.workspace_total() > 4 {
+			for i, action in ['session.workspace.previous', 'session.workspace.next']! {
+				children << ui2.button(action, if i == 0 { '<' } else { '>' },
+					ui2.rect(f64(workspace_x + 4 * (workspace_button_width + workspace_button_gap) + i * 22), f64(item_y), 20, f64(item_height)),
+					ui2.BoxStyle{bg:theme.taskbar_item_bg,radius:5}, ui2.TextStyle{color:theme.taskbar_text_active,size:12,align:.center})
+			}
+		}
+		if dock {
+			x = workspace_x + workspace_width + d.taskbar_gap()
+		}
 	}
 
 	// The notification area precedes the clock. Classic themes also keep the
@@ -1873,7 +1877,10 @@ fn (d &Desktop) taskbar_layout(entry_count int) TaskbarLayout {
 	dock := theme.dock
 	edge_padding := if dock { theme.dock_padding } else { d.taskbar_padding() }
 	start_x, start_width := d.start_button_span(edge_padding)
-	entries_left := start_x + start_width + d.taskbar_anchor_gap() + window_overview_button_width + d.taskbar_gap()
+	overview_width := if d.settings.taskbar_show_overview {
+		d.taskbar_anchor_gap() + window_overview_button_width
+	} else { 0 }
+	entries_left := start_x + start_width + overview_width + d.taskbar_gap()
 	// Reserve the status area before sizing entries. The clock therefore stays
 	// in the physical lower-right corner, just inside Show Desktop, after 2x M1
 	// presentation as well as on an unscaled framebuffer.
@@ -1887,9 +1894,12 @@ fn (d &Desktop) taskbar_layout(entry_count int) TaskbarLayout {
 		d.canvas.width - taskbar_show_desktop_width - d.taskbar_gap()
 	}
 	visible_workspaces := if d.workspace_total() > 4 { 4 } else { d.workspace_total() }
-	workspace_width := visible_workspaces * workspace_button_width +
-		(visible_workspaces - 1) * workspace_button_gap + if d.workspace_total() > 4 { 46 } else { 0 }
-	workspace_x := status_right - status_width - d.taskbar_gap() - workspace_width
+	workspace_width := if d.settings.taskbar_show_workspaces {
+		visible_workspaces * workspace_button_width +
+			(visible_workspaces - 1) * workspace_button_gap + if d.workspace_total() > 4 { 46 } else { 0 }
+	} else { 0 }
+	workspace_gap := if workspace_width > 0 { d.taskbar_gap() } else { 0 }
+	workspace_x := status_right - status_width - workspace_gap - workspace_width
 	entries_right := if dock { d.canvas.width } else { workspace_x - d.taskbar_gap() }
 	// Entries share whatever room is left rather than each taking a fixed
 	// slot: with a fixed one the last window opened simply had no entry, which

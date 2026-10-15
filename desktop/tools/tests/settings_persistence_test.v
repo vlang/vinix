@@ -26,6 +26,8 @@ fn test_settings_actions_save_and_restore_one_complete_snapshot() {
 	}
 	app.handle('${settings_action_side}1')!
 	app.handle('${settings_action_taskbar}1')!
+	app.handle('${settings_action_taskbar_overview}0')!
+	app.handle('${settings_action_taskbar_workspaces}0')!
 	app.category = .theme
 	app.handle('${settings_action_theme}1')!
 	app.category = .wallpaper
@@ -36,6 +38,8 @@ fn test_settings_actions_save_and_restore_one_complete_snapshot() {
 	appearance := desktop_load_preferences(home)
 	assert appearance.settings.button_side == .left
 	assert appearance.settings.taskbar_mode == .combined
+	assert appearance.settings.taskbar_show_overview
+	assert appearance.settings.taskbar_show_workspaces
 	assert appearance.settings.theme == .macos
 	assert appearance.settings.wallpaper_color == 4
 	assert appearance.settings.wallpaper_image == 0
@@ -68,4 +72,6 @@ fn test_settings_actions_save_and_restore_one_complete_snapshot() {
 	assert final_preferences.settings.theme == .macos
 	assert final_preferences.settings.button_side == .left
 	assert final_preferences.settings.taskbar_mode == .combined
+	assert final_preferences.settings.taskbar_show_overview
+	assert final_preferences.settings.taskbar_show_workspaces
 }

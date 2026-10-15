@@ -1237,7 +1237,7 @@ fn test_taskbar_keeps_a_bottom_right_clock_and_open_windows() {
 	taskbar := utility_element_named(root, 'taskbar') or { panic('missing taskbar') }
 	assert int(taskbar.frame.height) == 32
 	assert int(taskbar.frame.y + taskbar.frame.height) == desktop.canvas.height
-	assert utility_element_named(taskbar, action_window_overview) != none
+	assert utility_element_named(taskbar, action_window_overview) == none
 	assert utility_element_named(taskbar, action_show_desktop) != none
 	assert utility_element_named(taskbar, 'tray.icon.network') != none
 	assert utility_element_named(taskbar, action_tray_overflow) != none
