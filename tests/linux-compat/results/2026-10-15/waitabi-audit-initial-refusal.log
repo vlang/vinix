@@ -1,0 +1,4 @@
+tests/linux-compat/waitabi-check.v:317: FAIL: fn main.diagnostics: assert pins.len > 60
+   left value: pins.len = 58
+  right value: 60
+V panic: Assertion failed...

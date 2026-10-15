@@ -1,0 +1,3 @@
+tests/linux-compat/waitabi-check.v:361: FAIL: fn main.main: assert false, 'waitabi assertions must execute'
+      message: waitabi assertions must execute
+V panic: Assertion failed...

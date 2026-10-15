@@ -1,0 +1,3 @@
+tests/linux-compat/waitabi-check.v:206: FAIL: fn main.failure: assert log.contains('LINUX WAITABI DETAIL:'), 'waitabi baseline failure markers required'
+      message: waitabi baseline failure markers required
+V panic: Assertion failed...

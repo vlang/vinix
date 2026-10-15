@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "5f989e9f1431e6aae7152dcc01eaa05d64be8b1b0d5c81f51e8a336f4a6d09ed",
+    "results": [
+        {
+            "name": "waitabi",
+            "source_sha256": "673466b5c1a231e102946372fa2fbabe48adf6ba3463048932b7028939b42d81",
+            "init_sha256": "bc6cdc48fb865cd0790f81a7faf66ec36f38e9396ecc0e2e746a4efd0db2bc19",
+            "iso_sha256": "f040c4f984ccd487596a9890e41fe5639552a8709b3b21a07f43a02ccd49a0a9",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

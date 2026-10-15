@@ -1,0 +1,8 @@
+Completed /Users/alex/.cache/vinix-linux-compat/waitabi-20261015/states/p2-before-arm/waitabi: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/waitabi-20261015/states/p2-before-x86/waitabi: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/waitabi-20261015/states/p2-after-arm/waitabi: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/waitabi-20261015/states/p2-after-x86/waitabi: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/waitabi-20261015/states/p2-after-arm/runtime: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/waitabi-20261015/states/p2-after-x86/runtime: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/waitabi-20261015/states/p2-after-arm/groupzombie: captured files byte-identical; disposable boot staging retired
+Completed /Users/alex/.cache/vinix-linux-compat/waitabi-20261015/states/p2-after-x86/groupzombie: captured files byte-identical; disposable boot staging retired

@@ -1701,3 +1701,15 @@ its evidence area to verify original failures, native/reference results,
 whole-C scope, compiler/SDK/input pins, lifetime review and executing audit
 controls. Incomplete teardown and lifecycle races remain outside this stable
 contract. See the [zombie-group report](../../docs/linux-posix-qualification.md#native-completed-zombie-process-groups).
+
+The `waitabi` case qualifies native wait4/waitid low32 scalar imports,
+INT_MIN ESRCH after option validation, live/zombie group selection, WNOWAIT
+and exact errors. Root/UID1000 in initial and one-level PID namespaces run
+118,272 controls per architecture with independently varied raw register
+forms and genuine musl calls, plus four flat 200-cycle storage cohorts.
+`waitabi-reference.v` boots the unchanged native ELF on Linux. Compile
+`waitabi-check.v` without `-prod` and supply its evidence area to verify
+original failures, final native/reference results, whole-C scope, compiler/SDK/
+input pins, preserved failed exploratory copyout oracles and executing audit
+controls. Error siginfo copyout and consuming wait4 copy faults remain open.
+See the [wait ABI report](../../docs/linux-posix-qualification.md#native-wait-selectors-and-scalar-argument-words).

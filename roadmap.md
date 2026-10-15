@@ -995,6 +995,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   root/UID1000 in initial/one-level PID namespaces on both architectures, with
   flat storage and lifetime review. See [the zombie-group receipts](docs/linux-posix-qualification.md#native-completed-zombie-process-groups).
 
+- [x] Import native wait4/waitid scalar arguments from low32 register words;
+  preserve option-error priority and reject wait4 INT_MIN with ESRCH. Qualify
+  live/zombie selection, WNOWAIT, ignored outputs and reaped errors as root/UID1000
+  in initial/one-level PID namespaces on both architectures, with flat storage.
+  See [the wait ABI receipts](docs/linux-posix-qualification.md#native-wait-selectors-and-scalar-argument-words).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -1,0 +1,5 @@
+V panic: failed to open file "/Users/alex/.cache/vinix-linux-compat/waitabi-20261015/build-after-arm-detached.log"
+ v hash: f6358ec
+    pid: 0xbc59
+    tid: 0xbc59
+0   dyld                                0x000000018c507e00 start + 6992

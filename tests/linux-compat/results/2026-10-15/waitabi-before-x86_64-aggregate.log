@@ -1,0 +1,210 @@
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/waitabi-20261015/states/p2-before-x86/waitabi/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/waitabi-20261015/states/p2-before-x86/waitabi/.vinix-amd64.iso.XrG9GX'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 12.9g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/waitabi-20261015/states/p2-before-x86/waitabi/iso-build/.iso-staging.cbXtuk/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13707 sectors
+Written to medium : 13707 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/waitabi-20261015/states/p2-before-x86/waitabi/.vinix-amd64.iso.XrG9GX' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd62b.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/waitabi-20261015/states/p2-before-x86/waitabi/test.iso (28071936 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/waitabi-20261015/states/p2-before-x86/waitabi
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=80336
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX WAITABI TOPOLOGY: ordinary=0 namespace=0 uid=0 self=5774 kind=0 pid=52210 group=52210 session=5774
+LINUX WAITABI TOPOLOGY: ordinary=0 namespace=0 uid=0 self=5774 kind=1 pid=25770 group=5774 session=5774
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=5 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=6 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=1 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI EXIT: ordinary=0 namespace=0 pid=52210 wait=CLD_EXITED status=37
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=5 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=6 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=1 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=25770 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=25770 tform=1 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=25770 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=25770 tform=1 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=25770 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=25770 tform=1 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI REAP: ordinary=0 namespace=0 pid=52210 status=37
+LINUX WAITABI CASES: ordinary=0 namespace=0 kind=0 calls=1152 failures=948
+LINUX WAITABI CASES: ordinary=0 namespace=0 kind=1 calls=576 failures=0
+LINUX WAITABI CASES: ordinary=0 namespace=0 kind=2 calls=8704 failures=5155
+LINUX WAITABI CASES: ordinary=0 namespace=0 kind=3 calls=8704 failures=0
+LINUX WAITABI CASES: ordinary=0 namespace=0 kind=4 calls=8704 failures=5155
+LINUX WAITABI CASES: ordinary=0 namespace=0 kind=5 calls=1728 failures=1605
+LINUX WAITABI FINAL: ordinary=0 namespace=0 kind=0 calls=1152 failures=948
+LINUX WAITABI FINAL: ordinary=0 namespace=0 kind=1 calls=576 failures=0
+LINUX WAITABI FINAL: ordinary=0 namespace=0 kind=2 calls=8704 failures=5155
+LINUX WAITABI FINAL: ordinary=0 namespace=0 kind=3 calls=8704 failures=0
+LINUX WAITABI FINAL: ordinary=0 namespace=0 kind=4 calls=8704 failures=5155
+LINUX WAITABI FINAL: ordinary=0 namespace=0 kind=5 calls=1728 failures=1605
+LINUX WAITABI TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=38882 kind=0 pid=19990 group=19990 session=38882
+LINUX WAITABI TOPOLOGY: ordinary=1 namespace=0 uid=1000 self=38882 kind=1 pid=16297 group=38882 session=38882
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=5 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=6 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=1 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI EXIT: ordinary=1 namespace=0 pid=19990 wait=CLD_EXITED status=37
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=5 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=6 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=1 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=16297 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=16297 tform=1 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=16297 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=16297 tform=1 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=16297 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=16297 tform=1 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI REAP: ordinary=1 namespace=0 pid=19990 status=37
+LINUX WAITABI CASES: ordinary=1 namespace=0 kind=0 calls=1152 failures=948
+LINUX WAITABI CASES: ordinary=1 namespace=0 kind=1 calls=576 failures=0
+LINUX WAITABI CASES: ordinary=1 namespace=0 kind=2 calls=8704 failures=5155
+LINUX WAITABI CASES: ordinary=1 namespace=0 kind=3 calls=8704 failures=0
+LINUX WAITABI CASES: ordinary=1 namespace=0 kind=4 calls=8704 failures=5155
+LINUX WAITABI CASES: ordinary=1 namespace=0 kind=5 calls=1728 failures=1605
+LINUX WAITABI FINAL: ordinary=1 namespace=0 kind=0 calls=1152 failures=948
+LINUX WAITABI FINAL: ordinary=1 namespace=0 kind=1 calls=576 failures=0
+LINUX WAITABI FINAL: ordinary=1 namespace=0 kind=2 calls=8704 failures=5155
+LINUX WAITABI FINAL: ordinary=1 namespace=0 kind=3 calls=8704 failures=0
+LINUX WAITABI FINAL: ordinary=1 namespace=0 kind=4 calls=8704 failures=5155
+LINUX WAITABI FINAL: ordinary=1 namespace=0 kind=5 calls=1728 failures=1605
+LINUX WAITABI TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=0 pid=3 group=3 session=2
+LINUX WAITABI TOPOLOGY: ordinary=0 namespace=1 uid=0 self=2 kind=1 pid=4 group=2 session=2
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=5 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=6 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=1 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI EXIT: ordinary=0 namespace=1 pid=3 wait=CLD_EXITED status=37
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=5 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=6 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=1 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=4 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=4 tform=1 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=4 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=4 tform=1 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=4 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=4 tform=1 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI REAP: ordinary=0 namespace=1 pid=3 status=37
+LINUX WAITABI CASES: ordinary=0 namespace=1 kind=0 calls=1152 failures=948
+LINUX WAITABI CASES: ordinary=0 namespace=1 kind=1 calls=576 failures=0
+LINUX WAITABI CASES: ordinary=0 namespace=1 kind=2 calls=8704 failures=5155
+LINUX WAITABI CASES: ordinary=0 namespace=1 kind=3 calls=8704 failures=0
+LINUX WAITABI CASES: ordinary=0 namespace=1 kind=4 calls=8704 failures=5155
+LINUX WAITABI CASES: ordinary=0 namespace=1 kind=5 calls=1728 failures=1605
+LINUX WAITABI FINAL: ordinary=0 namespace=1 kind=0 calls=1152 failures=948
+LINUX WAITABI FINAL: ordinary=0 namespace=1 kind=1 calls=576 failures=0
+LINUX WAITABI FINAL: ordinary=0 namespace=1 kind=2 calls=8704 failures=5155
+LINUX WAITABI FINAL: ordinary=0 namespace=1 kind=3 calls=8704 failures=0
+LINUX WAITABI FINAL: ordinary=0 namespace=1 kind=4 calls=8704 failures=5155
+LINUX WAITABI FINAL: ordinary=0 namespace=1 kind=5 calls=1728 failures=1605
+LINUX WAITABI TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=0 pid=3 group=3 session=2
+LINUX WAITABI TOPOLOGY: ordinary=1 namespace=1 uid=1000 self=2 kind=1 pid=4 group=2 session=2
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=0 pid=0 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=5 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=0 oform=6 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=2 pid=0 tform=0 iform=1 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI EXIT: ordinary=1 namespace=1 pid=3 wait=CLD_EXITED status=37
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=5 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=0 oform=6 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=4 pid=0 tform=0 iform=1 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=4 tform=0 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=4 tform=1 iform=0 oform=2 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=4 tform=0 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=4 tform=1 iform=0 oform=3 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=4 tform=0 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI DETAIL: kind=5 pid=4 tform=1 iform=0 oform=4 actual=-1/22 expected_errno=0
+LINUX WAITABI REAP: ordinary=1 namespace=1 pid=3 status=37
+LINUX WAITABI CASES: ordinary=1 namespace=1 kind=0 calls=1152 failures=948
+LINUX WAITABI CASES: ordinary=1 namespace=1 kind=1 calls=576 failures=0
+LINUX WAITABI CASES: ordinary=1 namespace=1 kind=2 calls=8704 failures=5155
+LINUX WAITABI CASES: ordinary=1 namespace=1 kind=3 calls=8704 failures=0
+LINUX WAITABI CASES: ordinary=1 namespace=1 kind=4 calls=8704 failures=5155
+LINUX WAITABI CASES: ordinary=1 namespace=1 kind=5 calls=1728 failures=1605
+LINUX WAITABI FINAL: ordinary=1 namespace=1 kind=0 calls=1152 failures=948
+LINUX WAITABI FINAL: ordinary=1 namespace=1 kind=1 calls=576 failures=0
+LINUX WAITABI FINAL: ordinary=1 namespace=1 kind=2 calls=8704 failures=5155
+LINUX WAITABI FINAL: ordinary=1 namespace=1 kind=3 calls=8704 failures=0
+LINUX WAITABI FINAL: ordinary=1 namespace=1 kind=4 calls=8704 failures=5155
+LINUX WAITABI FINAL: ordinary=1 namespace=1 kind=5 calls=1728 failures=1605
+LINUX WAITABI FAIL: wait argument imports, selection, errors, copyout or retained zombies
+QEMU: Terminated
+Missing verdicts: ['LINUX WAITABI: PASS']; failures: ['FAIL:', 'LINUX WAITABI FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/waitabi-20261015/states/p2-before-x86/receipt.json

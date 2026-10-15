@@ -7590,3 +7590,110 @@ GNU libc and translated/ELF32 paths remain unqualified. The three broad section
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/groupzombie-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/groupzombie-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/groupzombie-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/groupzombie-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/groupzombie-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/groupzombie-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/groupzombie-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/groupzombie-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/groupzombie-check.v), [verdict](../tests/linux-compat/results/2026-10-15/groupzombie-audit.log), [lifetime review](../tests/linux-compat/results/2026-10-15/groupzombie-lifetime-review.txt).
+
+## Native wait selectors and scalar argument words
+
+The native AArch64 and x86-64 `wait4` and `waitid` adapters now import their
+Linux scalar arguments from the low 32 register bits. `wait4` sign-extends
+`pid_t` and `int` options; `waitid` imports its type/options as signed32 and
+retains only the ID's low32 bits before its existing positive/nonnegative
+validation. P_ALL continues to ignore the ID. `wait4(INT_MIN)` returns ESRCH
+after option validation, so invalid options retain EINVAL priority. Pointer
+arguments stay full-width. The patch changes two entry points and adds no
+allocation, pin, reclamation, waiter, child-claim or lock changes.
+
+Four fresh production kernels were built from committed base
+`6fb03bb2e396a18b64d8795e80be39b660945f59`, with only the owned
+`kernel/userland/linux_task.v` patch in the corrected builds. The audit compares
+the complete generated C on both architectures: only the two adapter definitions
+and their exact declarations differ; no identifier normalization is used.
+The unchanged final probe source, C and ELF are bound across original/corrected
+Vinix and Linux 6.12.51 reference runs.
+
+Root and UID/GID1000 run in initial and one-level PID namespaces. Each cohort
+creates a fresh session and two held direct children: one leads a separate
+process group and the other stays in the caller's group. Readiness pipes prove
+their reported PID, parent, PGID and SID before testing. Release of the first
+child produces a status-37 zombie observed with WNOWAIT. It remains available
+through repeated selection and is explicitly reaped before old-ID errors are
+tested. The second child is released and reaped with status 38 before completion.
+Topology records and four exit/reap edges per architecture bind these phases.
+
+Seven raw register forms cover zero/sign extension and upper words 1,
+0x12345678, 0x80000000, 0x7fffffff and 0xffffffff. Genuine musl wait4/waitid
+calls are the eighth form. Wait4 independently varies PID/options; waitid
+independently varies type/ID/options through all 512 form triples per selector.
+Each architecture runs 118,272 controls:
+
+| Per-cohort class | Controls | Original failures |
+| --- | ---: | ---: |
+| Held-child wait4 selectors, two valid option sets, untouched status/rusage | 1,152 | 948 |
+| Invalid wait4 options, including INT_MIN error priority | 576 | 0 |
+| Live-child waitid selection/errors and empty-event siginfo/rusage | 8,704 | 5,155 |
+| Invalid waitid options before type/ID selection | 8,704 | 0 |
+| Zombie WNOWAIT waitid selection and successful siginfo | 8,704 | 5,155 |
+| Held-child ignored wait4 outputs, WNOWAIT waitid EFAULT and reaped-ID errors | 1,728 | 1,605 |
+
+Selectors include PID, caller and child process groups, all children, absent
+IDs, zero, -1 and INT_MIN. Exact EINVAL/ECHILD/ESRCH/EFAULT behavior is checked.
+Valid waitid events verify signo, errno, code, PID and status; empty events also
+verify zero UID. Successful-event UID/accounting is outside this qualification.
+No-event wait4 ignores inaccessible status/rusage pointers; zombie waitid with
+WNOWAIT returns EFAULT for bad info/rusage and independently remains waitable.
+Original kernels fail exactly 51,452 controls per architecture. Corrected Vinix
+and identical native ELF probes on Linux pass every final control.
+
+The first probe contained two incorrect assumptions. Linux writes waitid's
+siginfo fields even for these selector/option errors, and wait4 may consume a
+zombie before returning a status/rusage copyout failure. The strict exploratory
+Linux runs fail both assumptions and reach ECHILD at the later attempted reap;
+their PID1 then exits and Linux panics. Their original source, C, ELF, receipts
+and serial logs remain retained and pinned. The final probe compares exact
+errors without asserting unchanged error siginfo, and exercises wait4 output
+pointers only on a held child with no event. WNOWAIT waitid retention remains
+required. **Waitid error copyout and wait4 consumption after copyout failure
+remain unsupported semantics**, published separately from this ABI fix. The
+diagnostic records are never counted as passing references.
+
+The p2 Linux probes pass, but their controller rejects both receipts because
+it retained the previous fixture's expected case counts. A corrected controller
+boots the same unchanged ELFs again in p3; the refused receipts are retained.
+The first audit also refuses an incorrect estimate of more than 60 diagnostic
+files: the complete original walk contains 58 regular files, now checked exactly.
+Controller/audit source, binary, log and status identities are retained, and
+another audit refuses the old template's missing build-log name before it is
+corrected to the actual producer path. These refusals stay pinned and the
+final audit passes separately. See the
+[controller/audit refusal notes](../tests/linux-compat/results/2026-10-15/waitabi-controller-audit-refusal-note.txt).
+
+Four warmed 200-cycle cohorts alternate upper-word raw and genuine musl calls:
+held-child nohang wait4, zombie group WNOWAIT waitid and INT_MIN ESRCH. Slab
+objects and big-page totals remain flat after settling. Setup, fork and reap
+are outside the measured interval. AArch64 compares 18 classes and retains
+78/78 big pages initially and 90/90 in the namespace for both users. x86-64
+compares 14 classes and retains 195/195 initially and 217/217 in the namespace,
+also for both users. The probe C uses five explicit stack allocas and no
+malloc/memdup/dynamic-array/fixed-index calls.
+
+Runtime and completed-zombie group regressions pass on both architectures;
+eight host test files pass. Allocation diagnostics are byte-identical, including
+existing allowance-file refusals. The audit binds 66 inventory inputs, 15,146
+compiler inputs, all 2,014 private SDK files, fresh ARM command receipts,
+source/C/ELF/ISO/kernel identities and 84 retained regular files across eight
+final native profiles. False-assertion and passing-Linux-as-original controls
+execute without `-prod`. The immutable
+[Linux v6.12 implementation](https://github.com/torvalds/linux/blob/v6.12/kernel/exit.c)
+and its digest are retained with the evidence.
+
+The older inventory input list omits `linux_task.v`; the wait source is pinned
+separately against the committed base, both worktrees and complete production C.
+
+P_PIDFD, __WCLONE/__WALL/__WNOTHREAD, ptrace/cross-thread waits, consuming
+copyout faults, error siginfo copyout, successful-event UID/accounting,
+concurrent group/reap changes, signal restart, GNU libc and translated/ELF32
+paths remain outside this bounded contract. The three broad section 15 gates
+remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/waitabi-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitabi-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitabi-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitabi-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/waitabi-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitabi-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitabi-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitabi-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/waitabi-check.v), [verdict](../tests/linux-compat/results/2026-10-15/waitabi-audit.log), [failed diagnostic notes](../tests/linux-compat/results/2026-10-15/waitabi-diagnostic-note.txt), [diagnostic input pins](../tests/linux-compat/results/2026-10-15/waitabi-diagnostic-inputs.json).

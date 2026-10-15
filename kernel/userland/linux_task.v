@@ -466,10 +466,16 @@ fn write_child_rusage(rusage_ptr u64, child &proc.Process) bool {
 }
 
 // wait4(pid, status, options, rusage).
-pub fn syscall_wait4(_ voidptr, pid int, status_ptr u64, options int, rusage_ptr u64) (u64, u64) {
+pub fn syscall_wait4(_ voidptr, pid_word u64, status_ptr u64, options_word u64, rusage_ptr u64) (u64, u64) {
+	// Linux imports pid_t and int from the low 32 bits of each register.
+	pid := int(i32(pid_word))
+	options := int(i32(options_word))
 	mut current_process := proc.current_thread().process
 
 	if options & ~(wnohang | wstopped | wcontinued) != 0 { return errno.err, errno.einval }
+	// Its negation is undefined in Linux's signed pid_t. Invalid options take
+	// precedence, then this selector returns ESRCH instead of scanning children.
+	if pid == -2147483648 { return errno.err, errno.esrch }
 	change := take_child_change(mut current_process, pid, options | wexited)
 	if change.child == unsafe { nil } {
 		if change.err != 0 { return errno.err, change.err }
@@ -493,7 +499,10 @@ pub fn syscall_wait4(_ voidptr, pid int, status_ptr u64, options int, rusage_ptr
 }
 
 // waitid(idtype, id, infop, options, rusage).
-pub fn syscall_waitid(_ voidptr, idtype int, id u64, infop u64, options int, rusage_ptr u64) (u64, u64) {
+pub fn syscall_waitid(_ voidptr, idtype_word u64, id_word u64, infop u64, options_word u64, rusage_ptr u64) (u64, u64) {
+	idtype := int(i32(idtype_word))
+	id := u64(u32(id_word))
+	options := int(i32(options_word))
 	mut current_process := proc.current_thread().process
 
 	// Linux requires an explicit set of child states to report.

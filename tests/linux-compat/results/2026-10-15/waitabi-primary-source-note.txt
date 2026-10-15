@@ -1,0 +1,1 @@
+Fetched immutable Linux v6.12 kernel/exit.c directly. kernel_wait4 validates options before INT_MIN ESRCH; syscall definitions import pid_t/int as signed32. kernel_waitid_prepare ignores P_ALL id, requires positive P_PID and nonnegative P_PGID. The probe compares these outcomes using identical ELFs on Linux6.12.51. No child claim, pin, lock, lifetime or allocation changes.

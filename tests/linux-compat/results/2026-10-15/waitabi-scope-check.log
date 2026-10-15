@@ -1,0 +1,1 @@
+arm/x86: complete production C differs only in native wait4/waitid definitions and exact declarations; low32 scalar imports and INT_MIN ESRCH after options validation; existing child claims, pins, locks, copyout and notifications unchanged; no added allocation/free/pin or compiler normalization
