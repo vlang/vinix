@@ -4816,8 +4816,11 @@ Desarrollo
 app_selection.category.games
 Juegos
 -----
+app_selection.category.creation
+Creación
+-----
 app_selection.category.media
-Medios y creación
+Medios
 -----
 app_selection.category.productivity
 Productividad
@@ -4836,6 +4839,9 @@ Permite ejecutar apps y juegos de iOS
 -----
 app_selection.keepassxc.detail
 Gestor de contraseñas con bóveda local
+-----
+app_selection.mpv.detail
+Reproductor de vídeo y audio
 -----
 app_selection.neovim.detail
 Editor de texto para Terminal

@@ -101,6 +101,7 @@ fn (app FirstRunApp) detail_text() string {
 		'minecraft' { tr('app_selection.minecraft.detail') }
 		'blender' { tr('app_selection.blender.detail') }
 		'vlc-qt' { tr('app_selection.vlc.detail') }
+		'mpv' { tr('app_selection.mpv.detail') }
 		'vscodium' { tr('app_selection.vscodium.detail') }
 		'zed' { tr('app_selection.zed.detail') }
 		'neovim' { tr('app_selection.neovim.detail') }

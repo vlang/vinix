@@ -4816,8 +4816,11 @@ Development
 app_selection.category.games
 Games
 -----
+app_selection.category.creation
+Creation
+-----
 app_selection.category.media
-Media & creation
+Media
 -----
 app_selection.category.productivity
 Productivity
@@ -4836,6 +4839,9 @@ Allows running iOS apps & games
 -----
 app_selection.keepassxc.detail
 Password manager with a local vault
+-----
+app_selection.mpv.detail
+Video and audio player
 -----
 app_selection.neovim.detail
 Terminal text editor

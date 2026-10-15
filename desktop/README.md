@@ -129,8 +129,8 @@ What it does:
 - **native ui2 applications**: every Files, Calculator, Terminal, Settings and
   utility window is backed by its own OS process, PID and memory accounting
 - a **first-run app picker** shown right after the user is created, offering
-  browsers, productivity tools, development tools, communication apps, media,
-  games and runtimes on one scrollable page with category headings and three
+  browsers, productivity tools, development tools, communication apps, creation,
+  media, games and runtimes on one scrollable page with category headings and three
   columns (two or one on narrower screens); the chosen apps install in a
   Terminal window through `pkg`. Every offered app is selectable: when the
   configured Alpine repositories lack VSCodium, Zed, Discord, Slack, Spotify or
@@ -339,23 +339,20 @@ VOffice. See [iOS compatibility](../docs/ios.md) for the supported subset and
 QEMU tests.
 
 First boot offers optional software in Browsers, Productivity, Development,
-Communication, Media & creation, Games, and Runtimes. Choices remain selected
-when changing categories. Up/Down or Tab moves between installable apps, Space
-toggles a choice, Left/Right changes category, and Enter confirms. Existing
-number shortcuts 1–9 keep their catalog identities. Downloads run separately in
+Communication, Creation, Media, Games, and Runtimes on one scrollable page.
+Creation contains Blender and OBS Studio; Media contains VLC, mpv and Spotify.
+Choices remain selected when scrolling. Arrows or Tab move between apps, Space
+toggles a choice, and Enter confirms. Existing number shortcuts 1–9 keep their
+catalog identities. Downloads run separately in
 Terminal, so a failed package does not cancel the remaining choices.
 
-The Alpine choices include Blender, VLC's `vlc-qt` desktop frontend, Neovim,
-KeePassXC, Telegram's `telegram-desktop`, and `obs-studio`. VSCodium requires
-untagged Alpine edge main/community/testing repositories. The tested Zed
-runtime uses the staged Alpine APK described below; setup recognizes its
-installed launcher. Setup does not add repositories. Discord,
-Slack and Spotify have no compatible package in the stable image; their rows
-show that requirement. Steam already runs through the existing `steam-hosted`
-launcher and `scripts/build-steam-aarch64.sh` compatibility layer; first boot
-recognizes installations supplied by that layer. Unavailable rows cannot queue
-installation. Neovim runs in Terminal; installation alone does not register
-new third-party GUI apps with the native desktop.
+The Alpine choices include Blender, VLC's `vlc-qt` desktop frontend, `mpv`, Neovim,
+KeePassXC, Telegram's `telegram-desktop`, and `obs-studio`. All offered apps are
+selectable. VSCodium, Zed, Discord, Slack, Spotify and Steam use official Linux
+downloads when absent from the configured Alpine repositories. Their private
+libraries and x86 translation are installed on demand. Setup keeps the existing
+repositories and recognizes apps already supplied by the image. Neovim runs
+in Terminal.
 
 The **iOS runtime** option installs Vinix's own static ARM64 compatibility
 runner from an optional image payload. To supply that choice, include the
@@ -366,8 +363,8 @@ v run build-support/ios/stage-setup-runtime.v build/ios/staging/usr/bin/run-ios 
 ```
 
 Images that already include `/usr/bin/run-ios` show it as installed. Images
-without the optional payload explain the requirement. The runtime executes
-compatible, unencrypted ARM64 iOS Mach-O apps directly, without CPU emulation;
+without the optional payload build it from official Vinix sources on demand.
+The runtime executes compatible, unencrypted ARM64 iOS Mach-O apps directly, without CPU emulation;
 its supported API subset and limitations are documented in [iOS compatibility](../docs/ios.md).
 It is not a general App Store runtime. The optional payload is a Vinix binary,
 and does not contain Apple's frameworks or applications.

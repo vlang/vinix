@@ -6,15 +6,16 @@ enum FirstRunCategory {
 	productivity
 	development
 	communication
+	creation
 	media
 	games
 	runtimes
 }
 
 const first_run_categories = [FirstRunCategory.browsers, .productivity, .development, .communication,
-	.media, .games, .runtimes]
+	.creation, .media, .games, .runtimes]
 const first_run_category_headers = ['apps.heading.browsers', 'apps.heading.productivity',
-	'apps.heading.development', 'apps.heading.communication', 'apps.heading.media',
+	'apps.heading.development', 'apps.heading.communication', 'apps.heading.creation', 'apps.heading.media',
 	'apps.heading.games', 'apps.heading.runtimes']
 
 const first_run_app_order = first_run_app_display_order()
@@ -35,6 +36,7 @@ fn (category FirstRunCategory) text() string {
 		.productivity { tr('app_selection.category.productivity') }
 		.development { tr('app_selection.category.development') }
 		.communication { tr('app_selection.category.communication') }
+		.creation { tr('app_selection.category.creation') }
 		.media { tr('app_selection.category.media') }
 		.games { tr('app_selection.category.games') }
 		.runtimes { tr('app_selection.category.runtimes') }
@@ -90,7 +92,7 @@ const first_run_app_catalogue = [
 		package_name:    'blender'
 		action:          'apps.toggle.blender'
 		installed_paths: ['/usr/bin/blender', '/usr/libexec/vinix-blender-native']
-		category:        .media
+		category:        .creation
 	},
 	FirstRunApp{
 		title:           'VLC'
@@ -161,6 +163,14 @@ const first_run_app_catalogue = [
 		requirement:     .external
 	},
 	FirstRunApp{
+		title:           'mpv'
+		icon:            'asset:mpv'
+		package_name:    'mpv'
+		action:          'apps.toggle.mpv'
+		installed_paths: ['/usr/bin/mpv']
+		category:        .media
+	},
+	FirstRunApp{
 		title:           'Spotify'
 		icon:            'asset:spotify'
 		package_name:    'spotify'
@@ -175,7 +185,7 @@ const first_run_app_catalogue = [
 		package_name:    'obs-studio'
 		action:          'apps.toggle.obs'
 		installed_paths: ['/usr/bin/obs']
-		category:        .media
+		category:        .creation
 	},
 	FirstRunApp{
 		title:           'Steam'

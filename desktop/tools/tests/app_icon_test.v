@@ -61,6 +61,7 @@ fn test_app_icons_keep_original_artwork_without_an_installed_directory() {
 	expected := {
 		'voffice': u32(0x3ae6dcda),
 		'vlc': u32(0x84b67ad4),
+		'mpv': u32(0x9bd0c357),
 		'vscodium': u32(0x21b3e302),
 		'zed': u32(0x27484920),
 		'neovim': u32(0xfc398914),

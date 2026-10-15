@@ -4815,8 +4815,11 @@ app_selection.category.development
 app_selection.category.games
 游戏
 -----
+app_selection.category.creation
+创作
+-----
 app_selection.category.media
-媒体与创作
+媒体
 -----
 app_selection.category.productivity
 办公
@@ -4835,6 +4838,9 @@ app_selection.ios.detail
 -----
 app_selection.keepassxc.detail
 本地密码管理器
+-----
+app_selection.mpv.detail
+视频和音频播放器
 -----
 app_selection.neovim.detail
 终端文本编辑器

@@ -82,10 +82,12 @@ fn app_selection_test_button_label(mut state AppSelectionState) string {
 fn test_app_selection_offers_the_optional_apps_this_machine_can_install() {
 	assert first_run_app_catalogue.map(it.title) == ['Firefox', 'Chromium', 'VOffice', 'Minecraft',
 		'Blender', 'VLC', 'VSCodium', 'Zed', 'Neovim', 'KeePassXC', 'Discord', 'Telegram', 'Slack',
-		'Spotify', 'OBS Studio', 'Steam', 'iOS']
+		'mpv', 'Spotify', 'OBS Studio', 'Steam', 'iOS']
 	assert first_run_app_catalogue.map(it.package_name) == ['firefox', 'chromium', 'voffice',
 		'minecraft', 'blender', 'vlc-qt', 'vscodium', 'zed', 'neovim', 'keepassxc', 'discord',
-		'telegram-desktop', 'slack', 'spotify', 'obs-studio', 'steam', 'ios-runtime']
+		'telegram-desktop', 'slack', 'mpv', 'spotify', 'obs-studio', 'steam', 'ios-runtime']
+	assert first_run_app_catalogue.filter(it.category == .media).map(it.title) == ['VLC', 'mpv', 'Spotify']
+	assert first_run_app_catalogue.filter(it.category == .creation).map(it.title) == ['Blender', 'OBS Studio']
 	$if arm64 {
 		assert first_run_apps.len == first_run_app_catalogue.len
 	} $else {
@@ -426,11 +428,11 @@ fn test_app_selection_vertical_arrows_follow_grid_columns_and_skip_unavailable_a
 }
 
 fn test_first_run_install_command_keeps_all_choices_and_routes_vendor_downloads() {
-	command := first_run_install_command('vlc-qt telegram-desktop neovim keepassxc obs-studio ios-runtime discord slack spotify steam')
+	command := first_run_install_command('vlc-qt mpv telegram-desktop neovim keepassxc obs-studio ios-runtime discord slack spotify steam')
 	$if arm64 {
-		assert command.contains('for app in vlc-qt telegram-desktop neovim keepassxc obs-studio ios-runtime discord slack spotify steam;')
+		assert command.contains('for app in vlc-qt mpv telegram-desktop neovim keepassxc obs-studio ios-runtime discord slack spotify steam;')
 	} $else {
-		assert command.contains('for app in vlc-qt telegram-desktop neovim keepassxc obs-studio discord slack spotify steam;')
+		assert command.contains('for app in vlc-qt mpv telegram-desktop neovim keepassxc obs-studio discord slack spotify steam;')
 	}
 	assert command.contains('qt5-qtbase-x11')
 	assert command.contains('qt6-qtbase-x11')

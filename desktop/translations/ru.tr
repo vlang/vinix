@@ -4816,8 +4816,11 @@ app_selection.category.development
 app_selection.category.games
 Игры
 -----
+app_selection.category.creation
+Творчество
+-----
 app_selection.category.media
-Медиа и творчество
+Медиа
 -----
 app_selection.category.productivity
 Работа
@@ -4836,6 +4839,9 @@ app_selection.ios.detail
 -----
 app_selection.keepassxc.detail
 Менеджер паролей с локальной базой
+-----
+app_selection.mpv.detail
+Видео- и аудиоплеер
 -----
 app_selection.neovim.detail
 Текстовый редактор в Терминале

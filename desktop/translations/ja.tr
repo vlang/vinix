@@ -4815,8 +4815,11 @@ app_selection.category.development
 app_selection.category.games
 ゲーム
 -----
+app_selection.category.creation
+制作
+-----
 app_selection.category.media
-メディアと制作
+メディア
 -----
 app_selection.category.productivity
 仕事
@@ -4835,6 +4838,9 @@ iOSのアプリとゲームを実行
 -----
 app_selection.keepassxc.detail
 ローカル保存のパスワードマネージャー
+-----
+app_selection.mpv.detail
+動画と音声のプレーヤー
 -----
 app_selection.neovim.detail
 ターミナル用テキストエディター

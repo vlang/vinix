@@ -13,6 +13,7 @@ its framebuffer compositor.
 - DOOM: `M_DOOM` menu logo from a locally supplied DOOM WAD, decoded with its `PLAYPAL` palette and scaled without smoothing.
 - Steam: [Valve's Steam installer package](https://cdn.fastly.steamstatic.com/client/installer/steam.deb), `usr/share/icons/hicolor/256x256/apps/steam.png`, resampled to 512 × 512
 - VLC: [VideoLAN application icon](https://raw.githubusercontent.com/videolan/vlc/master/share/icons/256x256/vlc.png)
+- mpv: [upstream application icon](https://raw.githubusercontent.com/mpv-player/mpv/master/etc/mpv.svg), rasterized at 512 × 512 with transparency preserved
 - VSCodium: [upstream stable Linux icon](https://raw.githubusercontent.com/VSCodium/vscodium/master/src/stable/resources/linux/code.png)
 - Zed: [upstream application icon](https://raw.githubusercontent.com/zed-industries/zed/main/crates/zed/resources/app-icon@2x.png)
 - Neovim: [upstream application icon](https://raw.githubusercontent.com/neovim/neovim/master/runtime/nvim.png)
@@ -49,6 +50,9 @@ source bytes, before color assignment/rasterization and QOI conversion:
 
 The VOffice logo was fetched on 2026-10-15. Its unmodified PNG source SHA-256
 is `e765434460a97da61f540231b61c4c9d9118eb41e546db51db095edaf95e5af5`.
+
+The mpv logo was fetched on 2026-10-16. Its unmodified SVG source SHA-256
+is `03e9c5e45e4c87009fb6ce1aa6c88bc65b5a3ce7d396800fa072cec5dde0f666`.
 
 Artwork was fetched and converted with V tooling invoking curl and ImageMagick;
 SVGs were rasterized at sufficient density before scaling. PNG source colors

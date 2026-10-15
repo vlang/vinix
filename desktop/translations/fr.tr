@@ -4815,8 +4815,11 @@ Développement
 app_selection.category.games
 Jeux
 -----
+app_selection.category.creation
+Création
+-----
 app_selection.category.media
-Médias et création
+Médias
 -----
 app_selection.category.productivity
 Bureautique
@@ -4835,6 +4838,9 @@ Permet de lancer des apps et jeux iOS
 -----
 app_selection.keepassxc.detail
 Gestionnaire de mots de passe local
+-----
+app_selection.mpv.detail
+Lecteur vidéo et audio
 -----
 app_selection.neovim.detail
 Éditeur de texte en Terminal
