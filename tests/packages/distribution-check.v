@@ -259,6 +259,8 @@ fn check() ! {
 	os.cp(repository + '/desktop/software_admin.v', work + '/software/software_admin.v')!
 	os.cp(repository + '/desktop/software_data.v', work + '/software/software_data.v')!
 	os.cp(repository + '/desktop/software_policy.v', work + '/software/software_policy.v')!
+	os.cp(repository + '/desktop/software_policy_navigation.v', work + '/software/software_policy_navigation.v')!
+	os.cp(repository + '/tests/packages/software_policy_navigation_fixture.v', work + '/software/policy_navigation_fixture.v')!
 	os.cp(repository + '/desktop/software_policy_pages.v', work + '/software/software_policy_pages.v')!
 	os.cp(repository + '/tests/packages/software_policy_fixture.v', work + '/software/policy_fixture.v')!
 	os.cp(repository + '/tests/packages/software_metadata_fixture.v', work + '/software/metadata_fixture.v')!
@@ -296,6 +298,7 @@ fn check() ! {
 	run(work + '/window-broker-memory', ['deployment-navigation-memory'])!
 	run(work + '/window-broker-memory', ['repository-navigation-memory'])!
 	run(work + '/window-broker-memory', ['package-navigation-memory'])!
+	run(work + '/window-broker-memory', ['policy-navigation-memory'])!
 	if '--cross' in os.args {
 		run(v, [...helper_flags, '-o', work + '/package-stage', repository + '/tools/packages/stage.v'])!
 		for architecture in ['aarch64', 'x86_64'] {

@@ -759,6 +759,10 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		return
 	}
 	if a.cleanup_mode { a.handle_cleanup(event_id); return }
+	if a.policy_read_running() && event_id in ['software.policy.stop', 'software.policy.cancel']! {
+		a.stop_policy_read()
+		return
+	}
 	if a.mirror_review_running() && event_id in ['software.mirror.stop', 'software.cancel']! {
 		a.stop_mirror_review()
 		return
@@ -1116,6 +1120,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.cleanup_mode && (width < 640 || height < 610) { return a.build_cleanup_compact(width, height) }
 	if a.deployment_mode && (width < 640 || height < 610) { return a.build_deployment_compact(width, height) }
 	if a.repository_mode && (width < 640 || height < 610) { return a.build_repositories_compact(width, height) }
+	if a.policy_mode && (width < 640 || height < 610) { return a.build_policy_compact(width, height) }
 	if width < 640 || height < 610 {
 		if a.package_screen_active() { return a.build_packages_compact(width, height) }
 		mut compact := frame_elements(2)

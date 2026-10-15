@@ -1301,6 +1301,16 @@ close is blocked while an approved change runs. Policy changes retain installed
 packages and personal data; a deployment is a separate reviewed action. See the
 [policy manager qualification](../tests/packages/policy-ui-check.md).
 
+Pending policy reads and reviews support **Stop**, Cancel or Escape, which reap
+the read-only worker and discard unaccepted output and proposals. The literal
+filename survives for fresh retry. A stopped review returns to the known current
+policy; a stopped reload requires a fresh read before another review, including
+after a successful save. Small windows retain Back/Stop/Cancel, status, progress
+and failure access without exposing confirmation. Resizing preserves review
+sections and pages. Approved saves keep running until they finish, and stopping
+their subsequent read-only reload preserves the saved result. See
+[policy navigation checks](../tests/packages/software-policy-navigation-check.md).
+
 Documents reject missing/null fields, type coercion, malformed version ranges,
 unknown/duplicate object keys (including escaped spellings), duplicate entries/pin
 IDs and unknown permissions. Keys are checked independently in the document,

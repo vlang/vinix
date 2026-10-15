@@ -2170,6 +2170,24 @@ bounded credential input and wiping. This UI never synthesizes a deployment,
 accepts a license implicitly or changes firmware permission outside the reviewed
 policy file. See [qualification](../../tests/packages/policy-ui-check.md).
 
+Software can stop pending public `policy` and `policy-review` workers with Stop,
+Cancel or Escape. It kills and reaps the child, closes its pipes, discards partial
+or complete-but-unaccepted output and retires the proposal/fingerprint. A stopped
+review returns to known current settings. A stopped reload leaves policy
+unavailable for review until a fresh read succeeds: its cached document may
+predate a completed save. The literal entered filename and any saved result
+survive for retry. Completed reviews accept Escape or Cancel; idle Escape blurs
+the editor first, then returns to Deployment.
+
+Compact policy screens retain Back/Stop/Cancel, status, progress and failure
+access, preserve review section/page state across resize and expose no
+confirmation. Approved `policy-apply` ignores these cancellation controls and
+retains its close guard; administrator approval remains separately cancellable
+before submission. The subsequent read-only reload can be stopped without
+discarding the saved result. Existing progress frames are displayed when
+emitted; command arguments and administrator transport are unchanged. See
+[navigation checks](../../tests/packages/software-policy-navigation-check.md).
+
 `mirror-review NEW_DIRECTORY ID...` emits a format-1
 [`pkgprotocol.MirrorReview`](pkgprotocol/mirror.v) envelope. Every envelope field
 is required: `format`, the literal `input_destination`, canonical absolute

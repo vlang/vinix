@@ -190,6 +190,11 @@ identity fields and the previous valid list for retry. Compact views keep
 navigation and diagnostics; approved trust changes and catalog refreshes remain
 protected. See [qualification](../../tests/packages/software-repository-navigation-check.md).
 
+Organization policy reads and reviews support Stop/Cancel/Escape and retain
+their filename for retry. Compact windows keep navigation and diagnostics;
+approved saves remain protected. Stopping a reload requires a fresh read before
+another review. See [qualification](../../tests/packages/software-policy-navigation-check.md).
+
 Configuration reads reject ambiguous keys, null values and incorrect field
 types while preserving legacy defaults for omitted fields. Policy typos fail
 before acquisition, cleanup or activation; correcting the configuration permits

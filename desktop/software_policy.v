@@ -191,22 +191,31 @@ fn (mut a SoftwareApp) policy_paste_input(input string) {
 }
 
 fn (mut a SoftwareApp) policy_key_input(input string) {
+	if input == '\x1b' {
+		if a.policy_read_running() { a.stop_policy_read(); return }
+		if a.worker == unsafe { nil } {
+			if a.policy_review_ready { a.handle_policy('software.policy.cancel'); return }
+			if !a.focus { a.handle_policy('software.policy.back'); return }
+		}
+	}
 	if !a.focus || a.policy_review_ready || a.worker != unsafe { nil } { return }
 	match input {
 		'\x01' { a.select_all = true }
 		'\x7f', '\x08' { console_backspace(mut a.policy_path, a.select_all); a.select_all = false }
-		'\x1b', '\r', '\n' { a.focus = false }
+		'\x1b', '\r', '\n' { a.focus = false; a.select_all = false }
 		else { a.policy_paste_input(input) }
 	}
 }
 
 fn (mut a SoftwareApp) build_policy(width int, height int) ui2.Element {
 	a.initialize_policy_path()
-	mut children := frame_elements(20)
+	mut children := frame_elements(24)
 	children << software_label(if a.policy_review_ready { 'Review organization policy' } else { 'Organization policy' }, 14, 8, 360, 28, false)
 	if a.worker == unsafe { nil } {
 		children << software_button(if a.policy_review_ready { 'software.policy.impacts' } else { 'software.policy.back' },
 			if a.policy_review_ready { 'Installed-app effects' } else { 'Back to deployment' }, width - 174, 8, 160)
+	} else if a.policy_read_running() {
+		children << software_button('software.policy.stop', if a.policy_worker == .review { 'Stop review' } else { 'Stop reading' }, width - 174, 8, 160)
 	}
 	children << software_label('Policy file', 14, 46, 110, 28, false)
 	if a.policy_review_ready {
@@ -239,6 +248,7 @@ fn (mut a SoftwareApp) build_policy(width int, height int) ui2.Element {
 			children << software_button('software.policy.cancel', 'Cancel', width - 132, height - 138, 118)
 		}
 	}
-	a.add_status_footer(mut children, width, height, false)
+	if a.progress_seen { children << a.progress_bar(width, height) }
+	a.add_status_footer(mut children, width, height, a.progress_seen)
 	return ui2.screen(app_surface, children)
 }
