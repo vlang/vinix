@@ -142,6 +142,13 @@ using the captured filename. A pending write blocks Back and window closing;
 failure details preserve diagnostics even when publication already occurred.
 See [Software qualification](../../tests/packages/software-deployment-save-check.md).
 
+The saved receipt's **Export offline…** action opens a locked export for the
+captured filename and digest, with an empty new-destination field. It checks that
+the source still matches, authenticates the exact package/runtime set, and
+requires the full export review and administrator approval. A receipt alone
+cannot authorize payload acquisition or publication. Empty snapshots have no
+payload export. See [qualification](../../tests/packages/software-snapshot-export-check.md).
+
 `[--json] deployment-audit LOCK.json` compares that exact format-2 lock with
 installed metadata, without catalog, payload or trust-history access. It reports
 missing, unexpected and changed packages, including requested roots, publisher

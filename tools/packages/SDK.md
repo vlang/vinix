@@ -1864,6 +1864,23 @@ or receipt as authorization. Diagnostics retain postpublication failures; no
 automatic retry or overwrite is attempted. See
 [Software save qualification](../../tests/packages/software-deployment-save-check.md).
 
+For a nonempty receipt, Software's **Export offline…** action transfers owned
+copies of the captured filename and saved bytes' SHA-256 into an exact locked
+export intent, retires the receipt, and clears the destination field. It invokes
+no service until the user chooses a new directory and requests review. Source
+and scope controls are fixed for this flow; mutable form storage cannot redirect
+the captured filename. `mirror-deployment-review` must return that source and
+the saved digest as well as the requested destination. A mismatch closes the
+decoded review before exposing confirmation, retains the source pin for retry,
+and explains that a new snapshot is needed after source changes.
+
+The existing path/digest disclosure, authenticated package/license review,
+administrator confirmation, stale-input admission and atomic mirror publication
+still apply. Canceling review retains the export intent; Back, opening a general
+export, leaving for maintenance, or application retirement frees its owned source
+and digest. Publication does not change installed applications. See
+[saved export qualification](../../tests/packages/software-snapshot-export-check.md).
+
 `[--json] deployment-audit FILE` compares an exact format-2 document with one
 reader-locked installed generation. It does not resolve against a catalog, read
 objects/replay history, verify installed payloads or apply policy/trust admission.

@@ -4,6 +4,31 @@ module main
 import ui2
 import tools.packages.pkgprotocol
 
+const software_saved_deployment_changed = 'saved deployment changed; save a new snapshot before exporting it'
+
+fn (mut a SoftwareApp) clear_mirror_source() {
+	unsafe { a.mirror_source.free(); a.mirror_source_sha256.free() }
+	a.mirror_source = ''; a.mirror_source_sha256 = ''
+}
+
+fn (mut a SoftwareApp) export_deployment_snapshot() {
+	if !a.snapshot_ready || a.snapshot_saved.packages == 0 { return }
+	// Capture receipt identity before retiring it. Choosing a destination does
+	// not acquire payloads or authorize publication; the full review still runs.
+	a.clear_mirror_source()
+	a.mirror_source = a.snapshot_pending.clone()
+	a.mirror_source_sha256 = a.snapshot_saved.sha256.clone()
+	a.clear_deployment_snapshot()
+	a.clear_review()
+	a.repository_mode = false; a.deployment_mode = false; a.mirror_mode = true
+	a.mirror_locked = true; a.mirror_all = false
+	a.initialize_mirror_field()
+	a.mirror_path.clear(); a.mirror_lock_path.clear()
+	for byte in a.mirror_source { a.mirror_lock_path << byte }
+	a.focus = true; a.select_all = false; a.mirror_lock_focus = false
+	a.set_status('Choose a new offline export directory. Review will authenticate the exact saved deployment and check permissions, licenses and space before publication.')
+}
+
 fn (mut a SoftwareApp) initialize_mirror_field() {
 	if a.mirror_path.cap == 0 { a.mirror_path = []u8{cap: software_deployment_path_limit} }
 	if a.mirror_lock_path.cap == 0 { a.mirror_lock_path = []u8{cap: software_deployment_path_limit} }
@@ -41,7 +66,7 @@ fn (mut a SoftwareApp) begin_mirror_review() {
 		return
 	}
 	if a.mirror_locked {
-		source := editor_bytes_text(a.mirror_lock_path)
+		source := if a.mirror_source != '' { a.mirror_source } else { editor_bytes_text(a.mirror_lock_path) }
 		if !software_deployment_path_valid(source) {
 			a.set_status('Enter an absolute organization deployment lock path without control characters (at most 4096 bytes).')
 			return
@@ -104,6 +129,10 @@ fn (mut a SoftwareApp) decode_mirror_output() !pkgprotocol.Review {
 			locked.close()
 			return error('deployment export intent changed')
 		}
+		if a.mirror_source_sha256 != '' && locked.deployment_sha256 != a.mirror_source_sha256 {
+			locked.close()
+			return error(software_saved_deployment_changed)
+		}
 		// Transfer the decoded envelope and digest. The frozen source path is
 		// separately owned; closing the emptied wrapper retires its copy.
 		envelope = locked.mirror
@@ -158,9 +187,10 @@ fn (mut a SoftwareApp) handle_mirror(event_id string) {
 	match event_id {
 		'software.mirror.path' { a.focus = true; a.mirror_lock_focus = false; a.select_all = false }
 		'software.mirror.lock' {
-			if a.mirror_locked { a.focus = true; a.mirror_lock_focus = true; a.select_all = false }
+			if a.mirror_locked && a.mirror_source == '' { a.focus = true; a.mirror_lock_focus = true; a.select_all = false }
 		}
 		'software.mirror.scope' {
+			if a.mirror_source != '' { return }
 			if a.mirror_locked { a.mirror_locked = false; a.mirror_all = false }
 			else if a.mirror_all { a.mirror_all = false; a.mirror_locked = true }
 			else { a.mirror_all = true }
@@ -168,14 +198,16 @@ fn (mut a SoftwareApp) handle_mirror(event_id string) {
 			a.select_all = false
 		}
 		'software.mirror.review' { a.begin_mirror_review() }
-		'software.mirror.back' { a.mirror_mode = false; a.focus = false; a.select_all = false }
+		'software.mirror.back' { a.clear_mirror_source(); a.mirror_mode = false; a.focus = false; a.select_all = false }
 		else {}
 	}
 }
 
 fn (mut a SoftwareApp) mirror_key_input(input string) {
 	if !a.focus || a.review != '' || a.worker != unsafe { nil } { return }
-	if a.mirror_locked && a.mirror_lock_focus { a.mirror_field_input(mut a.mirror_lock_path, input) }
+	if a.mirror_locked && a.mirror_lock_focus {
+		if a.mirror_source == '' { a.mirror_field_input(mut a.mirror_lock_path, input) }
+	}
 	else { a.mirror_field_input(mut a.mirror_path, input) }
 }
 
@@ -220,15 +252,25 @@ fn (mut a SoftwareApp) build_mirror(width int, height int) ui2.Element {
 	} else {
 		children << software_label('New directory on local disk or mounted offline media', 14, 54, width - 28, 28, false)
 		children << console_field('software.mirror.path', editor_bytes_text(a.mirror_path), 14, 90, width - 28, a.focus && !a.mirror_lock_focus)
-		children << software_button('software.mirror.scope', if a.mirror_locked { 'Organization deployment lock' }
-			else if a.mirror_all { 'All installed application roots' } else { 'Selected catalog application' }, 14, 138, 270)
+		if a.mirror_source != '' {
+			children << software_label('Exact saved deployment · fixed source', 14, 138, width - 28, 28, false)
+		} else {
+			children << software_button('software.mirror.scope', if a.mirror_locked { 'Organization deployment lock' }
+				else if a.mirror_all { 'All installed application roots' } else { 'Selected catalog application' }, 14, 138, 270)
+		}
 		if a.mirror_locked {
 			children << software_label('Organization deployment lock (absolute file path)', 14, 178, width - 28, 28, false)
-			children << console_field('software.mirror.lock', editor_bytes_text(a.mirror_lock_path), 14, 212, width - 28, a.focus && a.mirror_lock_focus)
+			if a.mirror_source != '' {
+				children << software_label(a.mirror_source, 14, 212, width - 28, 28, false)
+			} else {
+				children << console_field('software.mirror.lock', editor_bytes_text(a.mirror_lock_path), 14, 212, width - 28, a.focus && a.mirror_lock_focus)
+			}
 		} else if !a.mirror_all && a.selected >= 0 && a.selected < a.rows.len {
 			children << software_label(a.rows[a.selected].name, 14, 176, width - 28, 28, false)
 		}
-		children << software_label(if a.mirror_locked {
+		children << software_label(if a.mirror_source != '' {
+			'Exports the exact saved versions and runtimes. The source must still match the saved digest. Review the full paths, publishers, permissions, licenses and space before confirming.'
+		} else if a.mirror_locked {
 			'Exports exact approved application and runtime versions from a nonempty format-2 lock, including older versions. Review the source, publishers, permissions, licenses and space. Installed applications stay as they are.'
 		} else { 'Exports current authenticated catalog versions and their complete dependency closure. Review publishers, permissions, licenses and disk requirements before confirming. The installed applications stay as they are.' }, 14, 258, width - 28, 72, false)
 		if a.worker == unsafe { nil } {

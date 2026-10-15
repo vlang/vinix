@@ -363,6 +363,7 @@ fn main() {
 	if os.args.len == 2 && os.args[1] == 'cleanup-memory' { check_software_cleanup_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'audit-memory' { check_software_audit_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'snapshot-memory' { check_software_snapshot_memory() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'snapshot-export-memory' { check_software_snapshot_export_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'admin-memory' { check_software_admin_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'window-memory' { check_window_broker_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'data-memory' { check_software_data_memory() or { panic(err) }; return }
@@ -389,7 +390,8 @@ fn main() {
 		if software_policy_service_fixture(args) or { panic(err) } { return }
 		if software_metadata_service_fixture(args) { return }
 		if args[1] == 'admin' {
-			assert args[2..] in [['--progress', 'apply', 'c'.repeat(64), 'install', 'editor'], ['--progress', 'apply', 'c'.repeat(64), 'repair']]
+			exporting := args.len == 7 && args[2..5] == ['--progress', 'mirror-deployment-apply', 'd'.repeat(64)]
+			assert exporting || args[2..] in [['--progress', 'apply', 'c'.repeat(64), 'install', 'editor'], ['--progress', 'apply', 'c'.repeat(64), 'repair']]
 			mut bytes := [257]u8{}
 			mut count := 0
 			for count < bytes.len {
@@ -398,6 +400,10 @@ fn main() {
 				count++
 			}
 			assert unsafe { tos(&bytes[0], count) } == 'fixture secret é'
+			if exporting {
+				assert software_mirror_service_fixture([args[0], ...args[3..]]) or { panic(err) }
+				return
+			}
 			println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 }))
 			return
 		}
@@ -572,6 +578,7 @@ fn main() {
 	check_software_deployment() or { panic(err) }
 	check_software_audit() or { panic(err) }
 	check_software_snapshot() or { panic(err) }
+	check_software_snapshot_export() or { panic(err) }
 	check_software_mirror() or { panic(err) }
 	check_software_locked_mirror() or { panic(err) }
 	check_software_launch_options() or { panic(err) }
@@ -706,12 +713,13 @@ fn software_mirror_service_fixture(args []string) !bool {
 		if args[3] == '/catalog-response' { println(json2.encode(mirror)); return true }
 		text := json2.encode(pkgprotocol.DeploymentMirrorReview{ format: 1,
 			deployment: if args[3] == '/wrong-source' { '/other.json' } else { args[3] },
-			deployment_sha256: if args[3] == '/invalid-digest' { 'invalid' } else { 'e'.repeat(64) }, mirror: mirror })
+			deployment_sha256: if args[3] == '/invalid-digest' { 'invalid' }
+				else if args[3] == software_snapshot_fixture_path { 'd'.repeat(64) } else { 'e'.repeat(64) }, mirror: mirror })
 		println(if args[3] == '/missing-digest' { text.replace('"deployment_sha256":"' + 'e'.repeat(64) + '",', '') } else { text })
 		return true
 	}
 	if args[1] == 'mirror-deployment-apply' {
-		assert os.args[1] == '--progress'
+		assert os.args[1] == '--progress' || (os.args[1] == 'admin' && os.args[2] == '--progress')
 		assert args.len == 5 && args[2] == 'd'.repeat(64) && args[3] == mirror_fixture_destination
 		if args[4] == '/changed-lock' { eprintln('fixture: offline mirror review is stale; review again'); exit(23) }
 		assert args[4] == mirror_fixture_lock || args[4].len > 200

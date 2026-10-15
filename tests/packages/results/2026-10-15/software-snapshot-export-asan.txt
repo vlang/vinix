@@ -1,0 +1,30 @@
+ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1
+
+Software configured repositories: damaged metadata does not block reviewed revocation; enrollment remains refused PASS
+Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed
+Software Verify: visible control, no administrator/catalog dependency, streamed progress, stable selection, incomplete/failure retention, review isolation and safe close PASS
+Software repair: installed dependency control, exact-version closure disclosure, read-only review, duplicate/modal isolation, frozen confirmation and reviewed administrator apply PASS
+Software health: read-only asynchronous report, issue-first searchable metadata/diagnostics, issues-only filtering, stable visible selection, empty results, bounded Unicode editing, reload retention, compact Back, isolated catalog state, full-set repair review and safe close PASS
+Software health progress: separate bounded stderr, live package names, both-pipe EOF, complete/exit/report/count admission, malformed/partial/late/flood refusal, Stop/Escape kill and reap, retry and compact cancellation PASS
+SOFTWARE CLEANUP read-only review, complete paged disclosure, modal/compact controls, frozen administrator approval, stale refusal, diagnostics and reload PASS
+Software deployment: full closure, frozen literal path, empty removal, cancellation, bounds, stale/error diagnostics and close guard passed
+Software deployment audit: literal ordinary argv, exit 0/3 coherence, complete drift rows, details/paging, frozen reload/review, cancellation, failure diagnostics, bounds and compact navigation passed
+Software deployment saving: literal ordinary argv, bounded complete receipt, destination binding, both architectures, empty generation, close guard, fresh audit/review, diagnostics and compact navigation passed
+Software saved deployment export: frozen source/digest, explicit new destination, no catalog selection, full path/package/license review, administrator apply, progress, changed-source refusal, retry and retirement passed
+Software offline export: destination paging, dependency provenance, literal confirmation, installed scope, progress, stale diagnostics and close guard passed
+Software locked offline export: exact older runtime, source/digest paging, literal frozen confirmation, invalid responses, stale diagnostics, progress and cancellation passed
+Software launch options: quoted literal arguments, separate file grants, frozen worker input, diagnostics and terminal transfer passed
+Software native windows: bounded frames, namespaced controls, ordinary-service launch, clicks, close acknowledgement and EOF retirement passed
+Software native text: focus, UTF-8 bounds, literal replacement, stale controls, explicit commit/discard, close guard and protocol admission passed
+Software administrator approval: frozen literal request, masked bounded UTF-8 password, hidden-action refusal, credential wiping, cancellation and progress passed
+Software personal data: own-account inventory, installed/unsafe refusal, frozen explicit confirmation, cancellation, paging, live-lease diagnostics, reload and close guard passed
+Software organization policy: current restrictions, complete settings/impact paging, literal file review, frozen confirmation, administrator approval/cancel/wipe, stale/error refusal, reload and close guard passed
+Software metadata review: missing firmware and escaped duplicate flags refuse confirmation before administrator approval
+Software package details: complete Unicode descriptions/provenance/licenses/diagnostics, installed versus displayed permissions, paging, frozen review, hidden-action refusal, legacy fields and invalid-text refusal passed
+Software catalog reader: complete typed flags, installed-versus-planned launch fields, asynchronous malformed-response refusal, prior-valid-view preservation and explicit legacy details passed
+Software failure details: complete retained Unicode output, progress filtering, paging, read-only modal, compact back, reload retention and replacement/clear passed
+Software failure details: bounded tail, truncation disclosure, valid UTF-8/control escaping, empty diagnostics and response-limit failure passed
+Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed
+
+Snapshot allocations:
+Software saved deployment export: 1000 handoff, decode, path/package render, digest mismatch and retirement cycles retain zero tracked bytes

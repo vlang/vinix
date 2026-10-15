@@ -111,6 +111,7 @@ fn (mut a SoftwareApp) handle_deployment_snapshot(event_id string) {
 	match event_id {
 		'software.snapshot.back' { a.clear_deployment_snapshot() }
 		'software.snapshot.another' { a.begin_deployment_snapshot() }
+		'software.snapshot.export' { a.export_deployment_snapshot() }
 		'software.deployment.path' { if !a.snapshot_ready { a.focus = true; a.select_all = false } }
 		'software.snapshot.save' { if !a.snapshot_ready { a.save_deployment_snapshot() } }
 		'software.snapshot.previous' { if a.details_page > 0 { a.details_page-- } }
@@ -152,6 +153,9 @@ fn (mut a SoftwareApp) build_deployment_snapshot(width int, height int) ui2.Elem
 		children << software_button('software.snapshot.another', 'Save another…', 366, height - 168, 160)
 		children << software_button('software.snapshot.audit', 'Check installed', 14, height - 130, 180)
 		children << software_button('software.snapshot.review', 'Review deployment', 210, height - 130, 180)
+		if a.snapshot_saved.packages > 0 {
+			children << software_button('software.snapshot.export', 'Export offline…', 406, height - 130, 180)
+		}
 	} else {
 		children << software_label('New deployment file (absolute path)', 14, 94, width - 28, 28, false)
 		children << console_field('software.deployment.path', editor_bytes_text(a.deployment_path), 14, 128, width - 28, a.focus)

@@ -721,6 +721,15 @@ confirmation. Failure details retain storage diagnostics, including failures
 after publication. Inspect the destination before retrying if saving may already
 have created it. See [Software save qualification](../tests/packages/software-deployment-save-check.md).
 
+Choose **Export offline…** on a nonempty saved receipt to prepare portable media
+for that exact deployment. The source filename and saved digest stay fixed;
+choose a new export directory, then review the full paths, publishers,
+permissions, licenses, runtime closure and space before administrator approval.
+A changed source refuses review and requires saving a new snapshot. The receipt
+does not supply trust or publication approval. Export uses the existing atomic
+locked-mirror flow and bundles `_deployment.json`; no payloads are acquired by
+opening the destination form. See [saved export qualification](../tests/packages/software-snapshot-export-check.md).
+
 For read-only organization drift checks, run
 `vinix-package --json deployment-audit /path/to/approved-lock.json`. It compares
 exact installed manifests and provenance with a format-2 lock, including the

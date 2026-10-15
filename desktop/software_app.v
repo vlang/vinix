@@ -152,6 +152,8 @@ mut:
 	mirror_lock_focus bool
 	mirror_lock_pending string
 	mirror_lock_sha256 string
+	mirror_source string
+	mirror_source_sha256 string
 	mirror_pending string
 	mirror_snapshot pkgprotocol.MirrorReview // review rows are owned by review_snapshot
 	mirror_details bool
@@ -411,9 +413,11 @@ fn (mut a SoftwareApp) begin_review(operation string, names []string) {
 fn (mut a SoftwareApp) load_review() {
 	mut review := if a.mirror_pending != '' {
 		a.decode_mirror_output() or {
+			changed_source := err.msg() == software_saved_deployment_changed
 			unsafe { err.free() }
 			a.clear_review()
-			a.set_status('Unsupported or different offline export review. Review the export again.')
+			a.set_status(if changed_source { 'The saved deployment file changed. Save a new snapshot before exporting it.' }
+				else { 'Unsupported or different offline export review. Review the export again.' })
 			return
 		}
 	} else { pkgprotocol.decode_review(editor_bytes_text(a.output)) or {
@@ -774,6 +778,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 	if a.launch_mode { a.handle_launch_options(event_id); return }
 	if event_id == 'software.cleanup' {
 		a.clear_review(); a.clear_repository_review()
+		a.clear_mirror_source()
 		a.repository_mode = false; a.deployment_mode = false; a.mirror_mode = false
 		a.focus = false; a.select_all = false
 		a.cleanup_mode = true
@@ -782,6 +787,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 	}
 	if event_id == 'software.policy' {
 		a.clear_review()
+		a.clear_mirror_source()
 		a.clear_repository_review()
 		a.repository_mode = false
 		a.deployment_mode = false
@@ -793,6 +799,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 	}
 	if event_id == 'software.data' {
 		a.clear_review()
+		a.clear_mirror_source()
 		a.clear_repository_review()
 		a.repository_mode = false
 		a.deployment_mode = false
@@ -804,6 +811,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 	}
 	if event_id == 'software.mirror' {
 		a.clear_review()
+		a.clear_mirror_source()
 		a.repository_mode = false
 		a.deployment_mode = false
 		a.mirror_mode = true
@@ -1274,6 +1282,7 @@ fn (mut a SoftwareApp) close_app() {
 	a.clear_cleanup()
 	a.clear_deployment_audit()
 	a.clear_deployment_snapshot()
+	a.clear_mirror_source()
 	unsafe {
 		a.launch_request.free()
 		a.service_path.free()
