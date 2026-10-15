@@ -24,12 +24,33 @@ fn software_health_fixture() pkgprotocol.HealthReport {
 }
 
 fn software_health_service_fixture(args []string) bool {
-	if args.len != 3 || args[1..] != ['--json', 'health'] { return false }
+	if args.len != 4 || args[1..] != ['--json', '--progress', 'health'] { return false }
 	mode := os.getenv('VINIX_SOFTWARE_HEALTH_MODE')
 	defer { unsafe { mode.free() } }
 	if mode == 'failed' { eprintln('Installed state is unavailable; restore storage before retrying.'); exit(23) }
-	if mode == 'slow' { time.sleep(3 * time.second) }
-	text := json2.encode(software_health_fixture())
+	report := if mode == 'empty' { pkgprotocol.HealthReport{ architecture: 'aarch64' } } else { software_health_fixture() }
+	if mode != 'no-progress' {
+		first := pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'verify' }) + '\n'
+		eprint(first[..8]); flush_stderr(); time.sleep(5 * time.millisecond); eprint(first[8..]); flush_stderr()
+		for index, row in report.rows {
+			if mode == 'wrong-count' && index == report.rows.len - 1 { break }
+			eprintln(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'verify', package: row.id, repository: row.repository }))
+			flush_stderr()
+			if mode == 'slow' && index == 1 { time.sleep(3 * time.second) }
+		}
+		if mode == 'malformed-progress' { eprintln(pkgprotocol.progress_prefix + '{broken}') }
+		if mode == 'partial-progress' { eprint(pkgprotocol.progress_prefix + '{}'); flush_stderr() }
+		if mode == 'oversized-progress' { eprintln('unframed diagnostic '.repeat(500)) }
+		if mode == 'flood' { for _ in 0 .. 500 { eprintln('A retained failure after many stderr pipe chunks.') } }
+		if mode !in ['incomplete', 'partial-progress'] {
+			last := pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 })
+			eprintln(last)
+			if mode == 'duplicate-complete' { eprintln(last) }
+			if mode == 'reordered' { eprintln(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'verify' })) }
+		}
+		flush_stderr()
+	}
+	text := json2.encode(report)
 	defer { unsafe { text.free() } }
 	println(match mode {
 		'missing' { text.replace(',"diagnostic":""', '') }
@@ -38,6 +59,7 @@ fn software_health_service_fixture(args []string) bool {
 		'trailing' { text + '{}' }
 		else { text }
 	})
+	if mode == 'late-failure' { eprintln('Storage read failed after the completion frame.'); exit(24) }
 	return true
 }
 
@@ -121,7 +143,7 @@ fn check_software_health() ! {
 	assert tree.children.any(it.id == 'software.health' && it.text == 'Health report'); free_window_tree(tree)
 	app.handle('software.health')!
 	assert app.health_mode && app.worker_health && app.worker_view && !app.admin_prompt && app.prepare_close()
-	assert app.worker.args == ['--json', 'health']
+	assert app.worker.args == ['--json', '--progress', 'health']
 	pid := app.worker.pid; app.handle('software.health')!; assert app.worker.pid == pid
 	wait_for_software(mut app)
 	assert app.health_ready && app.health_snapshot.rows.len == 32 && app.health_summary.contains('3 with issues')
@@ -150,20 +172,48 @@ fn check_software_health() ! {
 	app.handle('software.health.back')!
 	assert !app.health_mode && app.health_snapshot.rows.len == 0 && app.health_query.len == 0 && !app.health_issues_only
 	assert app.selected == 0 && app.filter == 1 && app.query == 'catalog-search'.bytes() && app.catalog_error == 'catalog unavailable'
-	for mode in ['missing', 'duplicate', 'type', 'trailing', 'failed'] {
+	for mode in ['missing', 'duplicate', 'type', 'trailing', 'failed', 'incomplete', 'no-progress', 'malformed-progress', 'partial-progress', 'wrong-count', 'reordered', 'duplicate-complete', 'oversized-progress', 'flood', 'late-failure'] {
 		os.setenv('VINIX_SOFTWARE_HEALTH_MODE', mode, true)
 		app.handle('software.health')!; wait_for_software(mut app)
 		assert app.health_mode && !app.health_ready && app.health_snapshot.rows.len == 0
-		assert !app.build(ui2.rect(0, 0, 640, 610))!.children.any(it.id == 'software.health.repair')
+		failed := app.build(ui2.rect(0, 0, 640, 610))!
+		assert !failed.children.any(it.id == 'software.health.repair')
+		free_window_tree(failed)
+		assert app.failure_pages.len > 0
+		if mode in ['failed', 'late-failure', 'flood'] { assert app.status.contains(if mode == 'failed' { 'restore storage' } else if mode == 'flood' { 'retained failure' } else { 'Storage read failed' }) }
 		app.handle('software.health.repair')!; assert app.worker == unsafe { nil } && app.review == ''
 		app.handle('software.health.back')!
 	}
+	os.setenv('VINIX_SOFTWARE_HEALTH_MODE', 'empty', true)
+	app.handle('software.health')!; wait_for_software(mut app)
+	assert app.health_ready && app.health_snapshot.rows.len == 0 && app.health_progress_packages == 0
+	app.handle('software.health.back')!
 	os.unsetenv('VINIX_SOFTWARE_HEALTH_MODE')
 	app.handle('software.health')!; wait_for_software(mut app)
 	health_fixture_query(mut app, 'no matching package')!
 	app.handle('software.health.repair')!
 	assert !app.health_mode && app.health_snapshot.rows.len == 0 && app.worker.args == ['review', 'repair'] && !app.admin_prompt
 	wait_for_software(mut app); assert app.review_ready; app.handle('software.cancel')!
+	os.setenv('VINIX_SOFTWARE_HEALTH_MODE', 'slow', true)
+	for escape in [false, true]! {
+		app.handle('software.health')!; slow := app.worker.pid
+		for _ in 0 .. 500 { app.poll(); if app.health_progress_packages > 0 { break }; time.sleep(time.millisecond) }
+		assert app.worker != unsafe { nil } && app.progress_seen && app.status.contains('Inspecting app-') && !app.health_ready
+		pending := app.build(ui2.rect(0, 0, 640, 610))!
+		assert pending.children.any(it.id == 'software.health.stop') && pending.children.any(it.id == 'software.progress')
+		assert !pending.children.any(it.id == 'software.health.repair' || it.id == 'software.health.reload')
+		free_window_tree(pending)
+		compact := app.build(ui2.rect(0, 0, 320, 240))!
+		assert compact.children.any(it.id == 'software.health.stop'); free_window_tree(compact)
+		if escape { app.key_input('\x1b') } else { app.handle('software.health.stop')! }
+		assert app.health_mode && app.worker == unsafe { nil } && !app.health_ready && !app.progress_seen
+		assert app.health_snapshot.rows.len == 0 && app.health_progress_packages == 0 && app.status.contains('Inspection stopped')
+		assert C.kill(slow, 0) != 0
+		app.handle('software.health.back')!
+	}
+	os.unsetenv('VINIX_SOFTWARE_HEALTH_MODE')
+	app.handle('software.health')!; wait_for_software(mut app); assert app.health_ready
+	app.handle('software.health.back')!
 	os.setenv('VINIX_SOFTWARE_HEALTH_MODE', 'slow', true)
 	app.handle('software.health')!; slow := app.worker.pid
 	assert app.prepare_close(); app.close_app(); assert C.kill(slow, 0) != 0
@@ -172,6 +222,40 @@ fn check_software_health() ! {
 	assert missing.health_mode && missing.worker == unsafe { nil } && missing.status.contains('package service is missing')
 	missing.close_app()
 	println('Software health: read-only asynchronous report, issue-first searchable metadata/diagnostics, issues-only filtering, stable visible selection, empty results, bounded Unicode editing, reload retention, compact Back, isolated catalog state, full-set repair review and safe close PASS')
+	println('Software health progress: separate bounded stderr, live package names, both-pipe EOF, complete/exit/report/count admission, malformed/partial/late/flood refusal, Stop/Escape kill and reap, retry and compact cancellation PASS')
+}
+
+fn check_software_health_progress_memory() ! {
+	$if !track_heap ? { return error('compile health progress memory fixture with -d track_heap') }
+	$if track_heap ? {
+		text := json2.encode(software_health_fixture())
+		mut lines := [pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'verify' })]
+		for row in software_health_fixture().rows { lines << pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'verify', package: row.id, repository: row.repository }) }
+		lines << pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 })
+		frames := lines.join('\n') + '\n'
+		bad := pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'unknown', package: 'editor', repository: 'trusted' }) + '\n'
+		mut app := SoftwareApp{ query: []u8{cap: 256}, output: []u8{cap: 8192} }
+		unsafe { app.output.flags |= .noslices }
+		defer { app.close_app() }
+		for warmup in 0 .. 2 {
+			if warmup == 1 { C.vinix_heap_begin() }
+			for _ in 0 .. 1000 {
+				app.health_mode = true; app.worker_health = true; app.worker_failed = false
+				metadata_fixture_output(mut app, text)
+				app.health_progress_output(unsafe { tos(frames.str, 8) })
+				app.health_progress_output(unsafe { tos(frames.str + 8, frames.len - 8) })
+				app.finish_health_output(0)
+				assert app.health_ready && app.health_progress_packages == 32 && app.progress_pending.len == 0
+				free_window_tree(app.build_health(640, 610)); app.clear_health()
+				app.worker_failed = false; app.health_progress_output(bad); app.finish_health_output(0)
+				assert app.worker_failed && !app.health_ready && app.output.len < 8192
+				app.clear_health()
+			}
+		}
+		app.set_status('')
+		kept := C.vinix_heap_end(); assert kept == 0, 'health progress retained ${kept} bytes'
+		println('Software health progress: 1000 fragmented progress/report/admission/render and invalid-progress/failure/retirement cycles retain zero tracked bytes PASS')
+	}
 }
 
 fn check_software_health_memory() ! {

@@ -516,6 +516,12 @@ the observation itself authorizes no change. `vinix-package health` provides the
 same inspection, with `--json health` for scripts. A complete report returns zero
 even when rows contain issues; `verify` retains its failure exit behavior. See
 [health report qualification](../tests/packages/health-report-check.md).
+The report shows live package inspection progress. **Stop inspection** and
+Escape stop its read-only worker, discard partial results and allow Reload;
+small windows also expose Stop. CLI `--json --progress health` keeps the complete
+JSON on stdout and progress on stderr. Software drains both channels through
+exit and refuses incomplete or inconsistent responses and late diagnostics. See
+[progress/cancellation qualification](../tests/packages/health-progress-check.md).
 
 Installation health also checks payload modes (0755 for executables, 0644 for
 other files) and the exact generated desktop launcher/MIME contents at mode 0644.

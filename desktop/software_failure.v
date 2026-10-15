@@ -89,6 +89,7 @@ fn (mut a SoftwareApp) capture_failure(arguments []string, code int) {
 	unsafe { a.failure_pages.flags |= .noslices }
 	number := code.str()
 	a.failure_heading = if code == 0 && a.worker_failed && a.worker_verify { 'Verify installed software · incomplete response'.clone() }
+		else if code == 0 && a.worker_failed && a.worker_health { 'Inspect installed software health · incomplete response'.clone() }
 		else if code == 0 && a.worker_failed { software_failure_operation(arguments) + ' · response too large' }
 		else { software_failure_operation(arguments) + ' · exit ' + number }
 	unsafe { number.free() }

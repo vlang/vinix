@@ -1,0 +1,8 @@
+The initial 1000-cycle progress probe exhausted the allocation tracker's 16384 live-record capacity (exit 133). A reduced 16-cycle probe measured 560 retained bytes. After replacing generic progress decoding with the owned metadata reader and validating paths without component allocations, protocol and complete Software progress/report probes each retain zero bytes over 1000 cycles. The initial helper, progress source and probe binary are pinned separately.
+
+Exit status: 1
+/Users/alex/code/vinix/build/package-health-progress-work/software-initial/software_health_fixture.v:256: FAIL: fn main.check_software_health_progress_memory: assert kept == 0, 'health progress retained ${kept} bytes'
+   left value: kept = 560
+  right value: 0
+      message: health progress retained 560 bytes
+V panic: Assertion failed...

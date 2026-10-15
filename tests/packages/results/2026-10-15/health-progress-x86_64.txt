@@ -1,0 +1,2 @@
+PASS x86_64 packages-health-progress (47.3s)
+package-health-progress x86_64: 1 passed, 0 failed, 0 skipped

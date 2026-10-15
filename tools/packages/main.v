@@ -76,8 +76,8 @@ fn checked(arguments []string) !int {
 		return 2
 	}
 	command := args[0]
-	if progress && (as_json || command !in ['update', 'install', 'remove', 'upgrade', 'repair', 'apply', 'deploy', 'deployment-apply', 'rollback', 'verify', 'mirror', 'mirror-apply', 'mirror-deployment-apply']) {
-		return error('--progress supports update, install/remove/upgrade/repair, apply, deploy/deployment-apply, rollback, verify and mirror/mirror-apply/mirror-deployment-apply without --json')
+	if progress && ((as_json && command != 'health') || command !in ['update', 'install', 'remove', 'upgrade', 'repair', 'apply', 'deploy', 'deployment-apply', 'rollback', 'verify', 'health', 'mirror', 'mirror-apply', 'mirror-deployment-apply']) {
+		return error('--progress supports update, install/remove/upgrade/repair, apply, deploy/deployment-apply, rollback, verify, health and mirror/mirror-apply/mirror-deployment-apply; only health also supports --json')
 	}
 	names := args[1..].clone()
 	if command in ['run', 'run-terminal', 'run-window', 'run-args', 'run-terminal-args'] && os.geteuid() != 0 {
@@ -164,7 +164,7 @@ fn checked(arguments []string) !int {
 		else {}
 	}
 	service := pkgcore.Service{ root: root, offline: offline,
-		progress: if progress { print_progress } else { ignore_progress } }
+		progress: if progress && command == 'health' { print_health_progress } else if progress { print_progress } else { ignore_progress } }
 	match command {
 		'deployment-lock', 'deployment-review' {
 			if command == 'deployment-review' && names.len != 1 { return error('deployment-review requires a deployment document') }
@@ -424,6 +424,17 @@ fn print_progress(event pkgprotocol.Progress) {
 	frame := pkgprotocol.progress_prefix + text
 	println(frame)
 	flush_stdout()
+	unsafe { text.free(); frame.free() }
+}
+
+// Keep the complete health snapshot on stdout, including with --json. Health
+// is read-only, so its separate progress channel never needs admin transport.
+fn print_health_progress(event pkgprotocol.Progress) {
+	event.validate() or { return }
+	text := json2.encode(event)
+	frame := pkgprotocol.progress_prefix + text
+	eprintln(frame)
+	flush_stderr()
 	unsafe { text.free(); frame.free() }
 }
 

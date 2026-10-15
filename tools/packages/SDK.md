@@ -1483,9 +1483,9 @@ The package service remains authoritative for complete state, trust, policy and
 launch admission. See [registration qualification](../../tests/packages/registration-check.md).
 
 For live operation progress, pass `--progress` to `update`, `install`, `remove`,
-`upgrade`, `repair`, `apply`, `deploy`, `deployment-apply`, `rollback`, `mirror` or
-`mirror-apply`. It is refused with
-`--json` and other commands. Ordinary human output/diagnostics are retained;
+`upgrade`, `repair`, `apply`, `deploy`, `deployment-apply`, `rollback`, `verify`,
+`mirror` or `mirror-apply`. Health supports a separate stderr channel described
+below. Other progress commands refuse `--json`. Ordinary human output/diagnostics are retained;
 presentation records occupy complete stdout lines prefixed by
 `VINIX-PACKAGE-PROGRESS ` followed by a format-1 JSON object. The producer flushes
 each frame. Readers must handle frames split across pipe reads and multiple
@@ -1543,8 +1543,10 @@ do not freeze concurrent administrator changes between system calls. See
 
 Frames are bounded to 8192 bytes. Identifiers/paths, phase-specific counter
 limits, JSON field types and formats are validated by
-[`pkgprotocol.decode_progress`](pkgprotocol/progress.v). Decoded events own their
-strings; `.close()` releases them under manual memory management. Consumers
+[`pkgprotocol.decode_progress`](pkgprotocol/progress.v). The nonrecursive reader
+also rejects unknown/escaped-duplicate fields, invalid UTF-8 and noncanonical
+numbers, and retires partial results on refusal. Decoded events own their
+strings; `.close()` releases them under manual memory management. Operation consumers
 ignore unsupported/malformed frames and continue to report human diagnostics
 and process exit status. Counter progress is sampled approximately every 200 ms
 during HTTPS transfers and local copies, plus initial/final transfer counters;
@@ -1596,7 +1598,13 @@ It takes no IDs and returns exit 0 when the complete report was produced,
 including reports with integrity issues. Configuration/state/lock failures still
 return nonzero. Scripts use `--json health` and inspect the rows, or use `verify`
 when they need a nonzero exit for damaged installed files. `--progress health`
-is refused; the JSON snapshot is a complete response, not a progress stream.
+emits flushed format-1 progress records on stderr, leaving the human report on
+stdout. It also supports `--json --progress health`: stdout contains exactly the
+same complete JSON snapshot as `--json health`, and stderr carries progress or
+fatal diagnostics. Consumers must drain both pipes, including after process
+exit, and require exit 0 plus a valid complete report; a completion frame alone
+does not establish success. Other commands retain their stdout progress format
+and continue to refuse `--json --progress`.
 
 The owned SDK 1 `pkgprotocol.HealthReport` contains required `format:1`,
 `generation`, `architecture` and `rows`. Rows are sorted by unique ID and require
@@ -1622,9 +1630,20 @@ incoherent issue/diagnostic pairs. Responses are bounded to 8 MiB and 4,096 rows
 diagnostics are at most 384 UTF-8 bytes. The scanner escapes unsafe filesystem
 bytes and visibly marks truncation. `HealthReport.close()` retires service-created
 or decoded rows. Software's **Health report** lists problems first and pages the
-complete retained provenance and diagnostic; **Review repairs** obtains a fresh
+complete retained provenance and diagnostic; **Review all repairs** obtains a fresh
 version-preserving repair review before administrator confirmation. See
 [health report qualification](../../tests/packages/health-report-check.md).
+
+Software shows the currently inspected package and indeterminate progress. It
+accepts one initial `verify` frame, bounded package/repository `verify` frames,
+then one `complete` frame. It requires the number of package frames to match the
+decoded report rows, drains stderr independently of the 8 MiB stdout snapshot,
+and refuses malformed, partial, out-of-order or oversized progress and any
+stderr diagnostic, including after completion. Failure details retain the bounded
+stderr tail. **Stop inspection** or Escape kills and reaps only this read-only
+worker, discards partial results and leaves Reload available; compact windows
+also offer Stop. Closing the window uses the same read-only worker retirement.
+See [progress/cancellation checks](../../tests/packages/health-progress-check.md).
 
 On a fresh image, status/verification do not initialize package state. Direct
 administrator edits to configuration must honor the same lock or quiesce package

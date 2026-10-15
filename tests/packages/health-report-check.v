@@ -18,6 +18,60 @@ fn health_progress(event pkgprotocol.Progress) {
 }
 
 struct Client { root string binary string }
+struct Channels { code int output string diagnostic string }
+
+fn (client Client) channels(args []string) !Channels {
+	mut child := os.new_process(client.binary)
+	child.set_args(['--root', client.root, ...args]); child.set_redirect_stdio(); child.run()
+	mut output := []u8{}; mut diagnostic := []u8{}
+	unsafe { output.flags |= .noslices; diagnostic.flags |= .noslices }
+	defer { child.close(); unsafe { output.free(); diagnostic.free() } }
+	started := time.now()
+	for {
+		mut changed := false
+		for kind in [os.ChildProcessPipeKind.stdout, .stderr]! {
+			for _ in 0 .. 16 {
+				chunk := if kind == .stdout { child.stdout_read() } else { child.stderr_read() }
+				if chunk.len == 0 { break }
+				changed = true
+				for byte in chunk { if kind == .stdout { output << byte } else { diagnostic << byte } }
+				unsafe { chunk.free() }
+			}
+		}
+		if !child.is_alive() && !changed { break }
+		if time.since(started) > 30 * time.second || output.len > 8 * 1024 * 1024 || diagnostic.len > 8 * 1024 * 1024 {
+			child.signal_kill(); child.wait(); return error('health channel probe exceeded its time/output bound')
+		}
+		time.sleep(time.millisecond)
+	}
+	child.wait()
+	return Channels{ code: child.code, output: output.bytestr(), diagnostic: diagnostic.bytestr() }
+}
+
+fn check_progress_channels(client Client, expected pkgprotocol.HealthReport) ! {
+	if client.binary == '' { return }
+	for as_json in [false, true]! {
+		result := client.channels(if as_json { ['--json', '--progress', 'health'] } else { ['--progress', 'health'] })!
+		defer { unsafe { result.output.free(); result.diagnostic.free() } }
+		assert result.code == 0 && !result.output.contains(pkgprotocol.progress_prefix)
+		if as_json {
+			mut decoded := pkgprotocol.decode_health(result.output)!
+			assert decoded == expected; decoded.close()
+		} else { assert result.output.contains('Packages inspected: ' + expected.rows.len.str()) }
+		lines := result.diagnostic.split_into_lines()
+		assert lines.len == expected.rows.len + 2
+		mut ids := []string{}
+		for index, line in lines {
+			assert line.starts_with(pkgprotocol.progress_prefix)
+			mut event := pkgprotocol.decode_progress(line[pkgprotocol.progress_prefix.len..])!
+			assert event.phase == if index == lines.len - 1 { 'complete' } else { 'verify' }
+			if index > 0 && index < lines.len - 1 { ids << event.package.clone(); assert event.repository == 'trusted' && event.path == '' }
+			else { assert event.package == '' && event.repository == '' }
+			event.close()
+		}
+		ids.sort(); assert ids == expected.rows.map(it.id)
+	}
+}
 
 fn (client Client) command(args []string) !string {
 	mut child := os.new_process(client.binary)
@@ -43,7 +97,8 @@ fn check() ! {
 	configuration := root + '/etc/vinix-packages/config.json'; os.write_file(configuration, json2.encode(config))!
 	client := Client{ root: root, binary: if os.args.len == 3 { os.real_path(os.args[2]) } else { '' } }
 	store := pkgcore.state_directory(root)
-	mut empty := client.report()!; assert empty.generation == 0 && empty.rows.len == 0 && !os.exists(store); empty.close()
+	mut empty := client.report()!; assert empty.generation == 0 && empty.rows.len == 0 && !os.exists(store)
+	check_progress_channels(client, empty)!; assert !os.exists(store); empty.close()
 	for id in ['app', 'runtime', 'assets', 'utility'] {
 		source := work + '/source-' + id
 		os.mkdir_all(source + '/bin')!; os.write_file(source + '/bin/app', 'signed payload for ' + id)!
@@ -58,7 +113,8 @@ fn check() ! {
 	pkgcore.publish(work + '/repository', 'trusted', work + '/seed', 1, time.now().unix() + 3600)!
 	service := pkgcore.Service{ root: root }; service.refresh()!
 	initial := service.transact('install', ['app', 'utility'], pkgcore.TransactionOptions{})!
-	mut clean := client.report()!; assert clean.generation == initial.generation && clean.rows.len == 4 && clean.rows.all(it.issue == ''); clean.close()
+	mut clean := client.report()!; assert clean.generation == initial.generation && clean.rows.len == 4 && clean.rows.all(it.issue == '')
+	check_progress_channels(client, clean)!; clean.close()
 	app := store + '/current/apps/app/bin/app'
 	os.write_file(app, 'x'.repeat(os.read_file(app)!.len))!
 	os.write_file(store + '/current/apps/runtime/unexpected', 'undeclared')!
@@ -80,7 +136,7 @@ fn check() ! {
 	if client.binary != '' {
 		text := client.command(['health'])!; assert text.contains('4; with issues: 4') && text.contains('utility 1.0.0: registration')
 		if _ := client.command(['health', 'app']) { assert false } else { assert err.msg().contains('takes no package IDs') }
-		if _ := client.command(['--progress', 'health']) { assert false } else { assert err.msg().contains('--progress supports') }
+		check_progress_channels(client, damaged)!
 	}
 	// Integrity observations remain available with revoked publishers, restrictive
 	// policy, corrupt cached metadata and unavailable upstream repositories.
@@ -88,10 +144,16 @@ fn check() ! {
 	os.write_file(store + '/catalog.json', 'unavailable catalog')!; os.write_file(store + '/trust-history.json', 'unavailable history')!
 	os.rename(work + '/repository', work + '/hidden-repository')!
 	mut independent := client.report()!; assert independent == damaged; independent.close()
+	check_progress_channels(client, damaged)!
 	assert os.read_file(store + '/current/state.json')! == state && os.read_file(sentinel + '/keep')! == 'recovery data'
 	assert os.read_file(store + '/catalog.json')! == 'unavailable catalog' && os.read_file(store + '/trust-history.json')! == 'unavailable history'
 	os.write_file(store + '/current/state.json', 'broken state')!
 	if _ := client.report() { assert false }
+	if client.binary != '' {
+		fatal := client.channels(['--json', '--progress', 'health'])!
+		assert fatal.code != 0 && fatal.output == '' && fatal.diagnostic != ''
+		assert !fatal.diagnostic.contains('"phase":"complete"')
+	}
 	os.write_file(store + '/current/state.json', state)!
 	os.write_file(configuration, json2.encode(config))!; os.write_file(store + '/catalog.json', catalog)!; os.write_file(store + '/trust-history.json', history)!
 	// A report is not approval. A fresh authenticated repair review and the normal
@@ -107,7 +169,9 @@ fn check() ! {
 	service.transact('remove', ['app', 'utility'], pkgcore.TransactionOptions{})!
 	mut removed := client.report()!; defer { removed.close() }
 	assert removed.generation > repaired.generation && removed.rows.len == 0
+	check_progress_channels(client, removed)!
 	println('HEALTH REPORT signed service/CLI, all simultaneous app/runtime/data/launcher issues, read-only locking and retained state, trust/catalog independence, malformed state refusal, fresh offline repair and clean uninstall PASS')
+	if client.binary != '' { println('HEALTH PROGRESS real CLI: separate stdout/stderr, typed per-package frames and completion, unchanged JSON/human output, empty/damaged/revoked/offline/uninstalled states and fatal state refusal PASS') }
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }

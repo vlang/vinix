@@ -7,16 +7,19 @@ import tools.packages.pkgprotocol
 fn (mut a SoftwareApp) clear_health_report() {
 	a.clear_details()
 	a.health_snapshot.close()
-	unsafe { a.health_matching.free(); a.health_summary.free(); a.health_results.free() }
+	unsafe { a.health_matching.free(); a.health_summary.free(); a.health_results.free(); a.health_errors.free() }
 	a.health_matching = []int{}
 	a.health_summary = ''
 	a.health_results = ''
+	a.health_errors = []u8{}
+	a.health_progress_packages = 0
 	a.health_ready = false
 	a.health_selected = -1; a.health_scroll = 0
 }
 
 fn (mut a SoftwareApp) clear_health() {
 	a.clear_health_report()
+	a.clear_progress()
 	unsafe { a.health_query.free() }
 	a.health_query = []u8{}
 	a.health_mode = false; a.health_issues_only = false
@@ -29,12 +32,91 @@ fn (mut a SoftwareApp) read_health() {
 	a.health_mode = true
 	a.focus = false; a.select_all = false
 	a.health_focus = false; a.health_select_all = false
-	mut arguments := ['--json', 'health']
+	mut arguments := ['--json', '--progress', 'health']
 	a.start(arguments, true)
 	unsafe { (&array(&arguments)).free() }
 	if a.worker != unsafe { nil } {
 		a.set_status('Inspecting every installed package, runtime and data dependency…')
 	}
+}
+
+fn (mut a SoftwareApp) health_error(text string) {
+	a.worker_failed = true
+	unsafe { a.health_errors.flags |= .noslices }
+	start := if text.len >= 8192 { text.len - 8191 } else { 0 }
+	if start > 0 || a.health_errors.len + text.len - start + 1 > 8192 {
+		a.health_errors.clear(); a.output_truncated = true
+	}
+	for index in start .. text.len { a.health_errors << text[index] }
+	a.health_errors << `\n`
+}
+
+fn (mut a SoftwareApp) health_progress_line(line string) {
+	if !line.starts_with(pkgprotocol.progress_prefix) { a.health_error(line); return }
+	if a.worker_failed { return }
+	mut event := pkgprotocol.decode_progress(unsafe { tos(line.str + pkgprotocol.progress_prefix.len, line.len - pkgprotocol.progress_prefix.len) }) or {
+		unsafe { err.free() }
+		a.health_error('Health inspection returned an invalid progress frame. Reload the report.')
+		return
+	}
+	valid := event.path == '' && ((!a.progress_seen && event.phase == 'verify' && event.package == '' && event.repository == '')
+		|| (a.progress_seen && a.progress_snapshot.phase == 'verify' &&
+			((event.phase == 'verify' && event.package != '' && event.repository != '' && a.health_progress_packages < 4096)
+			|| (event.phase == 'complete' && event.package == '' && event.repository == ''))))
+	if !valid {
+		event.close()
+		a.health_error('Health inspection returned out-of-order progress. Reload the report.')
+		return
+	}
+	if event.package != '' { a.health_progress_packages++ }
+	a.progress_snapshot.close(); a.progress_snapshot = event; a.progress_seen = true
+	if event.phase == 'verify' {
+		text := if event.package == '' { 'Inspecting installed software…'.clone() } else { 'Inspecting ' + event.package + '…' }
+		a.set_status(text); unsafe { text.free() }
+	}
+}
+
+fn (mut a SoftwareApp) health_progress_output(text string) {
+	unsafe { a.progress_pending.flags |= .noslices }
+	for byte in text {
+		if byte == `\n` {
+			if !a.progress_skip && a.progress_pending.len > 0 { a.health_progress_line(editor_bytes_text(a.progress_pending)) }
+			a.progress_pending.clear(); a.progress_skip = false
+		} else if !a.progress_skip {
+			if a.progress_pending.len >= pkgprotocol.progress_limit {
+				a.progress_pending.clear(); a.progress_skip = true; a.output_truncated = true
+				a.health_error('Health inspection stderr exceeded its line limit. Reload the report.')
+			} else { a.progress_pending << byte }
+		}
+	}
+}
+
+fn (mut a SoftwareApp) finish_health_output(code int) {
+	if a.progress_pending.len > 0 || a.progress_skip {
+		a.health_error('Health inspection stderr ended with an incomplete line. Reload the report.')
+		if a.progress_pending.len > 0 { a.health_error(editor_bytes_text(a.progress_pending)) }
+	}
+	a.progress_pending.clear(); a.progress_skip = false
+	if code == 0 && !a.worker_failed && (!a.progress_seen || a.progress_snapshot.phase != 'complete') {
+		a.health_error('Health inspection ended without complete progress. Reload the report.')
+	}
+	if code == 0 && !a.worker_failed && !a.load_health() {
+		a.health_error(a.status)
+	}
+	if code != 0 || a.worker_failed {
+		if a.health_errors.len == 0 { a.health_error(if a.worker_failed { a.status } else { 'Health inspection failed before a complete report was available.' }) }
+		a.output.clear()
+		for byte in a.health_errors { a.output << byte }
+	}
+}
+
+fn (mut a SoftwareApp) stop_health() {
+	if !a.health_mode || !a.worker_health || a.worker == unsafe { nil } { return }
+	if a.worker.is_alive() { a.worker.signal_kill(); a.worker.wait() }
+	a.retire_worker()
+	a.clear_health_report(); a.clear_progress(); a.output.clear()
+	a.worker_health = false
+	a.set_status('Inspection stopped. No report was accepted. Reload to inspect installed software again.')
 }
 
 fn software_health_issue_label(issue string) string {
@@ -99,7 +181,7 @@ fn (mut a SoftwareApp) health_paste_input(input string) {
 }
 
 fn (mut a SoftwareApp) health_key_input(input string) {
-	if a.worker != unsafe { nil } { return }
+	if a.worker != unsafe { nil } { if input == '\x1b' { a.stop_health() }; return }
 	if input == '\x1b' {
 		if a.health_focus { a.health_focus = false; a.health_select_all = false } else { a.clear_health() }
 		return
@@ -139,11 +221,16 @@ fn (mut a SoftwareApp) prepare_health_details() {
 	unsafe { total.free() }
 }
 
-fn (mut a SoftwareApp) load_health() {
+fn (mut a SoftwareApp) load_health() bool {
 	mut report := pkgprotocol.decode_health(editor_bytes_text(a.output)) or {
 		unsafe { err.free() }
 		a.set_status('Invalid or incomplete health report. Reload before reviewing repairs.')
-		return
+		return false
+	}
+	if a.worker_health && report.rows.len != a.health_progress_packages {
+		report.close()
+		a.set_status('Health report package count does not match the completed scan. Reload the report.')
+		return false
 	}
 	a.clear_details()
 	a.health_snapshot.close()
@@ -159,6 +246,7 @@ fn (mut a SoftwareApp) load_health() {
 	a.health_summary = 'Generation ${number} · ${count} packages inspected · ${damaged} with issues'
 	unsafe { count.free(); damaged.free(); number.free(); (&array(&issues)).free() }
 	a.set_status('Integrity observation only: each row describes its own tree and first issue. Trust, policy and dependencies still gate launch. Repair review covers all installed packages and retains personal data.')
+	return true
 }
 
 fn (mut a SoftwareApp) handle_health(event_id string) {
@@ -200,6 +288,8 @@ fn (mut a SoftwareApp) build_health_compact(width int, height int) ui2.Element {
 	content_width := if width > 28 { width - 28 } else { 1 }
 	if a.worker == unsafe { nil } {
 		children << software_button('software.health.back', 'Back to packages', 14, 8, if content_width >= 160 { 160 } else { content_width })
+	} else {
+		children << software_button('software.health.stop', 'Stop inspection', 14, 8, if content_width >= 160 { 160 } else { content_width })
 	}
 	children << software_label('Installed software health', 14, 46, content_width, 28, false)
 	children << software_label('Enlarge this window to search the report and view package diagnostics.', 14, 80, content_width, if height > 140 { 60 } else { 28 }, false)
@@ -209,7 +299,8 @@ fn (mut a SoftwareApp) build_health_compact(width int, height int) ui2.Element {
 fn (mut a SoftwareApp) build_health(width int, height int) ui2.Element {
 	mut children := frame_elements(40)
 	children << software_label('Installed software health', 14, 8, width - 202, 28, false)
-	children << software_button('software.health.back', 'Back to packages', width - 174, 8, 160)
+	children << software_button(if a.worker == unsafe { nil } { 'software.health.back' } else { 'software.health.stop' },
+		if a.worker == unsafe { nil } { 'Back to packages' } else { 'Stop inspection' }, width - 174, 8, 160)
 	children << software_label(a.health_summary, 14, 46, width - 28, 36, false)
 	if a.health_ready {
 		children << software_label('Search', 14, 90, 56, 28, false)
@@ -245,7 +336,9 @@ fn (mut a SoftwareApp) build_health(width int, height int) ui2.Element {
 		children << software_button('software.health.down', 'Next packages', 136, height - 176, 110)
 		if a.health_snapshot.rows.len > 0 { children << software_button('software.health.repair', 'Review all repairs', 396, height - 138, 160) }
 	}
-	children << software_button('software.health.reload', 'Reload report', 274, height - 138, 110)
-	a.add_status_footer(mut children, width, height, false)
+	if a.worker == unsafe { nil } { children << software_button('software.health.reload', 'Reload report', 274, height - 138, 110) }
+	progress := a.worker != unsafe { nil } && a.progress_seen
+	if progress { children << a.progress_bar(width, height) }
+	a.add_status_footer(mut children, width, height, progress)
 	return ui2.screen(app_surface, children)
 }

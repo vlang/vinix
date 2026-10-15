@@ -49,6 +49,12 @@ A complete report returns zero with issues recorded in its rows;
 `verify` retains its failure exit behavior. **Review all repairs** obtains a fresh
 authenticated repair proposal before authorization. See
 [qualification](../../tests/packages/health-report-check.md).
+During inspection, Software shows the current package and offers **Stop
+inspection**, including in a small window. Stopping discards the partial report
+and permits Reload. CLI clients can use `--json --progress health` to receive the
+unchanged JSON on stdout with live progress on stderr. A complete report still
+requires a successful process exit. See
+[progress/cancellation qualification](../../tests/packages/health-progress-check.md).
 
 Start, Quick Launch and Open With use bounded installed-state presentation
 decoding with complete fields, explicit ownership and canonical generation

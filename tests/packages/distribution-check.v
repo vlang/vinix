@@ -258,6 +258,7 @@ fn check() ! {
 	run(work + '/window-broker-memory', ['failure-memory'])!
 	run(work + '/window-broker-memory', ['repair-memory'])!
 	run(work + '/window-broker-memory', ['health-memory'])!
+	run(work + '/window-broker-memory', ['health-progress-memory'])!
 	if '--cross' in os.args {
 		run(v, [...helper_flags, '-o', work + '/package-stage', repository + '/tools/packages/stage.v'])!
 		for architecture in ['aarch64', 'x86_64'] {

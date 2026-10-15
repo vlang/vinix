@@ -69,6 +69,8 @@ mut:
 	health_focus bool
 	health_select_all bool
 	health_issues_only bool
+	health_errors []u8
+	health_progress_packages int
 	health_selected int = -1
 	health_scroll int
 	data_mode       bool
@@ -219,7 +221,7 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	a.worker_review = false
 	a.worker_run = false
 	a.worker_verify = arguments.len == 1 && arguments[0] == 'verify'
-	a.worker_health = arguments == ['--json', 'health']
+	a.worker_health = arguments == ['--json', '--progress', 'health']
 	a.worker_mirror = false
 	a.repository_worker = .none
 	a.data_worker = .none
@@ -231,7 +233,7 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	if software_progress_command(arguments) { owned << '--progress'.clone() }
 	for argument in arguments { owned << argument.clone() }
 	a.worker.set_args(owned)
-	a.worker.set_redirect_stdio_merged()
+	if a.worker_health { a.worker.set_redirect_stdio() } else { a.worker.set_redirect_stdio_merged() }
 	a.worker.run()
 	if authorized { a.begin_admin_prompt() }
 	a.set_status(if view {
@@ -498,6 +500,15 @@ fn (mut a SoftwareApp) poll() bool {
 		}
 		unsafe { chunk.free() }
 	}
+	if a.worker_health {
+		for _ in 0 .. 16 {
+			chunk := a.worker.stderr_read()
+			if chunk.len == 0 { break }
+			changed = true
+			a.health_progress_output(chunk)
+			unsafe { chunk.free() }
+		}
+	}
 	if a.worker.is_alive() { return changed }
 	// A full drain batch can leave more queued data. Finish it next poll.
 	if a.worker.is_pending(.stdout) {
@@ -517,7 +528,19 @@ fn (mut a SoftwareApp) poll() bool {
 			}
 		}
 	}
+	// Health owns two pipes. A finished stdout document cannot hide pending
+	// progress or a late stderr failure after the process has exited.
+	if a.worker_health && a.worker.is_pending(.stderr) {
+		if chunk := a.worker.pipe_read(.stderr) {
+			a.health_progress_output(chunk)
+			unsafe { chunk.free() }
+			return true
+		}
+	}
 	code := a.worker.code
+	if a.worker_health {
+		a.finish_health_output(code)
+	}
 	if !a.worker_view && !a.worker_review { a.finish_operation_output() }
 	if a.worker_verify && code == 0 && (!a.progress_seen || a.progress_snapshot.phase != 'complete') {
 		a.operation_line('Verification ended without a complete result. Retry Verify installed.')
@@ -535,7 +558,7 @@ fn (mut a SoftwareApp) poll() bool {
 	mirroring := a.worker_mirror
 	a.retire_worker()
 	a.clear_admin_prompt()
-	if code != 0 || (verifying && a.worker_failed) {
+	if code != 0 || ((verifying || health) && a.worker_failed) {
 		if policy_worker == .review { a.clear_policy_review(); a.prepare_policy_pages(false) }
 		if policy_worker == .apply { a.policy_ready = false; a.clear_policy_pages() }
 		if repository_worker == .review { a.clear_repository_review() }
@@ -560,7 +583,7 @@ fn (mut a SoftwareApp) poll() bool {
 		}) }
 		unsafe { diagnostic.free() }
 	} else if health {
-		if !a.worker_failed { a.load_health() }
+		// The report was admitted only after both pipes drained and exit 0.
 	} else if policy_worker == .list {
 		if !a.worker_failed { a.load_policy_document() }
 	} else if policy_worker == .review {
@@ -674,7 +697,8 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		return
 	}
 	if a.health_mode {
-		if a.worker == unsafe { nil } { a.handle_health(event_id) }
+		if event_id == 'software.health.stop' { a.stop_health() }
+		else if a.worker == unsafe { nil } { a.handle_health(event_id) }
 		return
 	}
 	if event_id.starts_with(packagecore.request_prefix) {
