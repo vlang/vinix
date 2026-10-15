@@ -49,6 +49,13 @@ fn check_software_report_reader(mut app SoftwareApp) ! {
 	cleanup_fingerprint := app.cleanup_snapshot.fingerprint; cleanup_scroll := app.cleanup_scroll
 	cleanup_summary := app.cleanup_summary; cleanup_result := app.cleanup_result
 	cleanup_generations := app.cleanup_snapshot.generations.data; cleanup_ready := app.cleanup_ready
+	repository_ready := app.repository_review_ready; repository_operation := app.repository_operation
+	repository_fingerprint := app.repository_review.fingerprint; repository_source := app.repository_review.url
+	repository_key := app.repository_review.public_key; repository_pending := app.repository_pending
+	repository_page := app.repository_url_page; repository_seen := app.repository_url_seen
+	repository_selected := app.repository_selected; repository_scroll := app.repository_scroll
+	repository_id := editor_bytes_text(app.repository_id); repository_url := editor_bytes_text(app.repository_url)
+	repository_key_field := editor_bytes_text(app.repository_key)
 	storage := app.details_compact_pages.data
 	assert app.details_compact_pages.len > app.details_pages.len
 	for canonical, full in app.details_pages {
@@ -77,6 +84,7 @@ fn check_software_report_reader(mut app SoftwareApp) ! {
 			assert tree.children.any(it.id == 'software.report.package.next') == app.report_has_packages()
 			assert !tree.children.any(it.id in ['software.health.repair', 'software.audit.review', 'software.snapshot.export', 'software.snapshot.review',
 				'software.cleanup.confirm', 'software.cleanup.reload', 'software.failure'])
+			assert !tree.children.any(it.id in ['software.repository.confirm', 'software.repository.cancel', 'software.repository.url-next'])
 			for element in tree.children {
 				assert element.frame.x >= 0 && element.frame.x + element.frame.width <= size.width
 				assert element.frame.y >= 0 && element.frame.y + element.frame.height <= size.height
@@ -119,6 +127,9 @@ fn check_software_report_reader(mut app SoftwareApp) ! {
 	for action in ['software.health.reload', 'software.health.repair', 'software.health.issues', 'software.health.search',
 		'software.cleanup.confirm', 'software.cleanup.reload', 'software.cleanup.back', 'software.cleanup.stop', 'software.cleanup.cancel',
 		'software.cleanup.up', 'software.cleanup.down',
+		'software.repository.confirm', 'software.repository.cancel', 'software.repository.back', 'software.repository.stop',
+		'software.repository.reload', 'software.repository.new', 'software.repository.enroll', 'software.repository.revoke',
+		'software.repository.url-next', 'software.repository.url-previous', 'software.repository.id', 'software.repository.url', 'software.repository.key',
 		'software.audit.reload', 'software.audit.review', 'software.audit.differences', 'software.audit.search',
 		'software.snapshot.another', 'software.snapshot.save', 'software.snapshot.audit', 'software.snapshot.review', 'software.snapshot.export',
 		'software.deployment.path', 'software.cancel', 'software.confirm', 'software.failure', 'software.row.0',
@@ -133,6 +144,11 @@ fn check_software_report_reader(mut app SoftwareApp) ! {
 	assert app.status == status && app.details_compact_pages.data == storage
 	assert app.cleanup_snapshot.fingerprint == cleanup_fingerprint && app.cleanup_scroll == cleanup_scroll && app.cleanup_ready == cleanup_ready
 	assert app.cleanup_snapshot.generations.data == cleanup_generations && app.cleanup_summary == cleanup_summary && app.cleanup_result == cleanup_result
+	assert app.repository_review_ready == repository_ready && app.repository_operation == repository_operation
+	assert app.repository_review.fingerprint == repository_fingerprint && app.repository_review.url == repository_source && app.repository_review.public_key == repository_key
+	assert app.repository_pending == repository_pending && app.repository_url_page == repository_page && app.repository_url_seen == repository_seen
+	assert app.repository_selected == repository_selected && app.repository_scroll == repository_scroll
+	assert editor_bytes_text(app.repository_id) == repository_id && editor_bytes_text(app.repository_url) == repository_url && editor_bytes_text(app.repository_key) == repository_key_field
 	if app.report_has_packages() {
 		indices := if app.health_mode { app.health_matching } else { app.audit_matching }
 		for report_fixture_selected(&app) != indices[0] { app.key_input('\x1b[A') }
@@ -175,6 +191,7 @@ fn report_reader_cycle(mut app SoftwareApp) ! {
 	free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
 	app.handle('software.snapshot.export')!; app.handle('software.audit.review')!; app.handle('software.health.repair')!
 	app.handle('software.cleanup.confirm')!; app.handle('software.cleanup.reload')!; app.handle('software.cleanup.back')!
+	app.handle('software.repository.confirm')!; app.handle('software.repository.cancel')!; app.handle('software.repository.url-next')!
 	assert app.worker == unsafe { nil } && !app.admin_prompt && app.report_reader_mode
 	app.key_input('\x1b'); assert !app.report_reader_mode
 	if app.report_has_packages() && report_fixture_selected(&app) != selected {

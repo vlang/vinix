@@ -31,7 +31,7 @@ fn (mut a SoftwareApp) stop_repository_read() {
 fn (a &SoftwareApp) build_repositories_compact(width int, height int) ui2.Element {
 	mut children := frame_elements(8)
 	available := a.failure_pages.len > 0 && a.worker == unsafe { nil }
-	children << software_label('Repositories · enlarge for details', 14, 8, width - 28, 28, false)
+	children << software_label(if a.repository_review_ready { 'Repository trust review' } else { 'Repositories · enlarge for details' }, 14, 8, width - 28, 28, false)
 	button_width := if width > 202 { 174 } else { width - 28 }
 	if a.repository_read_running() {
 		children << software_button('software.repository.stop', if a.repository_worker == .review { 'Stop review' } else { 'Stop reading' }, 14, 46, button_width)
@@ -41,10 +41,16 @@ fn (a &SoftwareApp) build_repositories_compact(width int, height int) ui2.Elemen
 	} else {
 		children << software_label('Wait for repository changes to finish.', 14, 46, width - 28, 28, false)
 	}
-	if available { children << software_button('software.failure', 'Failure details', 14, 84, button_width) }
-	progress := a.progress_seen && height >= 240
+	mut next_y := 84
+	if a.worker == unsafe { nil } && a.repository_review_ready && a.details_pages.len > 0 && height >= 220 {
+		children << software_button('software.report.read', 'Read review', 14, next_y, button_width)
+		next_y += 38
+	}
+	if available { children << software_button('software.failure', 'Failure details', 14, next_y, button_width); next_y += 38 }
+	progress := a.progress_seen && height >= 240 && next_y <= height - 110
 	if progress { children << a.progress_bar(width, height) }
-	y := if height > 230 { height - if progress { 88 } else { 98 } } else if available { 122 } else { 84 }
+	preferred_y := if height > 230 { height - if progress { 88 } else { 98 } } else { next_y }
+	y := if preferred_y > next_y { preferred_y } else { next_y }
 	children << software_label(a.status, 14, y, width - 28, if height > y + 8 { height - y - 8 } else { 1 }, false)
 	return ui2.screen(app_surface, children)
 }

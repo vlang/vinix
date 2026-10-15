@@ -7,6 +7,79 @@ import time
 import ui2
 import tools.packages.pkgprotocol
 
+fn check_repository_report_content(app &SoftwareApp) {
+	mut bytes := []u8{}
+	unsafe { bytes.flags |= .noslices }
+	for page in app.details_pages {
+		mut lines := page.text.split_into_lines()
+		for line in lines {
+			start := if line.starts_with('• ') { 4 } else { 2 }
+			for index in start .. line.len { bytes << line[index] }
+		}
+		software_policy_free_lines(mut lines)
+	}
+	text := editor_bytes_text(bytes)
+	defer { unsafe { bytes.free() } }
+	review := app.repository_review
+	mut values := ['Operation: ' + review.operation, 'Repository: ' + review.id,
+		'Architecture: ' + review.architecture, 'Source URL: ' + review.url,
+		'Publisher public key: ' + review.public_key, 'Review fingerprint: ' + review.fingerprint]
+	unsafe { values.flags |= .noslices }
+	if review.previous_url != '' {
+		values << 'Previous source URL: ' + review.previous_url
+		values << 'Previous publisher key: ' + review.previous_public_key
+	} else { assert text.contains('No previous repository identity is configured.') }
+	if review.operation == 'enroll' {
+		sequence := review.sequence.str(); remembered := review.remembered_sequence.str()
+		count := review.package_count.str(); expires := review.expires.str()
+		values << 'Signed catalog SHA-256: ' + review.index_sha256
+		values << 'Signed sequence: ' + sequence; values << 'Remembered sequence: ' + remembered
+		values << 'Signed catalog entries: ' + count; values << 'Expires (Unix seconds): ' + expires
+		unsafe { sequence.free(); remembered.free(); count.free(); expires.free() }
+		assert text.contains('independently trusted channel') && text.contains('does not install applications')
+		assert text.contains('Old-key applications lose launch and rollback trust') == (review.previous_public_key != '' && review.previous_public_key != review.public_key)
+	} else {
+		assert text.contains('Revocation disables acquisition, launch and rollback')
+		assert text.contains('Installed payloads, personal data and sequence history remain. Uninstall stays available.')
+		assert !text.contains('Signed catalog SHA-256:') && !text.contains('Signed sequence:')
+	}
+	for value in values { assert text.contains(value) }
+	software_policy_free_lines(mut values)
+	assert text.contains('does not approve the change or complete the source URL review')
+}
+
+fn check_repository_reader_boundaries() ! {
+	prefix := 'file:///offline/部署 é🚀/'
+	url := prefix + 'a'.repeat(4096 - prefix.len)
+	old_url := prefix + 'b'.repeat(4096 - prefix.len)
+	defer { unsafe { url.free(); old_url.free() } }
+	for architecture in ['aarch64', 'x86_64']! {
+		for variant in 0 .. 4 {
+			key := 'b'.repeat(64); previous_key := 'a'.repeat(64)
+			mut review := pkgprotocol.RepositoryReview{ format: 1, architecture: architecture.clone(),
+				operation: if variant == 3 { 'revoke'.clone() } else { 'enroll'.clone() }, id: 'fixture'.clone(),
+				url: url.clone(), public_key: key, previous_url: if variant == 0 { '' } else if variant == 3 { url.clone() } else { old_url.clone() },
+				previous_public_key: if variant == 0 { '' } else if variant == 2 { previous_key.clone() } else { key.clone() },
+				fingerprint: 'd'.repeat(64), index_sha256: if variant == 3 { '' } else { 'c'.repeat(64) },
+				sequence: if variant == 3 { u64(0) } else { ~u64(0) }, remembered_sequence: if variant == 3 { u64(0) } else { ~u64(0) - 1 },
+				expires: if variant == 3 { i64(0) } else { i64(0x7fffffffffffffff) }, package_count: if variant == 3 { 0 } else { 4096 } }
+			text := json2.encode(review)
+			mut app := SoftwareApp{ repository_mode: true, repository_operation: review.operation.clone(),
+				repository_pending: pkgprotocol.Repository{ id: review.id.clone(), url: review.url.clone(), public_key: review.public_key.clone() },
+				output: text.bytes(), repository_selected: 7, repository_scroll: 5 }
+			app.load_repository_review(); assert app.repository_review_ready
+			check_repository_report_content(&app); check_software_report_reader(mut app)!
+			assert app.repository_url_seen == 0 && app.repository_url_page == 0
+			app.handle('software.repository.confirm')!; assert app.worker == unsafe { nil }
+			app.handle('software.repository.cancel')!
+			assert !app.repository_review_ready && app.details_pages.len == 0 && app.details_compact_pages.len == 0
+			assert !app.report_reader_mode && app.repository_operation == ''
+			app.close_app(); review.close(); unsafe { text.free(); previous_key.free() }
+		}
+	}
+	println('Software repository reader: complete trust fields, new/same/rotated keys and revocation effects, both architectures, maximum Unicode sources and counters, frozen URL gate and cache retirement passed')
+}
+
 fn check_software_repository_paste() ! {
 	mut app := SoftwareApp{ repository_mode: true, service_path: os.executable(), output: []u8{cap: 8192} }
 	app.initialize_repository_fields()
@@ -116,7 +189,8 @@ fn check_repository_writer_protected(mut app SoftwareApp) ! {
 		assert !tree.children.any(it.id in ['software.repository.stop', 'software.repository.cancel', 'software.repository.back', 'software.repository.confirm'])
 		free_window_tree(tree)
 	}
-	for action in ['software.repository.stop', 'software.repository.cancel', 'software.repository.back']! { app.handle(action)! }
+	for action in ['software.repository.stop', 'software.repository.cancel', 'software.repository.back', 'software.report.read']! { app.handle(action)! }
+	assert !app.report_reader_mode && app.details_pages.len == 0 && app.details_compact_pages.len == 0
 	for input in ['\x1b', '\n', '\t', '\x01', '\x7f']! { app.paste_input(input) }
 	app.key_input('\x1b'); app.stop_repository_read()
 	assert app.worker.pid == pid && C.kill(pid, 0) == 0 && app.repository_mode
@@ -124,6 +198,7 @@ fn check_repository_writer_protected(mut app SoftwareApp) ! {
 
 fn check_software_repository_navigation() ! {
 	check_software_repository_paste()!
+	check_repository_reader_boundaries()!
 	receipt := os.temp_dir() + '/vinix-repository-navigation-' + os.getpid().str()
 	url := repository_fixture_url + '/部署 ' + 'source-'.repeat(40)
 	os.setenv('VINIX_SOFTWARE_REPOSITORY_FIXTURE', receipt, true)
@@ -148,7 +223,8 @@ fn check_software_repository_navigation() ! {
 					assert !tree.children.any(it.id in ['software.repository.confirm', 'software.repository.back', 'software.repository.cancel'])
 					free_window_tree(tree)
 				}
-				app.handle('software.repository.confirm')!; app.paste_input('must-not-edit')
+				app.handle('software.repository.confirm')!; app.handle('software.report.read')!; app.paste_input('must-not-edit')
+				assert !app.report_reader_mode && app.details_pages.len == 0 && app.details_compact_pages.len == 0
 				for input in ['\x1b', '\n', '\t', '\x01', '\x7f']! { app.paste_input(input) }
 				assert app.worker.pid == pid && app.repository_read_running()
 				assert !os.exists(receipt) && editor_bytes_text(app.repository_id) == 'fixture'
@@ -171,6 +247,7 @@ fn check_software_repository_navigation() ! {
 					compact := app.build(ui2.rect(0, 0, 320, 240))!
 					assert compact.children.any(it.id == 'software.repository.cancel') && !compact.children.any(it.id == 'software.repository.confirm')
 					free_window_tree(compact)
+					check_repository_report_content(&app); check_software_report_reader(mut app)!
 					if kind == 'enroll' {
 						assert app.repository_url_pages.len > 1 && app.repository_url_seen == 0
 						unseen := app.build_repositories(640, 610)
@@ -271,6 +348,9 @@ fn check_software_repository_navigation_memory() ! {
 					app.output.clear(); for byte in text { app.output << byte }; app.load_repository_review(); assert app.repository_review_ready
 					for app.repository_url_page + 1 < app.repository_url_pages.len { app.handle_repositories('software.repository.url-next') }
 					free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!); free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
+					page := app.repository_url_page; seen := app.repository_url_seen
+					report_reader_cycle(mut app)!
+					assert app.repository_url_page == page && app.repository_url_seen == seen && app.repository_review_ready
 					app.repository_key_input('\x1b'); assert !app.repository_review_ready
 				}
 				app.capture_failure(arguments, 23); free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!); app.clear_failure()
@@ -282,5 +362,6 @@ fn check_software_repository_navigation_memory() ! {
 		kept := C.vinix_heap_end(); assert kept == 0, 'repository navigation retained ${kept} bytes'
 		println('Software repository navigation: 1000 configuration/enrollment/revocation/page/full/compact/failure/cancel/retirement cycles retain zero tracked bytes')
 		println('Software repository paste: 1000 valid/rejected/selected-input cycles retain zero tracked bytes')
+		println('Software repository reader: 1000 enrollment/revocation/read/page/resize/ignored-confirm/Back/cancel/retirement cycles retain zero tracked bytes')
 	}
 }

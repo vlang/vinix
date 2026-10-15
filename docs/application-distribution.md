@@ -229,6 +229,17 @@ channel. Long source URLs are paged; each part must be displayed before
 confirmation becomes available. **Confirm trust** applies that exact review and
 refreshes authenticated catalogs. Applications still require installation review.
 
+An admitted trust or revocation proposal also offers **Read review** in full and
+compact windows. The shared read-only reader preserves the complete current and
+previous sources/keys, fingerprint, signed catalog digest, sequence/history
+floor, expiry and entry count. It explains independent key comparison, key
+replacement and revocation effects. Three short native lines keep every byte
+readable at 180×220 or larger; Back/Escape and resizing retain reader and source
+URL anchors. Reading cannot confirm/cancel trust, edit fields, start operations
+or mark source URL parts as reviewed. Confirmation remains in the full proposal
+under its existing URL-review and administrator guards. Pending readers and
+writers cannot enter. See [trust reader checks](../tests/packages/software-trust-reader-check.md).
+
 ID, URL and key paste events accept literal valid UTF-8 within their existing
 128/4096/64-byte bounds. Control characters, malformed UTF-8 and oversized
 input are refused as a whole; the previous field and selection stay intact.

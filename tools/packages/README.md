@@ -49,6 +49,13 @@ receipts also render every prepared line as an individual monospace label. Narro
 report panels paginate shorter UTF-8 fragments so complete provenance, paths and
 diagnostics remain available. See [disclosure checks](../../tests/packages/software-disclosure-lines-check.md).
 
+Repository proposals offer **Read review** through the same reader. Compact
+windows disclose complete current/previous source URLs, publisher keys,
+fingerprint, authenticated catalog metadata and trust/revocation effects.
+Reading neither approves trust nor advances the existing source URL review
+gate; return to the full proposal to cancel or confirm. Pending work blocks
+entry. See [qualification](../../tests/packages/software-trust-reader-check.md).
+
 Compact **Package details** windows at least 180 pixels wide and 220 high now
 show complete short pages and Previous/Next section controls. Left/Right and
 Page keys turn pages; Up/Down and Tab/Shift-Tab change sections. Resizing retains

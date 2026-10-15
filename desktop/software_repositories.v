@@ -46,6 +46,7 @@ fn (mut a SoftwareApp) clear_repository_review() {
 }
 
 fn (mut a SoftwareApp) clear_repository_pages() {
+	a.clear_details()
 	unsafe {
 		a.repository_summary.free()
 		for page in a.repository_url_pages { page.free() }
@@ -145,6 +146,49 @@ fn (mut a SoftwareApp) repository_url_parts(url string, label string) {
 	}
 }
 
+fn (mut a SoftwareApp) prepare_repository_details() {
+	a.clear_details()
+	a.details_pages = []SoftwareDetailsPage{cap: 16}
+	unsafe { a.details_pages.flags |= .noslices }
+	review := a.repository_review
+	mut values := ['Operation: ' + review.operation, 'Repository: ' + review.id,
+		'Architecture: ' + review.architecture, 'Source URL: ' + review.url,
+		'Publisher public key: ' + review.public_key, 'Review fingerprint: ' + review.fingerprint]
+	unsafe { values.flags |= .noslices }
+	if review.previous_url != '' {
+		values << 'Previous source URL: ' + review.previous_url
+		values << 'Previous publisher key: ' + review.previous_public_key
+	} else { values << 'No previous repository identity is configured.'.clone() }
+	if review.operation == 'enroll' {
+		values << 'Signed catalog SHA-256: ' + review.index_sha256
+		software_details_count(mut values, 'Signed sequence: ', review.sequence)
+		software_details_count(mut values, 'Remembered sequence: ', review.remembered_sequence)
+		software_details_count(mut values, 'Signed catalog entries: ', u64(review.package_count))
+		expires := review.expires.str()
+		values << 'Expires (Unix seconds): ' + expires
+		unsafe { expires.free() }
+		values << 'Compare the exact publisher key through an independently trusted channel before confirming trust.'.clone()
+		if review.previous_public_key != '' && review.previous_public_key != review.public_key {
+			values << 'This replaces the publisher key. Old-key applications lose launch and rollback trust.'.clone()
+		}
+		values << 'Confirming enables trust and refreshes authenticated catalogs. It does not install applications.'.clone()
+	} else {
+		values << 'Revocation disables acquisition, launch and rollback for this exact repository configuration.'.clone()
+		values << 'Installed payloads, personal data and sequence history remain. Uninstall stays available.'.clone()
+	}
+	values << 'Reading these details does not approve the change or complete the source URL review. Return to the full trust review before confirming.'.clone()
+	a.details_values(0, values)
+	software_policy_free_lines(mut values)
+	total := a.details_pages.len.str()
+	for index in 0 .. a.details_pages.len {
+		number := (index + 1).str()
+		a.details_pages[index].label = number + ' of ' + total
+		unsafe { number.free() }
+	}
+	unsafe { total.free() }
+	a.prepare_report_reader()
+}
+
 fn (mut a SoftwareApp) load_repository_review() {
 	mut review := pkgprotocol.decode_repository_review(editor_bytes_text(a.output)) or {
 		unsafe { err.free() }
@@ -199,6 +243,7 @@ fn (mut a SoftwareApp) load_repository_review() {
 		a.repository_summary = 'Revocation disables acquisition, launch and rollback.'.clone()
 		a.set_status('Confirming revokes this exact repository configuration. Installed payloads, personal data and sequence history remain; uninstall stays available.')
 	}
+	a.prepare_repository_details()
 }
 
 fn (mut a SoftwareApp) handle_repositories(event_id string) {
@@ -402,6 +447,7 @@ fn (mut a SoftwareApp) build_repositories(width int, height int) ui2.Element {
 		}
 	} else if a.repository_review_ready {
 		review := a.repository_review
+		children << software_button('software.report.read', 'Read review', 14, height - 176, 174)
 		children << software_label('Repository: ${review.id}', 274, 90, width - 288, 60, true)
 		if a.repository_url_pages.len > 0 {
 			children << software_label(a.repository_page_labels[a.repository_url_page], 274, 154, width - 288, 22, false)
