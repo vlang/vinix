@@ -24,12 +24,12 @@ const app_selection_request_path = '/run/vinix-first-run-install'
 
 const action_apps_install = 'apps.install'
 
-const app_selection_row_height = 64
-const app_selection_row_top = 80
-const app_selection_row_gap = 8
+const app_selection_row_height = 40
+const app_selection_row_top = 64
+const app_selection_row_gap = 4
 const app_selection_column_gap = 12
-const app_selection_heading_height = 32
-const app_selection_category_gap = 16
+const app_selection_heading_height = 22
+const app_selection_category_gap = 6
 const action_apps_scrollbar = 'apps.scrollbar'
 const app_selection_selected_bg = u32(0xeef4fd)
 const app_selection_installed_bg = u32(0xf5f6f8)
@@ -351,7 +351,7 @@ fn app_selection_row(app FirstRunApp, installed bool, available bool, selected b
 	width int, height int) ui2.Element {
 	// Child coordinates are inside the one-pixel border.
 	mut children := frame_elements(5)
-	icon := ui2.image('', app.icon, ui2.rect(13, f64((height - 36) / 2), 36, 36))
+	icon := ui2.image('', app.icon, ui2.rect(9, f64((height - 28) / 2), 28, 28))
 	// Bundled artwork ignores the colour; a builtin glyph is drawn in it.
 	children << ui2.Element{
 		...icon
@@ -360,8 +360,8 @@ fn app_selection_row(app FirstRunApp, installed bool, available bool, selected b
 		}
 	}
 	title_color := if installed || !available { body_muted } else { body_heading }
-	title_width := width - 76 - if installed { 98 } else if available { 28 } else { 0 }
-	children << ui2.label('', app.title, ui2.rect(63, f64((height - 22) / 2), f64(title_width), 22),
+	title_width := width - 60 - if installed { 98 } else if available { 28 } else { 0 }
+	children << ui2.label('', app.title, ui2.rect(47, f64((height - 22) / 2), f64(title_width), 22),
 		ui2.TextStyle{
 			color: title_color
 			size:  14
@@ -435,7 +435,7 @@ fn app_selection_layout(width int, height int) AppSelectionLayout {
 		y: (height - card_height) / 2
 		width: card_width
 		height: card_height
-		list_height: math.max(1, card_height - app_selection_row_top - 116)
+		list_height: math.max(1, card_height - app_selection_row_top - 64)
 		columns: if card_width >= 960 { 3 } else if card_width >= 720 { 2 } else { 1 }
 	}
 }
@@ -524,7 +524,7 @@ fn (mut s AppSelectionState) element(d &Desktop) ui2.Element {
 	s.prepare_viewport(layout.list_height, layout.columns)
 
 	mut card_children := frame_elements(24)
-	card_children << ui2.label('apps.title', tr('app_selection.intro'), ui2.rect(24, 24, f64(inner),
+	card_children << ui2.label('apps.title', tr('app_selection.intro'), ui2.rect(24, 16, f64(inner),
 		34), ui2.TextStyle{
 		color: body_heading
 		size:  24
@@ -534,7 +534,7 @@ fn (mut s AppSelectionState) element(d &Desktop) ui2.Element {
 	mut y := -s.scroll
 	for category_index, category in first_run_categories {
 		list_children << ui2.label(first_run_category_headers[category_index], category.text(),
-			ui2.rect(1, f64(y), f64(grid_width), 24), ui2.TextStyle{
+			ui2.rect(1, f64(y), f64(grid_width), 18), ui2.TextStyle{
 				color: body_heading
 				size: 14
 				bold: true
@@ -578,17 +578,19 @@ fn (mut s AppSelectionState) element(d &Desktop) ui2.Element {
 			ui2.rect(f64(card_width - 30), app_selection_row_top, 6, f64(layout.list_height)),
 			ui2.BoxStyle{ bg: body_rule, radius: 3 }, frame_child(thumb))
 	}
-	card_children << ui2.label('apps.note', tr('app_selection.note'),
-		ui2.rect(24, f64(card_height - 100), f64(inner), 20), ui2.TextStyle{
-			color: body_muted
-			size:  11
-		})
 	mut count := s.selected_count()
 	if count >= app_selection_install_labels.len {
 		count = app_selection_install_labels.len - 1
 	}
 	label := app_selection_install_labels[count].text()
-	card_children << ui2.button(action_apps_install, label, ui2.rect(24, f64(card_height - 64), f64(inner), 40),
+	button_width := math.min(inner, if count == 0 { 112 } else { 192 })
+	card_children << ui2.label('apps.note', tr('app_selection.note'),
+		ui2.rect(24, f64(card_height - 42), f64(inner - button_width - 16), 20), ui2.TextStyle{
+			color: body_muted
+			size:  11
+		})
+	card_children << ui2.button(action_apps_install, label,
+		ui2.rect(f64(card_width - 24 - button_width), f64(card_height - 48), f64(button_width), 32),
 		ui2.BoxStyle{
 			bg:     if d.hover == action_apps_install { u32(0x4a8ee7) } else { app_accent }
 			radius: 6

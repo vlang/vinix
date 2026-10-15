@@ -337,8 +337,8 @@ fn test_app_selection_keyboard_reveals_each_app_in_display_order_and_wraps() {
 fn test_app_selection_wheel_and_scrollbar_reach_the_bottom_without_losing_choices() {
 	mut state := app_selection_test_state()
 	state.toggle(0)
-	layout := app_selection_layout(1024, 720)
-	mut desktop := app_selection_test_desktop()
+	layout := app_selection_layout(1024, 480)
+	mut desktop := Desktop{ canvas: Canvas{ width: 1024, height: 480, scale: 1 } }
 	desktop.pointer_x = layout.x + 100
 	desktop.pointer_y = layout.y + app_selection_row_top + 100
 	state.pointer_input(PointerPacket{ scroll: -4 }, &desktop)
