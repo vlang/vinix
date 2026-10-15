@@ -22,16 +22,102 @@ fn software_failure_service_fixture(args []string) bool {
 }
 
 fn software_failure_fixture_join(app &SoftwareApp) string {
-	mut text := ''
-	for page in app.failure_pages {
-		next := text + page.text
-		unsafe { text.free() }
-		text = next
+	return software_failure_fixture_join_pages(app.failure_pages)
+}
+
+fn software_failure_fixture_join_pages(pages []SoftwareFailurePage) string {
+	mut bytes := []u8{cap: software_failure_limit * 4}
+	defer { unsafe { bytes.free() } }
+	for page in pages {
+		for byte in page.text { if byte != `\n` { bytes << byte } }
 	}
-	return text.replace('\n', '')
+	return bytes.bytestr()
+}
+
+fn check_software_failure_compact() ! {
+	mut app := SoftwareApp{ output: []u8{cap: 8192}, query: 'kept catalog'.bytes(),
+		matching: [0], selected: 0, filter: 1, deployment_mode: true,
+		rows: [SoftwareRow{ id: 'editor', installed_version: '1.0.0' }] }
+	defer { app.close_app() }
+	text := software_failure_fixture_text() + 'Wide glyphs: ' + 'M'.repeat(80) + '\nControls: \x1b\xff\xc2\x80\n'
+	defer { unsafe { text.free() } }
+	for byte in text { app.output << byte }
+	app.capture_failure(['deployment-review', '/literal é; $file'], 27)
+	full_text := software_failure_fixture_join_pages(app.failure_pages)
+	compact_text := software_failure_fixture_join_pages(app.failure_compact_pages)
+	assert full_text == compact_text && app.failure_compact_pages.len > app.failure_pages.len
+	unsafe { full_text.free(); compact_text.free() }
+	for page in app.failure_compact_pages {
+		mut lines := page.text.split('\n')
+		assert lines.len <= 3 && page.source_page >= 0 && page.source_page < app.failure_pages.len
+		for line in lines { assert line.len <= 12 && utf8.validate_str(line) }
+		software_policy_free_lines(mut lines)
+	}
+	app.handle('software.failure')!; assert app.failure_mode
+	// Traverse every short page through the actual view and navigation handlers.
+	for index in 0 .. app.failure_compact_pages.len {
+		tree := app.build(ui2.rect(0, 0, 320, 240))!
+		assert app.failure_compact_mode && app.failure_compact_page == index
+		assert app.failure_page == app.failure_compact_pages[index].source_page
+		assert tree.children.any(it.id == 'software.failure.back') && tree.children.any(it.id == 'software.failure.previous')
+		assert tree.children.any(it.id == 'software.failure.next') && tree.children.any(it.text == app.failure_compact_pages[index].label)
+		mut visible := []u8{cap: 48}
+		for element in tree.children {
+			assert element.frame.x >= 0 && element.frame.x + element.frame.width <= 320
+			assert element.frame.y >= 0 && element.frame.y + element.frame.height <= 240
+			if element.text_style.font_family == 'mono' {
+				assert !element.text.contains('\n') && utf8.validate_str(element.text)
+				for byte in element.text { visible << byte }
+			}
+		}
+		expected := app.failure_compact_pages[index].text.replace('\n', '')
+		assert editor_bytes_text(visible) == expected
+		unsafe { visible.free(); expected.free() }
+		free_window_tree(tree)
+		if index % 2 == 0 { app.key_input('\x1b[C') } else { app.key_input('\x1b[6~') }
+	}
+	assert app.failure_compact_page == app.failure_compact_pages.len - 1
+	for _ in 0 .. app.failure_compact_pages.len + 2 { app.key_input('\x1b[5~') }
+	assert app.failure_compact_page == 0 && app.failure_page == 0
+	for _ in 0 .. 5 { app.key_input('\x1b[C') }
+	short_page := app.failure_compact_page; canonical := app.failure_page
+	assert short_page > 0
+	for size in [ui2.rect(0, 0, 900, 660), ui2.rect(0, 0, 180, 200), ui2.rect(0, 0, 180, 96), ui2.rect(0, 0, 160, 240), ui2.rect(0, 0, 320, 240)]! {
+		tree := app.build(size)!
+		assert app.failure_compact_page == short_page && app.failure_page == canonical
+		for element in tree.children {
+			assert element.frame.x >= 0 && element.frame.x + element.frame.width <= size.width
+			assert element.frame.y >= 0 && element.frame.y + element.frame.height <= size.height
+			if element.text_style.font_family == 'mono' { assert !element.text.contains('\n') }
+			if size.width < 640 && size.height >= 200 && element.text == app.failure_compact_pages[short_page].label {
+				assert element.frame.width >= 56
+			}
+		}
+		assert tree.children.any(it.id == 'software.failure.back')
+		free_window_tree(tree)
+	}
+	full := app.build(ui2.rect(0, 0, 640, 610))!
+	assert full.children.filter(it.text_style.font_family == 'mono').len <= 14
+	assert full.children.filter(it.text_style.font_family == 'mono').len > 3
+	free_window_tree(full)
+	app.handle('software.failure.next')!; assert app.failure_page == canonical + 1
+	compact := app.build(ui2.rect(0, 0, 320, 240))!
+	assert app.failure_compact_pages[app.failure_compact_page].source_page == canonical + 1
+	assert app.failure_compact_page == 0 || app.failure_compact_pages[app.failure_compact_page - 1].source_page != canonical + 1
+	free_window_tree(compact)
+	for event in ['software.confirm', 'software.install', 'software.refresh', 'software.snapshot.save', 'software.policy.confirm']! { app.handle(event)! }
+	app.key_input('typed'); app.paste_input('\x1b'); app.paste_input('\x1b[C')
+	assert app.failure_mode && app.worker == unsafe { nil } && app.query.bytestr() == 'kept catalog'
+	assert app.deployment_mode && app.selected == 0 && app.filter == 1 && app.matching == [0]
+	app.key_input('\x1b'); assert !app.failure_mode && app.deployment_mode
+	app.handle('software.failure')!; app.handle('software.failure.clear')!
+	assert !app.failure_mode && app.failure_pages.len == 0 && app.failure_compact_pages.len == 0
+	assert app.failure_compact_page == 0 && !app.failure_compact_mode
+	println('Software failure navigation: complete short Unicode/escaped diagnostic pages, separate native-renderer lines, Previous/Next/arrow/Page keys, resize anchors, narrow/tiny Back, modal isolation and clear PASS')
 }
 
 fn check_software_failure() ! {
+	check_software_failure_compact()!
 	mut app := SoftwareApp{service_path: os.executable(), output: []u8{cap: 8192}, query: []u8{cap: 256}}
 	defer { app.close_app() }
 	app.start(['install', 'diagnostic-app'], false)
@@ -101,6 +187,11 @@ fn check_software_failure_bounds() ! {
 	app.capture_failure(['view'], 1)
 	assert app.failure_truncated && app.failure_pages.len > 0
 	for page in app.failure_pages { assert utf8.validate_str(page.text) }
+	for page in app.failure_compact_pages { assert utf8.validate_str(page.text) }
+	app.handle('software.failure')!
+	compact := app.build(ui2.rect(0, 0, 320, 240))!
+	assert compact.children.any(it.text == 'Earlier output omitted.')
+	free_window_tree(compact); app.handle('software.failure.back')!
 	clean := software_failure_text('é🚀\r\n\t\x1b\x00\x7f\xc2\x80\xff\xe2')
 	assert clean == 'é🚀\n \\x1b\\x00\\x7f\\xc2\\x80\\xff\\xe2', clean
 	unsafe { clean.free() }
@@ -109,6 +200,16 @@ fn check_software_failure_bounds() ! {
 	assert app.failure_truncated && app.failure_pages[0].text.contains('no diagnostic text')
 	app.worker_failed = true; app.capture_failure(['view'], 0)
 	assert app.failure_heading.contains('response too large')
+	app.output.clear()
+	for byte in '\n'.repeat(15) { app.output << byte }
+	app.capture_failure(['view'], 1)
+	for index, _ in app.failure_pages {
+		assert app.failure_compact_pages.any(it.source_page == index)
+	}
+	app.failure_page = app.failure_pages.len - 1
+	blank := app.build_failure(ui2.rect(0, 0, 320, 240))
+	assert app.failure_compact_pages[app.failure_compact_page].source_page == app.failure_page
+	free_window_tree(blank)
 	app.operation_output('x'.repeat(pkgprotocol.progress_limit + 1))
 	assert app.output_truncated && app.progress_skip
 	app.finish_operation_output()
@@ -130,13 +231,23 @@ fn check_software_failure_memory() ! {
 				app.handle('software.failure.next')!
 				free_window_tree(app.build_failure(ui2.rect(0, 0, 640, 610)))
 				app.handle('software.failure.previous')!
+				for _ in 0 .. app.failure_compact_pages.len {
+					free_window_tree(app.build_failure(ui2.rect(0, 0, 320, 240)))
+					app.key_input('\x1b[6~')
+				}
+				short_page := app.failure_compact_page; canonical := app.failure_page
+				free_window_tree(app.build_failure(ui2.rect(0, 0, 900, 660)))
+				free_window_tree(app.build_failure(ui2.rect(0, 0, 180, 200)))
+				assert app.failure_compact_page == short_page && app.failure_page == canonical
+				app.paste_input('\x1b'); assert app.failure_mode
 				app.handle('software.failure.back')!
 				app.clear_failure()
+				assert app.failure_compact_pages.len == 0 && !app.failure_compact_mode
 			}
 		}
 		kept := C.vinix_heap_end()
 		app.close_app()
 		assert kept == 0, 'failure details retained ${kept} bytes'
-		println('Software failure details: 1000 capture/page/render/back/replace/clear cycles retain zero tracked bytes')
+		println('Software failure details: 1000 capture/full/compact/all-short-pages/keys/resize/back/replace/clear cycles retain zero tracked bytes')
 	}
 }

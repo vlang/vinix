@@ -26,6 +26,9 @@ mut:
 	output          []u8
 	output_truncated bool
 	failure_pages []SoftwareFailurePage
+	failure_compact_pages []SoftwareFailurePage
+	failure_compact_page int
+	failure_compact_mode bool
 	failure_heading string
 	failure_mode bool
 	failure_page int
@@ -1023,7 +1026,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.admin_prompt { a.admin_key_input(input); return }
 	if a.window_mode { a.window_key_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
-	if a.failure_mode { if input == '\x1b' { a.failure_mode = false }; return }
+	if a.failure_mode { a.failure_key_input(input); return }
 	if a.snapshot_mode { a.snapshot_key_input(input); return }
 	if a.audit_mode { a.audit_key_input(input); return }
 	if a.details_mode { if input == '\x1b' { a.clear_details() }; return }

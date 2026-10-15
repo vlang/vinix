@@ -1066,6 +1066,14 @@ copy administrator password input. Terminal and native-window applications keep
 their existing diagnostic views. See
 [failure-details qualification](../tests/packages/software-failure-check.md).
 
+Failure details can also be read in compact windows at least 180 pixels wide
+and 200 pixels high.
+Short pages preserve every retained diagnostic fragment, with Previous/Next,
+Left/Right and Page Up/Page Down navigation. Enlarging shows the corresponding
+full page; shrinking restores the current short page. Both views draw individual
+monospace lines so native single-line labels cannot hide later diagnostic lines.
+Smaller windows retain Back. See [compact diagnostic checks](../tests/packages/software-failure-navigation-check.md).
+
 The Updates filter and `vinix-package updates` use the same complete dependency
 resolution as `review upgrade`. They show runtime/data changes even when the
 application's version stays unchanged, dependencies added or removed by an

@@ -39,6 +39,11 @@ including long paths and exit status. It survives catalog reloads until another
 failure, explicit clearing or window close. The view is read-only and marks
 omitted output. See [qualification](../../tests/packages/software-failure-check.md).
 
+Compact failure views at least 180 pixels wide and 200 high show short pages with
+Previous/Next and arrow/Page-key navigation. Resizing retains the short page and
+its corresponding full page. Both views use individual monospace line labels;
+smaller windows retain Back. See [navigation qualification](../../tests/packages/software-failure-navigation-check.md).
+
 **Verify installed** supports Stop/Cancel/Escape in full and compact windows.
 Stopping retires unaccepted progress/output and keeps the catalog for retry.
 Completion and human success output wait for successful worker exit; late

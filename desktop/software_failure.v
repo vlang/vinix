@@ -8,6 +8,7 @@ const software_failure_limit = 8192
 
 struct SoftwareFailurePage {
 	text string
+	source_page int
 mut:
 	label string
 }
@@ -16,9 +17,13 @@ fn (mut a SoftwareApp) clear_failure() {
 	unsafe {
 		for page in a.failure_pages { page.text.free(); page.label.free() }
 		(&array(&a.failure_pages)).free()
+		for page in a.failure_compact_pages { page.text.free(); page.label.free() }
+		(&array(&a.failure_compact_pages)).free()
 		a.failure_heading.free()
 	}
 	a.failure_pages = []SoftwareFailurePage{}
+	a.failure_compact_pages = []SoftwareFailurePage{}
+	a.failure_compact_page = 0; a.failure_compact_mode = false
 	a.failure_heading = ''
 	a.failure_mode = false; a.failure_page = 0; a.failure_truncated = false
 }
@@ -80,12 +85,6 @@ fn software_failure_text(input string) string {
 	return bytes.bytestr()
 }
 
-fn (mut a SoftwareApp) failure_add_page(lines []string) {
-	page := SoftwareFailurePage{text: lines.join('\n')}
-	pointer := unsafe { &page }
-	unsafe { a.failure_pages.push_many(pointer, 1) }
-}
-
 fn (mut a SoftwareApp) capture_failure(arguments []string, code int) {
 	a.clear_failure()
 	a.failure_pages = []SoftwareFailurePage{cap: 16}
@@ -104,29 +103,52 @@ fn (mut a SoftwareApp) capture_failure(arguments []string, code int) {
 		else { 'The service returned no diagnostic text. Check administrator access, repository configuration and disk space.' }
 	text := software_failure_text(input)
 	defer { unsafe { text.free() } }
-	mut lines := []string{cap: 14}
+	software_failure_paginate(mut a.failure_pages, text, 48, 14, 0)
+	software_failure_labels(mut a.failure_pages)
+	a.failure_compact_pages = []SoftwareFailurePage{cap: 16}
+	unsafe { a.failure_compact_pages.flags |= .noslices }
+	// Keep a canonical-page anchor so compact -> full -> compact returns to
+	// the exact short page. All prepared text is owned; redraw only borrows it.
+	for index, page in a.failure_pages {
+		software_failure_paginate(mut a.failure_compact_pages, page.text, 12, 3, index)
+	}
+	software_failure_labels(mut a.failure_compact_pages)
+}
+
+fn software_failure_paginate(mut pages []SoftwareFailurePage, text string, columns int, rows int, source_page int) {
+	mut lines := []string{cap: rows}
 	unsafe { lines.flags |= .noslices }
 	defer { software_policy_free_lines(mut lines) }
+	if text.len == 0 { lines << ''.clone() }
 	mut position := 0
 	for position < text.len {
 		mut end := position
-		for end < text.len && end - position < 48 && text[end] != `\n` { end++ }
+		for end < text.len && end - position < columns && text[end] != `\n` { end++ }
 		for end > position && end < text.len && text[end] & 0xc0 == 0x80 { end-- }
 		part := unsafe { tos(text.str + position, end - position).clone() }
 		pointer := unsafe { &part }
 		unsafe { lines.push_many(pointer, 1) }
 		position = end + if end < text.len && text[end] == `\n` { 1 } else { 0 }
-		if lines.len == 14 {
-			a.failure_add_page(lines)
+		if lines.len == rows {
+			page := SoftwareFailurePage{text: lines.join('\n'), source_page: source_page}
+			page_pointer := unsafe { &page }
+			unsafe { pages.push_many(page_pointer, 1) }
 			for line in lines { unsafe { line.free() } }; lines.clear()
 		}
 	}
-	if lines.len > 0 { a.failure_add_page(lines) }
-	total := a.failure_pages.len.str()
+	if lines.len > 0 {
+		page := SoftwareFailurePage{text: lines.join('\n'), source_page: source_page}
+		page_pointer := unsafe { &page }
+		unsafe { pages.push_many(page_pointer, 1) }
+	}
+}
+
+fn software_failure_labels(mut pages []SoftwareFailurePage) {
+	total := pages.len.str()
 	defer { unsafe { total.free() } }
-	for index in 0 .. a.failure_pages.len {
+	for index in 0 .. pages.len {
 		page := (index + 1).str()
-		a.failure_pages[index].label = page + ' of ' + total
+		pages[index].label = page + ' of ' + total
 		unsafe { page.free() }
 	}
 }
@@ -135,8 +157,28 @@ fn (mut a SoftwareApp) handle_failure(action string) {
 	match action {
 		'software.failure.back' { a.failure_mode = false }
 		'software.failure.clear' { a.clear_failure() }
-		'software.failure.previous' { if a.failure_page > 0 { a.failure_page-- } }
-		'software.failure.next' { if a.failure_page + 1 < a.failure_pages.len { a.failure_page++ } }
+		'software.failure.previous', 'software.failure.next' {
+			step := if action == 'software.failure.next' { 1 } else { -1 }
+			if a.failure_compact_mode {
+				next := a.failure_compact_page + step
+				if next >= 0 && next < a.failure_compact_pages.len {
+					a.failure_compact_page = next
+					a.failure_page = a.failure_compact_pages[next].source_page
+				}
+			} else {
+				next := a.failure_page + step
+				if next >= 0 && next < a.failure_pages.len { a.failure_page = next }
+			}
+		}
+		else {}
+	}
+}
+
+fn (mut a SoftwareApp) failure_key_input(input string) {
+	match input {
+		'\x1b' { a.handle_failure('software.failure.back') }
+		'\x1b[D', '\x1b[5~' { a.handle_failure('software.failure.previous') }
+		'\x1b[C', '\x1b[6~' { a.handle_failure('software.failure.next') }
 		else {}
 	}
 }
@@ -148,14 +190,52 @@ fn (a &SoftwareApp) add_status_footer(mut children []ui2.Element, width int, hei
 	if available { children << software_button('software.failure', 'Failure details', width - 162, y, 148) }
 }
 
-fn (a &SoftwareApp) build_failure(size ui2.Rect) ui2.Element {
+fn software_failure_lines(mut children []ui2.Element, text string, x int, y int, width int, line_height int) {
+	// The native renderer draws each label as one line. Separate labels also
+	// prevent backend word wrapping from hiding a prepared diagnostic fragment.
+	mut start := 0
+	mut row := 0
+	for end in 0 .. text.len + 1 {
+		if end == text.len || text[end] == `\n` {
+			children << ui2.label('', unsafe { tos(text.str + start, end - start) },
+				ui2.rect(f64(x), f64(y + row * line_height), f64(width), f64(line_height)),
+				ui2.TextStyle{color: body_text, size: 12, font_family: 'mono'})
+			start = end + 1; row++
+		}
+	}
+}
+
+fn (mut a SoftwareApp) build_failure(size ui2.Rect) ui2.Element {
 	width := int(size.width); height := int(size.height)
-	mut children := frame_elements(10)
+	mut children := frame_elements(24)
 	if width < 640 || height < 610 {
-		children << software_label('Enlarge this window to read failure details.', 14, 8, if width > 28 { width - 28 } else { 1 }, 40, false)
-		children << software_button('software.failure.back', 'Back', 14, 58, 110)
+		a.failure_compact_mode = true
+		if a.failure_compact_page < a.failure_compact_pages.len
+			&& a.failure_compact_pages[a.failure_compact_page].source_page != a.failure_page {
+			for index, page in a.failure_compact_pages {
+				if page.source_page == a.failure_page { a.failure_compact_page = index; break }
+			}
+		}
+		content_width := if width > 28 { width - 28 } else { 1 }
+		back_width := if width >= 240 { 110 } else if content_width >= 56 { 56 } else { content_width }
+		children << software_button('software.failure.back', 'Back', if width > back_width + 28 { width - back_width - 14 } else { 14 }, 8, back_width)
+		if width < 180 || height < 200 {
+			children << software_label('Enlarge to read diagnostics.', 14, 46, content_width, 28, false)
+			return ui2.screen(app_surface, children)
+		}
+		children << software_label(a.failure_heading, 14, 46, content_width, 28, false)
+		children << software_label(if a.failure_truncated { 'Earlier output omitted.' } else { 'Retained service output.' }, 14, 80, content_width, 20, false)
+		if a.failure_compact_page >= 0 && a.failure_compact_page < a.failure_compact_pages.len {
+			page := a.failure_compact_pages[a.failure_compact_page]
+			children << software_label(page.label, 14, 8, if width > back_width + 42 { width - back_width - 42 } else { 1 }, 28, false)
+			software_failure_lines(mut children, page.text, 14, 110, content_width, 16)
+		}
+		button_width := if width >= 240 { 90 } else { (width - 42) / 2 }
+		children << software_button('software.failure.previous', 'Previous', 14, height - 36, button_width)
+		children << software_button('software.failure.next', 'Next', width - 14 - button_width, height - 36, button_width)
 		return ui2.screen(app_surface, children)
 	}
+	a.failure_compact_mode = false
 	children << software_label('Last service failure', 14, 8, width - 202, 28, false)
 	children << software_button('software.failure.back', 'Back', width - 174, 8, 160)
 	children << software_label(a.failure_heading, 14, 46, width - 28, 28, false)
@@ -163,7 +243,7 @@ fn (a &SoftwareApp) build_failure(size ui2.Rect) ui2.Element {
 		else { 'Retained diagnostic output. Long lines continue on the next line or page.' }, 14, 82, width - 28, 44, false)
 	if a.failure_page >= 0 && a.failure_page < a.failure_pages.len {
 		page := a.failure_pages[a.failure_page]
-		children << ui2.label('', page.text, ui2.rect(14, 142, f64(width - 28), f64(height - 306)), ui2.TextStyle{color: body_text, size: 12, lines: 14})
+		software_failure_lines(mut children, page.text, 14, 142, width - 28, 20)
 		children << software_label(page.label, 238, height - 138, width - 430, 28, false)
 	}
 	children << software_button('software.failure.previous', 'Previous', 14, height - 138, 100)
