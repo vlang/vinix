@@ -91,7 +91,8 @@ fn check_software_cleanup_navigation() ! {
 				assert !tree.children.any(it.id in ['software.cleanup.confirm', 'software.cleanup.back', 'software.cleanup.reload'])
 				free_window_tree(tree)
 			}
-			for event in ['software.cleanup.confirm', 'software.cleanup.back', 'software.cleanup.reload', 'software.cleanup.down']! { app.handle(event)! }
+			for event in ['software.cleanup.confirm', 'software.cleanup.back', 'software.cleanup.reload', 'software.cleanup.down', 'software.report.read']! { app.handle(event)! }
+			assert !app.report_reader_mode && app.details_pages.len == 0 && app.details_compact_pages.len == 0
 			app.paste_input('\x1b'); assert app.worker.pid == pid
 			if action == 'escape' { app.key_input('\x1b') } else { app.handle(action)! }
 			assert app.worker == unsafe { nil } && C.kill(pid, 0) != 0 && app.cleanup_worker == .none && !app.worker_view && !app.worker_review
@@ -120,6 +121,8 @@ fn check_software_cleanup_navigation() ! {
 		else { assert !tree.children.any(it.id == 'software.cleanup.confirm') }
 		free_window_tree(tree)
 	}
+	check_cleanup_report_content(&app); check_software_report_reader(mut app)!
+	assert app.cleanup_scroll == 7 && app.cleanup_snapshot.generations.len == 4096
 	os.setenv('VINIX_SOFTWARE_CLEANUP_NAVIGATION', 'apply-complete', true)
 	app.handle('software.cleanup.confirm')!; assert app.admin_prompt
 	app.stop_cleanup_review(); assert app.admin_prompt && app.worker != unsafe { nil }
@@ -141,7 +144,8 @@ fn check_software_cleanup_navigation() ! {
 			free_window_tree(tree)
 		}
 		for event in ['software.cleanup.stop', 'software.cleanup.cancel', 'software.cleanup.back', 'software.cleanup.reload',
-			'software.cleanup.confirm', 'software.cleanup.down', 'software.cancel', 'software.install']! { app.handle(event)! }
+			'software.cleanup.confirm', 'software.cleanup.down', 'software.report.read', 'software.cancel', 'software.install']! { app.handle(event)! }
+		assert !app.report_reader_mode && app.details_pages.len == 0 && app.details_compact_pages.len == 0
 		app.key_input('\x1b'); app.stop_cleanup_review(); app.paste_input('must not edit')
 		assert app.worker.pid == pid && C.kill(pid, 0) == 0 && app.cleanup_mode && !os.exists(receipt)
 		if mode == 'apply-complete' { os.setenv('VINIX_SOFTWARE_CLEANUP_NAVIGATION', 'review-complete', true) }
@@ -199,12 +203,14 @@ fn check_software_cleanup_navigation_memory() ! {
 				anchor := app.cleanup_scroll
 				free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!); free_window_tree(app.build(ui2.rect(0, 0, 900, 1200))!)
 				assert app.cleanup_scroll == anchor
+				report_reader_cycle(mut app)!; assert app.cleanup_scroll == anchor
 				app.capture_failure(arguments, 29); app.progress_seen = true
 				free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!); free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
 				app.progress_seen = false; app.clear_failure(); app.clear_cleanup_review()
 				app.cleanup_result = 'Cleanup finished fixture result.'.clone()
 				app.output.clear(); for byte in empty_text { app.output << byte }; app.load_cleanup_review()
 				assert app.cleanup_ready && app.cleanup_result == '' && app.status.contains('Cleanup finished')
+				report_reader_cycle(mut app)!
 				free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!); free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
 				app.cleanup_key_input('\x1b'); assert !app.cleanup_mode
 			}
@@ -212,5 +218,6 @@ fn check_software_cleanup_navigation_memory() ! {
 		app.set_status('')
 		kept := C.vinix_heap_end(); assert kept == 0, 'cleanup navigation retained ${kept} bytes'
 		println('Software cleanup navigation: 1000 4096-generation/empty review/full/compact/resize/failure/progress/result/back/retirement cycles retain zero tracked bytes')
+		println('Software cleanup reader: 1000 maximum/empty review/read/resize/back/retirement cycles retain zero tracked bytes')
 	}
 }

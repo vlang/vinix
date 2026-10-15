@@ -833,6 +833,17 @@ these controls. A stopped or failed post-cleanup reload keeps the completed
 result for the next successful read. See
 [cleanup navigation checks](../tests/packages/software-cleanup-navigation-check.md).
 
+Loaded cleanup reviews also offer **Read review** in full and compact windows.
+The shared read-only reader shows the architecture, complete review fingerprint,
+current/rollback identities, every listed obsolete generation and the permanent
+deletion/retention rules. Previous/Next and arrow/Page keys traverse complete
+short pages at 180×220 or larger; resizing retains the page anchor. Back or
+Escape returns to the same list position. Empty reviews disclose that nothing
+is listed. Reload, deletion, package actions and pasted commands stay inactive
+inside the reader, and pending reviews or approved writes cannot enter it.
+Deletion still requires the full review and administrator authorization. See
+[cleanup reader qualification](../tests/packages/software-cleanup-reader-check.md).
+
 The public commands are `cleanup-review` (format-1 JSON) and
 `cleanup-apply FINGERPRINT`. Approval binds configuration, both retained states
 and the complete removable set, including generation-parent, root and lease

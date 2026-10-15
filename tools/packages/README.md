@@ -192,6 +192,13 @@ Read [administration/recovery](../../docs/application-distribution.md) and
 [SDK 1](SDK.md) for enrollment, policy, packaging and limits. Release publisher
 enrollment and catalog/runtime guest qualification remain required.
 
+Software's **Clean up versions → Read review** presents the complete admitted
+generation list, fingerprint, retained current/rollback identities and deletion
+rules through the shared reader, including compact windows. Back/Escape keeps
+the list position; reading cannot confirm deletion or reload the proposal.
+Pending work blocks reader entry. Confirmation remains on the full review.
+See [qualification](../../tests/packages/software-cleanup-reader-check.md).
+
 `deployment-snapshot [INSTALLED_ID...]` exports exact installed app/runtime/data
 metadata as an existing format-2 deployment lock, including when catalogs are
 unavailable or a publisher was revoked. It preserves installed versions instead

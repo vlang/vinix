@@ -28,13 +28,17 @@ fn (mut a SoftwareApp) cleanup_key_input(input string) {
 
 fn (a &SoftwareApp) build_cleanup_compact(width int, height int) ui2.Element {
 	mut children := frame_elements(10)
-	children << software_label('Clean up versions · enlarge for details', 14, 8, width - 28, 28, false)
+	children << software_label(if a.cleanup_ready { 'Cleanup review' } else { 'Clean up versions · enlarge for details' }, 14, 8, width - 28, 28, false)
 	button_width := if width > 202 { 174 } else { width - 28 }
 	mut next_y := 84
 	if a.cleanup_review_running() {
 		children << software_button('software.cleanup.stop', 'Stop review', 14, 46, button_width)
 	} else if a.worker == unsafe { nil } {
 		children << software_button('software.cleanup.back', 'Back to catalog', 14, 46, button_width)
+		if a.cleanup_ready && a.details_pages.len > 0 && height >= 220 {
+			children << software_button('software.report.read', 'Read review', 14, next_y, button_width)
+			next_y += 38
+		}
 		children << software_button('software.cleanup.reload', 'Reload review', 14, next_y, button_width)
 		next_y += 38
 	} else {

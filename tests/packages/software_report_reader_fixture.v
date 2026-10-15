@@ -46,6 +46,9 @@ fn check_software_report_reader(mut app SoftwareApp) ! {
 	issues := app.health_issues_only; differences := app.audit_differences_only
 	path := app.audit_path; saved := app.snapshot_pending; digest := app.snapshot_saved.sha256
 	audit_digest := app.audit_snapshot.deployment_sha256; status := app.status
+	cleanup_fingerprint := app.cleanup_snapshot.fingerprint; cleanup_scroll := app.cleanup_scroll
+	cleanup_summary := app.cleanup_summary; cleanup_result := app.cleanup_result
+	cleanup_generations := app.cleanup_snapshot.generations.data; cleanup_ready := app.cleanup_ready
 	storage := app.details_compact_pages.data
 	assert app.details_compact_pages.len > app.details_pages.len
 	for canonical, full in app.details_pages {
@@ -72,7 +75,8 @@ fn check_software_report_reader(mut app SoftwareApp) ! {
 			for id in ['software.report.back', 'software.report.previous', 'software.report.next']! { assert tree.children.any(it.id == id) }
 			assert tree.children.any(it.text == short.label)
 			assert tree.children.any(it.id == 'software.report.package.next') == app.report_has_packages()
-			assert !tree.children.any(it.id in ['software.health.repair', 'software.audit.review', 'software.snapshot.export', 'software.snapshot.review', 'software.failure'])
+			assert !tree.children.any(it.id in ['software.health.repair', 'software.audit.review', 'software.snapshot.export', 'software.snapshot.review',
+				'software.cleanup.confirm', 'software.cleanup.reload', 'software.failure'])
 			for element in tree.children {
 				assert element.frame.x >= 0 && element.frame.x + element.frame.width <= size.width
 				assert element.frame.y >= 0 && element.frame.y + element.frame.height <= size.height
@@ -113,6 +117,8 @@ fn check_software_report_reader(mut app SoftwareApp) ! {
 		assert app.details_compact_page == 0 || app.details_compact_pages[app.details_compact_page - 1].source_page != app.details_page
 	}
 	for action in ['software.health.reload', 'software.health.repair', 'software.health.issues', 'software.health.search',
+		'software.cleanup.confirm', 'software.cleanup.reload', 'software.cleanup.back', 'software.cleanup.stop', 'software.cleanup.cancel',
+		'software.cleanup.up', 'software.cleanup.down',
 		'software.audit.reload', 'software.audit.review', 'software.audit.differences', 'software.audit.search',
 		'software.snapshot.another', 'software.snapshot.save', 'software.snapshot.audit', 'software.snapshot.review', 'software.snapshot.export',
 		'software.deployment.path', 'software.cancel', 'software.confirm', 'software.failure', 'software.row.0',
@@ -125,6 +131,8 @@ fn check_software_report_reader(mut app SoftwareApp) ! {
 	assert app.health_issues_only == issues && app.audit_differences_only == differences
 	assert app.audit_path == path && app.snapshot_pending == saved && app.snapshot_saved.sha256 == digest && app.audit_snapshot.deployment_sha256 == audit_digest
 	assert app.status == status && app.details_compact_pages.data == storage
+	assert app.cleanup_snapshot.fingerprint == cleanup_fingerprint && app.cleanup_scroll == cleanup_scroll && app.cleanup_ready == cleanup_ready
+	assert app.cleanup_snapshot.generations.data == cleanup_generations && app.cleanup_summary == cleanup_summary && app.cleanup_result == cleanup_result
 	if app.report_has_packages() {
 		indices := if app.health_mode { app.health_matching } else { app.audit_matching }
 		for report_fixture_selected(&app) != indices[0] { app.key_input('\x1b[A') }
@@ -166,6 +174,7 @@ fn report_reader_cycle(mut app SoftwareApp) ! {
 	free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!)
 	free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
 	app.handle('software.snapshot.export')!; app.handle('software.audit.review')!; app.handle('software.health.repair')!
+	app.handle('software.cleanup.confirm')!; app.handle('software.cleanup.reload')!; app.handle('software.cleanup.back')!
 	assert app.worker == unsafe { nil } && !app.admin_prompt && app.report_reader_mode
 	app.key_input('\x1b'); assert !app.report_reader_mode
 	if app.report_has_packages() && report_fixture_selected(&app) != selected {

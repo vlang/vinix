@@ -7,6 +7,7 @@ import tools.packages.pkgprotocol
 enum SoftwareCleanupWorker { none review apply }
 
 fn (mut a SoftwareApp) clear_cleanup_review() {
+	a.clear_details()
 	a.cleanup_snapshot.close()
 	a.cleanup_ready = false
 	a.cleanup_scroll = 0
@@ -28,6 +29,35 @@ fn (mut a SoftwareApp) read_cleanup() {
 	a.set_status('Reviewing obsolete package generations…')
 }
 
+fn (mut a SoftwareApp) prepare_cleanup_details() {
+	a.clear_details()
+	a.details_pages = []SoftwareDetailsPage{cap: 16}
+	unsafe { a.details_pages.flags |= .noslices }
+	mut values := ['Architecture: ' + a.cleanup_snapshot.architecture,
+		'Review fingerprint: ' + a.cleanup_snapshot.fingerprint]
+	unsafe { values.flags |= .noslices }
+	software_details_count(mut values, 'Current generation retained: ', a.cleanup_snapshot.generation)
+	software_details_count(mut values, 'Rollback generation retained: ', a.cleanup_snapshot.previous)
+	software_details_count(mut values, 'Obsolete generations to delete: ', u64(a.cleanup_snapshot.generations.len))
+	values << 'Deletion is permanent for the listed versions. Current, rollback and versions held by running applications are protected.'.clone()
+	values << 'Cached complete and partial downloads, interrupted stages and personal application data are retained.'.clone()
+	values << 'Reload after applications finish to review newly eligible versions. Changes to the reviewed state require a fresh review before deletion.'.clone()
+	if a.cleanup_snapshot.generations.len == 0 { values << 'No obsolete generations are listed for deletion.'.clone() }
+	for generation in a.cleanup_snapshot.generations {
+		software_details_count(mut values, 'Remove generation ', generation)
+	}
+	a.details_values(0, values)
+	software_policy_free_lines(mut values)
+	total := a.details_pages.len.str()
+	for index in 0 .. a.details_pages.len {
+		number := (index + 1).str()
+		a.details_pages[index].label = number + ' of ' + total
+		unsafe { number.free() }
+	}
+	unsafe { total.free() }
+	a.prepare_report_reader()
+}
+
 fn (mut a SoftwareApp) load_cleanup_review() {
 	a.clear_cleanup_review()
 	mut review := pkgprotocol.decode_cleanup_review(editor_bytes_text(a.output)) or {
@@ -42,6 +72,7 @@ fn (mut a SoftwareApp) load_cleanup_review() {
 	count := review.generations.len.str()
 	a.cleanup_summary = review.architecture + ' · Current: ' + current + ' · Rollback: ' + previous + ' · Obsolete generations: ' + count
 	unsafe { current.free(); previous.free(); count.free() }
+	a.prepare_cleanup_details()
 	a.set_status(if a.cleanup_result != '' { a.cleanup_result } else {
 		'Only the listed obsolete generations will be deleted. Current, rollback and running applications stay protected. Reload after applications finish to review newly eligible generations.'
 	})
@@ -88,6 +119,9 @@ fn (mut a SoftwareApp) build_cleanup(width int, height int) ui2.Element {
 	if a.worker == unsafe { nil } {
 		children << software_button('software.cleanup.back', 'Back to catalog', 14, height - 138, 140)
 		children << software_button('software.cleanup.reload', 'Reload review', 166, height - 138, 118)
+		if a.cleanup_ready && a.details_pages.len > 0 {
+			children << software_button('software.report.read', 'Read review', 488, height - 138, width - 502)
+		}
 		if a.cleanup_ready && a.cleanup_snapshot.generations.len > 0 {
 			children << software_button('software.cleanup.confirm', 'Delete listed versions', 296, height - 138, 180)
 		}

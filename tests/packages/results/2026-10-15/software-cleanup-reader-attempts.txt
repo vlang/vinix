@@ -1,0 +1,14 @@
+All 32 focused compile/run checks passed, including full Software functional assertions, all twenty-five allocation modes, clang ASan/UBSan functional plus the standard cleanup allocation mode, and native font metrics. The independent maintained Software-only driver and both full desktop architecture typechecks passed. No assertion, admission, authorization, protocol or service arguments were relaxed. Compiler calls use -nocache, V_MACOS_V3_NO_FALLBACK=1 and V_C_ERROR_BUG_REPORT_DISABLED=1. ASAN_OPTIONS=detect_leaks=0 and UBSAN_OPTIONS=halt_on_error=1. The two cleanup modes retain zero tracked bytes over 1000 cycles. No whole-service/spawned-worker allocation freedom, guest graphical acceptance or completed roadmap 14 release gate is claimed.
+
+The optional maximum-size sanitizer allocation loop was deliberately stopped
+after more than 21 minutes under heavy concurrent host load. It did not complete
+and is not a passing check. The full sanitizer functional suite already covered
+the 4,096-generation review, and its standard cleanup allocation mode completed
+1,000 cycles with zero tracked bytes. The maximum-size allocation loop passed
+without sanitizers both directly and through the maintained driver. No assertion
+was relaxed. The original sanitizer logs, binary, generated C and interruption
+note are pinned. Its parent only serializes results after every child finishes;
+the three observed successful completions were recovered with seconds=-1 to
+mark unavailable individual timings. No completed maximum-size sanitizer stress
+result is claimed.
+
