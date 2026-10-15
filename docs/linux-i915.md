@@ -512,7 +512,10 @@ after a filesystem failure. Mutable build inputs still require isolation.
   ordinary nice override of -20. It uses the native scheduler's existing nice
   weighting (twice the normal quantum at -20), without changing the shared
   kernel process or selecting a real-time policy. The existing scheduler cap
-  when real-time policies are in use still applies. `system_wq`,
+  when real-time policies are in use still applies. Worker priority changes
+  require ordinary task context and compare the kernel Process by pointer
+  identity. An interrupt handler with IF enabled is rejected before changing
+  the borrowed task or entering the scheduler. `system_wq`,
   `system_highpri_wq` and `system_unbound_wq` initialize together at boot; partial
   initialization releases every worker and publishes none of the system pointers.
   Required i915 default/unordered and high-priority queue allocations now work,
@@ -2960,3 +2963,65 @@ The backend author is excluded from that independent approval; a separate
 review covers the backend and shared scheduler implementation.
 That 17-body backend/shared C/O2/ELF review SHA256:
 `fc04706a129927b2a12c9cbb19b857e3576470e488a00357e751cfddfd0f537f`.
+
+## Priority worker task ownership (2026-10-15)
+
+The native worker priority setter now uses Process pointer identity, avoiding
+V's full Process value comparisons. It also rejects an active maskable IRQ
+frame even when the handler enables interrupts. Failure restores incoming IF
+before publishing any priority fields or entering the scheduler. Successful
+ordinary calls keep the existing nice value, enabling-flag publication order
+and one scheduler entry; WQ_HIGHPRI continues to use ordinary nice -20.
+
+Six GNU99/GNU11 O0/O1/O2 ASan/UBSan host profiles each pass 64,590 cases,
+two labeled historical controls and 763,350 assertions. Cases include all valid
+nice values and 256 modeled CPU indices, invalid-range/error precedence,
+IF/preemption/IRQ guards and distinct but equal-valued Process owners. The
+controls separately reproduce the old ownership acceptance and forbidden IRQ
+publication. Their scheduler is a V transport; real native IRQ scheduler entry
+would fail explicitly. Both production bodies remain exact across raw,
+selected and six separately compiled freestanding objects; imports are checked
+against eight allowed leaves. The four-path manifest binds 40 selected bodies,
+208 compiler-input snapshots and 77 artifacts.
+
+Host result `worker-priority-host-final-v1/result.json` SHA256:
+`e21e9030417515df8282afcd11472f33f3ac7be88e87c0d13895cca4271f2e4a`;
+manifest SHA256:
+`5b6c82d4600940060e506a2b00e47640a7ded191a1abd1add1f8243a8dd07f57`;
+independent host review SHA256:
+`b68da465cacb94bdecc86bba0f4a0104dceb6db9162c42c2450c9b055eaa41a4`.
+Independent source/lifetime review SHA256:
+`d8612031aae8fa34ff079a76021409fa7553431c30105f7e65d3d523cc403e2d`.
+
+Fresh isolated enabled/default x86 and disabled ARM builds pass at
+`219a33d6f` plus the two frozen production files. Freeze SHA256:
+`b9defe84de05c744db24b09d9944ba447e1ebd744bd61459a2f00de511e9b979`.
+Normal/SSE/four-level guests use the exact enabled ELF
+`3521ba24edfadecf91ec1564bf4d47b926509414b3dcf55c548299e24a10b690`;
+the default guest uses
+`37b88d958948cc502e9323ca4369596572737ac94bf0a1ff66c2121fe713a279`.
+All four guests pass. Each enabled guest retains all 54 markers and 36 strict
+page/live-heap equalities. The existing worker interrupt test now attempts both
+binding and nice changes in 200 actual interrupted-task callbacks per batch,
+with three warmups before the measured fourth. It checks raw priority fields,
+base/effective timeslice, affinity, NUMA, migration pin and IRQ/preemption/task
+identity, then repeats priority observations after the actual interrupt return.
+Every actor joins and retires before the final allocation comparison. No new
+allocation or lifetime owner is introduced.
+
+Independent enabled native C/O2/ELF and disabled ARM review SHA256:
+`532cbffa91db6b0d08960d684b5af7fdd6bb67e0c2ba53256558d2be0884bf98`.
+The last migration full-driver audit remains 6/269; the separate stddef header
+increment is validated independently. Full i915/core linking and hardware
+validation remain pending. Repeat host checks with:
+
+```sh
+build-support/run-v-tool.sh tests/linuxkpi/worker_priority.v --keep-dir NEW_DIRECTORY
+```
+
+Final four-guest artifact/ISO/chronology and parser-control map SHA256:
+`a933c5e082bdd51a7e5e9ae3a4d4c7758af775dfe2f4ac97ff0d33c2bee65273`;
+independent guest/default artifact review SHA256:
+`39a837fa711234987741480e83577ad50ecbe7841907cd14a1c8d516b11e2527`.
+Default generated C retains ordinary unused helper definitions, as before;
+their APIs and the conditional IRQ tests are absent from the default linked ELF.

@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-15 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Latest migration-pin build baseline: **`6896a6ea9`**, with the 18 frozen native inputs described below. Recheck HEAD and the worktree before
+Latest priority-worker build baseline: **`219a33d6f`**, with the two frozen native inputs described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -81,7 +81,7 @@ global fault-lease rewrite was not applied.
 
 Ordinary RCU, deferred page-backed frees, native IRQ work and the DMA-fence
 synchronization core are implemented and validated. The latest normal/SSE/
-four-level guests at the CPU-bug milestone pass 53 markers and 35 strict allocation equalities.
+four-level guests pass 54 markers and 36 strict allocation equalities.
 Fence containers, reservation ownership and unchanged i915 software fences are
 implemented and validated. Original boot-CPU L1TF queries are also implemented
 and validated, with native positive-MSR execution still pending. Task-owned migration pins now preserve CPU identity through sleep and yield; final validation is recorded below. Continue through the remaining task/MM, device,
@@ -91,6 +91,10 @@ memory and DRM services; complete i915 support is still pending.
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `219a33d6f` | Task-owned migration pins across sleep/yield, post-lock eligibility and coherent affinity release snapshots |
+| `6896a6ea9` | Original slab flag typedef ownership, with unchanged allocator semantics |
+| `d7b24c4bf` | Original boot-CPU L1TF query policy and observed native CPU classification |
+| `156ef022a` | Unchanged i915 software fences, real dependency graphs and DMA timeout ownership |
 | `59b1e9ac5` | Native DMA reservation producers, usage tags, writer ownership, RCU iteration and collection lifetimes |
 | `321bb4c63` | DMA-fence arrays/chains, actual IRQ union reuse and deferred container release |
 | `c136b3209` | Native DMA-fence synchronization core, callbacks, waits and RCU release |
@@ -1994,6 +1998,57 @@ regenerated ABI/bounds are unchanged. No new full audit was needed; the last
 executed result remains **6/269**, with the same task/MM, CPU-bug and entry-stack
 blockers. Full driver link, hardware PCI identity and real GPU validation remain
 unfinished.
+
+## Worker priority ownership and IRQ rejection (2026-10-15)
+
+The priority setter now compares Process pointers and rejects a live maskable
+IRQ frame before mutation even with IF enabled. Existing valid nice publication
+and ordinary scheduling remain unchanged. The native worker IRQ test now checks
+both binding and nice rejection with the same retained interrupted actor and
+post-IRET acknowledgement; priority overrides/flag, base/effective timeslice and
+migration pin are unchanged. It has 200 eligible actual callbacks per batch,
+three warmups and one measured fourth, with exact pages/all live heap recovery.
+No new allocation/reference is owned. The complete normal/SSE/four-level guests
+pass all 54 markers/36 strict rows; default startup passes without LinuxKPI.
+
+Frozen production2 at isolated baseline `219a33d6f` SHA256:
+`b9defe84de05c744db24b09d9944ba447e1ebd744bd61459a2f00de511e9b979`.
+Enabled/disabled x86 and disabled ARM builds pass. Final enabled ELF SHA256:
+`3521ba24edfadecf91ec1564bf4d47b926509414b3dcf55c548299e24a10b690`;
+default ELF SHA256:
+`37b88d958948cc502e9323ca4369596572737ac94bf0a1ff66c2121fe713a279`.
+The separate stddef header feature is excluded from these build overlays.
+
+Maintained V `worker_priority.v` passes six strict GNU99/GNU11 O0/O1/O2
+sanitizer profiles and six freestanding objects. Each run has 64,590 cases,
+two separately derived historical controls and 763,350 assertions. Host CPU/
+IRQ/task/store/scheduler leaves are explicit models; no native dispatch claim
+comes from them. Manifest40 actual definitions/two production bodies binds
+208 input snapshots and 77 artifacts. Result SHA256:
+`e21e9030417515df8282afcd11472f33f3ac7be88e87c0d13895cca4271f2e4a`;
+four-path manifest SHA256:
+`5b6c82d4600940060e506a2b00e47640a7ded191a1abd1add1f8243a8dd07f57`;
+independent host review SHA256:
+`b68da465cacb94bdecc86bba0f4a0104dceb6db9162c42c2450c9b055eaa41a4`.
+Independent production2 source/lifetime review SHA256:
+`d8612031aae8fa34ff079a76021409fa7553431c30105f7e65d3d523cc403e2d`;
+actual enabled x86 C/O2/ELF and disabled ARM review SHA256:
+`532cbffa91db6b0d08960d684b5af7fdd6bb67e0c2ba53256558d2be0884bf98`.
+
+Evidence is under `smp-oct10/priority-*` and `worker-priority-*`. The earlier
+author-only frontend invocation issue and bounded O2 timeout remain labeled;
+the exact complete root builds and saved objects are the executed evidence.
+GPU support remains incomplete. Continue through original declaration closure
+and real task/MM, device, mapping and DRM dependencies.
+
+Final four-guest artifact/ISO/chronology and parser-control map SHA256:
+`a933c5e082bdd51a7e5e9ae3a4d4c7758af775dfe2f4ac97ff0d33c2bee65273`;
+independent four-guest/default artifact review SHA256:
+`39a837fa711234987741480e83577ad50ecbe7841907cd14a1c8d516b11e2527`.
+Default raw C still contains ordinary unlinked helper definitions, matching its
+previous baseline; linked APIs and conditional IRQ tests are absent. The early
+overbroad reviewer assertion is preserved without treating it as a production
+failure. The final review authenticates all saved default compiler artifacts.
 
 ## Latest page-backed deferred RCU free increment
 

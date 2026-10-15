@@ -53,9 +53,14 @@ fn worker_irq_actor(_argument voidptr) {
 	// A valid local NUMA hint makes an erroneous same-CPU bind observable,
 	// independently of its already single-CPU affinity mask.
 	katomic.store(mut &owner.numa_node, int(cpulocal.current().numa_node))
+	nice := katomic.load(&owner.sched_nice_override)
+	has_nice := katomic.load(&owner.sched_has_nice_override)
+	timeslice := katomic.load(&owner.timeslice)
+	effective_slice := sched.thread_timeslice(owner)
+	migration_pin := katomic.load(&owner.linuxkpi_migration_pin)
 	if !ints || cpulocal.current().maskable_irq_depth != 0 || preempt_depth[1] != 0
 		|| voidptr(owner) != worker_irq_ledger.owner
-		|| voidptr(owner.process) != voidptr(kernel_process) {
+		|| voidptr(owner.process) != voidptr(kernel_process) || migration_pin != 0 {
 		katomic.store(mut &worker_irq_ledger.failures, u32(2))
 	}
 	katomic.store(mut &worker_irq_ledger.ready, true)
@@ -68,7 +73,12 @@ fn worker_irq_actor(_argument voidptr) {
 			// matching real IRQ return, rather than another interrupt callback.
 			if !check_ints || cpulocal.current().cpu_number != 1
 				|| cpulocal.current().maskable_irq_depth != 0 || preempt_depth[1] != 0
-				|| voidptr(proc.current_thread()) != voidptr(owner) {
+				|| voidptr(proc.current_thread()) != voidptr(owner)
+				|| katomic.load(&owner.sched_nice_override) != nice
+				|| katomic.load(&owner.sched_has_nice_override) != has_nice
+				|| katomic.load(&owner.timeslice) != timeslice
+				|| sched.thread_timeslice(owner) != effective_slice
+				|| katomic.load(&owner.linuxkpi_migration_pin) != migration_pin {
 				katomic.store(mut &worker_irq_ledger.failures, u32(4))
 			}
 			katomic.store(mut &worker_irq_ledger.post_iret, terminal)
@@ -96,6 +106,11 @@ fn worker_irq_callback(argument voidptr) {
 		node := katomic.load(&owner.numa_node)
 		failure_gate := owner.linuxkpi_alloc_fail_after
 		depth := local.maskable_irq_depth
+		nice := katomic.load(&owner.sched_nice_override)
+		has_nice := katomic.load(&owner.sched_has_nice_override)
+		timeslice := katomic.load(&owner.timeslice)
+		effective_slice := sched.thread_timeslice(owner)
+		migration_pin := katomic.load(&owner.linuxkpi_migration_pin)
 		if cpu.interrupt_state() || local.cpu_number != 1 || depth == 0
 			|| voidptr(owner.process) != voidptr(kernel_process) || failure_gate != 0 {
 			result.failures |= 1
@@ -120,6 +135,31 @@ fn worker_irq_callback(argument voidptr) {
 		// wrongly publishes affinity/NUMA state. The regression still fails.
 		katomic.store(mut &owner.affinity_mask, mask)
 		katomic.store(mut &owner.numa_node, node)
+		// Priority has the same task-only restriction even with IF enabled.
+		// A genuine old scheduler entry would fail explicitly in this frame;
+		// no callback polling or native test hook substitutes for that entry.
+		cpu.interrupt_toggle(true)
+		priority := worker_set_nice(-20)
+		priority_ints := cpu.interrupt_toggle(false)
+		if priority != -errno.ewouldblock || !priority_ints
+			|| voidptr(cpulocal.current()) != voidptr(local) || local.cpu_number != 1
+			|| local.maskable_irq_depth != depth || preempt_depth[1] != 0
+			|| voidptr(proc.current_thread()) != voidptr(owner)
+			|| katomic.load(&owner.affinity_mask) != mask
+			|| katomic.load(&owner.numa_node) != node
+			|| owner.linuxkpi_alloc_fail_after != failure_gate
+			|| katomic.load(&owner.sched_nice_override) != nice
+			|| katomic.load(&owner.sched_has_nice_override) != has_nice
+			|| katomic.load(&owner.timeslice) != timeslice
+			|| sched.thread_timeslice(owner) != effective_slice
+			|| katomic.load(&owner.linuxkpi_migration_pin) != migration_pin {
+			result.failures |= 4
+		}
+		// Preserve the borrowed actor if a returning historical control wrongly
+		// publishes priority scalars. The failure above remains observable.
+		katomic.store(mut &owner.sched_nice_override, nice)
+		katomic.store(mut &owner.sched_has_nice_override, has_nice)
+		katomic.store(mut &owner.timeslice, timeslice)
 	}
 	// No borrowed argument access follows this terminal publication. The
 	// controller additionally retains it until synchronous completion and a

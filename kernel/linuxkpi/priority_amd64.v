@@ -21,13 +21,17 @@ fn worker_set_nice(nice i32) int {
 		return -errno.einval
 	}
 	ints := cpu.interrupt_toggle(false)
-	index := cpulocal.current().cpu_number
-	if !ints || preempt_depth[index] != 0 {
+	local := cpulocal.current()
+	index := local.cpu_number
+	// An IRQ-enabled handler still borrows the interrupted task. It cannot
+	// publish a nice override or enter the ordinary scheduler on that task.
+	if !ints || preempt_depth[index] != 0 || local.maskable_irq_depth != 0 {
 		cpu.interrupt_toggle(ints)
 		return -errno.ewouldblock
 	}
 	mut t := proc.current_thread()
-	if t == unsafe { nil } || t.process != kernel_process || katomic.load(&t.is_dead) {
+	if t == unsafe { nil } || voidptr(t.process) != voidptr(kernel_process)
+		|| katomic.load(&t.is_dead) {
 		cpu.interrupt_toggle(ints)
 		return -errno.eperm
 	}
