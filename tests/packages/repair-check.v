@@ -16,6 +16,7 @@ fn repair_progress(event pkgprotocol.Progress) {
 	if path == '' { return }
 	os.unsetenv('VINIX_REPAIR_RESTORE')
 	os.write_file(path, os.read_file(os.getenv('VINIX_REPAIR_SOURCE')) or { panic(err) }) or { panic(err) }
+	os.chmod(path, 0o755) or { panic(err) }
 }
 
 fn (client Client) service() pkgcore.Service { return pkgcore.Service{ root: client.root, progress: repair_progress } }
@@ -78,6 +79,19 @@ fn check_case(work string, mode string, binary string, before bool) ! {
 	pkgcore.publish(work + '/repository', 'trusted', work + '/seed', 1, time.now().unix() + 3600)!
 	setup := pkgcore.Service{ root: root }; setup.refresh()!
 	initial := setup.transact('install', ['app'], pkgcore.TransactionOptions{})!
+	if mode == 'repair' {
+		// New signed versions are available, including their dependency closure.
+		// Explicit repair must retain the installed manifests and sequence records.
+		for installed in initial.packages {
+			p := pkgcore.Package{ ...installed.package, version: '2.0.0' }
+			os.write_file(work + '/manifest.json', json2.encode(p))!
+			pkgcore.pack(work + '/manifest.json', work + '/source-' + p.id, work + '/repository')!
+		}
+		pkgcore.publish(work + '/repository', 'trusted', work + '/seed', 2, time.now().unix() + 3600)!
+		setup.refresh()!
+		assert setup.plan('upgrade', [])!.packages.all(it.package.version == '2.0.0')
+		assert setup.plan('repair', [])!.packages == initial.packages
+	}
 	deployment := if mode.starts_with('deploy') { work + '/deployment.json' } else { '' }
 	if deployment != '' {
 		locked := setup.lock_deployment([])!
@@ -111,6 +125,7 @@ fn check_case(work string, mode string, binary string, before bool) ! {
 	mut decoded := pkgprotocol.decode_review(json2.encode(review))!; assert decoded == review; decoded.close()
 	// A different repair set (or a restored healthy set) requires new approval.
 	os.write_file(app, os.read_file(work + '/source-app/bin/app')!)!
+	os.chmod(app, 0o755)!
 	if _ := client.apply(review) { assert false } else { assert err.msg().contains('stale') }
 	os.write_file(runtime, os.read_file(work + '/source-runtime/bin/app')!)!
 	if _ := client.apply(review) { assert false } else { assert err.msg().contains('stale') }
@@ -154,6 +169,29 @@ fn check_case(work string, mode string, binary string, before bool) ! {
 	mut unchanged := client.review()!; defer { unchanged.close() }
 	assert unchanged.rows.all(it.action == 'keep') && unchanged.disk_needed == 0
 	assert client.apply(unchanged)!.generation == repaired.generation
+	if mode == 'repair' {
+		// A publisher withdrawal must fail explicitly, rather than substituting
+		// the newer manifest or trusting the old installed state by itself.
+		os.rename(work + '/hidden-objects', work + '/repository/objects')!
+		os.write_file(work + '/repository/objects/' + app_payload.sha256, os.read_file(work + '/source-app/bin/app')!)!
+		manifest := work + '/repository/manifests/app-' + architecture + '-1.0.0.json'
+		os.rename(manifest, work + '/withdrawn.json')!
+		pkgcore.publish(work + '/repository', 'trusted', work + '/seed', 3, time.now().unix() + 3600)!
+		setup.refresh()!
+		if _ := client.review() { assert false } else { assert err.msg().contains('installed manifest is unavailable') }
+		assert client.state(true)!.generation == repaired.generation
+		os.rename(work + '/withdrawn.json', manifest)!
+		pkgcore.publish(work + '/repository', 'trusted', work + '/seed', 4, time.now().unix() + 3600)!
+		setup.refresh()!
+		if binary == '' {
+			if _ := setup.review('repair', ['app']) { assert false } else { assert err.msg().contains('takes no package IDs') }
+			assert setup.transact('repair', [], pkgcore.TransactionOptions{})!.generation == repaired.generation
+		} else {
+			if _ := client.command(['repair', 'app']) { assert false } else { assert err.msg().contains('takes no package IDs') }
+			client.command(['--offline', '--progress', 'repair'])!
+			assert client.state(true)!.generation == repaired.generation
+		}
+	}
 	// The damaged previous generation is retained for inspection, but rollback
 	// must not trust its broken bytes merely because repair succeeded.
 	if binary == '' { if _ := setup.rollback('') { assert false } }
@@ -170,10 +208,10 @@ fn check() ! {
 	binary := if os.args.len == 3 && !before { os.real_path(os.args[2]) } else { '' }
 	if os.exists(work) || os.is_link(work) { return error('repair qualification directory must be new') }
 	os.mkdir(work)!
-	for mode in if before { ['install'] } else { ['install', 'upgrade', 'deploy-roots', 'deploy-lock'] } {
+	for mode in if before { ['install'] } else { ['install', 'upgrade', 'deploy-roots', 'deploy-lock', 'repair'] } {
 		check_case(work + '/' + mode, mode, binary, before)!
 	}
-	if !before { println('PACKAGE REPAIR signed install/upgrade/deployment, reviewed corruption recovery, preserved state/data and protocol compatibility PASS') }
+	if !before { println('PACKAGE REPAIR signed install/upgrade/deployment/explicit repair, reviewed corruption recovery, exact installed versions despite available updates, publisher withdrawal refusal, preserved state/data and protocol compatibility PASS') }
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }

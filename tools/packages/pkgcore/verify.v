@@ -19,13 +19,13 @@ fn verify_installed(directory string, state State, report fn (pkgprotocol.Progre
 			path := '${generation}/apps/${p.id}/${file.path}'
 			valid := verified_installed_file(path, file)
 			unsafe { path.free() }
-			if !valid { return error('${p.id}: installed payload verification failed: ${file.path}; use Repair / install') }
+			if !valid { return error('${p.id}: installed payload verification failed: ${file.path}; use Repair installed or vinix-package repair') }
 		}
 		if p.kind !in ['runtime', 'data'] {
 			path := 'share/applications/vinix-${p.id}.desktop'
 			report(pkgprotocol.Progress{ phase: 'verify', package: p.id, repository: installed.repository, path: path })
 			unsafe { path.free() }
-			if !verified_registration(generation, p) { return error('${p.id}: installed application registration verification failed; use Repair / install') }
+			if !verified_registration(generation, p) { return error('${p.id}: installed application registration verification failed; use Repair installed or vinix-package repair') }
 		}
 	}
 	report(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 })

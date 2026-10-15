@@ -103,7 +103,7 @@ fn check_installed_namespace(directory string, generation u64, p Package) ! {
 fn verify_installed_namespace(directory string, generation u64, p Package) ! {
 	check_installed_namespace(directory, generation, p) or {
 		message := err.msg()
-		failure := '${p.id}: installed namespace verification failed: ${message}; use Repair / install, or restore trusted state parents before retrying'
+		failure := '${p.id}: installed namespace verification failed: ${message}; use Repair installed or vinix-package repair, or restore trusted state parents before retrying'
 		unsafe { message.free(); err.free() }
 		return error(failure)
 	}

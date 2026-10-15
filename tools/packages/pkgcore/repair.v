@@ -5,7 +5,7 @@ module pkgcore
 // changes already stage fresh authenticated payloads. Removal and rollback keep
 // their independent recovery/trust rules.
 fn transaction_repairs(directory string, current State, plan Plan, operation string) []string {
-	if current.generation == 0 || operation !in ['install', 'upgrade', 'deploy'] { return []string{} }
+	if current.generation == 0 || operation !in ['install', 'upgrade', 'deploy', 'repair'] { return []string{} }
 	mut positions := map[string]int{}
 	defer { unsafe { positions.free() } }
 	for index, installed in current.packages { positions[installed.package.id] = index }

@@ -51,7 +51,7 @@ pub fn validate_arguments(arguments []string) ! {
 	match command {
 		'apply' {
 			if args.len >= 4 && args[2] in ['install', 'remove'] && args[3..].all(identifier(it)) { return }
-			if args.len == 3 && args[2] in ['upgrade', 'rollback'] { return }
+			if args.len == 3 && args[2] in ['upgrade', 'repair', 'rollback'] { return }
 		}
 		'repo-apply' {
 			if args.len == 4 && args[2] == 'revoke' && identifier(args[3]) { return }

@@ -15,9 +15,9 @@ import tools.packages.pkgprotocol
 const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progress] COMMAND [ARGS]\n' +
 	'  update | search [QUERY] | info ID | list | status | updates | view\n' +
 	'  admin [--progress] [--offline] update|apply|repo-apply|deployment-apply|policy-apply|mirror-apply|mirror-deployment-apply ...\n' +
-	'  install ID... | remove ID... | upgrade | rollback | gc | verify\n' +
-	'  plan install|remove|upgrade|deploy [ID...] | deploy MANIFEST.json\n' +
-	'  review install|remove|upgrade|deploy|rollback [ID...]\n' +
+	'  install ID... | remove ID... | upgrade | repair | rollback | gc | verify\n' +
+	'  plan install|remove|upgrade|repair|deploy [ID...] | deploy MANIFEST.json\n' +
+	'  review install|remove|upgrade|repair|deploy|rollback [ID...]\n' +
 	'  repo-list | repo-config | repo-enroll ID URL PUBLIC_KEY_HEX | repo-revoke ID\n' +
 	'  repo-review enroll ID URL KEY | repo-review revoke ID\n' +
 	'  repo-apply REVIEW_FINGERPRINT enroll ID URL KEY | repo-apply REVIEW_FINGERPRINT revoke ID\n' +
@@ -76,8 +76,8 @@ fn checked(arguments []string) !int {
 		return 2
 	}
 	command := args[0]
-	if progress && (as_json || command !in ['update', 'install', 'remove', 'upgrade', 'apply', 'deploy', 'deployment-apply', 'rollback', 'verify', 'mirror', 'mirror-apply', 'mirror-deployment-apply']) {
-		return error('--progress supports update, install/remove/upgrade, apply, deploy/deployment-apply, rollback, verify and mirror/mirror-apply/mirror-deployment-apply without --json')
+	if progress && (as_json || command !in ['update', 'install', 'remove', 'upgrade', 'repair', 'apply', 'deploy', 'deployment-apply', 'rollback', 'verify', 'mirror', 'mirror-apply', 'mirror-deployment-apply']) {
+		return error('--progress supports update, install/remove/upgrade/repair, apply, deploy/deployment-apply, rollback, verify and mirror/mirror-apply/mirror-deployment-apply without --json')
 	}
 	names := args[1..].clone()
 	if command in ['run', 'run-terminal', 'run-window', 'run-args', 'run-terminal-args'] && os.geteuid() != 0 {
@@ -300,7 +300,7 @@ fn checked(arguments []string) !int {
 			}
 			if command == 'verify' && progress { println('Installed package files and launchers verified.') }
 		}
-		'install', 'remove', 'upgrade' {
+		'install', 'remove', 'upgrade', 'repair' {
 			service.transact(command, names, pkgcore.TransactionOptions{})!
 		}
 		'plan' {
@@ -314,7 +314,7 @@ fn checked(arguments []string) !int {
 			println(text)
 		}
 		'apply' {
-			if names.len < 2 || !pkgcore.digest_valid(names[0]) || names[1] !in ['install', 'remove', 'upgrade', 'deploy', 'rollback'] {
+			if names.len < 2 || !pkgcore.digest_valid(names[0]) || names[1] !in ['install', 'remove', 'upgrade', 'repair', 'deploy', 'rollback'] {
 				return error('apply requires a review fingerprint and operation')
 			}
 			if names[1] == 'rollback' {

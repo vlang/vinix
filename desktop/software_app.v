@@ -425,6 +425,8 @@ fn (mut a SoftwareApp) load_review() {
 		message := 'Deployment file: ' + a.deployment_pending + '\nReview all dependencies and removals. This replaces the installed application set; personal data stays on disk.'
 		a.set_status(message)
 		unsafe { message.free() }
+	} else if a.review == 'repair' {
+		a.set_status('Repair preserves installed versions, permissions and the application set. Rows marked repair need rebuilding from authenticated payloads. Review every dependency before confirming; personal data stays on disk.')
 	} else {
 		a.set_status('Review every application and dependency, including retained packages and removals. Personal data stays on disk. Confirm applies this exact package set.')
 	}
@@ -789,6 +791,10 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 			if a.worker != unsafe { nil } || a.review != '' { return }
 			a.start(['verify'], false)
 		}
+		'software.repair' {
+			if a.worker != unsafe { nil } || a.review != '' { return }
+			a.begin_review('repair', [])
+		}
 		'software.up' {
 			if a.review_ready {
 				a.review_scroll = if a.review_scroll > a.page_rows {
@@ -956,7 +962,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 			14, 40, width - 28, 60, false)
 		return ui2.screen(app_surface, compact)
 	}
-	a.page_rows = if height > 400 { (height - 274) / 30 } else { 5 }
+	a.page_rows = if height > 400 { (height - if a.review != '' { 274 } else { 310 }) / 30 } else { 5 }
 	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
 	if a.details_mode { return a.build_details(width, height) }
 	if a.policy_mode { return a.build_policy(width, height) }
@@ -990,7 +996,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 			if !a.review_ready || index >= a.review_snapshot.rows.len { break }
 			row := a.review_snapshot.rows[index]
 			children << ui2.Element{
-				...ui2.button(software_row_actions[slot], '${row.action}: ${row.name}',
+				...ui2.button(software_row_actions[slot], '${if a.review == 'repair' && row.action == 'update' { 'repair' } else { row.action }}: ${row.name}',
 					ui2.rect(14, f64(90 + slot * 30), 236, 28),
 					ui2.BoxStyle{ bg: if index == a.review_selected {
 						settings_choice_bg
@@ -1051,14 +1057,10 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 			},
 				274, height - 176, width - 288, 28, false)
 		} else {
-			if row.updatable || row.installed_version == '' || row.requested {
+			if row.updatable || row.installed_version == '' {
 				children << software_button('software.install', if row.updatable {
 					'Review updates'
-				} else if row.installed_version == '' {
-					'Install'
-				} else {
-					'Repair / install'
-				}, 274, height - 176, 160)
+				} else { 'Install' }, 274, height - 176, 160)
 			}
 			if row.installed_version != '' {
 				children << software_button('software.remove', 'Uninstall', 446, height - 176, 130)
@@ -1085,6 +1087,9 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		children << software_button('software.rollback', 'Rollback', 394, height - 138, 100)
 		children << software_button('software.data', 'Personal data', 502, height - 138, 124)
 		children << software_button('software.verify', 'Verify installed', 136, height - 176, 110)
+		if a.rows.any(it.installed_version != '') {
+			children << software_button('software.repair', 'Repair installed', 14, height - 214, 232)
+		}
 	}
 	if a.progress_seen { children << a.progress_bar(width, height) }
 	a.add_status_footer(mut children, width, height, a.progress_seen)

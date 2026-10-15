@@ -1,0 +1,43 @@
+39 successful host compile/run checks:
+PASS repair-compile
+PASS repair-run
+PASS verify-compile
+PASS verify-run
+PASS review-compile
+PASS review-run
+PASS service-compile
+PASS service-run
+PASS distribution-compile
+PASS distribution-run
+PASS protocol-compile
+PASS protocol-run
+PASS admin-compile
+PASS admin-run
+PASS vinix-package-compile
+PASS repair-check-compile
+PASS verify-progress-compile
+PASS distribution-cli-compile
+PASS repair-service
+PASS repair-cli
+PASS verify-service
+PASS verify-cli
+PASS distribution-cli
+PASS ui-compile
+PASS ui-functional
+PASS ui-repair-memory
+PASS ui-failure-memory
+PASS ui-admin-memory
+PASS ui-window-memory
+PASS ui-data-memory
+PASS ui-policy-memory
+PASS ui-metadata-memory
+PASS ui-details-memory
+PASS ui-view-memory
+PASS ui-asan-compile
+PASS ui-asan-functional
+PASS ui-asan-repair-memory
+PASS repair-asan-compile
+PASS repair-asan-run
+PASS full desktop typecheck arm64
+PASS full desktop typecheck amd64
+PASS maintained Software-only distribution driver and all nine memory modes

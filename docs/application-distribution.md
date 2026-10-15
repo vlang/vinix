@@ -476,12 +476,25 @@ the configured reserve and per-copy verification remain required. See
 Install, upgrade and managed deployment also verify unchanged target payloads.
 Missing, corrupt or nonregular files require a fresh generation from verified
 cache or approved repository objects, even when versions stay the same. Software's
-**Repair / install** uses this path. Review shows affected packages as updates
+**Repair installed** opens a dedicated review of the complete installed closure,
+including dependencies. `vinix-package repair` provides the same operation for
+administrator scripts; `review repair` and `apply FINGERPRINT repair` provide
+reviewed automation. It preserves installed manifests, publisher/sequence records,
+versions, permissions and requested applications even when updates are available.
+Every installed manifest must still appear with its exact provenance in the
+current authenticated cached catalog and satisfy organization policy. Withdrawn
+versions fail with guidance to refresh or review updates, rather than silently
+upgrading. Repair works offline with valid cached metadata and objects, requires
+no package IDs, and does not refresh repositories. Review shows affected packages as updates
 and includes staging/acquisition space. Confirmation binds the affected package
 set; restoration or different damage requires review again before cleanup or
 downloads. Healthy identical targets remain a no-op. Trust, policy, offline and
 hash checks still apply, personal data is retained, and rollback refuses damaged
 previous generations. See [repair qualification](../tests/packages/repair-check.md).
+Software labels these same-version `update` rows as repairs and keeps **Update
+all** separate. Confirmation uses the existing reviewed administrator transport;
+verification diagnostics name both the graphical control and CLI repair command.
+See [explicit repair qualification](../tests/packages/explicit-repair-check.md).
 Installation health also checks payload modes (0755 for executables, 0644 for
 other files) and the exact generated desktop launcher/MIME contents at mode 0644.
 Verify and rollback enforce these checks; launch checks payload permissions

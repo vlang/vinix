@@ -92,10 +92,11 @@ fn check() ! {
 		if fault == 'mode' { os.chmod(app, 0o644)! }
 		if fault == 'registration' { os.rm(entry)! }
 		os.write_file(log, '')!
-		if _ := observed.verify() { assert false } else { assert err.msg().contains('verification failed') && err.msg().contains('Repair / install') }
-		failed := frames(os.read_file(log)!, false)!; assert failed.len >= 2 && failed.all(it.phase == 'verify')
+		if _ := observed.verify() { assert false } else { assert err.msg().contains('verification failed') && err.msg().contains('vinix-package repair') }
+		failed := frames(os.read_file(log)!, false)!; assert failed.len >= 1 && failed.all(it.phase == 'verify')
+		if fault == 'mode' { assert failed.len == 1 && failed[0].package == '' }
 		if binary != '' {
-			code, text := command(binary, root, ['--progress', 'verify']); assert code != 0 && text.contains('Repair / install')
+			code, text := command(binary, root, ['--progress', 'verify']); assert code != 0 && text.contains('vinix-package repair')
 			assert frames(text, true)!.all(it.phase != 'complete')
 			json_code, document := command(binary, root, ['--json', 'verify']); assert json_code != 0 && !document.contains('"generation"')
 		}

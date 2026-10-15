@@ -42,6 +42,23 @@ fn check_review(expected string, actual string) ! {
 }
 
 fn operation_plan(config Config, directory string, current State, operation string, names []string) !Plan {
+	if operation == 'repair' {
+		if names.len != 0 { return error('repair takes no package IDs; it preserves the complete installed closure') }
+		if current.packages.len == 0 { return Plan{ requested: current.requested, packages: current.packages } }
+		// Repair cannot turn a missing/withdrawn installed version into an update.
+		// Authenticate the exact manifests and provenance against today's cached
+		// catalog, then retain the already validated persistent dependency closure.
+		catalog := load_catalog(config, directory)!
+		defer { close_authenticated_catalog(catalog) }
+		for installed in current.packages {
+			if !catalog.packages.any(it.package == installed.package
+				&& it.repository == installed.repository && it.public_key == installed.public_key) {
+				return error('${installed.package.id}: installed manifest is unavailable in the authenticated catalog; refresh repositories or review updates')
+			}
+			check_policy(installed.package, config.policy)!
+		}
+		return Plan{ requested: current.requested, packages: current.packages }
+	}
 	roots := desired_roots(current, operation, names)!
 	// Uninstall remains available with expired/revoked publishers or tightened policy.
 	catalog := if operation == 'remove' {

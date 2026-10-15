@@ -120,11 +120,11 @@ service, separately from the action request. No password or authorization grant
 is cached.
 
 Allowed operations are `update`, reviewed `apply` for install/remove/upgrade/
-rollback, `repo-apply`, `deployment-apply`, `policy-apply`, `mirror-apply` and
+repair/rollback, `repo-apply`, `deployment-apply`, `policy-apply`, `mirror-apply` and
 `mirror-deployment-apply`. Every operation except refresh requires its exact
 64-digit review fingerprint; normal service validation repeats under the writer
 lock. IDs and absolute file/destination paths are checked before authorization.
-Raw install/remove/upgrade/rollback, alternate roots, arbitrary executables,
+Raw install/remove/upgrade/repair/rollback, alternate roots, arbitrary executables,
 publisher tooling, application launches and nested administration are refused.
 Read-only review/status commands remain available directly to ordinary users.
 
@@ -1483,7 +1483,7 @@ The package service remains authoritative for complete state, trust, policy and
 launch admission. See [registration qualification](../../tests/packages/registration-check.md).
 
 For live operation progress, pass `--progress` to `update`, `install`, `remove`,
-`upgrade`, `apply`, `deploy`, `deployment-apply`, `rollback`, `mirror` or
+`upgrade`, `repair`, `apply`, `deploy`, `deployment-apply`, `rollback`, `mirror` or
 `mirror-apply`. It is refused with
 `--json` and other commands. Ordinary human output/diagnostics are retained;
 presentation records occupy complete stdout lines prefixed by
@@ -1741,9 +1741,23 @@ Rollback/data retention use the standard transaction contract.
 Install, upgrade and both deployment formats verify unchanged target payloads
 before treating a plan as a no-op. Missing, wrong-length, corrupt or nonregular
 files trigger a new generation using verified cache/approved repository objects.
-This is also Software's **Repair / install** behavior. Format-1 review uses the
+Software's **Repair installed** opens `review repair` for the entire installed
+closure, including runtimes and data dependencies. This operation takes no IDs
+and preserves exact installed manifests, provenance/sequence, versions,
+permissions and requested roots. Each installed manifest must remain in the
+authenticated current cached catalog with the same repository and key, and pass
+current policy. A withdrawn or changed manifest fails explicitly with guidance
+to refresh or review updates; repair never selects a newer version. No implicit
+refresh occurs. Offline repair requires unexpired authenticated metadata and
+usable objects. `repair` is also available directly to administrator scripts,
+or as `apply FINGERPRINT repair` through reviewed administration.
+
+Format-1 review admits the additive `repair` operation with empty `names`, zero
+`target_generation`, and only `keep`/`update` rows whose installed and target
+versions match. Older clients that do not support the operation reject it.
+Software displays these update rows as repairs. The protocol uses the
 existing `update` row action for each affected package, including unchanged
-versions, and budgets the full transaction. It adds no protocol fields or actions.
+versions, and budgets the full transaction. It adds no protocol fields or row actions.
 The opaque fingerprint binds sorted affected IDs; healthy fingerprints retain
 their previous shape. Apply checks health under the writer lock and again after
 the resolve observer, before cleanup/acquisition. A changed repair set requires a
@@ -1758,6 +1772,7 @@ inspection, but rollback still refuses broken payloads. Payload health checks
 retain no scratch allocations under manual memory management; this does not
 claim whole-service allocation freedom. See
 [repair checks](../../tests/packages/repair-check.md).
+See also [explicit repair checks](../../tests/packages/explicit-repair-check.md).
 
 Installation health includes the canonical payload modes: 0755 when the signed
 `executable` flag is true, otherwise 0644, with no setuid/setgid/sticky bits.
@@ -1936,7 +1951,7 @@ Use the direct `Service.mirror`/`mirror` command for authorized automation that
 does not need a presentation review. Mirror media retains the original signed
 catalogs and expiry, and supplies payloads only for the exported closure.
 
-`review install|remove|upgrade|deploy|rollback [ID...]` emits a format-1 review
+`review install|remove|upgrade|repair|deploy|rollback [ID...]` emits a format-1 review
 without downloading payloads or changing installed state. It includes the active
 generation, rollback target generation, operation/IDs, target requested roots,
 and every package in the target closure plus removed packages. Rows contain

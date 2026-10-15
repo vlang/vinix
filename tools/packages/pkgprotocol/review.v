@@ -88,12 +88,12 @@ fn version(value string) bool {
 }
 
 pub fn (review &Review) validate() ! {
-	if review.format != 1 || review.operation !in ['install', 'remove', 'upgrade', 'deploy', 'rollback', 'mirror']
+	if review.format != 1 || review.operation !in ['install', 'remove', 'upgrade', 'deploy', 'repair', 'rollback', 'mirror']
 		|| review.architecture !in ['aarch64', 'x86_64'] || !digest(review.fingerprint)
 		|| review.rows.len > 8192 || review.names.len > 4096 || review.requested.len > 4096
 		|| review.names.any(!identifier(it)) || review.requested.any(!identifier(it))
 		|| (review.operation in ['install', 'remove', 'mirror'] && review.names.len == 0)
-		|| (review.operation in ['upgrade', 'rollback'] && review.names.len != 0)
+		|| (review.operation in ['upgrade', 'repair', 'rollback'] && review.names.len != 0)
 		|| (review.operation == 'rollback' && review.target_generation == 0)
 		|| (review.operation != 'rollback' && review.target_generation != 0) {
 		return error('invalid package review response')
@@ -110,6 +110,7 @@ pub fn (review &Review) validate() ! {
 			|| (row.runtime != '' && !identifier(row.runtime)) || !identifier(row.repository)
 			|| !digest(row.public_key) || row.action !in ['install', 'update', 'keep', 'remove', 'export']
 			|| ((row.action == 'export') != (review.operation == 'mirror'))
+			|| (review.operation == 'repair' && (row.action !in ['keep', 'update'] || row.installed_version != row.version))
 			|| !view_permissions(row.permissions)
 			|| row.requested != (row.id in review.requested) || (row.action == 'remove' && row.requested) {
 			return error('invalid package in review response')

@@ -190,7 +190,8 @@ fn (mut a SoftwareApp) open_details() {
 			|| !software_details_text_valid(a.mirror_snapshot.destination, 4096) || !software_details_text_valid(a.mirror_lock_pending, 4096))) {
 		a.set_status('Package details contain invalid UTF-8 or exceed supported text limits. Reload the catalog or review again.'); return
 	}
-	a.prepare_details(row, if reviewing { a.review_snapshot.rows[a.review_selected].action } else { '' }, reviewing)
+	action := if reviewing { a.review_snapshot.rows[a.review_selected].action } else { '' }
+	a.prepare_details(row, if a.review == 'repair' && action == 'update' { 'repair' } else { action }, reviewing)
 }
 
 fn (mut a SoftwareApp) handle_details(action string) {

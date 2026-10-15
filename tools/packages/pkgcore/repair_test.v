@@ -39,7 +39,7 @@ fn test_repairs_require_unchanged_target_provenance_and_signed_payloads_from_the
 	path := directory + '/generations/7/apps/app/bin/app'
 	assert_no_repairs(directory, current, plan, 'install')
 	os.write_file(path, 'x'.repeat(24))!
-	for operation in ['install', 'upgrade', 'deploy'] {
+	for operation in ['install', 'upgrade', 'deploy', 'repair'] {
 		repairs := transaction_repairs(directory, current, plan, operation)
 		assert repairs == ['app']; close_transaction_repairs(repairs)
 	}

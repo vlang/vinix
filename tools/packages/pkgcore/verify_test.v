@@ -61,10 +61,16 @@ fn test_verify_reports_payload_and_registration_work_and_completes_only_a_health
 		if kind == 'registration' { os.rm(entry)! }
 		os.write_file(log, '')!
 		if _ := verify_installed(directory, state, verify_record) { assert false }
-		else { assert err.msg().contains('verification failed') && err.msg().contains('Repair / install') }
+		else { assert err.msg().contains('verification failed') && err.msg().contains('vinix-package repair') }
 		failed := verify_events(log)!
-		assert failed.len >= 2 && failed.all(it.phase == 'verify')
-		assert failed.last().path == if kind == 'registration' { 'share/applications/vinix-app.desktop' } else { 'bin/app' }
+		assert failed.all(it.phase == 'verify')
+		if kind == 'mode' {
+			// Namespace admission refuses unsafe modes before payload hashing.
+			assert failed.len == 1 && failed[0].package == ''
+		} else {
+			assert failed.len >= 2
+			assert failed.last().path == if kind == 'registration' { 'share/applications/vinix-app.desktop' } else { 'bin/app' }
+		}
 		os.write_file(app, 'payload')!; os.chmod(app, 0o755)!
 		if kind == 'registration' { os.write_file(entry, desktop_entry(state.packages[0].package))!; os.chmod(entry, 0o644)! }
 	}

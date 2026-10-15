@@ -32,7 +32,7 @@ fn suite() hwhost.Suite {
 			about: 'same-version payload repair, health-bound review and offline transactional recovery',
 			required: ['HWTEST START packages-repair',
 				'PACKAGE REPAIR active payload hash/size/type, changed-target exclusion, sorted closure and removal/rollback isolation PASS',
-				'PACKAGE REPAIR signed install/upgrade/deployment, reviewed corruption recovery, preserved state/data and protocol compatibility PASS',
+				'PACKAGE REPAIR signed install/upgrade/deployment/explicit repair, reviewed corruption recovery, exact installed versions despite available updates, publisher withdrawal refusal, preserved state/data and protocol compatibility PASS',
 				'REPAIR PROCESS repair-core PASS', 'REPAIR PROCESS repair-probe PASS',
 				'HWTEST PASS packages-repair'], ending: .poweroff, timeout: 300 }]
 	}

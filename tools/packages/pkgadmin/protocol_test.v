@@ -4,7 +4,7 @@ module pkgadmin
 fn test_reviewed_admin_requests_and_bound_completion() {
 	fingerprint := 'a'.repeat(64)
 	for arguments in [['update'], ['--progress', 'update'], ['--progress', '--offline', 'apply', fingerprint, 'install', 'org.vinix.memo'],
-		['apply', fingerprint, 'upgrade'], ['apply', fingerprint, 'rollback'], ['repo-apply', fingerprint, 'revoke', 'publisher'],
+		['apply', fingerprint, 'upgrade'], ['apply', fingerprint, 'repair'], ['apply', fingerprint, 'rollback'], ['repo-apply', fingerprint, 'revoke', 'publisher'],
 		['repo-apply', fingerprint, 'enroll', 'publisher', 'file:///media/with spaces; $literal', fingerprint],
 		['deployment-apply', fingerprint, '/etc/company/approved apps.json'], ['policy-apply', fingerprint, '/etc/company/policy.json'],
 		['mirror-apply', fingerprint, '/media/offline', 'org.vinix.memo'], ['mirror-deployment-apply', fingerprint, '/media/offline', '/etc/company/lock.json']] {
@@ -26,9 +26,9 @@ fn test_admin_transport_refuses_launches_alternate_roots_and_unreviewed_changes(
 	fingerprint := 'a'.repeat(64)
 	for arguments in [['run', 'app'], ['run-window', 'app'], ['run-args', 'app', '--', 'literal'],
 		['admin-authorize'], ['--root', '/tmp', 'update'], ['--json', 'update'], ['--progress'],
-		['install', 'app'], ['remove', 'app'], ['rollback'], ['upgrade'], ['keygen', '/tmp/key'],
+		['install', 'app'], ['remove', 'app'], ['rollback'], ['upgrade'], ['repair'], ['keygen', '/tmp/key'],
 		['apply', fingerprint, 'install', '--root'], ['apply', fingerprint, 'install', 'bad; id'],
-		['apply', fingerprint, 'upgrade', 'extra'], ['repo-apply', fingerprint, 'revoke', 'publisher', 'extra'],
+		['apply', fingerprint, 'upgrade', 'extra'], ['apply', fingerprint, 'repair', 'app'], ['repo-apply', fingerprint, 'revoke', 'publisher', 'extra'],
 		['policy-apply', fingerprint, 'relative.json'], ['apply', fingerprint, 'deploy', 'app'],
 		['update', 'extra'], ['--offline', '--progress', 'update']] {
 		mut refused := false

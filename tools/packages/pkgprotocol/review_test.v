@@ -48,3 +48,21 @@ fn test_public_review_rejects_unknown_formats_and_incomplete_package_sets() {
 		assert refused
 	}
 }
+
+fn test_repair_review_preserves_installed_versions_and_excludes_other_actions() {
+	base := protocol_fixture()
+	valid := Review{ ...base, operation: 'repair', names: [], rows: [ReviewPackage{ ...base.rows[0], installed_version: '1.0.0', action: 'update' }] }
+	for action in ['update', 'keep'] {
+		mut decoded := decode_review(json2.encode(Review{ ...valid, rows: [ReviewPackage{ ...valid.rows[0], action: action }] }))!
+		decoded.close()
+	}
+	for bad in [Review{ ...valid, names: ['app'] },
+		Review{ ...valid, rows: [ReviewPackage{ ...valid.rows[0], installed_version: '' }] },
+		Review{ ...valid, rows: [ReviewPackage{ ...valid.rows[0], version: '2.0.0' }] },
+		Review{ ...valid, rows: [ReviewPackage{ ...valid.rows[0], action: 'install' }] },
+		Review{ ...valid, requested: [], rows: [ReviewPackage{ ...valid.rows[0], requested: false, action: 'remove' }] }] {
+		mut refused := false
+		bad.validate() or { refused = true; unsafe { err.free() } }
+		assert refused
+	}
+}

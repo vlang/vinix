@@ -66,8 +66,8 @@ fn fixture_review(operation string, names []string) pkgprotocol.Review {
 		target_generation: if operation == 'rollback' { u64(2) } else { u64(0) },
 		fingerprint: 'c'.repeat(64), requested: ['editor'], disk_needed: 4096, disk_available: 65536, disk_reserve: 1024,
 		rows: [
-			pkgprotocol.ReviewPackage{ id: 'editor', name: 'Editor', description: 'Write documents', version: '2.0.0', installed_version: '1.0.0', architecture: 'aarch64', kind: 'linux', runtime: 'runtime', repository: 'trusted', public_key: 'a'.repeat(64), license: 'MIT', permissions: ['files'], requested: true, action: 'update' },
-			pkgprotocol.ReviewPackage{ id: 'runtime', name: 'Runtime', description: 'Required shared runtime', version: '2.0.0', installed_version: '1.0.0', architecture: 'aarch64', kind: 'runtime', repository: 'runtime-publisher', public_key: 'b'.repeat(64), license: 'Vendor-EULA', proprietary: true, firmware: true, permissions: ['network', 'process'], action: 'update' },
+			pkgprotocol.ReviewPackage{ id: 'editor', name: 'Editor', description: 'Write documents', version: if operation == 'repair' { '1.0.0' } else { '2.0.0' }, installed_version: '1.0.0', architecture: 'aarch64', kind: 'linux', runtime: 'runtime', repository: 'trusted', public_key: 'a'.repeat(64), license: 'MIT', permissions: ['files'], requested: true, action: 'update' },
+			pkgprotocol.ReviewPackage{ id: 'runtime', name: 'Runtime', description: 'Required shared runtime', version: if operation == 'repair' { '1.0.0' } else { '2.0.0' }, installed_version: '1.0.0', architecture: 'aarch64', kind: 'runtime', repository: 'runtime-publisher', public_key: 'b'.repeat(64), license: 'Vendor-EULA', proprietary: true, firmware: true, permissions: ['network', 'process'], action: 'update' },
 		]
 	}
 }
@@ -367,6 +367,7 @@ fn main() {
 	if os.args.len == 2 && os.args[1] == 'details-memory' { check_software_details_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'view-memory' { check_software_view_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'failure-memory' { check_software_failure_memory() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'repair-memory' { check_software_repair_memory() or { panic(err) }; return }
 	mut args := os.args.clone()
 	if args.len > 1 && args[1] == '--progress' { args.delete(1) }
 	// This same executable is a literal-argv service fixture for asynchronous
@@ -378,7 +379,7 @@ fn main() {
 		if software_policy_service_fixture(args) or { panic(err) } { return }
 		if software_metadata_service_fixture(args) { return }
 		if args[1] == 'admin' {
-			assert args[2..] == ['--progress', 'apply', 'c'.repeat(64), 'install', 'editor']
+			assert args[2..] in [['--progress', 'apply', 'c'.repeat(64), 'install', 'editor'], ['--progress', 'apply', 'c'.repeat(64), 'repair']]
 			mut bytes := [257]u8{}
 			mut count := 0
 			for count < bytes.len {
@@ -432,7 +433,7 @@ fn main() {
 			return
 		}
 		if args[1] == 'apply' {
-			assert args[2..] == ['c'.repeat(64), 'install', 'editor']
+			assert args[2..] in [['c'.repeat(64), 'install', 'editor'], ['c'.repeat(64), 'repair']]
 			eprintln('fixture: package review is stale; review again')
 			exit(23)
 		}
@@ -555,6 +556,7 @@ fn main() {
 	check_repository_management() or { panic(err) }
 	check_software_progress() or { panic(err) }
 	check_software_verify() or { panic(err) }
+	check_software_repair() or { panic(err) }
 	check_software_deployment() or { panic(err) }
 	check_software_mirror() or { panic(err) }
 	check_software_locked_mirror() or { panic(err) }
