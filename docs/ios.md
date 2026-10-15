@@ -7496,8 +7496,9 @@ without a callback keep caller-owned bytes untouched.
 Geometry, pixel format, base-address/row-stride/data-size and plane accessors use
 that state. Lock/unlock make these permanently mapped CPU bytes accessible;
 they are cache-access operations, not mutual-exclusion locks. GPU coherence,
-IOSurface allocation, other pixel formats and nonempty creation attributes
-remain unsupported. Foreign or stale handles fail before object memory is read.
+IOSurface allocation and other pixel formats remain unsupported. Borrowed-storage
+constructors accept nil or empty attributes. Foreign or stale handles fail before
+object memory is read.
 
 Seventeen sealed CoreVideo CFString pointer globals cover pixel-buffer hints and
 color primaries, transfer functions, gamma and YCbCr matrix metadata. Their values
@@ -7519,7 +7520,39 @@ Generated C inspection checks state ownership, allocation-free queries and late
 constant retirement. Published runners remain unchanged; the full iOS regression
 remains unpassed.
 
-This resolves twenty-seven required imports. Metal texture-cache creation,
+`CVPixelBufferCreate` now allocates owned CPU storage for BGRA and two-plane
+420v/420f. It accepts positive signed integers for row and plane alignment,
+including non-power-of-two alignments, and rounds odd chroma dimensions upward.
+Row strides meet both the requested alignment and the CPU profile's 64-byte minimum. The
+contiguous YUV layout includes big-endian plane descriptors; clients use the
+plane accessors rather than assuming Apple's device-specific padding. Checked
+arithmetic bounds buffers to 2 GiB minus one byte. Final CF/ObjC release frees
+the allocation. Invalid dimensions leave the output unchanged; format and later
+failures clear it. Plane-alignment and IOSurface-properties keys join the sealed
+metadata globals, bringing their count to nineteen.
+
+This allocation profile rejects unknown attributes and alignment values outside
+that integer profile. Metal/OpenGLES compatibility requests return their
+incompatibility status; IOSurface allocation returns unsupported. False hints
+allow CPU allocation. These results do not advertise a GPU device or shared-surface mapping.
+
+Eight normal/deterministic host sanitizer runs and four ARM64 guest suites cover
+owned allocation, borrowed CoreVideo buffers, URL-error globals and autorelease
+pools. Native comparisons exercise odd dimensions, row/plane alignment, full-row
+writes/readback, plane descriptors, CF ownership, eight concurrent readers and
+error output semantics. Private cases cover overflow, unsupported attributes,
+256 allocation/release cycles, ASan backing-storage retirement and two drained
+runtimes. Eleven final generated C streams/executables and joined VM evidence are
+retained under `build/ios/fortnite/pixel-allocation-checks`.
+
+V/Mach-O/LLVM inspection found three actual texture-cache creation callers. At
+`0x10a64d6c8`, the game passes a device returned through its renderer interface,
+then imports BGRA storage as Metal pixel format 81 at `0x10a64d71c`. Owned CPU
+allocation is groundwork for this path; it does not satisfy the Metal cache
+imports. The current probe and import counts therefore remain unchanged.
+
+The borrowed-buffer APIs and original metadata group resolve twenty-seven
+required imports. Metal texture-cache creation,
 image-to-texture mapping and texture extraction still require a Metal device and
 shared-surface backend. The current IPA probe therefore still exits with status 1
 at `_CVMetalTextureCacheCreate`, before application entry. Fortnite remains unplayable.

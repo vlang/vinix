@@ -20,6 +20,8 @@ fn corevideo_constant_symbol(symbol string) ?u64 {
 		'_kCVImageBufferYCbCrMatrix_SMPTE_240M_1995' { 14 }
 		'_kCVImageBufferYCbCrMatrix_ITU_R_601_4' { 15 }
 		'_kCVPixelBufferPixelFormatTypeKey' { 16 }
+		'_kCVPixelBufferPlaneAlignmentKey' { 17 }
+		'_kCVPixelBufferIOSurfacePropertiesKey' { 18 }
 		else { return none }
 	}
 	if ios_runtime == unsafe { nil } { return none }
@@ -33,13 +35,14 @@ fn corevideo_constant_symbol(symbol string) ?u64 {
 		texts := ['CVImageBufferColorPrimaries', 'CVImageBufferGammaLevel', 'CVImageBufferTransferFunction',
 			'ITU_R_709_2', 'SMPTE_240M_1995', 'UseGamma', 'CVImageBufferYCbCrMatrix',
 			'BytesPerRowAlignment', 'MetalCompatibility', 'OpenGLESCompatibility', 'ITU_R_709_2',
-			'SMPTE_C', 'EBU_3213', 'ITU_R_709_2', 'SMPTE_240M_1995', 'ITU_R_601_4', 'PixelFormatType']!
-		mut cursor := u64(688) // 17 cells, alignment padding, then 17 possible CFSTR records.
+			'SMPTE_C', 'EBU_3213', 'ITU_R_709_2', 'SMPTE_240M_1995', 'ITU_R_601_4', 'PixelFormatType',
+			'PlaneAlignment', 'IOSurfaceProperties']!
+		mut cursor := u64(768) // 19 cells, alignment padding, then 19 possible CFSTR records.
 		for i, text in texts {
 			mut object := u64(0)
 			for j in 0 .. i { if texts[j] == text { object = read64(u64(arena) + u64(j * 8)); break } }
 			if object == 0 {
-				object = u64(arena) + 144 + u64(i * 32)
+				object = u64(arena) + 160 + u64(i * 32)
 				if cursor + u64(text.len) + 1 > u64(page) { panic('iOS: CoreVideo globals exceed their page') }
 				unsafe {
 					*(&u64(object)) = ios_runtime.names['NSString']
@@ -63,7 +66,7 @@ fn corevideo_constant_symbol(symbol string) ?u64 {
 fn corevideo_constants_stop() {
 	arena := ios_runtime.corevideo_constants_arena
 	if arena == 0 { return }
-	for i in 0 .. 17 { ios_runtime.constants.delete(read64(arena + u64(i * 8))) }
+	for i in 0 .. 19 { ios_runtime.constants.delete(read64(arena + u64(i * 8))) }
 	if C.munmap(unsafe { voidptr(arena) }, usize(C.getpagesize())) != 0 { panic('iOS: cannot retire CoreVideo globals') }
 	ios_runtime.corevideo_constants_arena = 0
 }

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
-// CPU storage is borrowed until the final CF/ObjC release invokes its owner.
+// Wrapped CPU storage is borrowed until the final CF/ObjC release invokes its
+// owner. CVPixelBufferCreate instead owns allocation, freed by the same lifetime.
 // No GPU coherence, IOSurface mapping or Metal texture is implied by this type.
 struct CVPixelState {
 mut:
@@ -18,6 +19,7 @@ mut:
 	strides [2]u64
 	callback u64
 	context u64
+	allocation u64
 }
 
 fn cv_pixel_type_id() u64 { return ios_runtime.names['VinixCVPixelBuffer'] }
@@ -82,6 +84,7 @@ fn cv_pixel_dispose(mut header ObjHeader) {
 		else { unsafe { CVReleasePlanes(voidptr(callback))(state.context, state.base, state.size, state.planes, &state.addresses[0]) } }
 	}
 	header.cv_pixel = unsafe { nil }
+	if state.allocation != 0 { C.free(unsafe { voidptr(state.allocation) }) }
 	C.free(state)
 }
 
@@ -128,6 +131,7 @@ fn cv_pixel_lock(object u64, flags u64) i32 {
 
 fn corevideo_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_CVPixelBufferCreate' { u64(unsafe { voidptr(cv_pixel_create) }) }
 		'_CVPixelBufferGetTypeID' { u64(unsafe { voidptr(cv_pixel_type_id) }) }
 		'_CVPixelBufferCreateWithBytes' { u64(unsafe { voidptr(cv_pixel_create_bytes) }) }
 		'_CVPixelBufferCreateWithPlanarBytes' { u64(unsafe { voidptr(cv_pixel_create_planar) }) }
