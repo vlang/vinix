@@ -170,6 +170,7 @@ fn main() {
 		require_child('/opt/ios/swift-cocoa-error-code-checks')
 		require_child('/opt/ios/swift-nslog-checks')
 		require_child('/opt/ios/swift-string-unbridge-checks')
+		require_child('/opt/ios/swift-cocoa-match-checks')
 		require_child('/opt/ios/swift-localized-error-checks')
 		require_child('/opt/ios/swift-error-description-checks')
 		if os.is_dir('/opt/ios/lookup-native') { os.setenv('VINIX_IOS_LOOKUP_NATIVE', '/opt/ios/lookup-native', true) }
@@ -190,6 +191,7 @@ fn main() {
 			require_child('/opt/ios/swift-' + name + '-checks')
 		}
 		require_child('/opt/ios/dispatch-queue-class-checks')
+		require_child('/opt/ios/swift-cocoa-match-checks')
 		println('VINIX iOS SWIFT: PASS')
 		C.fflush(unsafe { nil })
 	} else {

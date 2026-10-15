@@ -6212,9 +6212,34 @@ under `build/ios/fortnite/localized-error-checks`. The private build uses
 the previously pinned local musl/GCC SDK and C++/GLES dependencies.
 Full iOS regression remains unpassed and published runners remain unchanged.
 
-The current IPA startup probe resolves the LocalizedError default getter
-imports, then exits with status 1 at the required import
+That IPA startup probe resolved the LocalizedError default getter
+imports, then exited with status 1 at the required import
 `_$s10Foundation18_ErrorCodeProtocolPAAE2teoiySbx_s0B0_ptFZ`.
+Fortnite has not entered application code and remains unplayable.
+
+The CocoaError.Code specialization of Foundation's `_ErrorCodeProtocol.~=`
+now matches registered concrete CFError and NSError values by the exact
+`NSCocoaErrorDomain` string and full-width integer code. Native Foundation
+receives the borrowed indirect Code, Error owner, metadata and witness table
+in x0/x1/x2/x3. Vinix validates the canonical Code metadata/conformance and
+live registered error before reading fields. An unrelated domain returns false
+without reading the match bytes. No bridge object or owned reference is created.
+Swift error boxes, other code conformances and NSError subclass accessors remain
+explicitly unsupported; the wider stored-error witness table stays unavailable.
+
+Eight ASan/UBSan runs and four Vinix ARM64 suites pass for matching,
+LocalizedError defaults, Error.localizedDescription and Cocoa protocol layout.
+The matching fixture compares native and Vinix results across six domains,
+CFError/NSError storage, matching/nonmatching codes and signed 64-bit extrema.
+It checks protected wrong-domain inputs, readonly Code at a guard edge, borrowed
+ARC, x20/x21, concurrent calls/publication, invalid owners/fields/metadata and
+two drained runtime lifetimes. Eleven final C streams/programs and four joined,
+retired VM phases are retained under `build/ios/fortnite/cocoa-error-match-checks`.
+The private build reuses the pinned local musl/GCC SDK and C++/GLES dependencies.
+Full iOS regression remains unpassed and published runners remain unchanged.
+
+The current IPA startup probe resolves the error-code matching import, then
+exits with status 1 at the required import `_$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF`.
 Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -6222,12 +6247,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,494 | 666 | 79 |
+| Fortnite executable | 1,495 | 665 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,329 | 669 | 120 |
+| All images | 2,330 | 668 | 120 |
 
-The C++/GLES/Text variant reports 2,342 resolved imports, 656 unresolved strong
+The C++/GLES/Text variant reports 2,343 resolved imports, 655 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

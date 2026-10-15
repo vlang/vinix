@@ -102,6 +102,10 @@ fn swift_cocoa_error_table_checked(metadata u64) !u64 {
 	return base + u64(C.getpagesize()) + 640
 }
 fn swift_cocoa_error_symbol(symbol string) ?u64 {
+	if symbol == '_$s10Foundation18_ErrorCodeProtocolPAAE2teoiySbx_s0B0_ptFZ' {
+		if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired { return none }
+		return u64(unsafe { voidptr(swift_cocoa_match) })
+	}
 	offset := match symbol {
 		'_$s10Foundation10CocoaErrorV4CodeVAA01_cD8ProtocolAAMc' { u64(C.getpagesize()) + 608 }
 		'_$s10Foundation10CocoaErrorV4CodeVMa' { u64(0) }
