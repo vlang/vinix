@@ -6715,22 +6715,56 @@ snapshots. Fifteen final C streams/programs and four joined, retired VM phases
 are retained; published runners are unchanged. Full iOS regression remains
 unpassed.
 
-The current IPA probe links past the ISO 8601 case and exits with status 1 at
+The case-only IPA probe links past ISO 8601 and exits with status 1 at
 `_$s10Foundation8CalendarV10IdentifierOMa`
-(`Calendar.Identifier` metadata). Fortnite has not entered application code
-and remains unplayable.
+(`Calendar.Identifier` metadata).
+
+The next milestone supplies that metadata accessor, its nominal descriptor and
+all eleven value/enum witnesses in V. Native Identifier is an inline one-byte
+POD enum with 27 cases and 229 extra inhabitants. Copy/take witnesses transfer
+exactly one byte; destruction and payload projection do no work. Tag injection
+stores the low byte. Single-payload enums consume spare values before adding
+one, two or four tag bytes. The implementation follows native's conservative
+width thresholds and UInt32 wraparound, including truncated results for extreme
+empty-case counts.
+
+The accessor returns complete metadata in x0/x1 for all request values tested.
+Its private nested `Foundation.Calendar.Identifier` descriptor has a Calendar
+parent context without exposing Calendar metadata or construction. Bounded
+symbolic type lookup uses the descriptor's accessor. Both Foundation aliases
+publish the same sealed arena; two runtime lifetimes drain and unmap it.
+
+The existing Calendar fixture now checks all 27 values, all copy/take slots,
+one-byte guarded spans, optional-tag boundary/wraparound byte effects, borrowed
+read-only inputs, protected unused metadata/Self/result registers, nominal
+identity, accessor responses, bounded symbolic lookup and eight-worker
+publication/use against installed Foundation. Other case exports, Calendar
+construction and field reflection remain unsupported.
+
+Evidence is retained under `build/ios/fortnite/calendar-identifier-checks` using
+the prior verified private SDK. Twelve ASan/UBSan runs and six Vinix ARM64 suites
+pass for the Calendar case/metadata, Locale, Date, Data writing, Base64 and
+reference snapshots. Fifteen final C streams/programs and four joined, retired
+VM phases are retained; published runners are unchanged. The generated C
+confirms that the new witnesses and metadata emitter allocate no memory.
+Full iOS regression remains unpassed.
+
+The current IPA probe links past Identifier metadata and exits with status 1 at
+`_$s10Foundation8CalendarV10identifierA2C10IdentifierOh_tcfC`
+(`Calendar.init(identifier:)`). Fortnite has not entered application code and
+remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,525 | 635 | 79 |
+| Fortnite executable | 1,526 | 634 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,360 | 638 | 120 |
+| All images | 2,361 | 637 | 120 |
 
-The C++/GLES/Text variant reports 2,373 resolved imports, 625 unresolved strong
+The C++/GLES/Text variant reports 2,374 resolved imports, 624 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
