@@ -23,6 +23,7 @@ typedef unsigned int gfp_t;
 typedef u64 phys_addr_t;
 typedef u64 dma_addr_t;
 typedef u64 resource_size_t;
+typedef unsigned long irq_hw_number_t;
 typedef long ssize_t;
 #if defined(VINIX_LINUXKPI_HOST_TEST) && defined(__linux__)
 /* libc uses a different C spelling for this ABI-identical host test type. */

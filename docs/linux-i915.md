@@ -59,6 +59,9 @@ after a filesystem failure. Mutable build inputs still require isolation.
   checked `u64_to_user_ptr` conversion, `pgoff_t` representation and pinned
   integer type-limit/overflow macros are preserved. These compiler helpers
   supply no Linux page ownership or address-space runtime.
+- `irq_hw_number_t` preserves the pinned unconditional `unsigned long` type,
+  including C type identity distinct from `unsigned long long`. It supplies no
+  native IRQ domain, registration or routing service.
 - Original x86 page-table types and complete upstream page/folio/descriptor
   records are visible through their genuine transitive includes. The compiler
   profile supports five-level paging, matching native Limine support for four
@@ -2197,3 +2200,23 @@ Evidence is under `smp-oct10/include-closure-*`, including the exact source
 freeze at `df3389b5` plus four header/tool overlays, independently derived Kbuild
 contracts, compiler controls and the full audit. Native build results and the
 separate earlier conditional-annotation guest results have distinct artifacts.
+
+## Original hardware IRQ number type
+
+The reduced types facade now restores Linux 6.6.157's exact unconditional
+`typedef unsigned long irq_hw_number_t`. Sixteen strict original/candidate
+GNU99/GNU11 controls cover x86-64/arm64 and kernel/UAPI include order; eight
+absent-type baseline controls reject as expected. Independent replay verifies
+type identity, width, alignment, unsignedness and the full range against the
+actual original header. Declaration objects emit no storage or runtime symbols.
+The unchanged GSC source passes that missing type and reaches genuine task/MM
+dependencies. This adds no IRQ object, Linux IRQ domain or enabled ARM LinuxKPI
+runtime.
+
+Fresh worktrees at `4abd5cc6` plus the one frozen type-header overlay build
+enabled/default x86-64 and default ARM64. Actual native artifacts consume that
+header; the eleven previously reviewed runtime/guard/IRQ bodies are unchanged.
+No new boot or retained-allocation measurement is claimed for these ELFs.
+The full audit remains **6/269**, with all 7,958 guarded inputs stable. Remaining
+first-error groups are 229 task/MM/vfork, 33 CPU-bug policy and one original
+entry-stack record. Evidence is under `smp-oct10/irq-number-type-*`.

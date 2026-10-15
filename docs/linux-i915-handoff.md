@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-15 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Latest include-dependency validation baseline: **`df3389b5`**, with four frozen header/tool overlays described below. Recheck HEAD and the worktree before
+Latest IRQ-number validation baseline: **`4abd5cc6`**, with one frozen type-header overlay described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -1920,3 +1920,29 @@ saved conditional ELF; they are not boots of the new header-build artifacts.
 Continue with the real IRQ-number type, original entry-stack records, CPU-bug
 policy and task/MM ownership, then the remaining IRQ/RCU-free/DMA/device/DRM
 services. Full compile/link and real Tiger Lake validation remain pending.
+
+## Latest hardware IRQ number type increment
+
+Scheduler/IRQ header dependencies are committed as `4abd5cc6`. The next repair
+restores exactly `typedef unsigned long irq_hw_number_t` from pinned
+`include/linux/types.h:171`. Its C identity differs from `unsigned long long`
+even on LP64. Sixteen strict original/candidate GNU99/GNU11 metadata controls
+cover x86-64/arm64 and both include orders; eight real absent-type baseline
+controls reject. Independent replay authenticates the original header, full
+range, unsignedness, size/alignment and clean symbol-free objects. This is a
+type declaration, without a new record, allocation, owner or IRQ service.
+
+The original GSC unit now reaches genuine vfork/MM dependencies. Linux IRQ
+domains, frame storage, registration, native hardware dispatch and enabled ARM
+LinuxKPI are still separate unfinished services. Evidence is under
+`smp-oct10/irq-number-type-*`, with the exact one-header source freeze at
+`4abd5cc6`. Previous feature logs and ELFs remain unchanged.
+
+Enabled/default x86 and default ARM builds pass in fresh isolated worktrees.
+Actual C/object/ELF and dependency review verifies type-header consumption and
+unchanged runtime/guard/IRQ bodies; these ELFs have no new boot or allocation
+claim. Latest full audit: `irq-number-type-final-isolated-audit/i915-audit.json`,
+**6/269**, with all 7,958 guard inputs stable. Remaining groups are 229 genuine
+task/MM/vfork, 33 CPU-bug and one entry-stack record error. Only 11 units emit
+dependency files; retain that discovery limit. Hardware IRQ services, full
+driver linkage and Tiger Lake validation remain pending.
