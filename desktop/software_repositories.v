@@ -333,29 +333,40 @@ fn (mut a SoftwareApp) repository_key_input(input string) {
 		else {}
 	}
 	if a.repository_focus == 0 { return }
+	if input !in ['\x7f', '\x08']! { a.repository_paste_input(input); return }
+	a.initialize_repository_fields()
 	mut field := match a.repository_focus {
 		1 { &a.repository_id }
 		2 { &a.repository_url }
 		else { &a.repository_key }
 	}
-	unsafe { field.flags |= .noslices }
-	if input in ['\x7f', '\x08'] {
-		console_backspace(mut *field, a.select_all)
-	} else {
-		limit := match a.repository_focus {
-			1 { 128 }
-			2 { 4096 }
-			else { 64 }
-		}
-		mut printable_bytes := 0
-		for byte in input { if byte >= 32 { printable_bytes++ } }
-		current_length := if a.select_all { 0 } else { field.len }
-		if current_length + printable_bytes > limit {
-			a.set_status('Repository field exceeds its supported length. Shorten it; input was not truncated.')
-			return
-		}
-		console_paste_field(mut *field, input, limit, a.select_all)
+	console_backspace(mut *field, a.select_all)
+	a.select_all = false
+}
+
+fn (mut a SoftwareApp) repository_paste_input(input string) {
+	// Clipboard contents are field data, never focus, review, cancellation or
+	// editing commands. Keep both the field and selection intact on refusal.
+	if a.worker != unsafe { nil } || a.repository_operation != ''
+		|| a.repository_focus !in [1, 2, 3]! || input.len == 0 { return }
+	if !software_deployment_text_valid(input) {
+		a.set_status('Repository field input was kept intact: use valid UTF-8 without control characters.')
+		return
 	}
+	a.initialize_repository_fields()
+	mut field := match a.repository_focus {
+		1 { &a.repository_id }
+		2 { &a.repository_url }
+		else { &a.repository_key }
+	}
+	limit := match a.repository_focus { 1 { 128 } 2 { 4096 } else { 64 } }
+	length := if a.select_all { 0 } else { field.len }
+	if input.len > limit - length {
+		a.set_status('Repository field exceeds its supported length. Shorten it; input was not truncated.')
+		return
+	}
+	if a.select_all { field.clear() }
+	for byte in input { *field << byte }
 	a.select_all = false
 }
 

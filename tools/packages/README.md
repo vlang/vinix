@@ -239,6 +239,13 @@ identity fields and the previous valid list for retry. Compact views keep
 navigation and diagnostics; approved trust changes and catalog refreshes remain
 protected. See [qualification](../../tests/packages/software-repository-navigation-check.md).
 
+Repository clipboard input preserves literal field data. Controls, malformed
+UTF-8 and oversized pastes are refused as a whole, keeping the field and
+selection intact. Pasted Enter/Escape/Tab cannot review, cancel or navigate;
+empty/unfocused pastes and pastes during reads, reviews or writes do nothing.
+Keyboard commands retain their usual behavior. See
+[paste checks](../../tests/packages/software-repository-paste-check.md).
+
 Organization policy reads and reviews support Stop/Cancel/Escape and retain
 their filename for retry. Compact windows keep navigation and diagnostics;
 approved saves remain protected. Stopping a reload requires a fresh read before

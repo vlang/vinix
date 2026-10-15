@@ -229,6 +229,15 @@ channel. Long source URLs are paged; each part must be displayed before
 confirmation becomes available. **Confirm trust** applies that exact review and
 refreshes authenticated catalogs. Applications still require installation review.
 
+ID, URL and key paste events accept literal valid UTF-8 within their existing
+128/4096/64-byte bounds. Control characters, malformed UTF-8 and oversized
+input are refused as a whole; the previous field and selection stay intact.
+Empty or unfocused pastes do nothing. Pasted Enter, Escape, Tab and editing
+controls cannot start/cancel a review, change focus or edit a frozen proposal.
+Pastes are ignored while a repository operation is running. Keyboard commands
+and final repository validation remain in place. See
+[repository paste checks](../tests/packages/software-repository-paste-check.md).
+
 **Review revocation** and **Confirm revocation** disable an existing publisher
 without downloading metadata. If the repository list cannot be loaded, enter its
 ID to review revocation directly. Signature, expiry, stale-review and access

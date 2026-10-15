@@ -7,6 +7,62 @@ import time
 import ui2
 import tools.packages.pkgprotocol
 
+fn check_software_repository_paste() ! {
+	mut app := SoftwareApp{ repository_mode: true, service_path: os.executable(), output: []u8{cap: 8192} }
+	app.initialize_repository_fields()
+	defer { app.close_app() }
+	for focus in 1 .. 4 {
+		software_repository_text(mut app.repository_id, 'fixture')
+		software_repository_text(mut app.repository_url, repository_fixture_url)
+		software_repository_text(mut app.repository_key, 'b'.repeat(64))
+		app.repository_focus = focus
+		for selected in [false, true]! {
+			app.select_all = selected
+			for input in ['\x1b', '\r', '\n', '\t', '\x1b[Z', '\x01', '\x7f', '\x08', '\x00',
+				'file:///trusted\n-source', 'bad\x00field', '\xff', '\xc3', '\xe2\x82', '\xed\xa0\x80', '\xf4\x90\x80\x80', '\xc2\x80', '\xc2\x9f']! {
+				app.paste_input(input)
+				assert app.repository_mode && app.repository_focus == focus && app.select_all == selected
+				assert editor_bytes_text(app.repository_id) == 'fixture' && editor_bytes_text(app.repository_url) == repository_fixture_url
+				assert editor_bytes_text(app.repository_key) == 'b'.repeat(64) && app.worker == unsafe { nil }
+				assert app.repository_operation == '' && !app.admin_prompt
+			}
+			app.set_status('kept status'); app.paste_input('')
+			assert app.select_all == selected && app.status == 'kept status'
+		}
+		limit := match focus { 1 { 128 } 2 { 4096 } else { 64 } }
+		prefix := if focus == 2 { 'file:///offline/部署 é🚀 ; $literal/' } else { '' }
+		value := prefix + 'b'.repeat(limit - prefix.len)
+		oversized := value + '🚀'
+		defer { unsafe { value.free(); oversized.free() } }
+		app.select_all = true; app.paste_input(value)
+		mut field := match focus { 1 { &app.repository_id } 2 { &app.repository_url } else { &app.repository_key } }
+		assert field.len == limit && editor_bytes_text(*field) == value && !app.select_all
+		app.paste_input('🚀'); assert editor_bytes_text(*field) == value && !app.select_all && app.status.contains('not truncated')
+		app.select_all = true; app.paste_input(oversized)
+		assert editor_bytes_text(*field) == value && app.select_all && app.status.contains('not truncated')
+		app.paste_input('é🚀'); assert editor_bytes_text(*field) == 'é🚀' && !app.select_all
+		app.key_input('\x7f'); assert editor_bytes_text(*field) == 'é'
+		app.key_input('\x08'); assert field.len == 0
+		app.key_input('typed\xfftext'); assert field.len == 0 && app.status.contains('kept intact')
+		app.key_input('literal'); app.key_input('\x01'); app.key_input('\x7f'); assert field.len == 0 && !app.select_all
+	}
+	software_repository_text(mut app.repository_id, 'fixture')
+	software_repository_text(mut app.repository_url, repository_fixture_url)
+	software_repository_text(mut app.repository_key, 'b'.repeat(64))
+	app.repository_focus = 0; app.select_all = true
+	app.paste_input('must not edit'); app.paste_input('\n')
+	assert app.repository_focus == 0 && app.select_all && app.worker == unsafe { nil }
+	app.repository_focus = 3; app.key_input('\r')
+	assert app.worker != unsafe { nil } && app.worker.args == ['repo-review', 'enroll', 'fixture', repository_fixture_url, 'b'.repeat(64)]
+	wait_for_software(mut app)
+	assert app.repository_review_ready && app.repository_review.id == 'fixture' && app.repository_review.url == repository_fixture_url
+	for input in ['\x1b', '\n', '\t', '\x01', '\x7f', 'other source']! { app.paste_input(input) }
+	assert app.repository_review_ready && app.repository_operation == 'enroll' && app.worker == unsafe { nil }
+	assert app.repository_review.fingerprint == 'd'.repeat(64) && app.repository_url_seen == 0
+	app.key_input('\x1b'); assert !app.repository_review_ready && app.repository_operation == ''
+	println('Software repository paste: literal bounded UTF-8, atomic control/invalid/overflow refusal, preserved selection, empty/unfocused no-op, key-only commands and frozen trust review PASS')
+}
+
 fn software_repository_navigation_service_fixture(args []string) !bool {
 	mode := os.getenv('VINIX_SOFTWARE_REPOSITORY_NAVIGATION')
 	if mode == '' || args.len < 2 { return false }
@@ -61,11 +117,13 @@ fn check_repository_writer_protected(mut app SoftwareApp) ! {
 		free_window_tree(tree)
 	}
 	for action in ['software.repository.stop', 'software.repository.cancel', 'software.repository.back']! { app.handle(action)! }
+	for input in ['\x1b', '\n', '\t', '\x01', '\x7f']! { app.paste_input(input) }
 	app.key_input('\x1b'); app.stop_repository_read()
 	assert app.worker.pid == pid && C.kill(pid, 0) == 0 && app.repository_mode
 }
 
 fn check_software_repository_navigation() ! {
+	check_software_repository_paste()!
 	receipt := os.temp_dir() + '/vinix-repository-navigation-' + os.getpid().str()
 	url := repository_fixture_url + '/部署 ' + 'source-'.repeat(40)
 	os.setenv('VINIX_SOFTWARE_REPOSITORY_FIXTURE', receipt, true)
@@ -91,6 +149,8 @@ fn check_software_repository_navigation() ! {
 					free_window_tree(tree)
 				}
 				app.handle('software.repository.confirm')!; app.paste_input('must-not-edit')
+				for input in ['\x1b', '\n', '\t', '\x01', '\x7f']! { app.paste_input(input) }
+				assert app.worker.pid == pid && app.repository_read_running()
 				assert !os.exists(receipt) && editor_bytes_text(app.repository_id) == 'fixture'
 				if action == 'escape' { app.key_input('\x1b') } else { app.handle(action)! }
 				assert app.worker == unsafe { nil } && C.kill(pid, 0) != 0 && !app.worker_view && !app.worker_review
@@ -106,6 +166,8 @@ fn check_software_repository_navigation() ! {
 				} else {
 					app.begin_repository_review(kind); wait_for_software(mut app)
 					assert app.repository_review_ready && app.repository_review.operation == kind
+					for input in ['\x1b', '\n', '\t', '\x01', '\x7f']! { app.paste_input(input) }
+					assert app.repository_review_ready && app.worker == unsafe { nil } && app.repository_operation == kind
 					compact := app.build(ui2.rect(0, 0, 320, 240))!
 					assert compact.children.any(it.id == 'software.repository.cancel') && !compact.children.any(it.id == 'software.repository.confirm')
 					free_window_tree(compact)
@@ -195,6 +257,11 @@ fn check_software_repository_navigation_memory() ! {
 		for warmup in 0 .. 2 {
 			if warmup == 1 { C.vinix_heap_begin() }
 			for _ in 0 .. 1000 {
+				app.repository_focus = 2; app.select_all = true
+				app.repository_paste_input(url)
+				app.repository_paste_input('\x1b'); app.repository_paste_input('bad\xff')
+				app.select_all = true; app.repository_paste_input('bad\nsource')
+				assert editor_bytes_text(app.repository_url) == url && app.select_all && app.worker == unsafe { nil }
 				app.output.clear(); for byte in configuration { app.output << byte }; app.load_repositories()
 				software_repository_text(mut app.repository_id, 'fixture'); software_repository_text(mut app.repository_url, url); software_repository_text(mut app.repository_key, key)
 				free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!); free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
@@ -214,5 +281,6 @@ fn check_software_repository_navigation_memory() ! {
 		app.repository_status.close(); app.set_status('')
 		kept := C.vinix_heap_end(); assert kept == 0, 'repository navigation retained ${kept} bytes'
 		println('Software repository navigation: 1000 configuration/enrollment/revocation/page/full/compact/failure/cancel/retirement cycles retain zero tracked bytes')
+		println('Software repository paste: 1000 valid/rejected/selected-input cycles retain zero tracked bytes')
 	}
 }

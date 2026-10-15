@@ -1079,7 +1079,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.policy_mode { a.policy_paste_input(input); return }
 	if a.data_mode { return }
 	if a.launch_mode { a.launch_paste_input(input); return }
-	if a.repository_mode { a.repository_key_input(input) } else if a.deployment_mode {
+	if a.repository_mode { a.repository_paste_input(input) } else if a.deployment_mode {
 		a.deployment_key_input(input)
 	} else if a.mirror_mode {
 		a.mirror_key_input(input)
