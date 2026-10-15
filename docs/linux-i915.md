@@ -299,6 +299,17 @@ after a filesystem failure. Mutable build inputs still require isolation.
   shortcut remain unresolved. Selecting
   `CONFIG_TREE_RCU` supplies the original nonpreemptible ABI; it does not import
   Linux's hierarchical implementation. Native validation is recorded below.
+- Non-RT IRQ work retains original records, flags and initialization macros.
+  Local and explicit-CPU submissions use real APIC interrupts; local lazy work
+  waits for an actual PIT tick unless another IRQ-work interrupt drains it.
+  Queueing allocates nothing. Callbacks execute with IRQs disabled in real
+  maskable interrupt frames and may overlap after cross-CPU requeue.
+  Original PENDING/BUSY transitions are preserved; separate stack execution
+  records make `irq_work_sync` wait for every invocation even if BUSY clears
+  while another callback still runs. Producers must stop before final sync
+  and destruction. Storage must survive the post-callback flag update;
+  page-backed RCU deferred free supplies that lifetime. NMI, PREEMPT_RT,
+  hotplug, NOHZ and typesafe-cache ownership remain unsupported.
 - Unmodified Linux `wait.h`, `swait.h` and `completion.h` use native-backed
   queues and task wakeups. Ordinary wait queues preserve nonexclusive,
   exclusive and priority order, wake quotas, callback keys and automatic
@@ -2314,3 +2325,72 @@ all 7,668 files unchanged. This closes the page-backed RCU-free runtime gap;
 IRQ work, DMA fences/reservations and generic VM ownership remain dependencies.
 The last full audit remains 6/269; no new full-driver link or Tiger Lake result
 is claimed.
+
+## Native IRQ work, 2026-10-15
+
+Original `irq_work` records and initialization macros now use a native non-RT
+backend. A dedicated real APIC vector dispatches local and remote work with
+IRQs disabled. Local queueing always defers execution through an interrupt;
+it never invokes the callback inline. Local lazy work waits for a genuine PIT
+tick, while remote lazy submissions raise an immediate target interrupt.
+Empty-list transitions coalesce doorbells. Queues and private execution records
+allocate nothing. Fixed boot CPUs, ordinary tasks and maskable IRQs are the
+supported domain; NMI, RT, hotplug and NOHZ remain unsupported.
+
+The original PENDING-clear/full-barrier/callback/BUSY-CAS sequence is retained.
+Cross-CPU requeue can execute two callbacks concurrently. BUSY is not an
+invocation count, so `irq_work_sync` also scans pointer-only execution records
+under the same IRQ-save lock that publishes and retires those stack records.
+Successful sync makes no subsequent object access. Producers must stop before
+final sync and destruction. A callback's enclosing storage must survive the
+post-callback flag operation; real RCU deferred freeing supplies this lifetime.
+The i915 request execute cache's `SLAB_TYPESAFE_BY_RCU` and reclaim flags still
+require their own allocator implementation. This change does not make that
+caller operational or supply general Linux IRQ registration.
+
+The focused host suite passes 14 safe and 18 fatal sanitizer runs across seven
+CPU counts through 256. All 88 selected production bodies match complete
+modules, including export/initialization code. Strict GNU99/GNU11 production
+objects and original macros cover duplicate/coalesced queueing, deferred local
+and lazy execution, remote routing, requeue and a synchronization waiter that
+starts after BUSY clears while another invocation remains active. Invalid
+CPUs, flags, callbacks and contexts fail before changing the node. The host
+transport observes modeled IPIs; actual delivery is validated separately.
+
+Fresh isolated builds at `a97f0490` plus 14 frozen paths pass enabled/default
+x86 and default ARM. Final enabled ELF
+`c5fa1b88cd414dd71dfc2ecf3ef912ef5f4d504af9681d7e2f56b88254419bbb`
+passes normal, SSE and four-level guests: 48 required markers and 30 strict
+allocation equalities each. New coverage exercises actual local/remote IRQs,
+idle wakeup, lazy PIT delivery, two concurrent callbacks with BUSY already
+cleared, synchronous waiting and RCU-deferred callback containers. Three
+warmups precede the fourth complete actor lifecycle, recovering every page
+and live heap class. Default startup passes; actual default/ARM C and ELF
+exclude the feature. Independent source, generated-C and native-object lifetime
+reviews pass.
+
+Both initial guests failed heap equality despite page recovery. Generated C
+revealed one 72-byte boxed test node per lifecycle; even a proposed fixed array
+escaped. The final parallel control record has explicit boot lifetime and is
+reset only after callback drains and actual actor retirement. The original
+equalities remain; failed source, C, ELF and guest evidence are preserved.
+Final allocation review checks every new production/native function body.
+
+Evidence is under `smp-oct10/irqwork-*`. Independent native approval
+`irqwork-guest-review-oct15/final-v2.json` has SHA256
+`a14b6ae1aac5298d4a8c3c044fda518379d659daa24ad2085411250033ecaa7b`.
+Repeat focused tests with `build-support/run-v-tool.sh tests/linuxkpi/irq_work.v
+--keep-directory NEW_DIRECTORY` and the authenticated compiler router/private
+caches. The new full syntax audit remains 6/269, with all 7,971 guarded inputs
+stable; only 11 units produce actual dependency files. Remaining first errors
+are 229 task/MM/vfork, 33 CPU-bug queries and one entry-stack record.
+
+Entire unchanged `i915_sw_fence.c` compiles with the final native GNU11 command
+and a GNU99 control plus pinned Kbuild identities. All ten public exports and
+42 imports remain; 35 imports now exist in the final native ELF. The six
+substantive gaps are four DMA-fence operations and two unlocked reservation
+iterator operations. The additional absent `round_jiffies_up` is genuinely
+implemented in saved C/object and discarded when unused by this kernel.
+`irqwork-sw-fence-native-v2-closure/result.json` records this compiler/symbol
+evidence, not a whole-object link or GPU execution. Full driver compilation,
+device binding, memory ownership and Tiger Lake validation remain unfinished.

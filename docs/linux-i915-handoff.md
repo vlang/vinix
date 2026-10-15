@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-15 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Latest deferred-free build baseline: **`b5f2131e`**, with 14 frozen production/tool paths described below. Recheck HEAD and the worktree before
+Latest IRQ-work build baseline: **`a97f0490`**, with 14 frozen production/tool paths described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -83,6 +83,7 @@ global fault-lease rewrite was not applied.
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `a97f0490` | Genuine page-backed `kvfree` and deferred RCU free, original embedded/headless macros and measured complete actor teardown |
 | `1d0f5b00` | Native ordinary RCU callback/cookie service, real IRQ-return grace periods, fixed CPU-domain guards and V-only validation tools |
 | `b718a737` | Original SMP/CSD/header integration, genuine CPU accessor bindings and compiler provenance; remote dispatch remains pending |
 | `4052200b` | Immutable actual boot-CPU MOVDIRI/MOVDIR64B capability intersection and measured caller-state-preserving queries |
@@ -2037,7 +2038,8 @@ Preserve the first failed x86 generator-allowlist attempt and the original
 uses compiler/SDK `335214a9`; host tooling uses copied compiler/SDK `26b0f007`
 through the existing V router. Import verification still passes 7,668 files.
 
-Next runtime dependency: genuine IRQ work. i915 uses ordinary initialization,
+The next dependency at this increment was IRQ work, now implemented below.
+i915 uses ordinary initialization,
 local deferred queueing and breadcrumbs synchronization. Do not reuse local
 `smp_async` execution: it invokes inline and breaks GuC lock ordering. Actual
 hard-IRQ dispatch, pending/busy/requeue ordering and post-callback ownership
@@ -2047,3 +2049,75 @@ DMA fence and reservation lifetime/producer APIs remain a larger separate
 service; implementing only two reservation iterators cannot supply ownership.
 The last executed full audit remains 6/269. Full driver compile/link, confirmed
 PCI identity and real Tiger Lake validation are still pending.
+
+## Latest native IRQ-work increment
+
+Original IRQ-work records/macros now use a real dedicated maskable APIC vector.
+Ordinary local work defers through a self-IPI; remote queueing wakes its selected
+CPU. Local lazy work is promoted only by the actual PIT handler, not generic
+clock-update hooks. Remote lazy work raises immediately. Empty-list transitions
+coalesce doorbells. `CONFIG_IRQ_WORK` and `CONFIG_X86_LOCAL_APIC` select the
+genuine original declarations and APIC-capability helper. NMI, RT, hotplug,
+NOHZ and general Linux IRQ registration remain unsupported.
+
+Preserve original PENDING/BUSY flags and post-callback BUSY CAS. Cross-CPU
+requeue may overlap callbacks; the public bit is not an execution count.
+Private pointer-only stack running records share one IRQ-save lock with claim,
+retirement and sync scans. They prevent sync from returning while a concurrent
+callback still executes after BUSY clears. Objects must remain backed through
+post-callback retirement; real RCU deferred free is supported. Immediate free
+requires a separate valid ownership mechanism. The request execute cache's
+`SLAB_TYPESAFE_BY_RCU|SLAB_RECLAIM_ACCOUNT` is still rejected by native caches.
+Do not claim that caller works merely because IRQ-work APIs exist.
+
+Focused host checks pass 32 sanitizer runs: 14 safe over seven CPU counts up to
+256 and 18 fatal controls. All 88 selected production bodies are identical to
+full modules; no algorithm adapters or implicit production allocation imports
+are used. Four owned host paths are frozen by
+`irqwork-host-oct15-four-path-manifest.json`, SHA256
+`b5d108d1c471e875aae8dac334853de091846f39000c6f2255c065cd73d515e2`.
+Repeat with the authenticated router and private V caches:
+
+```sh
+build-support/run-v-tool.sh tests/linuxkpi/irq_work.v --keep-directory NEW_DIRECTORY
+```
+
+Both first native guests failed exact heap equality. A local node published to
+the ledger became a hidden 72-byte `memdup` allocation per lifecycle; a fixed
+array also escaped in compiler preflight. Final code stores that parallel
+control node explicitly in the boot ledger, resetting it only after drains and
+actual actor retirement. The production execution records remain genuine stack
+objects. Preserve failed v1 source/C/ELF/logs and the fixed-array preflight; no
+assertion was relaxed. Final review checks all new generated function bodies.
+
+Fresh builds at `a97f0490` plus 14 frozen production/tool paths pass enabled and
+default x86 and default ARM. Freeze v2 SHA256:
+`5da9fea0111d715de73cd36a19b9731a4488137e91e09d9e885503938c7c3e8e`.
+Final enabled ELF:
+`c5fa1b88cd414dd71dfc2ecf3ef912ef5f4d504af9681d7e2f56b88254419bbb`.
+Normal, SSE and four-level guests each pass 48 markers and 30 strict allocation
+rows, including exact fourth-lifecycle PMM/all-live-heap recovery after three
+warmups. Native cases cover real target IRQs/idle wake, lazy ticks, concurrent
+callbacks, record-aware sync and nine RCU-deferred owners per lifecycle. Default
+startup passes; actual ARM/default C and ELF omit the service. Independent
+allocator/fixture and backend lifetime reviewers approve saved C and objects.
+Final native approval: `irqwork-guest-review-oct15/final-v2.json`, SHA256
+`a14b6ae1aac5298d4a8c3c044fda518379d659daa24ad2085411250033ecaa7b`.
+
+The final v2 full audit remains 6/269, with 7,971 stable broad guards and only
+11 emitted dependency files. First errors: 229 task/MM/vfork, 33 CPU-bug queries,
+one entry-stack record. Whole original `i915_sw_fence.c` compiles in GNU11/GNU99
+with actual native flags and original Kbuild identities. It retains ten exports
+and 42 imports; 35 are present in the final ELF, including real IRQ-work and
+RCU-free exports. Six substantive gaps remain: four DMA-fence operations and
+two unlocked reservation iterator operations. The seventh absent name,
+`round_jiffies_up`, exists in saved native C/object and is discarded when unused.
+Closure evidence: `irqwork-sw-fence-native-v2-closure/result.json`, SHA256
+`7971350ffd48ccf756c9fcbf05e4e6d18df5cbf9e54de1fc92dc18a314ebf162`.
+
+Continue with the coherent DMA-fence core, including custom ops, callback races,
+waits, reference ownership and real deferred release, then reservation producer
+and iterator ownership. Use original public records: i915 breadcrumbs directly
+access flags/list/timestamp. A sidecar record or just four compile helpers is
+insufficient. Full driver compile/link, PCI identity, device/memory services and
+physical Tiger Lake validation remain unfinished.

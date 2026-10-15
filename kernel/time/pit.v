@@ -44,8 +44,14 @@ pub fn pit_initialise() {
 }
 
 fn C.x86__apic__lapic_eoi()
+fn C.vinix_linuxkpi_irqwork_pit_tick()
 
 fn pit_handler(_num u32, _gpr_state &cpulocal.GPRState) {
+	$if linuxkpi ? {
+		// Only the actual PIT interrupt promotes lazy IRQ work. Generic clock
+		// update hooks can also run from ordinary time-setting tasks.
+		C.vinix_linuxkpi_irqwork_pit_tick()
+	}
 	timer_handler()
 	C.x86__apic__lapic_eoi()
 }

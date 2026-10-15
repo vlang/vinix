@@ -497,6 +497,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux compatibility system queue initialization failed')
 		}
 		initialise_ordinary_rcu()
+		initialise_irq_work()
 		C.srcu_init()
 		C.wait_bit_init()
 		printk_bootstrap_result := C.vinix_linuxkpi_printk_bootstrap_native_selftest()
@@ -563,6 +564,10 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Native deferred RCU free self-test failed')
 		}
 		C.kprintf(c'linuxkpi: page-backed deferred RCU frees, mixed callback barriers and headless grace periods passed; no pages or heap objects retained\n')
+		if !irq_work_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Native IRQ work self-test failed')
+		}
+		C.kprintf(c'linuxkpi: native IRQ work, target interrupts, lazy ticks and concurrent callback synchronization passed; no pages or heap objects retained\n')
 		if !work_irq_native_selftest() {
 			lib.kpanic(unsafe { nil }, c'Native workqueue IRQ identity self-test failed')
 		}

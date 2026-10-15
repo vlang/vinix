@@ -23,6 +23,10 @@
 #define CONFIG_PGTABLE_LEVELS 5
 #define CONFIG_SMP 1
 #define CONFIG_NR_CPUS 256
+/* Native non-RT IRQ work uses a real local-APIC interrupt on its target CPU.
+ * NMI enqueue, hotplug and tickless idle are separate unsupported contexts. */
+#define CONFIG_IRQ_WORK 1
+#define CONFIG_X86_LOCAL_APIC 1
 /* Ordinary process/IRQ capture uses a native owned-byte logger. NMI entry,
  * panic bypass and device log metadata are separate pending services. */
 #define CONFIG_PRINTK 1
