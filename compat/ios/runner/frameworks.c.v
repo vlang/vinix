@@ -14,6 +14,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		&& symbol in ['_$s10Foundation5NSLogyySS_s7CVarArg_pdtF',
 			'_$sSD10FoundationE19_bridgeToObjectiveCSo12NSDictionaryCyF',
 			'_$sSa10FoundationE36_unconditionallyBridgeFromObjectiveCySayxGSo7NSArrayCSgFZ',
+			'_$sSy10FoundationE20replacingOccurrences2of4with7options5rangeSSqd___qd_0_So22NSStringCompareOptionsVSnySS5IndexVGSgtSyRd__SyRd_0_r0_lF',
 			'_$s10Foundation3URLV19_bridgeToObjectiveCSo5NSURLCyF',
 			'_$s10Foundation3URLV22appendingPathComponent_11isDirectoryACSS_SbtF',
 			'_$s10Foundation3URLV25deletingLastPathComponentACyF',

@@ -148,7 +148,15 @@ fn swift_foundation_arena() u64 {
 	// read as four-byte data before calling the enum tag injection witness.
 	// Its native case number is 7; this export does not construct a Calendar.
 	write32(data + 800, 7)
-	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 3800) })
+	// Generic String replacement spills x0-x7, borrowed Self and four stack
+	// generic arguments into a stack frame for the checked V implementation.
+	// Preserve Swift context/error registers; x8 is not an indirect result.
+	for i, op in [u32(0xa9b87bfd), 0xa90107e0, 0xa9020fe2, 0xa90317e4,
+		0xa9041fe6, 0xf9002bf4, 0xa9482be9, 0xa905abe9, 0xa9492be9,
+		0xa906abe9, 0x910043e0, 0x580000b0, 0xd63f0200, 0xa8c87bfd,
+		0xd65f03c0, 0xd503201f]! { write32(base + 3808 + u64(i * 4), op) }
+	unsafe { *(&u64(base + 3872)) = u64(voidptr(swift_string_replace)) }
+	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 3880) })
 	if C.mprotect(unsafe { voidptr(base) }, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(unsafe { voidptr(base) }, usize(page * 2)); panic('iOS: cannot seal Swift Foundation entries')
@@ -295,6 +303,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired { return error('iOS: Swift Foundation outside runtime lifetime') }
 	if symbol == '_$sSD10FoundationE19_bridgeToObjectiveCSo12NSDictionaryCyF' { return u64(unsafe { voidptr(swift_foundation_dictionary_bridge) }) }
 	if symbol == '_$sSa10FoundationE36_unconditionallyBridgeFromObjectiveCySayxGSo7NSArrayCSgFZ' { return u64(unsafe { voidptr(swift_foundation_array_unbridge) }) }
+	if symbol == '_$sSy10FoundationE20replacingOccurrences2of4with7options5rangeSSqd___qd_0_So22NSStringCompareOptionsVSnySS5IndexVGSgtSyRd__SyRd_0_r0_lF' { return swift_foundation_arena() + 3808 }
 	if address := swift_cocoa_error_symbol(symbol) { return address }
 	if address := swift_json_encoder_symbol(symbol) { return address }
 	if address := swift_json_decoder_symbol(symbol) { return address }

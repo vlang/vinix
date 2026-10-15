@@ -7061,22 +7061,70 @@ were rebuilt from the verified C archives and the corrected image passed.
 The lost RAM-only boot/serial files and raw supervisor logs are identified in
 the evidence; joined child output and statuses remain available on Data.
 
-The current IPA probe links past the Array bridge, then exits with status 1 at
+The Array-bridge IPA probe links past that bridge, then exits with status 1 at
 `_$sSy10FoundationE20replacingOccurrences2of4with7options5rangeSSqd___qd_0_So22NSStringCompareOptionsVSnySS5IndexVGSgtSyRd__SyRd_0_r0_lF`
-(StringProtocol's String replacement operation). Fortnite has not entered
-application code and remains unplayable.
+(StringProtocol's String replacement operation).
+
+V now supplies that String replacement entry for concrete String arguments.
+Installed Foundation disassembly and guarded native calls establish the ABI:
+pattern/replacement addresses in x0/x1, options in x2, optional Range payload
+in x3/x4 and its tag in the low byte of x5, Self/Pattern metadata in x6/x7,
+Replacement metadata followed by three StringProtocol tables on the stack,
+and borrowed indirect Self in x20. The owned String result returns in x0/x1;
+the caller's x20/x21 survive. The adapter uses stack storage in the existing
+sealed Foundation arena. This concrete specialization invokes no generic
+callbacks and does not read the witness tables or nil Range payload.
+
+Actual IPA calls include `0x1000697b4` and `0x10006e730`: all three metadata
+arguments are String, options are zero and the Range is nil. Their literal
+patterns include space, `+`, `/` and `=`, including Base64 URL cleanup.
+Default search supports ASCII source/pattern; literal search (option 2) also
+accepts validated Unicode. Replacement text may contain Unicode or NUL.
+Empty patterns leave the text unchanged. Matches are nonoverlapping and
+left-to-right. Default Unicode canonical equivalence, other search options,
+explicit ranges and other StringProtocol types remain unsupported.
+
+Input/output text is bounded to 1 MiB and the pattern to 4096 bytes. The
+two-pass KMP search runs in linear time, including repeated-prefix inputs.
+Its explicitly allocated prefix table and output buffer are freed on success
+and every error. Inline/native-tail strings, registered owned storage and
+checked foreign NSString storage are borrowed under the runtime lock; result
+bytes are copied into existing owned Swift String storage. Shared/custom
+storage remains unsupported. Alias inputs and protected, non-NUL-terminated
+literal spans work without mutating or consuming their owners.
+
+The dedicated fixture compares 61 native/Vinix cases across inline/literal
+and owned inputs, Unicode literal search, NULs, empty patterns, deletion,
+overlaps, size boundaries and adversarial 4096-byte patterns. It also checks
+native runtime-instantiated StringProtocol tables, independent result/pool
+lifetimes, protected nil/x8 arguments, private foreign/alias inputs, rejected
+metadata/representations/options/ranges/limits, eight concurrent workers and
+two fully drained runtime lifetimes. The initial native fixture incorrectly
+used a witness pattern instead of an instantiated table for the literal
+path; its sanitizer failure and generated C are retained.
+
+All 18 normal/deterministic sanitizer runs and nine ARM64 guest suites pass.
+The 21 generated C streams and executables, native measurements, actual IPA
+call sites, four retired VM phases and pinned inputs are retained under
+`build/ios/fortnite/string-replace-checks`. Generated C inspection checks the
+stack temporaries and explicit buffer cleanup. Published runners remain
+unchanged; the full iOS regression remains unpassed.
+
+The current IPA probe links past String replacement and exits with status 1
+at `_NSHomeDirectory`. Fortnite has not entered application code and remains
+unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,540 | 620 | 79 |
+| Fortnite executable | 1,541 | 619 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,375 | 623 | 120 |
+| All images | 2,376 | 622 | 120 |
 
-The C++/GLES/Text variant reports 2,388 resolved imports, 610 unresolved strong
+The C++/GLES/Text variant reports 2,389 resolved imports, 609 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
