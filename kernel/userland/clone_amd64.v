@@ -37,16 +37,10 @@ pub fn syscall_clone(gpr_state voidptr, flags u64, child_stack u64, parent_tid u
 pub fn syscall_clone3(gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 	state := unsafe { &cpulocal.GPRState(gpr_state) }
 
-	if size < clone_args_size_ver0 {
-		return errno.err, errno.einval
-	}
-	if size > sizeof(CloneArgs) {
-		return errno.err, errno.e2big
-	}
-
 	mut args := CloneArgs{}
-	if !usercopy.copy_from_user(voidptr(&args), uargs, size) {
-		return errno.err, errno.efault
+	failure := import_clone3_args(mut args, uargs, size)
+	if failure != 0 {
+		return errno.err, failure
 	}
 	if !valid_clone3_flags(args.flags) {
 		return errno.err, errno.einval

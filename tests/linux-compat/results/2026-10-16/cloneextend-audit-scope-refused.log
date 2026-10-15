@@ -1,0 +1,100 @@
+tests/linux-compat/cloneextend-check.v:351: FAIL: fn main.scope: assert old_body[ .. start] + replacement + old_body[end .. ] == new_body
+   left value: old_body[ .. start] + replacement + old_body[end .. ] = 
+multi_return_u64_u64 userland__syscall_clone3(void* _gpr_state, u64 uargs, u64 size) {
+	local__GPRState* state = (local__GPRState*)(_gpr_state);
+	userland__CloneArgs args = {0};
+	u64 failure = userland__import_clone3_args(&args, uargs, size);
+	if (failure != 0) {
+		return (multi_return_u64_u64){errno__err, failure};
+	}
+	if (!userland__valid_clone3_flags(args.flags)) {
+		return (multi_return_u64_u64){errno__err, errno__einval};
+	}
+	if (!userland__valid_clone3_exit_signal(args.flags, args.exit_signal)) {
+		return (multi_return_u64_u64){errno__err, errno__einval};
+	}
+	u64 child_sp = (u64)(0);
+	if (args.stack != 0) {
+		if ((args.stack_size == 0) || !usercopy__user_range(args.stack, args.stack_size)) {
+			return (multi_return_u64_u64){errno__err, errno__einval};
+		}
+		child_sp = lib__align_down(args.stack + args.stack_size, 16);
+	} else if (args.stack_size != 0) {
+		return (multi_return_u64_u64){errno__err, errno__einval};
+	}
+	void* cgroup = (void*)(NULL);
+	if ((args.flags & userland__clone_into_cgroup) != 0) {
+		if ((size < sizeof(userland__CloneArgs)) || (args.cgroup > 0x7fffffff)) {
+			return (multi_return_u64_u64){errno__err, errno__einval};
+		}
+		__v_option_file__FDptr __or_opt_0 = file__fd_from_fdnum(NULL, (i64)(args.cgroup));
+		file__FD* __or_val_1 = {0};
+		if (__or_opt_0.ok) {
+			__or_val_1 = __or_opt_0.value;
+		} else {
+			return (multi_return_u64_u64){errno__err, errno__ebadf};
+		}
+		file__FD* cgroup_fd = __or_val_1;
+		fs__VFSNode* node = (fs__VFSNode*)(cgroup_fd->handle->node);
+		file__FD__unref(cgroup_fd);
+		__v_option_voidptr __or_opt_2 = fs__cgroup_from_node(node);
+		void* __or_val_3 = {0};
+		if (__or_opt_2.ok) {
+			__or_val_3 = __or_opt_2.value;
+		} else {
+			return (multi_return_u64_u64){errno__err, errno__ebadf};
+		}
+		cgroup = __or_val_3;
+	}
+	return userland__do_clone_into(state, args.flags, child_sp, args.parent_tid, args.tls, args.child_tid, (args.flags & userland__clone_into_cgroup) != 0, cgroup);
+}
+  right value: new_body = 
+multi_return_u64_u64 userland__syscall_clone3(void* _gpr_state, u64 uargs, u64 size) {
+	local__GPRState* state = (local__GPRState*)(_gpr_state);
+	userland__CloneArgs args = (userland__CloneArgs){0};
+	u64 failure = userland__import_clone3_args(&args, uargs, size);
+	if (failure != 0) {
+		return (multi_return_u64_u64){errno__err, failure};
+	}
+	if (!userland__valid_clone3_flags(args.flags)) {
+		return (multi_return_u64_u64){errno__err, errno__einval};
+	}
+	if (!userland__valid_clone3_exit_signal(args.flags, args.exit_signal)) {
+		return (multi_return_u64_u64){errno__err, errno__einval};
+	}
+	u64 child_sp = (u64)(0);
+	if (args.stack != 0) {
+		if ((args.stack_size == 0) || !usercopy__user_range(args.stack, args.stack_size)) {
+			return (multi_return_u64_u64){errno__err, errno__einval};
+		}
+		child_sp = lib__align_down(args.stack + args.stack_size, 16);
+	} else if (args.stack_size != 0) {
+		return (multi_return_u64_u64){errno__err, errno__einval};
+	}
+	void* cgroup = (void*)(NULL);
+	if ((args.flags & userland__clone_into_cgroup) != 0) {
+		if ((size < sizeof(userland__CloneArgs)) || (args.cgroup > 0x7fffffff)) {
+			return (multi_return_u64_u64){errno__err, errno__einval};
+		}
+		__v_option_file__FDptr __or_opt_0 = file__fd_from_fdnum(NULL, (i64)(args.cgroup));
+		file__FD* __or_val_1 = {0};
+		if (__or_opt_0.ok) {
+			__or_val_1 = __or_opt_0.value;
+		} else {
+			return (multi_return_u64_u64){errno__err, errno__ebadf};
+		}
+		file__FD* cgroup_fd = __or_val_1;
+		fs__VFSNode* node = (fs__VFSNode*)(cgroup_fd->handle->node);
+		file__FD__unref(cgroup_fd);
+		__v_option_voidptr __or_opt_2 = fs__cgroup_from_node(node);
+		void* __or_val_3 = {0};
+		if (__or_opt_2.ok) {
+			__or_val_3 = __or_opt_2.value;
+		} else {
+			return (multi_return_u64_u64){errno__err, errno__ebadf};
+		}
+		cgroup = __or_val_3;
+	}
+	return userland__do_clone_into(state, args.flags, child_sp, args.parent_tid, args.tls, args.child_tid, (args.flags & userland__clone_into_cgroup) != 0, cgroup);
+}
+V panic: Assertion failed...

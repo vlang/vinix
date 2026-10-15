@@ -1973,3 +1973,19 @@ directory. `cloneclear-reference.v` runs the unchanged ELF on Linux; compile
 `cloneclear-check.v` without `-prod` to audit the original failures, corrected
 results, exact source/C scope, retention and executing negative controls.
 See [the disposition report](../../docs/linux-posix-qualification.md#native-clone3-cleared-signal-dispositions).
+
+The `cloneextend` case checks extensible clone3 argument import. Zero-filled
+extensions up to the native page size reach ordinary validation or create
+real children; nonzero extension bytes return E2BIG. Extension checks precede
+known-prefix import, and an earlier nonzero word wins over a later inaccessible
+page. All prefix lengths 64–88 remain accepted. Four credential/PID namespace
+cohorts run 1,308 controls per architecture with aligned, unaligned and guarded
+page-tail inputs, complete three-page canaries and child reaping. Native ARM
+uses a 16KiB limit; native x86 and both Linux references use 4KiB.
+Original/corrected kernels measure identical warmed 200-cycle admission,
+nonzero-extension and older-prefix fork/reap workloads. Only cleanup permits
+the original admission E2BIG; semantic classes require exact Linux results.
+Use `--cases cloneextend --timeout 1200` with a fresh state directory.
+`cloneextend-reference.v` runs the unchanged ELF on Linux; compile
+`cloneextend-check.v` without `-prod` for the executing evidence audit.
+See [the import report](../../docs/linux-posix-qualification.md#native-clone3-extensible-argument-import).

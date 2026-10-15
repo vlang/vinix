@@ -107,6 +107,39 @@ mut:
 
 const clone_args_size_ver0 = u64(64)
 
+// Import older prefixes and zero-filled future extensions, as Linux does.
+// Check the extension first, one aligned word at a time: a nonzero word must
+// win over an inaccessible later page or an inaccessible known prefix.
+fn import_clone3_args(mut args CloneArgs, address u64, size u64) u64 {
+	if size > page_size { return errno.e2big }
+	if size < clone_args_size_ver0 { return errno.einval }
+	args = CloneArgs{}
+	mut copy_size := size
+	if size > sizeof(CloneArgs) {
+		if address > ~u64(0) - sizeof(CloneArgs)
+			|| !usercopy.user_range(address + sizeof(CloneArgs), size - sizeof(CloneArgs)) {
+			return errno.efault
+		}
+		mut offset := u64(sizeof(CloneArgs))
+		mut word := [8]u8{}
+		for offset < size {
+			current := address + offset
+			mut length := u64(8) - (current & 7)
+			if length > size - offset { length = size - offset }
+			if !usercopy.copy_from_user(unsafe { voidptr(&word[0]) }, current, length) {
+				return errno.efault
+			}
+			for index in 0 .. int(length) {
+				if word[index] != 0 { return errno.e2big }
+			}
+			offset += length
+		}
+		copy_size = sizeof(CloneArgs)
+	}
+	if !usercopy.copy_from_user(voidptr(&args), address, copy_size) { return errno.efault }
+	return 0
+}
+
 // CLONE_CLEAR_SIGHAND resets the child's private copy before it can run.
 // Linux preserves SIG_IGN but clears every action's flags, restorer and mask.
 fn reset_clone_sighand(mut child proc.Thread, flags u64) {

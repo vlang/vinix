@@ -1,0 +1,31 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "f91154dbc6443d8c258d124657946ea9044127c913878266498603efec6b76f4",
+    "results": [
+        {
+            "name": "cloneextend",
+            "source_sha256": "f4f42e3384dbc13d9cf8e37bc622c7de7b0afef2be81d5c3c815bce9c8e70dfe",
+            "init_sha256": "3cc38b9ef282af85f32cdd75fcdec5a66cff73ac2335186cc3916c29aa34c30e",
+            "iso_sha256": "57c740efcc7bb37391ecbdcc1746e2878285f553e62fb3f74ebc07d9fb0bab65",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "3c22f6e44700a031e0c6e9bd04427095e423d595d3f9b81e09f07539d1ea3b9f",
+            "iso_sha256": "acc708368bcd757f20c043d3142b63506520b7925d4e252d947ee76d94d775e2",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "cloneclear",
+            "source_sha256": "73cb0c701301af2652353367633e210eb424ff332a0e6a6474d8f5f864dfcf63",
+            "init_sha256": "c8e821a759a731196674f458a82eaffe068159f0e1bb37170e3d2a0517794093",
+            "iso_sha256": "392a85706577c51042215b9bef28981b26660a723cf0f7daa0e7030a7dc32639",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

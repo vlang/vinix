@@ -1,0 +1,72 @@
+Compiler output from the default V compiler:
+/Users/alex/.cache/vinix-linux-compat/cloneextend-20261016/tmp/vinix-v-module-SQ3ubE/cloneextendfixture/core.v:74:3: warning: unused variable: `source`
+   72 |   placement := index%3; choice := index/3
+   73 |   offset := if placement == 0 {u64(128)} else if placement == 1 {u64(129)} else {state.page-88}
+   74 |   source := state.input+offset
+      |   ~~~~~~
+   75 |   if C.mprotect(voidptr(state.input),usize(3*state.page),C.PROT_READ|C.PROT_WRITE) != 0 {fatal(1)}
+   76 |   C.memset(voidptr(state.input),0xa5,usize(3*state.page))
+/Users/alex/.cache/vinix-linux-compat/cloneextend-20261016/tmp/vinix-v-module-SQ3ubE/cloneextendfixture/core.v:234:7: error: undefined ident: `prefix_fault`
+  232 |   reference := argc == 2 && C.strcmp(argv[1],c'--reference') == 0; mut good := true
+  233 |   for namespace in [false,true]! { for ordinary in [false,true]! {
+  234 |    if prefix_fault && C.mprotect(voidptr(state.input),usize(state.page),C.PROT_NONE) != 0 {fatal(22)}
+      |       ~~~~~~~~~~~~
+  235 |   mut pipe := [i32(-1),i32(-1)]!; if C.pipe2(&pipe[0],0) != 0 { fatal(15) }
+  236 |    outer := C.fork(); if outer < 0 { fatal(16) }
+/Users/alex/.cache/vinix-linux-compat/cloneextend-20261016/tmp/vinix-v-module-SQ3ubE/cloneextendfixture/core.v:234:7: error: left operand for `&&` is not a boolean
+  232 |   reference := argc == 2 && C.strcmp(argv[1],c'--reference') == 0; mut good := true
+  233 |   for namespace in [false,true]! { for ordinary in [false,true]! {
+  234 |    if prefix_fault && C.mprotect(voidptr(state.input),usize(state.page),C.PROT_NONE) != 0 {fatal(22)}
+      |       ~~~~~~~~~~~~
+  235 |   mut pipe := [i32(-1),i32(-1)]!; if C.pipe2(&pipe[0],0) != 0 { fatal(15) }
+  236 |    outer := C.fork(); if outer < 0 { fatal(16) }
+/Users/alex/.cache/vinix-linux-compat/cloneextend-20261016/tmp/vinix-v-module-SQ3ubE/cloneextendfixture/core.v:234:7: error: non-bool type `void` used as if condition
+  232 |   reference := argc == 2 && C.strcmp(argv[1],c'--reference') == 0; mut good := true
+  233 |   for namespace in [false,true]! { for ordinary in [false,true]! {
+  234 |    if prefix_fault && C.mprotect(voidptr(state.input),usize(state.page),C.PROT_NONE) != 0 {fatal(22)}
+      |       ~~~~~~~~~~~~
+  235 |   mut pipe := [i32(-1),i32(-1)]!; if C.pipe2(&pipe[0],0) != 0 { fatal(15) }
+  236 |    outer := C.fork(); if outer < 0 { fatal(16) }
+/Users/alex/.cache/vinix-linux-compat/cloneextend-20261016/tmp/vinix-v-module-SQ3ubE/cloneextendfixture/core.v:234:42: error: undefined ident: `state`
+  232 |   reference := argc == 2 && C.strcmp(argv[1],c'--reference') == 0; mut good := true
+  233 |   for namespace in [false,true]! { for ordinary in [false,true]! {
+  234 |    if prefix_fault && C.mprotect(voidptr(state.input),usize(state.page),C.PROT_NONE) != 0 {fatal(22)}
+      |                                          ~~~~~
+  235 |   mut pipe := [i32(-1),i32(-1)]!; if C.pipe2(&pipe[0],0) != 0 { fatal(15) }
+  236 |    outer := C.fork(); if outer < 0 { fatal(16) }
+/Users/alex/.cache/vinix-linux-compat/cloneextend-20261016/tmp/vinix-v-module-SQ3ubE/cloneextendfixture/core.v:234:48: error: `state` does not return a value
+  232 |   reference := argc == 2 && C.strcmp(argv[1],c'--reference') == 0; mut good := true
+  233 |   for namespace in [false,true]! { for ordinary in [false,true]! {
+  234 |    if prefix_fault && C.mprotect(voidptr(state.input),usize(state.page),C.PROT_NONE) != 0 {fatal(22)}
+      |                                                ~~~~~
+  235 |   mut pipe := [i32(-1),i32(-1)]!; if C.pipe2(&pipe[0],0) != 0 { fatal(15) }
+  236 |    outer := C.fork(); if outer < 0 { fatal(16) }
+/Users/alex/.cache/vinix-linux-compat/cloneextend-20261016/tmp/vinix-v-module-SQ3ubE/cloneextendfixture/core.v:234:42: error: expression does not return a value so it cannot be cast
+  232 |   reference := argc == 2 && C.strcmp(argv[1],c'--reference') == 0; mut good := true
+  233 |   for namespace in [false,true]! { for ordinary in [false,true]! {
+  234 |    if prefix_fault && C.mprotect(voidptr(state.input),usize(state.page),C.PROT_NONE) != 0 {fatal(22)}
+      |                                          ~~~~~~~~~~~
+  235 |   mut pipe := [i32(-1),i32(-1)]!; if C.pipe2(&pipe[0],0) != 0 { fatal(15) }
+  236 |    outer := C.fork(); if outer < 0 { fatal(16) }
+/Users/alex/.cache/vinix-linux-compat/cloneextend-20261016/tmp/vinix-v-module-SQ3ubE/cloneextendfixture/core.v:234:61: error: undefined ident: `state`
+  232 |   reference := argc == 2 && C.strcmp(argv[1],c'--reference') == 0; mut good := true
+  233 |   for namespace in [false,true]! { for ordinary in [false,true]! {
+  234 |    if prefix_fault && C.mprotect(voidptr(state.input),usize(state.page),C.PROT_NONE) != 0 {fatal(22)}
+      |                                                             ~~~~~
+  235 |   mut pipe := [i32(-1),i32(-1)]!; if C.pipe2(&pipe[0],0) != 0 { fatal(15) }
+  236 |    outer := C.fork(); if outer < 0 { fatal(16) }
+/Users/alex/.cache/vinix-linux-compat/cloneextend-20261016/tmp/vinix-v-module-SQ3ubE/cloneextendfixture/core.v:234:67: error: `state` does not return a value
+  232 |   reference := argc == 2 && C.strcmp(argv[1],c'--reference') == 0; mut good := true
+  233 |   for namespace in [false,true]! { for ordinary in [false,true]! {
+  234 |    if prefix_fault && C.mprotect(voidptr(state.input),usize(state.page),C.PROT_NONE) != 0 {fatal(22)}
+      |                                                                   ~~~~
+  235 |   mut pipe := [i32(-1),i32(-1)]!; if C.pipe2(&pipe[0],0) != 0 { fatal(15) }
+  236 |    outer := C.fork(); if outer < 0 { fatal(16) }
+/Users/alex/.cache/vinix-linux-compat/cloneextend-20261016/tmp/vinix-v-module-SQ3ubE/cloneextendfixture/core.v:234:61: error: expression does not return a value so it cannot be cast
+  232 |   reference := argc == 2 && C.strcmp(argv[1],c'--reference') == 0; mut good := true
+  233 |   for namespace in [false,true]! { for ordinary in [false,true]! {
+  234 |    if prefix_fault && C.mprotect(voidptr(state.input),usize(state.page),C.PROT_NONE) != 0 {fatal(22)}
+      |                                                             ~~~~~~~~~~
+  235 |   mut pipe := [i32(-1),i32(-1)]!; if C.pipe2(&pipe[0],0) != 0 { fatal(15) }
+  236 |    outer := C.fork(); if outer < 0 { fatal(16) }
+

@@ -1103,6 +1103,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   against identical probe ELFs on Linux.
   See [the disposition receipts](docs/linux-posix-qualification.md#native-clone3-cleared-signal-dispositions).
 
+- [x] Import zero-filled clone3 argument extensions up to the native page limit;
+  qualify exact nonzero/fault precedence, all older prefix lengths, protected
+  layouts, real extended forks and flat cleanup on both native architectures
+  against identical probe ELFs on Linux.
+  See [the extensible import receipts](docs/linux-posix-qualification.md#native-clone3-extensible-argument-import).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

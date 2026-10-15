@@ -1,0 +1,3 @@
+tests/linux-compat/cloneextend-check.v:372: FAIL: fn main.main: assert false, 'cloneextend assertions must execute'
+      message: cloneextend assertions must execute
+V panic: Assertion failed...

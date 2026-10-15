@@ -9466,9 +9466,100 @@ the receipts. The maintained auditor is `tests/linux-compat/cloneclear-check.v`.
 
 This qualifies separate-process clones using inherited stacks and stable
 parent dispositions. Concurrent handler installation, shared-VM/vfork forms,
-exec and signal-frame/restorer return behavior remain separate. Selected TIDs,
-pidfds, zero-filled argument extensions, non-SIGCHLD exit notification and
+exec and signal-frame/restorer return behavior remain separate. Zero-filled
+argument extensions are qualified below. Selected TIDs, pidfds, non-SIGCHLD
+exit notification and
 clone-child wait classes, supplied-stack execution/alignment, cgroup placement
 and its authorization/lifetimes, GNU libc and translated/32-bit paths remain
 unqualified here. The broad libc, installation/sandbox/portal and translation
 gates remain open.
+
+## Native clone3 extensible argument import
+
+Both native clone3 entry points now share an argument importer. Sizes below
+64 still return EINVAL; sizes larger than the native page return E2BIG before
+pointer access. Shorter supported prefixes are copied into a zeroed CloneArgs.
+For sizes above 88, the importer first verifies that every unknown byte is
+zero, then copies the known 88-byte prefix. Nonzero extensions return E2BIG;
+inaccessible extension or prefix memory returns EFAULT. Checking one aligned
+word fragment at a time preserves the precedence of an earlier nonzero word
+over a later inaccessible page. No requested extension byte is ignored.
+This follows [Linux v6.12's clone3 importer](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c)
+and [copy_struct_from_user](https://github.com/torvalds/linux/blob/v6.12/include/linux/uaccess.h).
+
+The `cloneextend` probe runs 1,308 controls per architecture, with 327 in each
+root/UID1000 and initial/one-level PID namespace cohort. Fifteen extension
+lengths cover 89/90/95/96/97/103/104/127/128/129/255/256/257 bytes and the native
+page size minus one/full size. Each uses aligned, byte-unaligned and guarded
+native-page-tail layouts. Bytes outside the declared input remain nonzero,
+so the probe also checks that the importer excludes those bytes. Native ARM
+uses 16KiB pages and an argument limit of 16,384; native x86 and both Linux
+references use 4KiB pages and a limit of 4,096. The unchanged probe ELF derives
+the native page size at runtime.
+
+| Class | Calls per cohort | Contract |
+| --- | ---: | --- |
+| Zero-extension admission | 45 | All fifteen zero-filled extension sizes reach a later missing-cgroup-FD EBADF. |
+| Nonzero extensions | 90 | A nonzero byte at the first or last declared extension byte returns E2BIG; surrounding canaries stay unchanged. |
+| Import fault ordering | 36 | Null/low/wrapping addresses, inaccessible extension words, readable zero tails with inaccessible prefixes, and readable bad flags followed by an inaccessible tail return EFAULT. Earlier nonzero words return E2BIG before later extension faults or inaccessible prefixes. |
+| Older prefix lengths | 75 | Every byte length from 64 through 88 creates and reaps a real SIGCHLD child; bytes beyond the prefix remain nonzero. |
+| Validation and size limits | 36 | Zero extensions reach invalid-flag/exit-signal EINVAL; four sizes above the native page return E2BIG even with null or wrapping pointers. |
+| Extended forks | 45 | Every tested extension size creates and reaps a real SIGCHLD child. |
+
+Original kernels fail exactly 564 controls per architecture: 45 admission,
+27 fault-ordering, 24 later-validation and 45 extended-fork checks per cohort.
+They create zero extended children. Corrected kernels and the identical
+original probe ELFs on Linux 6.12.51 pass every control and create 45 extended
+children per cohort, in addition to the 75 older-prefix children. Every child
+reports PID/TID, parent and UID, exits with status 37 and is reaped. Each call
+restores protections, compares the complete three-page canary and requires
+ECHILD from an empty nonblocking wait. The probe records extended-child totals
+both in the cohort and after transfer to its supervisor.
+
+Original and corrected kernels measure four cleanup cohorts after 64 warmup
+cycles and thirteen seconds of settling, followed by 200 measured cycles and
+another settle. Every cycle repeats a zero-extension admission call, a
+nonzero-extension refusal and an older-prefix real fork/reap. These inputs
+and child lifecycles are identical in both phases. Only this retention loop
+permits original E2BIG instead of corrected EBADF for admission; semantic
+classes require exact results. All live slab classes and big-heap page totals
+stay flat. This is targeted kernel-heap evidence; general page/cache retention
+and the earlier EXT2 rename observation remain separate.
+
+Four isolated original/corrected production builds pass. Exact whole-C
+comparison confines the change to the importer/prototype and two clone3 call
+sites. The helper uses an eight-byte stack buffer and the caller's existing
+CloneArgs; it adds no allocation, free, reference, ownership transfer or lock.
+The probe uses eight explicit stack allocas and no dynamic allocation or
+fixed-index helper. Its successful compiler preflight matches original ARM
+guest C. The initial fixture generator also inserted a local protection check
+in the supervisor and failed compilation; its exact input, original partial
+preflight artifacts and raw reproducer diagnostics are retained and pinned.
+The first scope auditor expected a C initializer without its generated type
+cast and refused comparison; its source, executable and raw refusal are also
+retained. The corrected auditor checks the actual complete C without rewriting
+either generated file.
+
+Both corrected architectures pass runtime and the 576-control cloneclear
+regression. The auditor verifies every case/cohort total, original failures,
+extended-child counts, credentials/page sizes, identical probe C/ELFs, Linux
+receipts, both phases' storage, all 84 retained native case files, 67 frozen
+dispatch inventory inputs, 2,014 SDK files and 15,146 compiler pins. False
+assertion and passing-Linux-as-original controls must execute and fail;
+compile without `-prod`.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/cloneextend-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/cloneextend-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/cloneextend-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/cloneextend-diagnostic-pins.json).
+Raw original/corrected/Linux, build, preflight, auditor-refusal and regression
+logs accompany the receipts. The maintained auditor is
+`tests/linux-compat/cloneextend-check.v`.
+
+This qualifies stable extensible imports with inherited stacks. Concurrent
+argument/mapping changes, tagged pointers and the complete architecture-specific
+address boundary remain separate. Selected TIDs, pidfds, non-SIGCHLD exit
+notification and clone-child wait classes, supplied-stack execution/alignment,
+cgroup placement and its authorization/lifetimes, GNU libc and translated/
+32-bit paths remain unqualified here. The broad libc, installation/sandbox/
+portal and translation gates remain open.
