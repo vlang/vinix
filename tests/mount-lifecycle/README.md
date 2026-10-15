@@ -94,6 +94,13 @@ through `de-7` select individual cases. Native `all` and Linux
 `--case descwx` selects inherited-descriptor W^X approval; `dw-0` through
 `dw-7` select individual cases. Native `all` includes them. Linux
 `move-reference` excludes the Vinix-specific `wxallowed` policy.
+`--case execflags` selects `execveat` flag and final-symlink validation;
+`ef-0` through `ef-9` select individual cases. Native `all` and Linux
+`move-reference` include them.
+
+The [execveat validation checks](exec-flags.md) reject unsupported flag bits,
+report `ELOOP` for final links left unfollowed, and retain the low-32-bit
+flags ABI, valid launch forms and selected error precedence.
 
 The [descriptor W^X checks](descriptor-wx.md) preserve the saved attachment's
 administrator-controlled `wxallowed` approval for direct execution. They cover

@@ -1,5 +1,11 @@
 # Execution and device mount policy
 
+`execveat` accepts only `AT_EMPTY_PATH` and `AT_SYMLINK_NOFOLLOW` in the low
+32 bits of its flags argument. Unsupported bits return `EINVAL`; unused upper
+register bits are ignored. A final symlink left unfollowed returns `ELOOP`,
+including a symlink held with `O_PATH`. Intermediate symlinks can still be
+followed. See [the execveat checks](../tests/mount-lifecycle/exec-flags.md).
+
 `noexec` rejects executable images, scripts and ELF interpreters with `EACCES`.
 Executable file mappings return `EPERM`; a mapping first made without execute
 permission through that mount cannot gain it through `mprotect`, even after

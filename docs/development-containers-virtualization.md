@@ -556,6 +556,14 @@ covered for linked/unlinked native ELFs, ordinary owners, root without
 W^X and initial-namespace privileged override remain enforced. This policy is
 Vinix-specific and excluded from the portable Linux suite. Broader runtime,
 backend and concurrent-remount qualification remains open.
+The [execveat validation checks](../tests/mount-lifecycle/exec-flags.md) reject
+unsupported flag bits with `EINVAL` and report `ELOOP` for final symlinks left
+unfollowed, including `O_PATH` link descriptions. Native ARM/x86 and the same
+probe executables on Linux cover absolute, relative, empty-path and unlinked
+descriptions, legal flags, ignored upper register bits, ordinary UID/GID 1000
+and selected path/flag/descriptor error precedence. Existing mount, MAC, W^X,
+credential and image-loading checks remain in place. General relative-directory
+mount routing and broader combined-error qualification remain open.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,

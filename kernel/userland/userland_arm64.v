@@ -1453,6 +1453,16 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 	mut process := proc.current_thread().process
 
 	path := fs.user_path(_path) or { return errno.err, errno.get() }
+	// The syscall ABI supplies a C int, even when its register has high bits.
+	call_flags := int(u32(flags))
+	if path.len == 0 && call_flags & fs.at_empty_path == 0 {
+		unsafe { path.free() }
+		return errno.err, errno.enoent
+	}
+	if call_flags & ~(fs.at_empty_path | fs.at_symlink_nofollow) != 0 {
+		unsafe { path.free() }
+		return errno.err, errno.einval
+	}
 	description := path.len == 0
 
 	mut directory := &fs.VFSNode(unsafe { nil })
@@ -1464,9 +1474,6 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 	if path.len == 0 {
 		// The descriptor's name below takes the empty path's place.
 		unsafe { path.free() }
-		if flags & fs.at_empty_path == 0 {
-			return errno.err, errno.enoent
-		}
 		// Run the descriptor's image with its actual mount route. A relative
 		// shebang interpreter is resolved from cwd, as for ordinary execve.
 		mut fd := file.fd_from_fdnum(process, dirfd) or { return errno.err, errno.ebadf }
@@ -1493,10 +1500,16 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 			unsafe { path.free() }
 			return errno.err, errno.get()
 		}
-		direct_node = fs.get_node_on_mount(directory, path, flags & fs.at_symlink_nofollow == 0, direct_mount) or {
+		direct_node = fs.get_node_on_mount(directory, path, call_flags & fs.at_symlink_nofollow == 0, direct_mount) or {
 			unsafe { path.free() }
 			return errno.err, errno.get()
 		}
+	}
+
+	// A final link left by NOFOLLOW (or an O_PATH link description) is ELOOP.
+	if direct_node != unsafe { nil } && stat.islnk(direct_node.resource.stat.mode) {
+		unsafe { target.free() }
+		return errno.err, errno.eloop
 	}
 
 	reserve_exec_scratch() or { unsafe { target.free() }; return errno.err, errno.get() }

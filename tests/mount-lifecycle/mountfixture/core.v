@@ -356,6 +356,8 @@ pub fn run(argc i32, argv &&char) i32 {
 		count := C.read(fd, &name[0], 31)
 		check(fd >= 0 && count > 0 && C.close(fd) == 0, 4)
 		selected := &char(&name[0])
+		exec_flags := if count == 4 && name[0] == `e` && name[1] == `f` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		identity := if count == 4 && name[0] == `i` && name[1] == `d` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `6` { int(name[3] - `0`) } else { -1 }
 		admission := if count == 4 && name[0] == `a` && name[1] == `d` && name[2] == `-`
@@ -444,7 +446,8 @@ pub fn run(argc i32, argv &&char) i32 {
 			|| C.strcmp(selected, c'descmaps') == 0 || descriptor_mmaps >= 0
 			|| C.strcmp(selected, c'descaccess') == 0 || descriptor_access >= 0
 			|| C.strcmp(selected, c'descexec') == 0 || descriptor_exec >= 0
-			|| C.strcmp(selected, c'descwx') == 0 || descriptor_wx >= 0, 4)
+			|| C.strcmp(selected, c'descwx') == 0 || descriptor_wx >= 0
+			|| C.strcmp(selected, c'execflags') == 0 || exec_flags >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
@@ -533,6 +536,9 @@ pub fn run(argc i32, argv &&char) i32 {
 		// wxallowed is a Vinix policy; the portable Linux group excludes it.
 		if C.strcmp(selected, c'descwx') == 0 || C.strcmp(selected, c'all') == 0 { descriptor_wx_cases(-1) }
 		if descriptor_wx >= 0 { descriptor_wx_cases(descriptor_wx) }
+		if C.strcmp(selected, c'execflags') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { exec_flags_cases(-1) }
+		if exec_flags >= 0 { exec_flags_cases(exec_flags) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }
