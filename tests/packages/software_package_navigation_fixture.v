@@ -69,6 +69,7 @@ fn wait_for_package_navigation_output(mut app SoftwareApp, progress bool) {
 
 fn check_package_navigation_writer(mut app SoftwareApp) ! {
 	pid := app.worker.pid
+	check_package_navigation_paste_guard(mut app)
 	assert !app.package_review_running() && !app.prepare_close()
 	compact := app.build(ui2.rect(0, 0, 320, 240))!
 	assert compact.children.any(it.id == 'software.progress') && compact.children.any(it.text == app.status)
@@ -77,6 +78,20 @@ fn check_package_navigation_writer(mut app SoftwareApp) ! {
 	for action in ['software.review.stop', 'software.cancel', 'software.reload', 'software.search']! { app.handle(action)! }
 	app.key_input('\x1b'); app.stop_package_review(); app.key_input('must-not-edit')
 	assert app.worker.pid == pid && C.kill(pid, 0) == 0 && app.query.bytestr() == 'Editor'
+}
+
+fn check_package_navigation_paste_guard(mut app SoftwareApp) {
+	pid := if app.worker == unsafe { nil } { 0 } else { app.worker.pid }
+	operation := app.review; fingerprint := app.review_snapshot.fingerprint
+	focused := app.focus; selected := app.select_all; scroll := app.scroll; row := app.selected
+	status := app.status; output_length := app.output.len
+	for input in ['\x1b', '\r', '\n', '\x01', '\x08', '\x7f', 'must not edit', '']! {
+		app.paste_input(input)
+		assert app.query.bytestr() == 'Editor' && app.focus == focused && app.select_all == selected
+		assert app.review == operation && app.review_snapshot.fingerprint == fingerprint
+		assert app.scroll == scroll && app.selected == row && app.status == status && app.output.len == output_length
+		assert if pid == 0 { app.worker == unsafe { nil } } else { app.worker != unsafe { nil } && app.worker.pid == pid && C.kill(pid, 0) == 0 }
+	}
 }
 
 fn check_software_package_navigation() ! {
@@ -93,6 +108,7 @@ fn check_software_package_navigation() ! {
 				app.handle('software.' + operation)!; pid := app.worker.pid
 				wait_for_package_navigation_output(mut app, false)
 				assert app.package_review_running() && app.prepare_close() && !app.review_ready && !app.admin_prompt
+				check_package_navigation_paste_guard(mut app)
 				assert app.worker.args == ['review', operation, ...if operation in ['install', 'remove']! { ['editor'] } else { []string{} }]
 				for size in [ui2.rect(0, 0, 640, 610), ui2.rect(0, 0, 320, 240)]! {
 					tree := app.build(size)!
@@ -110,6 +126,7 @@ fn check_software_package_navigation() ! {
 				os.unsetenv('VINIX_SOFTWARE_PACKAGE_NAVIGATION')
 				app.handle('software.' + operation)!; wait_for_software(mut app)
 				assert app.review_ready && app.review_snapshot.operation == operation
+				check_package_navigation_paste_guard(mut app)
 				app.handle('software.row.1')!; assert app.review_selected == 1 && app.selected == 0
 				compact := app.build(ui2.rect(0, 0, 320, 240))!
 				assert compact.children.any(it.id == 'software.cancel') && !compact.children.any(it.id == 'software.confirm')

@@ -63,6 +63,13 @@ frames; long keys and paths can split within a word. Oversized summaries show an
 ellipsis, and administrator status stays below the approval controls. See
 [paragraph checks](../../tests/packages/software-paragraphs-check.md).
 
+Catalog, health and deployment-audit searches accept clipboard text as a whole
+within 256 UTF-8 bytes. Controls, malformed text and overflow preserve the query,
+focus, selection and current results, with a diagnostic. Empty or unfocused
+pastes do nothing. Clipboard text cannot trigger keyboard navigation or cancel
+reviews; ordinary keyboard editing and search during catalog reload remain
+available. See [search input checks](../../tests/packages/software-search-paste-check.md).
+
 **Verify installed** supports Stop/Cancel/Escape in full and compact windows.
 Stopping retires unaccepted progress/output and keeps the catalog for retry.
 Completion and human success output wait for successful worker exit; late

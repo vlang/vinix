@@ -24,6 +24,11 @@ fn software_view_service_fixture(args []string) bool {
 	if mode == '' { return false }
 	text := json2.encode(software_view_fixture())
 	defer { unsafe { text.free() } }
+	if mode == 'held' {
+		print(text); flush_stdout()
+		mut release := u8(0); assert C.read(0, &release, 1) == 1 && release == `!`
+		return true
+	}
 	println(match mode {
 		'missing' { text.replace('"firmware":true,', '') }
 		'duplicate' { text.replace('"firmware":true', '"firmware":true,"firm\\u0077are":false') }
@@ -40,6 +45,7 @@ fn software_view_legacy(text string) string {
 }
 
 fn check_software_view_reader() ! {
+	check_software_search_paste()
 	mut app := SoftwareApp{ service_path: os.executable(), administration_required: true, query: []u8{cap: 256}, output: []u8{cap: 8192} }
 	defer { os.unsetenv('VINIX_SOFTWARE_VIEW_FIXTURE'); app.close_app() }
 	text := json2.encode(software_view_fixture())
@@ -52,6 +58,15 @@ fn check_software_view_reader() ! {
 	app.key_input('\x01'); app.key_input('éki'); assert app.matching.len == 32
 	app.key_input('\x01'); app.key_input('APP-31'); assert app.matching == [31]
 	app.key_input('\x01'); app.key_input('\x7f'); assert app.matching.len == 32
+	// Searching stays available while an ordinary catalog read waits to exit.
+	os.setenv('VINIX_SOFTWARE_VIEW_FIXTURE', 'held', true)
+	app.start(['view'], true); pid := app.worker.pid
+	wait_for_package_navigation_output(mut app, false)
+	app.paste_input('APP-31'); assert app.matching == [31] && app.worker.pid == pid
+	app.paste_input('\x1b'); assert app.focus && app.worker.pid == pid && app.query.bytestr() == 'APP-31'
+	release := u8(`!`); assert C.write(app.worker.stdio_fd[0], &release, 1) == 1
+	wait_for_software(mut app); assert app.matching == [31] && app.query.bytestr() == 'APP-31'
+	app.key_input('\x01'); app.key_input('\x7f')
 	app.selected = 31
 	for mode in ['missing', 'duplicate', 'partial', 'coherence'] {
 		os.setenv('VINIX_SOFTWARE_VIEW_FIXTURE', mode, true)
@@ -84,6 +99,7 @@ fn check_software_view_memory() ! {
 			if warmup == 1 { C.vinix_heap_begin() }
 			for _ in 0 .. 1000 {
 				metadata_fixture_output(mut app, text); app.load_view(); assert app.rows.len == 32
+				software_search_paste_cycle(mut app)
 				app.query.clear()
 				for byte in 'ÉKI' { app.query << byte }
 				app.filter_rows(); assert app.matching.len == 32
@@ -104,5 +120,82 @@ fn check_software_view_memory() ! {
 		kept := C.vinix_heap_end()
 		assert kept == 0, 'Software catalog reloads retained ${kept} bytes'
 		println('Software catalog reader: 1000 wide/partial-invalid/legacy reload, display/details and retirement cycles retain zero tracked bytes')
+		println('Software search paste: 1000 literal/rejected/selected/empty input and catalog retirement cycles retain zero tracked bytes')
 	}
+}
+
+fn software_search_fixture_text(a &SoftwareApp) string {
+	return editor_bytes_text(if a.health_mode { a.health_query } else if a.audit_mode { a.audit_query } else { a.query })
+}
+
+fn software_search_fixture_focus(a &SoftwareApp) bool {
+	return if a.health_mode { a.health_focus } else if a.audit_mode { a.audit_focus } else { a.focus }
+}
+
+fn software_search_fixture_selected(a &SoftwareApp) bool {
+	return if a.health_mode { a.health_select_all } else if a.audit_mode { a.audit_select_all } else { a.select_all }
+}
+
+fn software_search_fixture_set_focus(mut a SoftwareApp, focused bool) {
+	if a.health_mode { a.health_focus = focused } else if a.audit_mode { a.audit_focus = focused } else { a.focus = focused }
+}
+
+fn check_software_search_paste() {
+	full := 'é'.repeat(128); oversize := full + 'x'; prefix := 'x'.repeat(250)
+	defer { unsafe { full.free(); oversize.free(); prefix.free() } }
+	for mode in 0 .. 3 {
+		mut app := SoftwareApp{ health_mode: mode == 1, health_ready: mode == 1, audit_mode: mode == 2, audit_ready: mode == 2 }
+		software_search_fixture_set_focus(mut app, true)
+		for selected in [false, true]! {
+			app.key_input('\x01'); app.paste_input('kept')
+			if selected { app.key_input('\x01') }
+			app.scroll = 7; app.health_scroll = 8; app.audit_scroll = 9; app.details_page = 3
+			for invalid in ['\x00', '\x01', '\x08', '\x7f', '\r', '\n', '\x1b', '\t', 'bad\nquery', 'bad\x1b[A',
+				'bad\x80', '\xc2', '\xc0\xaf', '\xe0\x80\xaf', '\xed\xa0\x80', '\xf4\x90\x80\x80', '\xc2\x80', '\xc2\x9f', oversize]! {
+				app.paste_input(invalid)
+				assert software_search_fixture_text(&app) == 'kept' && software_search_fixture_focus(&app)
+				assert software_search_fixture_selected(&app) == selected && app.status == software_search_input_error
+				assert app.scroll == 7 && app.health_scroll == 8 && app.audit_scroll == 9 && app.details_page == 3
+			}
+			app.paste_input('')
+			assert software_search_fixture_text(&app) == 'kept' && software_search_fixture_selected(&app) == selected
+			app.paste_input(' é🚀 ; $(literal) \\')
+			assert software_search_fixture_text(&app) == if selected { ' é🚀 ; $(literal) \\' } else { 'kept é🚀 ; $(literal) \\' }
+			assert software_search_fixture_focus(&app) && !software_search_fixture_selected(&app)
+		}
+		app.key_input('\x01'); app.paste_input(full)
+		assert software_search_fixture_text(&app) == full
+		app.paste_input('🚀'); assert software_search_fixture_text(&app) == full && !software_search_fixture_selected(&app)
+		app.key_input('\x01'); app.paste_input(oversize)
+		assert software_search_fixture_text(&app) == full && software_search_fixture_selected(&app)
+		software_search_fixture_set_focus(mut app, false)
+		app.paste_input('unfocused'); app.paste_input('\x1b')
+		assert software_search_fixture_text(&app) == full && software_search_fixture_selected(&app) && !software_search_fixture_focus(&app)
+		software_search_fixture_set_focus(mut app, true)
+		app.paste_input(prefix); app.paste_input('🚀'); app.paste_input('é')
+		assert software_search_fixture_text(&app).len == 256
+		app.key_input('\x08'); assert software_search_fixture_text(&app).len == 254
+		app.key_input('\x7f'); assert software_search_fixture_text(&app) == prefix
+		app.key_input('\x01'); app.key_input('\x08'); assert software_search_fixture_text(&app) == ''
+		app.key_input('typed'); assert software_search_fixture_text(&app) == 'typed'
+		for key in ['\r', '\n', '\x1b']! {
+			software_search_fixture_set_focus(mut app, true); app.key_input(key)
+			assert !software_search_fixture_focus(&app) && software_search_fixture_text(&app) == 'typed'
+		}
+		app.close_app()
+	}
+	println('Software search paste: catalog/health/audit literal bounded UTF-8, controls, malformed text, exact byte limits, atomic refusal, selection/focus/page preservation, empty/unfocused input and keyboard editing passed')
+}
+
+fn software_search_paste_cycle(mut app SoftwareApp) {
+	software_search_fixture_set_focus(mut app, true)
+	app.key_input('\x01'); app.paste_input('É🚀')
+	app.key_input('\x01')
+	for input in ['\x1b', '\x01', '\x08', '\r', 'bad\ntext', '\xc2\x80', '\xed\xa0\x80', '']! {
+		app.paste_input(input)
+		assert software_search_fixture_text(&app) == 'É🚀' && software_search_fixture_selected(&app) && software_search_fixture_focus(&app)
+	}
+	app.paste_input('APP-23'); assert software_search_fixture_text(&app) == 'APP-23'
+	app.key_input('\x01'); app.key_input('\x08')
+	software_search_fixture_set_focus(mut app, false)
 }

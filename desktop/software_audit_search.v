@@ -57,16 +57,11 @@ fn (mut a SoftwareApp) filter_deployment_audit() {
 }
 
 fn (mut a SoftwareApp) audit_paste_input(input string) {
-	if a.worker != unsafe { nil } || !a.audit_ready || !a.audit_focus { return }
-	length := if a.audit_select_all { 0 } else { a.audit_query.len }
-	if input.len > console_filter_limit - length || !software_deployment_text_valid(input) {
-		a.set_status('Search text must be valid UTF-8 without control characters, at most 256 bytes. The field was kept intact.')
+	if a.worker != unsafe { nil } || !a.audit_ready || !a.audit_focus || input == '' { return }
+	if !software_search_paste(mut a.audit_query, input, a.audit_select_all) {
+		a.set_status(software_search_input_error)
 		return
 	}
-	if a.audit_query.cap == 0 { a.audit_query = []u8{cap: console_filter_limit} }
-	unsafe { a.audit_query.flags |= .noslices }
-	if a.audit_select_all { a.audit_query.clear() }
-	for byte in input { a.audit_query << byte }
 	a.audit_select_all = false
 	a.filter_deployment_audit()
 }

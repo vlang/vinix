@@ -176,9 +176,11 @@ fn (mut a SoftwareApp) filter_health() {
 }
 
 fn (mut a SoftwareApp) health_paste_input(input string) {
-	if a.worker != unsafe { nil } || !a.health_ready || !a.health_focus { return }
-	unsafe { a.health_query.flags |= .noslices }
-	console_paste_field(mut a.health_query, input, console_filter_limit, a.health_select_all)
+	if a.worker != unsafe { nil } || !a.health_ready || !a.health_focus || input == '' { return }
+	if !software_search_paste(mut a.health_query, input, a.health_select_all) {
+		a.set_status(software_search_input_error)
+		return
+	}
 	a.health_select_all = false
 	a.filter_health()
 }

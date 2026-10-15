@@ -170,6 +170,7 @@ fn check_software_audit_search_memory() ! {
 				app.audit_mode = true; app.audit_path = software_audit_fixture_path.clone()
 				app.output.clear(); for byte in text { app.output << byte }
 				assert app.load_deployment_audit(3)
+				software_search_paste_cycle(mut app)
 				free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!)
 				for query in ['APP-10037', '', 'PUBLIC_KEY', 'no matching package', 'é🚀']! {
 					audit_fixture_query(mut app, query)!

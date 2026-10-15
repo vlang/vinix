@@ -327,6 +327,28 @@ fn software_search_lower(value string) string {
 	return bytes.bytestr()
 }
 
+const software_search_input_error = 'Search text must be valid UTF-8 without control characters, at most 256 bytes. The field was kept intact.'
+
+fn software_search_paste(mut bytes []u8, input string, selected bool) bool {
+	length := if selected { 0 } else { bytes.len }
+	if input.len > console_filter_limit - length || !software_deployment_text_valid(input) { return false }
+	if bytes.cap == 0 { bytes = []u8{cap: console_filter_limit} }
+	unsafe { bytes.flags |= .noslices }
+	if selected { bytes.clear() }
+	for byte in input { bytes << byte }
+	return true
+}
+
+fn (mut a SoftwareApp) search_paste_input(input string) {
+	if !a.focus || input == '' || a.review != '' || (a.worker != unsafe { nil } && !a.worker_view) { return }
+	if !software_search_paste(mut a.query, input, a.select_all) {
+		a.set_status(software_search_input_error)
+		return
+	}
+	a.select_all = false
+	a.filter_rows()
+}
+
 fn (mut a SoftwareApp) filter_rows() {
 	a.matching.clear()
 	query := software_search_lower(editor_bytes_text(a.query))
@@ -1058,11 +1080,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 			a.filter_rows()
 		}
 		'\x1b', '\r', '\n' { a.focus = false }
-		else {
-			console_paste_field(mut a.query, input, console_filter_limit, a.select_all)
-			a.select_all = false
-			a.filter_rows()
-		}
+		else { a.search_paste_input(input) }
 	}
 }
 
@@ -1083,7 +1101,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 		a.deployment_paste_input(input)
 	} else if a.mirror_mode {
 		a.mirror_paste_input(input)
-	} else if a.focus { a.key_input(input) }
+	} else { a.search_paste_input(input) }
 }
 
 fn software_label(text string, x int, y int, width int, height int, owned bool) ui2.Element {

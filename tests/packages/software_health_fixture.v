@@ -415,6 +415,7 @@ fn check_software_health_memory() ! {
 			for _ in 0 .. 1000 {
 				app.health_mode = true; app.load_health()
 				assert app.health_ready && app.health_matching[0] == 1
+				software_search_paste_cycle(mut app)
 				free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!)
 				app.handle_health('software.row.1')
 				app.handle_health('software.health.next')

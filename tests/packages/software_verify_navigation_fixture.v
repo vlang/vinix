@@ -88,7 +88,8 @@ fn check_software_verify_navigation() ! {
 				free_window_tree(tree)
 			}
 			for event in ['software.verify', 'software.refresh', 'software.install', 'software.reload', 'software.row.0', 'software.search']! { app.handle(event)! }
-			app.paste_input('\x1b'); app.key_input('must not edit')
+			for input in ['\x1b', '\r', '\n', '\x01', '\x08', '\x7f', 'must not edit', '']! { app.paste_input(input) }
+			app.key_input('must not edit')
 			app.handle(packagecore.request_prefix + '{"id":"editor"}')!
 			assert app.worker.pid == pid && app.launch_request == '' && app.query.bytestr() == 'kept query'
 			if action == 'escape' { app.key_input('\x1b') } else { app.handle(action)! }

@@ -997,6 +997,16 @@ Its **Configured repositories** view remains available when cached indexes or
 replay history need repair. Revocation still requires review and administrator
 approval; the list does not repair metadata or enable acquisition.
 
+Catalog, health and deployment-audit clipboard searches use the same bounded
+insertion rule. Valid text is inserted literally, up to 256 UTF-8 bytes; controls,
+malformed UTF-8 and overflow are refused as a whole with a diagnostic. Refusal
+preserves the query, focus, selected text, result projection and page. Empty or
+unfocused pastes do nothing. Pasted editing/navigation controls cannot blur a
+search, cancel a proposal or stop verification. Reviews and writes ignore catalog
+search pastes; ordinary catalog reads still permit searching, and keyboard
+editing/navigation retains its existing guards. See
+[search clipboard checks](../tests/packages/software-search-paste-check.md).
+
 Pending install, uninstall, update, repair and rollback reviews support
 **Stop review**, Cancel and Escape before changes start. Stopping reaps the
 read-only worker and discards its proposal, fingerprint and unaccepted output;
