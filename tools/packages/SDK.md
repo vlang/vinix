@@ -1209,9 +1209,21 @@ relative outputs are saved under the ordinary account's
 `~/.local/share/vinix-apps/ID`. Choose **installed app** for apps needing their
 packaged assets as the working folder. **Run** shows captured diagnostics;
 **Run in Terminal** transfers the exact vector to Software's PTY. Input, grants
-and working-folder choice cannot change while a worker is active. Cancelling,
-reloading or closing clears the draft; failed batch execution retains it for
+and working-folder choice cannot change while a worker is active. Returning to
+the catalog or closing clears the draft; failed batch execution retains it for
 correction. The service performs the actual file/access/trust/policy checks.
+
+Compact Software views retain Back, status and failure access. Editor and
+launch controls appear in the full form; resize preserves arguments, explicit
+grants, working folder, field focus and file-page selection. Escape leaves a
+focused field and clears its selection; from an idle form it returns to the
+catalog and discards the draft. Pasted control bytes, including Escape and
+Enter, are rejected as text without navigating or replacing the field. Active
+batch workers retain their runtime leases and close guard, ignoring Back,
+Escape, editor and repeated launch actions until exit. This is a UI change;
+literal vectors, installed permission checks, ordinary-account handoff and
+the Terminal command contract are unchanged. See
+[navigation checks](../../tests/packages/software-launch-navigation-check.md).
 
 `pkgprotocol.command_words(text)` implements this bounded quoting grammar and
 returns owned strings; `command_vector` validates and builds owned CLI arguments.

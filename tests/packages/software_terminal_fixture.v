@@ -27,7 +27,10 @@ fn (mut a TerminalApp) build(_ ui2.Rect) !ui2.Element { return ui2.screen(u32(0)
 fn (mut a TerminalApp) configure_package_command(id string, arguments []string, documents []string, data_cwd bool, service string) ! {
 	mut vector := pkgprotocol.command_vector(id, arguments, documents, data_cwd, true)!
 	defer { pkgprotocol.free_command_values(mut vector) }
-	a.argv = [service.clone()]
+	// Match TerminalApp's owned, preallocated command vector under manualfree.
+	a.argv = []string{cap: vector.len + 1}
+	unsafe { a.argv.flags |= .noslices }
+	a.argv << service.clone()
 	for value in vector { a.argv << value.clone() }
 }
 fn (mut a TerminalApp) handle(_ string) ! {}

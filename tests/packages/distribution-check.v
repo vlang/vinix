@@ -255,6 +255,8 @@ fn check() ! {
 	os.cp(repository + '/desktop/software_mirror.v', work + '/software/software_mirror.v')!
 	os.cp(repository + '/desktop/software_terminal.v', work + '/software/software_terminal.v')!
 	os.cp(repository + '/desktop/software_launch.v', work + '/software/software_launch.v')!
+	os.cp(repository + '/desktop/software_launch_navigation.v', work + '/software/software_launch_navigation.v')!
+	os.cp(repository + '/tests/packages/software_launch_navigation_fixture.v', work + '/software/launch_navigation_fixture.v')!
 	os.cp(repository + '/desktop/software_window.v', work + '/software/software_window.v')!
 	os.cp(repository + '/desktop/software_admin.v', work + '/software/software_admin.v')!
 	os.cp(repository + '/desktop/software_data.v', work + '/software/software_data.v')!
@@ -302,6 +304,7 @@ fn check() ! {
 	run(work + '/window-broker-memory', ['package-navigation-memory'])!
 	run(work + '/window-broker-memory', ['policy-navigation-memory'])!
 	run(work + '/window-broker-memory', ['data-navigation-memory'])!
+	run(work + '/window-broker-memory', ['launch-navigation-memory'])!
 	if '--cross' in os.args {
 		run(v, [...helper_flags, '-o', work + '/package-stage', repository + '/tools/packages/stage.v'])!
 		for architecture in ['aarch64', 'x86_64'] {

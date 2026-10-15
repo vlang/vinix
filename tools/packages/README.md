@@ -333,6 +333,12 @@ The form defaults to private data for relative outputs; CLI clients select that
 folder with the additive `--data-cwd` flag. See the
 [launch-options qualification](../../tests/packages/launch-options-check.md).
 
+Small launch-option windows retain Back, status and failure access. Resizing
+preserves the draft and file-page selection; Escape leaves a field or returns
+an idle form to the catalog. Pasted control bytes cannot navigate, and running
+applications keep their runtime leases and close protection. See
+[navigation qualification](../../tests/packages/software-launch-navigation-check.md).
+
 `compose-catalog` combines reviewed profile locks into one publisher catalog,
 with separate prepared-root directories for each profile. It retains pins,
 permissions and license declarations and rechecks targets and dependencies.

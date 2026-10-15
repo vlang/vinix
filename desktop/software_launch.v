@@ -110,14 +110,26 @@ fn (mut a SoftwareApp) handle_launch_options(event_id string) {
 }
 
 fn (mut a SoftwareApp) launch_key_input(input string) {
-	if a.worker != unsafe { nil } || a.launch_focus == 0 { return }
+	if a.worker != unsafe { nil } { return }
+	if input == '\x1b' {
+		if a.launch_focus != 0 { a.launch_focus = 0; a.select_all = false }
+		else { a.handle_launch_options('software.launch.back') }
+		return
+	}
+	if a.launch_focus == 0 { return }
 	if input == '\x01' { a.select_all = true; return }
-	if input in ['\x1b', '\r', '\n'] { a.launch_focus = 0; return }
+	if input in ['\r', '\n'] { a.launch_focus = 0; a.select_all = false; return }
 	if input in ['\x7f', '\x08'] {
 		if a.launch_focus == 1 { console_backspace(mut a.launch_arguments, a.select_all) }
 		else { console_backspace(mut a.launch_file, a.select_all) }
 		a.select_all = false; return
 	}
+	a.launch_paste_input(input)
+}
+
+fn (mut a SoftwareApp) launch_paste_input(input string) {
+	// Pasted Escape/Enter/control bytes are text to validate, never navigation.
+	if a.worker != unsafe { nil } || a.launch_focus == 0 { return }
 	length := if a.select_all { 0 } else if a.launch_focus == 1 { a.launch_arguments.len } else { a.launch_file.len }
 	if input.len > software_launch_text_limit - length || !software_deployment_text_valid(input) {
 		a.set_status('The field was kept intact: enter valid text without control characters, at most 4096 bytes.'); return

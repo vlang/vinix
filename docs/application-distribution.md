@@ -446,11 +446,21 @@ names are saved in the ordinary account's `~/.local/share/vinix-apps/ID`.
 Switch to **installed app** when an application needs packaged assets relative
 to its working folder. **Run** captures diagnostics, while **Run in Terminal**
 opens the same command in Software's terminal. Input freezes during execution;
-failed batch commands keep the draft for correction. Cancellation, reload and
-close discard it. Launch controls use installed name/kind/permissions even when
-the catalog presents a pending update with different metadata. The service
+failed batch commands keep the draft for correction. Returning to the catalog
+or closing discards it. Launch controls use installed name/kind/permissions even
+when the catalog presents a pending update with different metadata. The service
 continues to enforce the current installed state, trust and organization policy.
 See [qualification](../tests/packages/launch-options-check.md).
+
+Small windows retain **Back to catalog**, status and failure access; enlarge the
+window to edit arguments/grants or launch. Resizing preserves the entire draft
+and file-page selection. Escape leaves a focused field, then returns an idle
+form to the catalog and discards its draft. Pasted Escape, Enter and other
+control bytes are rejected without editing or navigation. Running applications
+retain their close guard: Back, Escape and other form actions cannot interrupt
+the service that holds their runtime leases. After exit, failures retain the
+draft for correction and exact retry or transfer to Terminal. See the
+[launch navigation checks](../tests/packages/software-launch-navigation-check.md).
 
 Search covers names, IDs and descriptions. Info shows publisher, repository,
 license, permissions, target and installed version. Dependency ranges have

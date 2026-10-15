@@ -1,0 +1,8 @@
+The first ordinary functional suite and both full desktop architecture typechecks passed. The new 1000-cycle launch allocation mode measured 24,862,000 retained bytes in the Software-only Terminal stub. Its command array grew from one element under manualfree and retained replaced buffers. The maintained stub now reserves vector.len + 1 entries and sets the same noslices ownership flag as the production configure_package_command, which already preallocates its complete vector. Final ordinary and sanitized measurements are zero. This fixture correction changes no production command, authorization or protocol behavior.
+
+Initial allocation output:
+/Users/alex/code/vinix/build/package-launch-navigation-work/software-ui/software_launch_navigation_fixture.v:191: FAIL: fn main.check_software_launch_navigation_memory: assert kept == 0, 'launch navigation retained ${kept} bytes'
+   left value: kept = 24862000
+  right value: 0
+      message: launch navigation retained 24862000 bytes
+V panic: Assertion failed...
