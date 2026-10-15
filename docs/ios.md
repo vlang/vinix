@@ -6578,22 +6578,50 @@ that searched only text consumers and the next-blocker helper's attempt to
 disassemble conformance data are retained. Full iOS regression remains
 unpassed; published runners remain unchanged.
 
-The current IPA probe resolves Date metadata, then exits with status 1 at
-`_$s10Foundation4DateVSEAAMc` (the Date Encodable conformance). Date protocol
-conformances remain unsupported. Fortnite has not entered application code
-and remains unplayable.
+The following milestone implements Date's Encodable conformance and public
+`encode(to:)` entry in V, together with the canonical Swift Encodable protocol
+and its requirement descriptor. The concrete table uses the existing witness
+lookup. Encoding borrows Date and Encoder, obtains an owned single-value
+container, sends the Date's stored Double to its encoding witness, and destroys
+the container on both success and error. The Swift error value passes through
+x21 unchanged. Serialization belongs to the supplied encoder. Borrowed Encoder
+values may be inline or boxed; mutable containers must fit the inline buffer.
+General boxed-container uniqueness/copying remains unsupported.
+
+The fixture compares the installed Date method and native-instantiated witness
+with 432 encoding calls per runtime: signed zeros, subnormals, infinities and
+quiet/signaling NaN bits, inline/boxed borrowed encoders, guarded read-only
+inputs at both page edges, exact callback metadata/table/Self, container
+mutation/destruction order, opaque error propagation, preserved Self/d8 and
+eight-worker calls. Both Foundation aliases resolve to the same implementation,
+and two runtime lifetimes drain and unmap. Eight ASan/UBSan runs and four ARM64
+suites pass for Date, Data writing, Base64 and reference snapshots. Eleven final
+C streams/programs and four joined, retired VM phases are retained under
+`build/ios/fortnite/date-encoding-checks`. Native inspection follows authenticated
+dispatch stubs to the Encoder/container requirements, and the IPA's required
+conformance fixup and address consumers are retained. The indirect-protocol
+inspection trial and missing-sysroot/link-library build trials are retained.
+All 1,772 pinned files from the missing shared sysroot were recovered byte for
+byte into a private SDK, with five empty musl compatibility archives pinned
+for implicit C++ link dependencies. Full iOS regression remains unpassed;
+published runners remain unchanged.
+
+The current IPA probe resolves Date's Encodable conformance, then exits with
+status 1 at `_$s10Foundation4DateVSQAAMc` (the Date Equatable conformance).
+Equatable and Decodable conformances remain unsupported. Fortnite has not
+entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,513 | 647 | 79 |
+| Fortnite executable | 1,516 | 644 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,348 | 650 | 120 |
+| All images | 2,351 | 647 | 120 |
 
-The C++/GLES/Text variant reports 2,361 resolved imports, 637 unresolved strong
+The C++/GLES/Text variant reports 2,364 resolved imports, 634 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

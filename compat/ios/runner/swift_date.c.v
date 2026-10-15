@@ -95,4 +95,5 @@ fn swift_date_emit(code u64, data u64) {
 	}
 	write32(witness + 80, 0x02000007) // Native inline POD flags, alignment eight.
 	write32(witness + 84, 0) // Every Double bit pattern is a valid payload.
+	swift_date_encoding_emit(code, data)
 }

@@ -138,7 +138,7 @@ fn swift_foundation_arena() u64 {
 	// destructiveInjectEnumTag witness. Native formatted(DateFormatter) is
 	// payload case zero; this does not construct an encoder or format a date.
 	write32(data + 96, 0)
-	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 1336) })
+	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 1640) })
 	if C.mprotect(unsafe { voidptr(base) }, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(unsafe { voidptr(base) }, usize(page * 2)); panic('iOS: cannot seal Swift Foundation entries')
@@ -288,6 +288,8 @@ fn swift_foundation_symbol(symbol string) !u64 {
 	if address := swift_json_decoder_symbol(symbol) { return address }
 	if address := swift_json_date_symbol(symbol) { return address }
 	return match symbol {
+		'_$s10Foundation4DateVSEAAMc' { swift_foundation_arena() + u64(C.getpagesize()) + 608 }
+		'_$s10Foundation4DateV6encode2toys7Encoder_p_tKF' { swift_foundation_arena() + 1360 }
 		'_$s10Foundation4DateVMa' { swift_foundation_arena() + 1312 }
 		'_$s10Foundation4DateVMn' { swift_foundation_arena() + u64(C.getpagesize()) + 464 }
 		'_$s10Foundation4DateV11distantPastACvgZ' { swift_foundation_arena() + 1152 }
