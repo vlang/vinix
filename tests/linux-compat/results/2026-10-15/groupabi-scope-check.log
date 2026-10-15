@@ -1,0 +1,1 @@
+arm/x86: complete production C differs only in three syscall entry casts and three group/session helpers; exact signed32 normalization, query ESRCH and setpgid EINVAL/ESRCH precedence; existing table locking, borrowed processes, orphan stack descriptor and group mutation/notification are unchanged; no added allocation/free and no compiler normalization

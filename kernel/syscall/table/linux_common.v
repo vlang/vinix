@@ -774,11 +774,11 @@ fn syscall_linux_getitimer(_ voidptr, which int, curr_value u64) (u64, u64) {
 // setpgid / getpgid: wait4()/waitid() select on process groups, so these have
 // to be real.
 fn syscall_linux_setpgid(_ voidptr, pid int, pgid int) (u64, u64) {
-	return proc.set_process_group(pid, pgid)
+	return proc.set_process_group(int(i32(pid)), int(i32(pgid)))
 }
 
 fn syscall_linux_getpgid(_ voidptr, pid int) (u64, u64) {
-	return proc.get_process_group(pid)
+	return proc.get_process_group(int(i32(pid)))
 }
 
 fn syscall_linux_sched_yield(_ voidptr) (u64, u64) {

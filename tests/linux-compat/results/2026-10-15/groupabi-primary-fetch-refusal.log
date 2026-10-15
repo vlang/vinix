@@ -1,0 +1,6 @@
+/Users/alex/.cache/vinix-linux-compat/groupabi-20261015/manage.v:42: FAIL: fn main.run: assert code == expected, data
+   left value: code = 56
+  right value: expected = 0
+      message: curl: (56) The requested URL returned error: 429
+
+V panic: Assertion failed...

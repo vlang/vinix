@@ -1,0 +1,5 @@
+{
+    "cached_source": "/Users/alex/.cache/vinix-linux-compat/niceabi-20261015/linux-sys-v6.12.c",
+    "sha256": "e43eb875410d607ccf91ca00d88433052b58fdae4e4ccdd12c53c458f1ce1d69",
+    "source_url": "https://raw.githubusercontent.com/torvalds/linux/v6.12/kernel/sys.c"
+}

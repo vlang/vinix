@@ -726,6 +726,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/pipe/pipe.v` | `2ad825ae805ce9a9c8dfbc18d176424746cc32bdfa71491c3c427463dfd0a1c7` |
 | `kernel/pipe/usercopy.v` | `7af5925a4de313f7d8847269f2e07a293cbfb9c585eeaf2ab926d712983cad9b` |
 | `kernel/proc/container.v` | `f66753325982603ea72a325798e309d627c910d76df03d4fbc5744fd94fd4018` |
+| `kernel/proc/job_groups.v` | `5fecb8a6a100b2b5ed0e6bc2a745269cfbef21bc3ca0183fde807ab5aeeafdb7` |
 | `kernel/proc/kernel_budget.v` | `763ca9bea7d11825b8abc293e350a3afabe911bab8e718853626d52fd2201553` |
 | `kernel/proc/pidns.v` | `45b6d1038abd9f0e7fd63690f4466e6329e4ead34d3172a4076e70494ed39870` |
 | `kernel/proc/proc.v` | `81154124ce64e42994efe289fa371262a953eaa9cf01a37074b123a2e54a8a58` |
@@ -742,7 +743,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/sched/sched_arm64.v` | `47cf9e8deba0f3d10da99cafcb4b96467e6bc889583394fc987b69a4d30fd514` |
 | `kernel/socket/unix/unix.v` | `84875f74a964798fa7e64c6ed4a2c096ace28620fbe8bbaa3b8486d2789f5600` |
 | `kernel/syscall/table/container.v` | `3bd7f741353d73549d61affa8e6a9ee822fef466f997e10498dfd94cbd11c04f` |
-| `kernel/syscall/table/linux_common.v` | `52f4683bd50e24f8df090a4ad592b4b953112a39aef8d553b111fb683688f35d` |
+| `kernel/syscall/table/linux_common.v` | `1756e631becc5965aabda8d7db5ead862d53f6ea3ae982fb8688cc74f9e93c26` |
 | `kernel/syscall/table/linux_compat.v` | `c925dde7b04e8fb6798b48b5b0afa7007d5e43c74505e2f10bc9e8d2c9e3e688` |
 | `kernel/syscall/table/linux_table_amd64.v` | `f7e48c44a6152339e2ecb7a668102546a85cff540120109809ce3bd79c3a1bb7` |
 | `kernel/syscall/table/syscall_table_arm64.v` | `9e27de44d482ba0581c023f2486b295f16a2f5f8b4d02f7d42d6d9940d637747` |
@@ -752,12 +753,13 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/usercopy/word_atomic_arm64.v` | `640435b8cc95418defce02e672943f19383b98566c02f130d9a917837193d7f2` |
 | `kernel/userland/clone_amd64.v` | `11ea280407feb052332c838074840c95d58e31f2f156ce16ae8c1da07cb1a121` |
 | `kernel/userland/clone_arm64.v` | `b3fd0d2b894c6fb4d351fa2eac2ba917985f00d39a48f18e6beb287ada6b1793` |
+| `kernel/userland/cred.v` | `4c0b15cdc1445213cb077f3ec25e80bc300b0808be038f0689838587153c3575` |
 | `kernel/userland/exit.v` | `f7788611aed2a790a60cde0789b089c5771a3dcd91c086cb1ee01932216ea635` |
 | `kernel/userland/linux_signal_amd64.v` | `cd84d3265e38cd99189a1c0c27f30b5db6c01f7dd23208daef1bdbcd51f37077` |
 | `kernel/userland/seccomp_signal.v` | `b6fb6b23e10c8663d88b6d3fd6794eae1d906e162797b0c298e9bc674182f1f4` |
-| `kernel/userland/userland.v` | `1405b94d3e8a1d729ca1a0e81fcc6376940db673a39623a3e6fbac5ac146f277` |
-| `kernel/userland/userland_arm64.v` | `710993cd28567136d4f182811d180650470d67ea8183af231bea414117db7dc9` |
+| `kernel/userland/userland.v` | `27b189e6c96c9d93e77a6a18bb5a120d0ef46f612edb40b9cb08f5d68dd17c32` |
+| `kernel/userland/userland_arm64.v` | `69e5bfe49c764852654603667184777415e4014e8ca71cae22a112c6cd4a699e` |
 | `kernel/vmstorage/storage.v` | `df6ee1fc37aa7858401f19576d8f450278987acfc3f083f956e8e750174cea7d` |
-| `tools/linux-compat/coverage.v` | `4fb6092f7dad93f14a8f10eb51ba587df3cd847ea91f30b0dd73dd28d923970e` |
+| `tools/linux-compat/coverage.v` | `f2f22c174d67b9a4c873eb42de215dcce961f5feec9334e60f1e254dfbb8fca6` |
 | `tools/linux-compat/reference/aarch64-syscall.h` | `7b20fe57bf92c6b3cf800d4f83998419e92e19a88ead2d57c89c5725e0cfb816` |
 | `tools/linux-compat/reference/x86_64-syscall.h` | `c29e9cb15ff393eda50c320a6d96bb1132191251f8e079148a0646165bb8cabd` |

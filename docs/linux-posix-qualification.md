@@ -7250,3 +7250,91 @@ broad section 15 gates remain open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/randomsignal-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/randomsignal-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/randomsignal-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/randomsignal-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/randomsignal-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/randomsignal-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/randomsignal-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/randomsignal-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/randomsignal-check.v), [verdict](../tests/linux-compat/results/2026-10-15/randomsignal-audit.log), [first candidate pins](../tests/linux-compat/results/2026-10-15/randomsignal-exploratory-inputs.json), [first AArch64 result](../tests/linux-compat/results/2026-10-15/randomsignal-exploratory-arm-native.log), [first x86-64 result](../tests/linux-compat/results/2026-10-15/randomsignal-exploratory-x86-native.log).
+
+## Native process group and session argument words
+
+`getpgid`, `getsid` and `setpgid` now import their process/group arguments as
+signed 32-bit values. Raw upper register bits cannot turn an ordinary process
+ID into a different target or change a negative-ID error. Querying a negative
+ID returns `ESRCH`. `setpgid` returns `EINVAL` for a negative group or a negative
+PID with group zero, and `ESRCH` for a negative PID with a positive group.
+Errors leave existing group/session identities intact.
+
+The error ordering follows Linux v6.12's
+[setpgid, getpgid and getsid](https://github.com/torvalds/linux/blob/v6.12/kernel/sys.c).
+Linux substitutes the PID when group zero is requested before rejecting a
+negative group, while a remaining negative PID fails task lookup. The kernel
+change adds scalar argument casts and early errors. Existing process-table
+locking, borrowed process references, stack orphan-change descriptor, group
+mutation and notification lifetimes are unchanged.
+
+The `groupabi` probe runs 5,760 controls per architecture in root and UID/GID
+1000 children. Each cohort creates a private session, keeps two children alive
+behind explicit release pipes, establishes a separate child group, and records
+an outside-session parent plus a reaped child ID. Seven raw register-word forms
+cover zero/sign extension, low/high arbitrary upper bits and upper sign bits;
+the eighth form uses genuine musl calls. Setter PID and group words vary
+independently, including the real musl setter when both select that form.
+
+| Calls per cohort | Original failures per cohort | Controls |
+| --- | --- | --- |
+| 160 | 82 | Group/session queries of zero, caller, both held children, the outside-session parent, reaped and missing IDs, and three negative IDs. |
+| 192 | 165 | Successful child assignment to the caller group, another child group and its own group through group zero. |
+| 2,496 | 990 | Negative group precedence; negative, missing, reaped, self/session-leader and non-child targets; nonexistent groups; negative PID with group zero. |
+| 32 | 14 | Both queries while a child is observed with `WNOWAIT`, then after it is reaped. |
+
+Every call also checks the caller, group leader, member and outside parent's
+group/session state. Successful setters must put the member in the requested
+group without changing its session or any other tracked process. Children are
+explicitly released and reaped before the cohort reports its result. The
+original kernels fail exactly 2,502 controls per architecture. Corrected kernels
+and the identical native ELFs on Linux 6.12.51 pass all 5,760 controls each.
+
+Two warmed 200-cycle cohorts repeat negative queries and setter refusals through
+all word forms, plus real alternating child group changes. A preopened
+`/proc/slabinfo` descriptor compares every live slab class and big-page total
+after settling. Both cohorts stay flat: 18 classes and 75/75 big pages on
+AArch64, 14 classes and 182/182 big pages on x86-64. The generated probe C has
+four explicit stack allocas and no allocation, dynamic-array or fixed-index
+helper calls. Whole production C differs only in the three entry functions and
+three group/session helpers, without compiler-identifier normalization or added
+allocation/free calls.
+
+Four completed production builds qualify the original and corrected kernels.
+The final native `groupabi`, runtime and getrandom signal regressions pass on
+both architectures. Eight host test files pass after the inventory change.
+Allocation diagnostics remain byte-identical, including their existing
+allowance-file refusals. The inventory now includes `proc/job_groups.v` and
+`userland/cred.v`; the maintained audit checks the 64 original inputs and 66
+corrected inputs, the private SDK and compiler-command receipts, 15,146 pinned
+V compiler inputs, source/C/ELF/ISO/kernel identities and actual same-ELF Linux
+references. Deliberate false-assertion and passing-Linux-as-original controls
+execute without `-prod`. All eight completed qualification profiles retain 84
+hash-checked regular files before disposable boot staging is retired.
+
+Three diagnostic conditions remain visible. The first AArch64 link attempt had
+no init ELF or guest run because the copied SDK's GCC runtime was not selected
+and its separate pthread archive was absent. The explicit V compiler adapter
+invokes real Clang with the frozen GCC runtime directory; static musl supplies
+the pthread symbols from `libc.a`. All final ARM objects and ELFs are freshly
+compiled, with recorded commands and success status. An HTTP 429 fetching the
+Linux source is retained; the run reuses the byte-identical, previously pinned
+v6.12 source, with its provenance and hash recorded.
+
+The first Linux reference also exposed a probe setup assumption: early PID 1
+legitimately has group/session zero. The old precondition rejected that state
+before any conformance matrix ran, and the probe exiting as PID 1 caused Linux
+to panic. That failed receipt, raw log and probe source remain published. The
+final probe allows nonnegative outside identities, requires their session to
+differ from the cohort, and prints the observed values. Every syscall
+expectation remains the same. Earlier native probe artifacts remain pinned
+separately; they do not replace the final same-source, same-ELF qualification.
+
+Worker TIDs, nested PID namespaces, concurrent exec/exit/credential changes,
+zombie setters, terminal and job-control signal behavior, PID reuse, GNU libc
+and translated/ELF32 paths remain unqualified. The three broad section 15 gates
+remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/groupabi-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/groupabi-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/groupabi-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/groupabi-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/groupabi-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/groupabi-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/groupabi-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/groupabi-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/groupabi-check.v), [verdict](../tests/linux-compat/results/2026-10-15/groupabi-audit.log), [SDK inputs](../tests/linux-compat/results/2026-10-15/groupabi-sdk-inputs.json), [diagnostic pins](../tests/linux-compat/results/2026-10-15/groupabi-diagnostic-inputs.json), [initial link refusal](../tests/linux-compat/results/2026-10-15/groupabi-initial-link-refusal.log), [Linux setup refusal](../tests/linux-compat/results/2026-10-15/groupabi-exploratory-reference.log).

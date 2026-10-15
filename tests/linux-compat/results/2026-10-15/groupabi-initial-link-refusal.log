@@ -1,0 +1,7 @@
+ld.lld: error: cannot open crtbeginT.o: No such file or directory
+ld.lld: error: unable to find library -lgcc
+ld.lld: error: unable to find library -lgcc_eh
+ld.lld: error: unable to find library -lpthread
+ld.lld: error: cannot open crtend.o: No such file or directory
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/groupabi-20261015/states/p1-before-arm/receipt.json

@@ -1,0 +1,3 @@
+/Users/alex/code/vinix/tests/linux-compat/groupabi-check.v:263: FAIL: fn main.failure: assert log.contains('LINUX GROUPABI DETAIL:'), 'groupabi baseline failure markers required'
+      message: groupabi baseline failure markers required
+V panic: Assertion failed...

@@ -359,7 +359,7 @@ pub fn syscall_setsid(_ voidptr) (u64, u64) {
 
 // getsid(pid). Zero means the caller.
 pub fn syscall_getsid(_ voidptr, pid int) (u64, u64) {
-	return proc.get_process_session(pid)
+	return proc.get_process_session(int(i32(pid)))
 }
 
 // A change of ids the caller may not make: recorded, then refused.

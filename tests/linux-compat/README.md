@@ -1654,3 +1654,15 @@ and dispatch pins, executing audit controls and real diagnostic refusals.
 The final ARM run explicitly reuses byte-verified frozen objects/ELFs after
 shared SDK loss; it does not claim a fresh C compilation. See the
 [signal-interruption report](../../docs/linux-posix-qualification.md#native-getrandom-signal-interruption).
+
+The `groupabi` case checks getpgid/getsid/setpgid signed 32-bit argument words,
+negative-ID errors and precedence, successful child group changes, retained
+caller/child/outside-session identities and zombie/reaped queries. It runs
+5,760 controls per architecture as root and UID/GID1000, plus two warmed
+200-cycle mutation/query/error storage cohorts. `groupabi-reference.v` boots
+the unchanged probe ELF on supplied Linux kernels. Build `groupabi-check.v`
+without `-prod` and give it the evidence directory to verify actual original
+failures, native/reference results, whole-C scope, compiler/SDK/inventory pins,
+real diagnostic refusals and executing audit controls. The initial Linux setup
+refusal is retained; a PID1 group/session of zero is valid. See the
+[group/session report](../../docs/linux-posix-qualification.md#native-process-group-and-session-argument-words).

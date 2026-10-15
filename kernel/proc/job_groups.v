@@ -7,7 +7,8 @@ import katomic
 // Group/session identifiers and parent relationships are changed and read
 // together under the process-table lock. No borrowed process survives it.
 pub fn set_process_group(pid int, pgid int) (u64, u64) {
-	if pid < 0 || pgid < 0 { return errno.err, errno.einval }
+	if pgid < 0 || (pid < 0 && pgid == 0) { return errno.err, errno.einval }
+	if pid < 0 { return errno.err, errno.esrch }
 	caller := current_thread().process
 	mut orphan_change := unsafe { &OrphanChange(C.vinix_stack_alloc(sizeof(OrphanChange))) }
 	unsafe { *orphan_change = OrphanChange{} }
@@ -44,7 +45,7 @@ pub fn set_process_group(pid int, pgid int) (u64, u64) {
 }
 
 pub fn get_process_group(pid int) (u64, u64) {
-	if pid < 0 { return errno.err, errno.einval }
+	if pid < 0 { return errno.err, errno.esrch }
 	caller := current_thread().process
 	lock_table()
 	defer { unlock_table() }
@@ -76,7 +77,7 @@ pub fn create_session() (u64, u64) {
 }
 
 pub fn get_process_session(pid int) (u64, u64) {
-	if pid < 0 { return errno.err, errno.einval }
+	if pid < 0 { return errno.err, errno.esrch }
 	caller := current_thread().process
 	lock_table()
 	defer { unlock_table() }

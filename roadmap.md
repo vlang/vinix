@@ -971,6 +971,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   AArch64 failure and flat repeated-call storage. See the
   [signal-interruption receipts](docs/linux-posix-qualification.md#native-getrandom-signal-interruption).
 
+- [x] Normalize signed 32-bit process/group arguments and return Linux negative
+  getpgid/getsid/setpgid errors with correct precedence; qualify both native
+  architectures against identical-ELF Linux, including real group changes,
+  retained sessions, zombie/reaped queries and flat repeated-call storage. See
+  [the group/session receipts](docs/linux-posix-qualification.md#native-process-group-and-session-argument-words).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

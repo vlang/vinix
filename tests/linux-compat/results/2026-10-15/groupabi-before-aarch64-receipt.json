@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "653bf3e8c553bec481f1ed88e55afc109d9f44b4625fd1bb54cd2cbdba5d24de",
+    "results": [
+        {
+            "name": "groupabi",
+            "source_sha256": "dbe35057b0126c4fe63b7fe3b76e29b4d1253d26f0b721e844c504b2bf0ddeb6",
+            "init_sha256": "a8e1357cc1dfd17771a445183700b7d8ef1608610217c2ec2b42c668f91791d0",
+            "iso_sha256": "db9ec4ae9d53b93bdf27cf2eafd5a5a508b17df862f7ad879bdf1bff93616426",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}
