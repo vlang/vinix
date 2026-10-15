@@ -53,3 +53,47 @@ fn test_cold_boot_rejects_incomplete_evidence_and_changed_service_policy() {
 	missing.delete('/home/developer/service-state/state.json')
 	if _ := verify(missing, 2, 'a'.repeat(64)) { assert false, 'missing prior boot receipt accepted' }
 }
+
+fn test_shutdown_options_reject_ambiguous_or_unbounded_controls() {
+	assert options([]string{})! == Options{}
+	assert options(['persistent'])! == Options{'persistent', 13}
+	assert options(['volatile', '0'])! == Options{'volatile', 0}
+	assert options(['persistent', '30'])! == Options{'persistent', 30}
+	for arguments in [['other'], ['persistent', '31'], ['volatile', '-1'],
+		['volatile', ''], ['persistent', 'junk'], ['volatile', '07'],
+		['persistent', '+7'], ['volatile', '7s'], ['volatile', '1', 'extra']] {
+		if _ := options(arguments) { assert false, 'invalid shutdown options accepted' }
+	}
+}
+
+fn test_shutdown_requires_measured_wait_selected_runtime_and_unmount() {
+	for runtime in ['volatile', 'persistent'] {
+		selected := options([runtime])!
+		for phase in [1, 2, 3] {
+			mut receipts := proof_fixture(phase)!
+			path := '/fixture/service-cold-shutdown.json'
+			shutdown := Shutdown{schema: 1, phase: phase, runtime: runtime, settle_seconds: 13,
+				quiescence_millis: 13000, unmounted: true}
+			receipts[path] = json2.encode(shutdown)
+			verify_shutdown(receipts, phase, 'a'.repeat(64), selected)!
+			for changed in [Shutdown{...shutdown, schema: 0}, Shutdown{...shutdown, phase: 0},
+				Shutdown{...shutdown, runtime: if runtime == 'volatile' { 'persistent' } else { 'volatile' }},
+				Shutdown{...shutdown, settle_seconds: 7}, Shutdown{...shutdown, quiescence_millis: 12999},
+				Shutdown{...shutdown, unmounted: false}] {
+				receipts[path] = json2.encode(changed)
+				if _ := verify_shutdown(receipts, phase, 'a'.repeat(64), selected) {
+					assert false, 'incomplete or mismatched shutdown accepted'
+				}
+			}
+			receipts.delete(path)
+			if _ := verify_shutdown(receipts, phase, 'a'.repeat(64), selected) {
+				assert false, 'missing shutdown accepted'
+			}
+			receipts[path] = json2.encode(shutdown)
+			receipts.delete('/home/developer/service-after.json')
+			if _ := verify_shutdown(receipts, phase, 'a'.repeat(64), selected) {
+				assert false, 'missing account evidence accepted'
+			}
+		}
+	}
+}

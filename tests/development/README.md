@@ -71,8 +71,13 @@ Use `x86_64` for the other architecture. This gate needs `mke2fs` and `e2fsck`;
 `VINIX_MKE2FS` and `VINIX_E2FSCK` may select their executable paths. It uses the
 same native fixture/compiler settings as `run-guest`, including
 `VINIX_AARCH64_SYSROOT` when needed. Each boot receives a new initramfs and QEMU
-process; only `home.ext2` is reused. Runtime IPC lives on volatile `/run`, as in
-an installed session. Kernel, fixture, scheduler, broker, formatter/checker and
+process; only `home.ext2` is reused. Runtime IPC defaults to volatile `/run`, as
+in an installed session. Append `persistent` to put the broker socket under
+`/home/developer/service-runtime` on ext2 instead. Either mode defaults to a
+13-second cleanup interval; an optional second argument selects a canonical
+integer from `0` through `30` seconds for explicit timing controls, for example
+`persistent 7`. Short intervals must still pass the same filesystem checks.
+Kernel, fixture, scheduler, broker, formatter/checker and
 each ISO are pinned in the receipt. The controller owns the new output directory
 and disk and refuses an existing output directory.
 
@@ -81,24 +86,29 @@ job and shuts down the broker during that job. The second and third boots read
 the exact previous state before launching the broker; the saved enabled service
 must start without another import or Start request. Each boot retires all four
 observed processes and records exactly one additional interrupted attempt. The
-third boot stops and removes the service. The host checks every receipt, exact
+third boot stops and removes the service. Every shutdown verifies that the
+broker socket pathname has gone. The host checks every receipt, exact
 cross-boot state equality, service registry contents and disk hash continuity,
 then requires `e2fsck -f -n` to succeed without changing the image after each
-unmount. Payload credential output must stay out of all serial/broker logs.
+unmount. A separate post-unmount receipt reports the runtime mode, requested
+interval and monotonic measured wait; the controller rejects missing or
+mismatched shutdown evidence. Schema 2 controller receipts retain those options
+and eleven native records across the three boots. Payload credential output
+must stay out of all serial/broker logs.
 
-This is a **quiescent shutdown** gate: PID 1 allows seven seconds after account
-process retirement for the tested kernel's five-second removed-resource grace
-period and writeback worker before sync/unmount. An initial immediate-unmount
-run left orphaned inode/block allocations. Moving the broker socket onto ext2
-also left one unlinked socket inode even after the grace period. Those controls
-remain failing evidence; draining deferred cleanup at immediate unmount and
-reclaiming persistent ext2 socket inodes remain kernel gaps. This gate does not
-qualify power-loss recovery, sockets on persistent volumes, graphical interaction
-or a complete installed root/login/session startup.
+This is a **quiescent shutdown** gate: PID 1 defaults to 13 seconds after account
+process retirement before sync/unmount, matching the kernel retention harness.
+The tested kernel's socket pathname release and the endpoint's retained filesystem
+resource release each pass through a five-second grace period serviced by the
+writeback worker. A seven-second control snapshots between those two releases;
+its unlinked socket inode does not establish a permanent leak. An initial
+immediate-unmount run also left orphaned inode/block allocations. Immediate
+unmount cleanup, power-loss recovery, graphical interaction and a complete
+installed root/login/session startup remain outside this gate's acceptance.
 
-On 15 October 2026 the cold-boot gate passed all three boots on ARM64 HVF and
-x86-64 TCG, with eight validated native receipts per architecture and six clean
-read-only filesystem checks. Evidence is retained under
+On 15 October 2026 the earlier volatile-IPC cold-boot gate passed all three boots
+on ARM64 HVF and x86-64 TCG, with eight native receipts per architecture and six
+clean read-only filesystem checks. Evidence is retained under
 `build/development-service-cold-20261015/guest-arm-d` and `guest-x86-d`.
 Job/service retirement took 120/120/138 ms on ARM64 and 381/300/245 ms on x86,
 before the separate seven-second filesystem quiescence. Both receipt-validation
@@ -107,9 +117,29 @@ build gate also passes all 18 receipts in `base-arm` beside those runs.
 The audit revalidates executable/kernel pins, native receipts, exact state and
 disk continuity, filesystem logs and the final disk hash. The failed
 immediate-unmount control remains in `guest-x86-b`; `guest-arm-c` and
-`guest-x86-c` retain the persistent-socket failures after quiescence. No repair
-was applied to any test disk. The runs reuse the isolated kernels, static
-schedulers and native brokers recorded above and below.
+`guest-x86-c` retain the early persistent-socket snapshots after seven seconds.
+The previous description incorrectly treated those snapshots as persistent
+socket reclamation failures after all deferred cleanup. No repair was applied
+to any test disk. The runs reuse the isolated kernels, static schedulers and
+native brokers recorded above and below.
+
+The extended persistent-IPC gate passes all three boots on ARM64 HVF and x86-64
+TCG with those same frozen kernels. Evidence is retained under
+`build/development-service-cascade-20261015/persistent-arm-d` and
+`persistent-x86-d`: eleven validated native receipts per architecture, six
+clean read-only filesystem checks, exact schedule/disk continuity, and measured
+quiescence of at least 13 seconds after each account exits. All broker socket
+pathnames disappear before unmount. The independent V audit checks copied
+executable/kernel hashes, native receipts, filesystem logs and final disk hashes;
+no disk repairs or kernel lifetime changes were needed. Host tests also reject
+invalid timing arguments, missing shutdown records, premature waits, mismatched
+runtime modes and incomplete unmounts.
+The default volatile-IPC mode also passes three ARM64 boots, eleven receipts
+and three clean filesystem checks in `volatile-arm` beside those runs. The
+maintained `persistent 7` control in `control-arm-seven` reproduces inode 23
+still allocated after a measured 7039 ms; its account/shutdown proofs pass, but
+the controller correctly remains incomplete when read-only fsck rejects the
+disk. The V control audit checks that failure and the unchanged disk hash.
 
 On 15 October 2026 the earlier broker-restart gate and full base workflow passed on
 ARM64 HVF and x86-64 TCG with 18 receipts each. Evidence remains under
@@ -885,5 +915,5 @@ This qualifies the tested per-account job workflows in Vinix guests, including
 the native watcher, signal, deadline and interruption checks recorded above.
 The optional native Services broker lifecycle and quiescent persistent-home
 cold boots are covered above. Graphical service control, complete installed
-boot/login, immediate-unmount cleanup, persistent socket reclamation, broader
+boot/login, immediate-unmount cleanup, broader
 server/SSH/CI projects and complete self-hosted builds remain open acceptance work.

@@ -5,6 +5,33 @@ import desktop.sessioncore
 import encoding.hex
 import json2
 
+pub struct Options {
+pub:
+	runtime string = 'volatile'
+	settle_seconds int = 13
+}
+
+pub fn options(arguments []string) !Options {
+	if arguments.len > 2 { return error('expected [volatile|persistent [0..30]]') }
+	runtime := if arguments.len > 0 { arguments[0] } else { 'volatile' }
+	seconds := if arguments.len > 1 { arguments[1].int() } else { 13 }
+	if runtime !in ['volatile', 'persistent'] || seconds < 0 || seconds > 30
+		|| (arguments.len > 1 && arguments[1] != seconds.str()) {
+		return error('expected volatile|persistent and a canonical wait in 0..30 seconds')
+	}
+	return Options{runtime, seconds}
+}
+
+pub struct Shutdown {
+pub:
+	schema int
+	phase int
+	runtime string
+	settle_seconds int
+	quiescence_millis u64
+	unmounted bool
+}
+
 pub struct Proof {
 pub:
 	schema int
@@ -87,4 +114,21 @@ pub fn verify(receipts map[string]string, phase int, pin string) !Proof {
 	verify_state(receipts[prefix + 'service-after.json'], phase, pin)!
 	if phase > 1 { verify_state(receipts[prefix + 'service-state/state.json'], phase - 1, pin)! }
 	return proof
+}
+
+// Require the post-unmount observation as well as the account's job receipts.
+// A completion marker alone cannot qualify the requested runtime/wait mode.
+pub fn verify_shutdown(receipts map[string]string, phase int, pin string, selected Options) !Shutdown {
+	options([selected.runtime, selected.settle_seconds.str()])!
+	path := '/fixture/service-cold-shutdown.json'
+	shutdown := json2.decode[Shutdown](receipts[path], strict: true)!
+	if shutdown.schema != 1 || shutdown.phase != phase || !shutdown.unmounted
+		|| shutdown.runtime != selected.runtime || shutdown.settle_seconds != selected.settle_seconds
+		|| shutdown.quiescence_millis < u64(selected.settle_seconds) * 1000 {
+		return error('cold boot did not complete the selected quiescence and unmount')
+	}
+	mut account := receipts.clone()
+	account.delete(path)
+	verify(account, phase, pin)!
+	return shutdown
 }

@@ -6,13 +6,15 @@ module guestfixture
 
 fn C.umount(&char) i32
 fn C.sync()
+fn C.lstat(&char, &C.stat) i32
 
-fn cold_boot_account(phase i32) {
+fn cold_boot_account(phase i32, persistent bool) {
 	unsafe {
 		check(C.setgroups(0, nil) == 0 && C.setgid(1000) == 0 && C.setuid(1000) == 0
 			&& C.chdir(c'/home/developer') == 0, 490)
 		check(C.setenv(c'UNSELECTED_PARENT_SECRET', c'parent-must-not-reach-job', 1) == 0
-			&& C.setenv(c'VINIX_SESSION_RUNTIME', c'/run/development-service', 1) == 0, 491)
+			&& C.setenv(c'VINIX_SESSION_RUNTIME', if persistent { &char(c'/home/developer/service-runtime') }
+				else { &char(c'/run/development-service') }, 1) == 0, 491)
 		mut before := [8192]char{}
 		if phase == 1 {
 			snapshot_job(c'/fixture/service-jobs.json', c'/home/developer/service-jobs.json')
@@ -56,6 +58,9 @@ fn cold_boot_account(phase i32) {
 		}
 		service_call(c'shutdown', nil, nil)
 		wait_jobs(broker, 0)
+		path := service_socket_path()
+		mut socket_info := C.stat{}
+		check(C.lstat(&path[0], &socket_info) == -1 && *C.__errno_location() == C.ENOENT, 518)
 		for pid in [guardian, watcher, parent, child]! { retired_job(pid) }
 		elapsed := (job_clock() - start) / 1000000
 		check(elapsed < 10000, 499)
@@ -88,6 +93,21 @@ fn service_cold_boot() bool {
 		check(C.read(fd, &phase_text[0], 2) == 1 && C.close(fd) == 0
 			&& phase_text[0] >= char(`1`) && phase_text[0] <= char(`3`), 503)
 		phase := i32(phase_text[0]) - i32(`0`)
+		mut runtime_text := [2]char{}
+		runtime_fd := C.open(c'/fixture/service-cold-runtime', C.O_RDONLY)
+		check(runtime_fd >= 0 && C.read(runtime_fd, &runtime_text[0], 2) == 1
+			&& C.close(runtime_fd) == 0 && runtime_text[0] in [char(`v`), char(`p`)]!, 512)
+		persistent := runtime_text[0] == char(`p`)
+		mut settle_text := [3]char{}
+		settle_fd := C.open(c'/fixture/service-cold-settle', C.O_RDONLY)
+		settle_length := C.read(settle_fd, &settle_text[0], 3)
+		check(settle_fd >= 0 && settle_length in [i64(1), i64(2)]! && C.close(settle_fd) == 0, 513)
+		mut seconds := i32(0)
+		for i in 0 .. int(settle_length) {
+			check(settle_text[i] >= char(`0`) && settle_text[i] <= char(`9`), 514)
+			seconds = seconds * 10 + i32(settle_text[i]) - i32(`0`)
+		}
+		check(seconds <= 30 && (settle_length == 1 || settle_text[0] != char(`0`)), 515)
 		mut device := [64]char{}
 		device_fd := C.open(c'/fixture/service-cold-device', C.O_RDONLY)
 		count := C.read(device_fd, &device[0], device.len - 1)
@@ -100,14 +120,17 @@ fn service_cold_boot() bool {
 		mut st := C.stat{}
 		check(C.stat(c'/home/developer', &st) == 0 && st.st_uid == 1000
 			&& st.st_mode & 0o777 == 0o700, 507)
-		// Runtime sockets belong on volatile storage, as in an installed session.
-		// Only the account's home is the shared ext2 volume in this fixture.
-		check((C.mkdir(c'/run', 0o755) == 0 || *C.__errno_location() == C.EEXIST)
-			&& C.mkdir(c'/run/development-service', 0o700) == 0
-			&& C.chown(c'/run/development-service', 1000, 1000) == 0, 492)
+		// Test either installed-session volatile IPC or sockets on the ext2 home.
+		runtime := if persistent { &char(c'/home/developer/service-runtime') } else { &char(c'/run/development-service') }
+		check(C.mkdir(c'/run', 0o755) == 0 || *C.__errno_location() == C.EEXIST, 492)
+		if !persistent || phase == 1 {
+			check(C.mkdir(runtime, 0o700) == 0 && C.chown(runtime, 1000, 1000) == 0, 516)
+		}
+		check(C.stat(runtime, &st) == 0 && st.st_uid == 1000
+			&& st.st_mode & 0o177777 == 0o40700, 517)
 		pid := C.fork()
 		check(pid >= 0, 508)
-		if pid == 0 { cold_boot_account(phase); C._exit(0) }
+		if pid == 0 { cold_boot_account(phase, persistent); C._exit(0) }
 		mut status := i32(0)
 		for {
 			reaped := C.waitpid(-1, &status, C.WNOHANG)
@@ -115,18 +138,21 @@ fn service_cold_boot() bool {
 			if reaped == pid { check(status == 0, 510); break }
 			if reaped <= 0 { C.usleep(10000) }
 		}
-		// The tested kernel defers removed-node/resource release for five
-		// seconds, serviced by its one-second writeback worker. Preserve that
-		// lifetime: this gate explicitly qualifies a quiescent shutdown. An
-		// immediate sync/unmount left orphan allocations in the control run;
-		// draining deferred cleanup on immediate unmount remains a kernel gap.
-		settle := job_clock() + 7000000000
+		// The pathname and the socket's backing resource retire in separate
+		// five-second grace periods, each serviced by the writeback worker.
+		// Match the retention harness's 13-second cascading-cleanup interval.
+		// Shorter explicit intervals are controls, still subject to host fsck.
+		settle_started := job_clock()
+		settle := settle_started + u64(seconds) * 1000000000
 		for job_clock() < settle { C.usleep(100000) }
+		elapsed := (job_clock() - settle_started) / 1000000
 		C.sync()
 		check(C.umount(c'/home/developer') == 0, 511)
 		C.sync()
 		// The controller may stop QEMU only after the disk has been unmounted.
-		C.printf(c'DEVELOPMENT SERVICE COLD BOOT PASS: phase=%d, persistent ext2 home, UID 1000, seven-second quiescence, all processes retired, volume unmounted\n', phase)
+		C.printf(c'DEVELOPMENT RECEIPT /fixture/service-cold-shutdown.json {"schema":1,"phase":%d,"runtime":"%s","settle_seconds":%d,"quiescence_millis":%lu,"unmounted":true}\n',
+			phase, if persistent { &char(c'persistent') } else { &char(c'volatile') }, seconds, elapsed)
+		C.printf(c'DEVELOPMENT SERVICE COLD BOOT PASS: phase=%d, persistent ext2 home, UID 1000, all processes retired, volume unmounted\n', phase)
 		for { C.pause() }
 		return true
 	}

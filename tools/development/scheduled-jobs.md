@@ -210,10 +210,14 @@ remains open.
 
 The [persistent-home cold-boot gate](../../tests/development/README.md) also
 passed on both architectures on 15 October 2026. Three new QEMU processes reuse
-one ext2 home, with runtime IPC on volatile `/run`; later boots must restore
-the exact saved state and start the enabled watcher without another import or
-Start request. Each architecture passed eight receipts and three read-only
-filesystem checks. The gate allows seven seconds for deferred resource cleanup
-before sync/unmount. Immediate-unmount orphan cleanup and socket inode
-reclamation on persistent ext2 remain unresolved and retain failing controls.
-This does not qualify power-loss recovery or complete installed boot/login.
+one ext2 home; the extended gate also puts the broker socket on that persistent
+volume. Later boots must restore the exact saved state and start the enabled
+watcher without another import or
+Start request. Each architecture passed eleven receipts and three read-only
+filesystem checks with the same kernels as the earlier volatile-IPC gate.
+The default 13-second cleanup interval covers cascading pathname and socket
+backing-resource grace periods. Each shutdown records the runtime mode, measured
+wait and completed unmount; bounded explicit timing controls remain subject to
+the same filesystem gate. Earlier seven-second controls observed the socket
+inode before its final deferred release. Immediate-unmount orphan cleanup,
+power-loss recovery and complete installed boot/login remain open.

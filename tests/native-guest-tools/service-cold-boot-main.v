@@ -31,10 +31,11 @@ struct Boot {
 }
 
 struct Receipt {
-	schema int = 1
+	schema int = 2
 	architecture string
 	uid int = 1000
-	context string = 'native Vinix; three fresh QEMU processes sharing one private ext2 home; seven-second deferred-cleanup quiescence before unmount'
+	context string = 'native Vinix; three fresh QEMU processes sharing one private ext2 home; measured deferred-cleanup quiescence before unmount'
+	options coldbootcore.Options
 	inputs map[string]string
 	plan_sha256 string
 mut:
@@ -65,7 +66,7 @@ fn receipts(path string) !map[string]string {
 		entry := line.all_after('DEVELOPMENT RECEIPT ').trim_space()
 		name := entry.all_before(' ')
 		if name !in ['/home/developer/service-state/state.json', '/home/developer/service-after.json',
-			'/home/developer/service-cold-proof.json'] || name in values {
+			'/home/developer/service-cold-proof.json', '/fixture/service-cold-shutdown.json'] || name in values {
 			return error('unexpected or duplicate cold boot receipt')
 		}
 		body := entry.all_after(' ')
@@ -76,9 +77,10 @@ fn receipts(path string) !map[string]string {
 }
 
 fn run() ! {
-	if os.args.len != 6 || os.args[1] !in ['aarch64', 'x86_64'] {
-		return error('usage: service-cold-boot ARCH KERNEL-DIR STAGED-TOOLS NATIVE-DESKTOP FRESH-STATE')
+	if os.args.len < 6 || os.args.len > 8 || os.args[1] !in ['aarch64', 'x86_64'] {
+		return error('usage: service-cold-boot ARCH KERNEL-DIR STAGED-TOOLS NATIVE-DESKTOP FRESH-STATE [volatile|persistent [0..30]]')
 	}
+	selected := coldbootcore.options(os.args[6..])!
 	arch := os.args[1]
 	kernel := os.real_path(os.args[2])
 	stage := os.real_path(os.args[3])
@@ -113,7 +115,7 @@ fn run() ! {
 		environment: {'VINIX_DEVELOPMENT_PAYLOAD': 'service-linger', 'VINIX_JOB_PROOF_PREFIX': '/home/developer/service'},
 		credential_files: {'TEST_TOKEN': '/home/developer/token'}
 	}]})
-	mut receipt := Receipt{architecture: arch, plan_sha256: sha256.sum(plan.bytes()).hex(), inputs: {
+	mut receipt := Receipt{architecture: arch, options: selected, plan_sha256: sha256.sum(plan.bytes()).hex(), inputs: {
 		'kernel': digest(state + '/kernel/bin/vinix')!, 'fixture': digest(init)!,
 		'vinix-jobs': jobs_hash, 'vinix-desktop': broker_hash,
 		'mke2fs': digest(formatter)!, 'e2fsck': digest(checker)!
@@ -144,6 +146,8 @@ fn run() ! {
 		os.cp(init, boot + '/rootfs/usr/bin/development-payload')!
 		os.write_file(boot + '/rootfs/fixture/service-jobs.json', plan)!
 		os.write_file(boot + '/rootfs/fixture/service-cold-phase', phase.str())!
+		os.write_file(boot + '/rootfs/fixture/service-cold-runtime', if selected.runtime == 'persistent' { 'p' } else { 'v' })!
+		os.write_file(boot + '/rootfs/fixture/service-cold-settle', selected.settle_seconds.str())!
 		os.write_file(boot + '/rootfs/fixture/service-cold-device', if arch == 'aarch64' { '/dev/vda' } else { '/dev/sd0' })!
 		archive := guesthost.image(init, boot)!
 		os.rmdir_all(boot + '/rootfs')!
@@ -163,7 +167,7 @@ fn run() ! {
 		after := digest(disk)!
 		receipt.boots << Boot{phase, command, iso_hash, before, after, values, false}
 		if code != 0 { return error('native cold boot gate failed') }
-		coldbootcore.verify(values, phase, receipt.plan_sha256)!
+		coldbootcore.verify_shutdown(values, phase, receipt.plan_sha256, selected)!
 		if phase > 1 && values['/home/developer/service-state/state.json'] != previous_state {
 			return error('cold boot did not recover the exact previous schedule state')
 		}
