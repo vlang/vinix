@@ -310,6 +310,23 @@ after a filesystem failure. Mutable build inputs still require isolation.
   and destruction. Storage must survive the post-callback flag update;
   page-backed RCU deferred free supplies that lifetime. NMI, PREEMPT_RT,
   hotplug, NOHZ and typesafe-cache ownership remain unsupported.
+- The DMA-fence synchronization core uses original Linux fence, callback and
+  operations records, including their shared list/timestamp/RCU storage.
+  Signaling publishes the timestamp and invokes detached callbacks under the
+  supplied IRQ-save lock. Callback owners may free themselves after detachment.
+  Custom signaling, status, wait, deadline and release hooks retain their
+  original signatures. Ordinary waits use native task state, wakeups and timed
+  deadlines; wait-any removes every registered callback before freeing its
+  temporary array, including interruption and partial-registration paths.
+  Blocking waits require ordinary sleepable context; direct default waits
+  preserve completed-fence and pending-signal fast returns in atomic context.
+  Original reference helpers, context IDs and standard already-signaled fence
+  APIs are available. Default release uses a real future RCU grace period for
+  native page-backed kmalloc base owners. Custom release hooks own storage
+  lifetime, including any RCU readers. Callers retain references throughout
+  callback registration and waiting. The `seq_file` description sink,
+  reservation producer/iterator ownership, fence arrays/chains and i915's
+  typesafe request cache remain separate dependencies.
 - Unmodified Linux `wait.h`, `swait.h` and `completion.h` use native-backed
   queues and task wakeups. Ordinary wait queues preserve nonexclusive,
   exclusive and priority order, wake quotas, callback keys and automatic
@@ -2394,3 +2411,68 @@ implemented in saved C/object and discarded when unused by this kernel.
 `irqwork-sw-fence-native-v2-closure/result.json` records this compiler/symbol
 evidence, not a whole-object link or GPU execution. Full driver compilation,
 device binding, memory ownership and Tiger Lake validation remain unfinished.
+
+## Native DMA-fence synchronization, 2026-10-15
+
+The 18 non-lockdep synchronization APIs from pinned `dma-fence.c` now run on
+native locks, task waits, clocks, references and ordinary RCU. Original records
+and typed driver hooks remain intact. `dma_fence_describe` still requires a real
+`seq_file` sink and remains unresolved. Fence containers and reservation
+ownership are separate services.
+
+Signal dispatch detaches callbacks onto a stack sentinel before replacing the
+list/timestamp union. It saves the next callback and function before invocation;
+the callback may free its own owner. Default wait callbacks remain on the waiting
+task's stack. Every wait-any cleanup path removes registered callbacks before
+releasing task references or its allocated array. Default fence release defers
+freeing a page-backed kmalloc base owner through an actual future grace period.
+Custom release hooks supply their own storage and reader lifetime.
+
+Preflight caught hidden sentinel boxing, a deep pointer comparison in the test
+facade, and private wait declarations whose `long` spelling differed from V's
+64-bit type on Darwin. Final generated C has genuine stack records, pointer
+identity comparisons and portable private declarations; public Linux signatures
+remain exact. Direct default waits preserve atomic completed/pending fast
+returns, with sleep-context enforcement before an actual positive wait.
+The original context-ID fetch-add retains full ordering.
+
+Validation passes:
+
+- Strict GNU99/GNU11 host production objects with ASan/UBSan: 22 runs, including
+  callback/enable/context races, interrupted and timed waits, wait-any OOM and
+  partial cleanup, self-free callbacks and real reader-held deferred release.
+  Of 353 selected generated bodies, 350 match complete modules byte for byte;
+  three existing completion adapters serve only host RCU-worker bootstrap.
+  Scheduler, page, clock and console transport boundaries are documented in
+  `tests/linuxkpi/dmafencefixture/README.md`.
+- Fresh enabled/default x86-64 and default arm64 builds. Normal, SSE and
+  four-level guests use the same saved enabled ELF and each pass 49 markers and
+  31 exact PMM/live-heap equality rows. Three complete DMA-fence warmups precede
+  its measured fourth lifecycle, including retained actor creation/join,
+  actual IRQ signaling/polling and reader-held RCU release. Default startup
+  passes; actual default/arm64 C and ELF exclude the service.
+- Independent source, actual generated-C and native-object lifetime reviews,
+  including all 173 new bodies across the main blob and both separate modules.
+  The existing IRQ-work host regression also passes all 32 sanitizer runs.
+
+Evidence is under `smp-oct10/dmafence-*`. Final native source freeze v4 SHA256:
+`fd41ea37fc45668cefaf98617c78d7a017f69c1c20220c5b94e384d792e8dd85`.
+Enabled ELF:
+`e1e35d98c6006f18a97f876f66876615862b73e45ccb69f86f7c666e7d942805`.
+Host result `dmafence-host-final-v1/result.json` SHA256:
+`9ed2515e8c7356a66dd2665957b122fb75e8947413188d8a1c480b716a062d85`.
+Independent guest/ISO/chronology approval
+`dmafence-guest-independent-oct15/final.json` SHA256:
+`f1fddf2d58feab1432b13aaca9de3e8fb0485e148e2591b619513cf01f72da92`.
+Repeat with the authenticated compiler router/private caches and
+`build-support/run-v-tool.sh tests/linuxkpi/dma_fence.v --keep-directory NEW_DIRECTORY`.
+
+The fresh full syntax audit remains **6/269**; all 7,668 imported files remain
+unchanged. The entire original `i915_sw_fence.c` compiles in GNU99/GNU11 with
+its pinned Kbuild identities. Now 39 of its 42 imports exist in the final ELF.
+Only two substantive services remain missing from that object:
+`dma_resv_iter_first_unlocked` and `dma_resv_iter_next_unlocked`.
+`round_jiffies_up` is implemented in the native object and discarded when
+unused. This is compiler/symbol evidence, with no whole SW-fence link or GPU
+execution claim. Full i915 compilation/linking, device/memory services,
+confirmed PCI identity and physical Tiger Lake validation remain unfinished.

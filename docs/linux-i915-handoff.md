@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-15 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Latest IRQ-work build baseline: **`a97f0490`**, with 14 frozen production/tool paths described below. Recheck HEAD and the worktree before
+Latest DMA-fence build baseline: **`beb571021`**, with 11 frozen production/tool paths described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -79,10 +79,17 @@ and kernel destination fixups remain pending. The current native
 and rechecks mapping identity after unlocked acquisition; the earlier proposed
 global fault-lease rewrite was not applied.
 
+Ordinary RCU, deferred page-backed frees, native IRQ work and the DMA-fence
+synchronization core are implemented and validated. The latest normal/SSE/
+four-level guests pass 49 markers and 31 strict allocation equalities. Continue
+with real fence containers and reservation ownership; complete i915 support is
+still pending.
+
 ## Committed progress
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `beb571021` | Real maskable IRQ work, lazy PIT delivery, concurrent callback synchronization and measured teardown |
 | `a97f0490` | Genuine page-backed `kvfree` and deferred RCU free, original embedded/headless macros and measured complete actor teardown |
 | `1d0f5b00` | Native ordinary RCU callback/cookie service, real IRQ-return grace periods, fixed CPU-domain guards and V-only validation tools |
 | `b718a737` | Original SMP/CSD/header integration, genuine CPU accessor bindings and compiler provenance; remote dispatch remains pending |
@@ -2121,3 +2128,86 @@ and iterator ownership. Use original public records: i915 breadcrumbs directly
 access flags/list/timestamp. A sidecar record or just four compile helpers is
 insufficient. Full driver compile/link, PCI identity, device/memory services and
 physical Tiger Lake validation remain unfinished.
+
+## Latest native DMA-fence increment
+
+Baseline for the isolated build is `beb571021`, plus 11 frozen production/tool
+paths. The original DMA-fence record/ops/callback ABI now has 18 real
+synchronization services. Keep `dma_fence_describe` unresolved until a real
+`seq_file` sink exists. Arrays, chains and reservation ownership remain pending.
+
+Preserve stack callback-list detachment before timestamp union overwrite;
+save callback/function/next before invocation and never inspect a self-freed
+callback owner afterward. Default wait callbacks are stack records. Every
+wait-any exit removes earlier registrations before task-put and array-free.
+Custom release owns storage and any lockless reader lifetime. Default free
+requires a page-backed kmalloc base owner and uses the real offset16 RCU head.
+Callers retain a fence reference through waits and registration.
+
+Preflight corrected a hidden sentinel allocation, deep typed-pointer equality
+in the separate native facade and Darwin/private 64-bit declaration mismatch.
+The original failed sentinel C file was regenerated in place: its preserved
+focused reproduction is explicitly a reproduction, not the original artifact.
+All preliminary freezes/build logs are retained. Final v4 also preserves
+direct-default positive completed/pending fast returns from atomic contexts;
+the sleep-context snapshot precedes locking and is enforced only before an
+actual positive-wait callback. The wrapper remains an ordinary task API.
+Context-ID fetch-add uses the original full ordering.
+
+Final source freeze `dmafence-native-freeze-v4.json` SHA256:
+`fd41ea37fc45668cefaf98617c78d7a017f69c1c20220c5b94e384d792e8dd85`.
+Enabled proof `dmafence-x86-native-oct15/proof.json` SHA256:
+`3a700909c83f94c613aab67bdd0d38e5cd43fe3d43092b7fe713fcd718688bff`.
+Exact enabled ELF:
+`e1e35d98c6006f18a97f876f66876615862b73e45ccb69f86f7c666e7d942805`.
+Default and ARM proofs are in matching `dmafence-*-native-oct15` directories.
+Use the same compiler/SDK router as the preceding increment.
+
+Strict host GNU99/GNU11 ASan/UBSan passes 22 runs. Of 353 selected bodies, 350
+match full modules; three disclosed existing completion adapters serve only
+host RCU bootstrap. Actual allocator/task/time/RCU algorithms execute with
+explicit native transport. Host result SHA256:
+`9ed2515e8c7356a66dd2665957b122fb75e8947413188d8a1c480b716a062d85`;
+four-path manifest `dmafence-host-final-four-path-manifest.json` SHA256:
+`ceaa13a318fa4e8d7a9fdf49e2b18c29f38c44d9306282fdc6acfff365104735`.
+The previous IRQ-work suite also passes 32 sanitizer runs.
+
+Final enabled/default x86 and default ARM builds pass. Normal, SSE and
+four-level guests use that exact enabled ELF and pass 49 markers/31 strict
+PMM/all-live-heap rows. DMA-fence has three full warmups then an exact-equal
+fourth lifecycle; actual IRQ callback polling, finite/infinite/interrupted
+task waits, callback self-free, wait-any cleanup/OOM and held-reader default
+free all execute. All actors join and retire off stack before measurement.
+Default ABI startup passes and actual default/ARM C/ELF omit the feature.
+Root guest receipts are under `dmafence-guest-review-oct15`.
+Independent guest/ISO/chronology approval is
+`dmafence-guest-independent-oct15/final.json`, SHA256
+`f1fddf2d58feab1432b13aaca9de3e8fb0485e148e2591b619513cf01f72da92`.
+
+Independent native lifetime approval:
+`dmafence-native-review-oct15/final-native-v4-lifetime-review.json`, SHA256
+`775afc9e34059c2b113644b634c5c871be7b8eadba2c68cdb110f169e531041c`.
+The other reviewer checks all 173 new actual bodies across blob/headercore/
+separate fixture and final host source/evidence. Full audit remains 6/269,
+with unchanged import verification. Whole original SW-fence compilation and
+symbols: `dmafence-sw-fence-native-v4-closure/result.json`, SHA256
+`177cdc7ba5e479044f5a937d2eca33a1826265f0043f23411f3b5a5e78e5321e`.
+It retains all ten public exports and 42 imports; 39 imports exist in the
+saved native ELF. Two genuine reservation iterator services remain missing;
+`round_jiffies_up` is present in actual native C/object and GC-discarded from
+the ELF. No whole-object link or GPU execution has passed.
+
+Next implement coherent original array/chain containers and reservation
+producer/iterator ownership, including real growth/ref transfer, partial OOM
+cleanup and RCU protection. Their ops identities must be real implementations.
+Pinned array/chain callbacks deliberately reuse callback/IRQ-work union storage;
+preserve original snapshot/CAS retirement and backing through IRQ return.
+Reservation unlocked iteration holds one fence reference per returned body,
+restarts on list changes or failed get-unless-zero, and uses low two pointer
+bits for usage. It requires actual init/reserve/add/replace/fini services.
+Growth transfers unsignaled refs, publishes the new list, drops signaled refs
+and defers the old list through RCU. Page-backed allocation still needs real
+`kmalloc_size_roundup`/`krealloc_array` contracts; do not invent Linux cache
+buckets. Verified private research is under `dmafence-native-review-oct15` and
+`rcufree-backend-oct16`. Hardware identity and access remain pending; continue
+independent work without claiming full i915 support.
