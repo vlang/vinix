@@ -53,6 +53,13 @@ through `sp-7` select its individual cases. Native `all` and Linux
 `--case links` selects hard-link source and destination attachment policy;
 `lp-0` through `lp-9` select its individual cases. Native `all` and Linux
 `move-reference` include them.
+`--case renames` selects rename source and destination attachment policy;
+`rp-0` through `rp-9` select its individual cases. Native `all` and Linux
+`move-reference` include them.
+
+The [rename checks](rename-policy.md) cover replacement, no-replace, exchange,
+literal symlinks, directory moves, held descriptions, read-only routes and
+distinct writable bind/copied mount boundaries.
 
 The [hard-link checks](link-policy.md) cover regular sources and followed source
 symlinks, exact mount boundaries, link counts, protected-hardlink policy and
@@ -131,7 +138,7 @@ iterations, verifies capability denial and finishes with valid local operations.
 
 Use `--probe-state /path/to/prior-native-result` to reuse its probe ELF and
 generated C with a different kernel or case. The controller requires a matching
-architecture and identical current/copied hashes of all seventeen fixture files,
+architecture and identical current/copied hashes of all eighteen fixture files,
 verifies both artifact hashes against the prior receipt and checks the ELF
 architecture before boot.
 The prior result may be a failed control; its receipt hash is pinned in the new
@@ -182,7 +189,8 @@ cases, all seven pivot admission cases, all four pivot lifecycle cases and
 all five pivot alias cases, all seven private-thread cases, all five bind-policy
 cases, all six pathname truncation cases, all seven mode/ownership cases,
 all eight timestamp cases, all eight extended-attribute cases, all eight symlink
-creation cases, all eight removal cases and all ten hard-link cases. Vinix's cursor
+creation cases, all eight removal cases, all ten hard-link cases and all ten
+rename cases. Vinix's cursor
 limit and unsupported unmount modes are excluded. Supply a matching Linux kernel and
 the ELF preserved by a native run:
 

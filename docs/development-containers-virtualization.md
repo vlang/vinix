@@ -436,7 +436,7 @@ attachment while backend read-only state and existing authorization still
 apply. Retained fds, copied namespaces, chroot/cwd aliases and private thread
 views pass on both architectures and the same-ELF Linux reference. Internal
 inode-only creators keep their conservative fallback. The subsequent checks
-extend coverage to metadata and hard links; rename, descriptor truncation and
+extend coverage to metadata, hard links and rename; descriptor truncation and
 broader policy combinations still need qualification.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
@@ -485,7 +485,7 @@ the stored link target remains literal. Native and same-ELF Linux probes cover
 both bind-policy directions, copied namespaces, root/cwd aliases, parent
 symlinks, detached and retired descriptions, and UID/GID 1000 denial. Internal
 kernel callers keep their conservative fallback. Persistent backend integration,
-concurrent mount changes and the remaining link/rename qualification remain open.
+concurrent mount changes and broader link/rename qualification remain open.
 The [removal checks](../tests/mount-lifecycle/unlink-policy.md) extend attachment
 policy to `unlinkat` and its `AT_REMOVEDIR` form. Both native architectures and
 same-ELF Linux probes cover regular files, symlinks and empty directories through
@@ -505,6 +505,16 @@ UID/GID 1000 directory denial and protected-hardlink refusal. Existing MAC,
 attribute, budget and backend checks remain. Internal inode-only links,
 non-followed symlink backend behavior, `AT_EMPTY_PATH`, wider error ordering,
 concurrent changes and persistent/overlay integration remain unqualified.
+The [rename checks](../tests/mount-lifecycle/rename-policy.md) carry both routes
+through `renameat` and `renameat2`. Read-only admission uses the selected
+attachments; distinct writable bind and copied-namespace mounts return `EXDEV`.
+Native ARM/x86 and same-ELF Linux probes cover regular files, literal symlinks,
+directories, replacement, no-replace, exchange, permissions, retained routes and
+held descriptions. Directory moves preserve `..`, and mounted entries remain
+busy. Existing backend hooks, map publication, orphan pins and grace cleanup are
+unchanged. Internal callers keep conservative read-only inference. Combined-error
+ordering, concurrent changes and persistent/overlay integration remain outside
+this qualification.
 Mount reclamation, busy-reference accounting and full OCI acceptance remain open.
 The overlay-depth refusal measurements also exposed an event-record allocation per call.
 The separate [security event producer correction](../tests/overlay-rename/security-events.md)

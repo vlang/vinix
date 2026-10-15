@@ -2201,6 +2201,13 @@ pub const rename_whiteout = 4
 // durable namespace change first; only then does the VFS mirror it in the eager
 // child maps and update the node's parent/name.
 pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath string, flags int) ? {
+	old_identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	new_identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	rename_on_mount(oldparent, oldpath, newparent, newpath, flags, old_identity, new_identity, false)?
+}
+
+fn rename_on_mount(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath string, flags int,
+	old_identity &lib.MountContext, new_identity &lib.MountContext, explicit_identity bool) ? {
 	if flags & rename_whiteout != 0 {
 		errno.set(errno.einval)
 		return none
@@ -2215,12 +2222,16 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		vfs_lock.release()
 	}
 
+	// Internal callers infer both routes under the lock. Syscalls preserve
+	// the directory/attachment snapshots captured before either path walk.
+	if !explicit_identity && (!starting_mount(oldparent, old_identity)
+		|| !starting_mount(newparent, new_identity)) { return none }
 	// Both names are views into the paths. A node that takes a name is given
 	// a copy of its own.
-	mut old_parent_of, mut old_node, old_basename := walk_path(oldparent, oldpath, 0, true)
+	mut old_parent_of, mut old_node, old_basename := walk_path_on_mount(oldparent, oldpath, 0, true, old_identity)
 	if unsafe { old_node == 0 } || unsafe { old_parent_of == 0 } { return none }
 
-	mut new_parent_of, mut new_node, new_basename := walk_path(newparent, newpath, 0, true)
+	mut new_parent_of, mut new_node, new_basename := walk_path_on_mount(newparent, newpath, 0, true, new_identity)
 	if unsafe { new_parent_of == 0 } { return none }
 	if managed_volume_node(old_node) || (new_node != unsafe { nil } && managed_volume_node(new_node)) { errno.set(errno.ebusy); return none }
 	if !policy_check_name(old_parent_of, old_basename, proc.policy_create)
@@ -2228,8 +2239,11 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		return none
 	}
 
-	if read_only(old_parent_of) || read_only(new_parent_of) || read_only(old_node)
-		|| (new_node != unsafe { nil } && read_only(new_node)) {
+	if read_only_on_mount(old_parent_of, old_identity) || read_only_on_mount(new_parent_of, new_identity)
+		|| read_only_on_mount(old_node, old_identity)
+		|| (new_node != unsafe { nil } && read_only_on_mount(new_node, new_identity))
+		|| (!explicit_identity && (read_only(old_parent_of) || read_only(new_parent_of)
+		|| read_only(old_node) || (new_node != unsafe { nil } && read_only(new_node)))) {
 		errno.set(errno.erofs)
 		return none
 	}
@@ -2257,6 +2271,12 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 	if name_is_mounted_on(old_parent_of, old_basename)
 		|| name_is_mounted_on(new_parent_of, new_basename) {
 		errno.set(errno.ebusy)
+		return none
+	}
+	// Bind aliases and copied namespace mounts remain distinct even when
+	// their backing filesystem and stable mount IDs are the same.
+	if explicit_identity && lib.mount_context_top(old_identity) != lib.mount_context_top(new_identity) {
+		errno.set(errno.exdev)
 		return none
 	}
 	mac_node(old_node, proc.mac_metadata) or { return none }
@@ -2480,10 +2500,12 @@ pub fn syscall_renameat2(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int
 		return errno.err, errno.enoent
 	}
 
-	oldparent := get_parent_dir(olddirfd, oldpath) or { return errno.err, errno.get() }
-	newparent := get_parent_dir(newdirfd, newpath) or { return errno.err, errno.get() }
+	old_identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	new_identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	oldparent := parent_and_mount_for(olddirfd, oldpath, old_identity) or { return errno.err, errno.get() }
+	newparent := parent_and_mount_for(newdirfd, newpath, new_identity) or { return errno.err, errno.get() }
 
-	rename(oldparent, oldpath, newparent, newpath, flags) or { return errno.err, errno.get() }
+	rename_on_mount(oldparent, oldpath, newparent, newpath, flags, old_identity, new_identity, true) or { return errno.err, errno.get() }
 
 	return 0, 0
 }
