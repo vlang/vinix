@@ -414,7 +414,7 @@ fn test_swift_data_bridge() {
 				assert false
 			}
 		}
-		if _ := swift_foundation_symbol('_$s10Foundation4DataV19base64EncodedString7optionsSSSo27NSDataBase64EncodingOptionsV_tF') {
+		if _ := swift_foundation_symbol('_$s10Foundation4DataV36_unconditionallyBridgeFromObjectiveCyACSo6NSDataCSgFZ') {
 			assert false
 		}
 		objc_stop()

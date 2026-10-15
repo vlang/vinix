@@ -6407,9 +6407,41 @@ bytes and raw weak slots, and the missing native storage fixture, are retained
 as failed trials. Full iOS regression remains unpassed; published runners are
 unchanged.
 
-The new startup probe resolves the Data bridge and exits with status 1 at
+The Data bridge checkpoint resolves that bridge and exits with status 1 at
 `_$s10Foundation4DataV19base64EncodedString7optionsSSSo27NSDataBase64EncodingOptionsV_tF`
 (`Data.base64EncodedString(options:)`). Fortnite still has not entered
+application code and remains unplayable.
+
+`Data.base64EncodedString(options:)` now resolves through both Foundation
+install names. The V implementation borrows Data in x1/x2, takes options in
+x0 and returns an owned ASCII Swift String in x0/x1. It handles empty, inline
+and registered snapshot slices through the existing 16 MiB Data limit, with
+padding, 64/76-column wrapping and CR/LF selection. Both line-length flags
+select 64 columns; separators appear only between lines. Small results are
+inline, while larger results own independent native-tail String storage.
+External or large-range Data and undeclared option bits remain unsupported.
+The actual IPA consumers pass zero options. An exploratory native run with
+all option bits set failed while extracting the result's UTF-8; that trial is
+preserved separately from the declared-option measurements.
+
+Eight ASan/UBSan runs and four Vinix ARM64 suites pass for Base64, Data
+bridging, Data snapshots and String interpolation. The new fixture compares
+native output with V's standard Base64 encoder and independent line splitting,
+checks all 16 declared option combinations and the 64/76-column boundaries,
+empty/inline/sliced inputs, the small/heap String boundary, padding, 16 MiB
+inputs and independent results after releasing Data. It also checks exact ARC,
+concurrent encodes, read-only input spans ending at protected pages, a protected
+x8 register, invalid input rejection and two empty runtime teardowns.
+
+Eleven final C streams/programs and four joined, retired VM phases are retained
+under `build/ios/fortnite/data-base64-checks`, alongside the actual IPA call
+sites and native inspection. The native-symbol lookup and oracle cleanup
+failures are retained as earlier trials. Full iOS regression remains unpassed
+and published runners remain unchanged.
+
+The current IPA probe resolves Base64 encoding, then exits with status 1 at
+`_$s10Foundation4DataV36_unconditionallyBridgeFromObjectiveCyACSo6NSDataCSgFZ`
+(`Data._unconditionallyBridgeFromObjectiveC(_:)`). Fortnite has not entered
 application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -6417,12 +6449,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,504 | 656 | 79 |
+| Fortnite executable | 1,505 | 655 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,339 | 659 | 120 |
+| All images | 2,340 | 658 | 120 |
 
-The C++/GLES/Text variant reports 2,352 resolved imports, 646 unresolved strong
+The C++/GLES/Text variant reports 2,353 resolved imports, 645 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

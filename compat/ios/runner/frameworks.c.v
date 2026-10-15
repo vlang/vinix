@@ -18,6 +18,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 			'_$s10Foundation3URLVMa', '_$s10Foundation3URLVMn',
 			'_$s10Foundation4DataV11referencingACSo6NSDataCh_tcfC',
 			'_$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF',
+			'_$s10Foundation4DataV19base64EncodedString7optionsSSSo27NSDataBase64EncodingOptionsV_tF',
 			'_$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF',
 			'_$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ',
 			'_$sSSs7CVarArg10FoundationMc', '_$ss5ErrorP10FoundationE20localizedDescriptionSSvg',
