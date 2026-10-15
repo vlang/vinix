@@ -80,8 +80,8 @@ fn swift_calendar_identifier_emit(code u64, data u64) {
 	}
 	write32(witness + 80, 0x02200000)
 	write32(witness + 84, 229)
-	// Nongeneric nested enum, with a private Calendar parent context for nominal
-	// identity. This context provides no Calendar metadata, fields or constructor.
+	// Nongeneric nested enum. Calendar's emitter completes this same parent
+	// descriptor with its accessor and fields, preserving nominal identity.
 	write32(descriptor, 0x52)
 	swift_protocol_relative(descriptor + 4, calendar_context)
 	swift_protocol_relative(descriptor + 8, data + 1648)

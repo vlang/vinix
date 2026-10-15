@@ -6749,9 +6749,46 @@ VM phases are retained; published runners are unchanged. The generated C
 confirms that the new witnesses and metadata emitter allocate no memory.
 Full iOS regression remains unpassed.
 
-The current IPA probe links past Identifier metadata and exits with status 1 at
+The Identifier-metadata probe links past that accessor and exits with status 1 at
 `_$s10Foundation8CalendarV10identifierA2C10IdentifierOh_tcfC`
-(`Calendar.init(identifier:)`). Fortnite has not entered application code and
+(`Calendar.init(identifier:)`).
+
+The next milestone implements that constructor, the Calendar metadata/accessor
+and its identifier getter in V. The consuming input is a one-byte indirect
+Identifier; the owned Calendar result is a sixteen-byte implementation/table
+pair written through x8. All 27 identifier values are retained independently in
+private, registered Swift heap storage. Ordinary unknown-object ARC witnesses
+implement copy/take assignment and destruction; the last release deallocates
+the owner. There is no permanent Calendar cache.
+
+Calendar's descriptor completes the same parent context already used by
+`Calendar.Identifier`, preserving nominal identity. The borrowed identifier
+getter obtains the implementation's formal class metadata, calls table slot 24
+with native context, and writes exactly one result byte through x8. A custom
+implementation-table test checks this dispatch against native Foundation,
+including native pointer authentication. The private storage class is an
+implementation detail; Objective-C bridging, calendrical operations, mutation
+and field reflection remain unsupported.
+
+The existing Calendar fixture now checks all 27 constructors with guarded
+one-byte input and sixteen-byte result spans, read-only borrowed values,
+independent copied values, initialize/assign copy/take slots, optional tags,
+eight-worker construction/publication and two drained runtime lifetimes. Its
+registry assertions use the runtime lock and allocation generations, so
+concurrent address reuse does not masquerade as a retained owner.
+
+Evidence is retained under `build/ios/fortnite/calendar-checks` using the prior
+verified private SDK. Twelve final ASan/UBSan runs and six Vinix ARM64 suites
+pass for Calendar/Identifier, Locale, Date, Data writing, Base64 and reference
+snapshots. Fifteen final C streams/programs and four joined, retired VM phases
+are retained; published runners are unchanged. Generated C shows the explicit
+24-byte Swift heap allocation and its matching deallocation; the successful
+getter and emitter paths add no hidden allocations. Full iOS regression remains
+unpassed.
+
+The current IPA probe links past Calendar construction and exits with status 1
+at `_$s10Foundation8CalendarV10startOfDay3forAA4DateVAG_tF`
+(`Calendar.startOfDay(for:)`). Fortnite has not entered application code and
 remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -6759,12 +6796,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,526 | 634 | 79 |
+| Fortnite executable | 1,529 | 631 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,361 | 637 | 120 |
+| All images | 2,364 | 634 | 120 |
 
-The C++/GLES/Text variant reports 2,374 resolved imports, 624 unresolved strong
+The C++/GLES/Text variant reports 2,377 resolved imports, 621 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
