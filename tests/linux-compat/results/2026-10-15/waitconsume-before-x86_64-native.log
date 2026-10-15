@@ -1,0 +1,169 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=80960
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91200
+initramfs: Done (9 entries)
+LINUX WAITCONSUME TOPOLOGY: ordinary=0 namespace=0 profile=1 killed=0 self=54871 pid=59188 real=1001 effective=0 saved=1002
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=1 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=2 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=3 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=4 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=7 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=1 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=2 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=3 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=4 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=7 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=1 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=2 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=3 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=4 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=7 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=1 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=2 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=3 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=4 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=7 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME COHORT: ordinary=0 namespace=0 self=54871 uid=0 page=4096 prepared=720 cleaned=720 pidfds=360
+LINUX WAITCONSUME CASES: ordinary=0 namespace=0 kind=0 calls=120 failures=120
+LINUX WAITCONSUME CASES: ordinary=0 namespace=0 kind=1 calls=120 failures=120
+LINUX WAITCONSUME CASES: ordinary=0 namespace=0 kind=2 calls=120 failures=120
+LINUX WAITCONSUME CASES: ordinary=0 namespace=0 kind=3 calls=120 failures=120
+LINUX WAITCONSUME CASES: ordinary=0 namespace=0 kind=4 calls=120 failures=0
+LINUX WAITCONSUME CASES: ordinary=0 namespace=0 kind=5 calls=120 failures=0
+LINUX WAITCONSUME FINAL: ordinary=0 namespace=0 kind=0 calls=120 failures=120
+LINUX WAITCONSUME FINAL: ordinary=0 namespace=0 kind=1 calls=120 failures=120
+LINUX WAITCONSUME FINAL: ordinary=0 namespace=0 kind=2 calls=120 failures=120
+LINUX WAITCONSUME FINAL: ordinary=0 namespace=0 kind=3 calls=120 failures=120
+LINUX WAITCONSUME FINAL: ordinary=0 namespace=0 kind=4 calls=120 failures=0
+LINUX WAITCONSUME FINAL: ordinary=0 namespace=0 kind=5 calls=120 failures=0
+LINUX WAITCONSUME TOPOLOGY: ordinary=1 namespace=0 profile=1 killed=0 self=64720 pid=9933 real=1000 effective=1002 saved=1002
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=1 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=2 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=3 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=4 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=7 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=1 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=2 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=3 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=4 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=7 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=1 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=2 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=3 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=4 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=7 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=1 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=2 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=3 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=4 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=7 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME COHORT: ordinary=1 namespace=0 self=64720 uid=1000 page=4096 prepared=720 cleaned=720 pidfds=360
+LINUX WAITCONSUME CASES: ordinary=1 namespace=0 kind=0 calls=120 failures=120
+LINUX WAITCONSUME CASES: ordinary=1 namespace=0 kind=1 calls=120 failures=120
+LINUX WAITCONSUME CASES: ordinary=1 namespace=0 kind=2 calls=120 failures=120
+LINUX WAITCONSUME CASES: ordinary=1 namespace=0 kind=3 calls=120 failures=120
+LINUX WAITCONSUME CASES: ordinary=1 namespace=0 kind=4 calls=120 failures=0
+LINUX WAITCONSUME CASES: ordinary=1 namespace=0 kind=5 calls=120 failures=0
+LINUX WAITCONSUME FINAL: ordinary=1 namespace=0 kind=0 calls=120 failures=120
+LINUX WAITCONSUME FINAL: ordinary=1 namespace=0 kind=1 calls=120 failures=120
+LINUX WAITCONSUME FINAL: ordinary=1 namespace=0 kind=2 calls=120 failures=120
+LINUX WAITCONSUME FINAL: ordinary=1 namespace=0 kind=3 calls=120 failures=120
+LINUX WAITCONSUME FINAL: ordinary=1 namespace=0 kind=4 calls=120 failures=0
+LINUX WAITCONSUME FINAL: ordinary=1 namespace=0 kind=5 calls=120 failures=0
+LINUX WAITCONSUME TOPOLOGY: ordinary=0 namespace=1 profile=1 killed=0 self=2 pid=3 real=1001 effective=0 saved=1002
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=1 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=2 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=3 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=4 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=7 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=1 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=2 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=3 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=4 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=7 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=1 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=2 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=3 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=4 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=7 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=1 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=2 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=3 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=4 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=7 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME COHORT: ordinary=0 namespace=1 self=2 uid=0 page=4096 prepared=720 cleaned=720 pidfds=360
+LINUX WAITCONSUME CASES: ordinary=0 namespace=1 kind=0 calls=120 failures=120
+LINUX WAITCONSUME CASES: ordinary=0 namespace=1 kind=1 calls=120 failures=120
+LINUX WAITCONSUME CASES: ordinary=0 namespace=1 kind=2 calls=120 failures=120
+LINUX WAITCONSUME CASES: ordinary=0 namespace=1 kind=3 calls=120 failures=120
+LINUX WAITCONSUME CASES: ordinary=0 namespace=1 kind=4 calls=120 failures=0
+LINUX WAITCONSUME CASES: ordinary=0 namespace=1 kind=5 calls=120 failures=0
+LINUX WAITCONSUME FINAL: ordinary=0 namespace=1 kind=0 calls=120 failures=120
+LINUX WAITCONSUME FINAL: ordinary=0 namespace=1 kind=1 calls=120 failures=120
+LINUX WAITCONSUME FINAL: ordinary=0 namespace=1 kind=2 calls=120 failures=120
+LINUX WAITCONSUME FINAL: ordinary=0 namespace=1 kind=3 calls=120 failures=120
+LINUX WAITCONSUME FINAL: ordinary=0 namespace=1 kind=4 calls=120 failures=0
+LINUX WAITCONSUME FINAL: ordinary=0 namespace=1 kind=5 calls=120 failures=0
+LINUX WAITCONSUME TOPOLOGY: ordinary=1 namespace=1 profile=1 killed=0 self=2 pid=3 real=1000 effective=1002 saved=1002
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=1 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=2 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=3 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=3 actual=-1/14 available=4 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=0 event=0 profile=0 form=7 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=1 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=2 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=3 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=3 actual=-1/14 available=4 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=1 event=0 profile=0 form=7 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=1 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=2 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=3 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=3 actual=-1/14 available=4 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=2 event=0 profile=0 form=7 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=1 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=2 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=3 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=3 actual=-1/14 available=4 bad_byte=1
+LINUX WAITCONSUME DETAIL: kind=3 event=0 profile=0 form=7 actual=-1/14 available=0 bad_byte=1
+LINUX WAITCONSUME COHORT: ordinary=1 namespace=1 self=2 uid=1000 page=4096 prepared=720 cleaned=720 pidfds=360
+LINUX WAITCONSUME CASES: ordinary=1 namespace=1 kind=0 calls=120 failures=120
+LINUX WAITCONSUME CASES: ordinary=1 namespace=1 kind=1 calls=120 failures=120
+LINUX WAITCONSUME CASES: ordinary=1 namespace=1 kind=2 calls=120 failures=120
+LINUX WAITCONSUME CASES: ordinary=1 namespace=1 kind=3 calls=120 failures=120
+LINUX WAITCONSUME CASES: ordinary=1 namespace=1 kind=4 calls=120 failures=0
+LINUX WAITCONSUME CASES: ordinary=1 namespace=1 kind=5 calls=120 failures=0
+LINUX WAITCONSUME FINAL: ordinary=1 namespace=1 kind=0 calls=120 failures=120
+LINUX WAITCONSUME FINAL: ordinary=1 namespace=1 kind=1 calls=120 failures=120
+LINUX WAITCONSUME FINAL: ordinary=1 namespace=1 kind=2 calls=120 failures=120
+LINUX WAITCONSUME FINAL: ordinary=1 namespace=1 kind=3 calls=120 failures=120
+LINUX WAITCONSUME FINAL: ordinary=1 namespace=1 kind=4 calls=120 failures=0
+LINUX WAITCONSUME FINAL: ordinary=1 namespace=1 kind=5 calls=120 failures=0
+LINUX WAITCONSUME FAIL: wait4/waitid copyout-fault event consumption or WNOWAIT retention controls
+QEMU: Terminated
+

@@ -484,12 +484,13 @@ pub fn syscall_wait4(_ voidptr, pid_word u64, status_ptr u64, options_word u64, 
 	child := change.child
 	status := i32(change.status)
 	reaped := proc.pid_in(child, current_process.numbered_in)
+	// Selecting an event consumes it even when a later user copy faults.
 	if status_ptr != 0 && !usercopy.copy_to_user(status_ptr, voidptr(&status), sizeof(i32)) {
-		finish_child_change(mut current_process, change, false)
+		finish_child_change(mut current_process, change, true)
 		return errno.err, errno.efault
 	}
 	if !write_child_rusage(rusage_ptr, child) {
-		finish_child_change(mut current_process, change, false)
+		finish_child_change(mut current_process, change, true)
 		return errno.err, errno.efault
 	}
 
@@ -605,12 +606,13 @@ pub fn syscall_waitid(_ voidptr, idtype_word u64, id_word u64, infop u64, option
 	}
 
 	// Linux copies rusage first: its faults must leave siginfo untouched.
+	// Copyout faults consume the selected event unless WNOWAIT preserves it.
 	if !write_child_rusage(rusage_ptr, child) {
-		finish_child_change(mut current_process, change, false)
+		finish_child_change(mut current_process, change, options & wnowait == 0)
 		return errno.err, errno.efault
 	}
 	if infop != 0 && !write_waitid_siginfo(infop, unsafe { &info }) {
-		finish_child_change(mut current_process, change, false)
+		finish_child_change(mut current_process, change, options & wnowait == 0)
 		return errno.err, errno.efault
 	}
 

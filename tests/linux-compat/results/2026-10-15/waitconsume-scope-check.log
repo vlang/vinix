@@ -1,0 +1,1 @@
+arm/x86: complete production C differs only in four fault-path consume arguments in wait4/waitid; selected events consumed despite EFAULT, waitid WNOWAIT preserved; immediate returns after finish, no added allocation/free/pin and no normalization; existing helpers, claiming, pins, copyout order and successful paths unchanged; independent lifetime review bound

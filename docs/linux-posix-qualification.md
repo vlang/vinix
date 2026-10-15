@@ -8114,3 +8114,135 @@ The three broad section 15 gates remain open.
 - [AArch64 evidence](../tests/linux-compat/results/2026-10-15/waitusage-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitusage-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitusage-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitusage-reference-aarch64-receipt.json).
 - [x86-64 evidence](../tests/linux-compat/results/2026-10-15/waitusage-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitusage-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitusage-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitusage-reference-x86_64-receipt.json).
 - [Maintained audit](../tests/linux-compat/waitusage-check.v), [verdict](../tests/linux-compat/results/2026-10-15/waitusage-audit.log).
+
+## Native wait copyout-fault event consumption
+
+Native AArch64 and x86-64 wait4/waitid now consume the selected child event
+when a later status, siginfo or rusage copyout returns EFAULT. Waitid with
+WNOWAIT retains the event on both success and fault. Previously all four
+fault branches retained it, allowing a repeated wait to report an event that
+Linux had already consumed. The patch changes only four completion arguments
+and two comments. Existing claiming, pins, epoch matching, copyouts, accounting,
+reaping helpers and successful paths remain unchanged. Each error path returns
+immediately after completion, without another child access.
+
+The pinned [Linux v6.12 wait implementation](https://github.com/torvalds/linux/blob/v6.12/kernel/exit.c)
+consumes stopped/continued state or reaps an exited child in do_wait before
+copying output to userspace. WNOWAIT bypasses consumption. Wait4 copies status
+before rusage; waitid copies rusage before siginfo. Identical probe source,
+emitted C and native musl ELF run on original/corrected Vinix and Linux 6.12.51
+for each architecture. Four fresh production builds use committed base
+`96542f4955808cfe4492894c9b1bcf558c98734a`; only the owned wait-source patch enters
+the corrected worktrees. Complete generated C differs only in these four
+arguments, without normalization or new allocation/free/pin/stack promotion.
+
+Four cohorts cover root and ordinary UID 1000 callers, each in the initial
+and a one-level PID namespace. Every trial creates a fresh child in its own
+process group; each caller has a fresh session. Pipe readiness validates the
+child PID, parent, group, session and real/effective/saved credentials. Root
+children use 1001/0/1002; ordinary children use 1000/1002/1002. Four topology and
+four cohort summaries bind 720 prepared/cleaned trials and 360 pidfds per
+cohort. The probe observes SIGSTOP, SIGCONT, normal exit status 37 or SIGKILL
+with WNOWAIT before attempting the fault. Continued trials first consume the
+preceding stop. Exit and SIGKILL trials open a pidfd before termination and
+require POLLIN after the readiness observation, excluding incomplete teardown
+from the measured event-consumption contract.
+
+Each architecture runs 2,880 controls. Counts below are per cohort:
+
+| Class | Controls | Original failures |
+| --- | ---: | ---: |
+| Wait4 bad status pointer consumes event | 120 | 120 |
+| Wait4 bad rusage pointer consumes event after valid status | 120 | 120 |
+| Waitid bad siginfo pointer consumes event | 120 | 120 |
+| Waitid bad rusage pointer consumes event before siginfo writes | 120 | 120 |
+| Waitid bad siginfo with WNOWAIT retains event | 120 | 0 |
+| Waitid bad rusage with WNOWAIT retains event | 120 | 0 |
+
+Every class covers four event states, P_ALL/child PID/child process group,
+one raw form with nonzero upper register words and the musl form, and five
+bad-pointer classes: wrapping, low unmapped, read-only, PROT_NONE and a stable
+partial guard. Genuine musl waitid is used when rusage is NULL; other waitid
+trials exercise the raw fifth argument. WNOHANG varies with pointer class.
+Guard prefixes expose two status bytes, 25 siginfo bytes or 143 rusage bytes;
+the sixteen-byte leading canary must stay intact. Exact status/rusage prefix
+contents and architecture-dependent partial-copy counts remain unqualified.
+Read-only storage must remain poisoned. Distinct valid outputs verify prior
+copyout ordering: failed wait4 status skips rusage; failed wait4 rusage leaves
+status visible; failed waitid rusage skips siginfo; later waitid siginfo faults
+preserve valid rusage. Rusage checks field domains and surrounding canaries,
+without exact accounting claims. Diagnostic DETAIL rows retain the template's
+`profile` label for the selector index; topology records bind the fixed actual
+credential profile.
+
+After each fault, a valid nonblocking WNOWAIT query must find either the same
+retained event and real UID, or cleared PID/UID for a consumed live-child event,
+or ECHILD after reaping. The probe normally consumes any still-pending event
+on original kernels before cleanup; these semantic failures therefore do not
+turn later cases into setup failures. Live children are resumed/released and
+reaped normally; exit pidfds are closed. Originals fail exactly 1,920 controls
+per architecture; corrected Vinix and the unchanged-ELF Linux references pass
+all 2,880 each.
+
+Four warmed 200-cycle storage cohorts include fresh fork, selected event,
+faulting wait, any retained-event consumption, live-child exit/reap and pidfd
+close inside the measured interval. Thirty-two warmup trials and thirteen-second
+settling periods precede each snapshot. The 200 cycles rotate all six classes,
+four event kinds, three selectors, two call forms and five bad-pointer classes.
+All eighteen AArch64 and fourteen x86-64 slab classes and big-page totals stay
+flat. The probe C has five explicit stack allocas and no malloc/memdup/dynamic-
+array/fixed-index calls. Native AArch64 uses 16 KiB pages; x86-64 and both Linux
+references use 4 KiB pages. Raw allocation totals are in the serial logs.
+
+The independent [lifetime review](../tests/linux-compat/results/2026-10-15/waitconsume-lifetime-review.txt)
+found no defects in the changed error paths. It followed the claim pin through
+unlink, accounting, free_pid/quarantine, parent notification and final unpin;
+reviewed matching epochs and WNOWAIT; and independently verified the complete
+generated-C substitutions on both architectures. Its limits exclude independent
+guest execution, concurrency stress and general race safety.
+
+Runtime and the 310,400-control rusage/siginfo-order regression pass on both
+architectures; all eight host test files pass. Allocation diagnostics remain
+byte-identical, including existing allowance-file refusals. The maintained audit
+binds 67 inventory inputs, 15,146 compiler inputs, all 2,014 private SDK files,
+fifteen final ARM compiler-command receipts, source/C/ELF/ISO/kernel identity,
+84 retained regular files across eight final native profiles, independent review,
+exact source/C scope and executing false-assertion/passing-reference-as-original
+controls. Compile the auditor without `-prod`.
+
+Initial host setup compilation refused an option-unwrapping typo before creating
+probe sources. The first probe profiles on both architectures then refused a V
+Boolean syntax error before producing an ELF, ISO or guest verdict. Both sources,
+logs, receipts and complete regular-file pins remain retained; the audit verifies
+the one-expression probe correction and checks that these are preboot refusals.
+Final p2 original/ARM/reference and p3 corrected x86 profiles supply the
+semantic results. See the
+[host setup refusal](../tests/linux-compat/results/2026-10-15/waitconsume-initial-setup-refusal.log),
+[ARM probe refusal](../tests/linux-compat/results/2026-10-15/waitconsume-initial-probe-arm-refusal.log)
+and [x86 probe refusal](../tests/linux-compat/results/2026-10-15/waitconsume-initial-probe-x86-refusal.log).
+
+The first corrected x86 profile passed the new case with all allocation
+measurements flat, then disk exhaustion prevented the runtime and waitusage
+ISOs from being assembled. Those two attempts produced ELFs but no ISO or
+guest verdict. Their aggregate, receipt, completed-case log, partial staging
+files and earlier watcher pins remain retained and audited. A fresh p3 profile
+reruns all three cases against the identical kernel and ELFs after space is
+available. See the [interrupted receipt](../tests/linux-compat/results/2026-10-15/waitconsume-interrupted-x86-receipt.json)
+and [assembly refusal log](../tests/linux-compat/results/2026-10-15/waitconsume-interrupted-x86-aggregate.log).
+Only duplicate owned build intermediates were retired; captured before/after
+C, kernels and retained guest inputs remain. During diagnostic pin migration,
+a helper refused a mutable watcher log that had been reused. Its initial
+stdout was recovered from the immutable outer producer log with an exact
+match to its previously recorded SHA-256 before assigning the archived path.
+The [recovery record](../tests/linux-compat/results/2026-10-15/waitconsume-watch-diagnostic-recovery.json)
+and retained input manifests bind both watcher attempts.
+
+Exact accounting and partial-copy counts, arbitrary aliases, incomplete exit
+publication, concurrent waiters/mappings/credentials/lifecycle changes, mapped
+user IDs, P_PIDFD wait selectors, __W flags, ptrace/cross-thread waits, interrupted
+or restarted waits, GNU libc and translated/ELF32 paths remain outside this
+bounded contract. The three broad section 15 gates remain open.
+
+- [AArch64 evidence](../tests/linux-compat/results/2026-10-15/waitconsume-evidence-aarch64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitconsume-after-aarch64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitconsume-before-aarch64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitconsume-reference-aarch64-receipt.json).
+- [x86-64 evidence](../tests/linux-compat/results/2026-10-15/waitconsume-evidence-x86_64.json), [native receipt](../tests/linux-compat/results/2026-10-15/waitconsume-after-x86_64-receipt.json), [original receipt](../tests/linux-compat/results/2026-10-15/waitconsume-before-x86_64-receipt.json), [Linux reference](../tests/linux-compat/results/2026-10-15/waitconsume-reference-x86_64-receipt.json).
+- [Maintained audit](../tests/linux-compat/waitconsume-check.v), [verdict](../tests/linux-compat/results/2026-10-15/waitconsume-audit.log).

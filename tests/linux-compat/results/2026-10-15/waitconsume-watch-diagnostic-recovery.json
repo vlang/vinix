@@ -1,0 +1,7 @@
+{
+    "context": "Mutable helper-watch.log was reused by resumed watcher. Recovered original stdout from immutable outer producer log only after exact pre-recorded SHA-256 match.",
+    "outer_sha256": "42c537d46377daaaf9fdda094259509ffe4396b5190e954f78f7faa2027e8571",
+    "outer_source": "/Users/alex/.cache/vinix-linux-compat/waitconsume-20261015/initial-helper-watch.log",
+    "recovered": "/Users/alex/.cache/vinix-linux-compat/waitconsume-20261015/initial-helper-watch-detail.log",
+    "recovered_sha256": "c79676b7b292b700a818ed4b92de8063464358190ad1841ad508325d8bea4ef3"
+}

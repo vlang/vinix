@@ -1,0 +1,75 @@
+Independent lifetime review: waitconsume (2026-10-15)
+Verdict: NO FINDINGS in the four changed copyout-error completion paths.
+
+Scope: Review only, with no repository edits or commits. Reviewed the concrete
+kernel/userland/linux_task.v diff against base 96542f4955808cfe4492894c9b1bcf558c98734a, and followed the existing
+scan/take/finish_child_change, release_child, Process pins, free_pid/quarantine,
+exit publication, rusage/page-map access, parent teardown, and job-state epochs.
+The after source matches the current repository file byte for byte.
+
+Ownership and release:
+- take_child_change holds parent.children_lock while scan_child_change traverses
+  the child list. The exclusive claim is marked wait_busy under child.job_lock,
+  and its Process pin is acquired before either owner lock is released.
+- Both wait4 copyout failures now call finish_child_change(..., true); both
+  waitid failures use the same WNOWAIT-dependent consume expression as success.
+  Each fault path immediately returns the scalar EFAULT result after finishing.
+  Neither the V source nor the generated C reads child, its namespace identity,
+  its page map, or its event after that potentially final unpin.
+- finish_child_change retains the claim pin through job-state updates, child-list
+  unlink, cumulative child accounting, free_pid, and parent waiter notification.
+  The child job lock is released before acquiring the parent child-list lock;
+  release_child releases that lock before accounting and process-table removal.
+  The changed branches add no nested lock or new acquisition order.
+- For exit events, wait_reaped is set before wait_busy clears, so another waiter
+  cannot claim and reap the same child. free_pid removes table/numbering identity
+  and quarantines the Process; reclamation checks both zero pins and the existing
+  grace period, including overflow into the intrusive retained queue. The claim
+  pin survives until finish_child_change performs its last child access.
+- For stopped/continued events, consumption clears only the selected matching
+  epoch. It does not reap the live Process or clear a newer epoch published
+  during copyout. WNOWAIT clears the exclusive busy claim and releases its pin
+  without consuming the selected state or unlinking the child.
+
+Other lifetimes checked:
+- rusage is fully captured before finish_child_change. Its page-map peak is
+  read under the process-table lock; exit preserves the peak and detaches the
+  old map under that same lock before deleting it. Only scalar usage values
+  survive the read. No page-map borrow is introduced by this patch.
+- The active parent syscall retains its current Process through the existing
+  thread/teardown contract: sibling teardown waits for kernel syscalls to unwind
+  before releasing the parent address space and detaching its child list.
+- wait_exit_ready can become visible before the exiting CPU finishes pidfd and
+  parent notifications. The existing exit-owner pin and publication pin retain
+  the exiting Process across this interval. After readiness, no remaining exit
+  code needs the descriptor table freed by free_pid. Parent notification takes
+  its own Process pin. The patch reuses this already-successful reaping route.
+
+Generated-C check:
+Read both captured production before/after C files. Independently asserted that
+each complete after C file equals its before C file with exactly the two wait4
+false completion arguments changed to true and the two waitid false arguments
+changed to (options & userland__wnowait) == 0. No other generated-C change, new
+allocation, free, stack promotion, pin, unpin, deferred cleanup, or child access
+is introduced. Both after production build logs report PASS.
+
+Probe boundary:
+Read the consuming-error probe readiness/cleanup path. Exit and SIGKILL trials
+open a pidfd before initiating exit and require POLLIN before the faulting wait;
+stopped/continued trials first observe the matching event with WNOWAIT. The
+probe can clean retained original-kernel events, so the old behavior does not
+become a setup leak. Guest execution/results and maintained evidence validation
+are owned by the main agent; this review does not claim their completed verdict.
+
+Limits: This is a source/generated-C ownership review of this bounded change,
+not a formal proof or an independent execution of allocation, desktop, SMP
+waiter, signal, reparenting, namespace teardown, or concurrent unmap stress tests.
+The completed-exit probe does not qualify the earlier exit-publication window.
+Existing quarantine/raw-borrow assumptions are unchanged and are not upgraded
+to general race safety by this review.
+
+Reviewed source SHA-256: bcc7ec95a8cf1b31dff9faffbda8011e3c6502380d90d7c45a93440f2fa4da99
+arm before C SHA-256: 3895757832ca87ba0ed9a6b8743728bf073b3cadec721d03731d33ba1c5d8349
+arm after C SHA-256: a168db52e2a470bd2f2d940e57ada95b1f46d14c4d158ee7e3952b7225b9aae9
+x86 before C SHA-256: b4f2ffd32518f162782d9194c9e8923e4636ae0152201334f8a9df52e3a85dc7
+x86 after C SHA-256: 535c3384dec198f985722e7066b7ed1e4226bdb61fbd863c9724d18812fa1d73

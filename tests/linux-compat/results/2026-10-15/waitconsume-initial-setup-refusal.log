@@ -1,0 +1,15 @@
+Compiler output from the default V compiler:
+/Users/alex/.cache/vinix-linux-compat/waitconsume-20261015/create-probe.v:8:35: error: to propagate a Result, the call must also return a Result type
+    6 |  probe = probe.replace('struct Counts {','struct C.pollfd { mut: fd i32 events i16 revents i16 }\nstruct Counts {')
+    7 |  probe = probe.replace('fn C.waitpid(i32,&i32,i32) i32','fn C.waitpid(i32,&i32,i32) i32\nfn C.wait4(i32,voidptr,i32,voidptr) i32\nfn C.poll(&C.pollfd,u64,i32) i32')
+    8 |  start := probe.index('fn value(')!; end := probe.index('fn snapshot(')!
+      |                                   ^
+    9 |  probe = probe[..start] + '
+   10 | fn unchanged(data voidptr,length int) bool {return canaries(data,length,0,0)}
+/Users/alex/.cache/vinix-linux-compat/waitconsume-20261015/create-probe.v:8:72: error: to propagate a Result, the call must also return a Result type
+    6 |  probe = probe.replace('struct Counts {','struct C.pollfd { mut: fd i32 events i16 revents i16 }\nstruct Counts {')
+    7 |  probe = probe.replace('fn C.waitpid(i32,&i32,i32) i32','fn C.waitpid(i32,&i32,i32) i32\nfn C.wait4(i32,voidptr,i32,voidptr) i32\nfn C.poll(&C.pollfd,u64,i32) i32')
+    8 |  start := probe.index('fn value(')!; end := probe.index('fn snapshot(')!
+      |                                                                        ^
+    9 |  probe = probe[..start] + '
+   10 | fn unchanged(data voidptr,length int) bool {return canaries(data,length,0,0)}

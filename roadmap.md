@@ -1025,6 +1025,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   calls and flat storage as root/ordinary callers in both PID namespace views.
   See [the rusage/siginfo order receipts](docs/linux-posix-qualification.md#native-waitid-rusage-and-siginfo-copyout-order).
 
+- [x] Consume native wait4/waitid child events after copyout faults, retaining
+  waitid WNOWAIT events. Qualify four states, bad status/siginfo/rusage pointers,
+  raw/musl calls, selectors and flat fork/fault/reap/close storage as root and
+  ordinary callers in both PID namespace views, with independent lifetime review.
+  See [the consuming-fault receipts](docs/linux-posix-qualification.md#native-wait-copyout-fault-event-consumption).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

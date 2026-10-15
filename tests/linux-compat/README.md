@@ -1767,3 +1767,20 @@ evidence area to verify original failures, native/reference results, whole-C
 scope, compiler/SDK/input pins and executing audit controls. Consuming faults,
 exact partial-rusage counts/accounting and arbitrary aliases remain separate.
 See the [copyout-order report](../../docs/linux-posix-qualification.md#native-waitid-rusage-and-siginfo-copyout-order).
+
+The `waitconsume` case qualifies wait4/waitid event consumption after status,
+siginfo or rusage copyout faults and waitid WNOWAIT retention. It creates one
+child/event per trial, observes readiness without consuming it, and requires
+pidfd POLLIN for exit/SIGKILL events. Four root/UID1000 initial/one-level PID
+namespace cohorts run 2,880 controls per architecture across stopped/continued/
+exit37/SIGKILL, three selectors, raw upper-word/musl forms, WNOHANG variation
+and wrapping/unmapped/read-only/PROT_NONE/partial-guard outputs. Subsequent
+nonblocking waits must report cleared events/ECHILD or the retained identity;
+cleanup also works on original kernels. Four warmed 200-cycle storage cohorts
+include fork, faulting wait, normal cleanup and pidfd close. The unchanged ELF
+runs on Linux with `waitconsume-reference.v`. Compile `waitconsume-check.v`
+without `-prod` to verify original failures, native/reference identity, exact
+source/whole-C scope, independent lifetime review, retained preboot compiler
+refusals, compiler/SDK pins and executing audit negatives. Exact partial-copy
+counts/accounting, incomplete exit teardown and concurrent waits stay separate.
+See the [event-consumption report](../../docs/linux-posix-qualification.md#native-wait-copyout-fault-event-consumption).
