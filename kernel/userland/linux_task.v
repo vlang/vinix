@@ -107,6 +107,20 @@ mut:
 
 const clone_args_size_ver0 = u64(64)
 
+// CLONE_CLEAR_SIGHAND resets the child's private copy before it can run.
+// Linux preserves SIG_IGN but clears every action's flags, restorer and mask.
+fn reset_clone_sighand(mut child proc.Thread, flags u64) {
+	if flags & u64(0x100000000) == 0 { return }
+	for signum in 1 .. max_signal + 1 {
+		if u64(child.sigactions[signum].sa_sigaction) != 1 {
+			child.sigactions[signum].sa_sigaction = unsafe { nil }
+		}
+		child.sigactions[signum].sa_flags = 0
+		child.sigactions[signum].sa_restorer = unsafe { nil }
+		child.sigactions[signum].sa_mask = 0
+	}
+}
+
 // CLONE_CLEAR_SIGHAND and CLONE_INTO_CGROUP extend the legacy 32 flag bits.
 // clone3 reserves CLONE_DETACHED and former CSIGNAL bits other than NEWTIME.
 fn valid_clone3_flags(flags u64) bool {

@@ -234,6 +234,7 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 		abandon_new_process(mut new_process)
 		return errno.err, errno.eagain
 	}
+	reset_clone_sighand(mut new_thread, flags)
 
 	if flags & clone_child_cleartid != 0 {
 		new_thread.clear_child_tid = child_tid

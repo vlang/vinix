@@ -1097,6 +1097,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   cleanup on both native architectures against identical probe ELFs on Linux.
   See [the flag receipts](docs/linux-posix-qualification.md#native-clone3-flag-word-validation).
 
+- [x] Honor clone3 CLONE_CLEAR_SIGHAND on both native architectures; qualify
+  caught/default/ignored dispositions, cleared action metadata, ordinary
+  inheritance, parent isolation, blocked masks, actual delivery and flat cleanup
+  against identical probe ELFs on Linux.
+  See [the disposition receipts](docs/linux-posix-qualification.md#native-clone3-cleared-signal-dispositions).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

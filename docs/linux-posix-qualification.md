@@ -9381,11 +9381,94 @@ Raw original/corrected/Linux, build, preflight and regression logs accompany
 the receipts. The maintained auditor is `tests/linux-compat/cloneflags-check.v`.
 
 This qualifies clone3 flag-word validation and the tested admission/direct-call
-behavior. Standalone CLONE_CLEAR_SIGHAND still does not reset inherited caught
-handlers, and other recognized-flag effects remain unqualified here. Selected
+behavior. Standalone CLONE_CLEAR_SIGHAND effects are qualified in the following
+report; other recognized-flag effects remain unqualified here. Selected
 TIDs and their pointer/error ordering, pidfds, zero-filled extensions,
 alternative exit notification and clone-child wait classes, supplied-stack
 execution/alignment, tagged/boundary addresses, cgroup placement and its
 authorization/lifetimes, concurrent arguments, GNU libc and translated/32-bit
 paths remain separate. The broad libc, installation/sandbox/portal and
 translation gates remain open.
+
+## Native clone3 cleared signal dispositions
+
+Both native process-clone paths now honor CLONE_CLEAR_SIGHAND before the child
+can run. The helper updates the child's existing private signal-action array:
+caught handlers become SIG_DFL, SIG_IGN survives, and flags, restorer and mask
+are cleared for every signal. The blocked mask and parent's dispositions stay
+unchanged. Ordinary forks retain their existing inheritance. The earlier
+CLONE_SIGHAND conflict guard remains in force. This follows
+[Linux v6.12 copy_sighand](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c)
+and [flush_signal_handlers](https://github.com/torvalds/linux/blob/v6.12/kernel/signal.c).
+
+The `cloneclear` probe runs 576 controls per architecture, with 144 in each
+root/UID1000 and initial/one-level PID namespace cohort. Every request uses
+size 64, 72, 80 or 88 with aligned, byte-unaligned or native-page-tail input.
+The input page is read-only, followed by PROT_NONE. Each successful child
+queries all 62 dispositions that rt_sigaction permits changing. SIGCHLD stays
+default in the parent so that all children remain waitable. Two nonzero
+metadata patterns exercise action flags, a restorer word and per-signal masks.
+
+| Class | Calls per cohort | Contract |
+| --- | ---: | --- |
+| Clear caught handlers | 24 | Caught handlers become default; all metadata becomes zero. |
+| Preserve ignored handlers | 24 | SIG_IGN remains installed; all metadata becomes zero, including default SIGCHLD. |
+| Clear default-action metadata | 24 | Default handlers remain default; flags, restorers and action masks become zero. |
+| Ordinary inheritance | 24 | Mixed caught/ignored/default handlers and metadata survive without CLEAR_SIGHAND. |
+| Actual delivery | 36 | SIGUSR1 terminates a cleared caught-handler child with signal 10, invokes the ordinary inherited handler with exit 42, or remains ignored with exit 37. |
+| Conflicting sharing | 12 | CLEAR_SIGHAND with SIGHAND and VM returns EINVAL without children. |
+
+Original kernels fail exactly 384 controls per architecture: all three reset
+classes and 24 delivery-class checks per cohort. Ordinary inheritance and
+conflict errors already pass. Corrected kernels and the identical original
+probe ELFs on Linux 6.12.51 pass every control. Every successful fork reports
+its PID/TID, parent and UID, and confirms its inherited blocked mask. The
+parent verifies all its dispositions and blocked mask, restores the prior
+actions, reaps the child, compares the complete two-page input canary and
+requires ECHILD from an empty nonblocking wait. Delivery checks use a handler
+that calls _exit directly; returning through a restorer is outside this case.
+Native ARM uses 16KiB pages; native x86 and both Linux references use 4KiB.
+
+Original and corrected kernels each measure four cleanup cohorts after 64
+warmup cycles and thirteen seconds of settling, then 200 measured cycles and
+another settle. Each cycle makes a real fork, queries/restores dispositions,
+reaps it and runs a conflicting-flags refusal. The four fork classes rotate
+over identical inputs on both kernels. Only this retention loop tolerates
+the original uncleared child table; conformance classes require exact Linux
+state. All live slab classes and big-heap page totals stay flat. This is
+targeted kernel-heap evidence; general page/cache retention and the earlier
+EXT2 rename observation remain separate.
+
+Four isolated original/corrected production builds pass. Exact whole-C
+comparison confines the change to the reset helper/prototype and one call in
+each architecture's separate-process path. The helper writes existing scalar
+fields; it adds no allocation, free, reference, ownership transfer or lock.
+The probe uses eleven explicit stack allocas and no dynamic allocation or
+fixed-index helper. Its successful compiler preflight matches the original
+ARM guest C. The first preflight lacked the sched.h declarations for unshare
+and CLONE_NEWPID; its source, raw compiler refusal, generated C and compiler
+receipts are retained and pinned.
+
+Both corrected architectures pass runtime and the 1,056-control cloneflags
+regression. The auditor checks every case/cohort total, original failures,
+credentials/page sizes, identical probe C/ELFs, Linux receipts, both phases'
+storage, all 84 retained native case files, 67 frozen dispatch inventory
+inputs, 2,014 SDK files and 15,146 compiler pins. False-assertion and
+passing-Linux-as-original controls must execute and fail; compile without
+`-prod`.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/cloneclear-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/cloneclear-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/cloneclear-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/cloneclear-diagnostic-pins.json).
+Raw original/corrected/Linux, build, preflight and regression logs accompany
+the receipts. The maintained auditor is `tests/linux-compat/cloneclear-check.v`.
+
+This qualifies separate-process clones using inherited stacks and stable
+parent dispositions. Concurrent handler installation, shared-VM/vfork forms,
+exec and signal-frame/restorer return behavior remain separate. Selected TIDs,
+pidfds, zero-filled argument extensions, non-SIGCHLD exit notification and
+clone-child wait classes, supplied-stack execution/alignment, cgroup placement
+and its authorization/lifetimes, GNU libc and translated/32-bit paths remain
+unqualified here. The broad libc, installation/sandbox/portal and translation
+gates remain open.

@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "4582e585e8b61a100b4781646b180ad017518e94f6b47bca4f99453b974ce4f6",
+    "results": [
+        {
+            "name": "cloneclear",
+            "source_sha256": "73cb0c701301af2652353367633e210eb424ff332a0e6a6474d8f5f864dfcf63",
+            "init_sha256": "cd8eac67b19f9b7d671f34fec172fceee3bcb8aadad7075dc5ed00a0410abf87",
+            "iso_sha256": "5c4ccd85129b55e1c81f1b72f8acf8fe547d13e397f6b53b9bcf0bc9229b20c7",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

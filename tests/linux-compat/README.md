@@ -1957,3 +1957,19 @@ EINVAL; semantic cases require exact errors. Use `--cases cloneflags --timeout
 ELF on Linux; compile `cloneflags-check.v` without `-prod` for the executing
 evidence audit. Recognized-flag admission does not qualify each flag's effects.
 See [the flag report](../../docs/linux-posix-qualification.md#native-clone3-flag-word-validation).
+
+The `cloneclear` case checks actual CLONE_CLEAR_SIGHAND effects. Each child
+queries all 62 changeable dispositions; caught handlers become SIG_DFL,
+SIG_IGN survives, and all action flags, restorers and masks are cleared.
+Ordinary clones retain mixed dispositions. Parent dispositions and the blocked
+mask stay unchanged. Real SIGUSR1 delivery distinguishes caught, default and
+ignored behavior. Four credential/PID namespace cohorts run 576 controls per
+architecture through sizes 64/72/80/88 and three protected input layouts,
+including conflict refusals, input canaries and complete child reaping.
+Original and corrected kernels also measure identical warmed 200-cycle
+fork/query/reap/refusal workloads; only cleanup measurements tolerate the
+original child table. Use `--cases cloneclear --timeout 1200` with a fresh state
+directory. `cloneclear-reference.v` runs the unchanged ELF on Linux; compile
+`cloneclear-check.v` without `-prod` to audit the original failures, corrected
+results, exact source/C scope, retention and executing negative controls.
+See [the disposition report](../../docs/linux-posix-qualification.md#native-clone3-cleared-signal-dispositions).

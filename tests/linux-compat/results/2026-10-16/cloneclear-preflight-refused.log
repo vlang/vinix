@@ -1,0 +1,7 @@
+/Users/alex/.cache/vinix-linux-compat/cloneclear-20261016/states/preflight-arm/fixture.c:1562:13: error: call to undeclared function 'unshare'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1562 |                                                                 if (unshare(CLONE_NEWPID) != 0) {
+      |                                                                     ^
+/Users/alex/.cache/vinix-linux-compat/cloneclear-20261016/states/preflight-arm/fixture.c:1562:21: error: use of undeclared identifier 'CLONE_NEWPID'
+ 1562 |                                                                 if (unshare(CLONE_NEWPID) != 0) {
+      |                                                                             ^~~~~~~~~~~~
+2 errors generated.

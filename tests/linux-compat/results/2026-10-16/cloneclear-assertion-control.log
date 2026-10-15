@@ -1,0 +1,3 @@
+tests/linux-compat/cloneclear-check.v:348: FAIL: fn main.main: assert false, 'cloneclear assertions must execute'
+      message: cloneclear assertions must execute
+V panic: Assertion failed...
