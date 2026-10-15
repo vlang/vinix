@@ -103,6 +103,12 @@ fn decode_deployment(text string, architecture string) !DeploymentLock {
 
 fn deployment_plan(config Config, directory string, current State, document DeploymentLock) !Plan {
 	if document.format == 1 { return operation_plan(config, directory, current, 'deploy', document.packages) }
+	if document.packages.len == 0 {
+		if document.locked.len != 0 {
+			return error('deployment lock includes packages outside the requested dependency closure')
+		}
+		return operation_plan(config, directory, current, 'deploy', document.packages)
+	}
 	catalog := load_catalog(config, directory)!
 	mut accepted := false
 	defer { if !accepted { close_authenticated_catalog(catalog) } }

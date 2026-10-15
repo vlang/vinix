@@ -1682,7 +1682,16 @@ the approved versions available in the signed index and mirror. Cached payloads
 alone cannot substitute for an authenticated, unexpired catalog.
 
 Deployment does not change trust/policy or refresh repositories implicitly. An
-unchanged set needs no new generation; an explicit empty set removes all roots.
+unchanged set needs no new generation; an explicit empty set removes all roots
+and their runtime/data dependencies. Both root-list and locked formats support
+this removal without catalog, replay-history or payload-cache availability,
+including after publisher revocation or policy tightening. An empty locked
+document must have no pins. Configuration, installed-state coherence, review
+identity, disk reserve and transactional activation checks still apply. The
+review shows all removals with their historical permissions, provenance and
+licensing. Personal application data and retained generations remain available;
+restoring packages requires normal rollback trust/policy and integrity admission.
+See [qualification](../tests/packages/deployment-empty-check.md).
 Rollback and data retention use the normal transaction history. Runtime updates
 are ordinary signed packages in a newly reviewed lock or upgrade/deployment
 closure; no background updater is introduced.

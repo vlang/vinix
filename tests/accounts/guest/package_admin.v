@@ -70,6 +70,7 @@ fn qualify_package_admin(mut t Test) ! {
 	assert os.ls('/run/user/1000')!.all(!it.starts_with('pkg-'))
 	t.say('PACKAGE ADMIN ordinary-admin password-required peer-bound reviewed-install progress stale-refusal no-launch PASS')
 	qualify_package_metadata(mut t, db, alex, sam)!
+	qualify_empty_package_deployment(mut t, db, alex, sam)!
 	qualify_package_policy_admin(mut t, db, alex, sam)!
 	// Keep the adversarial metadata loop independent of PID 1's accumulated
 	// graph/account mapping charge, using the same fresh-worker service model.

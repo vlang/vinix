@@ -1,0 +1,239 @@
+deployment_empty:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Empty deployment: formats 1/2 both architectures offline/revoked/damaged/absent catalog remove complete closure, disclose policy, retain data and enforce rollback admission PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Empty deployment: nonempty/surplus lock refusal, generic/file review domains, stale config, invalid state, busy lock and interrupted-stage recovery PASS
+Empty deployment: initialized fresh store no activation or acquisition; invalid configuration and empty remove still refuse PASS
+deployment:
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-pins-5673-1792107166198042/locked export; $literal; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-capture-5673-1792107166770616/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-final-lock-5673-1792107166953805/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION locked export binds exact captured deployment bytes through publication; changed staged lock refuses and retry preserves pins PASS
+Updating trusted repository fixture
+Updating trusted repository deployment.json
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-namespace-5673-1792107167122212/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/2) from fixture
+Installing Runtime 2.0.0 (2/2) from fixture
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Offline mirror ready: /private/tmp/vinix-deployment-reproducible-5673-1792107167419578/mirror; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading unused/bin/runner (14 bytes)
+Activated package generation 1
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+deployment_candidates:
+Deployment candidates: exact version/architecture/repository/key matching, lock order, ignored variants, duplicate pins and saturated ambiguity PASS
+Deployment candidates: catalog-32768/lock-4096 and unrelated catalog growth succeed with pin-sized storage; excess pins refuse PASS
+Deployment digest: exact SDK-1 canonical JSON plus LF, sorted inventory/requirements/declarations and literal argument order preserve caller fields PASS
+deployment_decode:
+Deployment decode: formats 1/2, both architectures, empty/reordered/escaped fields, strict scalar/schema and all truncated prefixes PASS
+review:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 2.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Activated package generation 4
+distribution:
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 2
+Installing app 1.0.0 (1/1) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 4
+Activated package generation 5
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 6
+Restored packages from generation 4 in generation 6; application data was retained
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Updating trusted repository fixture
+policy:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+service:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+repair:
+PACKAGE REPAIR active payload hash/size/type, changed-target exclusion, sorted closure and removal/rollback isolation PASS
+removal:
+Removal guidance: transitive/shared/cyclic and batched roots, chain-4096 and dense-512 retain an actual requested blocker PASS
+Deployment document protocol: owned strings, repeatable close, full-width sequence, formats 1/2 and exact required schema PASS

@@ -2086,7 +2086,20 @@ documents, which resolve the latest satisfiable closure. `deploy FILE` supports
 both formats without a review fingerprint for existing administration scripts.
 Inputs require explicit fields and JSON types, matching architecture, bounded
 regular files and unique roots/records; null, unknown/duplicate keys and malformed
-digests/versions fail. A format-2 empty roots/records set removes all applications.
+digests/versions fail. An explicit empty root set in either format removes the
+complete installed application/runtime/data closure; format 2 must also have an
+empty `locked` array. Generic `review deploy` / `apply FINGERPRINT deploy` with
+no IDs has the same empty target, using its own review domain. Empty targets
+require validated configuration and coherent installed state, but no catalog,
+replay history or cached payloads, so removal remains available offline or after
+publisher revocation and policy tightening. Reviews disclose every removed
+package's historical provenance, permissions, license and firmware flags.
+Confirmation still checks review identity, writer exclusion, disk reserve and
+transactional staging/recovery. Personal data and retained generations remain;
+rollback retains current publisher/policy and retained-generation integrity
+checks. Reviewed rollback needs its own approval. An already empty target
+creates no new generation.
+See [empty deployment qualification](../../tests/packages/deployment-empty-check.md).
 No deployment changes trust/policy or refreshes implicitly. URLs are intentionally
 unbound: approved signed mirrors work offline with the same publisher and lock,
 subject to normal expiry/replay checks and availability of every locked object.

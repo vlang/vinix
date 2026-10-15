@@ -656,6 +656,87 @@ fn qualify_removal_guidance(binary string, directory string) ! {
 	println('Package CLI: explicit and implicit removal refusals name a retained requested package on both targets; offline/revoked/damaged-cache refusals preserve state and reviewed dependent removal remains available PASS')
 }
 
+fn qualify_empty_deployment(binary string, directory string) ! {
+	os.mkdir_all(directory + '/payload/bin')!
+	os.write_file(directory + '/payload/bin/runner', 'Synthetic empty-deployment fixture')!
+	os.chmod(directory + '/payload/bin/runner', 0o755)!
+	key := success(binary, ['keygen', directory + '/seed'])!.trim_space()
+	repository := directory + '/repository'
+	for architecture in ['aarch64', 'x86_64']! {
+		for id in ['app', 'runtime']! {
+			manifest := pkgcore.Package{ id: id, name: id, description: 'Empty deployment fixture', version: '1.0.0',
+				architecture: architecture, kind: if id == 'app' { 'linux' } else { 'runtime' }, license: 'MIT',
+				runtime: if id == 'app' { 'runtime' } else { '' }, entrypoint: 'bin/runner',
+				permissions: ['process'], associations: if id == 'app' { ['text/plain'] } else { []string{} },
+				dependencies: if id == 'app' { [pkgcore.Dependency{ id: 'runtime' }] } else { []pkgcore.Dependency{} } }
+			os.write_file(directory + '/manifest.json', json2.encode(manifest))!
+			success(binary, ['pack', directory + '/manifest.json', directory + '/payload', repository])!
+		}
+	}
+	success(binary, ['publish', repository, 'fixture', directory + '/seed', '1', (time.now().unix() + 3600).str()])!
+	for architecture in ['aarch64', 'x86_64']! {
+		for format in [1, 2]! {
+			root := directory + '/' + architecture + '-' + format.str()
+			os.mkdir_all(root + '/etc/vinix-packages')!
+			config := pkgcore.Config{ architecture: architecture, repositories: [pkgcore.Repository{ id: 'fixture', url: 'file://' + repository, public_key: key }],
+				policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 } }
+			config_text := json2.encode(config)
+			os.write_file(root + '/etc/vinix-packages/config.json', config_text)!
+			success(binary, ['--root', root, 'update'])!
+			success(binary, ['--root', root, 'install', 'app'])!
+			store := pkgcore.state_directory(root)
+			catalog := os.read_file(store + '/catalog.json')!; history := os.read_file(store + '/trust-history.json')!
+			state := os.read_file(store + '/current/state.json')!
+			pins := success(binary, ['--root', root, 'deployment-snapshot'])!
+			assert pins.contains('"packages":["app"]')
+			os.write_file(store + '/catalog.json', '{unavailable catalog')!
+			os.write_file(store + '/trust-history.json', '{unavailable history')!
+			for object in os.ls(store + '/objects')! { os.rm(store + '/objects/' + object)! }
+			os.write_file(root + '/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{ ...config,
+				repositories: [], policy: pkgcore.Policy{ offline: true, allowed: ['other'], permissions: [], reserve_bytes: 1234 } }))!
+			data := root + '/home/alex/.local/share/vinix-apps/app'
+			os.mkdir_all(data)!; os.write_file(data + '/saved', 'keep user data')!
+			path := root + '/empty.json'
+			empty := '{"format":${format},"architecture":"${architecture}","packages":[]' + if format == 2 { ',"locked":[]}' } else { '}' }
+			os.write_file(path, empty)!
+			mut review := pkgprotocol.decode_review(success(binary, ['--root', root, 'deployment-review', path])!)!
+			defer { review.close() }
+			assert review.rows.len == 2 && review.rows.all(it.action == 'remove' && it.repository == 'fixture' && it.public_key == key)
+			assert review.disk_needed == 4 * 1024 * 1024 && review.disk_reserve == 1234
+			mut generic := pkgprotocol.decode_review(success(binary, ['--root', root, 'review', 'deploy'])!)!
+			defer { generic.close() }
+			assert generic.rows == review.rows && generic.fingerprint != review.fingerprint
+			for text in [pins, pins.replace('"packages":["app"]', '"packages":[]')] {
+				os.write_file(path, text)!
+				for operation in [['deployment-review', path], ['deployment-apply', review.fingerprint, path], ['deploy', path]] {
+					assert command(binary, ['--root', root, ...operation])!.code != 0
+				}
+				assert os.read_file(store + '/current/state.json')! == state
+			}
+			os.write_file(path, empty)!
+			assert command(binary, ['--root', root, 'deployment-apply', generic.fingerprint, path])!.text.contains('stale')
+			// Alternate the public file and generic apply interfaces. Both resolve
+			// an explicit empty target through the shared transaction boundary.
+			success(binary, ['--root', root, '--progress', ...if format == 1 { ['apply', generic.fingerprint, 'deploy'] } else { ['deployment-apply', review.fingerprint, path] }])!
+			removed := pkgcore.read_state(store, architecture)!
+			assert removed.generation == 2 && removed.previous == 1 && removed.requested.len == 0 && removed.packages.len == 0
+			assert os.ls(store + '/current/apps')!.len == 0 && os.ls(store + '/current/share/applications')!.len == 0
+			assert os.read_file(store + '/generations/1/state.json')! == state && os.read_file(data + '/saved')! == 'keep user data'
+			assert os.read_file(store + '/catalog.json')! == '{unavailable catalog' && os.read_file(store + '/trust-history.json')! == '{unavailable history'
+			assert command(binary, ['--root', root, 'review', 'rollback'])!.code != 0
+			success(binary, ['--root', root, 'deploy', path])!
+			assert pkgcore.read_state(store, architecture)! == removed
+			os.write_file(root + '/etc/vinix-packages/config.json', config_text)!
+			os.write_file(store + '/catalog.json', catalog)!; os.write_file(store + '/trust-history.json', history)!
+			mut rollback := pkgprotocol.decode_review(success(binary, ['--root', root, 'review', 'rollback'])!)!
+			success(binary, ['--root', root, 'apply', rollback.fingerprint, 'rollback'])!
+			rollback.close()
+			assert pkgcore.read_state(store, architecture)!.requested == ['app'] && os.ls(store + '/objects')!.len == 0
+		}
+	}
+	println('Package CLI: empty formats 1/2 on both targets remove offline revoked app/runtime closures with damaged cache; review domains, surplus refusal, data retention, no-op and authorized rollback PASS')
+}
+
 fn qualify(binary string) ! {
 	work := os.real_path(os.temp_dir()) + '/vinix-package-cli-' + os.getpid().str()
 	os.mkdir_all(work + '/root/etc/vinix-packages')!
@@ -665,6 +746,7 @@ fn qualify(binary string) ! {
 	qualify_resolver_diagnostics(binary, work + '/resolver-diagnostics')!
 	qualify_install_preference(binary, work + '/install-preference')!
 	qualify_removal_guidance(binary, work + '/removal-guidance')!
+	qualify_empty_deployment(binary, work + '/empty-deployment')!
 	key := success(binary, ['keygen', work + '/seed'])!.trim_space()
 	assert key.len == 64
 	assert os.stat(work + '/seed')!.mode & 0o777 == 0o600

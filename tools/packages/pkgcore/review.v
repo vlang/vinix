@@ -43,6 +43,12 @@ fn check_review(expected string, actual string) ! {
 }
 
 fn operation_plan(config Config, directory string, current State, operation string, names []string) !Plan {
+	if operation == 'deploy' && names.len == 0 {
+		// An explicit empty target only removes packages. Like uninstall, it
+		// must remain available without an authenticated catalog or publisher.
+		config.validate()!
+		return Plan{}
+	}
 	if operation == 'repair' {
 		if names.len != 0 { return error('repair takes no package IDs; it preserves the complete installed closure') }
 		if current.packages.len == 0 { return Plan{ requested: current.requested, packages: current.packages } }
