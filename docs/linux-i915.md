@@ -2220,3 +2220,30 @@ No new boot or retained-allocation measurement is claimed for these ELFs.
 The full audit remains **6/269**, with all 7,958 guarded inputs stable. Remaining
 first-error groups are 229 task/MM/vfork, 33 CPU-bug policy and one original
 entry-stack record. Evidence is under `smp-oct10/irq-number-type-*`.
+
+## Native x86 UAPI compiler profile
+
+Native LinuxKPI compiler flags now include the pinned
+`arch/x86/include/uapi` directory after the architecture kernel headers.
+The full syntax audit already supplied this directory. Without it, an actual
+native-profile compilation of original `i915_sw_fence.c` stopped at missing
+`asm/auxvec.h`; adding the genuine original include path compiles the whole
+object in both GNU99 and the imported-object GNU11 dialect. No replacement
+header, runtime stub or warning suppression is involved.
+
+The full object retains all ten configured public exports and 42 imports. The
+saved native kernel supplies 33 names; eight genuine runtime services remain,
+plus the existing `round_jiffies_up` implementation discarded when unused by
+the kernel link. This is an object/compiler-profile result, not full-object
+linkage or GPU operation. Original diagnostics and the failed native controls
+remain preserved under `smp-oct10/sw-fence-current-closure-oct15-v2/`.
+
+Fresh enabled/default x86 and default ARM builds pass at `41f6da03` plus the
+one frozen Makefile overlay. Actual enabled object/bounds commands include the
+directory, while opt-out commands omit it. Whole-object replay uses the saved
+fixed native command without manually adding another include; both dialects
+authenticate 274 actual dependencies and preserve four original warnings.
+No new boot or allocation measurement is claimed. All 7,958 prior audit inputs,
+269 driver commands and regenerated ABI/bounds remain unchanged; the executed
+full-audit result remains **6/269**. Final evidence uses `smp-oct10/native-uapi-*`
+and `sw-fence-fixed-native-closure-oct15/`.

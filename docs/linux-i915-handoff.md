@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-15 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Latest IRQ-number validation baseline: **`4abd5cc6`**, with one frozen type-header overlay described below. Recheck HEAD and the worktree before
+Latest native compiler-profile baseline: **`41f6da03`**, with one frozen Makefile overlay described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -1946,3 +1946,38 @@ claim. Latest full audit: `irq-number-type-final-isolated-audit/i915-audit.json`
 task/MM/vfork, 33 CPU-bug and one entry-stack record error. Only 11 units emit
 dependency files; retain that discovery limit. Hardware IRQ services, full
 driver linkage and Tiger Lake validation remain pending.
+
+## Latest native x86 UAPI compiler profile
+
+The IRQ-number type is committed as `41f6da03`. Native LinuxKPI CPPFLAGS now
+include the original `arch/x86/include/uapi` directory, matching the namespace
+already used by the audit. Replaying the actual previous native imported-object
+flags on entire unchanged `i915_sw_fence.c` failed at genuine `asm/auxvec.h` in
+both GNU11 and GNU99. The genuine directory fixes that compile failure without
+replacement headers, source changes, runtime stubs or diagnostic suppression.
+
+The whole object keeps all ten configured public exports and 42 unresolved
+imports. The saved native kernel supplies 33; remaining names are the same
+eight genuine DMA-fence/reservation/IRQ-work/RCU-free services and
+`round_jiffies_up`, whose real V implementation is present in generated native
+C but removed from the kernel ELF when unused. No full-object link or native
+GPU execution is claimed. Prior controls/classification are preserved under
+`smp-oct10/sw-fence-current-closure-oct15-v2/`; new actual build-profile evidence
+uses `smp-oct10/native-uapi-*`. All earlier feature artifacts remain unchanged.
+
+All three builds pass from fresh worktrees at `41f6da03` plus only the frozen
+Makefile overlay. Actual enabled object/bounds command rows contain the UAPI
+directory; default/ARM rows omit it. Native artifacts and eleven unchanged
+runtime bodies are authenticated, without a new boot/allocation claim.
+`sw-fence-fixed-native-closure-oct15/final-receipt.json` binds the real fixed
+compiler command, whole GNU11/GNU99 objects, 274 actual dependencies each,
+four unsuppressed original warnings and the runtime-gap inventory. No extra
+include path is appended by that fixed-command replay.
+
+The addendum `native-uapi-audit-input-addendum-oct15/addendum.json` verifies
+that GNUmakefile is outside the driver's audit inputs and that all 269 recorded
+commands already contain the exact directory. All 7,958 guarded inputs and
+regenerated ABI/bounds are unchanged. No new full audit was needed; the last
+executed result remains **6/269**, with the same task/MM, CPU-bug and entry-stack
+blockers. Full driver link, hardware PCI identity and real GPU validation remain
+unfinished.
