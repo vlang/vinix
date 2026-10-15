@@ -25,7 +25,7 @@ const app_selection_request_path = '/run/vinix-first-run-install'
 const action_apps_install = 'apps.install'
 
 const app_selection_row_height = 64
-const app_selection_row_top = 104
+const app_selection_row_top = 80
 const app_selection_row_gap = 8
 const app_selection_column_gap = 12
 const app_selection_heading_height = 32
@@ -361,20 +361,14 @@ fn app_selection_row(app FirstRunApp, installed bool, available bool, selected b
 	}
 	title_color := if installed || !available { body_muted } else { body_heading }
 	title_width := width - 76 - if installed { 98 } else if available { 28 } else { 0 }
-	children << ui2.label('', app.title, ui2.rect(63, 9, f64(title_width), 22),
+	children << ui2.label('', app.title, ui2.rect(63, f64((height - 22) / 2), f64(title_width), 22),
 		ui2.TextStyle{
 			color: title_color
 			size:  14
 			bold:  true
 		})
-	detail := if !installed && !available { app.requirement_text() } else { app.detail_text() }
-	children << ui2.label('', detail, ui2.rect(63, 31, f64(width - 76), 18),
-		ui2.TextStyle{
-			color: body_muted
-			size:  11
-		})
 	if installed {
-		children << ui2.label('', tr('app_selection.installed'), ui2.rect(f64(width - 111), 9, 94, 20),
+		children << ui2.label('', tr('app_selection.installed'), ui2.rect(f64(width - 111), f64((height - 20) / 2), 94, 20),
 			ui2.TextStyle{
 				color: body_muted
 				size:  11
@@ -391,7 +385,7 @@ fn app_selection_row(app FirstRunApp, installed bool, available bool, selected b
 				}
 			}
 		}
-		children << app_selection_bordered('', ui2.rect(f64(width - 41), 9, 22, 22), 5,
+		children << app_selection_bordered('', ui2.rect(f64(width - 41), f64((height - 22) / 2), 22, 22), 5,
 			if selected || hovered { app_accent } else { body_rule },
 			if selected { app_accent } else { registration_field_bg }, mark)
 	}
@@ -530,17 +524,12 @@ fn (mut s AppSelectionState) element(d &Desktop) ui2.Element {
 	s.prepare_viewport(layout.list_height, layout.columns)
 
 	mut card_children := frame_elements(24)
-	card_children << ui2.label('apps.title', tr('app_selection.heading'), ui2.rect(24, 24, f64(inner),
+	card_children << ui2.label('apps.title', tr('app_selection.intro'), ui2.rect(24, 24, f64(inner),
 		34), ui2.TextStyle{
 		color: body_heading
 		size:  24
 		bold:  true
 	})
-	card_children << ui2.label('apps.subtitle', tr('app_selection.intro'),
-		ui2.rect(24, 65, f64(inner), 24), ui2.TextStyle{
-			color: body_muted
-			size:  12
-		})
 	mut list_children := frame_elements(first_run_apps.len * 2 + first_run_categories.len)
 	mut y := -s.scroll
 	for category_index, category in first_run_categories {
