@@ -1,0 +1,8 @@
+Pre-change decoder with new allocation assertion: expected failure retains 86,300 bytes over 100 format-1/2 decode/close cycles. Compiler input and binary are pinned in the ledger.
+
+Deployment decode: 100 format-1/2 decode/close cycles retained 86300 bytes
+tools/packages/pkgcore/deployment_decode_test.v:41: fn test_deployment_decode_retires_success_allocations
+   > assert kept == 0
+     Left value (len: 5): `86300`
+    Right value (len: 1): `0`
+

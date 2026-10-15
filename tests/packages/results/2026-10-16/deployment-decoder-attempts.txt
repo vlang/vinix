@@ -1,0 +1,48 @@
+Initial expanded fixture double-freed root strings through its typed array destructor. ASan identified the fixture; final cleanup frees array storage separately. Initial source, binaries and generated C are pinned in the ledger.
+
+memory.txt:
+PASS memory-compile
+memory-run: status 134; see /Users/alex/code/vinix/build/package-deployment-decode-work/memory-run.txt
+
+memory-run.txt:
+Deployment decode: formats 1/2, both architectures, empty/reordered/escaped fields, strict scalar/schema and all truncated prefixes PASS
+
+sanitize.txt:
+PASS sanitize-compile
+sanitize-run: status 134; see /Users/alex/code/vinix/build/package-deployment-decode-work/sanitize-run.txt
+
+sanitize-run.txt:
+Deployment decode: formats 1/2, both architectures, empty/reordered/escaped fields, strict scalar/schema and all truncated prefixes PASS
+=================================================================
+==3061==ERROR: AddressSanitizer: attempting double-free on 0x60200005dd90 in thread T0:
+    #0 0x00010221d258 in free+0x7c (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x41258)
+    #1 0x000100e0fa28 in v_free+0x1f4 (decode-sanitize:arm64+0x100033a28)
+    #2 0x000100e06fd0 in string__free+0x33c (decode-sanitize:arm64+0x10002afd0)
+    #3 0x000100e06768 in Array_string__free+0x24c (decode-sanitize:arm64+0x10002a768)
+    #4 0x0001013c4390 in pkgcore__deployment_decode_large+0xca8 (decode-sanitize:arm64+0x1005e8390)
+    #5 0x0001014f8d14 in pkgcore__test_deployment_decode_bounds_roots_pins_and_input_before_unbounded_growth+0x6b8 (decode-sanitize:arm64+0x10071cd14)
+    #6 0x000101720d34 in main+0x284 (decode-sanitize:arm64+0x100944d34)
+    #7 0x0001802ebdfc in start+0x1b4c (dyld:arm64e+0x1fdfc)
+
+0x60200005dd90 is located 0 bytes inside of 6-byte region [0x60200005dd90,0x60200005dd96)
+freed by thread T0 here:
+    #0 0x00010221d258 in free+0x7c (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x41258)
+    #1 0x000100e0fa28 in v_free+0x1f4 (decode-sanitize:arm64+0x100033a28)
+    #2 0x000100e06fd0 in string__free+0x33c (decode-sanitize:arm64+0x10002afd0)
+    #3 0x0001013c4358 in pkgcore__deployment_decode_large+0xc70 (decode-sanitize:arm64+0x1005e8358)
+    #4 0x0001014f8d14 in pkgcore__test_deployment_decode_bounds_roots_pins_and_input_before_unbounded_growth+0x6b8 (decode-sanitize:arm64+0x10071cd14)
+    #5 0x000101720d34 in main+0x284 (decode-sanitize:arm64+0x100944d34)
+    #6 0x0001802ebdfc in start+0x1b4c (dyld:arm64e+0x1fdfc)
+
+previously allocated by thread T0 here:
+    #0 0x00010221d164 in malloc+0x78 (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x41164)
+    #1 0x000100e08b40 in malloc_noscan+0x1b4 (decode-sanitize:arm64+0x10002cb40)
+    #2 0x000100df1ccc in string__plus+0x21c (decode-sanitize:arm64+0x100015ccc)
+    #3 0x0001013c3b18 in pkgcore__deployment_decode_large+0x430 (decode-sanitize:arm64+0x1005e7b18)
+    #4 0x0001014f8d14 in pkgcore__test_deployment_decode_bounds_roots_pins_and_input_before_unbounded_growth+0x6b8 (decode-sanitize:arm64+0x10071cd14)
+    #5 0x000101720d34 in main+0x284 (decode-sanitize:arm64+0x100944d34)
+    #6 0x0001802ebdfc in start+0x1b4c (dyld:arm64e+0x1fdfc)
+
+SUMMARY: AddressSanitizer: double-free (decode-sanitize:arm64+0x100033a28) in v_free+0x1f4
+==3061==ABORTING
+

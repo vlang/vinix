@@ -24,23 +24,6 @@ pub:
 	locked       []DeploymentPackage // complete dependency/runtime closure
 }
 
-struct DeploymentLockInput {
-	format       int                 @[required]
-	architecture string              @[required]
-	packages     []string            @[required]
-	locked       []DeploymentPackage @[required]
-}
-
-struct DeploymentHeader {
-	format int @[required]
-}
-
-struct DeploymentRoots {
-	format       int      @[required]
-	architecture string   @[required]
-	packages     []string @[required]
-}
-
 struct DeploymentIdentity {
 	domain   string = 'vinix-deployment-review-1'
 	config   Config
@@ -67,32 +50,21 @@ fn read_deployment(path string, architecture string) !DeploymentLock {
 }
 
 fn decode_deployment(text string, architecture string) !DeploymentLock {
-	header := json2.decode[DeploymentHeader](text)!
-	mut document := DeploymentLock{}
-	match header.format {
-		1 {
-			input := json2.decode[DeploymentRoots](text, strict: true)!
-			document = DeploymentLock{ format: 1, architecture: input.architecture, packages: input.packages }
-		}
-		2 {
-			input := json2.decode[DeploymentLockInput](text, strict: true)!
-			document = DeploymentLock{ format: input.format, architecture: input.architecture, packages: input.packages, locked: input.locked }
-		}
-		else { return error('unsupported deployment format') }
-	}
-	deployment_keys(text, document.format)!
+	mut input := pkgprotocol.decode_deployment_document(text)!
+	mut accepted := false
+	defer { if !accepted { input.close() } }
+	document := DeploymentLock{ format: input.format, architecture: input.architecture, packages: input.packages }
 	if document.architecture != architecture { return error('deployment architecture mismatch') }
-	if document.packages.len > 4096 || document.locked.len > 4096 {
-		return error('deployment exceeds its supported package limits')
-	}
-	mut roots := document.packages.clone()
+	// Sorting reuses the decoder's owned arrays; copying them would orphan
+	// their original buffers. Convert only the wire pin array's element type.
+	mut roots := unsafe { document.packages }
 	roots.sort()
 	for i, id in roots {
 		if !identifier(id) || (i > 0 && roots[i - 1] == id) {
 			return error('invalid or duplicate deployment root: ${id}')
 		}
 	}
-	mut locked := document.locked.clone()
+	mut locked := unsafe { input.locked }
 	locked.sort(a.id < b.id)
 	for i, pin in locked {
 		if !identifier(pin.id) || (i > 0 && locked[i - 1].id == pin.id)
@@ -100,29 +72,19 @@ fn decode_deployment(text string, architecture string) !DeploymentLock {
 			|| !digest_valid(pin.public_key) || !digest_valid(pin.metadata_sha256) || pin.minimum_sequence == 0 {
 			return error('invalid or duplicate locked deployment package: ${pin.id}')
 		}
-		version_parts(pin.version)!
+		validated_version(pin.version)!
 	}
-	return DeploymentLock{ ...document, packages: roots, locked: locked }
-}
-
-// json2 validates syntax/types but intentionally ignores unknown fields and
-// accepts duplicate keys. After decoding, inspect object keys without parsing
-// values again; the document schema has only a root and flat locked records.
-fn deployment_keys(text string, format int) ! {
-	document_keys(text, if format == 1 { deployment_roots_field } else { deployment_lock_field })!
-}
-
-fn deployment_roots_field(parent string, key string) bool {
-	return parent == '' && key in ['format', 'architecture', 'packages']!
-}
-
-fn deployment_lock_field(parent string, key string) bool {
-	return match parent {
-		'' { key in ['format', 'architecture', 'packages', 'locked']! }
-		'locked' { key in ['id', 'version', 'architecture', 'repository', 'public_key',
-			'minimum_sequence', 'metadata_sha256']! }
-		else { false }
+	mut pins := []DeploymentPackage{cap: locked.len}
+	for pin in locked {
+		value := DeploymentPackage{ id: pin.id, version: pin.version, architecture: pin.architecture,
+			repository: pin.repository, public_key: pin.public_key, minimum_sequence: pin.minimum_sequence,
+			metadata_sha256: pin.metadata_sha256 }
+		pointer := unsafe { &value }
+		unsafe { pins.push_many(pointer, 1) }
 	}
+	unsafe { (&array(&input.locked)).free() }
+	accepted = true // fields transfer to the returned lock
+	return DeploymentLock{ ...document, packages: roots, locked: pins }
 }
 
 fn deployment_plan(config Config, directory string, current State, document DeploymentLock) !Plan {

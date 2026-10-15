@@ -1854,6 +1854,19 @@ record requires `id`, `version`, `architecture`, `repository`, `public_key`,
 `minimum_sequence` (positive unsigned 64-bit) and `metadata_sha256` (lowercase
 SHA-256). Roots and records are unique and bounded to 4096 each.
 
+`pkgprotocol.decode_deployment_document` reads either deployment format into an
+owned `DeploymentDocument`; call `close()` when finished, including under
+`-gc none`. The JSON schema, 8 MiB input limit, 128-byte IDs, 29-byte versions,
+16-byte architecture fields, 64-byte key/digest fields and 4096-entry arrays are
+enforced during parsing. Unknown/duplicate/escaped duplicate, missing, null,
+coerced, truncated and trailing fields fail with partial storage released. Field
+order and unique escaped keys remain valid; format 1 forbids `locked`, while
+format 2 requires it. This wire decoder checks structure and bounds. The service
+also validates IDs, canonical versions, digests, positive sequences, target
+architecture and uniqueness, then authenticates catalog provenance and policy.
+Decoding alone grants no trust or deployment authority. See
+[decoder qualification](../../tests/packages/deployment-decoder-check.md).
+
 The metadata digest is SHA-256 of SDK-1 JSON encoding of the complete `Package`
 struct, plus a terminating LF. Fields follow the order in [`model.v`](pkgcore/model.v),
 including empty/default fields; files sort by path, dependencies by ID,

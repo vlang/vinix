@@ -1617,6 +1617,11 @@ Both commands take the package lock before loading their inputs. `deploy FILE`
 remains available for administrative scripts and validates the same document.
 Documents require explicit fields/types, matching architecture and unique roots;
 missing/null/coerced fields, unknown/duplicate keys and unsafe metadata files fail.
+Deployment documents use a bounded reader that releases partial fields on every
+refusal and limits roots and locked records to 4,096 each while parsing. Sorting
+reuses owned storage, and completed documents can be closed independently of the
+input bytes. The allocation fixture covers both formats, malformed/truncated
+input and collection growth; see [decoder qualification](../tests/packages/deployment-decoder-check.md).
 
 In **Software**, select **Deployment**, enter the absolute file path and choose
 **Review deployment**. The review shows the entire resulting set, including

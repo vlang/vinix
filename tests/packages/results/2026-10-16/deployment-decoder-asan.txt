@@ -1,0 +1,3 @@
+clang ASan/UBSan with -d track_heap; detect_leaks=0; halt_on_error=1
+Deployment decode: formats 1/2, both architectures, empty/reordered/escaped fields, strict scalar/schema and all truncated prefixes PASS
+Deployment decode: 1000 format-1/2 success/refusal cycles, pin-512/root-4096 growth and all truncated prefixes retained 0 bytes

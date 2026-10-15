@@ -12,7 +12,14 @@ fn qualify_package_metadata(mut t Test, db accountcore.Database, alex accountcor
 	before := service.state()!
 	config := os.read_file('/etc/vinix-packages/config.json')!
 	lock_path := '/tmp/metadata lock é; $literal.json'
-	os.write_file(lock_path, json2.encode(service.lock_deployment([])!))!
+	mut document := service.lock_deployment([])!
+	defer { document.close() }
+	lock_text := json2.encode(document)
+	mut decoded := pkgprotocol.decode_deployment_document(lock_text)!
+	assert decoded.packages == before.requested && decoded.locked.len == before.packages.len
+	assert decoded.locked[0].id == 'admin-fixture' && decoded.locked[0].minimum_sequence == 1
+	decoded.close(); decoded.close()
+	os.write_file(lock_path, lock_text)!
 	os.chmod(lock_path, 0o644)!
 	for user in [alex, sam] {
 		view_response := run(['/usr/bin/vinix-package', 'view'], '', db, user)
@@ -63,9 +70,27 @@ fn qualify_package_metadata(mut t Test, db accountcore.Database, alex accountcor
 		refused = false
 		pkgprotocol.decode_deployment_mirror_review(locked_response.output.replace('"firmware":false,', '')) or { refused = true }
 		assert refused
+		for malformed in [lock_text[..lock_text.len / 2], lock_text.replace('"format":2', '"format":2.0'),
+			lock_text.replace('"minimum_sequence":1', '"minimum_sequence":18446744073709551616'),
+			lock_text.replace('"locked":[', '"locked":[null,'),
+			lock_text.replace('"id":"admin-fixture"', '"id":"admin-fixture","i\\u0064":"admin-fixture"')] {
+			os.write_file(lock_path, malformed)!
+			for operation in [['deployment-review', lock_path],
+				['mirror-deployment-review', '/tmp/metadata locked export', lock_path]] {
+				response := run(['/usr/bin/vinix-package', ...operation], '', db, user)
+				assert response.status != 0 && response.output.trim_space() != '' && !response.output.contains('V panic:'), response.output
+			}
+		}
+		os.write_file(lock_path, '{"packages":[],"architecture":"' + before.architecture + '","format":1}')!
+		roots_response := run(['/usr/bin/vinix-package', 'deployment-review', lock_path], '', db, user)
+		assert roots_response.status == 0, roots_response.output
+		mut roots_review := pkgprotocol.decode_review(roots_response.output)!
+		assert roots_review.rows.len == 1 && roots_review.rows[0].action == 'remove'; roots_review.close()
+		os.write_file(lock_path, lock_text)!
 	}
 	assert service.state()! == before && os.read_file('/etc/vinix-packages/config.json')! == config
 	assert !os.exists('/tmp/metadata export é; $literal') && !os.exists('/tmp/metadata locked export')
 	t.say('PACKAGE METADATA ordinary-admin-standard complete-package-trust-history-offline-lock typed-flags nested-refusal read-only PASS')
 	t.say('PACKAGE VIEW ordinary-admin-standard complete-catalog installed-launch-fields typed-flags nested-refusal read-only PASS')
+	t.say('PACKAGE DEPLOYMENT bounded-reader formats-1-2 owned-fields malformed-refusal read-only PASS')
 }

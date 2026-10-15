@@ -7,6 +7,32 @@ import json2
 const key_policy_fixture = '{"format":1,"architecture":"aarch64","policy":{"offline":false,"allowed":[],"pins":[{"id":"app","minimum":"1.0.0","before":"2.0.0"},{"id":"runtime","minimum":"","before":""}],"permissions":[],"licenses":["{\\\"offline\\\":true}","braces [] {} and \\\"quotes\\\""],"allow_firmware":false,"reserve_bytes":0}}'
 const key_lock_fixture = '{"format":2,"architecture":"aarch64","packages":["app"],"locked":[{"id":"app","version":"1.0.0","architecture":"aarch64","repository":"publisher","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","minimum_sequence":1,"metadata_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},{"id":"runtime","version":"1.0.0","architecture":"aarch64","repository":"publisher","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","minimum_sequence":1,"metadata_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}]}'
 
+// Retain this flat schema as an independent scanner fixture. Deployment now
+// uses the bounded protocol reader rather than decoding then scanning keys.
+struct DeploymentLockInput {
+	format       int                 @[required]
+	architecture string              @[required]
+	packages     []string            @[required]
+	locked       []DeploymentPackage @[required]
+}
+
+fn deployment_keys(text string, format int) ! {
+	document_keys(text, if format == 1 { deployment_roots_field } else { deployment_lock_field })!
+}
+
+fn deployment_roots_field(parent string, key string) bool {
+	return parent == '' && key in ['format', 'architecture', 'packages']!
+}
+
+fn deployment_lock_field(parent string, key string) bool {
+	return match parent {
+		'' { key in ['format', 'architecture', 'packages', 'locked']! }
+		'locked' { key in ['id', 'version', 'architecture', 'repository', 'public_key',
+			'minimum_sequence', 'metadata_sha256']! }
+		else { false }
+	}
+}
+
 fn test_document_key_scanner_tracks_siblings_arrays_escaped_keys_and_quoted_values() {
 	for _ in 0 .. 100 {
 		document_keys(key_policy_fixture, policy_document_field)!

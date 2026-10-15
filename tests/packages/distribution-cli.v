@@ -102,6 +102,43 @@ fn success(binary string, arguments []string) !string {
 	return result.text
 }
 
+fn qualify_deployment_decoder_cli(binary string, root string, path string, text string, mirror_fingerprint string) ! {
+	store := pkgcore.state_directory(root)
+	current := os.readlink(store + '/current')!
+	retained := [root + '/etc/vinix-packages/config.json', store + '/catalog.json',
+		store + '/trust-history.json', store + '/' + current + '/state.json']
+	mut hashes := []string{}
+	for file in retained { hashes << pkgcore.hash_file(file)! }
+	mut review := pkgprotocol.decode_review(success(binary, ['--root', root, 'deployment-review', path])!)!
+	defer { review.close() }
+	sentinel := store + '/generations/.stage-deployment-decode'
+	os.mkdir_all(sentinel)!; os.write_file(sentinel + '/keep', 'retained')!
+	defer { os.rmdir_all(sentinel) or {} }
+	generation_names := os.ls(store + '/generations')!.sorted()
+	objects := os.ls(store + '/objects')!.sorted()
+	destination := root + '/uncreated-parent/deployment-mirror'
+	for invalid in [text[..text.len / 2], text.replace('"format":2', '"format":2.0'),
+		text.replace('"packages":["app"]', '"packages":["app","app"]'),
+		text.replace('"minimum_sequence":1', '"minimum_sequence":18446744073709551616'),
+		text.replace('"locked":[', '"locked":[null,'),
+		text.replace('"id":"app"', '"id":"app","i\\u0064":"app"'),
+		text.replace('"id":"app"', '"id":"' + 'a'.repeat(129) + '"')] {
+		os.write_file(path, invalid)!
+		for operation in [['deployment-review', path], ['deployment-apply', review.fingerprint, path], ['deploy', path],
+			['deployment-audit', path], ['mirror-deployment-review', destination, path],
+			['mirror-deployment-apply', mirror_fingerprint, destination, path]] {
+			refused := command(binary, ['--root', root, ...operation])!
+			assert refused.code != 0 && !refused.text.contains('V panic:') && refused.text.trim_space() != '', refused.text
+		}
+		assert os.readlink(store + '/current')! == current
+		assert os.ls(store + '/generations')!.sorted() == generation_names && os.ls(store + '/objects')!.sorted() == objects
+		for index, file in retained { assert pkgcore.hash_file(file)! == hashes[index] }
+		assert os.read_file(sentinel + '/keep')! == 'retained' && !os.exists(root + '/uncreated-parent')
+	}
+	os.write_file(path, text)!
+	println('Package CLI: malformed deployment review/apply/deploy/audit/mirror inputs preserve trust, catalog, activation, objects and recovery data before destination creation PASS')
+}
+
 fn package_template(id string, version string) pkgcore.Package {
 	return pkgcore.Package{
 		id:           id
@@ -814,6 +851,7 @@ fn qualify(binary string) ! {
 	defer { locked_mirror.close() }
 	assert locked_mirror.deployment_sha256 == pkgcore.hash_file(lock_path)!
 	assert !os.exists(locked_media)
+	qualify_deployment_decoder_cli(binary, work + '/root', lock_path, lock_text, locked_mirror.mirror.review.fingerprint)!
 	locked_output := success(binary, [...root_args, '--progress', 'mirror-deployment-apply',
 		locked_mirror.mirror.review.fingerprint, locked_media, lock_path])!
 	assert locked_output.contains('"phase":"complete"')
