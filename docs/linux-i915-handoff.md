@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-15 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Latest fence-container build baseline: **`c136b3209`**, with 15 frozen production/tool paths described below. Recheck HEAD and the worktree before
+Latest DMA-reservation build baseline: **`321bb4c63`**, with 13 frozen production/tool paths described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -2213,7 +2213,7 @@ buckets. Verified private research is under `dmafence-native-review-oct15` and
 `rcufree-backend-oct16`. Hardware identity and access remain pending; continue
 independent work without claiming full i915 support.
 
-## Latest native fence-container increment
+## Native fence-container increment
 
 The isolated baseline is `c136b3209` plus 15 frozen production/tool paths.
 Complete original array/chain APIs and immutable operations tables are present;
@@ -2307,3 +2307,95 @@ drops and clears the prior cursor reference on an empty restart. No reservation
 implementation or correction is included in this container increment. Keep the
 verified upstream sources unchanged and distinguish native corrections from
 exact upstream behavior.
+
+## Latest native DMA-reservation increment
+
+The isolated baseline is `321bb4c63` plus 13 frozen production/tool paths.
+All 15 configured non-lockdep public APIs and the genuine mutable original
+Wait-Die class are implemented. Original object/iterator/list/class sizes are
+48/48/24/32 bytes. Writer operations enforce actual native lock ownership;
+disabled lockdep assertions are not used as an ownership substitute.
+
+Preserve pre-reservation, low-two-bit usage tags, reference transfer before new
+list publication, signaled puts afterward and ordinary RCU release of retired
+lists. Add/replace get new owners before publication and put old owners after.
+Locked iterators borrow; unlocked iterators retain one fence until next/end.
+Every copy/get/singleton failure drops temporary references and vectors.
+`dma_resv_describe` still requires a real `seq_file` sink.
+
+Two documented native corrections leave the import intact: an empty-list
+restart releases and clears the previous cursor fence; a smaller live list
+count at a reused address triggers restart before entry reads. Ordinary count
+growth keeps the original cached snapshot. Preserve the original weak aggregate
+prefix behavior when a concurrent restart returns no next eligible fence; do
+not silently promise atomic collection. New host cases reproduce real page
+reuse through the page transport and real producer/RCU algorithms.
+
+Native kmalloc size reporting returns its actual requested span, never Linux
+bucket sizes or unadvertised physical-page slack. Checked `krealloc_array`
+delegates to real allocate/copy/free only after multiplication succeeds. OOM
+preserves the old owner. Changing only the requested-size metadata on shrink
+would invalidate its alignment geometry and is not implemented.
+
+Final freeze `dma-resv-native-freeze-v1.json` SHA256:
+`c0834f4d9232a65603a27b55aba0716ba3669bf6df6b0b59c534efddd9d38b3f`.
+Enabled proof `dma-resv-x86-native-oct15-v1/proof.json` SHA256:
+`4f5627679641c9c6cef78c123bfef56607a11fd54d2fd9d5366f4c1b307772a8`.
+Exact enabled ELF:
+`05080e308061d332adc4771edc75a606e2b2aed40e5918263333c1450819e8bb`.
+ARM proof SHA256:
+`32a259406e7a08a2280e8c6fb26d0af428304d6b4d21e6981e2171f26c886a4c`.
+Default proof SHA256:
+`822f2a19211782ff1fffd7325ee3b1a18183f4541df2b5d89bbdf111179f85a8`.
+Source and compiler freeze remains unchanged after initial sparse-checkout
+prerequisite failures: add `tests/native-generators` and `tools/sourcecommand`
+alongside kernel, LinuxKPI tests, build support and docs. Preserve the failed
+`dma-resv-x86-build-oct15-v1.log`/`v1b.log`; completed native build is `v1c.log`.
+Fresh architecture worktrees are under the private
+`/Volumes/HommV66Scratch/vinix-linuxkpi-resv-oct15-321bb4c63` directory. All final
+native proofs/ELFs, guest images/logs and host results are durable under
+`/Users/alex/.cache/vinix-linuxkpi/smp-oct10`. Completed container build worktrees
+were retired after exact source/commit/artifact verification; their saved
+proofs, guest evidence and audit receipts remain intact.
+
+Strict GNU99/GNU11 ASan/UBSan passes 14 host runs, including six fatal controls
+per dialect. Of 638 selected production bodies, 635 match full modules and three
+existing completion adapters serve only RCU bootstrap. All 277 fixture bodies
+are inspected using unique occurrence keys. The final host result is
+`dma-resv-host-final-v1/result.json`, SHA256
+`1fee365297b7807c399aa584e5a991be64698ddfb4ae2fa6d87edeaf76882513`;
+four-path manifest `dma-resv-host-four-path-manifest-v1.json`, SHA256
+`412d425f546b3690dc683c3258d5166dda1a769e55866e37ee99e295acdad268`.
+The README lists exact scheduler/clock/page/pointer-load scheduling boundaries.
+
+Enabled/default x86 and default ARM builds pass. Normal/SSE/four-level enabled
+guests pass 51 markers/33 strict PMM/live-heap rows. Reservation tests have three
+complete warmups then the exact-equal fourth lifecycle, with three retained
+actors joined and off stack before measurement. Default startup passes and
+actual default/ARM C and ELF omit the feature; ARM is build/artifact evidence.
+Independent actual native C/O2 artifact review of backend/bindings/helpers:
+`dma-resv-native-independent-v1/review.json`, SHA256
+`8abea2c788482f70a3764ef4c4a72c8f9dab2a4ca6727b5686125fe4a9096c37`.
+Reciprocal independent native fixture/root integration review:
+`dma-resv-independent-x86-oct15-v1/review.json`, SHA256
+`30a8862488503bc5d305748f33506e01a82ee64337a97ee49569df6813820fc8`.
+All 168 new actual function/export bodies are covered, along with original
+mutable class bytes/relocations and genuine stack aggregate cursors.
+Independent final host evidence review:
+`dma-resv-independent-host-oct15-v4/review.json`, SHA256
+`07670cb578264324b6b69204bdf39648d2d1d8a0b1225130d1512f128f3a0818`.
+Reviewer-only typed JSON decoding failed before producing a receipt; preserved
+failed tools/logs are separate from the passing host execution. The completed
+review uses dynamic parsing over the same frozen evidence.
+Independent actual ISO/kernel and allocation chronology aggregate:
+`dma-resv-guest-independent-oct15/final-v1.json`, SHA256
+`f188c50c526610812aeecd0770ee500fa7eaed9537e2a1ac313c569c0ea8d1f2`.
+
+Fresh full audit `dma-resv-final-v1-isolated-audit/i915-audit.json` remains 6/269.
+Independent input/import review checks 8,026 combined frozen/generated/dependency
+paths and all 7,668 unchanged imported files:
+`dma-resv-independent-audit-oct15-v1/review.json`, SHA256
+`819ca3e0bac0e7f5fcad4f45eb42fde5213da034637e96e21fef1f0b681355ad`.
+Continue through actual driver/core consumers and remaining device, memory and
+DRM services. Full driver compile/link, confirmed PCI identity and physical
+Tiger Lake validation remain pending.

@@ -324,9 +324,8 @@ after a filesystem failure. Mutable build inputs still require isolation.
   APIs are available. Default release uses a real future RCU grace period for
   native page-backed kmalloc base owners. Custom release hooks own storage
   lifetime, including any RCU readers. Callers retain references throughout
-  callback registration and waiting. The `seq_file` description sink,
-  reservation producer/iterator ownership and i915's
-  typesafe request cache remain separate dependencies.
+  callback registration and waiting. The `seq_file` description sink and
+  i915's typesafe request cache remain separate dependencies.
 - DMA-fence arrays and timeline chains use the original intrusive records,
   appended array callbacks, shared chain callback/IRQ-work union and immutable
   operations tables. Arrays preserve ALL/ANY signaling, signed pending tails,
@@ -336,7 +335,15 @@ after a filesystem failure. Mutable build inputs still require isolation.
   Successful construction transfers the original child/vector references;
   failed construction leaves them with the caller. Final owner release uses
   genuine native RCU, retaining storage through the IRQ dispatcher's final CAS.
-  Reservation ownership and the typesafe i915 request cache remain unresolved.
+  The typesafe i915 request cache remains unresolved.
+- DMA reservation objects use original records, a genuine mutable Wait-Die
+  class and native writer locks. Producers reserve capacity, transfer references
+  during growth, publish tagged fence entries and defer old lists through RCU.
+  Locked iteration borrows fences; unlocked iteration owns one reference until
+  the next step or `dma_resv_iter_end`. Copy/get/singleton, usage filtering,
+  waits and deadlines have real ownership and allocation-failure cleanup.
+  Native bounds/restart corrections are documented below. `dma_resv_describe`
+  still requires a real `seq_file` sink; this supplies no DRM device or GPU VM.
 - Unmodified Linux `wait.h`, `swait.h` and `completion.h` use native-backed
   queues and task wakeups. Ordinary wait queues preserve nonexclusive,
   exclusive and priority order, wake quotas, callback keys and automatic
@@ -2556,3 +2563,87 @@ The fresh full i915 syntax audit remains **6/269** with all 7,668 imported files
 unchanged. This increment supplies fence containers; reservation producers and
 iterators, the typesafe request cache, complete driver compile/link and real
 Tiger Lake operation remain unfinished.
+
+## Native DMA reservation ownership, 2026-10-15
+
+All 15 configured non-lockdep reservation services now use original 48-byte
+objects/iterators, 24-byte list prefixes and the mutable 32-byte original
+`reservation_ww_class`. Writer APIs check actual native lock ownership.
+Pre-reservation remains required before adding a fence. Growth transfers
+unsignaled references before publishing a new list, then drops signaled owners
+and defers the old list through genuine RCU. Add/replace retain new owners before
+publication and release replaced references afterward. Finalization requires
+stopped API users and an unlocked object.
+
+Unlocked iterators retain one fence across caller bodies, retry failed
+get-unless-zero, report restarts and drop their current reference on the next
+step or end. Locked iterators borrow while the writer lock remains held.
+Copy/get/singleton and their partial allocation failures release temporary
+owners correctly. Singleton construction uses the real array implementation.
+Original usage ordering, Wait-Die locking, waits and deadlines remain intact.
+`dma_resv_describe` and `dma_fence_describe` remain unresolved until a real
+`seq_file` sink exists.
+
+Two explicit native corrections address pinned iterator control flow without
+changing any upstream source. Restarting onto a NULL list drops and clears the
+old cursor reference rather than returning it indefinitely. If an allocator
+reuses a retired list's address with fewer active entries, a live count smaller
+than the cached count triggers restart before reading entries. Ordinary
+in-place append retains the original cached snapshot. Queries still have the
+original weak concurrent aggregation behavior: a restart that returns no next
+fence can leave an earlier collected prefix. Returned owners remain valid;
+these APIs do not promise an atomic snapshot.
+
+`kmalloc_size_roundup` reports Vinix's actual requested capacity, including zero
+and oversized inputs, without advertising physical page slack or Linux buckets.
+`krealloc_array` checks multiplication before calling the real allocator.
+Allocation failure preserves the old owner; successful resizing allocates a new
+owner, copies the bounded old contents and frees the old allocation. Zero size
+keeps the existing native free/sentinel behavior. No allocation-prefix alignment
+metadata is edited to simulate an in-place shrink.
+
+Strict GNU99/GNU11 host production objects and ASan/UBSan pass 14 runs: two normal
+runs and six fatal controls per dialect. Of 638 selected production bodies, 635
+match complete generated modules exactly; three existing RCU bootstrap adapters
+are disclosed. All 277 generated fixture definitions are inspected separately.
+Tests exercise real writer blocking/interruption and Wait-Die recovery, usage
+tags, growth/pruning/replacement, iterator references and both corrections,
+same-page allocator reuse, zero-reference retry under RCU, partial collection
+and restart OOM, singleton transfer, allocator requests, waits and deadlines.
+The host scheduler, pointer-load scheduling gates and physical-page transport
+are documented in `tests/linuxkpi/resvfixture/README.md`.
+
+Fresh enabled/default x86-64 and default ARM64 builds pass. Normal, SSE and
+four-level guests use the same saved enabled ELF; each passes 51 required markers
+and 33 strict PMM/live-heap rows. Three complete reservation warmups precede its
+measured fourth lifecycle, including retained actor creation/join, actual writer
+waits, collection failures and old-list/default-fence reclamation behind a real
+RCU reader. Default startup passes. Actual default/ARM C and ELF omit the feature;
+ARM evidence is a build and artifact check. Independent source and actual
+generated-C/O2 reviews cover all 168 new function/export bodies and original
+class data; all aggregate cursors and task-owner arrays are genuine stack data.
+
+The isolated baseline is `321bb4c63` plus 13 frozen production/tool paths.
+`dma-resv-native-freeze-v1.json` SHA256:
+`c0834f4d9232a65603a27b55aba0716ba3669bf6df6b0b59c534efddd9d38b3f`.
+Enabled ELF:
+`05080e308061d332adc4771edc75a606e2b2aed40e5918263333c1450819e8bb`.
+Host result `dma-resv-host-final-v1/result.json` SHA256:
+`1fee365297b7807c399aa584e5a991be64698ddfb4ae2fa6d87edeaf76882513`.
+Independent native artifact review `dma-resv-native-independent-v1/review.json`
+SHA256: `8abea2c788482f70a3764ef4c4a72c8f9dab2a4ca6727b5686125fe4a9096c37`.
+Independent host evidence review `dma-resv-independent-host-oct15-v4/review.json`
+SHA256: `07670cb578264324b6b69204bdf39648d2d1d8a0b1225130d1512f128f3a0818`.
+Independent guest/ISO/chronology aggregate
+`dma-resv-guest-independent-oct15/final-v1.json` SHA256:
+`f188c50c526610812aeecd0770ee500fa7eaed9537e2a1ac313c569c0ea8d1f2`.
+Evidence is under `smp-oct10/dma-resv-*`. Repeat host checks with:
+
+```sh
+build-support/run-v-tool.sh tests/linuxkpi/dma_resv.v --keep-directory NEW_DIRECTORY
+```
+
+The full unchanged i915 audit remains **6/269**, with all 7,668 imported files
+verified unchanged. Reservation ownership closes another synchronization
+dependency; DRM device/file services, typesafe request caches, memory/device
+ownership, complete driver compile/link and Tiger Lake validation remain pending.

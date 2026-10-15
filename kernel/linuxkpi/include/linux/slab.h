@@ -80,6 +80,8 @@ void *kzalloc(size_t, gfp_t) __must_check;
 void *kmalloc_array(size_t, size_t, gfp_t) __must_check;
 void *kcalloc(size_t, size_t, gfp_t) __must_check;
 void *krealloc(const void *, size_t, gfp_t) __must_check;
+void *krealloc_array(void *, size_t, size_t, gfp_t) __must_check;
+size_t kmalloc_size_roundup(size_t);
 void *kmemdup(const void *, size_t, gfp_t) __must_check;
 size_t ksize(const void *);
 void kfree(const void *);
