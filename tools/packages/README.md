@@ -56,6 +56,13 @@ Reading neither approves trust nor advances the existing source URL review
 gate; return to the full proposal to cancel or confirm. Pending work blocks
 entry. See [qualification](../../tests/packages/software-trust-reader-check.md).
 
+Personal-data inventories offer **Read inventory**, with item navigation for
+complete IDs, installed state, account-scoped locations and diagnostics. Frozen
+deletion confirmations offer **Read review** for their exact target and loss
+warnings. The reader cannot delete, cancel or reload; return to the full screen
+to review or confirm deletion. Root desktops and pending work cannot enter it.
+See [qualification](../../tests/packages/software-data-reader-check.md).
+
 Compact **Package details** windows at least 180 pixels wide and 220 high now
 show complete short pages and Previous/Next section controls. Left/Right and
 Page keys turn pages; Up/Down and Tab/Shift-Tab change sections. Resizing retains

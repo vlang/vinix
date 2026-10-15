@@ -1001,6 +1001,22 @@ or returns to the catalog. Approved deletions retain their close guard and
 cannot be cancelled through these controls. See the
 [personal-data navigation checks](../tests/packages/software-data-navigation-check.md).
 
+**Read inventory** opens the shared read-only reader in full and compact windows.
+It shows this account's retained-data count, application IDs, exact relative data
+locations, installed state and complete inventory diagnostics. Next/Previous item
+and Up/Down or Tab/Shift-Tab browse applications without wrapping; Next item
+selects the first application from the initial overview. Empty inventories keep
+the account-scope and retention explanations. Returning to a smaller full list
+keeps the selected row visible, while same-size redraw preserves list paging.
+
+A frozen deletion confirmation instead offers **Read review**, including its
+exact ID/directory, permanent-loss warning, retained document grants and live
+lease/state rechecks. Item navigation is disabled in that review. Reading cannot
+delete, cancel, reload or open another application; Back/Escape returns to the
+same inventory or confirmation. Pending inventory reads and approved deletions
+cannot enter the reader. Confirmation remains on the full screen. See
+[personal-data reader checks](../tests/packages/software-data-reader-check.md).
+
 `vinix-package --json data-list` provides the same bounded, read-only inventory;
 it uses installed state without refreshing repositories and works offline. The
 inventory is an observation; deletion rechecks current installation, leases and

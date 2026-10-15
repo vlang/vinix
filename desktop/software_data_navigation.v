@@ -30,7 +30,7 @@ fn (mut a SoftwareApp) data_key_input(input string) {
 
 fn (a &SoftwareApp) build_personal_data_compact(width int, height int) ui2.Element {
 	mut children := frame_elements(10)
-	children << software_label('Personal data · enlarge for details', 14, 8, width - 28, 28, false)
+	children << software_label(if a.data_ready { 'Personal application data' } else { 'Personal data · enlarge for details' }, 14, 8, width - 28, 28, false)
 	button_width := if width > 202 { 174 } else { width - 28 }
 	mut next_y := 84
 	if a.data_read_running() {
@@ -39,6 +39,10 @@ fn (a &SoftwareApp) build_personal_data_compact(width int, height int) ui2.Eleme
 		confirming := a.data_pending != ''
 		children << software_button(if confirming { 'software.data.cancel' } else { 'software.data.back' },
 			if confirming { 'Cancel deletion' } else { 'Back to catalog' }, 14, 46, button_width)
+		if a.data_ready && a.administration_required && a.details_pages.len > 0 && height >= 220 {
+			children << software_button('software.report.read', if confirming { 'Read review' } else { 'Read inventory' }, 14, next_y, button_width)
+			next_y += 38
+		}
 		if !confirming && a.administration_required {
 			children << software_button('software.data.reload', 'Reload inventory', 14, next_y, button_width)
 			next_y += 38

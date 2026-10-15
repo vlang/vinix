@@ -5,34 +5,43 @@ import ui2
 import desktop.packagecore
 
 fn report_fixture_selected(a &SoftwareApp) int {
-	return if a.health_mode { a.health_selected } else { a.audit_selected }
+	return if a.data_mode { a.data_selected } else if a.health_mode { a.health_selected } else { a.audit_selected }
+}
+
+fn report_fixture_indices(a &SoftwareApp) []int {
+	return if a.data_mode { []int{len: a.data_status.rows.len, init: index} }
+		else if a.health_mode { a.health_matching.clone() } else { a.audit_matching.clone() }
 }
 
 fn check_report_return_selection(mut app SoftwareApp) ! {
 	selected := report_fixture_selected(&app); page := app.details_page; short_page := app.details_compact_page
 	health_scroll := app.health_scroll; audit_scroll := app.audit_scroll; page_rows := app.page_rows
+	data_scroll := app.data_scroll
 	free_window_tree(app.build(ui2.rect(0, 0, 900, 900))!)
 	assert app.page_rows == 16
 	free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
 	app.handle('software.report.read')!
-	indices := if app.health_mode { app.health_matching } else { app.audit_matching }
+	indices := report_fixture_indices(&app)
+	defer { unsafe { (&array(&indices)).free() } }
 	for report_fixture_selected(&app) != indices[indices.len - 1] { app.key_input('\x1b[B') }
 	free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!)
 	assert app.page_rows == 16
 	app.key_input('\x1b')
 	tree := app.build(ui2.rect(0, 0, 640, 610))!
 	position := indices.index(report_fixture_selected(&app))
-	list_scroll := if app.health_mode { app.health_scroll } else { app.audit_scroll }
+	list_scroll := if app.data_mode { app.data_scroll } else if app.health_mode { app.health_scroll } else { app.audit_scroll }
 	assert position >= list_scroll && position < list_scroll + app.page_rows,
 		'selected package hidden after returning to a smaller report'
 	assert tree.children.any(it.id.starts_with('software.row.') && it.box.bg == settings_choice_bg)
 	free_window_tree(tree)
-	app.handle(if app.health_mode { 'software.health.up' } else { 'software.audit.up' })!
-	away := if app.health_mode { app.health_scroll } else { app.audit_scroll }
+	app.handle(if app.data_mode { 'software.data.up' } else if app.health_mode { 'software.health.up' } else { 'software.audit.up' })!
+	away := if app.data_mode { app.data_scroll } else if app.health_mode { app.health_scroll } else { app.audit_scroll }
 	free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!)
-	assert (if app.health_mode { app.health_scroll } else { app.audit_scroll }) == away
+	assert (if app.data_mode { app.data_scroll } else if app.health_mode { app.health_scroll } else { app.audit_scroll }) == away
 	app.health_scroll = health_scroll; app.audit_scroll = audit_scroll; app.page_rows = page_rows
-	if app.health_mode { app.health_selected = selected; app.prepare_health_details() }
+	app.data_scroll = data_scroll
+	if app.data_mode { app.data_selected = selected; app.prepare_personal_data_details() }
+	else if app.health_mode { app.health_selected = selected; app.prepare_health_details() }
 	else { app.audit_selected = selected; app.prepare_deployment_audit_details() }
 	app.details_page = page; app.details_compact_page = short_page
 }
@@ -41,6 +50,8 @@ fn check_software_report_reader(mut app SoftwareApp) ! {
 	page := app.details_page; short_page := app.details_compact_page
 	health_selected := app.health_selected; audit_selected := app.audit_selected
 	health_scroll := app.health_scroll; audit_scroll := app.audit_scroll
+	data_selected := app.data_selected; data_scroll := app.data_scroll; data_pending := app.data_pending
+	data_ready := app.data_ready; data_rows := app.data_status.rows.data; data_result := app.data_result
 	query := editor_bytes_text(app.query); health_query := editor_bytes_text(app.health_query); audit_query := editor_bytes_text(app.audit_query)
 	selected := app.selected; filter := app.filter; scroll := app.scroll; page_rows := app.page_rows
 	issues := app.health_issues_only; differences := app.audit_differences_only
@@ -85,6 +96,7 @@ fn check_software_report_reader(mut app SoftwareApp) ! {
 			assert !tree.children.any(it.id in ['software.health.repair', 'software.audit.review', 'software.snapshot.export', 'software.snapshot.review',
 				'software.cleanup.confirm', 'software.cleanup.reload', 'software.failure'])
 			assert !tree.children.any(it.id in ['software.repository.confirm', 'software.repository.cancel', 'software.repository.url-next'])
+			assert !tree.children.any(it.id in ['software.data.confirm', 'software.data.delete', 'software.data.cancel', 'software.data.reload'])
 			for element in tree.children {
 				assert element.frame.x >= 0 && element.frame.x + element.frame.width <= size.width
 				assert element.frame.y >= 0 && element.frame.y + element.frame.height <= size.height
@@ -130,6 +142,8 @@ fn check_software_report_reader(mut app SoftwareApp) ! {
 		'software.repository.confirm', 'software.repository.cancel', 'software.repository.back', 'software.repository.stop',
 		'software.repository.reload', 'software.repository.new', 'software.repository.enroll', 'software.repository.revoke',
 		'software.repository.url-next', 'software.repository.url-previous', 'software.repository.id', 'software.repository.url', 'software.repository.key',
+		'software.data.confirm', 'software.data.delete', 'software.data.cancel', 'software.data.reload', 'software.data.back',
+		'software.data.stop', 'software.data.up', 'software.data.down',
 		'software.audit.reload', 'software.audit.review', 'software.audit.differences', 'software.audit.search',
 		'software.snapshot.another', 'software.snapshot.save', 'software.snapshot.audit', 'software.snapshot.review', 'software.snapshot.export',
 		'software.deployment.path', 'software.cancel', 'software.confirm', 'software.failure', 'software.row.0',
@@ -149,9 +163,12 @@ fn check_software_report_reader(mut app SoftwareApp) ! {
 	assert app.repository_pending == repository_pending && app.repository_url_page == repository_page && app.repository_url_seen == repository_seen
 	assert app.repository_selected == repository_selected && app.repository_scroll == repository_scroll
 	assert editor_bytes_text(app.repository_id) == repository_id && editor_bytes_text(app.repository_url) == repository_url && editor_bytes_text(app.repository_key) == repository_key_field
+	assert app.data_selected == data_selected && app.data_scroll == data_scroll && app.data_pending == data_pending
+	assert app.data_ready == data_ready && app.data_status.rows.data == data_rows && app.data_result == data_result
 	if app.report_has_packages() {
-		indices := if app.health_mode { app.health_matching } else { app.audit_matching }
-		for report_fixture_selected(&app) != indices[0] { app.key_input('\x1b[A') }
+		indices := report_fixture_indices(&app)
+		defer { unsafe { (&array(&indices)).free() } }
+		for report_fixture_selected(&app) != indices[0] { app.key_input(if report_fixture_selected(&app) < indices[0] { '\x1b[B' } else { '\x1b[A' }) }
 		app.handle('software.report.package.previous')!; assert report_fixture_selected(&app) == indices[0]
 		for position, row in indices {
 			assert report_fixture_selected(&app) == row && app.report_reader_mode
@@ -167,7 +184,8 @@ fn check_software_report_reader(mut app SoftwareApp) ! {
 		assert app.health_issues_only == issues && app.audit_differences_only == differences
 		app.key_input('\x1b'); assert !app.report_reader_mode
 		app.health_selected = health_selected; app.audit_selected = audit_selected
-		if app.health_mode { app.prepare_health_details() } else { app.prepare_deployment_audit_details() }
+		if app.data_mode { app.data_selected = data_selected; app.prepare_personal_data_details() }
+		else if app.health_mode { app.prepare_health_details() } else { app.prepare_deployment_audit_details() }
 	} else {
 		before := app.details_page
 		app.key_input('\t'); app.key_input('\x1b[A'); app.key_input('\x1b[Z')
@@ -175,6 +193,7 @@ fn check_software_report_reader(mut app SoftwareApp) ! {
 		app.key_input('\x1b'); assert !app.report_reader_mode
 	}
 	app.health_scroll = health_scroll; app.audit_scroll = audit_scroll
+	app.data_scroll = data_scroll
 	app.details_page = page; app.details_compact_page = short_page
 	app.handle('software.report.read')!; app.handle('software.report.back')!
 	assert !app.report_reader_mode && app.audit_path == path && app.snapshot_pending == saved && app.status == status
@@ -184,6 +203,7 @@ fn check_software_report_reader(mut app SoftwareApp) ! {
 fn report_reader_cycle(mut app SoftwareApp) ! {
 	page := app.details_page; selected := report_fixture_selected(&app)
 	health_scroll := app.health_scroll; audit_scroll := app.audit_scroll
+	data_scroll := app.data_scroll; data_pending := app.data_pending
 	app.handle('software.report.read')!; assert app.report_reader_mode
 	free_window_tree(app.build(ui2.rect(0, 0, 180, 220))!)
 	app.key_input('\x1b[C'); app.key_input('\t')
@@ -192,11 +212,15 @@ fn report_reader_cycle(mut app SoftwareApp) ! {
 	app.handle('software.snapshot.export')!; app.handle('software.audit.review')!; app.handle('software.health.repair')!
 	app.handle('software.cleanup.confirm')!; app.handle('software.cleanup.reload')!; app.handle('software.cleanup.back')!
 	app.handle('software.repository.confirm')!; app.handle('software.repository.cancel')!; app.handle('software.repository.url-next')!
+	app.handle('software.data.confirm')!; app.handle('software.data.delete')!; app.handle('software.data.cancel')!; app.handle('software.data.reload')!
 	assert app.worker == unsafe { nil } && !app.admin_prompt && app.report_reader_mode
+	assert app.data_pending == data_pending
 	app.key_input('\x1b'); assert !app.report_reader_mode
 	if app.report_has_packages() && report_fixture_selected(&app) != selected {
-		if app.health_mode { app.health_selected = selected; app.prepare_health_details() }
+		if app.data_mode { app.data_selected = selected; app.prepare_personal_data_details() }
+		else if app.health_mode { app.health_selected = selected; app.prepare_health_details() }
 		else { app.audit_selected = selected; app.prepare_deployment_audit_details() }
 	}
 	app.health_scroll = health_scroll; app.audit_scroll = audit_scroll; app.details_page = page
+	app.data_scroll = data_scroll
 }

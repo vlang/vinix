@@ -16,7 +16,8 @@ fn (mut a SoftwareApp) open_report_reader() {
 	if a.worker != unsafe { nil } || a.details_pages.len == 0
 		|| !((a.health_mode && a.health_ready) || (a.audit_mode && a.audit_ready)
 			|| (a.snapshot_mode && a.snapshot_ready) || (a.cleanup_mode && a.cleanup_ready)
-			|| (a.repository_mode && a.repository_review_ready)) { return }
+			|| (a.repository_mode && a.repository_review_ready)
+			|| (a.data_mode && a.data_ready && a.administration_required)) { return }
 	a.report_reader_mode = true
 	a.focus = false; a.select_all = false
 	a.health_focus = false; a.health_select_all = false
@@ -26,11 +27,19 @@ fn (mut a SoftwareApp) open_report_reader() {
 
 fn (a &SoftwareApp) report_has_packages() bool {
 	return (a.health_mode && a.health_matching.len > 0) || (a.audit_mode && a.audit_matching.len > 0)
+		|| (a.data_mode && a.data_pending == '' && a.data_status.rows.len > 0)
 }
 
 fn (mut a SoftwareApp) report_select_package(step int) {
 	compact := a.details_compact_mode
-	if a.health_mode {
+	if a.data_mode {
+		if a.data_pending != '' { return }
+		position := a.data_selected + step
+		if position < 0 || position >= a.data_status.rows.len { return }
+		a.data_selected = position
+		a.keep_data_selection_visible()
+		a.prepare_personal_data_details()
+	} else if a.health_mode {
 		position := a.health_matching.index(a.health_selected) + step
 		if position < 0 || position >= a.health_matching.len { return }
 		a.health_selected = a.health_matching[position]
@@ -87,7 +96,7 @@ fn (mut a SoftwareApp) build_report_reader(width int, height int) ui2.Element {
 	a.anchor_details_compact_page()
 	mut children := frame_elements(if a.details_compact_mode { 10 } else { 24 })
 	content_width := if width > 28 { width - 28 } else { 1 }
-	title := if a.repository_mode { 'Repository trust' } else if a.cleanup_mode { 'Cleanup review' } else if a.health_mode { 'Health details' } else if a.audit_mode { 'Deployment check' } else { 'Saved deployment' }
+	title := if a.data_mode { 'Personal data' } else if a.repository_mode { 'Repository trust' } else if a.cleanup_mode { 'Cleanup review' } else if a.health_mode { 'Health details' } else if a.audit_mode { 'Deployment check' } else { 'Saved deployment' }
 	if a.details_compact_mode {
 		back_width := if content_width >= 56 { 56 } else { content_width }
 		children << software_button('software.report.back', 'Back', if width > back_width + 28 { width - back_width - 14 } else { 14 }, 8, back_width)
@@ -122,7 +131,8 @@ fn (mut a SoftwareApp) build_report_reader(width int, height int) ui2.Element {
 		}
 		children << software_button('software.report.previous', 'Previous', 14, height - 138, 100)
 		children << software_button('software.report.next', 'Next', 126, height - 138, 100)
-		children << software_label(if a.repository_mode { 'Read-only details. Return to the full trust review before cancelling, reviewing URL parts or confirming the change.' }
+		children << software_label(if a.data_mode { 'Read-only details. Return to personal data before reloading, reviewing, cancelling or confirming deletion.' }
+			else if a.repository_mode { 'Read-only details. Return to the full trust review before cancelling, reviewing URL parts or confirming the change.' }
 			else if a.cleanup_mode { 'Read-only review. Return to cleanup before reloading or confirming deletion.' }
 			else { 'Read-only details. Return to the report before reloading, saving, exporting or reviewing changes.' }, 14, height - 98, content_width, 90, false)
 	}

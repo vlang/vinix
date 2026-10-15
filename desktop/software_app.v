@@ -640,6 +640,7 @@ fn (mut a SoftwareApp) poll() bool {
 	a.retire_worker()
 	a.clear_admin_prompt()
 	if code != 0 || ((verifying || health || cleanup_worker != .none) && a.worker_failed) {
+		if data_worker == .purge && a.data_ready { a.prepare_personal_data_details() }
 		if cleanup_worker != .none { a.clear_cleanup_review() }
 		if policy_worker == .review { a.clear_policy_review(); a.prepare_policy_pages(false) }
 		if policy_worker == .apply { a.policy_ready = false; a.clear_policy_pages() }
@@ -1232,6 +1233,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		a.page_rows = if height > 400 { (height - if a.review != '' { 274 } else if a.health_mode { 348 } else { 310 }) / 30 } else { 5 }
 		if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
 		if a.health_mode && a.page_rows != previous_size { a.keep_health_selection_visible() }
+		if a.data_mode && a.data_pending == '' && a.page_rows != previous_size { a.keep_data_selection_visible() }
 	}
 	if a.audit_mode { return a.build_deployment_audit(width, height) }
 	if a.health_mode { return a.build_health(width, height) }

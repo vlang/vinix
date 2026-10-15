@@ -61,7 +61,8 @@ fn check_software_data_navigation() ! {
 				assert !tree.children.any(it.id in ['software.data.confirm', 'software.data.cancel', 'software.data.back', 'software.data.reload', 'software.row.0'])
 				free_window_tree(tree)
 			}
-			for event in ['software.data.confirm', 'software.data.delete', 'software.data.back', 'software.data.reload', 'software.row.2']! { app.handle(event)! }
+			for event in ['software.data.confirm', 'software.data.delete', 'software.data.back', 'software.data.reload', 'software.row.2', 'software.report.read']! { app.handle(event)! }
+			assert !app.report_reader_mode && app.details_pages.len == 0 && app.details_compact_pages.len == 0
 			app.paste_input('\x1b'); assert app.worker.pid == pid && app.data_selected == 1
 			if action == 'escape' { app.key_input('\x1b') } else { app.handle(action)! }
 			assert app.worker == unsafe { nil } && C.kill(pid, 0) != 0 && app.data_worker == .none && !app.worker_view && !app.worker_review
@@ -96,6 +97,7 @@ fn check_software_data_navigation() ! {
 			free_window_tree(tree)
 		}
 		assert app.data_selected == selected && app.data_scroll == scroll && app.data_pending == 'removed-app'
+		check_data_report_content(&app); check_software_report_reader(mut app)!
 		if action == 'escape' { app.key_input('\x1b') } else { app.handle(action)! }
 		assert app.data_pending == '' && app.status.contains('cancelled') && app.worker == unsafe { nil }
 	}
@@ -111,7 +113,8 @@ fn check_software_data_navigation() ! {
 			assert !tree.children.any(it.id in ['software.data.stop', 'software.data.cancel', 'software.data.confirm', 'software.data.back', 'software.data.reload'])
 			free_window_tree(tree)
 		}
-		for event in ['software.data.stop', 'software.data.cancel', 'software.data.back', 'software.data.reload', 'software.data.confirm', 'software.row.2']! { app.handle(event)! }
+		for event in ['software.data.stop', 'software.data.cancel', 'software.data.back', 'software.data.reload', 'software.data.confirm', 'software.row.2', 'software.report.read']! { app.handle(event)! }
+		assert !app.report_reader_mode && app.details_pages.len == 0 && app.details_compact_pages.len == 0
 		app.key_input('\x1b'); app.stop_data_read()
 		assert app.worker.pid == pid && C.kill(pid, 0) == 0 && !os.exists(receipt) && app.data_pending == 'removed-app'
 		if mode == 'purge-complete' { os.setenv('VINIX_SOFTWARE_DATA_NAVIGATION', 'list-complete', true) }
@@ -167,7 +170,9 @@ fn check_software_data_navigation_memory() ! {
 				app.output.clear(); for byte in text { app.output << byte }; app.load_personal_data()
 				app.handle_personal_data('software.row.1')
 				free_window_tree(app.build(ui2.rect(0, 0, 900, 1200))!); free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
+				report_reader_cycle(mut app)!
 				app.handle_personal_data('software.data.delete')
+				report_reader_cycle(mut app)!
 				app.progress_seen = true
 				free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!)
 				compact := app.build(ui2.rect(0, 0, 320, 240))!
@@ -183,5 +188,6 @@ fn check_software_data_navigation_memory() ! {
 		app.set_status('')
 		kept := C.vinix_heap_end(); assert kept == 0, 'personal data navigation retained ${kept} bytes'
 		println('Software personal data navigation: 1000 inventory/select/full/compact/confirm/cancel/failure/progress/retirement cycles retain zero tracked bytes')
+		println('Software personal data reader: 1000 read/confirm/failure/progress/resize/Back/cancel/cache-retirement cycles retain zero tracked bytes')
 	}
 }
