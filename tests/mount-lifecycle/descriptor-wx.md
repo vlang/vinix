@@ -13,7 +13,11 @@ existing raw reader for descriptions and namespace reader for pathname loads.
 Scripts still authorize their interpreter separately. No owner, allocation,
 reference transition or free is added.
 
-Use `--case descwx` or `dw-0` through `dw-7`. Native `all` includes the group.
+The subsequent [directory policy checks](directory-exec-policy.md) extend
+saved approval to inherited-directory relative execution. Cases 6/7 also
+cover retained script directories, and cases 8/9 add ELF directory routes.
+
+Use `--case descwx` or `dw-0` through `dw-9`. Native `all` includes the group.
 Linux `move-reference` excludes it: `wxallowed` and the explicit Vinix W^X
 opt-in are not Linux mount policy.
 
@@ -27,6 +31,8 @@ opt-in are not Linux mount policy.
 | 5 | Unapproved | Approved | Linked ELF, effective root without `CAP_SYS_ADMIN` |
 | 6 | Approved | Unapproved | Script, UID/GID 1000 owner, separately approved native interpreter |
 | 7 | Unapproved | Approved | Script, UID/GID 1000 owner, separately approved native interpreter |
+| 8 | Approved | Unapproved | ELF through retained directories, UID/GID 1000 owner |
+| 9 | Unapproved | Approved | ELF through retained directories, UID/GID 1000 owner |
 
 The fixture copies its own static ELF and duplicates read-only and `O_PATH`
 descriptions, then closes their originals. Both mounts stay executable and
@@ -113,7 +119,7 @@ probe artifacts.
 
 Concurrent remount timing, dynamic ELF interpreters, ARM translation execution,
 credential transitions, combined error ordering, broader MAC/W^X combinations,
-relative paths through inherited directory descriptions with divergent flags,
+cross-mount traversal through inherited directory descriptions,
 persistent/overlay integration, allocation-flatness and desktop performance
 remain outside this qualification. Full OCI/rootless acceptance and roadmap
 section 17 remain in progress.

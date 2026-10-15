@@ -816,6 +816,12 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
  loading_thread.exec_depth++
  defer { loading_thread.exec_depth-- }
 
+	// A relative execveat retains its starting directory's route. Consult the
+	// resolved attachment itself, including after a namespace copy; recursive
+	// interpreters still use ordinary pathname policy.
+	description_mount := description || (loading_thread.exec_depth == 1
+		&& loading_thread.exec_descriptor != unsafe { nil })
+
 	trace_gpu := execve && path == gpu_desktop_executable
 	gpu_exec_trace(trace_gpu, 'resolved executable path')
 	gpu_exec_trace(trace_gpu, 'opened executable node')
@@ -824,7 +830,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 	caller := proc.current_thread().process
 	root := fs.process_root(caller)
 	if !stat.isreg(prog_node.resource.stat.mode)
-		|| (if description { fs.raw_mount_flags(prog_mount) } else { fs.mount_flags(prog_mount) }) & fs.ms_noexec != 0 {
+		|| (if description_mount { fs.raw_mount_flags(prog_mount) } else { fs.mount_flags(prog_mount) }) & fs.ms_noexec != 0 {
 		errno.set(errno.eacces)
 		return none
 	}
@@ -832,7 +838,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 	gpu_exec_trace(trace_gpu, 'validated executable permissions')
 	mut prog := prog_node.resource
 	allow_wx := envp.contains('VINIX_ALLOW_WX=1')
-	if allow_wx && !fs.wx_exec_allowed(prog_mount, description) {
+	if allow_wx && !fs.wx_exec_allowed(prog_mount, description_mount) {
 		errno.set(errno.eperm)
 		return none
 	}

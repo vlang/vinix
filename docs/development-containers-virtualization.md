@@ -545,7 +545,7 @@ image execution through ordinary/`O_PATH` descriptions, unlinked ELFs, ordinary
 owners and scripts, plus fresh descriptors and relative/absolute pathname
 requests. Existing authorization, W^X and descriptor lifetimes remain.
 Concurrent remounts, dynamic interpreters, runtime translation,
-divergent paths relative to inherited directory descriptors
+cross-mount traversal through inherited directory descriptors
 and broader backend integration remain open.
 The [descriptor W^X checks](../tests/mount-lifecycle/descriptor-wx.md) keep
 empty-path executable descriptions on their saved attachment's `wxallowed`
@@ -571,7 +571,7 @@ implementations ignore unused register bits while preserving the selected
 descriptor, its mount and authorization. The fixture covers linked/unlinked
 native images, read-only/`O_PATH` descriptions, scripts, ordinary UID/GID 1000,
 relative directories, `AT_FDCWD`, invalid descriptors and `noexec` refusal.
-General inherited-directory mount routing remains open.
+Broader inherited-directory cross-mount routing remains open.
 The [close-on-exec script checks](../tests/mount-lifecycle/exec-cloexec.md)
 refuse empty-path execution of valid scripts through `FD_CLOEXEC` descriptors
 with `ENOENT` before interpreter launch. ELF execution, flag clearing and
@@ -583,7 +583,12 @@ Those checks provide descriptor-rooted interpreter names, pin the directory
 through image loading, and refuse scripts whose names would become inaccessible
 at exec. Renamed directories, cwd decoys, nested interpreters, ordinary users,
 absolute/`AT_FDCWD` requests, native ELF and lookup/authorization errors are
-covered. Divergent inherited-directory mount flags remain open.
+covered. The subsequent [directory policy checks](../tests/mount-lifecycle/directory-exec-policy.md)
+keep relative `execveat` on its resolved attachment for `noexec` and W^X approval
+after namespace copies. Retained read-only/`O_PATH` directories, both flag
+directions, relative/absolute links, ordinary owners and separate interpreter
+policy are covered. General cross-mount traversal and concurrent namespace
+changes remain open.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,

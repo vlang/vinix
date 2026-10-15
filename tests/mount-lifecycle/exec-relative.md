@@ -22,8 +22,8 @@ A valid directory-relative script with `FD_CLOEXEC` returns `ENOENT` before
 interpreter launch. Clearing that flag or duplicating without it allows
 execution. Native ELF execution still closes the directory descriptor in the
 new image. Existing mount, permission, MAC, W^X and lookup error checks remain.
-This preserves the existing nonempty-path mount-policy model; divergent
-inherited-directory mount flags remain a separate gap.
+The subsequent [directory policy checks](directory-exec-policy.md) cover
+divergent inherited-directory `noexec` and W^X flags after namespace copies.
 
 [Linux v6.12 executable naming](https://github.com/torvalds/linux/blob/v6.12/fs/exec.c)
 uses `/dev/fd/N/script` for directory-relative requests, and its
@@ -126,7 +126,7 @@ ELFs and reopen the actual kernel-supplied name with that conventional link.
 These earlier failures and their artifacts are retained; no kernel change
 was made for either harness correction.
 
-Concurrent close/reuse or flag mutation, namespace/remount races, divergent
-inherited-directory policy, translated-image runtime qualification, arbitrary
-failure injection, persistent/overlay integration and complete OCI/rootless
+Concurrent close/reuse or flag mutation, namespace/remount races,
+cross-mount inherited-directory policy, translated-image runtime qualification,
+arbitrary failure injection, persistent/overlay integration and complete OCI/rootless
 acceptance remain open. Roadmap section 17 remains in progress.

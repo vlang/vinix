@@ -402,9 +402,9 @@ pub fn run(argc i32, argv &&char) i32 {
 		rename_case := if count == 4 && name[0] == `r` && name[1] == `p` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		descriptor_wx := if count == 4 && name[0] == `d` && name[1] == `w` && name[2] == `-`
-			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
+			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		descriptor_exec := if count == 4 && name[0] == `d` && name[1] == `e` && name[2] == `-`
-			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
+			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		descriptor_access := if count == 4 && name[0] == `d` && name[1] == `a` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		descriptor_mmaps := if count == 4 && name[0] == `m` && name[1] == `m` && name[2] == `-`

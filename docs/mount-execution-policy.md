@@ -1,5 +1,11 @@
 # Execution and device mount policy
 
+Relative `execveat` through an inherited directory checks `noexec` and
+`wxallowed` on the final resolved attachment. Remounting a namespace copy
+cannot change that directory's original authority. Relative links retain
+their route, while absolute links and interpreter paths use their resolved
+namespace attachments. See [the directory policy checks](../tests/mount-lifecycle/directory-exec-policy.md).
+
 Directory-relative `execveat` scripts receive `/proc/self/fd/N/path` so their
 interpreters reopen the selected file independently of cwd. A close-on-exec
 directory makes that name inaccessible and returns `ENOENT` before launch.
@@ -90,7 +96,7 @@ carrying an executable in that chain, including its interpreter or translator.
 Empty-path `execveat` with `AT_EMPTY_PATH` checks both `noexec` and
 `wxallowed` on the descriptor's actual saved mount. Remounting a namespace
 copy cannot grant or revoke that inherited descriptor's authority. Fresh
-descriptions and ordinary pathname requests use the current namespace's
+descriptions and pathname requests starting in the current namespace use its
 attachment. To revoke future launches through a saved description, revoke
 approval on its actual attachment. Script interpreters still undergo their
 own pathname checks. The [descriptor W^X tests](../tests/mount-lifecycle/descriptor-wx.md)

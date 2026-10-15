@@ -137,7 +137,7 @@ fn descriptor_wx_case(kind int) {
 	unsafe {
 		approved := kind % 2 == 0
 		unlinked := kind in [2, 3]
-		script := kind >= 6
+		script := kind in [6, 7]
 		identity := if kind in [4, 5] { 2 } else { 1 }
 		check(C.unshare(int(C.CLONE_NEWNS)) == 0
 			&& C.mount(c'none', c'/', nil, usize(C.MS_PRIVATE | C.MS_REC), nil) == 0, 634)
@@ -170,6 +170,21 @@ fn descriptor_wx_case(kind int) {
 		check(C.syscall(int(C.SYS_fchown), i32(fd), uid, uid) == 0
 			&& C.syscall(int(C.SYS_fchmod), i32(fd), u32(0o755)) == 0, 634)
 		if unlinked { check(C.unlink(&target[0]) == 0, 634) }
+		mut retained := i32(-1)
+		mut retained_path := i32(-1)
+		if kind >= 6 {
+			ordinary := C.open(&root[0], C.O_RDONLY | C.O_DIRECTORY)
+			path_only := C.open(&root[0], C.O_PATH | C.O_DIRECTORY)
+			retained = i32(C.syscall(int(C.SYS_dup), i32(ordinary)))
+			retained_path = i32(C.syscall(int(C.SYS_dup), i32(path_only)))
+			check(ordinary >= 0 && path_only >= 0 && retained >= 0 && retained_path >= 0
+				&& C.close(ordinary) == 0 && C.close(path_only) == 0, 634)
+			mut link := [256]char{}
+			check(C.snprintf(&link[0], 256, c'%s/link', &root[0]) > 0
+				&& C.symlink(c'target', &link[0]) == 0
+				&& C.snprintf(&link[0], 256, c'%s/absolute', &root[0]) > 0
+				&& C.symlink(&target[0], &link[0]) == 0, 634)
+		}
 		descriptor_wx_policy(&root[0], approved)
 		check(C.unshare(int(C.CLONE_NEWNS)) == 0, 635)
 		descriptor_wx_policy(&root[0], !approved)
@@ -186,6 +201,13 @@ fn descriptor_wx_case(kind int) {
 			for request in [true, false]! {
 				descriptor_wx_attempt(0, fd, c'', approved, identity, request)
 				descriptor_wx_attempt(0, pathfd, c'', approved, identity, request)
+				if retained >= 0 {
+					for directory_fd in [retained, retained_path]! {
+						descriptor_wx_attempt(3, int(directory_fd), c'target', approved, identity, request)
+						descriptor_wx_attempt(3, int(directory_fd), c'link', approved, identity, request)
+						descriptor_wx_attempt(3, int(directory_fd), c'absolute', !approved, identity, request)
+					}
+				}
 				if fresh >= 0 {
 					descriptor_wx_attempt(0, fresh, c'', !approved, identity, request)
 					descriptor_wx_attempt(0, fresh_path, c'', !approved, identity, request)
@@ -193,6 +215,13 @@ fn descriptor_wx_case(kind int) {
 					descriptor_wx_attempt(3, dirfd, c'target', !approved, identity, request)
 					descriptor_wx_attempt(2, -1, &target[0], !approved, identity, request)
 				}
+			}
+		}
+		if script {
+			// An approved directory must not grant its interpreter approval.
+			descriptor_wx_policy(&helper[0], false)
+			for directory_fd in [retained, retained_path]! {
+				descriptor_wx_attempt(3, int(directory_fd), c'target', false, identity, true)
 			}
 		}
 		mut after := C.stat{}
@@ -203,13 +232,14 @@ fn descriptor_wx_case(kind int) {
 		check(C.read(fd, &bytes[0], 2) == 2 && bytes[0] == if script { u8(`#`) } else { u8(127) }
 			&& bytes[1] == if script { u8(`!`) } else { u8(`E`) }, 636)
 		check(C.close(fd) == 0 && C.close(pathfd) == 0 && C.close(dirfd) == 0
+			&& (retained < 0 || (C.close(retained) == 0 && C.close(retained_path) == 0))
 			&& (fresh < 0 || (C.close(fresh) == 0 && C.close(fresh_path) == 0)), 636)
 	}
 }
 
 fn descriptor_wx_cases(selected int) {
 	unsafe {
-		for kind in 0 .. 8 {
+		for kind in 0 .. 10 {
 			if selected >= 0 && selected != kind { continue }
 			child := C.fork()
 			check(child >= 0, 637)

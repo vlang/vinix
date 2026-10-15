@@ -89,10 +89,10 @@ through `df-5` select individual cases. Native `all` includes them. The Linux
 through `da-7` select individual cases. Native `all` and Linux
 `move-reference` include them.
 `--case descexec` selects inherited-descriptor executable loading; `de-0`
-through `de-7` select individual cases. Native `all` and Linux
+through `de-9` select individual cases. Native `all` and Linux
 `move-reference` include them.
 `--case descwx` selects inherited-descriptor W^X approval; `dw-0` through
-`dw-7` select individual cases. Native `all` includes them. Linux
+`dw-9` select individual cases. Native `all` includes them. Linux
 `move-reference` excludes the Vinix-specific `wxallowed` policy.
 `--case execflags` selects `execveat` flag and final-symlink validation;
 `ef-0` through `ef-9` select individual cases. Native `all` and Linux
@@ -122,9 +122,11 @@ without `CAP_SYS_ADMIN`, scripts, default W^X and the privileged override.
 
 The [descriptor executable-loading checks](descriptor-exec.md) preserve the
 saved mount's `noexec` policy for direct ordinary and `O_PATH` descriptions,
-including unlinked files, ordinary owners and scripts. Fresh descriptors and
-the tested pathname requests use the namespace view; divergent paths relative
-to inherited directory descriptors remain open.
+including unlinked files, ordinary owners and scripts. The
+[directory policy checks](directory-exec-policy.md) extend both execution
+groups to retained ordinary/`O_PATH` directories after divergent namespace
+remounts, relative and absolute symlinks, and separate interpreter policy.
+Fresh descriptors and paths starting in the copy use its mount flags.
 
 The [descriptor access checks](descriptor-access.md) preserve the saved mount's
 read-only and `noexec` policy for empty-path ordinary and `O_PATH` descriptors,

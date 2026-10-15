@@ -142,7 +142,7 @@ fn run() ! {
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT DESCXATTR CASE: ${kind} PASS') }
 	for kind in 0 .. 6 { cases_pass = cases_pass && result.text.contains('MOUNT DESCMAP CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT DESCACCESS CASE: ${kind} PASS') }
-	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT DESCEXEC CASE: ${kind} PASS') }
+	for kind in 0 .. 10 { cases_pass = cases_pass && result.text.contains('MOUNT DESCEXEC CASE: ${kind} PASS') }
 	for kind in 0 .. 10 { cases_pass = cases_pass && result.text.contains('MOUNT EXECFLAGS CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT EXECFD CASE: ${kind} PASS') }
 	for kind in 0 .. 8 { cases_pass = cases_pass && result.text.contains('MOUNT EXECREL CASE: ${kind} PASS') }

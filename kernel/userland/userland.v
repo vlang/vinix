@@ -288,20 +288,26 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
  loading_thread.exec_depth++
  defer { loading_thread.exec_depth-- }
 
+	// A relative execveat retains its starting directory's route. Consult the
+	// resolved attachment itself, including after a namespace copy; recursive
+	// interpreters still use ordinary pathname policy.
+	description_mount := description || (loading_thread.exec_depth == 1
+		&& loading_thread.exec_descriptor != unsafe { nil })
+
 	// The program, or a script's interpreter, is subject to pledge(2) and
 	// unveil(2); the ELF interpreter the kernel loads for it is not.
 	if execve && !fs.policy_check(prog_node, proc.policy_exec) {
 		return none
 	}
 	if !stat.isreg(prog_node.resource.stat.mode)
-		|| (if description { fs.raw_mount_flags(prog_mount) } else { fs.mount_flags(prog_mount) }) & fs.ms_noexec != 0 {
+		|| (if description_mount { fs.raw_mount_flags(prog_mount) } else { fs.mount_flags(prog_mount) }) & fs.ms_noexec != 0 {
 		errno.set(errno.eacces)
 		return none
 	}
 	fs.check_access(prog_node, fs.access_exec, true)?
 	mut prog := prog_node.resource
 	allow_wx := envp.contains('VINIX_ALLOW_WX=1')
-	if allow_wx && !fs.wx_exec_allowed(prog_mount, description) {
+	if allow_wx && !fs.wx_exec_allowed(prog_mount, description_mount) {
 		errno.set(errno.eperm)
 		return none
 	}

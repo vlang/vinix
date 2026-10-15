@@ -20,7 +20,12 @@ transition or free is added.
 checks `noexec` on the opened file's saved path and returns `EACCES` before
 loading the image.
 
-Use `--case descexec` or `de-0` through `de-7`. Native `all` and Linux
+The subsequent [directory policy checks](directory-exec-policy.md) extend
+saved-mount execution policy to relative requests through inherited directory
+descriptions. Cases 6/7 now include retained script directories, and cases
+8/9 add ELF directory routes as UID/GID 1000 owners.
+
+Use `--case descexec` or `de-0` through `de-9`. Native `all` and Linux
 `move-reference` include the group:
 
 | Case | Saved description | Copied mount |
@@ -33,6 +38,8 @@ Use `--case descexec` or `de-0` through `de-7`. Native `all` and Linux
 | 5 | Owner's `noexec` native ELF | Executable |
 | 6 | Executable script with an executable native interpreter | `noexec` |
 | 7 | `noexec` script with an executable native interpreter | Executable |
+| 8 | Owner's executable ELF through retained directories | `noexec` |
+| 9 | Owner's `noexec` ELF through retained directories | Executable |
 
 The fixture copies its own static native ELF and duplicates both ordinary
 read-only and `O_PATH` descriptions before closing the originals. Script
@@ -117,12 +124,11 @@ Per-architecture `descriptor-exec-c-audit.txt`,
 `mount-descexec-source-evidence-c.log`, `mount-descexec-evidence-d.log`
 and `mount-descexec-post-commit-d.log` retain the results.
 
-Relative execution through a pre-copy directory descriptor with divergent
-flags remains an open Vinix gap: Linux retains the actual old directory mount,
-while Vinix currently remaps this path walk through the namespace copy. The
-initial Linux fixtures exposed this mismatch; the final portable relative-path
-case uses a fresh directory descriptor. This fix covers direct image
-descriptors and does not change the general path walker.
+The initial Linux fixtures exposed a separate pre-copy directory mismatch.
+The evidence above covers direct image descriptions and fresh relative
+directories. [Later qualification](directory-exec-policy.md) covers inherited
+directory policy in both flag directions, relative/absolute links and
+interpreter refusal without changing the general path walker.
 
 Concurrent remount/setns, dynamic ELF interpreters, ARM translation execution,
 relative shebang resolution, credential transitions, combined error precedence,
