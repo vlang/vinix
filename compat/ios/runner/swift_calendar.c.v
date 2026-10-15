@@ -14,12 +14,13 @@ fn swift_calendar_input_checked(value u64) !u8 {
 fn swift_calendar_initialize(identifier u64, output u64) {
 	which := swift_calendar_input_checked(identifier) or { panic(err) }
 	data := swift_foundation_arena() + u64(C.getpagesize())
-	owner := swift_heap_allocate(data + 1808, 40, 7)
+	owner := swift_heap_allocate(data + 1808, 56, 7)
 	// The consuming Identifier is POD: only its one readable byte is needed.
 	// This owner stores a complete independent snapshot and has no cache retain.
 	unsafe {
 		*(&u64(owner + 16)) = u64(which)
 		*(&u64(owner + 24)) = 0; *(&u64(owner + 32)) = 0
+		*(&u64(owner + 40)) = 0; *(&u64(owner + 48)) = 0
 		*(&SwiftURLWords(output)) = SwiftURLWords{owner: owner, table: data + 2048}
 	}
 	if which == 7 {
@@ -30,7 +31,8 @@ fn swift_calendar_initialize(identifier u64, output u64) {
 
 fn swift_calendar_storage_destroy(owner u64) {
 	swift_unknown_release(read64(owner + 24))
-	swift_heap_deallocate(owner, 40, 7)
+	swift_unknown_release(read64(owner + 40))
+	swift_heap_deallocate(owner, 56, 7)
 }
 
 fn swift_calendar_identifier_checked(owner u64) !u8 {
@@ -40,7 +42,7 @@ fn swift_calendar_identifier_checked(owner u64) !u8 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	storage := ios_runtime.swift_heap[owner] or { return error('iOS: Swift Calendar requires registered storage') }
-	if storage.deiniting || storage.size != 40 || storage.mask != 7
+	if storage.deiniting || storage.size != 56 || storage.mask != 7
 		|| ios_runtime.swift_foundation_arena == 0
 		|| storage.metadata != ios_runtime.swift_foundation_arena + u64(C.getpagesize()) + 1808
 		|| read64(owner) != storage.metadata || read64(owner + 16) >= 27 {
@@ -54,10 +56,20 @@ fn swift_calendar_identifier(owner u64, output u64) {
 	unsafe { *(&u8(output)) = which }
 }
 
-fn swift_calendar_interval_unavailable() {
-	// Identifier snapshots do not yet carry timezone rules. Never manufacture
-	// a UTC midnight for a calendar whose timezone has not been implemented.
-	panic('iOS: Swift Calendar day intervals require a timezone-aware calendar backend')
+fn swift_calendar_day_interval(component u64, date u64, owner u64, output u64) {
+	which := swift_calendar_identifier_checked(owner) or { panic(err) }
+	if unsafe { *(&u8(component)) } != 3 || which !in [u8(0), 7]! {
+		panic('iOS: only Gregorian and ISO 8601 fixed-zone day intervals are implemented')
+	}
+	zone := read64(owner + 40)
+	if zone == 0 { panic('iOS: Swift Calendar requires an explicitly assigned fixed TimeZone') }
+	seconds := swift_timezone_seconds_checked(zone) or { panic(err) }
+	value := unsafe { *(&f64(date)) }
+	if !(value >= -211845067200.0 && value <= 15927175497600.0) { panic('iOS: Calendar day interval requires a clamped Date') }
+	// Day boundaries are integral seconds. Floor before dividing so a tiny
+	// negative Date cannot underflow to negative zero and select the next day.
+	start := C.floor((C.floor(value) + f64(seconds)) / 86400.0) * 86400.0 - f64(seconds)
+	unsafe { *(&f64(output)) = start; *(&f64(output + 8)) = 86400.0; *(&u8(output + 16)) = 0 }
 }
 
 fn swift_calendar_empty_locale(output u64) {
@@ -106,13 +118,51 @@ fn swift_calendar_set_locale(value u64, self u64) {
 	// Owners are immutable after publication. Transfer the consumed Locale to
 	// a fresh snapshot before releasing Self's previous owner; borrowed copies
 	// keep their original settings and independently retained getter results.
-	owner := swift_heap_allocate(data + 1808, 40, 7)
+	zone := unsafe { *(&SwiftURLWords(previous + 40)) }
+	swift_unknown_retain(zone.owner)
+	owner := swift_heap_allocate(data + 1808, 56, 7)
 	unsafe {
 		*(&u64(owner + 16)) = u64(which)
 		*(&SwiftURLWords(owner + 24)) = words
+		*(&SwiftURLWords(owner + 40)) = zone
 		*(&SwiftURLWords(self)) = SwiftURLWords{owner: owner, table: data + 2048}
 	}
 	swift_unknown_release(previous)
+}
+
+fn swift_calendar_set_zone(value u64, self u64) {
+	zone := swift_timezone_input_checked(value) or { panic(err) }
+	data := swift_foundation_arena() + u64(C.getpagesize())
+	if self == 0 || read64(self + 8) != data + 2048 { panic('iOS: Swift Calendar timezone mutation requires built-in Calendar storage') }
+	previous := read64(self)
+	which := swift_calendar_identifier_checked(previous) or { panic(err) }
+	current := read64(previous + 40)
+	if current != 0 {
+		old_seconds := swift_timezone_seconds_checked(current) or { panic(err) }
+		new_seconds := swift_timezone_seconds_checked(zone.owner) or { panic(err) }
+		if swift_timezone_identity(old_seconds) == swift_timezone_identity(new_seconds) {
+			swift_unknown_release(zone.owner)
+			return
+		}
+	}
+	locale := unsafe { *(&SwiftURLWords(previous + 24)) }
+	swift_unknown_retain(locale.owner)
+	owner := swift_heap_allocate(data + 1808, 56, 7)
+	unsafe {
+		*(&u64(owner + 16)) = u64(which)
+		*(&SwiftURLWords(owner + 24)) = locale
+		*(&SwiftURLWords(owner + 40)) = zone
+		*(&SwiftURLWords(self)) = SwiftURLWords{owner: owner, table: data + 2048}
+	}
+	swift_unknown_release(previous)
+}
+
+fn swift_calendar_zone(owner u64, output u64) {
+	swift_calendar_identifier_checked(owner) or { panic(err) }
+	words := unsafe { *(&SwiftURLWords(owner + 40)) }
+	if words.owner == 0 { panic('iOS: Swift Calendar requires an explicitly assigned fixed TimeZone') }
+	swift_unknown_retain(words.owner)
+	unsafe { *(&SwiftURLWords(output)) = words }
 }
 
 fn swift_calendar_emit(code u64, data u64) {
@@ -160,7 +210,7 @@ fn swift_calendar_emit(code u64, data u64) {
 		*(&u64(data + 2072)) = code + 2592
 	}
 	write32(data + 1848, 2) // Class flags: native Swift reference counting.
-	write32(data + 1856, 40); write32(data + 1860, 7)
+	write32(data + 1856, 56); write32(data + 1860, 7)
 	write32(data + 1864, 96); write32(data + 1868, 16)
 	write32(data + 2560, 0x50)
 	swift_protocol_relative(data + 2564, data + 64)
@@ -189,7 +239,7 @@ fn swift_calendar_emit(code u64, data u64) {
 		*(&u64(code + 2800)) = u64(voidptr(swift_object_type))
 		*(&u64(code + 2808)) = 0xc248a97998e00000 // -211845067200 seconds since 2001.
 		*(&u64(code + 2816)) = 0x42acf8ab468f0000 // 15927175497600 seconds since 2001.
-		*(&u64(data + 2208)) = u64(voidptr(swift_calendar_interval_unavailable))
+		*(&u64(data + 2208)) = code + 3456
 	}
 	// Consuming indirect Optional<Locale> in x0; inout Calendar in x20.
 	write32(code + 2832, 0xaa1403e1); write32(code + 2836, 0x58000070); write32(code + 2840, 0xd61f0200)
@@ -211,4 +261,23 @@ fn swift_calendar_emit(code u64, data u64) {
 	write32(code + 3008, 0xaa1403e0); write32(code + 3012, 0xaa0803e1)
 	write32(code + 3016, 0x58000050); write32(code + 3020, 0xd61f0200)
 	unsafe { *(&u64(code + 3024)) = u64(voidptr(swift_calendar_locale)) }
+	write32(code + 3296, 0xaa1403e1); write32(code + 3300, 0x58000070); write32(code + 3304, 0xd61f0200)
+	unsafe { *(&u64(code + 3312)) = u64(voidptr(swift_calendar_set_zone)) }
+	// Generic borrowed TimeZone getter at +48, with an owned sixteen-byte result.
+	for i, op in [u32(0xa9bd57f6), 0xa9014ff4, 0xa9027bfd, 0x910083fd,
+		0xaa0803f3, 0xa9405a95, 0xaa1503e0, 0x580002b0, 0xd63f0200,
+		0xaa1603e9, 0xf8430d2a, 0xaa1303e8, 0xaa1503f4, 0xaa1603e1,
+		0xd63f0140, 0xa9427bfd, 0xa9414ff4, 0xa8c357f6, 0xd65f03c0]! {
+		write32(code + 3328 + u64(i * 4), op)
+	}
+	unsafe {
+		*(&u64(code + 3440)) = u64(voidptr(swift_object_type))
+		*(&u64(data + 2096)) = code + 3488
+	}
+	write32(code + 3456, 0xaa1403e2); write32(code + 3460, 0xaa0803e3)
+	write32(code + 3464, 0x58000050); write32(code + 3468, 0xd61f0200)
+	unsafe { *(&u64(code + 3472)) = u64(voidptr(swift_calendar_day_interval)) }
+	write32(code + 3488, 0xaa1403e0); write32(code + 3492, 0xaa0803e1)
+	write32(code + 3496, 0x58000050); write32(code + 3500, 0xd61f0200)
+	unsafe { *(&u64(code + 3504)) = u64(voidptr(swift_calendar_zone)) }
 }

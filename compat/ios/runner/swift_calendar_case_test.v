@@ -99,18 +99,19 @@ fn (locale CalendarLocaleApi) check(api CalendarApi, value u64, expected string,
 
 struct CalendarApi {
 	native bool
-	entries [7]u64
+	entries [9]u64
 	metadata u64
 	witness u64
 	probe CalendarProbe
 }
 
 fn calendar_api(native bool, code u64) CalendarApi {
-	mut entries := [7]u64{}
+	mut entries := [9]u64{}
 	for i, symbol in ['_$s10Foundation8CalendarV10identifierA2C10IdentifierOh_tcfC',
 		'_$s10Foundation8CalendarV10identifierAC10IdentifierOvg', '_$s10Foundation8CalendarVMa', '_$s10Foundation8CalendarVMn',
 		'_$s10Foundation8CalendarV10startOfDay3forAA4DateVAG_tF',
-		'_$s10Foundation8CalendarV6localeAA6LocaleVSgvs', '_$s10Foundation8CalendarV6localeAA6LocaleVSgvg']! {
+		'_$s10Foundation8CalendarV6localeAA6LocaleVSgvs', '_$s10Foundation8CalendarV6localeAA6LocaleVSgvg',
+		'_$s10Foundation8CalendarV8timeZoneAA04TimeD0Vvs', '_$s10Foundation8CalendarV8timeZoneAA04TimeD0Vvg']! {
 		for library in ['/System/Library/Frameworks/Foundation.framework/Foundation', '/usr/lib/swift/libswiftFoundation.dylib']! {
 			mut address := u64(0)
 			$if macos { if native { handle := C.dlopen(library.str, 2); address = u64(C.dlsym(handle, symbol[1..].str)) } }
@@ -167,7 +168,7 @@ fn calendar_value_case(api CalendarApi, which u8, source_end bool, result_end bo
 		storage := ios_runtime.swift_heap[owner] or { panic('missing Calendar owner') }
 		generation = storage.generation
 		C.ios_objc_initialize_unlock()
-		assert storage.size == 40 && storage.mask == 7 && !storage.deiniting && read64(owner + 8) == 3
+		assert storage.size == 56 && storage.mask == 7 && !storage.deiniting && read64(owner + 8) == 3
 		assert read64(owner + 16) == u64(which)
 	}
 	assert C.mprotect(voidptr(span + u64(page * 3)), page, C.PROT_READ) == 0
@@ -448,6 +449,175 @@ fn calendar_locales_suite(api CalendarApi) {
 	api.call(api.entries[6], 0, 0, self, output)
 	api.destroy(self)
 	locale.check(api, output, 'en_001', 0); locale.destroy(output)
+}
+
+struct CalendarZoneApi {
+	constructor u64
+	value CalendarLocaleApi
+}
+
+fn calendar_zone_api(api CalendarApi) CalendarZoneApi {
+	mut entries := [4]u64{}
+	for i, symbol in ['_$s10Foundation8TimeZoneV14secondsFromGMTACSgSi_tcfC', '_$s10Foundation8TimeZoneV10identifierSSvg',
+		'_$s10Foundation8TimeZoneVMa', '_$s10Foundation8TimeZoneVMn']! {
+		for library in ['/System/Library/Frameworks/Foundation.framework/Foundation', '/usr/lib/swift/libswiftFoundation.dylib']! {
+			mut address := u64(0)
+			$if macos { if api.native { address = u64(C.dlsym(C.dlopen(library.str, 2), symbol[1..].str)) } }
+			if !api.native { address = runtime_symbol(library, symbol) or { panic(err) } }
+			assert address != 0 && (entries[i] == 0 || entries[i] == address)
+			entries[i] = address
+		}
+	}
+	response := unsafe { CalendarCaseAccess(voidptr(entries[2]))(0) }
+	assert response.state == 0 && read64(response.metadata) == 0x200
+	witness := read64(response.metadata - 8) & 0x0000ffffffffffff
+	assert read64(witness + 64) == 16 && read64(witness + 72) == 16
+	assert read32(witness + 80) == 0x02010007 && read32(witness + 84) == 0x7fffffff
+	assert read64(response.metadata + 8) & 0x0000ffffffffffff == entries[3]
+	assert read32(entries[3] + 20) == 1 && read32(entries[3] + 24) == 2
+	assert unsafe { (&char(calendar_identifier_relative(entries[3] + 8))).vstring() } == 'TimeZone'
+	common := calendar_locale_api(api.native)
+	return CalendarZoneApi{constructor: entries[0], value: CalendarLocaleApi{native: api.native, constructor: entries[0],
+		identifier: entries[1], metadata: response.metadata, witness: witness, cstring: common.cstring, utf8: common.utf8, drop: common.drop}}
+}
+
+fn calendar_zone_label(seconds i64) string {
+	return match seconds {
+		-64800, -64799 { 'GMT-1800' }
+		-3600 { 'GMT-0100' }
+		-61, -60, -59, -31, -30 { 'GMT-0001' }
+		-29, -1, 0, 1, 29 { 'GMT' }
+		30, 31, 59, 60, 61 { 'GMT+0001' }
+		19800 { 'GMT+0530' }
+		64799, 64800 { 'GMT+1800' }
+		else { panic('missing zone expectation') }
+	}
+}
+
+fn calendar_zone_days(api CalendarApi, self u64, seconds i64, span u64, at_end bool) {
+	page := usize(C.getpagesize())
+	input := span + u64(page) + if at_end { u64(page) - 8 } else { u64(0) }
+	output := span + u64(page * 5) + if at_end { u64(page) - 8 } else { u64(0) }
+	for bits in [u64(0), 0x8000000000000000, 0x3ff8000000000000, 0xbff8000000000000,
+		0x40f5180000000000, 0x40f517ffffffffff, 0x8000000000000001, 0x3e112e0be826d695, 0xbe112e0be826d695,
+		0xc248a97998e00001, 0xc248a97998e00000, 0xc248a97998dfffff,
+		0x42acf8ab468effff, 0x42acf8ab468f0000, 0x42acf8ab468f0001,
+		0x7ff0000000000000, 0xfff0000000000000, 0x7ff8000000001234, 0xfff8000000001234, 0x7ff0000000001234]! {
+		assert C.mprotect(voidptr(span + u64(page)), page, C.PROT_READ | C.PROT_WRITE) == 0
+		C.memset(voidptr(span + u64(page)), 0xa5, page)
+		unsafe { *(&u64(input)) = bits }
+		assert C.mprotect(voidptr(span + u64(page)), page, C.PROT_READ) == 0
+		assert C.mprotect(voidptr(span + u64(page * 5)), page, C.PROT_READ | C.PROT_WRITE) == 0
+		C.memset(voidptr(span + u64(page * 5)), 0xa5, page)
+		api.call(api.entries[4], input, span, self, output)
+		clamped := calendar_day_clamped_bits(bits)
+		value := unsafe { *(&f64(&clamped)) }
+		expected := C.floor((C.floor(value) + f64(seconds)) / 86400.0) * 86400.0 - f64(seconds)
+		assert read64(output) == unsafe { *(&u64(&expected)) } && read64(input) == bits
+		calendar_identifier_padding(span + u64(page), u64(page), input, 8)
+		calendar_identifier_padding(span + u64(page * 5), u64(page), output, 8)
+	}
+}
+
+fn calendar_zone_case(api CalendarApi, zone CalendarZoneApi, seconds i64, which u8, at_end bool) {
+	page := usize(C.getpagesize())
+	span := u64(C.mmap(unsafe { nil }, page * 7, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+	assert span != u64(-1)
+	for index in [1, 3, 5]! {
+		assert C.mprotect(voidptr(span + u64(page * usize(index))), page, C.PROT_READ | C.PROT_WRITE) == 0
+		C.memset(voidptr(span + u64(page * usize(index))), 0xa5, page)
+	}
+	source := span + u64(page) + if at_end { u64(page) - 16 } else { u64(0) }
+	self := span + u64(page * 3) + if at_end { u64(page) - 16 } else { u64(0) }
+	input := span + u64(page * 5) + if at_end { u64(page) - 16 } else { u64(0) }
+	api.call(zone.constructor, u64(seconds), span, span, source)
+	calendar_identifier_padding(span + u64(page), u64(page), source, 16)
+	tag := unsafe { CalendarIdentifierGet(voidptr(read64(zone.value.witness + 48) & 0x0000ffffffffffff)) }
+	if seconds < -64800 || seconds > 64800 {
+		assert read64(source) == 0 && read64(source + 8) == 0 && tag(source, 1, zone.value.metadata) == 1
+		assert C.munmap(voidptr(span), page * 7) == 0
+		return
+	}
+	assert tag(source, 1, zone.value.metadata) == 0
+	zone.value.check(api, source, calendar_zone_label(seconds), span)
+	copy_zone := unsafe { CalendarCaseCopy(voidptr(read64(zone.value.witness + 16) & 0x0000ffffffffffff)) }
+	mut alias := [2]u64{}; alias_value := u64(unsafe { &alias[0] })
+	assert copy_zone(alias_value, source, zone.value.metadata) == alias_value
+	assert copy_zone(input, source, zone.value.metadata) == input
+	api.call(api.entries[0], u64(unsafe { &which }), span, span, self)
+	locale := calendar_locale_api(api.native)
+	mut supplied_locale := [2]u64{}; lp := u64(unsafe { &supplied_locale[0] })
+	locale.make(api, 'en_US_POSIX', lp, span); api.call(api.entries[5], lp, span, self, span)
+	before := unsafe { *(&SwiftURLWords(input)) }
+	assert C.mprotect(voidptr(span + u64(page * 5)), page, C.PROT_READ) == 0
+	api.call(api.entries[7], input, span, self, span)
+	assert unsafe { *(&SwiftURLWords(input)) } == before
+	calendar_identifier_padding(span + u64(page * 5), u64(page), input, 16)
+	zone.value.destroy(source)
+	mut saved := [2]u64{}; backup := u64(unsafe { &saved[0] })
+	copy_calendar := unsafe { CalendarCaseCopy(voidptr(read64(api.witness + 16) & 0x0000ffffffffffff)) }
+	assert copy_calendar(backup, self, api.metadata) == backup
+	locale.make(api, 'fr_FR', lp, span); api.call(api.entries[5], lp, span, self, span)
+	assert C.mprotect(voidptr(span + u64(page * 3)), page, C.PROT_READ) == 0
+	assert C.mprotect(voidptr(span + u64(page * 5)), page, C.PROT_READ | C.PROT_WRITE) == 0
+	C.memset(voidptr(span + u64(page * 5)), 0xa5, page)
+	api.call(api.entries[8], span, span, self, input)
+	zone.value.check(api, input, calendar_zone_label(seconds), span)
+	calendar_identifier_padding(span + u64(page * 5), u64(page), input, 16)
+	mut kept := unsafe { *(&SwiftURLWords(input)) }; held := u64(unsafe { &kept })
+	calendar_zone_days(api, self, seconds, span, at_end)
+	assert C.mprotect(voidptr(span + u64(page * 3)), page, C.PROT_READ | C.PROT_WRITE) == 0
+	other := if calendar_zone_label(seconds) == 'GMT+0530' { i64(0) } else { i64(19800) }
+	api.call(zone.constructor, u64(other), span, span, input)
+	assert C.mprotect(voidptr(span + u64(page * 5)), page, C.PROT_READ) == 0
+	api.call(api.entries[7], input, span, self, span)
+	assert C.mprotect(voidptr(span + u64(page * 3)), page, C.PROT_READ) == 0
+	calendar_zone_days(api, self, other, span, at_end)
+	mut got := [2]u64{}; result := u64(unsafe { &got[0] })
+	api.call(api.entries[6], span, span, self, result); locale.check(api, result, 'fr_FR', span); locale.destroy(result)
+	api.call(api.entries[6], span, span, backup, result); locale.check(api, result, 'en_US_POSIX', span); locale.destroy(result)
+	api.call(api.entries[8], span, span, backup, result); zone.value.check(api, result, calendar_zone_label(seconds), span); zone.value.destroy(result)
+	api.destroy(self); api.destroy(backup)
+	zone.value.check(api, held, calendar_zone_label(seconds), span); zone.value.destroy(held)
+	zone.value.check(api, alias_value, calendar_zone_label(seconds), span); zone.value.destroy(alias_value)
+	assert C.munmap(voidptr(span), page * 7) == 0
+}
+
+fn calendar_zone_worker(api CalendarApi, zone CalendarZoneApi, seed u64) {
+	mut value := [2]u64{}; self := u64(unsafe { &value[0] })
+	copy_calendar := unsafe { CalendarCaseCopy(voidptr(read64(api.witness + 16) & 0x0000ffffffffffff)) }
+	assert copy_calendar(self, seed, api.metadata) == self
+	mut current := i64(0)
+	for _ in 0 .. 4 { for seconds in [i64(0), 1, 19800, 30, 61, -3600, -29]! {
+		if calendar_zone_label(current) != calendar_zone_label(seconds) { current = seconds }
+		mut supplied := [2]u64{}; input := u64(unsafe { &supplied[0] })
+		api.call(zone.constructor, u64(seconds), 0, 0, input)
+		api.call(api.entries[7], input, 0, self, 0)
+		mut got := [2]u64{}; output := u64(unsafe { &got[0] })
+		api.call(api.entries[8], 0, 0, self, output)
+		zone.value.check(api, output, calendar_zone_label(current), 0); zone.value.destroy(output)
+		date := f64(0); mut day := f64(1)
+		api.call(api.entries[4], u64(unsafe { &date }), 0, self, u64(unsafe { &day }))
+		assert day == C.floor(f64(current) / 86400.0) * 86400.0 - f64(current)
+	} }
+	api.destroy(self)
+}
+
+fn calendar_zones_suite(api CalendarApi) {
+	zone := calendar_zone_api(api)
+	for seconds in [i64(-64801), -64800, -64799, -61, -60, -59, -31, -30, -29, -1, 0, 1, 29, 30, 31, 59, 60, 61, 19800, 64799, 64800, 64801]! {
+		for which in [u8(0), 7]! { for at_end in [false, true]! { calendar_zone_case(api, zone, seconds, which, at_end) } }
+	}
+	mut value := [2]u64{}; self := u64(unsafe { &value[0] }); which := u8(7)
+	api.call(api.entries[0], u64(unsafe { &which }), 0, 0, self)
+	mut supplied := [2]u64{}; input := u64(unsafe { &supplied[0] })
+	api.call(zone.constructor, 0, 0, 0, input); api.call(api.entries[7], input, 0, self, 0)
+	mut workers := []thread{}
+	for _ in 0 .. 8 { workers << spawn calendar_zone_worker(api, zone, self) }
+	workers.wait()
+	mut got := [2]u64{}; output := u64(unsafe { &got[0] })
+	api.call(api.entries[8], 0, 0, self, output); api.destroy(self)
+	zone.value.check(api, output, 'GMT', 0); zone.value.destroy(output)
 }
 
 fn calendar_identifier_relative(address u64) u64 {
@@ -795,7 +965,8 @@ fn test_swift_calendar_case() {
 		calendar_values_suite(calendar_api(true, code), code)
 		calendar_days_suite(calendar_api(true, code), code)
 		calendar_locales_suite(calendar_api(true, code))
-		println('IOS-SWIFT-CALENDAR-CASE-NATIVE: Calendar locale getter/setter, default identifiers for 27 calendars, consuming optional Locale, independent snapshots and getter results, guarded values, concurrent mutation of copied Calendars; startOfDay, construction, ownership, metadata and Identifier witnesses measured')
+		calendar_zones_suite(calendar_api(true, code))
+		println('IOS-SWIFT-CALENDAR-CASE-NATIVE: fixed-offset TimeZone construction/metadata/identifier, exact seconds and rounded equality, Calendar timezone/locale snapshot independence, Gregorian/ISO startOfDay boundaries and concurrent copied-Calendar mutation; guarded values, ARC and native Identifier witnesses measured')
 	}
 	if _ := swift_foundation_symbol(calendar_case_symbol) {
 		assert false
@@ -826,10 +997,11 @@ fn test_swift_calendar_case() {
 		calendar_values_suite(api, code)
 		calendar_days_suite(api, code)
 		calendar_locales_suite(api)
-		assert read64(arena + u64(page) + 2208) == u64(unsafe { voidptr(swift_calendar_interval_unavailable) })
+		calendar_zones_suite(api)
+		assert read64(arena + u64(page) + 2208) == arena + 3456
 		for invalid in [u8(27), 28, 127, 255]! { if _ := swift_calendar_input_checked(u64(unsafe { &invalid })) { assert false } }
 		if _ := swift_calendar_identifier_checked(0) { assert false }
-		for symbol in ['_$s10Foundation8CalendarV10IdentifierO9gregorianyA2EmFWC', '_$s10Foundation8CalendarV8timeZoneAA04TimeD0Vvs']! {
+		for symbol in ['_$s10Foundation8CalendarV10IdentifierO9gregorianyA2EmFWC', '_$s10Foundation8TimeZoneV19_bridgeToObjectiveCSo06NSTimeC0CyF']! {
 			if _ := swift_foundation_symbol(symbol) {
 				assert false
 			}
@@ -860,5 +1032,5 @@ fn test_swift_calendar_case() {
 		}
 	}
 	assert C.munmap(voidptr(code), page) == 0
-	println('IOS-SWIFT-CALENDAR-CASE: Calendar locale mutation/getter, consuming optional Locale, 27 default identifiers, independent immutable snapshots and owned getter results, guarded values, concurrent copied-Calendar mutation; startOfDay, construction, ownership, metadata and Identifier witnesses, two drained/unmapped runtimes; timezone mutation, private interval backend and Objective-C bridging remain unsupported')
+	println('IOS-SWIFT-CALENDAR-CASE: fixed-offset TimeZone construction/metadata/identifier, exact seconds and rounded equality, Calendar timezone/locale immutable snapshots, owned getter results and Gregorian/ISO startOfDay, guarded values and concurrent mutation, native Identifier witnesses, two drained/unmapped runtimes; default/named timezone rules, other calendar calculations and Objective-C bridging remain unsupported')
 }

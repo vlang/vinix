@@ -61,6 +61,9 @@ fn framework_symbol(library string, symbol string) ?u64 {
 			'_$s10Foundation8CalendarV10identifierAC10IdentifierOvg',
 			'_$s10Foundation8CalendarV10startOfDay3forAA4DateVAG_tF',
 			'_$s10Foundation8CalendarV6localeAA6LocaleVSgvs', '_$s10Foundation8CalendarV6localeAA6LocaleVSgvg',
+			'_$s10Foundation8CalendarV8timeZoneAA04TimeD0Vvs', '_$s10Foundation8CalendarV8timeZoneAA04TimeD0Vvg',
+			'_$s10Foundation8TimeZoneV14secondsFromGMTACSgSi_tcfC', '_$s10Foundation8TimeZoneVMa',
+			'_$s10Foundation8TimeZoneVMn', '_$s10Foundation8TimeZoneV10identifierSSvg',
 			'_$s10Foundation8CalendarVMa', '_$s10Foundation8CalendarVMn',
 			'_$s10Foundation11JSONEncoderC20DateEncodingStrategyO9formattedyAESo15NSDateFormatterCcAEmFWC'] {
 		return swift_foundation_symbol(symbol) or { return none }

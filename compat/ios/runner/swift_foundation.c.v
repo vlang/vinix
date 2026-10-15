@@ -123,6 +123,7 @@ fn swift_foundation_arena() u64 {
 	swift_locale_emit(base, data)
 	swift_calendar_identifier_emit(base, data)
 	swift_calendar_emit(base, data)
+	swift_timezone_emit(base, data)
 	// A concrete specialization of Foundation's retroactive String conformance.
 	// The installed descriptor uses a generic witness cache; this implementation
 	// supplies its already-specialized table, accepted by normal witness lookup.
@@ -145,7 +146,7 @@ fn swift_foundation_arena() u64 {
 	// read as four-byte data before calling the enum tag injection witness.
 	// Its native case number is 7; this export does not construct a Calendar.
 	write32(data + 800, 7)
-	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 3032) })
+	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 3512) })
 	if C.mprotect(unsafe { voidptr(base) }, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(unsafe { voidptr(base) }, usize(page * 2)); panic('iOS: cannot seal Swift Foundation entries')
@@ -300,6 +301,12 @@ fn swift_foundation_symbol(symbol string) !u64 {
 		'_$s10Foundation8CalendarV10startOfDay3forAA4DateVAG_tF' { swift_foundation_arena() + 2624 }
 		'_$s10Foundation8CalendarV6localeAA6LocaleVSgvs' { swift_foundation_arena() + 2832 }
 		'_$s10Foundation8CalendarV6localeAA6LocaleVSgvg' { swift_foundation_arena() + 2864 }
+		'_$s10Foundation8CalendarV8timeZoneAA04TimeD0Vvs' { swift_foundation_arena() + 3296 }
+		'_$s10Foundation8CalendarV8timeZoneAA04TimeD0Vvg' { swift_foundation_arena() + 3328 }
+		'_$s10Foundation8TimeZoneV14secondsFromGMTACSgSi_tcfC' { swift_foundation_arena() + 3032 }
+		'_$s10Foundation8TimeZoneVMa' { swift_foundation_arena() + 3064 }
+		'_$s10Foundation8TimeZoneVMn' { swift_foundation_arena() + u64(C.getpagesize()) + 2784 }
+		'_$s10Foundation8TimeZoneV10identifierSSvg' { swift_foundation_arena() + 3096 }
 		'_$s10Foundation8CalendarVMa' { swift_foundation_arena() + 2528 }
 		'_$s10Foundation8CalendarVMn' { swift_foundation_arena() + u64(C.getpagesize()) + 1600 }
 		'_$s10Foundation8CalendarV10IdentifierOMa' { swift_foundation_arena() + 2336 }

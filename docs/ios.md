@@ -6868,22 +6868,75 @@ VM phases are retained; published runners are unchanged. Generated C confirms
 explicit forty-byte owner allocation/deallocation and Locale transfer/release without hidden allocations
 in the new successful paths. Full iOS regression remains unpassed.
 
-The current IPA probe links past Calendar locale assignment and exits with
+The locale-assignment IPA probe links past that setter and exits with
 status 1 at `_$s10Foundation8CalendarV8timeZoneAA04TimeD0Vvs`
-(`Calendar.timeZone` setter). Fortnite has not entered application code and
-remains unplayable.
+(`Calendar.timeZone` setter).
+
+The next milestone implements fixed-offset TimeZone construction, metadata and
+identifier access, Calendar timezone assignment/getting, and actual Gregorian
+and ISO 8601 day intervals in V. The IPA explicitly constructs GMT+0 and assigns
+it after `en_US_POSIX`; that sequence can now compute `startOfDay(for:)` using
+the private Calendar backend.
+
+TimeZone is an owned sixteen-byte implementation/table pair. Its private
+twenty-four-byte Swift heap owner preserves exact offset seconds in the inclusive
+range -64800 through 64800; offsets just outside that range return nil. Native
+identifiers round to minutes, with half-minutes rounded away from zero, while
+the offset used in date calculations remains exact. Native timezone equality
+uses the rounded identifier: assigning GMT+1 second over GMT+0 preserves the
+old exact offset. The setter matches that behavior and consumes the supplied
+TimeZone on both changed and equal assignments. The native minimum-Int probe
+trapped; its source, executable and failed log are retained in
+`native-minimum-trial`. Vinix checks bounds before arithmetic or allocation.
+
+Calendar's immutable owner grows to fifty-six bytes to own both Locale and
+TimeZone. Changing either property preserves the other, and copied Calendars
+and owned getter results remain independent. The last release drops both
+settings and deallocates the owner. A new Calendar has no implemented default
+timezone snapshot: timezone access and day calculations require an explicitly
+assigned fixed TimeZone. Named zones, daylight-saving rules, other calendar
+calculations and Objective-C TimeZone/Calendar bridging remain unsupported.
+
+The day-interval callback accepts `Component.day` and the public method's
+clamped Date, returns a POD DateInterval of 86400 seconds, and writes
+the optional discriminator after its two Doubles. It floors the timestamp
+before dividing by the day length, so even the smallest negative subnormal
+selects the previous day. Native checks cover bound neighbors, signed zero,
+infinities, NaNs, minute rounding, exact-second offsets and negative dates.
+
+The Calendar fixture exercises 88 guarded constructor/setting cases across
+Gregorian and ISO calendars and both span boundaries, consuming read-only
+timezone inputs, independent locale/timezone snapshots and getter lifetimes.
+Eight workers perform 224 timezone assignments on values copied from one
+fixed-zone Calendar; equal rounded identifiers must preserve its previous exact
+seconds. Every runtime lifetime must drain all Calendar, TimeZone and
+Objective-C owners before unmapping its
+sealed metadata pages.
+
+All twelve normal/deterministic ASan/UBSan host runs and six ARM64 Vinix guest
+suites pass. The native comparison, fifteen archived generated C streams and
+executables, four retired VM phases and pinned inputs are retained under
+`build/ios/fortnite/calendar-zone-checks`. Generated C confirms explicit
+Calendar/TimeZone allocation and matching destruction without hidden allocations
+in the new successful paths. Published runners remain unchanged; the full iOS
+regression remains unpassed.
+
+The current IPA probe links past the fixed TimeZone constructor, metadata and
+Calendar timezone setter, then exits with status 1 at
+`_$s10Foundation8TimeZoneV19_bridgeToObjectiveCSo06NSTimeC0CyF`.
+Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,531 | 629 | 79 |
+| Fortnite executable | 1,535 | 625 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,366 | 632 | 120 |
+| All images | 2,370 | 628 | 120 |
 
-The C++/GLES/Text variant reports 2,379 resolved imports, 619 unresolved strong
+The C++/GLES/Text variant reports 2,383 resolved imports, 615 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
