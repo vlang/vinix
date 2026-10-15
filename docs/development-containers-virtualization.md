@@ -480,6 +480,15 @@ bind remounts, detached/retired mounts and unprivileged metadata queries.
 Existing authorization and descriptor release paths remain. Concurrent remount
 snapshots, other inherited-descriptor policy lookups and persistent/overlay
 integration remain open.
+The [descriptor metadata checks](../tests/mount-lifecycle/descriptor-metadata.md)
+extend saved-mount policy to `fchmod`, `fchown` and empty-path `fchownat`.
+Inherited writable descriptions remain usable after the copied mount becomes
+read-only; inherited read-only descriptions cannot gain mutation authority
+when the copy becomes writable. Native ARM/x86 and the same Linux executables
+cover regular/directory/unlinked descriptions, dup/fork retention and
+unprivileged ownership checks. Existing MAC, attributes, ownership/capability,
+copy-up, persistence and release paths are retained. Other metadata families,
+concurrent remount serialization and persistent/overlay integration remain open.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,

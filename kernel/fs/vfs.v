@@ -1901,7 +1901,7 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 
 	if fd.handle.node != unsafe { nil } {
 		node := unsafe { &VFSNode(fd.handle.node) }
-		if read_only_on_mount(node, &fd.handle.mount) { return errno.err, errno.erofs }
+		if read_only_on_description(node, &fd.handle.mount) { return errno.err, errno.erofs }
 		if !attr_allows_metadata(node) { return errno.err, errno.get() }
 	}
 	if !owns_resource(fd.handle.resource.stat.uid) {
@@ -2663,7 +2663,7 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 		mut res := fd.handle.resource
 		if fd.handle.node != unsafe { nil } {
 			node := unsafe { &VFSNode(fd.handle.node) }
-			if read_only_on_mount(node, &fd.handle.mount) { return errno.err, errno.erofs }
+			if read_only_on_description(node, &fd.handle.mount) { return errno.err, errno.erofs }
 			if !attr_allows_metadata(node) { return errno.err, errno.get() }
 		}
 		if !may_chown(res.stat.uid, uid, gid) {
@@ -2711,7 +2711,7 @@ pub fn syscall_fchown(_ voidptr, fdnum int, uid u32, gid u32) (u64, u64) {
 	mut res := fd.handle.resource
 	if fd.handle.node != unsafe { nil } {
 		node := unsafe { &VFSNode(fd.handle.node) }
-		if read_only_on_mount(node, &fd.handle.mount) { return errno.err, errno.erofs }
+		if read_only_on_description(node, &fd.handle.mount) { return errno.err, errno.erofs }
 		if !attr_allows_metadata(node) { return errno.err, errno.get() }
 	}
 	if !may_chown(res.stat.uid, uid, gid) {

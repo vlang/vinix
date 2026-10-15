@@ -68,6 +68,14 @@ include them.
 `--case fsflags` selects filesystem-statistics attachment flags; `sf-0` through
 `sf-9` select individual cases. Native `all` and Linux `move-reference` include
 them.
+`--case descmeta` selects inherited-descriptor mode/ownership checks; `dm-0`
+through `dm-7` select individual cases. Native `all` and Linux `move-reference`
+include them.
+
+The [descriptor metadata checks](descriptor-metadata.md) keep an inherited
+description's actual mount policy when a copied namespace is remounted with
+different flags. They cover files, directories, unlinked files and ordinary
+owners, including dup and fork retention.
 
 The [filesystem-statistics checks](statfs-policy.md) cover pathname and saved
 descriptor mount flags, bind remounts, retained mounts and namespace copies
@@ -224,7 +232,8 @@ cases, all six pathname truncation cases, all seven mode/ownership cases,
 all eight timestamp cases, all eight extended-attribute cases, all eight symlink
 creation cases, all eight removal cases, all ten hard-link cases, all ten
 rename cases, all ten writer-lifetime cases, all eight node-creation cases,
-all ten access-query cases and all ten filesystem-statistics cases.
+all ten access-query cases, all ten filesystem-statistics cases and all eight
+inherited-descriptor metadata cases.
 Vinix's cursor limit and unsupported unmount modes are excluded. Supply a matching Linux kernel and
 the ELF preserved by a native run:
 
