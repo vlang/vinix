@@ -65,6 +65,15 @@ an unauthorized original program. An unprivileged script or translated
 program requesting the exception therefore needs `wxallowed` on every mount
 carrying an executable in that chain, including its interpreter or translator.
 
+Empty-path `execveat` with `AT_EMPTY_PATH` checks both `noexec` and
+`wxallowed` on the descriptor's actual saved mount. Remounting a namespace
+copy cannot grant or revoke that inherited descriptor's authority. Fresh
+descriptions and ordinary pathname requests use the current namespace's
+attachment. To revoke future launches through a saved description, revoke
+approval on its actual attachment. Script interpreters still undergo their
+own pathname checks. The [descriptor W^X tests](../tests/mount-lifecycle/descriptor-wx.md)
+cover approval, denial and the resulting mapping permissions.
+
 Nested shared child mounts retain the actual alias route used to enter them,
 so `..` restores that alias's policy. Open descriptions and filesystem state
 store a bounded context inline; namespace copies resolve its mount identities

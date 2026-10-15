@@ -544,9 +544,18 @@ namespace route. Native ARM/x86 and same-executable Linux probes cover actual
 image execution through ordinary/`O_PATH` descriptions, unlinked ELFs, ordinary
 owners and scripts, plus fresh descriptors and relative/absolute pathname
 requests. Existing authorization, W^X and descriptor lifetimes remain.
-Concurrent remounts, dynamic interpreters, runtime translation, descriptor
-`wxallowed` policy, divergent paths relative to inherited directory descriptors
+Concurrent remounts, dynamic interpreters, runtime translation,
+divergent paths relative to inherited directory descriptors
 and broader backend integration remain open.
+The [descriptor W^X checks](../tests/mount-lifecycle/descriptor-wx.md) keep
+empty-path executable descriptions on their saved attachment's `wxallowed`
+approval. Both directions of approval changes in a copied namespace are
+covered for linked/unlinked native ELFs, ordinary owners, root without
+`CAP_SYS_ADMIN` and scripts. Successful images check actual RWX `mmap` and
+`mprotect` policy, also after fork. The explicit environment request, default
+W^X and initial-namespace privileged override remain enforced. This policy is
+Vinix-specific and excluded from the portable Linux suite. Broader runtime,
+backend and concurrent-remount qualification remains open.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,

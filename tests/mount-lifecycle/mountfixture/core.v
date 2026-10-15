@@ -347,6 +347,7 @@ fn move_cycles(check_depth bool) {
 @[export: 'main']
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		descriptor_wx_entry(argc, argv)
 		descriptor_exec_entry(argc, argv)
 		check(C.mount(c'none', c'/', nil, usize(C.MS_PRIVATE | C.MS_REC), nil) == 0, 4)
 		directory(c'/tmp/mount-lifecycle')
@@ -389,6 +390,8 @@ pub fn run(argc i32, argv &&char) i32 {
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
 		rename_case := if count == 4 && name[0] == `r` && name[1] == `p` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `9` { int(name[3] - `0`) } else { -1 }
+		descriptor_wx := if count == 4 && name[0] == `d` && name[1] == `w` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		descriptor_exec := if count == 4 && name[0] == `d` && name[1] == `e` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		descriptor_access := if count == 4 && name[0] == `d` && name[1] == `a` && name[2] == `-`
@@ -440,7 +443,8 @@ pub fn run(argc i32, argv &&char) i32 {
 			|| C.strcmp(selected, c'descflags') == 0 || descriptor_flags >= 0
 			|| C.strcmp(selected, c'descmaps') == 0 || descriptor_mmaps >= 0
 			|| C.strcmp(selected, c'descaccess') == 0 || descriptor_access >= 0
-			|| C.strcmp(selected, c'descexec') == 0 || descriptor_exec >= 0, 4)
+			|| C.strcmp(selected, c'descexec') == 0 || descriptor_exec >= 0
+			|| C.strcmp(selected, c'descwx') == 0 || descriptor_wx >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
@@ -526,6 +530,9 @@ pub fn run(argc i32, argv &&char) i32 {
 		if C.strcmp(selected, c'descexec') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { descriptor_exec_cases(-1) }
 		if descriptor_exec >= 0 { descriptor_exec_cases(descriptor_exec) }
+		// wxallowed is a Vinix policy; the portable Linux group excludes it.
+		if C.strcmp(selected, c'descwx') == 0 || C.strcmp(selected, c'all') == 0 { descriptor_wx_cases(-1) }
+		if descriptor_wx >= 0 { descriptor_wx_cases(descriptor_wx) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }

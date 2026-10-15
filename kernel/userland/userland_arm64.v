@@ -832,7 +832,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 	gpu_exec_trace(trace_gpu, 'validated executable permissions')
 	mut prog := prog_node.resource
 	allow_wx := envp.contains('VINIX_ALLOW_WX=1')
-	if allow_wx && !fs.wx_exec_allowed(prog_mount) {
+	if allow_wx && !fs.wx_exec_allowed(prog_mount, description) {
 		errno.set(errno.eperm)
 		return none
 	}

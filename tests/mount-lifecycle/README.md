@@ -91,6 +91,14 @@ through `da-7` select individual cases. Native `all` and Linux
 `--case descexec` selects inherited-descriptor executable loading; `de-0`
 through `de-7` select individual cases. Native `all` and Linux
 `move-reference` include them.
+`--case descwx` selects inherited-descriptor W^X approval; `dw-0` through
+`dw-7` select individual cases. Native `all` includes them. Linux
+`move-reference` excludes the Vinix-specific `wxallowed` policy.
+
+The [descriptor W^X checks](descriptor-wx.md) preserve the saved attachment's
+administrator-controlled `wxallowed` approval for direct execution. They cover
+approval/revocation in a namespace copy, unlinked files, ordinary owners, root
+without `CAP_SYS_ADMIN`, scripts, default W^X and the privileged override.
 
 The [descriptor executable-loading checks](descriptor-exec.md) preserve the
 saved mount's `noexec` policy for direct ordinary and `O_PATH` descriptions,
