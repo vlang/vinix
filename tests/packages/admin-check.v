@@ -41,6 +41,7 @@ fn suite(repository string) !hwhost.Suite {
 				'PACKAGE ADMIN ordinary-admin password-required peer-bound reviewed-install progress stale-refusal no-launch PASS',
 				'PACKAGE METADATA ordinary-admin-standard complete-package-trust-history-offline-lock typed-flags nested-refusal read-only PASS',
 				'PACKAGE DEPLOYMENT bounded-reader formats-1-2 owned-fields malformed-refusal read-only PASS',
+				'PACKAGE DEPLOYMENT exact-pins sequence-digest missing-version refusal read-only PASS',
 				'PACKAGE VIEW ordinary-admin-standard complete-catalog installed-launch-fields typed-flags nested-refusal read-only PASS',
 				'PACKAGE POLICY ordinary-admin-standard public-read complete-impact literal-path password-role stale-file-refusal atomic-policy-only reload clean-runtime PASS',
 				'PACKAGE ADMIN reviewed-remove rollback trust-revocation root-state audit no-password-log clean-runtime PASS', 'HWTEST PASS packages-admin'],

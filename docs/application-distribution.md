@@ -1656,6 +1656,10 @@ permissions, license or payloads under the same version are rejected. Missing
 dependencies, unrelated locked packages and publisher substitutions fail before
 downloads or cleanup. The usual policy/version/architecture/runtime checks apply;
 the lock grants no permissions, license acceptance or firmware approval.
+Exact pin matching scans the authenticated catalog once with storage proportional
+to the lock. Matching and manifest-digest scratch are retired on success and
+refusal; duplicate exact matches fail as ambiguous. See
+[matching qualification](../tests/packages/deployment-candidates-check.md).
 
 For offline deployment, export the exact locked payload closure with
 `mirror-deployment-review NEW_DIRECTORY LOCK.json`, then confirm with

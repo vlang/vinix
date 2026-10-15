@@ -36,11 +36,25 @@ struct DeploymentIdentity {
 // Digest every manifest field, including payload hashes, permissions, license,
 // runtime entrypoint and launch arguments. Index sequence/expiry are independent.
 pub fn package_metadata_digest(p Package) !string {
-	text := json2.encode(canonical_package(p)!) + '\n'
-	bytes := text.bytes()
-	digest := sha256.sum(bytes).hex()
-	unsafe { bytes.free(); text.free() }
-	return digest
+	canonical := canonical_package(p)!
+	defer {
+		// Canonicalization owns these four buffers and borrows their fields.
+		unsafe {
+			(&array(&canonical.files)).free(); (&array(&canonical.dependencies)).free()
+			(&array(&canonical.permissions)).free(); (&array(&canonical.associations)).free()
+		}
+	}
+	mut bytes := []u8{cap: 2048}
+	unsafe { bytes.flags |= .noslices }
+	defer { unsafe { bytes.free() } }
+	json2.encode_append(canonical, mut bytes)
+	bytes << u8(`\n`)
+	mut hash := sha256.new()
+	mut sum := []u8{len: sha256.size}
+	defer { unsafe { sum.free(); hash.free(); free(hash) } }
+	hash.write(bytes)!
+	hash.checksum_into(mut sum)
+	return sum.hex()
 }
 
 fn read_deployment(path string, architecture string) !DeploymentLock {
@@ -90,26 +104,19 @@ fn decode_deployment(text string, architecture string) !DeploymentLock {
 fn deployment_plan(config Config, directory string, current State, document DeploymentLock) !Plan {
 	if document.format == 1 { return operation_plan(config, directory, current, 'deploy', document.packages) }
 	catalog := load_catalog(config, directory)!
-	mut candidates := []Installed{cap: document.locked.len}
-	for pin in document.locked {
-		matches := catalog.packages.filter(it.package.id == pin.id && it.package.version == pin.version
-			&& it.package.architecture == pin.architecture && it.repository == pin.repository && it.public_key == pin.public_key)
-		if matches.len != 1 {
-			return error('${pin.id}: locked ${pin.version}/${pin.architecture} publisher is absent from the authenticated catalog; restore the approved repository or regenerate the deployment lock')
-		}
-		candidate := matches[0]
-		if candidate.sequence < pin.minimum_sequence || package_metadata_digest(candidate.package)! != pin.metadata_sha256 {
-			return error('${pin.id}: locked publisher sequence or package metadata changed; review a new deployment lock')
-		}
-		candidates << candidate
-	}
+	mut accepted := false
+	defer { if !accepted { close_authenticated_catalog(catalog) } }
+	candidates := locked_deployment_candidates(catalog, document)!
+	defer { unsafe { (&array(&candidates)).free() } }
 	// The normal solver still enforces architecture, organization policy,
 	// installed publisher ownership, dependency ranges and runtime entrypoints.
 	// It can only select the exact authenticated packages in this document.
 	plan := resolve(Catalog{ packages: candidates }, config, current, document.packages, true)!
 	if plan.packages.len != document.locked.len {
+		unsafe { (&array(&plan.requested)).free(); (&array(&plan.packages)).free() }
 		return error('deployment lock includes packages outside the requested dependency closure')
 	}
+	accepted = true // returned plan manifests borrow the authenticated catalog
 	return plan
 }
 

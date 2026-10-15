@@ -1878,6 +1878,12 @@ ID/version/architecture/publisher/digest in the current authenticated catalog,
 whose signed sequence must meet the lock floor and persistent replay history.
 The regular resolver still checks policy, installed publisher ownership, version
 ranges, runtime entrypoints and full closure; unused/missing records fail.
+Exact matching indexes pin IDs and scans the authenticated catalog once, using
+storage proportional to the number of pins. Candidate results borrow catalog
+manifest fields, and matching/digest scratch is retired after use. More than one
+exact identity refuses as ambiguous even if one record has the approved digest.
+Canonical metadata digest bytes retain their SDK-1 definition above. See
+[matching qualification](../../tests/packages/deployment-candidates-check.md).
 
 `deployment-snapshot [INSTALLED_ID...]` emits the same format-2 document from
 installed metadata alone. Without IDs it records every explicitly installed

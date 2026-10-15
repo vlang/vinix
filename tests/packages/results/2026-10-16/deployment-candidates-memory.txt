@@ -1,0 +1,5 @@
+Native -gc none -manualfree -d track_heap
+Deployment candidates: exact version/architecture/repository/key matching, lock order, ignored variants, duplicate pins and saturated ambiguity PASS
+Deployment candidates: catalog-32768/lock-4096 and unrelated catalog growth succeed with pin-sized storage; excess pins refuse PASS
+Deployment digest: exact SDK-1 canonical JSON plus LF, sorted inventory/requirements/declarations and literal argument order preserve caller fields PASS
+Deployment candidates: 1000 exact/absent/digest/sequence/ambiguous matching and growing digest cycles retained 0 bytes

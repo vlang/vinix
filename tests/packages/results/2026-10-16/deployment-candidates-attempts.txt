@@ -1,0 +1,63 @@
+After replacing catalog filters and retiring canonical/encoding scratch, the first probe retained 54,560 bytes from SHA-256 convenience context/checksum storage. Final hashing frees its context, state and checksum explicitly. Initial binary, generated C and source are pinned. An initial CLI fixture compile also used the reserved identifier lock; it was renamed before running.
+
+Deployment candidates: 10 matches of 16 pins in catalog-256 retained 54560 bytes
+tools/packages/pkgcore/deployment_candidates_test.v:41: fn test_locked_candidate_matching_retires_its_own_storage_and_preserves_borrowed_fields
+   > assert kept == 0
+     Left value (len: 5): `54560`
+    Right value (len: 1): `0`
+
+
+CLI first diagnostic:
+tests/packages/distribution-cli.v:563:12: error: unexpected token `:=`, expecting one or more shared variable names
+  561 |         lock_text := success(binary, ['--root', root, 'deployment-lock', 'base', 'node-0'])!
+  562 |         os.write_file(lock_path, lock_text)!
+  563 |         mut lock := pkgprotocol.decode_deployment_document(lock_text)!; defer { lock.close() }
+      |                  ~~
+  564 |         assert lock.locked.len == 2 && lock.locked.all(it.version == '1.0.0' && it.minimum_sequence == 2)
+  565 |         mut deployment := pkgprotocol.decode_review(success(binary, ['--root', root, 'deployment-review', lock_path])!)!
+
+Initial AArch64 run: exact-pin and bounded-reader markers passed, then the unchanged package_admin.v:107 disconnected-worker completion assertion failed. Cause not established. A fresh retry uses the same timeout after host checks completed. Initial guest source/binaries/logs are pinned separately.
+FAIL aarch64 packages-admin (84.2s)
+  forbidden "FAIL: fn main.qualify_package_admin" in the line: /Users/alex/code/vinix/tests/accounts/guest/package_admin.v:107: FAIL: fn main.qualify_package_admin: assert completed && service.verify()!.packages.len == 0
+  last 40 serial lines:
+  | TracerPid:	0
+  | Uid:	0	0	0	0
+  | Gid:	0	0	0	0
+  | NSpid:	62343
+  | Threads:	1
+  | VmLck:	0 kB
+  | CapInh:	0000000000000000
+  | CapPrm:	000001ffffffffff
+  | CapEff:	000001ffffffffff
+  | CapBnd:	000001ffffffffff
+  | CapAmb:	0000000000000000
+  | NoNewPrivs:	0
+  | Seccomp:	0
+  | Seccomp_filters:	0
+  | 
+  | PACKAGE ADMIN disconnected-worker process: 62751
+  | Name:	vinix-package[45240]
+  | Umask:	022
+  | State:	Z (zombie)
+  | Tgid:	62751
+  | Ngid:	0
+  | Pid:	62751
+  | PPid:	1
+  | TracerPid:	0
+  | Uid:	0	0	0	0
+  | Gid:	0	0	0	0
+  | NSpid:	62751
+  | Threads:	1
+  | VmLck:	0 kB
+  | CapInh:	0000000000000000
+  | CapPrm:	000001ffffffffff
+  | CapEff:	000001ffffffffff
+  | CapBnd:	000001ffffffffff
+  | CapAmb:	0000000000000000
+  | NoNewPrivs:	0
+  | Seccomp:	0
+  | Seccomp_filters:	0
+  | 
+  | /Users/alex/code/vinix/tests/accounts/guest/package_admin.v:107: FAIL: fn main.qualify_package_admin: assert completed && service.verify()!.packages.len == 0
+  | V panic: Assertion failed...
+  logs: /Users/alex/code/vinix/build/pkg-pin-arm/packages-admin

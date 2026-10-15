@@ -555,8 +555,44 @@ fn qualify_install_preference(binary string, directory string) ! {
 		success(binary, ['--root', root, 'rollback'])!
 		assert pkgcore.read_state(store, architecture)!.packages.len == 21
 		success(binary, ['--root', root, 'verify'])!
+		// Lock older installed variants from a catalog that also advertises
+		// newer versions. Rejected substitutions cannot alter a live generation.
+		lock_path := root + '/deployment.json'
+		lock_text := success(binary, ['--root', root, 'deployment-lock', 'base', 'node-0'])!
+		os.write_file(lock_path, lock_text)!
+		mut pinned_document := pkgprotocol.decode_deployment_document(lock_text)!; defer { pinned_document.close() }
+		assert pinned_document.locked.len == 2 && pinned_document.locked.all(it.version == '1.0.0' && it.minimum_sequence == 2)
+		mut deployment := pkgprotocol.decode_review(success(binary, ['--root', root, 'deployment-review', lock_path])!)!
+		defer { deployment.close() }
+		before_deployment := os.readlink(store + '/current')!
+		state_bytes := os.read_file(store + '/current/state.json')!
+		generations := os.ls(store + '/generations')!.sorted(); objects := os.ls(store + '/objects')!.sorted()
+		for broken in [lock_text.replace('"minimum_sequence":2', '"minimum_sequence":3'),
+			lock_text.replace(pinned_document.locked[1].metadata_sha256, '0'.repeat(64)),
+			lock_text.replace('"version":"1.0.0"', '"version":"9.0.0"'),
+			lock_text.replace('"architecture":"all"', '"architecture":"' + architecture + '"'),
+			lock_text.replace('"repository":"fixture"', '"repository":"other"'),
+			lock_text.replace(key, '0'.repeat(64))] {
+			os.write_file(lock_path, broken)!
+			for operation in [['deployment-review', lock_path], ['deployment-apply', deployment.fingerprint, lock_path], ['deploy', lock_path]] {
+				refused := command(binary, ['--root', root, ...operation])!
+				assert refused.code == 1 && refused.text.contains('locked') && !refused.text.contains('V panic:'), refused.text
+			}
+			assert os.readlink(store + '/current')! == before_deployment && os.read_file(store + '/current/state.json')! == state_bytes
+			assert os.read_file(store + '/catalog.json')! == catalog && os.read_file(store + '/trust-history.json')! == history
+			assert os.ls(store + '/generations')!.sorted() == generations && os.ls(store + '/objects')!.sorted() == objects
+		}
+		os.write_file(lock_path, lock_text)!
+		success(binary, ['--root', root, 'deployment-apply', deployment.fingerprint, lock_path])!
+		deployed := pkgcore.read_state(store, architecture)!
+		assert deployed.requested == ['base', 'node-0'] && deployed.packages.len == 2 && deployed.packages.all(it.package.version == '1.0.0')
+		success(binary, ['--root', root, 'verify'])!
+		success(binary, ['--root', root, 'rollback'])!
+		assert pkgcore.read_state(store, architecture)!.packages.len == 21
+		success(binary, ['--root', root, 'verify'])!
 	}
 	println('Package CLI: signed offline install backtracks past 20 unrelated installed identities; exact installed preference, missing-requirement refusal, reviewed activation and rollback pass on both targets PASS')
+	println('Package CLI: exact older deployment pins survive newer catalog variants; sequence/digest/version/architecture/repository/key refusals preserve state and reviewed activation/rollback pass on both targets PASS')
 }
 
 fn qualify_removal_guidance(binary string, directory string) ! {

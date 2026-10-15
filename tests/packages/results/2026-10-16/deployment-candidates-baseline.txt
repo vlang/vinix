@@ -1,0 +1,8 @@
+Pre-change matching loop extracted unchanged into a private helper: expected failure retains 23,578,480 bytes over ten matches of 16 pins in a 256-entry catalog. Compiler input and binary are pinned in the ledger.
+
+Deployment candidates: 10 matches of 16 pins in catalog-256 retained 23578480 bytes
+tools/packages/pkgcore/deployment_candidates_test.v:41: fn test_locked_candidate_matching_retires_its_own_storage_and_preserves_borrowed_fields
+   > assert kept == 0
+     Left value (len: 8): `23578480`
+    Right value (len: 1): `0`
+

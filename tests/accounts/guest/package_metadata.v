@@ -87,10 +87,25 @@ fn qualify_package_metadata(mut t Test, db accountcore.Database, alex accountcor
 		mut roots_review := pkgprotocol.decode_review(roots_response.output)!
 		assert roots_review.rows.len == 1 && roots_review.rows[0].action == 'remove'; roots_review.close()
 		os.write_file(lock_path, lock_text)!
+		pinned_response := run(['/usr/bin/vinix-package', 'deployment-review', lock_path], '', db, user)
+		assert pinned_response.status == 0, pinned_response.output
+		mut pinned := pkgprotocol.decode_review(pinned_response.output)!
+		assert pinned.rows.len == 1 && pinned.rows[0].action == 'keep'; pinned.close()
+		for invalid_pin in [lock_text.replace('"minimum_sequence":1', '"minimum_sequence":2'),
+			lock_text.replace(document.locked[0].metadata_sha256, '0'.repeat(64)),
+			lock_text.replace('"version":"1.0.0"', '"version":"9.0.0"')] {
+			os.write_file(lock_path, invalid_pin)!
+			for operation in [['deployment-review', lock_path], ['mirror-deployment-review', '/tmp/metadata locked export', lock_path]] {
+				response := run(['/usr/bin/vinix-package', ...operation], '', db, user)
+				assert response.status != 0 && response.output.contains('locked') && !response.output.contains('V panic:'), response.output
+			}
+		}
+		os.write_file(lock_path, lock_text)!
 	}
 	assert service.state()! == before && os.read_file('/etc/vinix-packages/config.json')! == config
 	assert !os.exists('/tmp/metadata export é; $literal') && !os.exists('/tmp/metadata locked export')
 	t.say('PACKAGE METADATA ordinary-admin-standard complete-package-trust-history-offline-lock typed-flags nested-refusal read-only PASS')
 	t.say('PACKAGE VIEW ordinary-admin-standard complete-catalog installed-launch-fields typed-flags nested-refusal read-only PASS')
 	t.say('PACKAGE DEPLOYMENT bounded-reader formats-1-2 owned-fields malformed-refusal read-only PASS')
+	t.say('PACKAGE DEPLOYMENT exact-pins sequence-digest missing-version refusal read-only PASS')
 }
