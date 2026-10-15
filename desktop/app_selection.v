@@ -422,7 +422,7 @@ struct AppSelectionLayout {
 }
 
 fn app_selection_layout(width int, height int) AppSelectionLayout {
-	mut card_width := 780
+	mut card_width := 1000
 	if card_width > width - 24 {
 		card_width = width - 24
 	}
@@ -442,7 +442,7 @@ fn app_selection_layout(width int, height int) AppSelectionLayout {
 		width: card_width
 		height: card_height
 		list_height: math.max(1, card_height - app_selection_row_top - 116)
-		columns: if card_width >= 720 { 2 } else { 1 }
+		columns: if card_width >= 960 { 3 } else if card_width >= 720 { 2 } else { 1 }
 	}
 }
 

@@ -365,9 +365,9 @@ fn test_app_selection_wheel_and_scrollbar_reach_the_bottom_without_losing_choice
 	assert state.packages() == ['firefox']
 }
 
-fn test_app_selection_pairs_apps_under_headers_and_stacks_them_on_narrow_screens() {
+fn test_app_selection_uses_three_columns_and_adapts_to_narrow_screens() {
 	mut state := app_selection_test_state()
-	for width in [1024, 640] {
+	for width in [1024, 800, 640] {
 		desktop := Desktop{ canvas: Canvas{ width: width, height: 720, scale: 1 } }
 		begin_frame_elements()
 		tree := state.element(&desktop)
@@ -376,12 +376,20 @@ fn test_app_selection_pairs_apps_under_headers_and_stacks_them_on_narrow_screens
 		browsers := app_selection_test_element(tree, 'apps.heading.browsers') or { panic('missing heading') }
 		assert browsers.frame.x == firefox.frame.x
 		assert browsers.frame.y + browsers.frame.height < firefox.frame.y
-		if width == 1024 {
+		if width >= 800 {
 			assert firefox.frame.y == chromium.frame.y
 			assert firefox.frame.x + firefox.frame.width < chromium.frame.x
 		} else {
 			assert firefox.frame.x == chromium.frame.x
 			assert firefox.frame.y + firefox.frame.height < chromium.frame.y
+		}
+		if width == 1024 {
+			codium := app_selection_test_element(tree, 'apps.toggle.vscodium') or { panic('missing VSCodium') }
+			zed := app_selection_test_element(tree, 'apps.toggle.zed') or { panic('missing Zed') }
+			neovim := app_selection_test_element(tree, 'apps.toggle.neovim') or { panic('missing Neovim') }
+			assert codium.frame.y == zed.frame.y && zed.frame.y == neovim.frame.y
+			assert codium.frame.x + codium.frame.width < zed.frame.x
+			assert zed.frame.x + zed.frame.width < neovim.frame.x
 		}
 		$if arm64 {
 			voffice := app_selection_test_element(tree, 'apps.toggle.voffice') or { panic('missing VOffice') }
@@ -393,7 +401,7 @@ fn test_app_selection_pairs_apps_under_headers_and_stacks_them_on_narrow_screens
 
 fn test_app_selection_vertical_arrows_follow_grid_columns_and_skip_unavailable_apps() {
 	mut state := app_selection_test_state()
-	state.prepare_viewport(452, 2)
+	state.prepare_viewport(452, 3)
 	state.set_focus(1) // Chromium, in the second column.
 	state.key_input('\x1b[B')
 	assert first_run_apps[state.focus].package_name == 'keepassxc'
