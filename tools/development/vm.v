@@ -8,7 +8,7 @@ import vmcore
 fn dispatch() ! {
 	args := os.args[1..]
 	if args.len == 0 || args == ['--help'] {
-		println('Usage: vinix-vm init CONFIG.json FRESH-STATE | start|status|pause|resume|reset|shutdown|stop|snapshot-recover STATE | snapshot-create|snapshot-restore|snapshot-delete STATE NAME')
+		println('Usage: vinix-vm init CONFIG.json FRESH-STATE | start|status|pause|resume|reset|shutdown|stop|snapshot-recover STATE | guest-ping|guest-info|guest-osinfo|guest-network STATE | snapshot-create|snapshot-restore|snapshot-delete STATE NAME')
 		return
 	}
 	if args.len == 3 && args[0] == 'init' {
@@ -20,6 +20,10 @@ fn dispatch() ! {
 		return
 	}
 	if args.len != 2 { return error('invalid arguments; use --help') }
+	if args[0].starts_with('guest-') {
+		println(vmcore.guest(args[0], args[1])!)
+		return
+	}
 	if args[0] == 'snapshot-recover' {
 		vmcore.snapshot_recover(args[1])!
 		return

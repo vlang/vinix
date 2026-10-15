@@ -110,6 +110,7 @@ fn test_real_qemu_lifecycle_isolated_state_offline_snapshots_and_locking() {
 		memory_mib:    128
 		cpus:          2
 		start_paused:  true
+		guest_agent:   true
 		qemu:          pin(qemu)!
 		qemu_img:      pin(image_tool)!
 		disk:          pin(root + '/raw.img')!
@@ -143,6 +144,7 @@ fn test_real_qemu_lifecycle_isolated_state_offline_snapshots_and_locking() {
 		break
 	}
 	assert !control('status', state)!.as_map()['running']!.bool()
+	assert os.lstat(state + '/agent.sock')!.get_filetype() == .socket
 	control('resume', state)!
 	assert control('status', state)!.as_map()['running']!.bool()
 	control('pause', state)!

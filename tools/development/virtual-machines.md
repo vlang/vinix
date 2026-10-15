@@ -70,6 +70,44 @@ The guest-agent option creates a private `agent.sock` endpoint connected to
 This command does not expose remote control, inject credentials, or install
 guest software. No guest-agent implementation for Vinix is claimed.
 
+With that transport enabled and a running guest agent, query it from the host:
+
+```
+./vinix-vm guest-ping /home/developer/vm-state
+./vinix-vm guest-info /home/developer/vm-state
+./vinix-vm guest-osinfo /home/developer/vm-state
+./vinix-vm guest-network /home/developer/vm-state
+```
+
+These commands return JSON for agent health, agent version/capabilities,
+guest OS details and guest interfaces respectively. Integer counters retain
+their exact values. Each exchange has a five-second socket deadline, a 1 MiB
+total receive budget including discarded stale data, and a JSON nesting limit
+of 64. Missing, disabled, paused or unresponsive agents fail without starting
+the VM or changing its configuration. Guest policy errors are returned to the
+caller. No arbitrary RPC, guest execution, file access, freeze, password change
+or time adjustment is exposed by this CLI.
+
+The client follows QEMU's
+[guest-agent synchronization protocol](https://www.qemu.org/docs/master/interop/qemu-ga-ref.html#command-guest-sync-delimited):
+it sends a reset sentinel and a random integer nonce, discards stale data until
+the delimited nonce response, then correlates the query response by transaction
+ID. Every query opens a fresh connection and resynchronizes after earlier
+timeouts. A persistent private `agent.lock` serializes query processes without
+taking the running VM's lock. Older state directories acquire that file on
+their first query. The endpoint must be a socket owned by the calling user;
+symlinks and nonprivate state or lock files are refused.
+
+The guest administrator must install and authorize its agent. The manager's
+allowlist does not change the agent's own policy or restrict other clients
+that already have access to the private socket. For an administrator-selected
+read-only agent policy, QEMU supports an explicit
+[RPC allowlist](https://www.qemu.org/docs/master/interop/qemu-ga.html#cmdoption-qemu-ga-a)
+containing `guest-sync-delimited`, `guest-ping`, `guest-info`,
+`guest-get-osinfo` and `guest-network-get-interfaces`. Availability of those
+queries depends on the guest's agent and platform. No guest-side permissions
+are granted by invoking these commands.
+
 While the VM is stopped:
 
 ```
@@ -219,3 +257,19 @@ acceptance.
 The updated CLI also builds as static Linux ELF64 for AArch64 and x86_64.
 The checked machine IDs, source/compiler/binary hashes and build logs are
 retained locally in `/tmp/vinix-vm-monitor-build-62727`.
+
+Host guest-query checks use V protocol fixtures to exercise stale/partial
+output, wrong synchronization nonces, transaction correlation, exact 64-bit
+counters, agent policy errors, closure, deadlines, cancellation, and byte/JSON
+depth limits. The public CLI also checks concurrent-query refusal, queries
+while the VM lease is held, unchanged disk/firmware/pending files, disabled
+transport, nonprivate state/locks and unsafe endpoint paths. The real QEMU
+lifecycle fixture enables the virtio-serial agent channel and verifies its
+socket, alongside the existing lifecycle and snapshot checks. These fixtures
+do not qualify a packaged `qemu-ga` inside a guest or provide Vinix's missing
+guest-side virtio-serial driver and agent.
+All eight host VM/QMP test files passed on 15 October 2026 with QEMU 11.1.1
+and V `be2eb40`. The updated CLI cross-compiled and linked as static Linux
+ELF64 for AArch64 and x86_64; both machine IDs were checked. Source/compiler/
+binary hashes, logs and the build receipt are retained locally in
+`/tmp/vinix-vm-guest-build-86620`.
