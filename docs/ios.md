@@ -6048,17 +6048,44 @@ discriminator,
 `_$s10Foundation11JSONEncoderC20DateEncodingStrategyO9formattedyAESo15NSDateFormatterCcAEmFWC`.
 Fortnite has not entered application code and remains unplayable.
 
+The Foundation bridge now exports this formatted-date enum discriminator as
+four-byte read-only data with value zero, through both Foundation install names.
+Fortnite's GOT cell at `10dc98220` supplies the pointer to `ldr w1` at
+`10006e624`; the caller passes the loaded tag to DateEncodingStrategy's
+destructive enum-tag injection witness at offset 104. Native Foundation verifies
+that this tag selects the owned DateFormatter payload and survives a retained
+enum copy and destruction. The export uses the existing sealed Foundation data
+page and its drained lifetime. Reading the constant introduces no code dispatch,
+allocation or ARC operation.
+
+Eight ASan/UBSan runs and four Vinix ARM64 guest suites pass for the enum data,
+JSONDecoder construction, Foundation logging and CocoaError getter. The fixture
+uses real ARM64 four-byte loads/stores, guarded input/output edges and canaries,
+native payload witnesses, concurrent alias publication/readers, read-only mapping
+checks and two unmapped retirements. The rejected consumer fixture's instruction
+encoding, generated C, executable, debug symbols and diagnostic are retained
+separately; all final fixtures were regenerated after correcting its observation
+store. Eleven final C streams/programs and four joined, retired VM phases are
+retained under `build/ios/fortnite/json-encoder-date-case-checks`.
+Strategy/encoder metadata, date formatting and JSON encoding remain unsupported.
+Full iOS regression remains unpassed and published runners remain unchanged.
+
+The current IPA startup probe resolves the enum-case data export and exits with
+status 1 at Foundation's required DateEncodingStrategy metadata accessor,
+`_$s10Foundation11JSONEncoderC20DateEncodingStrategyOMa`.
+Fortnite has not entered application code and remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,483 | 677 | 79 |
+| Fortnite executable | 1,484 | 676 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,318 | 680 | 120 |
+| All images | 2,319 | 679 | 120 |
 
-The C++/GLES/Text variant reports 2,331 resolved imports, 667 unresolved strong
+The C++/GLES/Text variant reports 2,332 resolved imports, 666 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

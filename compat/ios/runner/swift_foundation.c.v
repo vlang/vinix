@@ -91,6 +91,10 @@ fn swift_foundation_arena() u64 {
 	swift_protocol_relative(conformance + 16, module_descriptor)
 	swift_protocol_relative(module_descriptor + 8, data + 80)
 	C.memcpy(unsafe { voidptr(data + 80) }, c'Foundation', 11)
+	// Resilient enum case exports are u32 data, consumed by the enum's
+	// destructiveInjectEnumTag witness. Native formatted(DateFormatter) is
+	// payload case zero; this does not construct an encoder or format a date.
+	write32(data + 96, 0)
 	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 172) })
 	if C.mprotect(unsafe { voidptr(base) }, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
@@ -247,6 +251,9 @@ fn swift_foundation_symbol(symbol string) !u64 {
 		'_$ss5ErrorP10FoundationE20localizedDescriptionSSvg' { swift_foundation_arena() + 96 }
 		'_$s10Foundation10CocoaErrorV19fileWriteFileExistsAC4CodeVvgZ' { swift_foundation_arena() + 128 }
 		'_$s10Foundation11JSONDecoderC6decode_4fromxxm_AA4DataVtKSeRzlFTj' { swift_foundation_arena() + 160 }
+		'_$s10Foundation11JSONEncoderC20DateEncodingStrategyO9formattedyAESo15NSDateFormatterCcAEmFWC' {
+			swift_foundation_arena() + u64(C.getpagesize()) + 96
+		}
 		else { return error('iOS: Swift Foundation symbol is not implemented: ${symbol}') }
 	}
 }

@@ -19,7 +19,8 @@ fn framework_symbol(library string, symbol string) ?u64 {
 			'_$s10Foundation10CocoaErrorV4CodeVAA01_cD8ProtocolAAMc', '_$s10Foundation10CocoaErrorV4CodeVMa',
 			'_$s10Foundation11JSONDecoderC6decode_4fromxxm_AA4DataVtKSeRzlFTj',
 			'_$s10Foundation11JSONDecoderCACycfc', '_$s10Foundation11JSONDecoderCMa',
-			'_$s10Foundation11JSONDecoderCMn'] {
+			'_$s10Foundation11JSONDecoderCMn',
+			'_$s10Foundation11JSONEncoderC20DateEncodingStrategyO9formattedyAESo15NSDateFormatterCcAEmFWC'] {
 		return swift_foundation_symbol(symbol) or { return none }
 	}
 	if library == '/System/Library/Frameworks/CFNetwork.framework/CFNetwork' {
