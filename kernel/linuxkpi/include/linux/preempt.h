@@ -27,4 +27,9 @@ void preempt_count_add(int value);
 #define preempt_count() vinix_linuxkpi_preempt_count()
 #include <vinix/integer_policy.h>
 #define preempt_check_resched() vinix_linuxkpi_preempt_check_resched()
+/* Task-owned nesting permits preemption and sleep on the same CPU. Ordinary
+ * task calls and balanced active-task maskable IRQ pairs are supported;
+ * idle, NMI, CPU hotplug and Linux's blocking affinity API remain unsupported. */
+void migrate_disable(void);
+void migrate_enable(void);
 #endif

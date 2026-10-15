@@ -38,9 +38,17 @@ fn worker_bind(target u32) int {
 		return -errno.einval
 	}
 	mut t := proc.current_thread()
-	if t == unsafe { nil } || t.process != kernel_process || katomic.load(&t.is_dead) {
+	if t == unsafe { nil } || voidptr(t.process) != voidptr(kernel_process)
+		|| katomic.load(&t.is_dead) {
 		cpu.interrupt_toggle(ints)
 		return -errno.eperm
+	}
+	// Waiting for another CPU cannot finish while the current task has a
+	// sleep-preserving migration pin. Reject before changing mask or NUMA.
+	pin := katomic.load(&t.linuxkpi_migration_pin)
+	if pin != 0 && u32(pin) != target + 1 {
+		cpu.interrupt_toggle(ints)
+		return -errno.ebusy
 	}
 	// No other CPU can hold this running thread's scheduling lock. Publish its
 	// new mask atomically for the run-queue scans, and let the target CPU claim
@@ -80,7 +88,8 @@ fn test_worker_route(owner voidptr, target u32) int {
 		cpu.interrupt_toggle(ints)
 		return -errno.einval
 	}
-	if t == unsafe { nil } || t.process != kernel_process || katomic.load(&t.is_dead) {
+	if t == unsafe { nil } || voidptr(t.process) != voidptr(kernel_process)
+		|| katomic.load(&t.is_dead) {
 		cpu.interrupt_toggle(ints)
 		return -errno.eperm
 	}

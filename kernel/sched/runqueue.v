@@ -38,6 +38,12 @@ pub fn set_cpu_capacity(number u64, value u32) {
 // Affinity is mandatory; capacity hints only bias placement. Unknown or
 // insufficient capacity never makes an otherwise allowed CPU ineligible.
 fn placement_cpu(t &proc.Thread) u64 {
+	return placement_cpu_with_affinity(t, katomic.load(&t.affinity_mask))
+}
+
+// The result is a wake/placement hint. Actual dispatch rechecks eligibility
+// after taking the task lock; later asynchronous mask updates remain legal.
+fn placement_cpu_with_affinity(t &proc.Thread, affinity u64) u64 {
 	mut target := u64(0)
 	mut best := ~u64(0)
 	count := cpu_locals.len
@@ -46,7 +52,7 @@ fn placement_cpu(t &proc.Thread) u64 {
 	for step in 0 .. count {
 		number := (start + u64(step)) % u64(count)
 		entry := cpu_locals[number]
-		if katomic.load(&entry.online) == 0 || !may_run_here(t, number) { continue }
+		if katomic.load(&entry.online) == 0 || !may_run_here_with_affinity(t, number, affinity) { continue }
 		capacity := cpu_capacity(number)
 		load := katomic.load(&runqueues[number % max_runqueue_cpus].count)
 		mut score := load * 1024 / u64(capacity)
@@ -212,6 +218,14 @@ fn scan_run_queue(cpu_number u64, last_index &int, want_node int) &proc.Thread {
 			}
 			mut candidate := unsafe { t }
 			if !candidate.l.test_and_acquire() { continue }
+			// A remote scan can observe an unpinned running task, then acquire
+			// its lock only after that task publishes a pin and switches off.
+			// Recheck mandatory eligibility after ownership transfers. While
+			// this lock is held the task cannot run and change its own pin.
+			if katomic.load(&candidate.is_dead) || !may_run_here(candidate, cpu_number) {
+				candidate.l.release()
+				continue
+			}
 			if cgroup_parks(candidate, &candidate.gpr_state) {
 				candidate.l.release()
 				continue

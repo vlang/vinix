@@ -554,6 +554,14 @@ after a filesystem failure. Mutable build inputs still require isolation.
   no-reschedule release and deferred rescheduling. `preempt_count` currently
   reports scheduler pins only. Full Linux IRQ/NMI/softirq context encoding and
   `in_interrupt`/`in_atomic` are not implemented.
+- Native x86 `migrate_disable`/`migrate_enable` retain a task's CPU across
+  sleep, yield and preemption without holding a preemption pin or overwriting
+  requested affinity. Nested maskable interrupt pairs on a live task preserve
+  that task's existing pin. Outermost release notifies the scheduler when the
+  requested mask excludes the current CPU; IRQ/preemption guards defer the
+  switch until safe. Idle, NMI, hotplug and deep-sleep CPU removal are outside
+  this fixed boot CPU contract. This does not supply Linux's blocking affinity
+  setter or enlarge native workers' 64-bit affinity masks.
 - `might_sleep_if` evaluates its C scalar predicate once. False predicates
   skip the context query; true predicates enforce the existing native
   `might_sleep` sleep-context invariant without rescheduling. This is stronger
@@ -2864,3 +2872,91 @@ unchanged audit remains **6/269**, with 229 task/MM/vfork first errors, 28 type
 declaration errors, five migration API declarations and one entry-stack record.
 The 7,668-file import is unchanged. This is compiler/type closure; driver/core
 linking, device ownership and physical Tiger Lake validation remain pending.
+
+## Task-owned migration pins (2026-10-15)
+
+The native x86 migration API stores nesting and CPU identity in one atomic word
+at the end of each native Thread. New and cloned threads start unpinned. The
+task owns this scalar through sleep and exit; no separate object or reference
+is allocated. Nesting is checked through 65,535 and the representation accepts
+the fixed boot domain through 256 CPUs. Native worker binding remains limited
+to 64 CPUs; validation uses four CPUs. ARM shares the zero-initialized scheduler
+field and eligibility check but does not expose the x86 compatibility API.
+
+The scheduler checks mandatory eligibility again after acquiring a candidate's
+lock. This closes a race where a remote scan observed a running, unpinned task
+and acquired it only after the task published a pin and switched off its CPU.
+Release selects and validates its destination against one requested-affinity
+snapshot. A later valid remote mask publication can make that notification
+stale; actual dispatch and the existing post-unlock wake use current policy.
+An empty eligible snapshot still fails explicitly. A worker cannot bind away
+from an existing pin. Binding and retained-worker routing compare Process
+pointer identity without V's structural Process copies.
+
+The maintained V host test stages the real migration, eligibility, placement,
+scanner, binding and preemption bodies. Six strict GNU99/GNU11 O0/O1/O2
+ASan/UBSan profiles each pass 4,649 fatal controls, six scanner race controls
+and 48 affinity-publication controls, with eight concurrent observers. The
+publication controls include 24 corrected successes and 24 historical false
+fatals. Six separate production objects retain their strict import allowlists.
+All 129 selected definitions and 34 production bodies are checked against their
+generated sources; 256 input snapshots and 77 artifacts are retained. The host
+transports model hardware and locks; they do not establish native dispatch.
+
+Host result `migration-host-final-v2/result.json` SHA256:
+`caf0061c6dbe315bdc7dd3272e2344139c1fdab67357e849cf4d2252866c7850`;
+four-path manifest SHA256:
+`2e2a3e4f50e121a463c34e8ada789248cfbd04a5b33b512713ed84f2c4d76bce`.
+Independent host review SHA256:
+`40a8c0b718e9543422de528cc5501aafddeb34ca6fd2248d812d5929eecf03b4`.
+The final 18-path native source freeze is
+`migration-native-freeze-v4.json`, SHA256
+`af737fa4de3568b827188d531c03a35eac1ab2fcde91ff99663ce0765b46a5f1`,
+over isolated baseline `6896a6ea9`. Earlier v3 native runs passed but predate the
+affinity snapshot correction and cannot validate the final implementation.
+
+Repeat the host checks with:
+
+```sh
+build-support/run-v-tool.sh tests/linuxkpi/migration.v --keep-dir NEW_DIRECTORY
+```
+
+Isolated enabled/default x86 and disabled ARM builds pass. Normal, SSE4.1 and
+four-level x86 guests boot the exact saved enabled ELF
+`8851b859bde79880ac2060d8bb9bbe1eec3ed93ef44dea7af8a0ae9461ff620c`;
+the default guest boots ELF
+`7cf26666ce3fc95fcc322cdb4ab8bfb80de80a7d834a8b99ca7e430782ade107`
+without LinuxKPI markers. The native tests join every created actor and wait for
+off-stack retirement before checking allocation recovery. All four constructor
+failure stages are observed both before publication and after one live actor,
+with exact failure-index and consumed-stage witnesses. Each of those eight
+cases recovers pages and live heap objects. Three complete lifecycle warmups
+precede the measured fourth; each lifecycle includes 600 nested pin/yield
+contention cycles, real sleeps, remote affinity changes, actual idle CPU wake,
+independent task pins, and IRQ/preemption-deferred release. The final measured
+page counts match exactly and every live heap class matches in all three enabled
+guests. Balanced nested pin calls also run in a real maskable IRQ callback.
+
+Each enabled guest passes all 54 maintained markers and 36 strict allocation
+equalities, including existing user-copy, synchronization, workqueue and fence
+checks. These are feature measurements, not a global allocation-gate result.
+The genuine generated C and optimized native objects are reviewed separately
+from the smaller host transports. Valid repeated migration paths allocate
+nothing; compiler-generated out-of-bounds fatal diagnostics remain outside that
+claim. The final full unchanged i915 audit remains **6/269**, with 232 task/MM/
+vfork first errors, 30 type-declaration errors and one entry-stack record. All
+7,668 imported files are unchanged. Full driver/core compile/link, GPU binding,
+confirmed PCI identity and real Tiger Lake validation remain pending.
+
+Final four-guest artifact/ISO/chronology and parser-control map
+`migration-final-guests-v4.json` SHA256:
+`b40c95795f83fac7879b09174cf7fd76febf3890ce93bb6a947ea77030840782`.
+Independent guest reconstruction/review SHA256:
+`a9df2ded1d3c86cd144f98132765cee85b1e8075ba70244673089ff69ecf8722`.
+Independent final enabled/default/ARM C/O2, constructor/layout and native fixture
+review SHA256:
+`06b3cd5b07c34b92cd6ec54ac7c2318ee459b8ba16f283bfd512b6390f70b9c9`.
+The backend author is excluded from that independent approval; a separate
+review covers the backend and shared scheduler implementation.
+That 17-body backend/shared C/O2/ELF review SHA256:
+`fc04706a129927b2a12c9cbb19b857e3576470e488a00357e751cfddfd0f537f`.

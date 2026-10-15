@@ -18,14 +18,30 @@ import time
 // CPU: an affinity change while a thread is running has to take effect, so a CPU
 // it may no longer use puts it down even with nothing to replace it.
 fn may_run_here(t &proc.Thread, cpu_number u64) bool {
+	return may_run_here_with_affinity(t, cpu_number, katomic.load(&t.affinity_mask))
+}
+
+// A caller can retain one requested-affinity snapshot across selection and
+// validation. Pin and parking policy retain the same single owner here.
+fn may_run_here_with_affinity(t &proc.Thread, cpu_number u64, affinity u64) bool {
 	// A processor being taken out for a deep sleep runs nothing: park_amd64.v.
 	if parking(cpu_number) {
 		return false
 	}
+	// A sleeping task retains its current CPU independently of subsequent
+	// requested affinity. One atomic word publishes CPU and nesting together.
+	// Only that task's migration API writes this; new threads start at zero.
+	pin := katomic.load(&t.linuxkpi_migration_pin)
+	if pin != 0 {
+		depth := pin >> 32
+		owner_cpu := u32(pin)
+		return depth > 0 && depth <= 65535 && owner_cpu > 0 && owner_cpu <= 256
+			&& cpu_number == u64(owner_cpu - 1)
+	}
 	if cpu_number >= 64 {
 		return true
 	}
-	return katomic.load(&t.affinity_mask) & (u64(1) << cpu_number) != 0
+	return affinity & (u64(1) << cpu_number) != 0
 }
 
 // ── Real-time scheduling ─────────────────────────────────────────────────────

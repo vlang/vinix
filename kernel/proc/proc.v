@@ -996,7 +996,7 @@ pub fn thread_affinity(tid int) ?u64 {
 	if !mac_peer_allowed(current_thread().process, t.process) {
 		errno.set(errno.eperm); return none
 	}
-	return t.affinity_mask
+	return katomic.load(&t.affinity_mask)
 }
 
 pub fn set_thread_affinity(tid int, mask u64) bool {
@@ -1014,7 +1014,7 @@ pub fn set_thread_affinity(tid int, mask u64) bool {
 	if !mac_peer_allowed(current_thread().process, t.process) {
 		errno.set(errno.eperm); return false
 	}
-	t.affinity_mask = mask
+	katomic.store(mut &t.affinity_mask, mask)
 	// Forget which memory node this thread was at home on. The scheduler looks
 	// for threads whose home node matches the CPU it is picking for before it
 	// will take any thread at all, so a thread pinned to the CPUs of a
@@ -1022,7 +1022,7 @@ pub fn set_thread_affinity(tid int, mask u64) bool {
 	// scan by any thread already at home there -- for ever. The next CPU to run
 	// it claims it again, which is the right answer anyway: a thread told to run
 	// somewhere else does not belong where it used to be.
-	t.numa_node = -1
+	katomic.store(mut &t.numa_node, -1)
 	return true
 }
 

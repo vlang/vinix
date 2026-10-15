@@ -589,6 +589,10 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Native CPU bug query self-test failed')
 		}
 		C.kprintf(c'linuxkpi: original boot CPU L1TF classification, actual CPU samples and query lifetimes passed; no pages or heap objects retained\n')
+		if !migration_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Native migration pin self-test failed')
+		}
+		C.kprintf(c'linuxkpi: task-owned migration pins, sleeping affinity overrides and deferred release passed; no pages or heap objects retained\n')
 		if !work_irq_native_selftest() {
 			lib.kpanic(unsafe { nil }, c'Native workqueue IRQ identity self-test failed')
 		}

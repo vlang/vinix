@@ -269,6 +269,9 @@ pub mut:
  memory_until_ns u64
  io_context &cgcontrol.Group = unsafe { nil }
  io_context_active bool
+	// Atomic depth (high 32 bits) and pinned logical CPU + 1 (low 32).
+	// New threads start unpinned; this scalar owns no separate allocation.
+	linuxkpi_migration_pin u64
 }
 
 pub fn current_thread() &Thread {

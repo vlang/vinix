@@ -212,6 +212,9 @@ pub mut:
  memory_until_ns u64
  io_context &cgcontrol.Group = unsafe { nil }
  io_context_active bool
+	// Shared scheduler representation; the x86 LinuxKPI API is opt-in.
+	// Zero is unpinned, with no inherited or separately allocated owner.
+	linuxkpi_migration_pin u64
 }
 
 pub fn (t &Thread) current_syscall() (i64, u64) {

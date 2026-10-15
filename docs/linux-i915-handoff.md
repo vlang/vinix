@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-15 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Latest type-header build baseline: **`d7b24c4bf`**, with two frozen production headers described below. Recheck HEAD and the worktree before
+Latest migration-pin build baseline: **`6896a6ea9`**, with the 18 frozen native inputs described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -81,10 +81,10 @@ global fault-lease rewrite was not applied.
 
 Ordinary RCU, deferred page-backed frees, native IRQ work and the DMA-fence
 synchronization core are implemented and validated. The latest normal/SSE/
-four-level guests now pass 53 markers and 35 strict allocation equalities.
+four-level guests at the CPU-bug milestone pass 53 markers and 35 strict allocation equalities.
 Fence containers, reservation ownership and unchanged i915 software fences are
 implemented and validated. Original boot-CPU L1TF queries are also implemented
-and validated, with native positive-MSR execution still pending. Continue through the remaining task/MM, device,
+and validated, with native positive-MSR execution still pending. Task-owned migration pins now preserve CPU identity through sleep and yield; final validation is recorded below. Continue through the remaining task/MM, device,
 memory and DRM services; complete i915 support is still pending.
 
 ## Committed progress
@@ -2596,3 +2596,90 @@ Evidence/build worktrees are durable below
 in progress separately; it is not part of these type-only artifacts. Continue
 through real task/MM, page/mapping/device and DRM dependencies. GPU validation
 and full unchanged driver/core compile/link remain pending.
+
+## Task-owned migration pins (2026-10-15)
+
+Native x86 `migrate_disable`/`migrate_enable` store depth and logical CPU+1 in
+one atomic Thread tail word, with no new allocation/reference. New and cloned
+threads start at zero. Nesting permits actual sleep/preemption; existing
+requested affinity remains separate. The outer release restores ordinary mask
+policy and posts deferred scheduler notifications. Entry IF and preemption depth
+are preserved. Balanced active-task maskable IRQ pairs are covered; idle, NMI,
+hotplug and deep-sleep CPU removal are unsupported. Encoding accepts the fixed
+boot domain through 256 CPUs; worker binding still rejects machines above 64.
+Native tests exercise four CPUs. ARM has the shared zero-initialized field and
+scheduler predicate, with no x86 compatibility API.
+
+Mandatory eligibility is rechecked after acquiring a runqueue candidate's lock:
+the original precheck alone could admit a task that published a migration pin
+before switching off. Release selects and validates against one atomic requested
+mask snapshot, avoiding a false fatal when a remote valid mask change stales its
+wake hint. Dispatch and post-unlock wake still use latest policy. Empty eligible
+snapshots remain fatal. Worker binding away from a pin returns EBUSY before
+mutation; Process identity checks avoid structural Process copies.
+
+Final 18-path source freeze `migration-native-freeze-v4.json` SHA256:
+`af737fa4de3568b827188d531c03a35eac1ab2fcde91ff99663ce0765b46a5f1`.
+Build worktrees start at `6896a6ea9` and carry only that overlay. V3 normal/SSE/
+four-level guests passed but predate the snapshot correction; preserve them as
+historical evidence, without treating them as final-source validation.
+
+Maintained V host checks stage 34 production bodies unchanged in 129 selected
+definitions, retain 256 input snapshots/77 artifacts, and pass all six strict
+GNU99/GNU11 O0/O1/O2 sanitizer and six freestanding object profiles. Each run
+includes 4,649 fatal controls, six deterministic scanner controls, 48 affinity
+publication controls (24 corrected successes/24 historical false-fatals) and
+eight concurrent observers. Host transports are models, not real CPU dispatch.
+Result SHA256:
+`caf0061c6dbe315bdc7dd3272e2344139c1fdab67357e849cf4d2252866c7850`;
+four-path manifest SHA256:
+`2e2a3e4f50e121a463c34e8ada789248cfbd04a5b33b512713ed84f2c4d76bce`;
+independent host rereview SHA256:
+`40a8c0b718e9543422de528cc5501aafddeb34ca6fd2248d812d5929eecf03b4`.
+Source/lifetime snapshot correction review SHA256:
+`23b3bea51f39ed970715bc569b07a29543aea46f3ca7de90a313dde72dfad7a0`.
+
+Enabled/default x86 and disabled ARM builds pass. Final enabled proof SHA256:
+`f406092be4f2365f63b03f2ad48bdcf48133854a441c2a4974ebd1678c87a243`;
+ARM proof SHA256:
+`4d82c0f9619b5598788b042569dd002734c943f6527bf22395115a0b9bc4e096`;
+default x86 proof SHA256:
+`a468b993508e5f42333bc03fff3b9422daf6678fd1d03646a26bcbcd8fa2e602`.
+Final enabled ELF SHA256:
+`8851b859bde79880ac2060d8bb9bbe1eec3ed93ef44dea7af8a0ae9461ff620c`;
+default ELF SHA256:
+`7cf26666ce3fc95fcc322cdb4ab8bfb80de80a7d834a8b99ca7e430782ade107`.
+
+Final normal/SSE/four-level guests and the default guest pass. Each enabled
+guest has 54 required markers and 36 strict page/live-heap equalities. All eight
+constructor-failure cases (stages1..4 before any actor and after one actor) check
+the actual failure index and consumed stage, then recover pages/all live heap
+classes. Three full lifecycle warmups precede the measured fourth, each with
+600 pin/yield contention cycles and actual timed sleeps. Independent pins,
+remote requested affinity, idle target wake, IRQ-off release, actual scheduler
+preemption deferral and balanced real maskable IRQ pin pairs are covered.
+Every actor joins and retires off-stack before measurement. Generated C/O2
+review distinguishes valid allocation-free paths from compiler-generated fatal
+bounds diagnostics. These are feature measurements, not a global allocator pass.
+
+The fresh isolated full audit remains 6/269: 232 task/MM/vfork, 30 declaration,
+one entry-stack record. All 7,668 imports are unchanged. Independent audit/input
+guard review checks 8,053 paths and actual 269 Kbuild commands, SHA256:
+`230d93b20e8b8d64c8b30f5fbeea7dce23098ad3ed60d5145a47b340ee0866f5`.
+
+Final four-guest artifact/ISO/chronology and parser-control map SHA256:
+`b40c95795f83fac7879b09174cf7fd76febf3890ce93bb6a947ea77030840782`;
+independent exact ISO/PID1 reconstruction, observed profiles and guest review:
+`a9df2ded1d3c86cd144f98132765cee85b1e8075ba70244673089ff69ecf8722`.
+Final independent actual native/shared/constructor/layout/ARM/default C/O2 review:
+`06b3cd5b07c34b92cd6ec54ac7c2318ee459b8ba16f283bfd512b6390f70b9c9`.
+It excludes the reviewer's authored backend2, covered by a separate reviewer.
+Final 17-body backend/shared C/O2/ELF review SHA256:
+`fc04706a129927b2a12c9cbb19b857e3576470e488a00357e751cfddfd0f537f`.
+
+Evidence is durable under `/Users/alex/.cache/vinix-linuxkpi/smp-oct10/migration-*`.
+Next concrete work includes the legacy priority worker's Process identity and
+IRQ-enabled-handler guard, original stddef group/FAM closure, and genuine
+task/MM/vfork lifetimes. Do not add dummy task fields. Linux device/page/DMA/DRM
+ownership, full unchanged driver/core link and Tiger Lake validation remain
+unfinished.
