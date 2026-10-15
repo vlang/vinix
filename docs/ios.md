@@ -6655,23 +6655,55 @@ Base64 and reference snapshots. Eleven final C streams/programs and four joined,
 retired VM phases are retained. Full iOS regression remains unpassed; published
 runners remain unchanged.
 
-The current IPA probe resolves Date's Decodable conformance, then exits with
-status 1 at `_$s10Foundation6LocaleV10identifierACSS_tcfC`
-(`Locale.init(identifier:)`). Native inspection of that initializer is retained
-for the next step. Fortnite has not entered application code and remains
-unplayable.
+The next milestone implements Swift `Locale.init(identifier:)`, nominal
+metadata, value witnesses, the identifier getter and the Objective-C bridge
+in V. Both constructor call sites in this IPA pass the frozen small String
+`en_US_POSIX`. The constructor consumes its String and writes an owned
+sixteen-byte implementation/table pair through x8. A built-in NSLocale owns
+an independent NSString snapshot; copying the Swift value retains its owner,
+and final destruction releases that snapshot through ordinary Objective-C ARC.
+This private implementation has no permanent locale cache.
+
+The fixed-locale profile accepts empty, C/POSIX roots and the modern language
+codes en, de, fr, ru, zh, sr, es, pt, ja, ko, it, ar, he, hi, id and yi, plus
+the measured iw/in/ji aliases. It canonicalizes supported script/region/POSIX
+components within 128 bytes. Region separators are preserved; scripts use a
+hyphen; underscore POSIX variants are uppercase and hyphen variants lowercase.
+Legacy underscore scripts require their canonical spelling. ICU keywords,
+extensions, other variants, Unicode identifiers and the broader alias database
+remain unsupported. The borrowed getters dispatch through implementation slots
+64 and 488 with formal class metadata; their String and NSLocale results are
+owned and survive release of the original Swift value.
+
+The new Locale fixture compares the installed Foundation APIs with Vinix for
+24 identifier cases, inline/immortal/owned String inputs, guarded result/Self
+spans, copy and take assignment, optional-value tags, result lifetimes and
+eight-worker construction/publication. Two private runtimes drain their object,
+String and Swift heap registries and unmap their sealed arena. The public V
+harness registers `swift-locale-checks` and `build-swift-locale`; full iOS
+regression remains unpassed. Evidence is retained under
+`build/ios/fortnite/locale-checks` using the prior verified private SDK.
+Ten ASan/UBSan runs and five Vinix ARM64 suites pass for Locale, Date, Data
+writing, Base64 and reference snapshots. Thirteen final C streams/programs
+and four joined, retired VM phases are retained; published runners are unchanged.
+
+The current IPA probe resolves the Locale constructor, bridge and nominal
+metadata, then exits with status 1 at
+`_$s10Foundation8CalendarV10IdentifierO7iso8601yA2EmFWC`
+(`Calendar.Identifier.iso8601`). Fortnite has not entered application code and
+remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,520 | 640 | 79 |
+| Fortnite executable | 1,524 | 636 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,355 | 643 | 120 |
+| All images | 2,359 | 639 | 120 |
 
-The C++/GLES/Text variant reports 2,368 resolved imports, 630 unresolved strong
+The C++/GLES/Text variant reports 2,372 resolved imports, 626 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
