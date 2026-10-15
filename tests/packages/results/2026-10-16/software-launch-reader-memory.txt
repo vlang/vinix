@@ -1,0 +1,17 @@
+Software launch navigation: 1000 256-file draft/full/compact/paging/paste/blur/failure/terminal-transfer/retirement cycles retain zero tracked bytes
+Software launch reader: 1000 entry/file/page/render/resize/ignored-run/Back/cache-retirement cycles retain zero tracked bytes
+Software personal data: 1000 wide/invalid/valid decode/select/render/confirm/cancel/retire cycles retain zero tracked bytes
+Software personal data reader: 1000 inventory/confirmation/read/item/page/resize/ignored-deletion/Back/cancel/retirement cycles retain zero tracked bytes
+Software repository navigation: 1000 configuration/enrollment/revocation/page/full/compact/failure/cancel/retirement cycles retain zero tracked bytes
+Software repository paste: 1000 valid/rejected/selected-input cycles retain zero tracked bytes
+Software repository reader: 1000 enrollment/revocation/read/page/resize/ignored-confirm/Back/cancel/retirement cycles retain zero tracked bytes
+Software health: 1000 decode/order/page/render/select/search/filter/empty/compact/retire cycles retain zero tracked bytes PASS
+Software deployment audit: 1000 complete decode, detail, render, paging and retirement cycles retain zero tracked bytes
+Software report reader: 1000 decode/short-pages/package-steps/resize/back/cache-retirement cycles retain zero tracked bytes
+Software deployment saving: 1000 literal paste/control refusal/blur/full/compact/receipt/paging/mismatch/retirement cycles retain zero tracked bytes
+SOFTWARE CLEANUP 1000 owned decode/page/render/compact/retirement cycles retain zero tracked bytes PASS
+Software cleanup reader: 1000 decode/read/page/resize/back/retirement cycles retain zero tracked bytes
+Software organization policy: 1000 wide-document/valid-review/invalid-review/page/redraw/cancel/retire cycles retain zero tracked bytes
+Software package details: 1000 catalog/review/open/growing-UTF-8-page/redraw/navigate/back/retire cycles retain zero tracked bytes
+Software paragraphs: 1000 owned/borrowed/wrapped/truncated label retirement cycles retain zero tracked bytes
+Software compact package details: 1000 prepare/section/full/compact/keys/resize/back/review/retire cycles retain zero tracked bytes

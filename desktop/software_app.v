@@ -182,6 +182,7 @@ mut:
 	worker_mirror bool
 	terminal_app &TerminalApp = unsafe { nil }
 	launch_mode bool
+	launch_read_file int = -1
 	launch_id string
 	launch_name string
 	launch_arguments []u8

@@ -453,6 +453,13 @@ an idle form to the catalog. Pasted control bytes cannot navigate, and running
 applications keep their runtime leases and close protection. See
 [navigation qualification](../../tests/packages/software-launch-navigation-check.md).
 
+**Read draft** exposes complete launch arguments, working folder, installed
+identity/file permission, each allowed path and any unadded path in the shared
+full/compact reader. File navigation leaves the form's selection and paging
+intact; Back/Escape also preserves field focus and selection. The reader cannot
+edit grants or run commands, and is unavailable during execution. See
+[launch reader qualification](../../tests/packages/software-launch-reader-check.md).
+
 `compose-catalog` combines reviewed profile locks into one publisher catalog,
 with separate prepared-root directories for each profile. It retains pins,
 permissions and license declarations and rechecks targets and dependencies.

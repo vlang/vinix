@@ -79,7 +79,138 @@ fn check_launch_empty_paste(mut app SoftwareApp) {
 	app.launch_focus = focused; app.select_all = selection
 }
 
+fn launch_reader_text(a &SoftwareApp) string {
+	mut bytes := []u8{cap: 16384}
+	unsafe { bytes.flags |= .noslices }
+	defer { unsafe { bytes.free() } }
+	for page in a.details_pages {
+		mut lines := page.text.split_into_lines()
+		for line in lines {
+			// Each canonical line has a bullet or continuation prefix.
+			start := if line.starts_with('• ') { 4 } else { 2 }
+			for index in start .. line.len { bytes << line[index] }
+		}
+		software_policy_free_lines(mut lines)
+	}
+	return bytes.bytestr()
+}
+
+fn launch_reader_cycle(mut app SoftwareApp) ! {
+	focus := app.launch_focus; selection := app.select_all
+	selected := app.launch_file_selected; scroll := app.launch_file_scroll
+	arguments := editor_bytes_text(app.launch_arguments); file := editor_bytes_text(app.launch_file)
+	argument_storage := app.launch_arguments.data; file_storage := app.launch_file.data; files := app.launch_documents.data
+	id := app.launch_id; name := app.launch_name; cwd := app.launch_data_cwd; allowed := app.launch_files_allowed; status := app.status
+	app.handle('software.report.read')!; assert app.report_reader_mode && app.details_pages.len > 0
+	for size in [ui2.rect(0, 0, 180, 220), ui2.rect(0, 0, 640, 610), ui2.rect(0, 0, 160, 96)]! {
+		free_window_tree(app.build(size)!)
+	}
+	app.key_input('\x1b[C'); app.key_input('\t'); app.key_input('\x1b[Z')
+	request := packagecore.request_prefix + '{"id":"no-files"}'
+	defer { unsafe { request.free() } }
+	for action in ['software.launch.arguments', 'software.launch.file', 'software.launch.data-cwd', 'software.launch.add-file',
+		'software.launch.remove-file', 'software.launch.up', 'software.launch.down', 'software.launch.file.0',
+		'software.launch.run', 'software.launch.terminal', 'software.launch.back', 'software.reload', 'software.cancel', 'software.confirm',
+		'software.run-options', 'software.report.read', request]! {
+		app.handle(action)!
+	}
+	app.key_input('typed'); app.key_input('\x01'); app.key_input('\x08'); app.key_input('\r')
+	app.paste_input('changed'); app.paste_input('\x1b'); app.paste_input('')
+	assert app.report_reader_mode && app.worker == unsafe { nil } && app.terminal_app == unsafe { nil } && !app.admin_prompt
+	assert app.launch_focus == focus && app.select_all == selection && app.launch_file_selected == selected && app.launch_file_scroll == scroll
+	assert editor_bytes_text(app.launch_arguments) == arguments && editor_bytes_text(app.launch_file) == file
+	assert app.launch_arguments.data == argument_storage && app.launch_file.data == file_storage && app.launch_documents.data == files
+	assert app.launch_id == id && app.launch_name == name && app.launch_data_cwd == cwd && app.launch_files_allowed == allowed && app.status == status
+	app.key_input('\x1b')
+	assert !app.report_reader_mode && app.launch_mode && app.details_pages.len == 0 && app.details_compact_pages.len == 0
+	assert app.launch_focus == focus && app.select_all == selection && app.launch_file_selected == selected && app.launch_file_scroll == scroll
+}
+
+fn check_software_launch_reader() ! {
+	mut app := launch_navigation_app()
+	defer { app.close_app() }
+	mut files := []string{cap: 256}
+	unsafe { files.flags |= .noslices }
+	for index in 0 .. 256 {
+		number := index.str()
+		files << '/private/tmp/document-' + number
+		unsafe { number.free() }
+	}
+	padding := '文'.repeat(1359)
+	long_file := '/private/tmp/' + padding + 'é.txt'
+	arguments := 'λ'.repeat(2048)
+	defer { pkgprotocol.free_command_values(mut files); unsafe { padding.free(); long_file.free(); arguments.free() } }
+	unsafe { files[255].free() }; files[255] = long_file.clone()
+	assert long_file.len == 4096 && arguments.len == 4096
+	fill_launch_navigation_draft(mut app, files)!
+	app.handle('software.launch.arguments')!; app.key_input('\x01'); app.paste_input(arguments)
+	app.handle('software.launch.file')!; app.paste_input(long_file); app.key_input('\x01')
+	launch_reader_cycle(mut app)!
+	app.handle('software.report.read')!
+	text := launch_reader_text(&app)
+	assert text.contains('Installed application ID: launch-app') && text.contains('Installed application name: Installed App é')
+	assert text.contains('Argument text: ' + arguments) && text.contains('Allowed file path: ' + long_file)
+	assert text.contains('Entered file path (not yet granted): ' + long_file)
+	assert text.contains('Allowed files: 256') && text.contains('Installed application directory (read-only)')
+	assert text.contains('readable and writable') && text.contains('does not validate or run')
+	unsafe { text.free() }
+	for canonical, full in app.details_pages {
+		mut bytes := []u8{cap: full.text.len}
+		for short in app.details_compact_pages {
+			if short.source_page == canonical { for byte in short.text { if byte != `\n` { bytes << byte } } }
+		}
+		expected := full.text.replace('\n', '')
+		assert editor_bytes_text(bytes) == expected
+		unsafe { bytes.free(); expected.free() }
+	}
+	for index, short in app.details_compact_pages {
+		app.details_compact_page = index; app.details_page = short.source_page
+		for size in [ui2.rect(0, 0, 180, 220), ui2.rect(0, 0, 320, 240)]! {
+			tree := app.build(size)!
+			details_fixture_rendered_lines(&tree, short.text, 14, 118, int(size.width) - 28, 18, 12)
+			assert tree.children.any(it.id == 'software.report.back') && tree.children.any(it.text == short.label)
+			assert !tree.children.any(it.id in ['software.launch.run', 'software.launch.terminal', 'software.launch.add-file', 'software.launch.remove-file'])
+			for element in tree.children {
+				assert element.frame.x >= 0 && element.frame.x + element.frame.width <= size.width
+				assert element.frame.y >= 0 && element.frame.y + element.frame.height <= size.height
+			}
+			free_window_tree(tree)
+		}
+	}
+	anchor := app.details_compact_page; canonical := app.details_page
+	for size in [ui2.rect(0, 0, 640, 610), ui2.rect(0, 0, 160, 96), ui2.rect(0, 0, 180, 220)]! {
+		free_window_tree(app.build(size)!); assert app.details_compact_page == anchor && app.details_page == canonical
+	}
+	app.key_input('\x1b[C'); assert app.details_compact_page == anchor
+	app.key_input('\x1b[D'); assert app.details_compact_page == anchor - 1
+	// Traverse all grants independently of the form's selection and file page.
+	for app.launch_read_file > 0 { app.key_input('\x1b[A') }
+	app.key_input('\x1b[Z'); assert app.launch_read_file == 0
+	for index, path in files {
+		assert app.launch_read_file == index
+		current := launch_reader_text(&app); assert current.contains('Allowed file path: ' + path); unsafe { current.free() }
+		app.key_input('\t'); assert app.launch_read_file == if index < 255 { index + 1 } else { 255 }
+	}
+	assert app.launch_file_selected == 255 && app.launch_file_scroll == 251
+	app.handle('software.report.back')!
+	assert app.launch_focus == 2 && app.select_all && app.details_pages.len == 0
+	app.key_input('\x08'); app.handle('software.launch.data-cwd')!
+	app.handle('software.report.read')!
+	private := launch_reader_text(&app)
+	assert private.contains('~/.local/share/vinix-apps/launch-app') && private.contains('Entered file path (not yet granted): (empty)')
+	unsafe { private.free() }; app.key_input('\x1b')
+	app.handle('software.launch.back')!; app.selected = 1; app.handle('software.run-options')!
+	app.handle('software.report.read')!
+	empty := launch_reader_text(&app)
+	assert empty.contains('Argument text: (empty)') && empty.contains('No document files have been granted') && empty.contains('does not declare document-file access')
+	unsafe { empty.free() }
+	app.key_input('\t'); app.key_input('\x1b[A'); assert app.launch_read_file == -1
+	app.key_input('\x1b'); launch_reader_cycle(mut app)!
+	println('Software launch reader: complete 4096-byte Unicode arguments, pending and allowed paths; all 256 grants; installed permissions, both working folders, empty drafts, native lines, compact/full/tiny anchors and frozen form state passed')
+}
+
 fn check_software_launch_navigation() ! {
+	check_software_launch_reader()!
 	receipt := os.temp_dir() + '/vinix-launch-navigation-' + os.getpid().str()
 	os.setenv('VINIX_SOFTWARE_LAUNCH_NAVIGATION_RECEIPT', receipt, true)
 	defer { os.rm(receipt) or {}; os.unsetenv('VINIX_SOFTWARE_LAUNCH_NAVIGATION'); os.unsetenv('VINIX_SOFTWARE_LAUNCH_NAVIGATION_RECEIPT') }
@@ -137,16 +268,17 @@ fn check_software_launch_navigation() ! {
 		for size in [ui2.rect(0, 0, 640, 610), ui2.rect(0, 0, 320, 240)]! {
 			tree := app.build(size)!
 			assert tree.children.any(it.text == app.status)
-			assert !tree.children.any(it.id in ['software.launch.back', 'software.launch.run', 'software.launch.terminal', 'software.failure'])
+			assert !tree.children.any(it.id in ['software.launch.back', 'software.launch.run', 'software.launch.terminal', 'software.failure', 'software.report.read'])
 			free_window_tree(tree)
 		}
 		for event in ['software.launch.back', 'software.launch.arguments', 'software.launch.file', 'software.launch.data-cwd',
 			'software.launch.add-file', 'software.launch.remove-file', 'software.launch.up', 'software.launch.down', 'software.launch.file.0',
-			'software.launch.run', 'software.launch.terminal', 'software.reload', 'software.cancel']! { app.handle(event)! }
+			'software.launch.run', 'software.launch.terminal', 'software.reload', 'software.cancel', 'software.report.read']! { app.handle(event)! }
 		app.key_input('\x1b'); app.key_input('\x01'); app.paste_input('must not edit')
 		app.handle(packagecore.request_prefix + '{"id":"no-files"}')!
 		assert app.worker.pid == pid && C.kill(pid, 0) == 0 && app.launch_mode && app.launch_request == '' && !os.exists(receipt)
 		assert app.launch_documents == files && !app.launch_data_cwd && editor_bytes_text(app.launch_arguments) == launch_navigation_arguments
+		assert !app.report_reader_mode && app.details_pages.len == 0
 		app.worker.stdin_write('x'); wait_for_software(mut app)
 		assert app.launch_mode && app.prepare_close() && app.launch_documents == files && app.worker == unsafe { nil }
 		assert json2.decode[[]string](os.read_file(receipt)!)! == vector
@@ -156,6 +288,7 @@ fn check_software_launch_navigation() ! {
 			assert compact.children.any(it.id == 'software.failure') && compact.children.any(it.id == 'software.launch.back')
 			free_window_tree(compact)
 			app.handle('software.failure')!; app.key_input('\x1b'); assert !app.failure_mode && app.launch_mode
+			launch_reader_cycle(mut app)!
 		} else { assert app.status.contains('finished successfully') }
 		os.rm(receipt)!
 	}
@@ -192,6 +325,7 @@ fn check_software_launch_navigation_memory() ! {
 				fill_launch_navigation_draft(mut app, files)!
 				check_launch_empty_paste(mut app)
 				assert app.launch_documents.len == 256 && app.launch_file_scroll == 251 && app.launch_file_selected == 255
+				launch_reader_cycle(mut app)!
 				app.handle('software.launch.file')!; app.paste_input('/private/tmp/overflow'); app.handle('software.launch.add-file')!
 				check_launch_empty_paste(mut app)
 				assert app.launch_documents.len == 256 && app.status.contains('At most 256')
@@ -214,5 +348,6 @@ fn check_software_launch_navigation_memory() ! {
 		app.set_status('')
 		kept := C.vinix_heap_end(); assert kept == 0, 'launch navigation retained ${kept} bytes'
 		println('Software launch navigation: 1000 256-file draft/full/compact/paging/paste/blur/failure/terminal-transfer/retirement cycles retain zero tracked bytes')
+		println('Software launch reader: 1000 entry/file/page/render/resize/ignored-run/Back/cache-retirement cycles retain zero tracked bytes')
 	}
 }

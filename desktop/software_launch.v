@@ -14,13 +14,51 @@ fn software_launch_kind(row SoftwareRow) string {
 }
 
 fn (mut a SoftwareApp) clear_launch_options() {
+	a.clear_details()
 	unsafe { a.launch_id.free(); a.launch_name.free(); a.launch_arguments.free(); a.launch_file.free() }
 	pkgprotocol.free_command_values(mut a.launch_documents)
 	a.launch_id = ''; a.launch_name = ''
 	a.launch_arguments = []u8{}; a.launch_file = []u8{}
 	a.launch_mode = false; a.launch_focus = 0
 	a.launch_file_selected = -1; a.launch_file_scroll = 0
+	a.launch_read_file = -1
 	a.launch_data_cwd = true; a.launch_files_allowed = false
+}
+
+fn (mut a SoftwareApp) prepare_launch_details() {
+	a.clear_details()
+	a.details_pages = []SoftwareDetailsPage{cap: 32}
+	unsafe { a.details_pages.flags |= .noslices }
+	mut values := ['Installed application ID: ' + a.launch_id, 'Installed application name: ' + a.launch_name,
+		'Draft only. Reading does not validate or run this command.'.clone(),
+		'Arguments use quotes and backslash escapes; shell operators and variables remain literal.'.clone(),
+		'Argument text: ' + if a.launch_arguments.len == 0 { '(empty)' } else { editor_bytes_text(a.launch_arguments) },
+		if a.launch_data_cwd { 'Working folder: This account\'s private application data, ~/.local/share/vinix-apps/' + a.launch_id }
+		else { 'Working folder: Installed application directory (read-only)'.clone() }]
+	unsafe { values.flags |= .noslices }
+	software_details_count(mut values, 'Allowed files: ', u64(a.launch_documents.len))
+	values << if a.launch_files_allowed { 'Installed manifest declares file access. Each allowed file is readable and writable by this application.'.clone() }
+		else { 'Installed manifest does not declare document-file access. Private application data remains available.'.clone() }
+	if a.launch_read_file >= 0 && a.launch_read_file < a.launch_documents.len {
+		software_details_count(mut values, 'Allowed file number: ', u64(a.launch_read_file + 1))
+		values << 'Allowed file path: ' + a.launch_documents[a.launch_read_file]
+	} else if a.launch_documents.len > 0 {
+		values << 'Use Next file to inspect every allowed path. Reader navigation keeps the form\'s file selection and paging.'.clone()
+	} else { values << 'No document files have been granted.'.clone() }
+	values << 'Entered file path (not yet granted): ' + if a.launch_file.len == 0 { '(empty)' } else { editor_bytes_text(a.launch_file) }
+	values << 'An entered file must be added or cleared before running. Allowed paths must be used explicitly in arguments when needed.'.clone()
+	values << 'The ordinary-account service checks current installed state, trust, policy, file existence and access at launch.'.clone()
+	values << 'Return to the full launch form to edit, add or remove grants, change the working folder or run.'.clone()
+	a.details_values(0, values)
+	software_policy_free_lines(mut values)
+	total := a.details_pages.len.str()
+	for index in 0 .. a.details_pages.len {
+		number := (index + 1).str()
+		a.details_pages[index].label = number + ' of ' + total
+		unsafe { number.free() }
+	}
+	unsafe { total.free() }
+	a.prepare_report_reader()
 }
 
 fn (mut a SoftwareApp) open_launch_options() {
@@ -174,6 +212,7 @@ fn (mut a SoftwareApp) build_launch_options(width int, height int) ui2.Element {
 	if !busy {
 		children << software_button('software.launch.run', 'Run', 14, height - 138, 100)
 		children << software_button('software.launch.terminal', 'Run in Terminal', 126, height - 138, 160)
+		children << software_button('software.report.read', 'Read draft', 298, height - 138, 130)
 	}
 	a.add_status_footer(mut children, width, height, false)
 	return ui2.screen(app_surface, children)

@@ -482,6 +482,17 @@ the service that holds their runtime leases. After exit, failures retain the
 draft for correction and exact retry or transfer to Terminal. See the
 [launch navigation checks](../tests/packages/software-launch-navigation-check.md).
 
+**Read draft** opens a read-only review in full or compact launch windows.
+It shows the installed application identity, complete argument text, working
+folder, installed file-access permission, granted file paths and any entered
+path that has not been added. Previous/Next file, Up/Down and Tab/Shift-Tab
+browse the grants without changing the form's selection or file page. Only the
+current grant's pages are cached, so all 256 grants can be inspected without
+preparing every path at once. Back/Escape returns to the exact draft, including
+field focus and selection. Reading neither validates nor starts a command;
+return to the full form to edit or run. Active applications cannot enter the
+reader. See [launch draft reader checks](../tests/packages/software-launch-reader-check.md).
+
 Search covers names, IDs and descriptions. Info shows publisher, repository,
 license, permissions, target and installed version. Dependency ranges have
 inclusive minimum/exclusive upper versions. Resolution backtracks across all

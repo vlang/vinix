@@ -13,13 +13,19 @@ fn (mut a SoftwareApp) prepare_report_reader() {
 }
 
 fn (mut a SoftwareApp) open_report_reader() {
-	if a.worker != unsafe { nil } || a.details_pages.len == 0
+	if a.worker != unsafe { nil } { return }
+	if a.launch_mode {
+		a.launch_read_file = a.launch_file_selected
+		a.prepare_launch_details()
+	}
+	if a.details_pages.len == 0
 		|| !((a.health_mode && a.health_ready) || (a.audit_mode && a.audit_ready)
 			|| (a.snapshot_mode && a.snapshot_ready) || (a.cleanup_mode && a.cleanup_ready)
 			|| (a.repository_mode && a.repository_review_ready)
-			|| (a.data_mode && a.data_ready && a.administration_required)) { return }
+			|| (a.data_mode && a.data_ready && a.administration_required) || a.launch_mode) { return }
 	a.report_reader_mode = true
-	a.focus = false; a.select_all = false
+	// The launch form keeps its exact focus and selection behind the modal.
+	if !a.launch_mode { a.focus = false; a.select_all = false }
 	a.health_focus = false; a.health_select_all = false
 	a.audit_focus = false; a.audit_select_all = false
 	a.anchor_details_compact_page()
@@ -28,11 +34,17 @@ fn (mut a SoftwareApp) open_report_reader() {
 fn (a &SoftwareApp) report_has_packages() bool {
 	return (a.health_mode && a.health_matching.len > 0) || (a.audit_mode && a.audit_matching.len > 0)
 		|| (a.data_mode && a.data_pending == '' && a.data_status.rows.len > 0)
+		|| (a.launch_mode && a.launch_documents.len > 0)
 }
 
 fn (mut a SoftwareApp) report_select_package(step int) {
 	compact := a.details_compact_mode
-	if a.data_mode {
+	if a.launch_mode {
+		position := a.launch_read_file + step
+		if position < 0 || position >= a.launch_documents.len { return }
+		a.launch_read_file = position
+		a.prepare_launch_details()
+	} else if a.data_mode {
 		if a.data_pending != '' { return }
 		position := a.data_selected + step
 		if position < 0 || position >= a.data_status.rows.len { return }
@@ -60,7 +72,10 @@ fn (mut a SoftwareApp) report_select_package(step int) {
 fn (mut a SoftwareApp) handle_report_reader(action string) {
 	if a.worker != unsafe { nil } { return }
 	match action {
-		'software.report.back' { a.report_reader_mode = false; a.details_compact_mode = false }
+		'software.report.back' {
+			if a.launch_mode { a.clear_details(); a.launch_read_file = -1 }
+			else { a.report_reader_mode = false; a.details_compact_mode = false }
+		}
 		'software.report.previous', 'software.report.next' {
 			step := if action == 'software.report.next' { 1 } else { -1 }
 			if a.details_compact_mode {
@@ -96,7 +111,7 @@ fn (mut a SoftwareApp) build_report_reader(width int, height int) ui2.Element {
 	a.anchor_details_compact_page()
 	mut children := frame_elements(if a.details_compact_mode { 10 } else { 24 })
 	content_width := if width > 28 { width - 28 } else { 1 }
-	title := if a.data_mode { 'Personal data' } else if a.repository_mode { 'Repository trust' } else if a.cleanup_mode { 'Cleanup review' } else if a.health_mode { 'Health details' } else if a.audit_mode { 'Deployment check' } else { 'Saved deployment' }
+	title := if a.launch_mode { 'Launch draft' } else if a.data_mode { 'Personal data' } else if a.repository_mode { 'Repository trust' } else if a.cleanup_mode { 'Cleanup review' } else if a.health_mode { 'Health details' } else if a.audit_mode { 'Deployment check' } else { 'Saved deployment' }
 	if a.details_compact_mode {
 		back_width := if content_width >= 56 { 56 } else { content_width }
 		children << software_button('software.report.back', 'Back', if width > back_width + 28 { width - back_width - 14 } else { 14 }, 8, back_width)
@@ -107,8 +122,8 @@ fn (mut a SoftwareApp) build_report_reader(width int, height int) ui2.Element {
 		children << software_label(title, 14, 46, content_width, 28, false)
 		button_width := (width - 42) / 2
 		if a.report_has_packages() {
-			children << software_button('software.report.package.previous', 'Prev item', 14, 80, button_width)
-			children << software_button('software.report.package.next', 'Next item', width - 14 - button_width, 80, button_width)
+			children << software_button('software.report.package.previous', if a.launch_mode { 'Prev file' } else { 'Prev item' }, 14, 80, button_width)
+			children << software_button('software.report.package.next', if a.launch_mode { 'Next file' } else { 'Next item' }, width - 14 - button_width, 80, button_width)
 		} else { children << software_label('Recorded metadata', 14, 80, content_width, 28, false) }
 		if a.details_compact_page >= 0 && a.details_compact_page < a.details_compact_pages.len {
 			page := a.details_compact_pages[a.details_compact_page]
@@ -121,8 +136,8 @@ fn (mut a SoftwareApp) build_report_reader(width int, height int) ui2.Element {
 		children << software_label(title, 14, 8, width - 202, 28, false)
 		children << software_button('software.report.back', 'Back to report', width - 174, 8, 160)
 		if a.report_has_packages() {
-			children << software_button('software.report.package.previous', 'Previous package', 14, 46, 160)
-			children << software_button('software.report.package.next', 'Next package', 186, 46, 160)
+			children << software_button('software.report.package.previous', if a.launch_mode { 'Previous file' } else { 'Previous package' }, 14, 46, 160)
+			children << software_button('software.report.package.next', if a.launch_mode { 'Next file' } else { 'Next package' }, 186, 46, 160)
 		}
 		if a.details_page >= 0 && a.details_page < a.details_pages.len {
 			page := a.details_pages[a.details_page]
@@ -131,7 +146,8 @@ fn (mut a SoftwareApp) build_report_reader(width int, height int) ui2.Element {
 		}
 		children << software_button('software.report.previous', 'Previous', 14, height - 138, 100)
 		children << software_button('software.report.next', 'Next', 126, height - 138, 100)
-		children << software_label(if a.data_mode { 'Read-only details. Return to personal data before reloading, reviewing, cancelling or confirming deletion.' }
+		children << software_label(if a.launch_mode { 'Read-only draft. Return to launch options before editing arguments or grants, changing the working folder or running.' }
+			else if a.data_mode { 'Read-only details. Return to personal data before reloading, reviewing, cancelling or confirming deletion.' }
 			else if a.repository_mode { 'Read-only details. Return to the full trust review before cancelling, reviewing URL parts or confirming the change.' }
 			else if a.cleanup_mode { 'Read-only review. Return to cleanup before reloading or confirming deletion.' }
 			else { 'Read-only details. Return to the report before reloading, saving, exporting or reviewing changes.' }, 14, height - 98, content_width, 90, false)
