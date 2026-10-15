@@ -347,6 +347,7 @@ fn move_cycles(check_depth bool) {
 @[export: 'main']
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		exec_relative_entry(argc, argv)
 		exec_cloexec_entry(argc, argv)
 		exec_fd_entry(argc, argv)
 		descriptor_wx_entry(argc, argv)
@@ -358,6 +359,8 @@ pub fn run(argc i32, argv &&char) i32 {
 		count := C.read(fd, &name[0], 31)
 		check(fd >= 0 && count > 0 && C.close(fd) == 0, 4)
 		selected := &char(&name[0])
+		exec_relative := if count == 4 && name[0] == `e` && name[1] == `r` && name[2] == `-`
+			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		exec_cloexec := if count == 4 && name[0] == `e` && name[1] == `c` && name[2] == `-`
 			&& name[3] >= `0` && name[3] <= `7` { int(name[3] - `0`) } else { -1 }
 		exec_fd := if count == 4 && name[0] == `e` && name[1] == `d` && name[2] == `-`
@@ -455,7 +458,8 @@ pub fn run(argc i32, argv &&char) i32 {
 			|| C.strcmp(selected, c'descwx') == 0 || descriptor_wx >= 0
 			|| C.strcmp(selected, c'execflags') == 0 || exec_flags >= 0
 			|| C.strcmp(selected, c'execfd') == 0 || exec_fd >= 0
-			|| C.strcmp(selected, c'execcloexec') == 0 || exec_cloexec >= 0, 4)
+			|| C.strcmp(selected, c'execcloexec') == 0 || exec_cloexec >= 0
+			|| C.strcmp(selected, c'execrel') == 0 || exec_relative >= 0, 4)
 		if C.strcmp(selected, c'flags') == 0 || C.strcmp(selected, c'all') == 0 { unmount_modes() }
 		if C.strcmp(selected, c'move') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { move_cycles(C.strcmp(selected, c'move-reference') != 0) }
@@ -553,6 +557,9 @@ pub fn run(argc i32, argv &&char) i32 {
 		if C.strcmp(selected, c'execcloexec') == 0 || C.strcmp(selected, c'all') == 0
 			|| C.strcmp(selected, c'move-reference') == 0 { exec_cloexec_cases(-1) }
 		if exec_cloexec >= 0 { exec_cloexec_cases(exec_cloexec) }
+		if C.strcmp(selected, c'execrel') == 0 || C.strcmp(selected, c'all') == 0
+			|| C.strcmp(selected, c'move-reference') == 0 { exec_relative_cases(-1) }
+		if exec_relative >= 0 { exec_relative_cases(exec_relative) }
 		C.puts(c'MOUNT LIFECYCLE: PASS')
 		C.fflush(nil)
 		for { C.pause() }

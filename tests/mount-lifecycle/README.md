@@ -103,6 +103,9 @@ include them.
 `--case execcloexec` selects [close-on-exec script checks](exec-cloexec.md);
 `ec-0` through `ec-7` select individual cases. Native `all` and Linux
 `move-reference` include them.
+`--case execrel` selects [directory-relative script checks](exec-relative.md);
+`er-0` through `er-7` select individual cases. Native `all` and Linux
+`move-reference` include them.
 
 The [execveat descriptor checks](exec-fd.md) ignore unused upper register bits
 when selecting an executable description and constructing its script name.

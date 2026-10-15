@@ -107,7 +107,8 @@ and runtime checks. `post-commit-a.log` verifies all eleven committed paths,
 the exact three-file kernel patch, identity with tested sources and
 preservation of unrelated staged edits.
 
-Relative pathname scripts through close-on-exec directory descriptors,
-concurrent descriptor close/reuse or `F_SETFD`, namespace/remount races,
+Relative pathname scripts through close-on-exec directory descriptors are
+covered separately by [directory-relative script checks](exec-relative.md).
+Concurrent descriptor close/reuse or `F_SETFD`, namespace/remount races,
 dynamic/translated images, full OCI/rootless acceptance and the remaining
 roadmap section 17 gates remain open.

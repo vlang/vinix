@@ -577,7 +577,13 @@ refuse empty-path execution of valid scripts through `FD_CLOEXEC` descriptors
 with `ENOENT` before interpreter launch. ELF execution, flag clearing and
 duplicate-descriptor independence remain usable; existing authorization and
 descriptor releases remain in place. Relative pathname scripts through
-close-on-exec directory descriptions remain outside this qualification.
+close-on-exec directory descriptions are covered separately by the
+[directory-relative script checks](../tests/mount-lifecycle/exec-relative.md).
+Those checks provide descriptor-rooted interpreter names, pin the directory
+through image loading, and refuse scripts whose names would become inaccessible
+at exec. Renamed directories, cwd decoys, nested interpreters, ordinary users,
+absolute/`AT_FDCWD` requests, native ELF and lookup/authorization errors are
+covered. Divergent inherited-directory mount flags remain open.
 The [pathname truncation checks](../tests/mount-lifecycle/truncate-policy.md)
 also require a writable resolved attachment before changing size or copying up
 an overlay. Lookup retains the node and original resource under the VFS lock,

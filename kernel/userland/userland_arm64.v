@@ -842,9 +842,12 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 	prog.read(0, &shebang[0], 0, 2)?
 	gpu_exec_trace(trace_gpu, 'read executable signature')
 	if shebang[0] == char(`#`) && shebang[1] == char(`!`) {
-		if !grow_exec_scratch(exec_strings_size(argv) * 4 + u64(argv.len) * 256 + 4096) { return none }
+		relative_name := !description && loading_thread.exec_depth == 1
+			&& loading_thread.exec_descriptor != unsafe { nil }
+		name_budget := if relative_name { u64(path.len) * 2 + 64 } else { u64(0) }
+		if !grow_exec_scratch(exec_strings_size(argv) * 4 + u64(argv.len) * 256 + 4096 + name_budget) { return none }
   real_path, arg := parse_shebang(mut prog)?
-		if description && exec_descriptor_cloexec() {
+		if loading_thread.exec_depth == 1 && exec_descriptor_cloexec() {
 			// A valid script cannot outlive the descriptor naming it.
 			unsafe { real_path.free(); arg.free() }
 			errno.set(errno.enoent)
@@ -857,7 +860,13 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		if arg != '' {
 			final_argv << arg
 		}
-		final_argv << path
+		if relative_name {
+			script_path := exec_relative_script_name(path) @[freed]
+			final_argv << script_path
+			unsafe { script_path.free() }
+		} else {
+			final_argv << path
+		}
 		for i := 1; i < argv.len; i++ {
 			final_argv << argv[i]
 		}
@@ -1503,9 +1512,25 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		name.add_decimal(i64(call_dirfd))
 		target = lib.finish_text(*name)
 	} else {
-		directory = fs.parent_and_mount_for(call_dirfd, path, direct_mount) or {
-			unsafe { path.free() }
-			return errno.err, errno.get()
+		if path[0] != `/` && call_dirfd != fs.at_fdcwd {
+			// Keep the same directory for lookup and the interpreter's name.
+			mut fd := file.fd_from_fdnum(process, call_dirfd) or {
+				unsafe { path.free() }
+				return errno.err, errno.ebadf
+			}
+			mac_thread.exec_descriptor = voidptr(fd)
+			mac_thread.exec_descriptor_number = call_dirfd
+			if !stat.isdir(fd.handle.resource.stat.mode) || fd.handle.node == unsafe { nil } {
+				unsafe { path.free() }
+				return errno.err, errno.enotdir
+			}
+			directory = unsafe { &fs.VFSNode(fd.handle.node) }
+			lib.copy_mount_context(direct_mount, &fd.handle.mount)
+		} else {
+			directory = fs.parent_and_mount_for(call_dirfd, path, direct_mount) or {
+				unsafe { path.free() }
+				return errno.err, errno.get()
+			}
 		}
 		direct_node = fs.get_node_on_mount(directory, path, call_flags & fs.at_symlink_nofollow == 0, direct_mount) or {
 			unsafe { path.free() }

@@ -74,8 +74,9 @@ pub mut:
 	audit_sequence u64
 	// Only the synchronous executable loader consults the staged domain.
 	mac_loading bool
-	// AT_EMPTY_PATH owns this FD until failure or the loader commits.
+	// execveat owns this image/directory FD until failure or loader commit.
 	exec_descriptor voidptr
+	exec_descriptor_number int
 	is_in_queue   bool
 	queue_membership_lock klock.Lock
 	queue_cpu u32

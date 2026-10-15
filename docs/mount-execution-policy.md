@@ -1,5 +1,11 @@
 # Execution and device mount policy
 
+Directory-relative `execveat` scripts receive `/proc/self/fd/N/path` so their
+interpreters reopen the selected file independently of cwd. A close-on-exec
+directory makes that name inaccessible and returns `ENOENT` before launch.
+Absolute paths, `AT_FDCWD`, native ELF and nested interpreter pathname spelling
+remain unchanged. See [the relative script checks](../tests/mount-lifecycle/exec-relative.md).
+
 An empty-path `execveat` of a valid script returns `ENOENT` when its descriptor
 has `FD_CLOEXEC`, before starting the interpreter. Native ELF execution still
 accepts the descriptor and closes it in the new image. Clearing the flag
