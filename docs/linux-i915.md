@@ -3081,3 +3081,98 @@ closure. Full driver/core linking and Tiger Lake validation remain pending.
 ```sh
 build-support/run-v-tool.sh tests/linuxkpi/stddef_layout.v --keep-dir NEW_DIRECTORY
 ```
+
+
+## Native sleeping reader/writer semaphores (2026-10-16)
+
+The original non-RT `rw_semaphore` layout, static initializer and eleven public
+APIs now have a native V runtime. Shared readers and exclusive writers sleep on
+stack waiters protected by the original IRQ-save wait lock. A queued writer
+gates a reader phase; a reader head admits up to 256 queued readers, including
+readers beyond intervening writers, while preserving writer order. Try-locks do
+not barge ahead of queued waiters. Write downgrade, interruptible/killable read,
+killable write and nonowner read aliases use the real count/owner representation.
+
+The complete phase count is published before waking any grantee. A queued call
+retakes the same lock before returning; a granted ownership transfer wins over a
+concurrent signal. Cancellation detaches its waiter under that lock. No removed
+waiter is read after wake publication, and release paths never touch the
+semaphore after their final unlock. A grantee may release and free its enclosing
+object while an earlier unlock returns. Reader-owner addresses are weak hints,
+never retained or dereferenced; read unlock performs no current-task lookup.
+Valid acquire/release paths allocate no memory. Fresh initialization writes
+storage without reading prior bytes; callers must quiesce active users before
+reinitialization or freeing. Reader recursion is invalid caller use and has no
+per-reader tracking. RT, optimistic spinning, lockdep/debug layouts and NMI use
+are outside the supported profile. This does not supply a task address-space
+owner, VMA/page services or a Linux `mmap_lock` integration yet.
+
+The maintained host gate passes six GNU99/GNU11 O0/O1/O2 ASan/UBSan runs:
+66 safe scenarios, six deliberate lifetime-error controls and 90 invariant
+controls. It exercises 257 simultaneous queued readers, phase limits, writer
+gates, downgrade, cancellation/grant ordering, actual pthread parking, atomic
+contexts and deterministic post-unlock grantee/free handoffs. Sixty selected
+backend/facade generated bodies match full production modules. Twelve genuine
+freestanding production objects have bounded stack usage and only expected
+native imports. Host transports are separate V task/IRQ/scheduling models;
+they do not establish native CPU or interrupt behavior.
+
+The initial fixture exposed a native335 compiler metadata fault involving a
+foreign static declaration. The final test declares original `DECLARE_RWSEM`
+data in its contract and uses a pointer macro, with executable behavior still
+in V. A finite diagnostic retained four failing original generations and eight
+successful corrected generations; the final gate also repeats generation three
+times. No cached C or retry-to-pass was used. The descriptive scratch directory
+provides isolation; it is not claimed as a compiler fix.
+
+Final host result `rwsem-host-final-oct16-v1/result.json` SHA256:
+`ca2c2067c86c52d7bfdac04df70eb493a367f194da2022bbe47e51a7eb29b019`;
+four-path source manifest SHA256:
+`7ae783b3bf46d0efef853b7f184a2d3a35abef6fb3cec4d04c300dceea9baa79`;
+tool/input/artifact receipt SHA256:
+`bfe632b465797b15ea4aaa6c7d2d3d967364148f85d0044aab76e1394e8f0d16`.
+
+Fresh isolated enabled/default x86 and disabled ARM builds pass at
+`a55cf6540` plus thirteen frozen inputs. Native source freeze SHA256:
+`1407337319700cd27c7b2163a76bcc0efbecf8202b6da87bd840139c5ffe61f3`.
+The exact enabled ELF is
+`51aaae2329ea176147c01085703823bbeae1acb59c2e3d4673f5964a0195aeb9`;
+the default ELF is
+`1b19f2f7a03036babc2e8462055e166160c7e1c6a83f45efa4018e096a46df9e`.
+Normal/SSE/four-level/default guests all complete Linux ABI startup. Every
+enabled guest retains all 55 markers and 37 strict allocation equalities. The new
+native lifecycle checks eight actual constructor failures before/after actor
+publication, actual maskable IRQ and atomic-context calls, real sleeping reader
+sharing, signal cancellation and 12 self-freeing owners per batch. All actors
+join and retire off-stack. Three complete warmups precede a fourth batch with
+identical free pages and every live heap class; the measured rwsem baseline is
+378195968 bytes in the normal/SSE guests. This is feature-specific recovery,
+not a claim that the broader kernel allocation gate passes.
+
+Earlier normal/SSE runs with 180-second deadlines were incomplete after a later
+worker-test boundary. The unchanged final ELF passes both profiles with a
+600-second deadline. A separate trace-flag diagnostic failed an earlier
+software-fence selftest before reaching its worker probe; it is excluded from
+completion evidence. These artifacts are retained, and no specific cause of
+the earlier deadlines is asserted. Use 600 seconds for this expanded TCG suite.
+
+Independent full native/host/source/artifact review SHA256:
+`af03c71dd7ba229a293d2aa7aa6bf14c39da5d3fdaad4b83d78b3d7d30d091b8`;
+independent exact ISO/PID1/kernel/image and serial review SHA256:
+`df82d2fb33dfe2daa242c420ca5f765a2368945ece744c334f63709a4871356e`.
+Actual native C/O2 reviews cover all 48 backend/public-facade bodies and 53
+consumer/init bodies, including every export wrapper. The final root parser
+has 49 negative controls. The full unchanged-driver syntax audit remains
+**6/269**, with 232 missing `vfork_done`, 30 missing `mm` and one entry-stack
+record. All 7,668 imported files are unchanged. Independent full audit/input
+review SHA256:
+`45f8ed3196e77f2ca479040a17d3f3c6d57c02f37f462de0b1636f4d2acdd635`.
+Full driver/core linking, confirmed PCI identity and Tiger Lake validation
+remain pending. Continue through real task/MM and device/object ownership;
+read-only planning identifies constant-string ownership and formatted names as
+prerequisites for genuine unpublished kobjects and later PCI device references.
+
+```sh
+build-support/run-v-tool.sh tests/linuxkpi/rwsem.v --keep-dir NEW_DIRECTORY
+# Add --timeout 600 to tests/linuxkpi/run_vm invocations for this full suite.
+```

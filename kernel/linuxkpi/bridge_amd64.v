@@ -674,6 +674,10 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux synchronization self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: sleeping mutexes, wait queues and completions passed on 4 workers; no pages retained\n')
+		if !rwsem_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Native reader/writer semaphore self-test failed')
+		}
+		C.kprintf(c'linuxkpi: sleeping reader/writer semaphores, reader phases, signal cancellation and native handoff lifetimes passed; no pages or heap objects retained\n')
 		for _ in 0 .. 3 {
 			if C.vinix_linuxkpi_time_native_selftest() != 0 {
 				lib.kpanic(unsafe { nil }, c'Linux timed-wait self-test failed')
