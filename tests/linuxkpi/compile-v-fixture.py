@@ -10,7 +10,7 @@ MODULES = ("cachefixture", "i915policyfixture", "pciconfigfixture", "runtimefixt
            "taskfixture", "timefixture", "timerfixture", "syncfixture", "wwfixture",
            "iofixture", "seqfixture",
            "srcufixture", "workerfixture", "workfixture", "usleepfixture", "waitbitfixture", "printkfixture",
-           "smpfixture", "workirqfixture")
+           "smpfixture", "workirqfixture", "rcufixture")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
