@@ -51,7 +51,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--arch", choices=("aarch64", "x86_64"), default="aarch64")
     parser.add_argument("--kernel-dir", type=Path, default=ROOT / "kernel")
-    parser.add_argument("--source", type=Path, default=ROOT / "tests/ext2-xattr/test.c")
+    parser.add_argument("--source", type=Path, help="independent C fixture source; default builds the maintained V fixture")
+    parser.add_argument("--prebuilt-fixture", type=Path, help="immutable SDK fixture executable to boot")
     parser.add_argument("--state-dir", type=Path)
     parser.add_argument("--acl-fixture", action="store_true", help="seed malformed and mode-inconsistent on-disk access ACLs")
     parser.add_argument("--timeout", type=int, default=240)
@@ -79,19 +80,34 @@ def main():
                                       cwd=kernel_dir.parent, text=True).splitlines()
     hashes = {name: hashlib.sha256((kernel_dir.parent / name).read_bytes()).hexdigest()
               for name in sorted(set(sources)) if (kernel_dir.parent / name).is_file()}
+    module = ROOT / "tests/ext2-xattr/xattrfixture"
+    fixture_source = args.source.resolve() if args.source else module / "core.v"
     evidence = {"arch": args.arch, "kernel_sha256": hashlib.sha256(tested_kernel.read_bytes()).hexdigest(),
-                "test_sha256": hashlib.sha256(args.source.resolve().read_bytes()).hexdigest(),
+                "test_sha256": hashlib.sha256(fixture_source.read_bytes()).hexdigest(),
                 "kernel_sources_sha256": hashes}
+    if not args.source:
+        evidence["fixture_sources_sha256"] = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                                               for path in sorted(module.iterdir()) if path.is_file()}
     (state / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
     sysroot = Path(os.environ.get("VINIX_AARCH64_SYSROOT", str(ROOT / "build-aarch64-userland/sysroot")))
     cc = ([os.environ.get("CC", "clang"), "--target=aarch64-linux-musl", f"--sysroot={sysroot}",
            f"-L{sysroot / 'lib'}", "-fuse-ld=lld"] if args.arch == "aarch64" else
           [os.environ.get("CC_AMD64", "x86_64-linux-musl-gcc")])
-    serial = runpy.run_path(str(ROOT / "tests/kernel-gaps/compile-v-fixture.py"))["compile_serial"](
+    compiler = runpy.run_path(str(ROOT / "tests/kernel-gaps/compile-v-fixture.py"))
+    serial = compiler["compile_serial"](
         state / "serial.o", args.arch, cc + ["-O2", "-Wall", "-Wextra", "-Werror"])
-    subprocess.run(cc + ["-static", "-pthread", "-O2", "-fno-stack-protector", "-Wall", "-Wextra", "-Werror",
-                        str(args.source.resolve()), str(serial),
-                        "-o", str(state / "init")], check=True)
+    flags = cc + ["-static", "-pthread", "-O2", "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
+    if args.prebuilt_fixture:
+        shutil.copy2(args.prebuilt_fixture.resolve(), state / "init")
+    else:
+        fixture = args.source.resolve() if args.source else compiler["compile_module"](
+            module, state / "fixture.o", args.arch, flags)
+        subprocess.run(flags + [str(fixture), str(serial), "-o", str(state / "init")], check=True)
+    evidence["fixture_elf_sha256"] = hashlib.sha256((state / "init").read_bytes()).hexdigest()
+    evidence["prebuilt_fixture"] = bool(args.prebuilt_fixture)
+    evidence["fixture_source_relationship"] = ("prebuilt payload; source provenance supplied independently"
+                                                 if args.prebuilt_fixture else "compiled from recorded source")
+    (state / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
     rootfs = state / "rootfs"
     for directory in ("root", "sbin", "tmp", "dev", "proc", "sys", "run"):
         (rootfs / directory).mkdir(parents=True, exist_ok=True)
