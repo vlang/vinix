@@ -1,0 +1,2 @@
+LAUNCH CLIENT unavailable authentication retained 0 bytes
+LAUNCH CLIENT borrowed reply checks retained 0 bytes

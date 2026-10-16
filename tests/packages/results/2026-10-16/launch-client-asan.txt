@@ -1,0 +1,2 @@
+ASan/UBSan local-refusal and borrowed-reply fixture: exit 0 (quiet success).
+ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1

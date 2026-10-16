@@ -1311,6 +1311,12 @@ Borrowed requests retain the existing wipe-only contract. Stream writes erase
 and release their encoded scratch; failed receives erase and release partial
 fields. See [authentication frame qualification](../../tests/packages/auth-frame-check.md).
 
+The isolated-launch client also closes its owned authentication requests and
+checks approval bytes without allocating text copies. Its caller-owned argv
+remains borrowed throughout the handoff. Tests exercise a real root peer,
+ordinary callers, protected stream transfer and complete cleanup after failed
+approval or completion; see [launch client qualification](../../tests/packages/launch-client-check.md).
+
 On Linux, account-session launch reads its executable identity directly from
 `/proc/self/exe` with bounded stack storage. An unavailable, empty or oversized
 identity refuses with a diagnostic before the session helper starts.

@@ -1,0 +1,2632 @@
+
+aarch64 before2:
+pkglaunch__run_with_socket(Array arguments, string socket_path) {
+	__v_result __or_opt_0 = pkglaunch__validate_arguments(arguments);
+	if (!__or_opt_0.ok) {
+		return (__v_result_i64){.ok = false, .err = __or_opt_0.err};
+	}
+	u32 uid = (u32)(os__geteuid());
+	if (uid == 0) {
+		return (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_208, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+	}
+	Array __varargs_3 = array_new(	sizeof(Array), 0, 1);
+	Array __vararg_4 = string__bytes(pkglaunch__action);
+	array_push(&__varargs_3, &__vararg_4);
+	__v_result_authproto__Frame __or_opt_1 = authclient__ask_root(socket_path, authproto__op_describe, __varargs_3);
+	authproto__Frame __or_val_2 = {0};
+	if (__or_opt_1.ok) {
+		__or_val_2 = __or_opt_1.value;
+	} else {
+		return (__v_result_i64){.ok = false, .err = __or_opt_1.err};
+	}
+	authproto__Frame description = __or_val_2;
+	if ((description.code != authproto__status_ok) || (description.fields.len != 3) || !string__eq(authproto__Frame__text(&description, 1), _str_209) || !string__eq(authproto__Frame__text(&description, 2), _str_51)) {
+		__v_result_i64 _t1 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_210, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t1;
+	}
+	__v_result_string __or_opt_5 = pkgadmin__runtime_directory(uid);
+	string __or_val_6 = {0};
+	if (__or_opt_5.ok) {
+		__or_val_6 = __or_opt_5.value;
+	} else {
+		__v_result_i64 _t2 = (__v_result_i64){.ok = false, .err = __or_opt_5.err};
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t2;
+	}
+	string directory = __or_val_6;
+	__v_result_Array __or_opt_7 = crypto__rand__bytes(16);
+	Array __or_val_8 = {0};
+	if (__or_opt_7.ok) {
+		__or_val_8 = __or_opt_7.value;
+	} else {
+		__v_result_i64 _t3 = (__v_result_i64){.ok = false, .err = __or_opt_7.err};
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t3;
+	}
+	Array random = __or_val_8;
+	string nonce = Array_u8__hex(random);
+	pkglaunch__Request request = (pkglaunch__Request){.nonce = nonce, .arguments = arguments, .format = 1};
+	__v_result_pkgadmin__Listener __or_opt_9 = pkgadmin__listen_private(directory, uid, nonce);
+	pkgadmin__Listener __or_val_10 = {0};
+	if (__or_opt_9.ok) {
+		__or_val_10 = __or_opt_9.value;
+	} else {
+		__v_result_i64 _t4 = (__v_result_i64){.ok = false, .err = __or_opt_9.err};
+		{
+			{
+				array__free(&random);
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t4;
+	}
+	pkgadmin__Listener __esc_11 = __or_val_10;
+	pkgadmin__Listener* listener = (pkgadmin__Listener*)(memdup(&__esc_11, sizeof(pkgadmin__Listener)));
+	Array __varargs_14 = array_new(	sizeof(Array), 0, 3);
+	Array __vararg_15 = string__bytes(pkglaunch__action);
+	array_push(&__varargs_14, &__vararg_15);
+	Array __vararg_16 = __new_array_noscan(0, 0, sizeof(u8));
+	array_push(&__varargs_14, &__vararg_16);
+	Array __vararg_17 = string__bytes(nonce);
+	array_push(&__varargs_14, &__vararg_17);
+	__v_result_authproto__Frame __or_opt_12 = authclient__ask_root(socket_path, authproto__op_run, __varargs_14);
+	authproto__Frame __or_val_13 = {0};
+	if (__or_opt_12.ok) {
+		__or_val_13 = __or_opt_12.value;
+	} else {
+		__v_result_i64 _t5 = (__v_result_i64){.ok = false, .err = __or_opt_12.err};
+		{
+			pkgadmin__Listener__close(listener);
+		}
+		{
+			{
+				array__free(&random);
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t5;
+	}
+	authproto__Frame reply = __or_val_13;
+	if ((reply.code != authproto__status_ok) || (reply.fields.len != 2) || !string__eq(authproto__Frame__text(&reply, 0), _str_51)) {
+		__v_result_i64 _t6 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_211, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			pkgadmin__Listener__close(listener);
+		}
+		{
+			{
+				array__free(&random);
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t6;
+	}
+	string approved = authproto__Frame__text(&reply, 1);
+	if (!string__eq(approved, string__plus(nonce, _str_0))) {
+		__v_result_i64 _t7 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_212, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			{
+				string__free(&approved);
+			}
+		}
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			pkgadmin__Listener__close(listener);
+		}
+		{
+			{
+				array__free(&random);
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t7;
+	}
+	__v_result_i64 __or_opt_18 = pkgadmin__Listener__accept_root(listener);
+	i64 __or_val_19 = {0};
+	if (__or_opt_18.ok) {
+		__or_val_19 = __or_opt_18.value;
+	} else {
+		__v_result_i64 _t8 = (__v_result_i64){.ok = false, .err = __or_opt_18.err};
+		{
+			{
+				string__free(&approved);
+			}
+		}
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			pkgadmin__Listener__close(listener);
+		}
+		{
+			{
+				array__free(&random);
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t8;
+	}
+	i64 fd = __or_val_19;
+	__v_result __or_opt_20 = pkglaunch__send_request(fd, request);
+	if (!__or_opt_20.ok) {
+		__v_result_i64 _t9 = (__v_result_i64){.ok = false, .err = __or_opt_20.err};
+		{
+			close(fd);
+		}
+		{
+			{
+				string__free(&approved);
+			}
+		}
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			pkgadmin__Listener__close(listener);
+		}
+		{
+			{
+				array__free(&random);
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t9;
+	}
+	__v_result __or_opt_21 = pkglaunch__send_streams(fd, (i32[]){(i32)(0), 1, 2});
+	if (!__or_opt_21.ok) {
+		__v_result_i64 _t10 = (__v_result_i64){.ok = false, .err = __or_opt_21.err};
+		{
+			close(fd);
+		}
+		{
+			{
+				string__free(&approved);
+			}
+		}
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			pkgadmin__Listener__close(listener);
+		}
+		{
+			{
+				array__free(&random);
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t10;
+	}
+	__v_result_i64 _t11 = 	pkglaunch__receive_result(fd, request);
+	{
+		close(fd);
+	}
+	{
+		{
+			string__free(&approved);
+		}
+	}
+	{
+		authproto__Frame__close(&reply);
+	}
+	{
+		pkgadmin__Listener__close(listener);
+	}
+	{
+		{
+			array__free(&random);
+			string__free(&nonce);
+		}
+	}
+	{
+		{
+			string__free(&directory);
+		}
+	}
+	{
+		authproto__Frame__close(&description);
+	}
+	return _t11;
+	{
+		close(fd);
+	}
+	{
+		{
+			string__free(&approved);
+		}
+	}
+	{
+		authproto__Frame__close(&reply);
+	}
+	{
+		pkgadmin__Listener__close(listener);
+	}
+	{
+		{
+			array__free(&random);
+			string__free(&nonce);
+		}
+	}
+	{
+		{
+			string__free(&directory);
+		}
+	}
+	{
+		authproto__Frame__close(&description);
+	}
+	return (__v_result_i64){.ok = true};
+}
+pkgadmin__runtime_directory(u32 uid) {
+	Array __in_lhs_0 = new_array_from_c_array(2, 2, sizeof(string), (string[2]){_str_562, _str_563});
+	{
+		i64 __for_idx_1 = 0;
+		for (; __for_idx_1 < __in_lhs_0.len; __for_idx_1++) {
+			string parent = *(string*)(array_get(__in_lhs_0, __for_idx_1));
+			__v_result_os__Stat __or_opt_2 = os__lstat(parent);
+			os__Stat __or_val_3 = {0};
+			if (__or_opt_2.ok) {
+				__or_val_3 = __or_opt_2.value;
+			} else {
+				return (__v_result_string){.ok = false, .err = __or_opt_2.err};
+			}
+			os__Stat info = __or_val_3;
+			if ((os__Stat__get_filetype(info) != os__FileType__directory) || (info.uid != 0) || ((info.mode & 0022) != 0)) {
+				return (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_564, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+			}
+		}
+	}
+	string value = u32__str(uid);
+	string directory = string__plus(_str_565, value);
+	__v_result __or_opt_4 = pkgadmin__private_directory(directory, uid);
+	if (!__or_opt_4.ok) {
+		IError err = __or_opt_4.err;
+		{
+			string__free(&directory);
+		}
+		__v_result_string _t1 = (__v_result_string){.ok = false, .err = err};
+		{
+			{
+				string__free(&value);
+			}
+		}
+		return _t1;
+	}
+	__v_result_string _t2 = (__v_result_string){.ok = true, .value = 	directory};
+	{
+		{
+			string__free(&value);
+		}
+	}
+	return _t2;
+	{
+		{
+			string__free(&value);
+		}
+	}
+	return (__v_result_string){.ok = true};
+}
+
+aarch64 measure2:
+pkglaunch__run_with_socket(Array arguments, string socket_path) {
+	__v_result __or_opt_0 = pkglaunch__validate_arguments(arguments);
+	if (!__or_opt_0.ok) {
+		return (__v_result_i64){.ok = false, .err = __or_opt_0.err};
+	}
+	u32 uid = (u32)(os__geteuid());
+	if (uid == 0) {
+		return (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_208, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+	}
+	Array __arr_lit_1 = array_new(	sizeof(Array), 0, 1);
+	Array __arr_val_2 = string__bytes(pkglaunch__action);
+	array_push(&__arr_lit_1, &__arr_val_2);
+	authproto__Frame describe_request = (authproto__Frame){.code = authproto__op_describe, .fields = __arr_lit_1};
+	__v_result_authproto__Frame __or_opt_3 = authclient__ask_root(socket_path, describe_request.code, describe_request.fields);
+	authproto__Frame __or_val_4 = {0};
+	if (__or_opt_3.ok) {
+		__or_val_4 = __or_opt_3.value;
+	} else {
+		__v_result_i64 _t1 = (__v_result_i64){.ok = false, .err = __or_opt_3.err};
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t1;
+	}
+	authproto__Frame description = __or_val_4;
+	if ((description.code != authproto__status_ok) || (description.fields.len != 3) || !pkglaunch__reply_field(description, 1, _str_209) || !pkglaunch__reply_field(description, 2, _str_51)) {
+		__v_result_i64 _t2 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_210, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t2;
+	}
+	__v_result_string __or_opt_5 = pkgadmin__runtime_directory(uid);
+	string __or_val_6 = {0};
+	if (__or_opt_5.ok) {
+		__or_val_6 = __or_opt_5.value;
+	} else {
+		__v_result_i64 _t3 = (__v_result_i64){.ok = false, .err = __or_opt_5.err};
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t3;
+	}
+	string directory = __or_val_6;
+	Array random = __new_array_noscan(16, 0, sizeof(u8));
+	__v_result __or_opt_7 = crypto__rand__read(&random);
+	if (!__or_opt_7.ok) {
+		__v_result_i64 _t4 = (__v_result_i64){.ok = false, .err = __or_opt_7.err};
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t4;
+	}
+	string nonce = Array_u8__hex(random);
+	pkglaunch__Request request = (pkglaunch__Request){.nonce = nonce, .arguments = arguments, .format = 1};
+	__v_result_pkgadmin__Listener __or_opt_8 = pkgadmin__listen_private(directory, uid, nonce);
+	pkgadmin__Listener __or_val_9 = {0};
+	if (__or_opt_8.ok) {
+		__or_val_9 = __or_opt_8.value;
+	} else {
+		__v_result_i64 _t5 = (__v_result_i64){.ok = false, .err = __or_opt_8.err};
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t5;
+	}
+	pkgadmin__Listener listener = __or_val_9;
+	Array __arr_lit_10 = array_new(	sizeof(Array), 0, 3);
+	Array __arr_val_11 = string__bytes(pkglaunch__action);
+	array_push(&__arr_lit_10, &__arr_val_11);
+	Array __arr_val_12 = __new_array_noscan(0, 0, sizeof(u8));
+	array_push(&__arr_lit_10, &__arr_val_12);
+	Array __arr_val_13 = string__bytes(nonce);
+	array_push(&__arr_lit_10, &__arr_val_13);
+	authproto__Frame run_request = (authproto__Frame){.code = authproto__op_run, .fields = __arr_lit_10};
+	__v_result_authproto__Frame __or_opt_14 = authclient__ask_root(socket_path, run_request.code, run_request.fields);
+	authproto__Frame __or_val_15 = {0};
+	if (__or_opt_14.ok) {
+		__or_val_15 = __or_opt_14.value;
+	} else {
+		__v_result_i64 _t6 = (__v_result_i64){.ok = false, .err = __or_opt_14.err};
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t6;
+	}
+	authproto__Frame reply = __or_val_15;
+	if ((reply.code != authproto__status_ok) || (reply.fields.len != 2) || !pkglaunch__reply_field(reply, 0, _str_51)) {
+		__v_result_i64 _t7 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_211, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t7;
+	}
+	if (!pkglaunch__reply_invitation(reply, nonce)) {
+		__v_result_i64 _t8 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_212, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t8;
+	}
+	__v_result_i64 __or_opt_16 = pkgadmin__Listener__accept_root(&listener);
+	i64 __or_val_17 = {0};
+	if (__or_opt_16.ok) {
+		__or_val_17 = __or_opt_16.value;
+	} else {
+		__v_result_i64 _t9 = (__v_result_i64){.ok = false, .err = __or_opt_16.err};
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t9;
+	}
+	i64 fd = __or_val_17;
+	__v_result __or_opt_18 = pkglaunch__send_request(fd, request);
+	if (!__or_opt_18.ok) {
+		__v_result_i64 _t10 = (__v_result_i64){.ok = false, .err = __or_opt_18.err};
+		{
+			close(fd);
+		}
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t10;
+	}
+	__v_result __or_opt_19 = pkglaunch__send_streams(fd, (i32[]){(i32)(0), 1, 2});
+	if (!__or_opt_19.ok) {
+		__v_result_i64 _t11 = (__v_result_i64){.ok = false, .err = __or_opt_19.err};
+		{
+			close(fd);
+		}
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t11;
+	}
+	__v_result_i64 _t12 = 	pkglaunch__receive_result(fd, request);
+	{
+		close(fd);
+	}
+	{
+		authproto__Frame__close(&reply);
+	}
+	{
+		authproto__Frame__close(&run_request);
+	}
+	{
+		pkgadmin__Listener__close(&listener);
+	}
+	{
+		{
+			string__free(&nonce);
+		}
+	}
+	{
+		{
+			array__free(&random);
+		}
+	}
+	{
+		{
+			string__free(&directory);
+		}
+	}
+	{
+		authproto__Frame__close(&description);
+	}
+	{
+		authproto__Frame__close(&describe_request);
+	}
+	return _t12;
+	{
+		close(fd);
+	}
+	{
+		authproto__Frame__close(&reply);
+	}
+	{
+		authproto__Frame__close(&run_request);
+	}
+	{
+		pkgadmin__Listener__close(&listener);
+	}
+	{
+		{
+			string__free(&nonce);
+		}
+	}
+	{
+		{
+			array__free(&random);
+		}
+	}
+	{
+		{
+			string__free(&directory);
+		}
+	}
+	{
+		authproto__Frame__close(&description);
+	}
+	{
+		authproto__Frame__close(&describe_request);
+	}
+	return (__v_result_i64){.ok = true};
+}
+pkgadmin__runtime_directory(u32 uid) {
+	string __in_lhs_0[2];
+	memmove(__in_lhs_0, (string[]){_str_562, _str_563}, sizeof(__in_lhs_0));
+	{
+		i64 __for_idx_1 = 0;
+		for (; __for_idx_1 < 2; __for_idx_1++) {
+			string parent = __in_lhs_0[v_fixed_index(__for_idx_1, 2)];
+			__v_result_os__Stat __or_opt_2 = os__lstat(parent);
+			os__Stat __or_val_3 = {0};
+			if (__or_opt_2.ok) {
+				__or_val_3 = __or_opt_2.value;
+			} else {
+				return (__v_result_string){.ok = false, .err = __or_opt_2.err};
+			}
+			os__Stat info = __or_val_3;
+			if ((os__Stat__get_filetype(info) != os__FileType__directory) || (info.uid != 0) || ((info.mode & 0022) != 0)) {
+				return (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_564, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+			}
+		}
+	}
+	string value = u32__str(uid);
+	string directory = string__plus(_str_565, value);
+	__v_result __or_opt_4 = pkgadmin__private_directory(directory, uid);
+	if (!__or_opt_4.ok) {
+		IError err = __or_opt_4.err;
+		{
+			string__free(&directory);
+		}
+		__v_result_string _t1 = (__v_result_string){.ok = false, .err = err};
+		{
+			{
+				string__free(&value);
+			}
+		}
+		return _t1;
+	}
+	__v_result_string _t2 = (__v_result_string){.ok = true, .value = 	directory};
+	{
+		{
+			string__free(&value);
+		}
+	}
+	return _t2;
+	{
+		{
+			string__free(&value);
+		}
+	}
+	return (__v_result_string){.ok = true};
+}
+
+aarch64 client:
+pkglaunch__run_with_socket(Array arguments, string socket_path) {
+	__v_result __or_opt_0 = pkglaunch__validate_arguments(arguments);
+	if (!__or_opt_0.ok) {
+		return (__v_result_i64){.ok = false, .err = __or_opt_0.err};
+	}
+	u32 uid = (u32)(os__geteuid());
+	if (uid == 0) {
+		return (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_208, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+	}
+	Array __arr_lit_1 = array_new(	sizeof(Array), 0, 1);
+	Array __arr_val_2 = string__bytes(pkglaunch__action);
+	array_push(&__arr_lit_1, &__arr_val_2);
+	authproto__Frame describe_request = (authproto__Frame){.code = authproto__op_describe, .fields = __arr_lit_1};
+	__v_result_authproto__Frame __or_opt_3 = authclient__ask_root(socket_path, describe_request.code, describe_request.fields);
+	authproto__Frame __or_val_4 = {0};
+	if (__or_opt_3.ok) {
+		__or_val_4 = __or_opt_3.value;
+	} else {
+		__v_result_i64 _t1 = (__v_result_i64){.ok = false, .err = __or_opt_3.err};
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t1;
+	}
+	authproto__Frame description = __or_val_4;
+	if ((description.code != authproto__status_ok) || (description.fields.len != 3) || !pkglaunch__reply_field(description, 1, _str_209) || !pkglaunch__reply_field(description, 2, _str_51)) {
+		__v_result_i64 _t2 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_210, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t2;
+	}
+	__v_result_string __or_opt_5 = pkgadmin__runtime_directory(uid);
+	string __or_val_6 = {0};
+	if (__or_opt_5.ok) {
+		__or_val_6 = __or_opt_5.value;
+	} else {
+		__v_result_i64 _t3 = (__v_result_i64){.ok = false, .err = __or_opt_5.err};
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t3;
+	}
+	string directory = __or_val_6;
+	Array random = __new_array_noscan(16, 0, sizeof(u8));
+	__v_result __or_opt_7 = crypto__rand__read(&random);
+	if (!__or_opt_7.ok) {
+		__v_result_i64 _t4 = (__v_result_i64){.ok = false, .err = __or_opt_7.err};
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t4;
+	}
+	string nonce = Array_u8__hex(random);
+	pkglaunch__Request request = (pkglaunch__Request){.nonce = nonce, .arguments = arguments, .format = 1};
+	__v_result_pkgadmin__Listener __or_opt_8 = pkgadmin__listen_private(directory, uid, nonce);
+	pkgadmin__Listener __or_val_9 = {0};
+	if (__or_opt_8.ok) {
+		__or_val_9 = __or_opt_8.value;
+	} else {
+		__v_result_i64 _t5 = (__v_result_i64){.ok = false, .err = __or_opt_8.err};
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t5;
+	}
+	pkgadmin__Listener listener = __or_val_9;
+	Array __arr_lit_10 = array_new(	sizeof(Array), 0, 3);
+	Array __arr_val_11 = string__bytes(pkglaunch__action);
+	array_push(&__arr_lit_10, &__arr_val_11);
+	Array __arr_val_12 = __new_array_noscan(0, 0, sizeof(u8));
+	array_push(&__arr_lit_10, &__arr_val_12);
+	Array __arr_val_13 = string__bytes(nonce);
+	array_push(&__arr_lit_10, &__arr_val_13);
+	authproto__Frame run_request = (authproto__Frame){.code = authproto__op_run, .fields = __arr_lit_10};
+	__v_result_authproto__Frame __or_opt_14 = authclient__ask_root(socket_path, run_request.code, run_request.fields);
+	authproto__Frame __or_val_15 = {0};
+	if (__or_opt_14.ok) {
+		__or_val_15 = __or_opt_14.value;
+	} else {
+		__v_result_i64 _t6 = (__v_result_i64){.ok = false, .err = __or_opt_14.err};
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t6;
+	}
+	authproto__Frame reply = __or_val_15;
+	if ((reply.code != authproto__status_ok) || (reply.fields.len != 2) || !pkglaunch__reply_field(reply, 0, _str_51)) {
+		__v_result_i64 _t7 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_211, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t7;
+	}
+	if (!pkglaunch__reply_invitation(reply, nonce)) {
+		__v_result_i64 _t8 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_212, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t8;
+	}
+	__v_result_i64 __or_opt_16 = pkgadmin__Listener__accept_root(&listener);
+	i64 __or_val_17 = {0};
+	if (__or_opt_16.ok) {
+		__or_val_17 = __or_opt_16.value;
+	} else {
+		__v_result_i64 _t9 = (__v_result_i64){.ok = false, .err = __or_opt_16.err};
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t9;
+	}
+	i64 fd = __or_val_17;
+	__v_result __or_opt_18 = pkglaunch__send_request(fd, request);
+	if (!__or_opt_18.ok) {
+		__v_result_i64 _t10 = (__v_result_i64){.ok = false, .err = __or_opt_18.err};
+		{
+			close(fd);
+		}
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t10;
+	}
+	__v_result __or_opt_19 = pkglaunch__send_streams(fd, (i32[]){(i32)(0), 1, 2});
+	if (!__or_opt_19.ok) {
+		__v_result_i64 _t11 = (__v_result_i64){.ok = false, .err = __or_opt_19.err};
+		{
+			close(fd);
+		}
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t11;
+	}
+	__v_result_i64 _t12 = 	pkglaunch__receive_result(fd, request);
+	{
+		close(fd);
+	}
+	{
+		authproto__Frame__close(&reply);
+	}
+	{
+		authproto__Frame__close(&run_request);
+	}
+	{
+		pkgadmin__Listener__close(&listener);
+	}
+	{
+		{
+			string__free(&nonce);
+		}
+	}
+	{
+		{
+			array__free(&random);
+		}
+	}
+	{
+		{
+			string__free(&directory);
+		}
+	}
+	{
+		authproto__Frame__close(&description);
+	}
+	{
+		authproto__Frame__close(&describe_request);
+	}
+	return _t12;
+	{
+		close(fd);
+	}
+	{
+		authproto__Frame__close(&reply);
+	}
+	{
+		authproto__Frame__close(&run_request);
+	}
+	{
+		pkgadmin__Listener__close(&listener);
+	}
+	{
+		{
+			string__free(&nonce);
+		}
+	}
+	{
+		{
+			array__free(&random);
+		}
+	}
+	{
+		{
+			string__free(&directory);
+		}
+	}
+	{
+		authproto__Frame__close(&description);
+	}
+	{
+		authproto__Frame__close(&describe_request);
+	}
+	return (__v_result_i64){.ok = true};
+}
+pkgadmin__runtime_directory(u32 uid) {
+	string __in_lhs_0[2];
+	memmove(__in_lhs_0, (string[]){_str_565, _str_566}, sizeof(__in_lhs_0));
+	{
+		i64 __for_idx_1 = 0;
+		for (; __for_idx_1 < 2; __for_idx_1++) {
+			string parent = __in_lhs_0[v_fixed_index(__for_idx_1, 2)];
+			__v_result_os__Stat __or_opt_2 = os__lstat(parent);
+			os__Stat __or_val_3 = {0};
+			if (__or_opt_2.ok) {
+				__or_val_3 = __or_opt_2.value;
+			} else {
+				return (__v_result_string){.ok = false, .err = __or_opt_2.err};
+			}
+			os__Stat info = __or_val_3;
+			if ((os__Stat__get_filetype(info) != os__FileType__directory) || (info.uid != 0) || ((info.mode & 0022) != 0)) {
+				return (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_567, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+			}
+		}
+	}
+	string value = u32__str(uid);
+	string directory = string__plus(_str_568, value);
+	__v_result __or_opt_4 = pkgadmin__private_directory(directory, uid);
+	if (!__or_opt_4.ok) {
+		IError err = __or_opt_4.err;
+		{
+			string__free(&directory);
+		}
+		__v_result_string _t1 = (__v_result_string){.ok = false, .err = err};
+		{
+			{
+				string__free(&value);
+			}
+		}
+		return _t1;
+	}
+	__v_result_string _t2 = (__v_result_string){.ok = true, .value = 	directory};
+	{
+		{
+			string__free(&value);
+		}
+	}
+	return _t2;
+	{
+		{
+			string__free(&value);
+		}
+	}
+	return (__v_result_string){.ok = true};
+}
+
+Persistent encoder metadata initialized before measurement:
+json2__Encoder_pkglaunch__Request__cached_field_infos(json2__Encoder* encoder) {
+	static json2__EncoderFieldInfoCache* cache = (json2__EncoderFieldInfoCache*)(NULL);
+	static u64 initializing = (u64)(0);
+	static u64 initialized = (u64)(0);
+	if (stdatomic__load_u64(&initialized) == 0) {
+		if (stdatomic__fetch_add_u64(&initializing, 1) == 0) {
+			cache = (json2__EncoderFieldInfoCache*)memdup(&(json2__EncoderFieldInfoCache){.field_infos = array_new(sizeof(json2__EncoderFieldInfo), 0, 0)}, sizeof(json2__EncoderFieldInfoCache));
+			{
+				json2__EncoderFieldInfo __arr_val_0 = json2__encoder_field_info(_str_714, array_new(				sizeof(string), 0, 0));
+				array_push(&cache->field_infos, &__arr_val_0);
+			}
+			{
+				json2__EncoderFieldInfo __arr_val_1 = json2__encoder_field_info(_str_1450, array_new(				sizeof(string), 0, 0));
+				array_push(&cache->field_infos, &__arr_val_1);
+			}
+			{
+				json2__EncoderFieldInfo __arr_val_2 = json2__encoder_field_info(_str_1451, array_new(				sizeof(string), 0, 0));
+				array_push(&cache->field_infos, &__arr_val_2);
+			}
+			stdatomic__store_u64(&initialized, 1);
+		} else {
+			while (stdatomic__load_u64(&initialized) == 0) {
+				time__sleep(time__microsecond);
+			}
+		}
+	}
+	return cache;
+}
+
+x86_64 before2:
+pkglaunch__run_with_socket(Array arguments, string socket_path) {
+	__v_result __or_opt_0 = pkglaunch__validate_arguments(arguments);
+	if (!__or_opt_0.ok) {
+		return (__v_result_i64){.ok = false, .err = __or_opt_0.err};
+	}
+	u32 uid = (u32)(os__geteuid());
+	if (uid == 0) {
+		return (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_208, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+	}
+	Array __varargs_3 = array_new(	sizeof(Array), 0, 1);
+	Array __vararg_4 = string__bytes(pkglaunch__action);
+	array_push(&__varargs_3, &__vararg_4);
+	__v_result_authproto__Frame __or_opt_1 = authclient__ask_root(socket_path, authproto__op_describe, __varargs_3);
+	authproto__Frame __or_val_2 = {0};
+	if (__or_opt_1.ok) {
+		__or_val_2 = __or_opt_1.value;
+	} else {
+		return (__v_result_i64){.ok = false, .err = __or_opt_1.err};
+	}
+	authproto__Frame description = __or_val_2;
+	if ((description.code != authproto__status_ok) || (description.fields.len != 3) || !string__eq(authproto__Frame__text(&description, 1), _str_209) || !string__eq(authproto__Frame__text(&description, 2), _str_51)) {
+		__v_result_i64 _t1 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_210, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t1;
+	}
+	__v_result_string __or_opt_5 = pkgadmin__runtime_directory(uid);
+	string __or_val_6 = {0};
+	if (__or_opt_5.ok) {
+		__or_val_6 = __or_opt_5.value;
+	} else {
+		__v_result_i64 _t2 = (__v_result_i64){.ok = false, .err = __or_opt_5.err};
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t2;
+	}
+	string directory = __or_val_6;
+	__v_result_Array __or_opt_7 = crypto__rand__bytes(16);
+	Array __or_val_8 = {0};
+	if (__or_opt_7.ok) {
+		__or_val_8 = __or_opt_7.value;
+	} else {
+		__v_result_i64 _t3 = (__v_result_i64){.ok = false, .err = __or_opt_7.err};
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t3;
+	}
+	Array random = __or_val_8;
+	string nonce = Array_u8__hex(random);
+	pkglaunch__Request request = (pkglaunch__Request){.nonce = nonce, .arguments = arguments, .format = 1};
+	__v_result_pkgadmin__Listener __or_opt_9 = pkgadmin__listen_private(directory, uid, nonce);
+	pkgadmin__Listener __or_val_10 = {0};
+	if (__or_opt_9.ok) {
+		__or_val_10 = __or_opt_9.value;
+	} else {
+		__v_result_i64 _t4 = (__v_result_i64){.ok = false, .err = __or_opt_9.err};
+		{
+			{
+				array__free(&random);
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t4;
+	}
+	pkgadmin__Listener __esc_11 = __or_val_10;
+	pkgadmin__Listener* listener = (pkgadmin__Listener*)(memdup(&__esc_11, sizeof(pkgadmin__Listener)));
+	Array __varargs_14 = array_new(	sizeof(Array), 0, 3);
+	Array __vararg_15 = string__bytes(pkglaunch__action);
+	array_push(&__varargs_14, &__vararg_15);
+	Array __vararg_16 = __new_array_noscan(0, 0, sizeof(u8));
+	array_push(&__varargs_14, &__vararg_16);
+	Array __vararg_17 = string__bytes(nonce);
+	array_push(&__varargs_14, &__vararg_17);
+	__v_result_authproto__Frame __or_opt_12 = authclient__ask_root(socket_path, authproto__op_run, __varargs_14);
+	authproto__Frame __or_val_13 = {0};
+	if (__or_opt_12.ok) {
+		__or_val_13 = __or_opt_12.value;
+	} else {
+		__v_result_i64 _t5 = (__v_result_i64){.ok = false, .err = __or_opt_12.err};
+		{
+			pkgadmin__Listener__close(listener);
+		}
+		{
+			{
+				array__free(&random);
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t5;
+	}
+	authproto__Frame reply = __or_val_13;
+	if ((reply.code != authproto__status_ok) || (reply.fields.len != 2) || !string__eq(authproto__Frame__text(&reply, 0), _str_51)) {
+		__v_result_i64 _t6 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_211, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			pkgadmin__Listener__close(listener);
+		}
+		{
+			{
+				array__free(&random);
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t6;
+	}
+	string approved = authproto__Frame__text(&reply, 1);
+	if (!string__eq(approved, string__plus(nonce, _str_0))) {
+		__v_result_i64 _t7 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_212, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			{
+				string__free(&approved);
+			}
+		}
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			pkgadmin__Listener__close(listener);
+		}
+		{
+			{
+				array__free(&random);
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t7;
+	}
+	__v_result_i64 __or_opt_18 = pkgadmin__Listener__accept_root(listener);
+	i64 __or_val_19 = {0};
+	if (__or_opt_18.ok) {
+		__or_val_19 = __or_opt_18.value;
+	} else {
+		__v_result_i64 _t8 = (__v_result_i64){.ok = false, .err = __or_opt_18.err};
+		{
+			{
+				string__free(&approved);
+			}
+		}
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			pkgadmin__Listener__close(listener);
+		}
+		{
+			{
+				array__free(&random);
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t8;
+	}
+	i64 fd = __or_val_19;
+	__v_result __or_opt_20 = pkglaunch__send_request(fd, request);
+	if (!__or_opt_20.ok) {
+		__v_result_i64 _t9 = (__v_result_i64){.ok = false, .err = __or_opt_20.err};
+		{
+			close(fd);
+		}
+		{
+			{
+				string__free(&approved);
+			}
+		}
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			pkgadmin__Listener__close(listener);
+		}
+		{
+			{
+				array__free(&random);
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t9;
+	}
+	__v_result __or_opt_21 = pkglaunch__send_streams(fd, (i32[]){(i32)(0), 1, 2});
+	if (!__or_opt_21.ok) {
+		__v_result_i64 _t10 = (__v_result_i64){.ok = false, .err = __or_opt_21.err};
+		{
+			close(fd);
+		}
+		{
+			{
+				string__free(&approved);
+			}
+		}
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			pkgadmin__Listener__close(listener);
+		}
+		{
+			{
+				array__free(&random);
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		return _t10;
+	}
+	__v_result_i64 _t11 = 	pkglaunch__receive_result(fd, request);
+	{
+		close(fd);
+	}
+	{
+		{
+			string__free(&approved);
+		}
+	}
+	{
+		authproto__Frame__close(&reply);
+	}
+	{
+		pkgadmin__Listener__close(listener);
+	}
+	{
+		{
+			array__free(&random);
+			string__free(&nonce);
+		}
+	}
+	{
+		{
+			string__free(&directory);
+		}
+	}
+	{
+		authproto__Frame__close(&description);
+	}
+	return _t11;
+	{
+		close(fd);
+	}
+	{
+		{
+			string__free(&approved);
+		}
+	}
+	{
+		authproto__Frame__close(&reply);
+	}
+	{
+		pkgadmin__Listener__close(listener);
+	}
+	{
+		{
+			array__free(&random);
+			string__free(&nonce);
+		}
+	}
+	{
+		{
+			string__free(&directory);
+		}
+	}
+	{
+		authproto__Frame__close(&description);
+	}
+	return (__v_result_i64){.ok = true};
+}
+pkgadmin__runtime_directory(u32 uid) {
+	Array __in_lhs_0 = new_array_from_c_array(2, 2, sizeof(string), (string[2]){_str_562, _str_563});
+	{
+		i64 __for_idx_1 = 0;
+		for (; __for_idx_1 < __in_lhs_0.len; __for_idx_1++) {
+			string parent = *(string*)(array_get(__in_lhs_0, __for_idx_1));
+			__v_result_os__Stat __or_opt_2 = os__lstat(parent);
+			os__Stat __or_val_3 = {0};
+			if (__or_opt_2.ok) {
+				__or_val_3 = __or_opt_2.value;
+			} else {
+				return (__v_result_string){.ok = false, .err = __or_opt_2.err};
+			}
+			os__Stat info = __or_val_3;
+			if ((os__Stat__get_filetype(info) != os__FileType__directory) || (info.uid != 0) || ((info.mode & 0022) != 0)) {
+				return (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_564, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+			}
+		}
+	}
+	string value = u32__str(uid);
+	string directory = string__plus(_str_565, value);
+	__v_result __or_opt_4 = pkgadmin__private_directory(directory, uid);
+	if (!__or_opt_4.ok) {
+		IError err = __or_opt_4.err;
+		{
+			string__free(&directory);
+		}
+		__v_result_string _t1 = (__v_result_string){.ok = false, .err = err};
+		{
+			{
+				string__free(&value);
+			}
+		}
+		return _t1;
+	}
+	__v_result_string _t2 = (__v_result_string){.ok = true, .value = 	directory};
+	{
+		{
+			string__free(&value);
+		}
+	}
+	return _t2;
+	{
+		{
+			string__free(&value);
+		}
+	}
+	return (__v_result_string){.ok = true};
+}
+
+x86_64 measure2:
+pkglaunch__run_with_socket(Array arguments, string socket_path) {
+	__v_result __or_opt_0 = pkglaunch__validate_arguments(arguments);
+	if (!__or_opt_0.ok) {
+		return (__v_result_i64){.ok = false, .err = __or_opt_0.err};
+	}
+	u32 uid = (u32)(os__geteuid());
+	if (uid == 0) {
+		return (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_208, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+	}
+	Array __arr_lit_1 = array_new(	sizeof(Array), 0, 1);
+	Array __arr_val_2 = string__bytes(pkglaunch__action);
+	array_push(&__arr_lit_1, &__arr_val_2);
+	authproto__Frame describe_request = (authproto__Frame){.code = authproto__op_describe, .fields = __arr_lit_1};
+	__v_result_authproto__Frame __or_opt_3 = authclient__ask_root(socket_path, describe_request.code, describe_request.fields);
+	authproto__Frame __or_val_4 = {0};
+	if (__or_opt_3.ok) {
+		__or_val_4 = __or_opt_3.value;
+	} else {
+		__v_result_i64 _t1 = (__v_result_i64){.ok = false, .err = __or_opt_3.err};
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t1;
+	}
+	authproto__Frame description = __or_val_4;
+	if ((description.code != authproto__status_ok) || (description.fields.len != 3) || !pkglaunch__reply_field(description, 1, _str_209) || !pkglaunch__reply_field(description, 2, _str_51)) {
+		__v_result_i64 _t2 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_210, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t2;
+	}
+	__v_result_string __or_opt_5 = pkgadmin__runtime_directory(uid);
+	string __or_val_6 = {0};
+	if (__or_opt_5.ok) {
+		__or_val_6 = __or_opt_5.value;
+	} else {
+		__v_result_i64 _t3 = (__v_result_i64){.ok = false, .err = __or_opt_5.err};
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t3;
+	}
+	string directory = __or_val_6;
+	Array random = __new_array_noscan(16, 0, sizeof(u8));
+	__v_result __or_opt_7 = crypto__rand__read(&random);
+	if (!__or_opt_7.ok) {
+		__v_result_i64 _t4 = (__v_result_i64){.ok = false, .err = __or_opt_7.err};
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t4;
+	}
+	string nonce = Array_u8__hex(random);
+	pkglaunch__Request request = (pkglaunch__Request){.nonce = nonce, .arguments = arguments, .format = 1};
+	__v_result_pkgadmin__Listener __or_opt_8 = pkgadmin__listen_private(directory, uid, nonce);
+	pkgadmin__Listener __or_val_9 = {0};
+	if (__or_opt_8.ok) {
+		__or_val_9 = __or_opt_8.value;
+	} else {
+		__v_result_i64 _t5 = (__v_result_i64){.ok = false, .err = __or_opt_8.err};
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t5;
+	}
+	pkgadmin__Listener listener = __or_val_9;
+	Array __arr_lit_10 = array_new(	sizeof(Array), 0, 3);
+	Array __arr_val_11 = string__bytes(pkglaunch__action);
+	array_push(&__arr_lit_10, &__arr_val_11);
+	Array __arr_val_12 = __new_array_noscan(0, 0, sizeof(u8));
+	array_push(&__arr_lit_10, &__arr_val_12);
+	Array __arr_val_13 = string__bytes(nonce);
+	array_push(&__arr_lit_10, &__arr_val_13);
+	authproto__Frame run_request = (authproto__Frame){.code = authproto__op_run, .fields = __arr_lit_10};
+	__v_result_authproto__Frame __or_opt_14 = authclient__ask_root(socket_path, run_request.code, run_request.fields);
+	authproto__Frame __or_val_15 = {0};
+	if (__or_opt_14.ok) {
+		__or_val_15 = __or_opt_14.value;
+	} else {
+		__v_result_i64 _t6 = (__v_result_i64){.ok = false, .err = __or_opt_14.err};
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t6;
+	}
+	authproto__Frame reply = __or_val_15;
+	if ((reply.code != authproto__status_ok) || (reply.fields.len != 2) || !pkglaunch__reply_field(reply, 0, _str_51)) {
+		__v_result_i64 _t7 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_211, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t7;
+	}
+	if (!pkglaunch__reply_invitation(reply, nonce)) {
+		__v_result_i64 _t8 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_212, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t8;
+	}
+	__v_result_i64 __or_opt_16 = pkgadmin__Listener__accept_root(&listener);
+	i64 __or_val_17 = {0};
+	if (__or_opt_16.ok) {
+		__or_val_17 = __or_opt_16.value;
+	} else {
+		__v_result_i64 _t9 = (__v_result_i64){.ok = false, .err = __or_opt_16.err};
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t9;
+	}
+	i64 fd = __or_val_17;
+	__v_result __or_opt_18 = pkglaunch__send_request(fd, request);
+	if (!__or_opt_18.ok) {
+		__v_result_i64 _t10 = (__v_result_i64){.ok = false, .err = __or_opt_18.err};
+		{
+			close(fd);
+		}
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t10;
+	}
+	__v_result __or_opt_19 = pkglaunch__send_streams(fd, (i32[]){(i32)(0), 1, 2});
+	if (!__or_opt_19.ok) {
+		__v_result_i64 _t11 = (__v_result_i64){.ok = false, .err = __or_opt_19.err};
+		{
+			close(fd);
+		}
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t11;
+	}
+	__v_result_i64 _t12 = 	pkglaunch__receive_result(fd, request);
+	{
+		close(fd);
+	}
+	{
+		authproto__Frame__close(&reply);
+	}
+	{
+		authproto__Frame__close(&run_request);
+	}
+	{
+		pkgadmin__Listener__close(&listener);
+	}
+	{
+		{
+			string__free(&nonce);
+		}
+	}
+	{
+		{
+			array__free(&random);
+		}
+	}
+	{
+		{
+			string__free(&directory);
+		}
+	}
+	{
+		authproto__Frame__close(&description);
+	}
+	{
+		authproto__Frame__close(&describe_request);
+	}
+	return _t12;
+	{
+		close(fd);
+	}
+	{
+		authproto__Frame__close(&reply);
+	}
+	{
+		authproto__Frame__close(&run_request);
+	}
+	{
+		pkgadmin__Listener__close(&listener);
+	}
+	{
+		{
+			string__free(&nonce);
+		}
+	}
+	{
+		{
+			array__free(&random);
+		}
+	}
+	{
+		{
+			string__free(&directory);
+		}
+	}
+	{
+		authproto__Frame__close(&description);
+	}
+	{
+		authproto__Frame__close(&describe_request);
+	}
+	return (__v_result_i64){.ok = true};
+}
+pkgadmin__runtime_directory(u32 uid) {
+	string __in_lhs_0[2];
+	memmove(__in_lhs_0, (string[]){_str_562, _str_563}, sizeof(__in_lhs_0));
+	{
+		i64 __for_idx_1 = 0;
+		for (; __for_idx_1 < 2; __for_idx_1++) {
+			string parent = __in_lhs_0[v_fixed_index(__for_idx_1, 2)];
+			__v_result_os__Stat __or_opt_2 = os__lstat(parent);
+			os__Stat __or_val_3 = {0};
+			if (__or_opt_2.ok) {
+				__or_val_3 = __or_opt_2.value;
+			} else {
+				return (__v_result_string){.ok = false, .err = __or_opt_2.err};
+			}
+			os__Stat info = __or_val_3;
+			if ((os__Stat__get_filetype(info) != os__FileType__directory) || (info.uid != 0) || ((info.mode & 0022) != 0)) {
+				return (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_564, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+			}
+		}
+	}
+	string value = u32__str(uid);
+	string directory = string__plus(_str_565, value);
+	__v_result __or_opt_4 = pkgadmin__private_directory(directory, uid);
+	if (!__or_opt_4.ok) {
+		IError err = __or_opt_4.err;
+		{
+			string__free(&directory);
+		}
+		__v_result_string _t1 = (__v_result_string){.ok = false, .err = err};
+		{
+			{
+				string__free(&value);
+			}
+		}
+		return _t1;
+	}
+	__v_result_string _t2 = (__v_result_string){.ok = true, .value = 	directory};
+	{
+		{
+			string__free(&value);
+		}
+	}
+	return _t2;
+	{
+		{
+			string__free(&value);
+		}
+	}
+	return (__v_result_string){.ok = true};
+}
+
+x86_64 client:
+pkglaunch__run_with_socket(Array arguments, string socket_path) {
+	__v_result __or_opt_0 = pkglaunch__validate_arguments(arguments);
+	if (!__or_opt_0.ok) {
+		return (__v_result_i64){.ok = false, .err = __or_opt_0.err};
+	}
+	u32 uid = (u32)(os__geteuid());
+	if (uid == 0) {
+		return (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_208, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+	}
+	Array __arr_lit_1 = array_new(	sizeof(Array), 0, 1);
+	Array __arr_val_2 = string__bytes(pkglaunch__action);
+	array_push(&__arr_lit_1, &__arr_val_2);
+	authproto__Frame describe_request = (authproto__Frame){.code = authproto__op_describe, .fields = __arr_lit_1};
+	__v_result_authproto__Frame __or_opt_3 = authclient__ask_root(socket_path, describe_request.code, describe_request.fields);
+	authproto__Frame __or_val_4 = {0};
+	if (__or_opt_3.ok) {
+		__or_val_4 = __or_opt_3.value;
+	} else {
+		__v_result_i64 _t1 = (__v_result_i64){.ok = false, .err = __or_opt_3.err};
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t1;
+	}
+	authproto__Frame description = __or_val_4;
+	if ((description.code != authproto__status_ok) || (description.fields.len != 3) || !pkglaunch__reply_field(description, 1, _str_209) || !pkglaunch__reply_field(description, 2, _str_51)) {
+		__v_result_i64 _t2 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_210, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t2;
+	}
+	__v_result_string __or_opt_5 = pkgadmin__runtime_directory(uid);
+	string __or_val_6 = {0};
+	if (__or_opt_5.ok) {
+		__or_val_6 = __or_opt_5.value;
+	} else {
+		__v_result_i64 _t3 = (__v_result_i64){.ok = false, .err = __or_opt_5.err};
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t3;
+	}
+	string directory = __or_val_6;
+	Array random = __new_array_noscan(16, 0, sizeof(u8));
+	__v_result __or_opt_7 = crypto__rand__read(&random);
+	if (!__or_opt_7.ok) {
+		__v_result_i64 _t4 = (__v_result_i64){.ok = false, .err = __or_opt_7.err};
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t4;
+	}
+	string nonce = Array_u8__hex(random);
+	pkglaunch__Request request = (pkglaunch__Request){.nonce = nonce, .arguments = arguments, .format = 1};
+	__v_result_pkgadmin__Listener __or_opt_8 = pkgadmin__listen_private(directory, uid, nonce);
+	pkgadmin__Listener __or_val_9 = {0};
+	if (__or_opt_8.ok) {
+		__or_val_9 = __or_opt_8.value;
+	} else {
+		__v_result_i64 _t5 = (__v_result_i64){.ok = false, .err = __or_opt_8.err};
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t5;
+	}
+	pkgadmin__Listener listener = __or_val_9;
+	Array __arr_lit_10 = array_new(	sizeof(Array), 0, 3);
+	Array __arr_val_11 = string__bytes(pkglaunch__action);
+	array_push(&__arr_lit_10, &__arr_val_11);
+	Array __arr_val_12 = __new_array_noscan(0, 0, sizeof(u8));
+	array_push(&__arr_lit_10, &__arr_val_12);
+	Array __arr_val_13 = string__bytes(nonce);
+	array_push(&__arr_lit_10, &__arr_val_13);
+	authproto__Frame run_request = (authproto__Frame){.code = authproto__op_run, .fields = __arr_lit_10};
+	__v_result_authproto__Frame __or_opt_14 = authclient__ask_root(socket_path, run_request.code, run_request.fields);
+	authproto__Frame __or_val_15 = {0};
+	if (__or_opt_14.ok) {
+		__or_val_15 = __or_opt_14.value;
+	} else {
+		__v_result_i64 _t6 = (__v_result_i64){.ok = false, .err = __or_opt_14.err};
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t6;
+	}
+	authproto__Frame reply = __or_val_15;
+	if ((reply.code != authproto__status_ok) || (reply.fields.len != 2) || !pkglaunch__reply_field(reply, 0, _str_51)) {
+		__v_result_i64 _t7 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_211, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t7;
+	}
+	if (!pkglaunch__reply_invitation(reply, nonce)) {
+		__v_result_i64 _t8 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_212, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t8;
+	}
+	__v_result_i64 __or_opt_16 = pkgadmin__Listener__accept_root(&listener);
+	i64 __or_val_17 = {0};
+	if (__or_opt_16.ok) {
+		__or_val_17 = __or_opt_16.value;
+	} else {
+		__v_result_i64 _t9 = (__v_result_i64){.ok = false, .err = __or_opt_16.err};
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t9;
+	}
+	i64 fd = __or_val_17;
+	__v_result __or_opt_18 = pkglaunch__send_request(fd, request);
+	if (!__or_opt_18.ok) {
+		__v_result_i64 _t10 = (__v_result_i64){.ok = false, .err = __or_opt_18.err};
+		{
+			close(fd);
+		}
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t10;
+	}
+	__v_result __or_opt_19 = pkglaunch__send_streams(fd, (i32[]){(i32)(0), 1, 2});
+	if (!__or_opt_19.ok) {
+		__v_result_i64 _t11 = (__v_result_i64){.ok = false, .err = __or_opt_19.err};
+		{
+			close(fd);
+		}
+		{
+			authproto__Frame__close(&reply);
+		}
+		{
+			authproto__Frame__close(&run_request);
+		}
+		{
+			pkgadmin__Listener__close(&listener);
+		}
+		{
+			{
+				string__free(&nonce);
+			}
+		}
+		{
+			{
+				array__free(&random);
+			}
+		}
+		{
+			{
+				string__free(&directory);
+			}
+		}
+		{
+			authproto__Frame__close(&description);
+		}
+		{
+			authproto__Frame__close(&describe_request);
+		}
+		return _t11;
+	}
+	__v_result_i64 _t12 = 	pkglaunch__receive_result(fd, request);
+	{
+		close(fd);
+	}
+	{
+		authproto__Frame__close(&reply);
+	}
+	{
+		authproto__Frame__close(&run_request);
+	}
+	{
+		pkgadmin__Listener__close(&listener);
+	}
+	{
+		{
+			string__free(&nonce);
+		}
+	}
+	{
+		{
+			array__free(&random);
+		}
+	}
+	{
+		{
+			string__free(&directory);
+		}
+	}
+	{
+		authproto__Frame__close(&description);
+	}
+	{
+		authproto__Frame__close(&describe_request);
+	}
+	return _t12;
+	{
+		close(fd);
+	}
+	{
+		authproto__Frame__close(&reply);
+	}
+	{
+		authproto__Frame__close(&run_request);
+	}
+	{
+		pkgadmin__Listener__close(&listener);
+	}
+	{
+		{
+			string__free(&nonce);
+		}
+	}
+	{
+		{
+			array__free(&random);
+		}
+	}
+	{
+		{
+			string__free(&directory);
+		}
+	}
+	{
+		authproto__Frame__close(&description);
+	}
+	{
+		authproto__Frame__close(&describe_request);
+	}
+	return (__v_result_i64){.ok = true};
+}
+pkgadmin__runtime_directory(u32 uid) {
+	string __in_lhs_0[2];
+	memmove(__in_lhs_0, (string[]){_str_565, _str_566}, sizeof(__in_lhs_0));
+	{
+		i64 __for_idx_1 = 0;
+		for (; __for_idx_1 < 2; __for_idx_1++) {
+			string parent = __in_lhs_0[v_fixed_index(__for_idx_1, 2)];
+			__v_result_os__Stat __or_opt_2 = os__lstat(parent);
+			os__Stat __or_val_3 = {0};
+			if (__or_opt_2.ok) {
+				__or_val_3 = __or_opt_2.value;
+			} else {
+				return (__v_result_string){.ok = false, .err = __or_opt_2.err};
+			}
+			os__Stat info = __or_val_3;
+			if ((os__Stat__get_filetype(info) != os__FileType__directory) || (info.uid != 0) || ((info.mode & 0022) != 0)) {
+				return (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_567, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+			}
+		}
+	}
+	string value = u32__str(uid);
+	string directory = string__plus(_str_568, value);
+	__v_result __or_opt_4 = pkgadmin__private_directory(directory, uid);
+	if (!__or_opt_4.ok) {
+		IError err = __or_opt_4.err;
+		{
+			string__free(&directory);
+		}
+		__v_result_string _t1 = (__v_result_string){.ok = false, .err = err};
+		{
+			{
+				string__free(&value);
+			}
+		}
+		return _t1;
+	}
+	__v_result_string _t2 = (__v_result_string){.ok = true, .value = 	directory};
+	{
+		{
+			string__free(&value);
+		}
+	}
+	return _t2;
+	{
+		{
+			string__free(&value);
+		}
+	}
+	return (__v_result_string){.ok = true};
+}
+
+Persistent encoder metadata initialized before measurement:
+json2__Encoder_pkglaunch__Request__cached_field_infos(json2__Encoder* encoder) {
+	static json2__EncoderFieldInfoCache* cache = (json2__EncoderFieldInfoCache*)(NULL);
+	static u64 initializing = (u64)(0);
+	static u64 initialized = (u64)(0);
+	if (stdatomic__load_u64(&initialized) == 0) {
+		if (stdatomic__fetch_add_u64(&initializing, 1) == 0) {
+			cache = (json2__EncoderFieldInfoCache*)memdup(&(json2__EncoderFieldInfoCache){.field_infos = array_new(sizeof(json2__EncoderFieldInfo), 0, 0)}, sizeof(json2__EncoderFieldInfoCache));
+			{
+				json2__EncoderFieldInfo __arr_val_0 = json2__encoder_field_info(_str_714, array_new(				sizeof(string), 0, 0));
+				array_push(&cache->field_infos, &__arr_val_0);
+			}
+			{
+				json2__EncoderFieldInfo __arr_val_1 = json2__encoder_field_info(_str_1450, array_new(				sizeof(string), 0, 0));
+				array_push(&cache->field_infos, &__arr_val_1);
+			}
+			{
+				json2__EncoderFieldInfo __arr_val_2 = json2__encoder_field_info(_str_1451, array_new(				sizeof(string), 0, 0));
+				array_push(&cache->field_infos, &__arr_val_2);
+			}
+			stdatomic__store_u64(&initialized, 1);
+		} else {
+			while (stdatomic__load_u64(&initialized) == 0) {
+				time__sleep(time__microsecond);
+			}
+		}
+	}
+	return cache;
+}

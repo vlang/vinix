@@ -508,6 +508,12 @@ transactions cover success, peer rejection, interrupted/malformed replies and
 local refusals while preserving borrowed-request erasure and descriptor counts.
 See [authentication client checks](../../tests/packages/auth-client-check.md).
 
+The isolated-launch caller owns and erases its authentication request buffers,
+borrows reply bytes for approval checks, and retires its nonce and listener
+without hidden wrapper allocations. Full root-service/ordinary-client tests
+cover handoff, literal input, protected streams and refusal cleanup. See
+[launch client checks](../../tests/packages/launch-client-check.md).
+
 Small launch-option windows retain Back, status and failure access. Resizing
 preserves the draft and file-page selection; Escape leaves a field or returns
 an idle form to the catalog. Pasted control bytes cannot navigate, and running

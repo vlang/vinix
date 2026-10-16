@@ -1,0 +1,29 @@
+28 focused native compile/run checks passed; full target comparisons and stress are recorded separately.
+protocol-compile PASS 1.055s
+protocol-run PASS 0.323s
+authcore-compile PASS 2.811s
+authcore-run PASS 6.999s
+shipped-actions-compile PASS 2.625s
+shipped-actions-run PASS 0.254s
+root-peer-compile PASS 3.483s
+root-peer-run PASS 0.249s
+launch-protocol-compile PASS 4.178s
+launch-protocol-run PASS 0.278s
+launch-streams-compile PASS 4.198s
+launch-streams-run PASS 0.257s
+admin-protocol-compile PASS 2.844s
+admin-protocol-run PASS 0.257s
+admin-socket-compile PASS 2.72s
+admin-socket-run PASS 0.248s
+package-cli-compile PASS 5.351s
+distribution-cli-compile PASS 6.078s
+distribution-cli-run PASS 6.335s
+distribution-driver-compile PASS 1.086s
+baseline-compile PASS
+baseline-run PASS
+comparison-compile PASS
+comparison-run PASS
+memory-compile PASS
+memory-run PASS
+asan-compile PASS
+asan-run PASS

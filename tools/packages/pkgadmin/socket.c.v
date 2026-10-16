@@ -60,7 +60,7 @@ fn private_directory(directory string, uid u32) ! {
 }
 
 pub fn runtime_directory(uid u32) !string {
-	for parent in ['/run', '/run/user'] {
+	for parent in ['/run', '/run/user']! {
 		info := os.lstat(parent)!
 		if info.get_filetype() != .directory || info.uid != 0 || info.mode & 0o022 != 0 { return error('unsafe package runtime parent') }
 	}

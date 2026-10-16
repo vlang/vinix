@@ -226,6 +226,10 @@ fn check() ! {
 			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/auth-client-memory', repository + '/tools/accounts/authclient/ownership_test.v'])!
 		run(work + '/auth-client-memory', [])!
+		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/launch-client-memory', repository + '/tools/packages/pkglaunch/client_ownership_test.v'])!
+		run(work + '/launch-client-memory', [])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap', '-o', work + '/context-memory', repository + '/tests/packages/sdk-context-memory.v'])!
 		run(work + '/context-memory', [])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap', '-o', work + '/window-memory', repository + '/tests/packages/window-memory.v'])!

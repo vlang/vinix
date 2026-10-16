@@ -1,0 +1,48 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./run/ sz=0
+!>+ [10] ./tmp/ sz=0
+!>+ [11] ./run/user/ sz=0
+!>+ [12] ./etc/hwtest-scenario sz=23
+!>+ [13] ./sbin/init sz=137704
+!>+ [14] ./usr/bin/ sz=0
+!>+ [15] ./usr/sbin/ sz=0
+!>+ [16] ./usr/share/ sz=0
+!>+ [17] ./usr/share/package-fixtures/ sz=0
+!>+ [18] ./usr/share/package-fixtures/streams sz=637104
+!>+ [19] ./usr/share/package-fixtures/launch-client sz=683208
+!>+ [20] ./usr/share/package-fixtures/protocol sz=622120
+!>+!>+!>+!>+!>+!>initramfs: no ustar sig at 0xff00000037104000
+initramfs: Done (25 entries)
+HWTEST START packages-launch-client
+LAUNCH CLIENT unavailable authentication retained 0 bytes
+LAUNCH CLIENT status 37 retained 2800 bytes
+LAUNCH CLIENT description denied retained 625 bytes
+LAUNCH CLIENT description fields retained 625 bytes
+LAUNCH CLIENT account denied retained 635 bytes
+LAUNCH CLIENT password required retained 645 bytes
+LAUNCH CLIENT approval denied retained 2620 bytes
+LAUNCH CLIENT approval fields retained 2620 bytes
+LAUNCH CLIENT approval status retained 2635 bytes
+LAUNCH CLIENT invitation mismatch retained 2800 bytes
+LAUNCH CLIENT approval interrupted retained 2620 bytes
+LAUNCH CLIENT receipt mismatch retained 2800 bytes
+LAUNCH CLIENT unsafe runtime retained 1040 bytes
+LAUNCH CLIENT status 0 retained 2800 bytes
+LAUNCH CLIENT root service and ordinary caller preserve literal input, three protected streams, status, cleanup and diagnostics PASS
+LAUNCH CLIENT ACTOR root PASS
+LAUNCH CLIENT unavailable authentication retained 625 bytes
+LAUNCH CLIENT ACTOR UID 1000 PASS
+LAUNCH CLIENT COMPANION protocol PASS
+LAUNCH CLIENT COMPANION streams PASS
+LAUNCH CLIENT COMPANION admin-socket PASS
+HWTEST PASS packages-launch-client

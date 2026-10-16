@@ -1,0 +1,71 @@
+Native unavailable-service probes, five calls: baseline 4f038484b and final
+LAUNCH CLIENT unavailable authentication retained 625 bytes
+LAUNCH CLIENT unavailable authentication retained 0 bytes
+
+aarch64 BASELINE: five calls per outcome, encoder metadata primed
+LAUNCH CLIENT unavailable authentication retained 0 bytes
+LAUNCH CLIENT status 37 retained 2800 bytes
+LAUNCH CLIENT description denied retained 625 bytes
+LAUNCH CLIENT description fields retained 625 bytes
+LAUNCH CLIENT account denied retained 635 bytes
+LAUNCH CLIENT password required retained 645 bytes
+LAUNCH CLIENT approval denied retained 2620 bytes
+LAUNCH CLIENT approval fields retained 2620 bytes
+LAUNCH CLIENT approval status retained 2635 bytes
+LAUNCH CLIENT invitation mismatch retained 2800 bytes
+LAUNCH CLIENT approval interrupted retained 2620 bytes
+LAUNCH CLIENT receipt mismatch retained 2800 bytes
+LAUNCH CLIENT unsafe runtime retained 1040 bytes
+LAUNCH CLIENT status 0 retained 2800 bytes
+LAUNCH CLIENT unavailable authentication retained 625 bytes
+
+aarch64 FINAL: identical five-call outcomes and priming
+LAUNCH CLIENT unavailable authentication retained 0 bytes
+LAUNCH CLIENT status 37 retained 0 bytes
+LAUNCH CLIENT description denied retained 0 bytes
+LAUNCH CLIENT description fields retained 0 bytes
+LAUNCH CLIENT account denied retained 0 bytes
+LAUNCH CLIENT password required retained 0 bytes
+LAUNCH CLIENT approval denied retained 0 bytes
+LAUNCH CLIENT approval fields retained 0 bytes
+LAUNCH CLIENT approval status retained 0 bytes
+LAUNCH CLIENT invitation mismatch retained 0 bytes
+LAUNCH CLIENT approval interrupted retained 0 bytes
+LAUNCH CLIENT receipt mismatch retained 0 bytes
+LAUNCH CLIENT unsafe runtime retained 0 bytes
+LAUNCH CLIENT status 0 retained 0 bytes
+LAUNCH CLIENT unavailable authentication retained 0 bytes
+
+x86_64 BASELINE: five calls per outcome, encoder metadata primed
+LAUNCH CLIENT unavailable authentication retained 0 bytes
+LAUNCH CLIENT status 37 retained 2800 bytes
+LAUNCH CLIENT description denied retained 625 bytes
+LAUNCH CLIENT description fields retained 625 bytes
+LAUNCH CLIENT account denied retained 635 bytes
+LAUNCH CLIENT password required retained 645 bytes
+LAUNCH CLIENT approval denied retained 2620 bytes
+LAUNCH CLIENT approval fields retained 2620 bytes
+LAUNCH CLIENT approval status retained 2635 bytes
+LAUNCH CLIENT invitation mismatch retained 2800 bytes
+LAUNCH CLIENT approval interrupted retained 2620 bytes
+LAUNCH CLIENT receipt mismatch retained 2800 bytes
+LAUNCH CLIENT unsafe runtime retained 1040 bytes
+LAUNCH CLIENT status 0 retained 2800 bytes
+LAUNCH CLIENT unavailable authentication retained 625 bytes
+
+x86_64 FINAL: identical five-call outcomes and priming
+LAUNCH CLIENT unavailable authentication retained 0 bytes
+LAUNCH CLIENT status 37 retained 0 bytes
+LAUNCH CLIENT description denied retained 0 bytes
+LAUNCH CLIENT description fields retained 0 bytes
+LAUNCH CLIENT account denied retained 0 bytes
+LAUNCH CLIENT password required retained 0 bytes
+LAUNCH CLIENT approval denied retained 0 bytes
+LAUNCH CLIENT approval fields retained 0 bytes
+LAUNCH CLIENT approval status retained 0 bytes
+LAUNCH CLIENT invitation mismatch retained 0 bytes
+LAUNCH CLIENT approval interrupted retained 0 bytes
+LAUNCH CLIENT receipt mismatch retained 0 bytes
+LAUNCH CLIENT unsafe runtime retained 0 bytes
+LAUNCH CLIENT status 0 retained 0 bytes
+LAUNCH CLIENT unavailable authentication retained 0 bytes

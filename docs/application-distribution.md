@@ -1956,3 +1956,9 @@ reply reads. Complete transaction ownership checks cover successful calls,
 root-peer decisions and interrupted/malformed replies without changing the
 existing diagnostics or borrowed-request contract. See
 [authentication client qualification](../tests/packages/auth-client-check.md).
+
+The isolated-launch caller now retires its authentication request tables,
+reply-check scratch and listener wrapper, including when approval or completion
+fails. Runtime-parent validation uses fixed storage. Handoffs between ordinary
+clients and a root service preserve literal arguments, three protected streams and exact
+diagnostics; see [launch client qualification](../tests/packages/launch-client-check.md).
