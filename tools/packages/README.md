@@ -487,6 +487,11 @@ literal arguments, inherited environment/streams, identity, child exit status
 and the parent's generation lease are preserved. See
 [launch-process qualification](../../tests/packages/launch-process-check.md).
 
+The isolated launch protocol also releases decoded-request and completion
+scratch after success or refusal. Canonical request and receipt bytes and
+literal input limits remain unchanged. See
+[launch-transport qualification](../../tests/packages/launch-transport-check.md).
+
 Small launch-option windows retain Back, status and failure access. Resizing
 preserves the draft and file-page selection; Escape leaves a field or returns
 an idle form to the catalog. Pasted control bytes cannot navigate, and running

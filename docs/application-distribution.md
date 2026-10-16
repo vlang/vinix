@@ -1931,3 +1931,10 @@ channel. Child exit and signal statuses, literal argument boundaries, inherited
 environment/streams and credentials retain their existing behavior. The parent
 holds the generation lease throughout execution. See
 [launch-process qualification](../tests/packages/launch-process-check.md).
+
+Isolated launch envelopes now use a bounded reader for their existing canonical
+schema. Decoded requests own their nonce and arguments; malformed requests
+release partial records and growth buffers. Receipt generation releases its
+hash state and digest, and completion reads release their bounded scratch.
+The envelope, receipt bytes and literal argument contract are unchanged. See
+[launch-transport qualification](../tests/packages/launch-transport-check.md).

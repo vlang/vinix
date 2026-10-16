@@ -1291,6 +1291,14 @@ failure from an application's own exit code. The parent retains the generation
 lease until the child is reaped. See
 [launch-process checks](../../tests/packages/launch-process-check.md).
 
+The isolated launch envelope keeps its existing canonical JSON and receipt
+bytes. Its bounded reader owns the decoded nonce and argument strings and
+releases partial records after malformed input; call `Request.close()` on a
+decoded result. Receipt hashing and completion reads also release their scratch
+on success and refusal. The 772-value, 512 KiB envelope and existing command
+limits are unchanged, including literal non-NUL argument bytes. See
+[launch-transport checks](../../tests/packages/launch-transport-check.md).
+
 On Linux, account-session launch reads its executable identity directly from
 `/proc/self/exe` with bounded stack storage. An unavailable, empty or oversized
 identity refuses with a diagnostic before the session helper starts.

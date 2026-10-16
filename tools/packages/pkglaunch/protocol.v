@@ -71,20 +71,18 @@ pub fn (request &Request) encode() !string {
 
 pub fn decode(text string) !Request {
 	if text.len == 0 || text.len > request_limit { return error('invalid isolated package request size') }
-	mut request := json2.decode[Request](text)!
-	mut accepted := false
-	defer { if !accepted { request.close() } }
-	canonical := request.encode()!
-	defer { unsafe { canonical.free() } }
-	if text != canonical { return error('isolated package request is not canonical') }
-	accepted = true
-	return request
+	return decode_request(text)
 }
 
 pub fn (request &Request) receipt(code int) string {
-	text := request.encode() or { return '' }
+	text := request.encode() or { message := err.msg(); unsafe { message.free(); err.free() }; return '' }
 	bytes := text.bytes()
-	digest := sha256.sum(bytes).hex()
+	mut hash := sha256.new()
+	mut checksum := []u8{len: sha256.size}
+	defer { unsafe { hash.free(); free(hash); checksum.free() } }
+	hash.write(bytes) or { panic(err) }
+	hash.checksum_into(mut checksum)
+	digest := checksum.hex()
 	number := code.str()
 	defer { unsafe { text.free(); bytes.free(); digest.free(); number.free() } }
 	return result_prefix + request.nonce + ' ' + digest + ' ' + number

@@ -1,0 +1,4 @@
+LAUNCH TRANSPORT independent owned requests, five modes, all non-NUL byte values, 772-value envelope and escaped 64-KiB boundary PASS
+LAUNCH TRANSPORT every truncated prefix, noncanonical fields/escapes/types, NUL, argument/document/byte and envelope limits refuse with retired scratch PASS
+LAUNCH TRANSPORT request/rights/completion roundtrips preserve nonce, literal argv, three CLOEXEC streams and 0/37/126/127/143/255 statuses PASS
+LAUNCH TRANSPORT truncated/oversized request frames, tampered/noncanonical/overlong completion and closed-descriptor errors retire scratch PASS

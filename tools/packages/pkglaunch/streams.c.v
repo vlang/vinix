@@ -156,7 +156,13 @@ pub fn receive_result(fd int, request Request) !int {
 		count := C.read(fd, unsafe { &bytes[used] }, usize(bytes.len - used))
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count < 0 { return error('isolated application completion was interrupted') }
-		if count == 0 { return request.result(unsafe { tos(&bytes[0], used) }) }
+		if count == 0 {
+			// Keep the fixed receive buffer on the stack. A borrowed view passed
+			// directly to result() escapes in the manual-free compiler.
+			text := unsafe { tos(&bytes[0], used).clone() }
+			defer { unsafe { text.free() } }
+			return request.result(text)
+		}
 		used += int(count)
 	}
 	return error('isolated application completion exceeds its bound')

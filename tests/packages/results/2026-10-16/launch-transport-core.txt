@@ -1,0 +1,31 @@
+
+protocol-run
+
+streams-run
+
+ownership-run
+LAUNCH TRANSPORT independent owned requests, five modes, all non-NUL byte values, 772-value envelope and escaped 64-KiB boundary PASS
+LAUNCH TRANSPORT every truncated prefix, noncanonical fields/escapes/types, NUL, argument/document/byte and envelope limits refuse with retired scratch PASS
+LAUNCH TRANSPORT request/rights/completion roundtrips preserve nonce, literal argv, three CLOEXEC streams and 0/37/126/127/143/255 statuses PASS
+LAUNCH TRANSPORT truncated/oversized request frames, tampered/noncanonical/overlong completion and closed-descriptor errors retire scratch PASS
+
+command-ownership-run
+COMMAND OWNERSHIP independent literal arguments/documents survive source and sibling retirement; repeated close resets both vectors and data-cwd PASS
+COMMAND OWNERSHIP repeated empty/one/64/256-document requests and twelve syntax/string/count/aggregate refusal paths retire all scratch PASS
+COMMAND OWNERSHIP exact 256 arguments/documents, 4096-byte values and 65535/65536/65537 aggregate bytes preserve limits and error precedence PASS
+COMMAND OWNERSHIP isolated transport borrows bounded prefixes, preserves literal source vectors and exact 772-value/document refusal diagnostics PASS
+
+command-run
+
+session-run
+
+launch-ownership-run
+LAUNCH OWNERSHIP plans survive request/state/path/account and sibling retirement; repeated close resets all fields PASS
+LAUNCH OWNERSHIP both architectures and native/Linux/Windows/Apple plans preserve promises, environment, templates and literal tails PASS
+LAUNCH OWNERSHIP 0/1/64 dependencies, shared edges/cycles, 256 documents and 256 literal arguments retire vector growth PASS
+LAUNCH OWNERSHIP policy, revoked/weak publishers, SDK directories and regular-file/permission refusals retire partial plans PASS
+LAUNCH OWNERSHIP five isolated session modes and 0/1/64/256 documents release independent vectors PASS
+
+admin-protocol-run
+
+admin-socket-run

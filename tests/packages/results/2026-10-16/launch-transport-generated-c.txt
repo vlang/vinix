@@ -1,0 +1,66 @@
+aarch64: receive_result retains its 129-byte stack buffer and retires the owned text clone on all validation returns.
+__v_result_i64 pkglaunch__receive_result(i64 fd, pkglaunch__Request request) {
+	u8 bytes[129];
+	memmove(bytes, (u8[129]){0}, sizeof(bytes));
+	i64 used = 0;
+	while (used < 129) {
+		ptrdiff_t count = read(fd, &bytes[used], (size_t)(129 - used));
+		if ((count < 0) && (errno == EINTR)) {
+			continue;
+		}
+		if (count < 0) {
+			return (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_251, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		}
+		if (count == 0) {
+			string text = string__clone(tos(&bytes[0], used));
+			__v_result_i64 _t1 = 			pkglaunch__Request__result(&request, text);
+			{
+				{
+					string__free(&text);
+				}
+			}
+			return _t1;
+			{
+				{
+					string__free(&text);
+				}
+			}
+		}
+		used += (i64)(count);
+	}
+	return (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_252, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+	return (__v_result_i64){.ok = true};
+}
+x86_64: receive_result retains its 129-byte stack buffer and retires the owned text clone on all validation returns.
+__v_result_i64 pkglaunch__receive_result(i64 fd, pkglaunch__Request request) {
+	u8 bytes[129];
+	memmove(bytes, (u8[129]){0}, sizeof(bytes));
+	i64 used = 0;
+	while (used < 129) {
+		ptrdiff_t count = read(fd, &bytes[used], (size_t)(129 - used));
+		if ((count < 0) && (errno == EINTR)) {
+			continue;
+		}
+		if (count < 0) {
+			return (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_251, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		}
+		if (count == 0) {
+			string text = string__clone(tos(&bytes[0], used));
+			__v_result_i64 _t1 = 			pkglaunch__Request__result(&request, text);
+			{
+				{
+					string__free(&text);
+				}
+			}
+			return _t1;
+			{
+				{
+					string__free(&text);
+				}
+			}
+		}
+		used += (i64)(count);
+	}
+	return (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_252, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+	return (__v_result_i64){.ok = true};
+}

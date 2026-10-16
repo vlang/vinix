@@ -214,6 +214,10 @@ fn check() ! {
 		run(v, ['-nocache', 'run', repository + '/tests/packages/space-check.v'])!
 		run(v, ['-nocache', 'run', repository + '/tests/packages/removal-space-check.v'])!
 		check_tests(v, ['-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts'], repository + '/tools/packages/pkglaunch', work)!
+		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/launch-transport-memory', repository + '/tools/packages/pkglaunch/ownership_test.v'])!
+		run(work + '/launch-transport-memory', [])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap', '-o', work + '/context-memory', repository + '/tests/packages/sdk-context-memory.v'])!
 		run(work + '/context-memory', [])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap', '-o', work + '/window-memory', repository + '/tests/packages/window-memory.v'])!

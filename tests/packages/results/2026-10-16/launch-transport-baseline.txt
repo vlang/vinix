@@ -1,0 +1,15 @@
+BEFORE 62a4345c2: five cycles; all returned owners, fixture allocations and errors explicitly retired
+TRANSPORT owned decode: five cycles retained 1035 bytes
+TRANSPORT malformed decode: five cycles retained 3515 bytes
+TRANSPORT receipt: five cycles retained 1705 bytes
+TRANSPORT wire request: five cycles retained 5 bytes
+TRANSPORT stream rights: five cycles retained 0 bytes
+TRANSPORT completion: five cycles retained 4055 bytes
+
+AFTER: same probes; all six retain zero
+TRANSPORT owned decode: five cycles retained 0 bytes
+TRANSPORT malformed decode: five cycles retained 0 bytes
+TRANSPORT receipt: five cycles retained 0 bytes
+TRANSPORT wire request: five cycles retained 0 bytes
+TRANSPORT stream rights: five cycles retained 0 bytes
+TRANSPORT completion: five cycles retained 0 bytes
