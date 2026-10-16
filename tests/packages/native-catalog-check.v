@@ -84,6 +84,7 @@ fn native_suite(sandbox string, image bool, software bool) hwhost.Suite {
 			'SOFTWARE IMAGE unchanged-staged-trust root-owned-state separate-user-data clean-runtime PASS']
 		required << 'SOFTWARE IMAGE staged-release-catalog discovered full-set review separate administrator approval exact offline install PASS'
 		required << release_audit_markers()[..3]
+		required << 'SOFTWARE IMAGE compact-deployment 320x240 keyboard paging visible release review and audit separate approval PASS'
 	}
 	if image { required << 'PACKAGE IMAGE BUNDLE production-staged signed repository before first refresh PASS' }
 	return hwhost.Suite{ name: 'package-native-catalog', guest: 'tests/accounts/guest',

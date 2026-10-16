@@ -556,6 +556,16 @@ and the declaration; it does not pin subsequent updates to the image release.
 Payload health and current trust remain separate checks. See the
 [installed-release qualification](../../tests/packages/release-audit-check.md).
 
+At 320×240 and larger, compact Deployment forms retain the literal path field
+and page through file selection, deployment review, installed checks, snapshots,
+organization policy and available release actions. Use **Previous**/**Next**, or
+Left/Right and Page Up/Page Down after leaving the path field. **Status** opens
+the complete diagnostic; **Failure details** is an additional action when a
+failure is retained. Each action explains its effect. Paging and resizing
+preserve the draft and selected action; tiny windows retain Back. Confirmation
+still requires the full reviewed plan. See
+[compact form qualification](../../tests/packages/software-deployment-form-check.md).
+
 V builders use `configuration.prepare_applications(&repositories, ids)` or
 `configuration.prepare_application_file(&repositories, source)` to own an
 `ImageApplications` plan. `plan.report()` returns independently owned JSON.

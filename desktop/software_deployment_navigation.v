@@ -19,7 +19,11 @@ fn (mut a SoftwareApp) stop_deployment_review() {
 	a.set_status('Deployment review stopped. No changes were started. Review again to continue.')
 }
 
-fn (a &SoftwareApp) build_deployment_compact(width int, height int) ui2.Element {
+fn (mut a SoftwareApp) build_deployment_compact(width int, height int) ui2.Element {
+	a.deployment_form_compact = false
+	if a.deployment_form_idle() && !a.details_mode && width >= 320 && height >= 240 {
+		return a.build_deployment_form(width, height)
+	}
 	mut children := frame_elements(9)
 	available := a.failure_pages.len > 0 && a.worker == unsafe { nil } && !a.details_mode
 	readable := a.package_review_readable() && !a.details_mode

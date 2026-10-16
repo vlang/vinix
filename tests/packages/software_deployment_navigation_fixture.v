@@ -120,7 +120,7 @@ fn check_software_deployment_navigation() ! {
 				app.handle('software.deployment')!
 				software_repository_text(mut app.deployment_path, path)
 				form := app.build(ui2.rect(0, 0, 320, 240))!
-				assert form.children.any(it.id == 'software.deployment.back') && form.children.any(it.text == app.status)
+				assert form.children.any(it.id == 'software.deployment.back') && form.children.any(it.id == 'software.status')
 				free_window_tree(form)
 				os.setenv('VINIX_SOFTWARE_DEPLOYMENT_NAVIGATION', mode, true)
 				app.handle('software.deployment.review')!; pid := app.worker.pid
@@ -188,10 +188,9 @@ fn check_software_deployment_navigation() ! {
 			if mode == 'apply-failed' {
 				assert app.deployment_mode && !app.review_ready && app.status.contains('disk space changed')
 				compact := app.build(ui2.rect(0, 0, 320, 240))!
-				assert compact.children.any(it.id == 'software.failure') && compact.children.any(it.id == 'software.deployment.back')
-				assert compact.children.any(it.text == app.status)
+				assert compact.children.any(it.id == 'software.status') && compact.children.any(it.id == 'software.deployment.back')
 				free_window_tree(compact)
-				app.handle('software.failure')!; assert app.failure_mode
+				deployment_form_select(mut app, 'software.failure')!; assert app.failure_mode
 				app.handle('software.failure.back')!; assert !app.failure_mode && app.deployment_mode
 				app.handle('software.deployment.back')!
 			} else {

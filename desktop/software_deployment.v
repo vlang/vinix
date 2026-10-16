@@ -51,6 +51,8 @@ fn (mut a SoftwareApp) begin_deployment_review() {
 
 fn (mut a SoftwareApp) handle_deployment(event_id string) {
 	match event_id {
+		'software.deployment.action.previous' { a.navigate_deployment_form(-1) }
+		'software.deployment.action.next' { a.navigate_deployment_form(1) }
 		'software.deployment.choose' { a.choose_deployment_file() }
 		'software.deployment.release' { a.review_release_deployment() }
 		'software.deployment.release-audit' { a.audit_release_deployment() }
@@ -81,6 +83,13 @@ fn (mut a SoftwareApp) deployment_key_input(input string) {
 				return
 			}
 			if !a.focus { a.handle_deployment('software.deployment.back'); return }
+		}
+	}
+	if !a.focus && a.deployment_form_compact && a.deployment_form_idle() {
+		match input {
+			'\x1b[D', '\x1b[5~' { a.navigate_deployment_form(-1); return }
+			'\x1b[C', '\x1b[6~' { a.navigate_deployment_form(1); return }
+			else {}
 		}
 	}
 	// A pending review or transaction owns its literal path. Editing is only
@@ -117,6 +126,7 @@ fn (mut a SoftwareApp) deployment_paste_input(input string) {
 }
 
 fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
+	a.deployment_form_compact = false
 	a.initialize_deployment_field()
 	// Include all four actions, progress and failure controls without growing
 	// the manual-free frame buffer on each redraw.

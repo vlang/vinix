@@ -1310,6 +1310,14 @@ with confirmation available only in the full review. Approved transactions and
 repository refreshes keep running until completion. See
 [package navigation checks](../tests/packages/software-package-navigation-check.md).
 
+Compact Deployment forms now expose the path field and paged actions at
+320×240. **Previous**/**Next**, Left/Right and Page Up/Page Down reach file
+selection, review, installed checks, snapshots, policy and available release
+actions. Keyboard paging applies after leaving the filename field. Complete
+help, **Status** and retained failure details remain accessible. Paging and
+resizing preserve the draft; applying changes still requires the full review
+and separate approval. See [compact deployment checks](../tests/packages/software-deployment-form-check.md).
+
 The repository screen keeps Back, Stop, Cancel, status, progress and failure
 access in small windows. Stop or Escape can cancel a pending configuration list
 or trust review, reap the child and discard unaccepted output while preserving

@@ -693,6 +693,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     preserves drafts on cancellation/failure, and discards late selections after
     editing, navigation or review. Selection requires a separate review and
     confirmation; full graphical-session acceptance remains open.
+    [Compact Deployment forms](tests/packages/software-deployment-form-check.md)
+    retain literal editing and paged file/release/management actions at 320×240,
+    complete help and diagnostics, with approval on the full reviewed plan.
 - [ ] Package native, Linux, Windows and Apple-compatible apps with isolated
   runtimes, launcher/association registration and clean uninstall behavior.
   - [x] [A Win64 publisher profile](tools/packages/SDK.md#wine-win64-publisher-profile)

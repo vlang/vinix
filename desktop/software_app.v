@@ -163,6 +163,8 @@ mut:
 	repository_result string
 	repository_worker SoftwareRepositoryWorker
 	deployment_mode bool
+	deployment_form_compact bool
+	deployment_action int
 	deployment_path []u8
 	deployment_pending string // frozen file path for deployment-review/apply
 	deployment_choice_pending bool

@@ -1,5 +1,10 @@
 # Deployment review cancellation and compact navigation
 
+The later [compact form check](software-deployment-form-check.md) makes idle
+Deployment forms usable at 320×240 with literal editing and paged actions.
+Pending reviews, approved transactions and nested reports retain the lifecycle
+rules qualified here.
+
 Software's Deployment form and proposals previously lost their controls and
 diagnostics in small windows, and pending read-only proposals had no working
 Stop action. The compact view now retains status, progress and failure access,

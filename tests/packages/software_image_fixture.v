@@ -56,11 +56,27 @@ fn image_tree_has(tree ui2.Element, id string) bool {
 	return false
 }
 fn image_control(mut app SoftwareApp, id string) ! {
+	image_control_at(mut app, id, ui2.rect(0, 0, 960, 720))!
+}
+fn image_control_at(mut app SoftwareApp, id string, size ui2.Rect) ! {
 	eprintln('SOFTWARE CONTROL ' + id)
-	tree := app.build(ui2.rect(0, 0, 960, 720))!
+	tree := app.build(size)!
 	defer { image_free_tree(tree) }
 	assert image_tree_has(tree, id), 'missing visible control: ' + id + '; ' + app.status
 	app.handle(id)!
+}
+fn image_compact_deployment_action(mut app SoftwareApp, id string) ! {
+	size := ui2.rect(0, 0, 320, 240)
+	image_free_tree(app.build(size)!)
+	for _ in 0 .. 8 { app.key_input('\x1b[5~') }
+	for _ in 0 .. 8 {
+		tree := app.build(size)!
+		found := image_tree_has(tree, id)
+		image_free_tree(tree)
+		if found { image_control_at(mut app, id, size)!; return }
+		image_control_at(mut app, 'software.deployment.action.next', size)!
+	}
+	return error('compact deployment action unavailable: ' + id)
 }
 fn image_wait(mut app SoftwareApp) !bool {
 	mut progress := false
@@ -173,7 +189,7 @@ fn image_release_audit(mut app SoftwareApp, phase string, version string) ! {
 	failures := app.failure_pages.len
 	image_control(mut app, 'software.deployment')!
 	assert app.release_deployment_available
-	image_control(mut app, 'software.deployment.release-audit')!
+	image_compact_deployment_action(mut app, 'software.deployment.release-audit')!
 	assert app.worker_audit && !app.admin_prompt && app.review == ''
 	assert app.worker.args == ['--json', 'deployment-audit', pkgprotocol.image_applications_path]
 	image_wait(mut app)!
@@ -262,7 +278,7 @@ fn image_run() ! {
 		image_release_audit(mut app, 'initial-empty', '')!
 		image_control(mut app, 'software.deployment')!
 		assert app.release_deployment_available && editor_bytes_text(app.deployment_path) == pkgprotocol.image_applications_path
-		image_control(mut app, 'software.deployment.release')!
+		image_compact_deployment_action(mut app, 'software.deployment.release')!
 		assert app.worker_review && !app.admin_prompt && !app.review_ready
 		image_wait(mut app)!
 		assert app.review_ready && app.review_snapshot.rows.len == 3 && app.review_snapshot.rows.all(it.action == 'install')
@@ -272,6 +288,7 @@ fn image_run() ! {
 		assert app.rows.all(it.installed_version == '1.0.0') && !app.worker_failed
 		println('SOFTWARE IMAGE staged-release-catalog discovered full-set review separate administrator approval exact offline install PASS')
 		image_release_audit(mut app, 'initial-installed', '1.0.0')!
+		println('SOFTWARE IMAGE compact-deployment 320x240 keyboard paging visible release review and audit separate approval PASS')
 		image_counter(mut app)!
 		image_memo(mut app, true)!
 		document := os.home_dir() + '/software document ; $literal.txt'

@@ -1,0 +1,6 @@
+Software compact deployment: 1000 seven-action render/edit/rejected-paste/keyboard/full/compact/tiny/retirement cycles retain zero tracked bytes PASS
+Software deployment navigation: 1000 normal/empty form/review/details/failure render, cancel and retirement cycles retain zero tracked bytes
+Software deployment path paste: 1000 literal/rejected/selected/empty input cycles retain zero tracked bytes
+Software deployment plan reader: 1000 normal/removal-only/decode/read/item/page/render/resize/ignored-confirm/Back/cancel/cache-retirement cycles retain zero tracked bytes
+Software deployment chooser: 1000 literal/empty/invalid/4096-byte/oversize/late-result/directory/full/compact lifecycle cycles retain zero tracked bytes PASS
+Software release catalog: 1000 full/compact form, discovery, missing-file refusal, navigation and retirement cycles retain zero tracked bytes PASS

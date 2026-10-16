@@ -1,0 +1,3 @@
+16 focused Software compile/run checks passed, including ASan/UBSan with leak detection disabled. Maintained Software functional suite, all 28 allocation modes, both full Linux desktop target typechecks and launcher checks passed.
+aarch64 Software guest PASS 30.197s, 59 artifacts
+x86_64 Software guest PASS 35.314s, 59 artifacts

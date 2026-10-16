@@ -362,6 +362,8 @@ fn check() ! {
 	os.cp(repository + '/tests/packages/software_verify_navigation_fixture.v', work + '/software/verify_navigation_fixture.v')!
 	os.cp(repository + '/desktop/software_deployment.v', work + '/software/software_deployment.v')!
 	os.cp(repository + '/desktop/software_release.v', work + '/software/software_release.v')!
+	os.cp(repository + '/desktop/software_deployment_form.v', work + '/software/software_deployment_form.v')!
+	os.cp(repository + '/tests/packages/software_deployment_form_fixture.v', work + '/software/deployment_form_fixture.v')!
 	os.cp(repository + '/tests/packages/software_release_fixture.v', work + '/software/release_fixture.v')!
 	os.cp(repository + '/desktop/software_deployment_chooser.v', work + '/software/software_deployment_chooser.v')!
 	os.cp(repository + '/tests/packages/software_deployment_chooser_fixture.v', work + '/software/deployment_chooser_fixture.v')!
@@ -431,6 +433,7 @@ fn check() ! {
 	run(work + '/window-broker-memory', ['deployment-navigation-memory'])!
 	run(work + '/window-broker-memory', ['deployment-chooser-memory'])!
 	run(work + '/window-broker-memory', ['release-memory'])!
+	run(work + '/window-broker-memory', ['deployment-form-memory'])!
 	run(work + '/window-broker-memory', ['repository-navigation-memory'])!
 	run(work + '/window-broker-memory', ['package-navigation-memory'])!
 	run(work + '/window-broker-memory', ['policy-navigation-memory'])!

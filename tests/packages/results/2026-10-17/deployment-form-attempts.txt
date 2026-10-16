@@ -1,0 +1,56 @@
+The first UI functional run passed the new complete-help/geometry/action-routing assertions and zero-retention form check, then failed an older navigation assertion requiring Failure details to stay on the initial compact screen. That fixture now opens diagnostics through the visible pager and keeps its worker, error, Back and protected-transaction assertions. Final UI, sanitizers, maintained driver and both guest runs passed with unchanged final product/fixture sources.
+
+Initial functional output:
+Software package plan reader: all 4096 arguments and 8192 packages, bounded per-item caches and invalid-metadata diagnostics passed
+Software package plan reader: six operations on both architectures, complete metadata and Unicode paths/descriptions, exact u64 space/generations, arguments/packages, empty plans, native lines, resize anchors and frozen confirmation passed
+Software package navigation: all five operations, partial and complete-before-exit Stop/Cancel/Escape, fresh retry, frozen catalog state, compact review/details/status/progress/failures, protected apply/refresh and reload passed
+Software configured repositories: damaged metadata does not block reviewed revocation; enrollment remains refused PASS
+Software repository paste: literal bounded UTF-8, atomic control/invalid/overflow refusal, preserved selection, empty/unfocused no-op, key-only commands and frozen trust review PASS
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software repository reader: complete trust fields, new/same/rotated keys and revocation effects, both architectures, maximum Unicode sources and counters, frozen URL gate and cache retirement passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software repository navigation: compact list/review/status/progress/failures, partial and complete-before-exit Stop/Cancel/Escape, retained inputs/list, fresh paged review, protected apply/refresh and retry passed
+Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed
+Software Verify: visible control, no administrator/catalog dependency, streamed progress, stable selection, incomplete/failure retention, review isolation and safe close PASS
+Software verification navigation: partial/live/complete-before-exit Stop/Cancel/Escape, pending completion despite human success text, kill/reap and buffer retirement, fresh retry and late failure, compact diagnostics, frozen catalog state and protected verify-phase transactions/launches passed
+Software repair: installed dependency control, exact-version closure disclosure, read-only review, duplicate/modal isolation, frozen confirmation and reviewed administrator apply PASS
+Software health navigation: partial/live/complete-before-exit Stop/Cancel/Escape, compact reload/status/progress/summary/failure, frozen search/filter/selection/paging, late failure and fresh retry PASS
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software health: read-only asynchronous report, issue-first searchable metadata/diagnostics, issues-only filtering, stable visible selection, empty results, bounded Unicode editing, reload retention, compact Back, isolated catalog state, full-set repair review and safe close PASS
+Software health progress: separate bounded stderr, live package names, both-pipe EOF, complete/exit/report/count admission, malformed/partial/late/flood refusal, Stop/Escape kill and reap, retry and compact cancellation PASS
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software cleanup reader: complete generation IDs, fingerprint and retention rules, both architectures, empty and maximum u64 identities, modal confirmation isolation and cache retirement passed
+SOFTWARE CLEANUP read-only review, complete paged disclosure, modal/compact controls, frozen administrator approval, stale refusal, diagnostics and reload PASS
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software cleanup navigation: partial and complete-before-exit Stop/Cancel/Escape, fresh review requirement, 4096-generation admission and stable resize anchor, compact diagnostics, approval cancellation, protected deletion, stopped/failed post-cleanup reload and retained result passed
+Software deployment: full closure, frozen literal path, empty removal, cancellation, bounds, stale/error diagnostics and close guard passed
+Software release catalog: optional ordinary-file discovery, explicit full-closure review, frozen literal path, separate confirmation, stale-picker retirement, missing/link refusal and retained drafts PASS
+Software release audit: visible ordinary read, frozen literal path, stale-picker retirement, reload, drift, separate review and missing/link refusal PASS
+Software compact deployment: complete bounded help and controls at 320x240, literal editing, keyboard/pager/resize anchors, optional actions, stale chooser, status/failure, review/audit/snapshot/policy/release routing and separate confirmation PASS
+Software distribution path paste: deployment/destination/lock fields, atomic controls/UTF-8/4096-byte refusal, preserved focus/selection, literal append/replace, empty/unfocused no-op, keyboard editing and fixed saved source PASS
+/Users/alex/code/vinix/build/package-deployment-form-work/ui-sources-qualified/software_deployment_navigation_fixture.v:191: FAIL: fn main.check_software_deployment_navigation: assert compact.children.any(it.id == 'software.failure') && compact.children.any(it.id == 'software.deployment.back')
+V panic: Assertion failed...
