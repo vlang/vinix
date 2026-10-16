@@ -1,0 +1,85 @@
+
+launch_process-run
+LAUNCH PROCESS literal empty/Unicode/shell-looking arguments, inherited environment, exact working directory and identity PASS
+LAUNCH PROCESS normal and signal exits preserve 37/126/127/143 status, reap children and retire parent storage/descriptors PASS
+LAUNCH PROCESS missing/non-directory cwd, missing/denied/invalid executable and malformed-plan diagnostics refuse before execution with retired scratch PASS
+LAUNCH PROCESS existing stdin/stdout/stderr stay separate and closed standard descriptors remain closed PASS
+LAUNCH PROCESS parent retains its generation lease, final close releases it, descriptor exhaustion retires scratch and restoration permits retry PASS
+
+launch_service-run
+LAUNCH SERVICE both architectures, independent 1/64-entry snapshots, offline overlay, reusable close, reader release and exact generation lease lifetime PASS
+LAUNCH SERVICE executable identity owns independent paths and retires lookup scratch PASS
+LAUNCH SERVICE root/lock/config/state/ID and missing/FIFO/hard-linked/busy lease refusals retire scratch, preserve files and permit retry PASS
+
+coordination-run
+COORDINATION IDENTITY lock/writer refused=true preserved=true
+COORDINATION IDENTITY lock/reader refused=true preserved=true
+COORDINATION IDENTITY lock/status refused=true preserved=true
+COORDINATION IDENTITY generations/1/lease/lease refused=true preserved=true
+COORDINATION IDENTITY generations/1/lease/collection refused=true preserved=true
+COORDINATION IDENTITY generations/1/lease/purge refused=true preserved=true
+COORDINATION IDENTITY state reader/writer/status and launch/collection/purge refuse hard links before mutation; restored entries retry PASS
+COORDINATION IDENTITY captured locks reject replaced/unlinked names and captured-parent lease changes without mutating replacements; restored identities retry PASS
+COORDINATION IDENTITY malformed obsolete lease refuses collection before any generation/cache removal; restored lease permits collection PASS
+COORDINATION IDENTITY 128 repeats of six hard-link refusals retire descriptors under a 32-descriptor limit; busy writer preserves permissions and restored exclusion PASS
+Package coordination: malformed locks refuse promptly without changing special entries or link targets
+Package coordination: malformed and exclusively held generation leases refuse within the deadline
+Package coordination: fresh read-only status stays available; retained metadata without its lock refuses before parsing
+Package coordination: 128 valid and repeated malformed reader/writer/lease cycles preserve exclusion and recovery under a 32-descriptor limit
+
+state_schema-run
+Stored state probe: aarch64 missing firmware accepted=false
+Stored state probe: aarch64 missing proprietary accepted=false
+Stored state probe: aarch64 null permissions accepted=false
+Stored state probe: aarch64 missing sdk accepted=false
+Stored state probe: x86_64 missing firmware accepted=false
+Stored state probe: x86_64 missing proprietary accepted=false
+Stored state probe: x86_64 null permissions accepted=false
+Stored state probe: x86_64 missing sdk accepted=false
+Stored state: complete nested declarations, explicit types, ambiguity refusal and legacy window compatibility passed on both architectures
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Downloading app/bin/app (14 bytes)
+Activated package generation 1
+Updating trusted repository publisher
+Installing Application 2.0.0 (1/1) from publisher
+Activated package generation 2
+Activated package generation 4
+Installing Application 2.0.0 (1/1) from publisher
+Activated package generation 5
+Restored packages from generation 2 in generation 5; application data was retained
+Stored state: malformed active/previous metadata preserves activation, trust, payloads, cache and recovery; restoration permits reviewed removal, rollback and collection
+
+launch_ownership-run
+LAUNCH OWNERSHIP plans survive request/state/path/account and sibling retirement; repeated close resets all fields PASS
+LAUNCH OWNERSHIP both architectures and native/Linux/Windows/Apple plans preserve promises, environment, templates and literal tails PASS
+LAUNCH OWNERSHIP 0/1/64 dependencies, shared edges/cycles, 256 documents and 256 literal arguments retire vector growth PASS
+LAUNCH OWNERSHIP policy, revoked/weak publishers, SDK directories and regular-file/permission refusals retire partial plans PASS
+LAUNCH OWNERSHIP five isolated session modes and 0/1/64/256 documents release independent vectors PASS
+
+command-run
+
+context-run
+
+session-run
+
+installed_namespace-run
+INSTALLED NAMESPACE extra-runtime refused=true repair=true
+INSTALLED NAMESPACE 24 app/runtime/data extra-entry, alias, mode, hard-link and missing-entry refusals bind exact repair IDs; restored trees pass without mutation PASS
+INSTALLED NAMESPACE generation/apps parent aliases refuse all package checks; root guest also checks package/directory/file foreign ownership PASS
+INSTALLED NAMESPACE ordinary launch refuses undeclared app/runtime/dependency entries before private-data creation or execution; restored administrator-owned trees verify PASS
+INSTALLED NAMESPACE 64-level and 1024-file inventories plus 128 successful/refused checks retire descriptors below 32 PASS
+
+registration_parent-run
+LAUNCHER PARENTS identical external launchers through share/application aliases refuse Verify, classify health and bind repairs; restored parents pass PASS
+LAUNCHER PARENTS directory modes and special entries refuse without mutation; private staged admission and canonical hard-linked launchers remain supported PASS
+LAUNCHER PARENTS 24 captured/opened/read root, parent and leaf identity/mode mutations refuse PASS
+LAUNCHER PARENTS ordinary launch refuses damaged registration before private data or execution; restored administrator-owned launchers verify; guest root checks foreign ownership PASS
+LAUNCHER PARENTS 128 healthy and 128 refused checks pass below 32 descriptors; tracked host retains zero checker bytes PASS
+
+standalone-run
+LAUNCH PROCESS literal empty/Unicode/shell-looking arguments, inherited environment, exact working directory and identity PASS
+LAUNCH PROCESS normal and signal exits preserve 37/126/127/143 status, reap children and retire parent storage/descriptors PASS
+LAUNCH PROCESS missing/non-directory cwd, missing/denied/invalid executable and malformed-plan diagnostics refuse before execution with retired scratch PASS
+LAUNCH PROCESS existing stdin/stdout/stderr stay separate and closed standard descriptors remain closed PASS
+LAUNCH PROCESS parent retains its generation lease, final close releases it, descriptor exhaustion retires scratch and restoration permits retry PASS

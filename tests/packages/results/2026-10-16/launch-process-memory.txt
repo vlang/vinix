@@ -1,0 +1,8 @@
+LAUNCH PROCESS literal empty/Unicode/shell-looking arguments, inherited environment, exact working directory and identity PASS
+LAUNCH PROCESS tracked exits: four modes, 1000 attempts each retained 0 bytes
+LAUNCH PROCESS normal and signal exits preserve 37/126/127/143 status, reap children and retire parent storage/descriptors PASS
+LAUNCH PROCESS tracked refusals: ten paths, 1000 attempts each retained 0 bytes
+LAUNCH PROCESS missing/non-directory cwd, missing/denied/invalid executable and malformed-plan diagnostics refuse before execution with retired scratch PASS
+LAUNCH PROCESS existing stdin/stdout/stderr stay separate and closed standard descriptors remain closed PASS
+LAUNCH PROCESS tracked descriptor exhaustion: 1000 refusals retained 0 bytes
+LAUNCH PROCESS parent retains its generation lease, final close releases it, descriptor exhaustion retires scratch and restoration permits retry PASS

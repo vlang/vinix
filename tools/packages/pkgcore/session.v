@@ -93,11 +93,5 @@ fn run_in_session_request(config Config, id string, input LaunchInput) !int {
 	if !os.is_executable(launch.program) {
 		return error('the account session tool is missing: ${launch.program}')
 	}
-	mut process := os.new_process(launch.program)
-	process.set_args(launch.arguments)
-	process.set_work_folder(launch.directory)
-	process.wait()
-	code := process.code
-	process.close()
-	return code
+	return run_launch_process(launch)
 }

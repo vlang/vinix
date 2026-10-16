@@ -1,0 +1,7 @@
+BEFORE 4a49db923: five calls per path; borrowed Launch and original production Process wait/close sequence
+PROCESS exit: five waits/closes retained 109870 bytes
+PROCESS signal: five waits/closes retained 110105 bytes
+
+AFTER: same borrowed plans, child and synchronous execution probes; both retain zero
+PROCESS exit: five waits/closes retained 0 bytes
+PROCESS signal: five waits/closes retained 0 bytes

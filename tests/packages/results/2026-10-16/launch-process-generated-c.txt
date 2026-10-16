@@ -1,0 +1,44 @@
+aarch64: child failure/status arrays remain i32 stack values; pipe duplication is close-on-exec; child branch has no V allocation/formatting/environment-map access; owned parent argv buffer retires on every return.
+void pkgcore__launch_child_failure(i64 fd, i32 stage, i32 code) {
+	i32 record[2];
+	memmove(record, (i32[]){stage, code}, sizeof(record));
+	for (;;) {
+		ptrdiff_t written = write(fd, &record[0], 8);
+		if ((written < 0) && (errno == EINTR)) {
+			continue;
+		}
+		break;
+	}
+}
+if (pid == 0) {
+		close(fds[0]);
+		if (chdir(launch.directory.str) != 0) {
+			pkgcore__launch_child_failure(fds[1], 1, (i32)(errno));
+			_exit(126);
+		}
+		execv(launch.program.str, &(*((char**)((__v3_internal_symbol_local_argv).data) + (0))));
+		pkgcore__launch_child_failure(fds[1], 2, (i32)(errno));
+		_exit(127);
+	}
+x86_64: child failure/status arrays remain i32 stack values; pipe duplication is close-on-exec; child branch has no V allocation/formatting/environment-map access; owned parent argv buffer retires on every return.
+void pkgcore__launch_child_failure(i64 fd, i32 stage, i32 code) {
+	i32 record[2];
+	memmove(record, (i32[]){stage, code}, sizeof(record));
+	for (;;) {
+		ptrdiff_t written = write(fd, &record[0], 8);
+		if ((written < 0) && (errno == EINTR)) {
+			continue;
+		}
+		break;
+	}
+}
+if (pid == 0) {
+		close(fds[0]);
+		if (chdir(launch.directory.str) != 0) {
+			pkgcore__launch_child_failure(fds[1], 1, (i32)(errno));
+			_exit(126);
+		}
+		execv(launch.program.str, &(*((char**)((__v3_internal_symbol_local_argv).data) + (0))));
+		pkgcore__launch_child_failure(fds[1], 2, (i32)(errno));
+		_exit(127);
+	}

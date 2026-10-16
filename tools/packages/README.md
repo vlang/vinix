@@ -481,6 +481,12 @@ cleanup. Temporary dependency, path, environment and argument storage is retired
 after success or refusal; synchronous runners close their plans after the child
 finishes. See [launch ownership qualification](../../tests/packages/launch-ownership-check.md).
 
+Synchronous launch also retires its process scratch and status descriptors.
+Directory-change and exec failures return useful path/OS-error diagnostics;
+literal arguments, inherited environment/streams, identity, child exit status
+and the parent's generation lease are preserved. See
+[launch-process qualification](../../tests/packages/launch-process-check.md).
+
 Small launch-option windows retain Back, status and failure access. Resizing
 preserves the draft and file-page selection; Escape leaves a field or returns
 an idle form to the catalog. Pasted control bytes cannot navigate, and running

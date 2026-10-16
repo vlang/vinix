@@ -1,0 +1,35 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=24
+!>+ [11] ./sbin/init sz=212840
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/launch-process sz=760296
+!>+ [15] ./usr/share/package-fixtures/coordination sz=1392576
+!>+ [16] ./usr/share/package-fixtures/launch-child sz=486944
+!>+ [17] ./usr/share/package-fixtures/command sz=823384
+!>+ [18] ./usr/share/package-fixtures/session sz=702544
+!>+ [19] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e88000
+initramfs: Done (19 entries)
+HWTEST START packages-launch-process
+LAUNCH PROCESS literal empty/Unicode/shell-looking arguments, inherited environment, exact working directory and identity PASS
+LAUNCH PROCESS tracked exits: four modes, 1000 attempts each retained 0 bytes
+LAUNCH PROCESS normal and signal exits preserve 37/126/127/143 status, reap children and retire parent storage/descriptors PASS
+LAUNCH PROCESS tracked refusals: ten paths, 1000 attempts each retained 0 bytes
+LAUNCH PROCESS missing/non-directory cwd, missing/denied/invalid executable and malformed-plan diagnostics refuse before execution with retired scratch PASS
+LAUNCH PROCESS existing stdin/stdout/stderr stay separate and closed standard descriptors remain closed PASS
+LAUNCH PROCESS tracked descriptor exhaustion: 1000 refusals retained 0 bytes
+LAUNCH PROCESS parent retains its generation lease, final close releases it, descriptor exhaustion retires scratch and restoration permits retry PASS
+LAUNCH PROCESS ACTOR root PASS
+LAUNCH PROCESS literal empty/Unicode/shell-looking arguments, inherited environment, exact working directory and identity PASS

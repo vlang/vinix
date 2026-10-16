@@ -1922,3 +1922,12 @@ state; runners retire complete ownership after validation or child completion.
 The reader-lock and generation-lease order is retained, including root's fresh
 ordinary-account handoff. See
 [launch-service lifecycle qualification](../tests/packages/launch-service-check.md).
+
+Application and account-session runners now use a synchronous process helper
+that retires its parent-side argument pointers and status descriptors after
+reaping the child. A failed working-directory change prevents exec; directory
+and exec failures report their path and OS error through a private close-on-exec
+channel. Child exit and signal statuses, literal argument boundaries, inherited
+environment/streams and credentials retain their existing behavior. The parent
+holds the generation lease throughout execution. See
+[launch-process qualification](../tests/packages/launch-process-check.md).

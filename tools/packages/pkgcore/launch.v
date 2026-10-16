@@ -269,11 +269,5 @@ fn run_leased_mode(config Config, directory string, state State, id string, inpu
 		}
 	}
 	prepare_launch_data(home, id, u32(uid))!
-	mut process := os.new_process(launch.program)
-	process.set_args(launch.arguments)
-	process.set_work_folder(launch.directory)
-	process.wait()
-	code := process.code
-	process.close()
-	return code
+	return run_launch_process(launch)
 }

@@ -1279,6 +1279,18 @@ The reader still retires immediately after admission, while the generation lease
 remains held through execution. No new public interface or serialized field is
 introduced. See [launch-service lifecycle checks](../../tests/packages/launch-service-check.md).
 
+The synchronous runners borrow their plan through child completion and retire
+their argument-pointer vector and launch-status descriptors on return. They
+inherit the existing environment, identity and separate standard streams; closed
+standard descriptors remain closed. Exit codes, including 126 and 127, and
+`128 + signal` statuses are returned unchanged. Failure to enter the planned
+working directory or execute its program returns a diagnostic with the path,
+stage and numeric OS error instead. The process never executes after a failed
+directory change. A private close-on-exec status channel distinguishes setup
+failure from an application's own exit code. The parent retains the generation
+lease until the child is reaped. See
+[launch-process checks](../../tests/packages/launch-process-check.md).
+
 On Linux, account-session launch reads its executable identity directly from
 `/proc/self/exe` with bounded stack storage. An unavailable, empty or oversized
 identity refuses with a diagnostic before the session helper starts.

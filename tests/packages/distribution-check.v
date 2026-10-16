@@ -51,6 +51,9 @@ fn check() ! {
 		if '--https-only' in os.args { println('Package HTTPS checks passed'); return }
 	}
 	if '--software-only' !in os.args {
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-o', work + '/launch-child',
+			repository + '/tests/packages/launch-process-child.v'])!
+		os.setenv('VINIX_PACKAGE_LAUNCH_CHILD', os.real_path(work + '/launch-child'), true)
 		check_tests(v, ['-gc', 'none'], repository + '/tools/packages/signing', work)!
 		run(v, [...helper_flags, '-enable-globals', '-d', 'track_heap', '-gc', 'none', '-manualfree',
 			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/signing-allocation-check',
@@ -141,6 +144,10 @@ fn check() ! {
 			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/launch-service-memory', repository + '/tools/packages/pkgcore/launch_service_test.v'])!
 		run(work + '/launch-service-memory', [])!
+		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/launch-process-memory', repository + '/tools/packages/pkgcore/launch_process_test.v'])!
+		run(work + '/launch-process-memory', [])!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
 			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/diagnostics-memory', repository + '/tools/packages/pkgcore/view_test.v'])!
