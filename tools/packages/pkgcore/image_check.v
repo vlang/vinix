@@ -32,6 +32,7 @@ struct ImageInputCheck {
 	bundle_reserve_bytes u64
 	bundled_repositories []ImageBundleCheck
 	applications_checked bool
+	application_requirements_sha256 string
 	application_deployment DeploymentLock
 }
 
@@ -39,7 +40,7 @@ struct ImageInputCheck {
 // free the returned text. Report encoding borrows decoded/plan fields only
 // while their owners are alive; no private capture paths enter the report.
 pub fn (configuration &ImageConfiguration) check_repositories(repositories &ImageRepositories) !string {
-	return configuration.check_inputs(repositories, [])
+	return configuration.check_inputs(repositories, [], '')
 }
 
 // Check an advertised application set together, using only the captured signed
@@ -48,10 +49,25 @@ pub fn (configuration &ImageConfiguration) check_repositories(repositories &Imag
 // install packages, enroll remote publishers or authorize a deployment.
 pub fn (configuration &ImageConfiguration) check_applications(repositories &ImageRepositories, required []string) !string {
 	if required.len == 0 { return error('image application check requires at least one application ID') }
-	return configuration.check_inputs(repositories, required)
+	return configuration.check_inputs(repositories, required, '')
 }
 
-fn (configuration &ImageConfiguration) check_inputs(repositories &ImageRepositories, required []string) !string {
+// Format-1 deployment roots are a declarative advertised application set.
+// Format-2 locks must never be reduced to IDs, discarding their exact pins.
+// Capture once: resolution and the reported digest refer to the same bytes.
+pub fn (configuration &ImageConfiguration) check_application_file(repositories &ImageRepositories, source string) !string {
+	text := read_metadata(source)!
+	defer { unsafe { text.free() } }
+	mut document := decode_deployment(text, configuration.architecture)!
+	defer { document.close() }
+	if document.format != 1 { return error('image application requirements need a format-1 root manifest; exact format-2 deployment locks cannot be used as unpinned requirements') }
+	if document.packages.len == 0 { return error('image application requirements must name at least one application') }
+	digest := index_digest(text)
+	defer { unsafe { digest.free() } }
+	return configuration.check_inputs(repositories, document.packages, digest)
+}
+
+fn (configuration &ImageConfiguration) check_inputs(repositories &ImageRepositories, required []string, requirements_sha256 string) !string {
 	if required.len > 4096 { return error('image application check supports at most 4096 application IDs') }
 	mut seen := map[string]bool{}
 	defer { unsafe { seen.free() } }
@@ -118,5 +134,6 @@ fn (configuration &ImageConfiguration) check_inputs(repositories &ImageRepositor
 		configuration_path: configuration.path, configuration_action: if configuration.existing { 'preserve' } else { 'initialize' },
 		configuration_sha256: digest, configuration: config, bundle_supplied: repositories.capture != '', bundle_action: bundle_action,
 		bundle_required_bytes: repositories.needed, bundle_reserve_bytes: if repositories.capture != '' { u64(64 * 1024 * 1024) } else { 0 },
-		bundled_repositories: rows, applications_checked: required.len > 0, application_deployment: deployment })
+		bundled_repositories: rows, applications_checked: required.len > 0,
+		application_requirements_sha256: requirements_sha256, application_deployment: deployment })
 }

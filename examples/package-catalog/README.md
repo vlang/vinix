@@ -27,6 +27,21 @@ use [`publish-release`](../../tools/packages/SDK.md#build-and-publish) to sign
 or the CLI. No host image rebuild or shared runtime is needed for these static
 applications. Select an ordinary `launch_user` for a root desktop session.
 
+For a release image, save the advertised set as a reviewed requirements file
+(use `x86_64` for that target):
+
+```json
+{"format":1,"architecture":"aarch64","packages":["org.vinix.package-hello","org.vinix.counter","org.vinix.memo"]}
+```
+
+Select it with `VINIX_PACKAGE_IMAGE_APPLICATIONS=/absolute/native-apps.json`
+alongside the reviewed `VINIX_PACKAGE_IMAGE_CONFIG` and signed offline
+`VINIX_PACKAGE_IMAGE_REPOSITORIES` bundle. Desktop staging checks their joint
+installability before package-tool compilation, and its cache tracks the selected
+requirements and contents. Direct `stage.v --check --applications FILE` returns
+the requirements digest and exact deployment lock without changing the image.
+See [the release contract](../../tools/packages/SDK.md#application-requirements-files-in-desktop-builds).
+
 The version argument labels the three application manifests. Publishers must
 review source and toolchain changes when advancing it. Binary reproducibility
 across different compiler installations is not implied. Signed updates,

@@ -54,6 +54,13 @@ deployment lock for normal reviewed offline installation. This adds a concrete
 catalog admission gate; production publisher/catalog migration and real graphical
 runtime acceptance remain open. See [qualification](../tests/packages/image-applications-check.md).
 
+Desktop builds can carry that advertised set in a reviewed format-1 deployment
+root manifest selected by `VINIX_PACKAGE_IMAGE_APPLICATIONS` or direct
+`--applications FILE`. The stager resolves those exact captured requirements
+before compiling or publishing, reports their source digest, and refuses exact
+format-2 locks rather than dropping their pins. The native desktop cache tracks
+the selection and contents. See [file/cache qualification](../tests/packages/image-requirements-check.md).
+
 Configuration, cached catalogs, trust histories, installed state and publisher
 documents share a bounded metadata reader. It captures a nonblocking descriptor,
 refuses leaf symlinks and nonregular files, and reads at most the admitted file

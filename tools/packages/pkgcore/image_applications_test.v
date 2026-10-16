@@ -5,6 +5,8 @@ import json2
 import os
 import time
 
+fn C.mkfifo(&char, u32) int
+
 fn image_apps_fixture() !(string, string) {
 	work := os.real_path(os.temp_dir()) + '/vinix-image-apps-' + os.getpid().str() + '-' + time.now().unix_micro().str()
 	os.mkdir(work, mode: 0o700)!
@@ -214,4 +216,119 @@ fn test_image_application_catalog_real_staging_cli_gates_normal_and_check_paths_
 	assert no_bundle != 0 && bundle_error.contains('need a selected signed repository bundle'), bundle_error
 	assert os.ls(root)!.len == 0
 	println('IMAGE APPLICATIONS real CLI repeated/position-independent app requirements, canonical compiler-free reports and normal/check refusal before compiler lookup PASS')
+}
+
+fn test_image_requirements_file_captures_exact_digest_and_resolves_owned_target_locks() {
+	for architecture in ['aarch64', 'x86_64']! {
+		work, key := image_apps_fixture()!; defer { os.rmdir_all(work) or {} }
+		root := work + '/image'; os.mkdir(root)!
+		source := image_apps_config(work, architecture, key, Policy{})!
+		mut configuration := prepare_image_configuration(root, architecture, source)!
+		mut repositories := unsafe { &configuration }.prepare_repositories(work + '/bundle')!
+		path := work + '/reviewed apps ; $literal.json'
+		first := '{"format":1,"architecture":"' + architecture + '","packages":["modern","editor"]}\n'
+		os.write_file(path, first)!
+		text := unsafe { &configuration }.check_application_file(unsafe { &repositories }, path)!
+		report := json2.decode[ImageInputCheck](text)!
+		assert report.applications_checked && report.application_requirements_sha256 == index_digest(first)
+		inline := json2.decode[ImageInputCheck](unsafe { &configuration }.check_applications(unsafe { &repositories }, ['editor', 'modern'])!)!
+		assert inline.application_requirements_sha256 == '' && inline.application_deployment == report.application_deployment
+		assert text == unsafe { &configuration }.check_application_file(unsafe { &repositories }, path)!
+		other := ' \n{"packages":["editor","modern"],"architecture":"' + architecture + '","format":1}\t'
+		os.write_file(path, other)!
+		changed := json2.decode[ImageInputCheck](unsafe { &configuration }.check_application_file(unsafe { &repositories }, path)!)!
+		assert changed.application_requirements_sha256 == index_digest(other) && changed.application_requirements_sha256 != report.application_requirements_sha256
+		assert changed.application_deployment == report.application_deployment && os.ls(root)!.len == 0
+		repositories.close(); configuration.close(); os.rm(path)!
+		assert json2.decode[ImageInputCheck](text)!.application_requirements_sha256 == index_digest(first)
+	}
+	println('IMAGE REQUIREMENTS FILE exact-byte digests, canonical both-host joint locks, inline parity, whitespace/order provenance and independent reports without publication PASS')
+}
+
+fn test_image_requirements_file_refuses_unpinned_lock_downgrades_bad_documents_and_special_inputs() {
+	work, key := image_apps_fixture()!; defer { os.rmdir_all(work) or {} }
+	root := work + '/image'; os.mkdir(root)!
+	source := image_apps_config(work, 'aarch64', key, Policy{})!
+	mut configuration := prepare_image_configuration(root, 'aarch64', source)!
+	defer { configuration.close() }
+	mut repositories := unsafe { &configuration }.prepare_repositories(work + '/bundle')!
+	defer { repositories.close() }
+	path := work + '/requirements.json'
+	valid := '{"format":1,"architecture":"aarch64","packages":["editor"]}'
+	inline := json2.decode[ImageInputCheck](unsafe { &configuration }.check_applications(unsafe { &repositories }, ['editor'])!)!
+	os.write_file(path, publisher_json(inline.application_deployment))!
+	if _ := unsafe { &configuration }.check_application_file(unsafe { &repositories }, path) { assert false } else {
+		assert err.msg().contains('exact format-2 deployment locks cannot be used as unpinned requirements')
+	}
+	for text in ['{}', valid + '{}', valid.replace('1,', 'true,'), valid.replace('"editor"', 'null'),
+		valid.replace('"editor"', '"editor","editor"'), valid.replace('"editor"', '"../editor"'),
+		valid.replace('"editor"', '"support"'), valid.replace('"editor"', '"missing"'),
+		valid.replace('"editor"', ''), valid.replace('aarch64', 'x86_64'), valid.replace('"format":1', '"format":1,"format":1'),
+		valid.replace('"format":1', '"format":1,"unknown":0'), valid.replace('"editor"', '"legacy","modern"'),
+		valid.replace('"editor"', '"editor",'.repeat(4096) + '"editor"')] {
+		os.write_file(path, text)!
+		if _ := unsafe { &configuration }.check_application_file(unsafe { &repositories }, path) { assert false } else {}
+		assert os.read_file(path)! == text && os.ls(root)!.len == 0
+	}
+	os.write_file(path, ' '.repeat(8 * 1024 * 1024 + 1))!
+	if _ := unsafe { &configuration }.check_application_file(unsafe { &repositories }, path) { assert false } else {
+		assert err.msg().contains('bounded regular file')
+	}
+	os.rm(path)!
+	for kind in ['missing', 'directory', 'link', 'fifo']! {
+		match kind {
+			'directory' { os.mkdir(path)! }
+			'link' { os.write_file(work + '/real', valid)!; os.symlink(work + '/real', path)! }
+			'fifo' { assert C.mkfifo(path.str, 0o600) == 0 }
+			else {}
+		}
+		if _ := unsafe { &configuration }.check_application_file(unsafe { &repositories }, path) { assert false } else { assert err.msg().contains('bounded regular file') }
+		if kind == 'directory' { os.rmdir(path)! } else if kind != 'missing' { os.rm(path)! }
+	}
+	os.write_file(path, valid)!
+	assert unsafe { &configuration }.check_application_file(unsafe { &repositories }, path)!.len > 0 && os.ls(root)!.len == 0
+	println('IMAGE REQUIREMENTS FILE format-2 pin downgrades, schema/host/empty/invalid/oversized/conflicting sets and missing/aliased/special/oversized files refuse unchanged; restore/retry PASS')
+}
+
+fn test_image_requirements_file_cli_explicit_and_environment_inputs_preserve_precedence_and_gate_staging() {
+	binary := os.getenv('VINIX_PACKAGE_STAGE_CHECK_CLI'); if binary == '' { return }
+	previous := os.getenv_opt('VINIX_PACKAGE_IMAGE_APPLICATIONS')
+	defer { if value := previous { os.setenv('VINIX_PACKAGE_IMAGE_APPLICATIONS', value, true) } else { os.unsetenv('VINIX_PACKAGE_IMAGE_APPLICATIONS') } }
+	for architecture in ['aarch64', 'x86_64']! {
+		work, key := image_apps_fixture()!; defer { os.rmdir_all(work) or {} }
+		root := work + '/image'; os.mkdir(root)!
+		source := image_apps_config(work, architecture, key, Policy{})!
+		path := work + '/reviewed ; $literal.json'
+		os.write_file(path, '{"format":1,"architecture":"' + architecture + '","packages":["modern","editor"]}\n')!
+		base := ['--arch', architecture, '--staging', root, '--config', source, '--repositories', work + '/bundle', '--cc', work + '/missing-compiler']
+		os.setenv('VINIX_PACKAGE_IMAGE_APPLICATIONS', work + '/invalid-environment-file', true)
+		explicit_code, explicit := image_apps_cli(binary, ['--applications', path, ...base, '--check'])
+		assert explicit_code == 0, explicit
+		report := json2.decode[ImageInputCheck](explicit)!
+		assert report.application_requirements_sha256 == hash_file(path)! && report.application_deployment.packages == ['editor', 'modern']
+		ids_code, ids := image_apps_cli(binary, [...base, '--require-app', 'editor', '--require-app', 'modern', '--check'])
+		assert ids_code == 0, ids
+		assert json2.decode[ImageInputCheck](ids)!.application_requirements_sha256 == ''
+		assert json2.decode[ImageInputCheck](ids)!.application_deployment == report.application_deployment
+		os.setenv('VINIX_PACKAGE_IMAGE_APPLICATIONS', path, true)
+		env_code, environment := image_apps_cli(binary, ['--check', ...base])
+		assert env_code == 0 && environment == explicit, environment
+		for check in [true, false]! {
+			mut args := base.clone(); if check { args << '--check' }
+			for mixed in [['--applications', path, '--require-app', 'editor'], ['--require-app', 'editor', '--applications', path]] {
+				code, error_text := image_apps_cli(binary, [...args, ...mixed])
+				assert code != 0 && error_text.contains('alternative application requirement inputs'), error_text
+			}
+			os.write_file(path, '{"format":1,"architecture":"' + architecture + '","packages":["legacy","modern"]}')!
+			code, diagnostic := image_apps_cli(binary, args)
+			assert code != 0 && diagnostic.contains('Dependency path:') && !diagnostic.contains('missing-compiler'), diagnostic
+		}
+		os.write_file(path, '{"format":1,"architecture":"' + architecture + '","packages":["editor"]}')!
+		normal_code, normal := image_apps_cli(binary, base)
+		assert normal_code != 0 && normal.contains('target compiler is missing or not executable:'), normal
+		empty_code, empty := image_apps_cli(binary, [...base, '--applications', ''])
+		assert empty_code != 0 && empty.contains('--applications requires a reviewed application requirements file'), empty
+		assert os.ls(root)!.len == 0
+	}
+	println('IMAGE REQUIREMENTS FILE CLI both-host inherited/explicit selection, inline override, mutual exclusion and normal/check compiler gates preserve unchanged images PASS')
 }

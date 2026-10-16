@@ -659,6 +659,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     from the selected signed bundle. Reports include exact deployment locks;
     missing hosts, nonapplication substitutes and conflicting runtimes refuse
     before compilation or publication. Production catalog migration remains open.
+    [Reviewed requirements files](tests/packages/image-requirements-check.md)
+    carry that set through desktop staging, retaining exact source digests and
+    invalidating cached images when the selected file or its contents change.
   - [x] [Bounded prepared-root materialization](tests/packages/import-limits-check.md)
     checks aggregate entries across selectors/aliases and output directory depth
     during import, including empty-directory trees and nested selector parents.

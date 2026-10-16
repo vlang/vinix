@@ -60,6 +60,16 @@ remote URLs, data packages and runtime packages cannot stand in for advertised
 applications. See [the contract](SDK.md#require-an-advertised-application-catalog)
 and [qualification](../../tests/packages/image-applications-check.md).
 
+Desktop/release builds can select the same gate declaratively with
+`VINIX_PACKAGE_IMAGE_APPLICATIONS=/absolute/requirements.json`, or use
+`stage.v --applications FILE`. This is a nonempty format-1 deployment root
+manifest for the selected architecture. Explicit file or inline-ID options
+override the environment; the two explicit forms cannot be combined. Reports
+retain the exact file digest, and the native desktop cache tracks its selection
+and contents. Exact format-2 locks are refused here so their pins cannot be
+discarded. See [the contract](SDK.md#application-requirements-files-in-desktop-builds)
+and [qualification](../../tests/packages/image-requirements-check.md).
+
 Desktop checks need generated examples under `build/app-src` and a headless ui2
 overlay under `build/vmodules`; `VINIX_PACKAGE_TEST_UI2` selects another overlay
 parent. Package implementation, publishing, staging and qualification use V.
