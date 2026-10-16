@@ -1238,6 +1238,20 @@ and digest encoding are unchanged.
 V SDK callers use `command_launch(argv) !CommandLaunch` to parse the service
 prefix and `Service.run_command(id, input, terminal) !int` to execute it;
 `command_launch_plan` exposes the same validated sandbox plan for inspection.
+Parsed requests own both vectors and every string. Keep the parsed request in a
+mutable variable and call `input.close()` after use, including when launch fails;
+repeated close is safe and resets `data_cwd`. The CLI closes its parsed request
+after the run call. `Service.run_command` and `command_launch_plan` borrow their
+input, so manually assembled inputs may continue to borrow caller fields and
+must not close those borrowed values.
+
+Parsing uses a bounded temporary vector of borrowed document paths, validates
+the complete request before cloning strings, and retires prefix scratch on every
+refusal. The ordinary-user isolation transport also validates borrowed prefix
+paths without retaining clones or growth buffers. Its 772-value envelope and
+diagnostics remain unchanged. The 256-argument/document, 4096-byte value and
+64 KiB aggregate limits, literal ordering and error precedence remain unchanged. See
+[command request ownership checks](../../tests/packages/command-ownership-check.md).
 
 Software's **Launch options…** form exposes these commands for installed apps.
 Enter arguments using single/double quotes to group values and backslash to

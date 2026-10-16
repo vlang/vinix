@@ -1,0 +1,35 @@
+BEFORE: both returned vectors and strings retired explicitly
+COMMAND BASELINE 0 documents, five parsed/retired requests: 0 bytes
+COMMAND BASELINE 1 documents, five parsed/retired requests: 0 bytes
+COMMAND BASELINE 64 documents, five parsed/retired requests: 8215 bytes
+COMMAND BASELINE 256 documents, five parsed/retired requests: 31565 bytes
+COMMAND BASELINE refusal 0, five attempts: 410 bytes
+COMMAND BASELINE refusal 1, five attempts: 22450 bytes
+COMMAND BASELINE refusal 2, five attempts: 22450 bytes
+COMMAND BASELINE refusal 3, five attempts: 22450 bytes
+COMMAND BASELINE refusal 4, five attempts: 38010 bytes
+COMMAND BASELINE refusal 5, five attempts: 22725 bytes
+COMMAND BASELINE refusal 6, five attempts: 22725 bytes
+COMMAND BASELINE refusal 7, five attempts: 24525 bytes
+COMMAND BASELINE transport 0 documents, five validations: 0 bytes
+COMMAND BASELINE transport 1 documents, five validations: 100 bytes
+COMMAND BASELINE transport 64 documents, five validations: 14615 bytes
+COMMAND BASELINE transport 256 documents, five validations: 57165 bytes
+
+AFTER: identical probes against final core and transport
+COMMAND BASELINE 0 documents, five parsed/retired requests: 0 bytes
+COMMAND BASELINE 1 documents, five parsed/retired requests: 0 bytes
+COMMAND BASELINE 64 documents, five parsed/retired requests: 0 bytes
+COMMAND BASELINE 256 documents, five parsed/retired requests: 0 bytes
+COMMAND BASELINE refusal 0, five attempts: 0 bytes
+COMMAND BASELINE refusal 1, five attempts: 0 bytes
+COMMAND BASELINE refusal 2, five attempts: 0 bytes
+COMMAND BASELINE refusal 3, five attempts: 0 bytes
+COMMAND BASELINE refusal 4, five attempts: 0 bytes
+COMMAND BASELINE refusal 5, five attempts: 0 bytes
+COMMAND BASELINE refusal 6, five attempts: 0 bytes
+COMMAND BASELINE refusal 7, five attempts: 0 bytes
+COMMAND BASELINE transport 0 documents, five validations: 0 bytes
+COMMAND BASELINE transport 1 documents, five validations: 0 bytes
+COMMAND BASELINE transport 64 documents, five validations: 0 bytes
+COMMAND BASELINE transport 256 documents, five validations: 0 bytes

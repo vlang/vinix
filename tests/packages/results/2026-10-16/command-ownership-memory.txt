@@ -1,0 +1,21 @@
+COMMAND OWNERSHIP independent literal arguments/documents survive source and sibling retirement; repeated close resets both vectors and data-cwd PASS
+COMMAND OWNERSHIP 0 documents: 1000 parse/close cycles retained 0 bytes
+COMMAND OWNERSHIP 1 documents: 1000 parse/close cycles retained 0 bytes
+COMMAND OWNERSHIP 64 documents: 1000 parse/close cycles retained 0 bytes
+COMMAND OWNERSHIP 256 documents: 1000 parse/close cycles retained 0 bytes
+COMMAND OWNERSHIP refusal 0: 1000 attempts retained 0 bytes
+COMMAND OWNERSHIP refusal 1: 1000 attempts retained 0 bytes
+COMMAND OWNERSHIP refusal 2: 1000 attempts retained 0 bytes
+COMMAND OWNERSHIP refusal 3: 1000 attempts retained 0 bytes
+COMMAND OWNERSHIP refusal 4: 1000 attempts retained 0 bytes
+COMMAND OWNERSHIP refusal 5: 1000 attempts retained 0 bytes
+COMMAND OWNERSHIP refusal 6: 1000 attempts retained 0 bytes
+COMMAND OWNERSHIP refusal 7: 1000 attempts retained 0 bytes
+COMMAND OWNERSHIP refusal 8: 1000 attempts retained 0 bytes
+COMMAND OWNERSHIP refusal 9: 1000 attempts retained 0 bytes
+COMMAND OWNERSHIP refusal 10: 1000 attempts retained 0 bytes
+COMMAND OWNERSHIP refusal 11: 1000 attempts retained 0 bytes
+COMMAND OWNERSHIP repeated empty/one/64/256-document requests and twelve syntax/string/count/aggregate refusal paths retire all scratch PASS
+COMMAND OWNERSHIP exact 256 arguments/documents, 4096-byte values and 65535/65536/65537 aggregate bytes preserve limits and error precedence PASS
+COMMAND OWNERSHIP transport: both modes, 0/1/64/256 documents and nine refusals repeat 1000 times with 0 retained bytes
+COMMAND OWNERSHIP isolated transport borrows bounded prefixes, preserves literal source vectors and exact 772-value/document refusal diagnostics PASS

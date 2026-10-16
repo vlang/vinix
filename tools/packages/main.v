@@ -436,7 +436,9 @@ fn checked(arguments []string) !int {
 			}
 			if names.len < 1 { return error('run requires an application ID') }
 			if command in ['run-args', 'run-terminal-args'] {
-				return service.run_command(names[0], pkgcore.command_launch(names[1..])!, command == 'run-terminal-args')
+				mut input := pkgcore.command_launch(names[1..])!
+				defer { input.close() }
+				return service.run_command(names[0], input, command == 'run-terminal-args')
 			}
 			if command == 'run-terminal' { return service.run_terminal(names[0], names[1..]) }
 			if command == 'run-window' { return service.run_window(names[0], names[1..]) }

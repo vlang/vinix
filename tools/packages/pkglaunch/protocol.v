@@ -37,14 +37,19 @@ pub fn validate_arguments(arguments []string) ! {
 		return
 	}
 	if arguments[0] !in ['run-args', 'run-terminal-args'] { return error('isolated transport supports installed application launches only') }
-	mut documents := []string{}
+	capacity := if arguments.len / 2 < pkgprotocol.command_argument_limit + 1 {
+		arguments.len / 2
+	} else { pkgprotocol.command_argument_limit + 1 }
+	mut documents := []string{cap: capacity}
+	unsafe { documents.flags |= .noslices }
 	defer { unsafe { (&array(&documents)).free() } }
 	mut at := 2
 	mut data_cwd := false
 	for at < arguments.len && arguments[at] != '--' {
 		if arguments[at] == '--data-cwd' && !data_cwd { data_cwd = true; at++; continue }
 		if arguments[at] != '--file' || at + 1 == arguments.len { return error('invalid isolated command launch options') }
-		documents << arguments[at + 1]
+		// Validation borrows paths. Ordinary string append clones their storage.
+		unsafe { documents.push_many(&arguments[at + 1], 1) }
 		if documents.len > pkgprotocol.command_argument_limit { return error('too many isolated launch documents') }
 		at += 2
 	}

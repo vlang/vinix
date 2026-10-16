@@ -1899,3 +1899,10 @@ advertised native/Linux/Wine/Apple catalog, integrate ordinary-user graphical
 sessions, qualify wider filesystem/device crash windows and measure wider
 runtime sandbox profiles. Apple packaging does not provide general macOS/AppKit
 compatibility; Windows/Linux packaging does not expand runtime API coverage.
+
+Literal launch-command requests now provide explicit ownership and repeatable
+cleanup. Parsing validates borrowed prefix paths and the complete request before
+cloning accepted fields, and releases scratch after malformed or oversized input.
+The CLI closes parsed requests after launch returns. Limits, sandbox grants,
+session reconstruction and application context values keep their existing
+behavior. See [command ownership qualification](../tests/packages/command-ownership-check.md).

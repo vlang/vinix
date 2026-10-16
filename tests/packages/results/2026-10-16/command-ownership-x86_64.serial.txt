@@ -1,0 +1,37 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=27
+!>+ [11] ./sbin/init sz=210976
+!>+ [12] ./usr/bin/ sz=0
+!>+ [13] ./usr/share/ sz=0
+!>+ [14] ./usr/share/package-fixtures/ sz=0
+!>+ [15] ./usr/share/package-fixtures/context sz=772360
+!>+ [16] ./usr/share/package-fixtures/command-cli sz=534192
+!>+ [17] ./usr/share/package-fixtures/command sz=827200
+!>+ [18] ./usr/share/package-fixtures/command-ownership sz=724784
+!>+ [19] ./usr/share/package-fixtures/session sz=698448
+!>+ [20] ./usr/bin/vinix-package sz=2323928
+!>+!>initramfs: no ustar sig at 0xff00000037e88a00
+initramfs: Done (21 entries)
+HWTEST START packages-command-ownership
+COMMAND OWNERSHIP independent literal arguments/documents survive source and sibling retirement; repeated close resets both vectors and data-cwd PASS
+COMMAND OWNERSHIP repeated empty/one/64/256-document requests and twelve syntax/string/count/aggregate refusal paths retire all scratch PASS
+COMMAND OWNERSHIP exact 256 arguments/documents, 4096-byte values and 65535/65536/65537 aggregate bytes preserve limits and error precedence PASS
+COMMAND OWNERSHIP isolated transport borrows bounded prefixes, preserves literal source vectors and exact 772-value/document refusal diagnostics PASS
+COMMAND PROCESS command-ownership PASS
+COMMAND PROCESS command PASS
+COMMAND PROCESS session PASS
+COMMAND PROCESS context PASS
+COMMAND CLI run-args/run-terminal-args preserve parser and outer admission diagnostics before session setup PASS
+COMMAND PROCESS command-cli PASS
+HWTEST PASS packages-command-ownership
