@@ -7,11 +7,13 @@ import json2
 import os
 import time
 import tools.packages.pkgcore
+import tools.packages.pkgprotocol
 
 struct NativeArtifact { role string bytes u64 sha256 string }
 struct NativeReceipt { format int = 1 architecture string completed_at i64 seconds f64 platform string = 'qemu-initramfs' boots int = 1 artifacts []NativeArtifact }
 struct NativeInputArtifact { path string bytes u64 sha256 string }
 struct NativeInputs { format int profile string version string catalog_sha256 string artifacts []NativeInputArtifact }
+struct NativeImageApplications { format int = 1 architecture string packages []string }
 
 fn native_artifact(role string, path string) !NativeArtifact {
 	mut source := os.open(path)!
@@ -66,6 +68,7 @@ fn native_suite(sandbox string, image bool, software bool) hwhost.Suite {
 			'SOFTWARE IMAGE reviewed-update rollback retained-memo PASS',
 			'SOFTWARE IMAGE updates rollback uninstall registration cached-reinstall retained-memo PASS',
 			'SOFTWARE IMAGE unchanged-staged-trust root-owned-state separate-user-data clean-runtime PASS']
+		required << 'SOFTWARE IMAGE staged-release-catalog discovered full-set review separate administrator approval exact offline install PASS'
 	}
 	if image { required << 'PACKAGE IMAGE BUNDLE production-staged signed repository before first refresh PASS' }
 	return hwhost.Suite{ name: 'package-native-catalog', guest: 'tests/accounts/guest',
@@ -143,7 +146,7 @@ fn stage_software_image(host hwhost.Host, root string, work string) !NativeArtif
 	}
 	os.cp(host.root + '/tests/packages/software_image_fixture.v', source + '/main.v')!
 	os.cp(host.root + '/tests/packages/software_terminal_fixture.v', source + '/terminal_fixture.v')!
-	lookup := '@vlib|' + modules + '|@vmodules|' + host.root + '|' + host.root + '/tools/accounts'
+	lookup := '@vlib|' + host.root + '|' + host.root + '/tools/accounts|' + modules + '|@vmodules'
 	binary := hwhost.build_program_with_flags(host, source, work + '/software-build', 'software-image', [],
 		['-manualfree', '-enable-globals', '-d', 'ui2_headless', '-path', lookup, '-cflags', '-I' + host.root + '/desktop'])!
 	target := root + '/usr/share/package-fixtures/software-image'
@@ -208,12 +211,16 @@ fn stage_native_image(host hwhost.Host, inputs string, root string, work string)
 		policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 },
 		repositories: [pkgcore.Repository{ id: 'native', url: 'file://' + pkgcore.image_repositories_path + '/native', public_key: key }] }) + '\n')!
 	stage := work + '/package-stage'
+	applications := publisher + '/image-applications.json'
+	os.write_file(applications, json2.encode(NativeImageApplications{ architecture: host.arch,
+		packages: ['org.vinix.counter', 'org.vinix.memo', 'org.vinix.package-hello'] }) + '\n')!
 	hwhost.run_tool([host.v, '-nocache', '-no-skip-unused', '-path', '@vlib|@vmodules|' + host.root + '|' + host.root + '/tools/accounts',
 		'-o', stage, host.root + '/tools/packages/stage.v'], {}, work + '/stage-build.log', 300)!
-	mut arguments := [stage, '--arch', host.arch, '--staging', root, '--config', configuration, '--repositories', publisher + '/bundle']
+	mut arguments := [stage, '--arch', host.arch, '--staging', root, '--config', configuration, '--repositories', publisher + '/bundle', '--applications', applications]
 	compiler := os.getenv('CC_' + host.arch.to_upper())
 	if compiler != '' { arguments << ['--cc', compiler] }
 	hwhost.run_tool(arguments, { 'V': host.v, 'VFLAGS': '-nocache' }, work + '/stage.log', 300)!
+	artifacts << native_artifact('image' + pkgprotocol.image_applications_path, root + pkgprotocol.image_applications_path)!
 	for path in ['etc/vinix-packages/config.json', 'usr/bin/vinix-package', 'usr/sbin/vinix-session',
 		'usr/libexec/vinix/vinix-linux-runner', 'usr/share/vinix/actions/packages-change', 'usr/share/vinix/actions/packages-launch',
 		'usr/share/licenses/vinix-packages/ed25519-MIT.txt', 'usr/share/licenses/vinix-packages/application-sdk-MIT.txt']! {

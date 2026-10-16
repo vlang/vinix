@@ -68,6 +68,16 @@ distributed for normal Software/CLI deployment review, where current trust,
 policy and changes are checked again. Existing output files and the target image
 remain intact. See [qualification](../tests/packages/image-export-check.md).
 
+Normal staging with advertised requirements now saves the exact resolved lock
+inside the image at `/usr/share/vinix-packages/applications.json`. Software's
+**Deployment → Review release apps** discovers it and reviews the full set
+without typing a filename or installing anything automatically. Confirmation
+and administrator approval still apply. The stager captures the lock before
+compilation, publishes it after matching trust/bundle publication, and preserves
+existing identical declarations. Check reports expose its path, action, byte
+count and digest. See [the contract](../tools/packages/SDK.md#declare-release-applications-in-an-image)
+and [qualification](../tests/packages/image-catalog-check.md).
+
 Configuration, cached catalogs, trust histories, installed state and publisher
 documents share a bounded metadata reader. It captures a nonblocking descriptor,
 refuses leaf symlinks and nonregular files, and reads at most the admitted file

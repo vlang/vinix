@@ -52,6 +52,7 @@ fn (mut a SoftwareApp) begin_deployment_review() {
 fn (mut a SoftwareApp) handle_deployment(event_id string) {
 	match event_id {
 		'software.deployment.choose' { a.choose_deployment_file() }
+		'software.deployment.release' { a.review_release_deployment() }
 		'software.deployment.path' {
 			a.focus = true
 			a.select_all = false
@@ -118,7 +119,7 @@ fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
 	a.initialize_deployment_field()
 	// Include all four actions, progress and failure controls without growing
 	// the manual-free frame buffer on each redraw.
-	mut children := frame_elements(16)
+	mut children := frame_elements(20)
 	children << software_label('Software · Deployment', 14, 8, width - 188, 28, false)
 	if a.worker == unsafe { nil } {
 		children << software_button('software.deployment.back', 'Back to catalog', width - 174, 8, 160)
@@ -137,6 +138,9 @@ fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
 		children << software_button('software.deployment.audit', 'Check installed', 210, 286, 160)
 		children << software_button('software.policy', 'Organization policy', 14, 330, 180)
 		children << software_button('software.deployment.snapshot', 'Save installed…', 210, 330, 160)
+		if a.release_deployment_available {
+			children << software_button('software.deployment.release', 'Review release apps', 14, 374, 180)
+		}
 	} else if a.deployment_review_running() {
 		children << software_button('software.deployment.stop', 'Stop review', 14, 286, 160)
 	}

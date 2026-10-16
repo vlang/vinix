@@ -4,6 +4,7 @@ module pkgcore
 import json2
 import os
 import time
+import tools.packages.pkgprotocol
 
 fn C.mkfifo(&char, u32) int
 fn C.link(&char, &char) int
@@ -47,6 +48,136 @@ fn image_apps_config(work string, architecture string, key string, policy Policy
 			Repository{ id: 'native', public_key: key, url: 'file://' + image_repositories_path + '/native' },
 			Repository{ id: 'remote', public_key: key, url: 'https://packages.example.invalid/release' }] }))!
 	return path
+}
+
+fn test_image_catalog_declaration_captures_publishes_and_preserves_exact_both_host_locks() {
+	for architecture in ['aarch64', 'x86_64']! {
+		work, key := image_apps_fixture()!; defer { os.rmdir_all(work) or {} }
+		root := work + '/image'; os.mkdir(root)!
+		source := image_apps_config(work, architecture, key, Policy{})!
+		mut configuration := prepare_image_configuration(root, architecture, source)!
+		mut repositories := unsafe { &configuration }.prepare_repositories(work + '/bundle')!
+		requirements := work + '/applications.json'
+		os.write_file(requirements, '{"format":1,"architecture":"' + architecture + '","packages":["modern","editor"]}\n')!
+		mut applications := unsafe { &configuration }.prepare_application_file(unsafe { &repositories }, requirements)!
+		report_text := unsafe { &applications }.report()
+		defer { unsafe { report_text.free() } }
+		report := json2.decode[ImageInputCheck](report_text)!
+		assert report.image_application_deployment_path == pkgprotocol.image_applications_path
+		assert report.image_application_deployment_action == 'publish'
+		assert report.image_application_deployment_sha256 == index_digest(applications.text)
+		assert report.image_application_deployment_bytes == u64(applications.text.len)
+		assert report.application_deployment_sha256 == '' && report.application_deployment_destination == ''
+		assert applications.text == encode_deployment_lock(report.application_deployment, true)!
+		assert os.ls(root)!.len == 0
+		if _ := unsafe { &applications }.publish(unsafe { &repositories }) { assert false } else {}
+		// Original release inputs cannot redirect or invalidate this capture.
+		os.rm(requirements)!; os.rm(source)!; os.rmdir_all(work + '/bundle')!
+		assert unsafe { &repositories }.publish()! && unsafe { &configuration }.publish()!
+		assert unsafe { &applications }.publish(unsafe { &repositories })!
+		path := root + pkgprotocol.image_applications_path
+		assert os.read_file(path)! == applications.text && os.stat(path)!.mode & 0o7777 == 0o644
+		assert !unsafe { &applications }.publish(unsafe { &repositories })! && !os.exists(root + '/var')
+		applications.close(); repositories.close(); configuration.close()
+		mut existing := prepare_image_configuration(root, architecture, '')!
+		mut same := unsafe { &existing }.prepare_repositories(root + image_repositories_path)!
+		mut preserved := unsafe { &existing }.prepare_applications(unsafe { &same }, ['editor', 'modern'])!
+		assert json2.decode[ImageInputCheck](unsafe { &preserved }.report())!.image_application_deployment_action == 'preserve'
+		assert !unsafe { &preserved }.publish(unsafe { &same })!
+		preserved.close(); same.close(); existing.close()
+		assert json2.decode[ImageInputCheck](report_text)!.application_deployment == report.application_deployment
+	}
+	println('IMAGE CATALOG captured both-host exact locks, stable source removal, publish ordering, canonical bytes/digest/mode, no consumer state and identical-file preservation PASS')
+}
+
+fn test_image_catalog_refuses_existing_and_late_substituted_destinations() {
+	work, key := image_apps_fixture()!; defer { os.rmdir_all(work) or {} }
+	for kind in ['file', 'link', 'dangling', 'fifo', 'directory', 'hardlink', 'mode']! {
+		root := work + '/' + kind; os.mkdir(root)!
+		source := image_apps_config(work, 'aarch64', key, Policy{})!
+		mut configuration := prepare_image_configuration(root, 'aarch64', source)!
+		defer { configuration.close() }
+		mut repositories := unsafe { &configuration }.prepare_repositories(work + '/bundle')!
+		defer { repositories.close() }
+		mut applications := unsafe { &configuration }.prepare_applications(unsafe { &repositories }, ['editor'])!
+		defer { applications.close() }
+		assert unsafe { &repositories }.publish()! && unsafe { &configuration }.publish()!
+		path := root + pkgprotocol.image_applications_path
+		other := root + '/kept'; os.write_file(other, 'existing owner bytes')!
+		match kind {
+			'file' { os.write_file(path, 'existing declaration')! }
+			'link' { os.symlink(other, path)! }
+			'dangling' { os.symlink(root + '/absent', path)! }
+			'fifo' { assert C.mkfifo(path.str, 0o600) == 0 }
+			'directory' { os.mkdir(path)! }
+			'hardlink' { assert C.link(other.str, path.str) == 0 }
+			else { os.write_file(path, applications.text)!; os.chmod(path, 0o666)! }
+		}
+		before := os.lstat(path)!
+		if _ := unsafe { &applications }.publish(unsafe { &repositories }) { assert false } else {}
+		mut fresh := prepare_image_configuration(root, 'aarch64', '')!
+		defer { fresh.close() }
+		if mut refused := unsafe { &fresh }.prepare_applications(unsafe { &repositories }, ['editor']) { refused.close(); assert false } else {}
+		after := os.lstat(path)!
+		assert before.inode == after.inode && before.mode == after.mode && before.size == after.size
+		assert os.read_file(other)! == 'existing owner bytes' && !os.exists(root + '/var')
+		if kind == 'directory' { os.rmdir(path)! } else { os.rm(path)! }
+		assert unsafe { &applications }.publish(unsafe { &repositories })!
+	}
+	println('IMAGE CATALOG occupied and late file/link/dangling/FIFO/directory/hardlink/shared-write destinations refuse unchanged before publication; removal and retry PASS')
+}
+
+fn image_catalog_checkpoint(phase string, temporary string) ! {
+	kind := os.getenv('VINIX_IMAGE_CATALOG_FAULT')
+	defer { unsafe { kind.free() } }
+	if kind == 'race' && phase == 'flushed' { os.write_file(os.dir(temporary) + '/applications.json', 'concurrent owner bytes')! }
+	if kind == phase { return error('injected image catalog failure') }
+}
+
+fn test_image_catalog_failure_cleanup_and_changed_dependencies_refuse_before_publication() {
+	work, key := image_apps_fixture()!; defer { os.rmdir_all(work) or {}; os.unsetenv('VINIX_IMAGE_CATALOG_FAULT') }
+	root := work + '/image'; os.mkdir(root)!
+	source := image_apps_config(work, 'x86_64', key, Policy{})!
+	mut configuration := prepare_image_configuration(root, 'x86_64', source)!; defer { configuration.close() }
+	mut repositories := unsafe { &configuration }.prepare_repositories(work + '/bundle')!; defer { repositories.close() }
+	mut applications := unsafe { &configuration }.prepare_applications(unsafe { &repositories }, ['editor'])!; defer { applications.close() }
+	assert unsafe { &repositories }.publish()! && unsafe { &configuration }.publish()!
+	path := root + pkgprotocol.image_applications_path
+	config_path := root + '/etc/vinix-packages/config.json'; config := os.read_file(config_path)!
+	os.write_file(config_path, config + ' ')!
+	if _ := unsafe { &applications }.publish(unsafe { &repositories }) { assert false } else {}
+	os.write_file(config_path, config)!
+	objects := root + image_repositories_path + '/native/objects'
+	object := objects + '/' + os.ls(objects)![0]; original := os.read_file(object)!
+	os.write_file(object, 'changed published payload')!
+	if _ := unsafe { &applications }.publish(unsafe { &repositories }) { assert false } else {}
+	os.write_file(object, original)!
+	os.rename(root, work + '/saved-image')!; os.mkdir(root)!
+	if _ := unsafe { &applications }.publish(unsafe { &repositories }) { assert false } else {}
+	os.rmdir(root)!; os.rename(work + '/saved-image', root)!
+	os.chmod(root + '/usr/share/vinix-packages', 0o777)!
+	if _ := unsafe { &applications }.publish(unsafe { &repositories }) { assert false } else {}
+	os.chmod(root + '/usr/share/vinix-packages', 0o755)!
+	assert !os.exists(path)
+	for kind in ['created', 'written', 'flushed', 'published', 'space', 'directory-flush', 'race']! {
+		os.setenv('VINIX_IMAGE_CATALOG_FAULT', kind, true)
+		options := AtomicWriteOptions{ checkpoint: image_catalog_checkpoint,
+			write: if kind == 'space' { image_export_no_space } else { atomic_write_bytes },
+			flush: if kind == 'directory-flush' { image_export_directory_flush_failure } else { atomic_flush } }
+		if _ := unsafe { &applications }.publish_with(unsafe { &repositories }, options) { assert false } else {
+			if kind in ['published', 'directory-flush']! {
+				assert err.msg().contains('saved, but') && os.read_file(path)! == applications.text
+				assert !unsafe { &applications }.publish(unsafe { &repositories })!
+			} else if kind == 'race' {
+				assert os.read_file(path)! == 'concurrent owner bytes'
+				if _ := unsafe { &applications }.publish(unsafe { &repositories }) { assert false } else {}
+			} else { assert !os.exists(path); assert unsafe { &applications }.publish(unsafe { &repositories })! }
+		}
+		assert os.ls(os.dir(path))!.all(!it.starts_with('.package-'))
+		os.rm(path)!
+	}
+	assert !os.exists(root + '/var')
+	println('IMAGE CATALOG changed trust/payloads, write/space/flush/checkpoint failures and concurrent destinations refuse safely; saved diagnostics, cleanup and retry PASS')
 }
 
 fn test_image_application_catalog_reports_owned_reproducible_joint_lock_for_both_hosts() {
@@ -201,6 +332,8 @@ fn test_image_application_catalog_real_staging_cli_gates_normal_and_check_paths_
 	assert code == 0, text
 	report := json2.decode[ImageInputCheck](text)!
 	assert report.applications_checked && report.application_deployment.packages == ['editor', 'modern']
+	assert report.image_application_deployment_path == pkgprotocol.image_applications_path
+	assert report.image_application_deployment_action == 'publish' && report.image_application_deployment_bytes > 0
 	other_code, other := image_apps_cli(binary, [...base, '--require-app', 'editor', '--check', '--require-app', 'modern'])
 	assert other_code == 0 && other == text, other
 	for check in [false, true]! {

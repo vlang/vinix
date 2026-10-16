@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
+import tools.packages.pkgprotocol
+
 // SDK 1 image-input report. This describes the selected trust/policy and the
 // complete authenticated bundle, without initializing consumer package state.
 struct ImageBundleCheck {
@@ -36,6 +38,10 @@ struct ImageInputCheck {
 	application_deployment DeploymentLock
 	application_deployment_destination string
 	application_deployment_sha256 string
+	image_application_deployment_path string
+	image_application_deployment_action string
+	image_application_deployment_sha256 string
+	image_application_deployment_bytes u64
 }
 
 // Return owned, newline-terminated JSON. Callers close both input plans and
@@ -62,6 +68,12 @@ pub fn (configuration &ImageConfiguration) check_application_file(repositories &
 }
 
 fn (configuration &ImageConfiguration) check_application_source(repositories &ImageRepositories, source string, output ImageDeploymentOutput) !string {
+	mut plan := configuration.plan_application_source(repositories, source, output)!
+	defer { plan.close() }
+	return unsafe { &plan }.report()
+}
+
+fn (configuration &ImageConfiguration) plan_application_source(repositories &ImageRepositories, source string, output ImageDeploymentOutput) !ImageApplications {
 	text := read_metadata(source)!
 	defer { unsafe { text.free() } }
 	mut document := decode_deployment(text, configuration.architecture)!
@@ -70,10 +82,16 @@ fn (configuration &ImageConfiguration) check_application_source(repositories &Im
 	if document.packages.len == 0 { return error('image application requirements must name at least one application') }
 	digest := index_digest(text)
 	defer { unsafe { digest.free() } }
-	return configuration.check_inputs(repositories, document.packages, digest, output)
+	return configuration.plan_inputs(repositories, document.packages, digest, output)
 }
 
 fn (configuration &ImageConfiguration) check_inputs(repositories &ImageRepositories, required []string, requirements_sha256 string, output ImageDeploymentOutput) !string {
+	mut plan := configuration.plan_inputs(repositories, required, requirements_sha256, output)!
+	defer { plan.close() }
+	return unsafe { &plan }.report()
+}
+
+fn (configuration &ImageConfiguration) plan_inputs(repositories &ImageRepositories, required []string, requirements_sha256 string, output ImageDeploymentOutput) !ImageApplications {
 	if output.destination != '' && required.len == 0 { return error('image deployment export requires selected application requirements') }
 	if required.len > 4096 { return error('image application check supports at most 4096 application IDs') }
 	mut seen := map[string]bool{}
@@ -139,20 +157,26 @@ fn (configuration &ImageConfiguration) check_inputs(repositories &ImageRepositor
 	defer { unsafe { digest.free() } }
 	target := if output.destination != '' { image_deployment_target(configuration.root, output.destination)! } else { '' }
 	defer { unsafe { target.free() } }
-	lock_text := if target != '' { encode_deployment_lock(deployment, true)! } else { '' }
+	lock_text := if required.len > 0 { encode_deployment_lock(deployment, true)! } else { '' }
 	defer { unsafe { lock_text.free() } }
-	lock_digest := if target != '' { index_digest(lock_text) } else { '' }
+	lock_digest := if lock_text != '' { index_digest(lock_text) } else { '' }
 	defer { unsafe { lock_digest.free() } }
+	image_action := image_applications_action(configuration.root, lock_text)!
 	report := publisher_json(ImageInputCheck{ architecture: configuration.architecture, root: configuration.root,
 		configuration_path: configuration.path, configuration_action: if configuration.existing { 'preserve' } else { 'initialize' },
 		configuration_sha256: digest, configuration: config, bundle_supplied: repositories.capture != '', bundle_action: bundle_action,
 		bundle_required_bytes: repositories.needed, bundle_reserve_bytes: if repositories.capture != '' { u64(64 * 1024 * 1024) } else { 0 },
 		bundled_repositories: rows, applications_checked: required.len > 0,
 		application_requirements_sha256: requirements_sha256, application_deployment: deployment,
-		application_deployment_destination: target, application_deployment_sha256: lock_digest })
+		application_deployment_destination: target, application_deployment_sha256: if target != '' { lock_digest } else { '' },
+		image_application_deployment_path: if lock_text != '' { pkgprotocol.image_applications_path } else { '' },
+		image_application_deployment_action: image_action, image_application_deployment_sha256: lock_digest,
+		image_application_deployment_bytes: u64(lock_text.len) })
 	mut accepted := false
 	defer { if !accepted { unsafe { report.free() } } }
 	if target != '' { atomic_write_with(target, lock_text, AtomicWriteOptions{ ...output.options, exclusive: true })! }
 	accepted = true
-	return report
+	return ImageApplications{ root: if required.len > 0 { configuration.root.clone() } else { '' },
+		architecture: configuration.architecture.clone(), configuration: text.clone(),
+		device: configuration.device, inode: configuration.inode, text: lock_text.clone(), report_text: report }
 }

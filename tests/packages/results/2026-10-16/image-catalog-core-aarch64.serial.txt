@@ -1,0 +1,433 @@
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FC86000 start failed: Unsupported
+Error: Image at 0007FC0B000 start failed: Not Found
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+BdsDxe: starting Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x760c8000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x760c8000 to 0xffffffff80000000, length: 0x2f0000
+vmm: Kernel: Mapping 0x763b8000 to 0xffffffff802f0000, length: 0x2c000
+vmm: Kernel: Mapping 0x763e4000 to 0xffffffff8031c000, length: 0x15e6000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x760c8000 +0x31c000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 29
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 30
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 1000000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+init smp...
+smp: BSP MPIDR:       0
+smp: Discovered CPUs: 4
+smp: Starting CPUs:   4
+security: PAN enabled
+smp: CPU 0 online!
+smp: CPU 1 online!
+smp: CPU 2 online!
+smp: CPU 3 online!
+smp: 4 CPUs online
+smp done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+initramfs: Module:  1
+initramfs: Address: 0xffff000075377000
+initramfs: Size:    13961728
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=22
+!>+ [11] ./sbin/init sz=308776
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/image-configuration sz=1475464
+!>+ [15] ./usr/share/package-fixtures/stage-check sz=1106480
+!>+ [16] ./usr/share/package-fixtures/image-export sz=1824704
+!>+ [17] ./usr/share/package-fixtures/resolve sz=890880
+!>+ [18] ./usr/share/package-fixtures/catalog sz=1479256
+!>+ [19] ./usr/share/package-fixtures/atomic-new sz=892072
+!>+ [20] ./usr/share/package-fixtures/release sz=1474728
+!>+!>+!>+!>initramfs: no ustar sig at 0xffff0000760c7600
+initramfs: Done (23 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 1000000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+pci: Found [0:2:0:-1]
+devcore: 3 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 3 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+HWTEST START packages-image-export
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+random: reseeded from 62709 events, 4 hardware words
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+IMAGE CATALOG captured both-host exact locks, stable source removal, publish ordering, canonical bytes/digest/mode, no consumer state and identical-file preservation PASS
+IMAGE CATALOG occupied and late file/link/dangling/FIFO/directory/hardlink/shared-write destinations refuse unchanged before publication; removal and retry PASS
+IMAGE CATALOG changed trust/payloads, write/space/flush/checkpoint failures and concurrent destinations refuse safely; saved diagnostics, cleanup and retry PASS
+IMAGE APPLICATIONS reproducible both-host joint locks, signed provenance, runtime/shared closure, app-kind selection and independent reports PASS
+IMAGE APPLICATIONS individually valid conflicting runtimes, missing/wrong-host/nonapp roots, duplicate/invalid/oversized sets and absent bundles refuse without publication; retry PASS
+IMAGE APPLICATIONS organization permissions/allowlist/pins and captured payload integrity remain mandatory before app resolution; restoration/retry PASS
+Updating trusted repository native
+Installing Editor 1.0.0 (1/4) from native
+Downloading editor/bin/runner (43 bytes)
+Installing modern 1.0.0 (2/4) from native
+Installing Runtime 2.0.0 (3/4) from native
+Installing Support 1.0.0 (4/4) from native
+Activated package generation 1
+Updating trusted repository native
+Installing Editor 1.0.0 (1/4) from native
+Downloading editor/bin/runner (43 bytes)
+Installing modern 1.0.0 (2/4) from native
+Installing Runtime 2.0.0 (3/4) from native
+Installing Support 1.0.0 (4/4) from native
+Activated package generation 1
+IMAGE APPLICATIONS exported format-2 locks drive ordinary reviewed offline install and integrity verification for both hosts; staged trust and consumer state remain separate PASS
+IMAGE APPLICATIONS real CLI repeated/position-independent app requirements, canonical compiler-free reports and normal/check refusal before compiler lookup PASS
+IMAGE REQUIREMENTS FILE exact-byte digests, canonical both-host joint locks, inline parity, whitespace/order provenance and independent reports without publication PASS
+IMAGE REQUIREMENTS FILE format-2 pin downgrades, schema/host/empty/invalid/oversized/conflicting sets and missing/aliased/special/oversized files refuse unchanged; restore/retry PASS
+IMAGE REQUIREMENTS FILE CLI both-host inherited/explicit selection, inline override, mutual exclusion and normal/check compiler gates preserve unchanged images PASS
+IMAGE DEPLOYMENT EXPORT both-host exact canonical format-2 locks, inline/file parity, independent source/result digests, exclusive atomic publication and independent receipts PASS
+IMAGE DEPLOYMENT EXPORT existing file/link/FIFO/directory/hardlink outputs, direct/aliased image namespaces, unsafe parents, invalid paths and invalid app sets refuse unchanged PASS
+IMAGE DEPLOYMENT EXPORT write/space/checkpoint/flush failures and destination races retire temporary files, report saved outputs accurately and permit safe retry without image writes PASS
+IMAGE DEPLOYMENT EXPORT real CLI both-host inline/file exports, option placement, compiler bypass, existing-file protection and required context preserve target images PASS
+IMAGE EXPORT PROCESS image-export PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+IMAGE INPUT CHECK reproducible both-host trust/policy, exact signed digests, architecture/license/firmware counts and deduplicated bytes without image publication PASS
+IMAGE INPUT CHECK preserved literal existing configuration and consumer history; no-bundle scope and zero bundle estimate PASS
+IMAGE INPUT CHECK capture corruption, unrelated plans, appeared consumer state and replaced roots refuse with unchanged targets; stable capture survives source removal PASS
+IMAGE INPUT CHECK CLI flag placement, literal paths, environment/explicit selection and reproducible compiler-free reports; normal staging and invalid-input refusals PASS
+IMAGE INPUT CHECK publish/preserve/none decisions, occupied configuration, aliased/special/shared-write/damaged bundles refuse without overwriting destinations PASS
+IMAGE EXPORT PROCESS image-check PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+Updating trusted repository native
+Installing Offline app 1.0.0 (1/2) from native
+Downloading app/share/data (38 bytes)
+Installing Offline support 1.0.0 (2/2) from native
+Activated package generation 1
+Updating trusted repository native
+Installing Offline app 1.0.0 (1/2) from native
+Downloading app/share/data (38 bytes)
+Installing Offline support 1.0.0 (2/2) from native
+Activated package generation 1
+PACKAGE IMAGE BUNDLE captured signed closure atomic publication offline dependency install both architectures PASS
+IMAGE EXPORT PROCESS image-repositories PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+Updating trusted repository release
+Installing Application 2.0.0 (1/1) from release
+Downloading app/bin/app (25 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 2.0.0 (1/1) from release
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository release
+Installing Application 2.0.0 (1/1) from release
+Downloading app/bin/app (24 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 2.0.0 (1/1) from release
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+PACKAGE IMAGE CONFIG signed catalog install remove rollback both architectures PASS
+IMAGE EXPORT PROCESS image-configuration PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+RELEASE ADMISSION late-index refused=true unpublished=true
+RELEASE ADMISSION changed staged metadata refuses after reservation; exact retry preserves publisher floor PASS
+RELEASE ADMISSION 34 staged/reserved refusals preserve workspace and outside data; history timing, no publication, cleanup and exact retry PASS
+IMAGE EXPORT PROCESS release PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+Updating trusted repository fixture
+Installing app 1.0.0 (1/3) from fixture
+Downloading app/bin/application (19 bytes)
+Installing License 1.0.0 (2/3) from fixture
+Downloading license/COPYING (23 bytes)
+Installing runtime 1.0.0 (3/3) from fixture
+Downloading runtime/bin/runner (23 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing app 1.0.0 (1/3) from fixture
+Downloading app/bin/application (18 bytes)
+Installing License 1.0.0 (2/3) from fixture
+Downloading license/COPYING (23 bytes)
+Installing runtime 1.0.0 (3/3) from fixture
+Downloading runtime/bin/runner (22 bytes)
+Activated package generation 1
+Activated package generation 2
+CATALOG WORKSPACE owned replies close independently without removing published manifests, objects or catalog PASS
+IMAGE EXPORT PROCESS catalog PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /tmp/vinix-deployment-mirror-pins-17249-1792182678661489/locked export; $literal; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /tmp/vinix-deployment-mirror-capture-17249-1792182679857460/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /tmp/vinix-deployment-mirror-final-lock-17249-1792182680345091/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION locked export binds exact captured deployment bytes through publication; changed staged lock refuses and retry preserves pins PASS
+Updating trusted repository fixture
+Updating trusted repository deployment.json
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /tmp/vinix-deployment-mirror-namespace-17249-1792182680926244/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/2) from fixture
+Installing Runtime 2.0.0 (2/2) from fixture
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Offline mirror ready: /tmp/vinix-deployment-reproducible-17249-1792182681676017/mirror; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading unused/bin/runner (14 bytes)
+Activated package generation 1
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+IMAGE EXPORT PROCESS deployment PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+IMAGE EXPORT PROCESS resolve PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NEW METADATA existing file/alias/dangling/FIFO/directory/hardlink destinations refuse without replacement or blocking PASS
+NEW METADATA checkpoint/write/space/flush failures, destination races, mode/parent/final substitutions, cleanup and saved-file retry refusal PASS
+NEW METADATA concurrent publishers admit exactly one complete file with canonical final mode and no temporary leftovers PASS
+IMAGE EXPORT PROCESS atomic-new PASS
+HWTEST PASS packages-image-export
+syspower: power off: stopping devices

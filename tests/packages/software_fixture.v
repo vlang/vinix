@@ -375,6 +375,7 @@ fn check_software_window_text() ! {
 
 fn main() {
 	unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+	if os.args.len == 2 && os.args[1] == 'release-memory' { check_software_release_memory() or { panic(err) }; return }
 	if os.args.len == 3 && os.args[1] == 'deployment-chooser' { check_software_deployment_chooser(os.args[2]) or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'deployment-chooser-memory' { check_software_deployment_chooser_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'cleanup-memory' { check_software_cleanup_memory() or { panic(err) }; return }
@@ -618,6 +619,7 @@ fn main() {
 	check_software_cleanup() or { panic(err) }
 	check_software_cleanup_navigation() or { panic(err) }
 	check_software_deployment() or { panic(err) }
+	check_software_release() or { panic(err) }
 	check_software_deployment_navigation() or { panic(err) }
 	check_software_audit() or { panic(err) }
 	check_software_audit_search() or { panic(err) }

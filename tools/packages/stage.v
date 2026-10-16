@@ -75,7 +75,9 @@ fn stage() ! {
 	defer { image_configuration.close() }
 	mut image_repositories := unsafe { &image_configuration }.prepare_repositories(repositories)!
 	defer { image_repositories.close() }
-	if check || required_applications.len > 0 || applications != '' {
+	mut image_applications := pkgcore.ImageApplications{}
+	defer { image_applications.close() }
+	if check {
 		report := if deployment_output != '' && applications != '' {
 			unsafe { &image_configuration }.export_application_file(unsafe { &image_repositories }, applications, deployment_output)!
 		} else if deployment_output != '' {
@@ -86,7 +88,11 @@ fn stage() ! {
 			unsafe { &image_configuration }.check_applications(unsafe { &image_repositories }, required_applications)!
 		} else { unsafe { &image_configuration }.check_repositories(unsafe { &image_repositories })! }
 		defer { unsafe { report.free() } }
-		if check { print(report); return }
+		print(report); return
+	} else if applications != '' {
+		image_applications = unsafe { &image_configuration }.prepare_application_file(unsafe { &image_repositories }, applications)!
+	} else if required_applications.len > 0 {
+		image_applications = unsafe { &image_configuration }.prepare_applications(unsafe { &image_repositories }, required_applications)!
 	}
 	if compiler == '' { compiler = os.getenv('VINIX_MUSL_CC_' + architecture.to_upper()) }
 	if compiler == '' { compiler = architecture + '-linux-musl-gcc' }
@@ -141,6 +147,9 @@ fn stage() ! {
 	if unsafe { &image_repositories }.publish()! { println('Published authenticated offline image repositories') }
 	created := unsafe { &image_configuration }.publish()!
 	println(if created { 'Initialized reviewed image package configuration' } else { 'Preserved existing image package configuration; release input was not applied' })
+	if unsafe { &image_applications }.publish(unsafe { &image_repositories })! {
+		println('Declared reviewed release applications for Software deployment review')
+	}
 	os.mkdir_all(staging + '/usr/share/vinix/actions')!
 	// Fixed actions separate reviewed administration from own-account launch
 	// isolation. Preserve administrator-owned overrides when upgrading an image.

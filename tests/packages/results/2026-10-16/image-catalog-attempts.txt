@@ -1,0 +1,22 @@
+The first warmed UI check retained 1408000 bytes in 1000 chooser lifecycle iterations after adding release discovery. The standard is_file/is_link helpers retained status scratch. Discovery now uses one non-following lstat call with stack scratch. Fresh UI/core sanitizers, all 27 maintained allocation modes and both target typechecks passed after correction.
+
+Initial allocation output:
+ui-compile PASS
+ui-broker-compile PASS
+ui-chooser PASS
+ui-memory failed: /Users/alex/code/vinix/build/package-image-catalog-work/ui-sources-current/software_deployment_chooser_fixture.v:172: FAIL: fn main.check_software_deployment_chooser_memory: assert kept == 0, 'deployment chooser retained ${kept} bytes'
+   left value: kept = 1408000
+  right value: 0
+      message: deployment chooser retained 1408000 bytes
+V panic: Assertion failed...
+
+
+The first native image builders emitted a format-1 requirement with an unwanted locked field by using the format-2 lock type. Strict staging refused before publication or guest boot on both hosts. A dedicated format-1 input record now supplies the three reviewed roots. Fresh builds and guests passed.
+
+Initial native build refusals:
+/Users/alex/code/vinix/build/picat-software-arm-1/package-stage --arch aarch64 --staging /Users/alex/code/vinix/build/picat-software-arm-1/guest/root --config /Users/alex/code/vinix/build/picat-software-arm-1/publisher/image-config.json --repositories /Users/alex/code/vinix/build/picat-software-arm-1/publisher/bundle --applications /Users/alex/code/vinix/build/picat-software-arm-1/publisher/image-applications.json --cc /Users/alex/code/vinix/build/package-launch-transport-work/cross-cc
+package-stage: exit status 1
+package staging: incomplete, incompatible or trailing deployment document
+/Users/alex/code/vinix/build/picat-software-x86-1/package-stage --arch x86_64 --staging /Users/alex/code/vinix/build/picat-software-x86-1/guest/root --config /Users/alex/code/vinix/build/picat-software-x86-1/publisher/image-config.json --repositories /Users/alex/code/vinix/build/picat-software-x86-1/publisher/bundle --applications /Users/alex/code/vinix/build/picat-software-x86-1/publisher/image-applications.json
+package-stage: exit status 1
+package staging: incomplete, incompatible or trailing deployment document

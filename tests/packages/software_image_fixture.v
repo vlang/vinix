@@ -211,10 +211,17 @@ fn image_run() ! {
 		image_control(mut app, 'software.refresh')!
 		assert image_approve(mut app, password)!
 		assert app.rows.len == 3 && app.offline && app.catalog_error == '', app.status
-		for id in ['org.vinix.counter', 'org.vinix.memo', 'org.vinix.package-hello']! {
-			image_select(mut app, id)!
-			image_apply(mut app, 'software.install', password)!
-		}
+		image_control(mut app, 'software.deployment')!
+		assert app.release_deployment_available && app.deployment_path.len == 0
+		image_control(mut app, 'software.deployment.release')!
+		assert app.worker_review && !app.admin_prompt && !app.review_ready
+		image_wait(mut app)!
+		assert app.review_ready && app.review_snapshot.rows.len == 3 && app.review_snapshot.rows.all(it.action == 'install')
+		assert app.review_snapshot.rows.all(it.repository == 'native' && it.public_key.len == 64 && it.version == '1.0.0')
+		image_control(mut app, 'software.confirm')!
+		assert image_approve(mut app, password)!
+		assert app.rows.all(it.installed_version == '1.0.0') && !app.worker_failed
+		println('SOFTWARE IMAGE staged-release-catalog discovered full-set review separate administrator approval exact offline install PASS')
 		image_counter(mut app)!
 		image_memo(mut app, true)!
 		document := os.home_dir() + '/software document ; $literal.txt'

@@ -511,6 +511,50 @@ Each returns the same independently owned report after successful publication;
 free the text and close both image plans. See
 [export qualification](../../tests/packages/image-export-check.md).
 
+### Declare release applications in an image
+
+Normal staging with selected `--applications FILE`,
+`VINIX_PACKAGE_IMAGE_APPLICATIONS` or repeated `--require-app ID` now publishes
+the jointly resolved format-2 lock at
+`/usr/share/vinix-packages/applications.json`. It captures the exact lock before
+compiler lookup and publishes it after the matching authenticated bundle and
+configuration. Changing or removing the original input files cannot redirect
+that plan. Staging creates no installed application generation or deployment
+authorization.
+
+`--check` remains read-only and adds `image_application_deployment_path`,
+`image_application_deployment_action` (`none`, `publish`, `preserve`),
+`image_application_deployment_sha256` and `image_application_deployment_bytes`
+to the input report. The digest includes the canonical lock's final LF. These
+fields are separate from an explicit outside-image export receipt. With no
+selected requirements, the path/digest are empty, bytes are zero, and existing
+image declarations remain untouched.
+
+The new file is published atomically with exclusive creation and mode 0644.
+An identical controlled ordinary single-link file is preserved. Different
+contents, aliases, special files, shared-write parents or unexpected modes
+refuse before replacement. Publication rechecks the captured root, unchanged
+configuration, current signed bundle and payloads, and available space with
+64 MiB headroom. Errors after publication report that the file was saved; a
+retry preserves its complete bytes. A changed release set needs a fresh staging
+root rather than overwriting an existing declaration.
+
+In Software, **Deployment → Review release apps** discovers this optional file
+and starts the ordinary read-only review. It discloses the full resulting set,
+including removals; applying it still needs explicit confirmation and normal
+administrator approval. Current publisher trust, policy and exact metadata pins
+remain mandatory. Missing declarations leave manual/file-dialog workflows
+available. This does not enroll a production publisher or migrate the legacy
+Alpine/vendor catalog.
+
+V builders use `configuration.prepare_applications(&repositories, ids)` or
+`configuration.prepare_application_file(&repositories, source)` to own an
+`ImageApplications` plan. `plan.report()` returns independently owned JSON.
+Publish the matching repositories and configuration, call
+`plan.publish(&repositories)`, and close all three plans. `publish` returns true
+only for a newly created file. See
+[release declaration qualification](../../tests/packages/image-catalog-check.md).
+
 ## Build and publish
 
 ```sh

@@ -1,0 +1,5 @@
+32 host package/cache/CLI compile-run checks and 14 focused Software compile-run checks passed. Maintained Software functional suite, all 27 allocation modes, both full desktop Linux target typechecks and launcher checks passed.
+core aarch64 PASS 88.538s, 13 receipt artifacts
+core x86_64 PASS 71.355s, 13 receipt artifacts
+software aarch64 PASS 23.345s, 59 receipt artifacts
+software x86_64 PASS 27.044s, 59 receipt artifacts

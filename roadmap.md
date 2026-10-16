@@ -665,6 +665,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Explicit deployment export](tests/packages/image-export-check.md) saves the
     resolved lock atomically outside the image for normal reviewed deployment,
     retaining output digests and preserving existing/concurrent files.
+    [Image catalog declarations](tests/packages/image-catalog-check.md) carry the
+    exact lock into normal staging. Software discovers it for a full-set review
+    with separate confirmation; matching trust and signed offline bundles remain
+    mandatory, and existing declarations are preserved or refused.
   - [x] [Bounded prepared-root materialization](tests/packages/import-limits-check.md)
     checks aggregate entries across selectors/aliases and output directory depth
     during import, including empty-directory trees and nested selector parents.

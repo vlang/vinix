@@ -167,6 +167,8 @@ mut:
 	deployment_pending string // frozen file path for deployment-review/apply
 	deployment_choice_pending bool
 	deployment_choice_current bool // intervening input/navigation invalidates a late selection
+	release_deployment_path string = pkgprotocol.image_applications_path
+	release_deployment_available bool
 	mirror_mode bool
 	mirror_path []u8
 	mirror_all bool
@@ -927,6 +929,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		a.clear_review()
 		a.deployment_mode = true
 		a.initialize_deployment_field()
+		a.find_release_deployment()
 		a.focus = false
 		a.select_all = false
 		a.set_status('Enter an absolute deployment file path. Review the complete application set and removals before applying it.')
@@ -1487,6 +1490,7 @@ fn (mut a SoftwareApp) close_app() {
 		a.repository_key.free()
 		a.repository_result.free()
 		a.deployment_path.free()
+		a.release_deployment_path.free()
 		a.mirror_path.free()
 		a.mirror_lock_path.free()
 	}

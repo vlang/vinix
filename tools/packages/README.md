@@ -85,6 +85,15 @@ navigation or review discards late selections. If the dialog is unavailable,
 the absolute-path field remains usable. See
 [chooser checks](../../tests/packages/software-deployment-chooser-check.md).
 
+Normal staging with selected application requirements also declares that exact
+set at `/usr/share/vinix-packages/applications.json`, after publishing its matching
+trust and signed bundle. Software's **Deployment → Review release apps** opens
+the complete proposal for separate confirmation. Existing identical declarations
+are preserved; different or unsafe files refuse. Check reports include the image
+path, publish/preserve decision, byte count and digest. See
+[the contract](SDK.md#declare-release-applications-in-an-image) and
+[qualification](../../tests/packages/image-catalog-check.md).
+
 Desktop checks need generated examples under `build/app-src` and a headless ui2
 overlay under `build/vmodules`; `VINIX_PACKAGE_TEST_UI2` selects another overlay
 parent. Package implementation, publishing, staging and qualification use V.

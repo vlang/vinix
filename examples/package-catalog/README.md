@@ -48,6 +48,13 @@ with the authenticated bundle, then open its path in Software's **Deployment**
 form to review the complete set before applying it. Current publisher trust and
 policy are checked again. See [deployment export](../../tools/packages/SDK.md#export-an-image-application-deployment).
 
+Normal image staging with that requirements file also saves the exact lock in
+the image. After boot, **Software → Deployment → Review release apps** reviews
+Hello, Counter and Memo together from the bundled signed repository. Confirm the
+complete plan before administrator approval. The release declaration does not
+install apps or change personal data during image construction. See
+[image declaration](../../tools/packages/SDK.md#declare-release-applications-in-an-image).
+
 The version argument labels the three application manifests. Publishers must
 review source and toolchain changes when advancing it. Binary reproducibility
 across different compiler installations is not implied. Signed updates,
