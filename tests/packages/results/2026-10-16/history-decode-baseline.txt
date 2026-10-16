@@ -1,0 +1,9 @@
+Pre-change unwarmed complete history decoder regression: ten consumer decodes retain 583 bytes; ten publisher decodes retain 185 bytes; ten truncated-document refusals retain 7,030 bytes in each domain, after caller retirement of results/errors. Input source, production source, executable and generated C are retained and pinned.
+
+HISTORY DECODE publisher=false ten complete decodes retained 583 bytes; ten partial refusals retained 7030 bytes
+HISTORY DECODE publisher=true ten complete decodes retained 185 bytes; ten partial refusals retained 7030 bytes
+tools/packages/pkgcore/history_decode_test.v:31: fn test_history_decoders_retire_complete_and_partial_results
+   > assert retained == 0
+     Left value (len: 5): `14828`
+    Right value (len: 1): `0`
+

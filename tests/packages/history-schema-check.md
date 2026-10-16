@@ -1,5 +1,9 @@
 # Persistent repository history admission
 
+Follow-up [bounded history decoder checks](history-decode-check.md) extend this
+qualification to complete decode and file-reader lifetimes. The results below
+retain their original scanner-only allocation and static-build scope.
+
 The previous consumer reader accepted `repositories:null` or an omitted list as
 empty trust history. After revocation and an empty refresh removed cached
 snapshots, a valid older signed index could be enrolled again. `publish-release`'s

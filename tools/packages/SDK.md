@@ -1477,6 +1477,14 @@ by a failed refresh/enrollment/publication. Restore the retained history under
 the appropriate writer lock before retrying; revocation requires no history.
 See [history qualification](../../tests/packages/history-schema-check.md).
 
+Both history envelopes use the internal bounded stored-metadata reader. It
+enforces the 8 MiB input and 4,096-identity limits while parsing, preserves the
+full u64 sequence range and exact writer bytes, and retires partial fields on
+refusal. Only `ENOENT` permits initial empty history; other path errors, leaf
+aliases and special files refuse. Decode diagnostics keep their consumer or
+publisher prefix while retiring the original error. See
+[complete decode and file-reader checks](../../tests/packages/history-decode-check.md).
+
 The local `catalog.json` cache is an array of complete
 `{repository:{id,url,public_key},text,signature}` snapshots, with at most 4,096
 distinct repository IDs. Configuration has the same repository limit and shares

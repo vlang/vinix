@@ -1,0 +1,37 @@
+Expanded reader measurements first retained 176,000 bytes over 1,000 absent consumer reads through os.is_link failed-stat error storage. Stack lstat retired that scratch; malformed history still retained a 16-byte boxed IError per call in the result-or wrapper. The final reader uses explicit synchronous interface access in an if-result branch, verified by the retained error_probe.v. Raw intermediate failures and generated C are pinned. The alias-to-FIFO fixture transition was corrected to restore an ordinary file before the next case; final runs include all refusal cases and non-directory parents.
+
+Initial expanded reader probe:
+HISTORY DECODE publisher=false 1000 complete decodes retained 0 bytes; 1000 partial refusals retained 0 bytes
+HISTORY DECODE publisher=true 1000 complete decodes retained 0 bytes; 1000 partial refusals retained 0 bytes
+HISTORY DECODE owned empty/growing/full 4096 identities, distinct keys per ID, u64 maximum, escaped keys and exact canonical writer bytes PASS
+HISTORY DECODE 1000-cycle partial/schema/numeric/UTF8/duplicate refusals and 4097-record/8-MiB bounds retire all owned scratch PASS
+tools/packages/pkgcore/history_decode_test.v:145: fn test_history_file_readers_retire_envelopes_preserve_damage_and_allow_restored_retry
+   > assert kept == 0
+     Left value (len: 6): `176000`
+    Right value (len: 1): `0`
+
+
+Stack-stat probe:
+HISTORY DECODE publisher=false 1000 complete decodes retained 0 bytes; 1000 partial refusals retained 0 bytes
+HISTORY DECODE publisher=true 1000 complete decodes retained 0 bytes; 1000 partial refusals retained 0 bytes
+HISTORY DECODE owned empty/growing/full 4096 identities, distinct keys per ID, u64 maximum, escaped keys and exact canonical writer bytes PASS
+HISTORY DECODE 1000-cycle partial/schema/numeric/UTF8/duplicate refusals and 4097-record/8-MiB bounds retire all owned scratch PASS
+tools/packages/pkgcore/history_decode_test.v:144: fn test_history_file_readers_retire_envelopes_preserve_damage_and_allow_restored_retry
+   > assert kept == 0
+     Left value (len: 5): `16000`
+    Right value (len: 1): `0`
+
+
+Boxed-wrapper probe:
+HISTORY DECODE publisher=false 1000 complete decodes retained 0 bytes; 1000 partial refusals retained 0 bytes
+HISTORY DECODE publisher=true 1000 complete decodes retained 0 bytes; 1000 partial refusals retained 0 bytes
+HISTORY DECODE owned empty/growing/full 4096 identities, distinct keys per ID, u64 maximum, escaped keys and exact canonical writer bytes PASS
+HISTORY DECODE 1000-cycle partial/schema/numeric/UTF8/duplicate refusals and 4097-record/8-MiB bounds retire all owned scratch PASS
+HISTORY FILE publisher=false absent retained 0 bytes
+HISTORY FILE publisher=false valid retained 0 bytes
+HISTORY FILE publisher=false partial retained 16000 bytes
+tools/packages/pkgcore/history_decode_test.v:144: fn test_history_file_readers_retire_envelopes_preserve_damage_and_allow_restored_retry
+   > assert kept == 0
+     Left value (len: 5): `16000`
+    Right value (len: 1): `0`
+

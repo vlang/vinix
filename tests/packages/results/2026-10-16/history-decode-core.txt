@@ -1,0 +1,104 @@
+history_decode:
+HISTORY DECODE owned empty/growing/full 4096 identities, distinct keys per ID, u64 maximum, escaped keys and exact canonical writer bytes PASS
+HISTORY DECODE 1000-cycle partial/schema/numeric/UTF8/duplicate refusals and 4097-record/8-MiB bounds retire all owned scratch PASS
+HISTORY DECODE 1000 absent/valid/partial/alias/FIFO consumer and publisher reads retire scratch, preserve retained bytes and permit restored retry PASS
+history_schema:
+history_ownership:
+HISTORY OWNERSHIP migrated expired snapshots produce independent replay records and survive input retirement PASS
+HISTORY OWNERSHIP 64 authenticated migrations/retirements preserve source snapshots within reader budget: 0 bytes / 0 allocations PASS
+HISTORY OWNERSHIP remembered indexes detach both existing and new identity fields and preserve sorted floors PASS
+HISTORY OWNERSHIP later signature/equivocation failures retire partial results without publishing history PASS
+HISTORY OWNERSHIP newer retained floors survive authenticated older cache migration with bounded lifetimes PASS
+HISTORY OWNERSHIP full 4096-identity replacement and overflow refusal release scratch without mutating source floors PASS
+HISTORY OWNERSHIP SHA256 vectors, binary/Unicode bytes and block boundaries preserve replay digests with zero hashing scratch PASS
+trust_recovery:
+TRUST RECOVERY exact disabled identity/digest/sequence and complete index required PASS
+TRUST RECOVERY valid retired keys still require authenticated signatures PASS
+TRUST RECOVERY empty refresh preserves retired and independent replay floors PASS
+administration:
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository unreachable
+Updating trusted repository fixture
+Updating trusted repository fixture
+administration_metadata:
+ADMINISTRATION METADATA configuration and both history formats preserve exact JSON, escaping, defaults, u64 widths and reader round-trips PASS
+ADMINISTRATION METADATA limit-minus-one and exact 8 MiB accepted; newline and escape expansion overflow refused PASS
+ADMINISTRATION METADATA review fingerprints preserve legacy digests and bind configuration, history, intent, publisher and index bytes PASS
+ADMINISTRATION METADATA repeated writes remain readable; oversized and publication failures preserve prior documents and source models PASS
+release:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+RELEASE ADMISSION late-index refused=true unpublished=true
+RELEASE ADMISSION changed staged metadata refuses after reservation; exact retry preserves publisher floor PASS
+RELEASE ADMISSION 34 staged/reserved refusals preserve workspace and outside data; history timing, no publication, cleanup and exact retry PASS
+service:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+snapshot_schema:
+Snapshot probe: null cache accepted=false
+Snapshot probe: unknown field accepted=false
+Snapshot probe: duplicate text accepted=false
+Snapshot probe: missing URL accepted=false
+Snapshot probe: dangling cache accepted=false
+Snapshot schema: complete typed records, ambiguity refusal, exact signed bytes, legacy whitespace and fresh/empty caches passed
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Downloading app/bin/app (14 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Activated package generation 5
+Activated package generation 6
+Snapshot schema: failed migration preserves state/cache/recovery; restored legacy floor rejects replay, authentic renewal and revoked-publisher uninstall passed
+repository_configuration:
+REPOSITORY CONFIG fresh/locked/corrupt configuration checks; damaged cache/history listing and reviewed revocation preserve maintenance failures PASS

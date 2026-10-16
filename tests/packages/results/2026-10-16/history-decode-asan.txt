@@ -1,0 +1,33 @@
+clang ASan/UBSan; -gc none -manualfree; detect_leaks=0; halt_on_error=1
+HISTORY DECODE publisher=false 1000 complete decodes retained 0 bytes; 1000 partial refusals retained 0 bytes
+HISTORY DECODE publisher=true 1000 complete decodes retained 0 bytes; 1000 partial refusals retained 0 bytes
+HISTORY DECODE owned empty/growing/full 4096 identities, distinct keys per ID, u64 maximum, escaped keys and exact canonical writer bytes PASS
+HISTORY DECODE 1000-cycle partial/schema/numeric/UTF8/duplicate refusals and 4097-record/8-MiB bounds retire all owned scratch PASS
+HISTORY FILE publisher=false absent retained 0 bytes
+HISTORY FILE publisher=false valid retained 0 bytes
+HISTORY FILE publisher=false partial retained 0 bytes
+HISTORY FILE publisher=false alias retained 0 bytes
+HISTORY FILE publisher=false fifo retained 0 bytes
+HISTORY FILE publisher=true absent retained 0 bytes
+HISTORY FILE publisher=true valid retained 0 bytes
+HISTORY FILE publisher=true partial retained 0 bytes
+HISTORY FILE publisher=true alias retained 0 bytes
+HISTORY FILE publisher=true fifo retained 0 bytes
+HISTORY DECODE 1000 absent/valid/partial/alias/FIFO consumer and publisher reads retire scratch, preserve retained bytes and permit restored retry PASS
+
+Publisher release lifecycle:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+RELEASE ADMISSION late-index refused=true unpublished=true
+RELEASE ADMISSION changed staged metadata refuses after reservation; exact retry preserves publisher floor PASS
+RELEASE ADMISSION 34 staged/reserved refusals preserve workspace and outside data; history timing, no publication, cleanup and exact retry PASS

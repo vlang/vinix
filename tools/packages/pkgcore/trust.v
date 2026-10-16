@@ -2,7 +2,6 @@
 module pkgcore
 
 import crypto.sha256
-import os
 
 pub struct RepositoryFloor {
 pub:
@@ -32,10 +31,23 @@ fn floor_order(a &RepositoryFloor, b &RepositoryFloor) int {
 fn read_history(directory string) !TrustHistory {
 	path := directory + '/trust-history.json'
 	defer { unsafe { path.free() } }
-	if !os.exists(path) && !os.is_link(path) { return TrustHistory{} }
+	if history_file_missing(path) { return TrustHistory{} }
 	text := read_metadata(path)!
 	defer { unsafe { text.free() } }
-	return decode_history(text, false) or { return error('invalid repository trust history: ${err}') }
+	if history := decode_history(text, false) { return history } else {
+		// The interface is consumed synchronously; an implicit address boxes it.
+		message := unsafe { (&err).msg() }
+		diagnostic := 'invalid repository trust history: ' + message
+		unsafe { message.free(); (&err).free() }
+		return error(diagnostic)
+	}
+}
+
+// Only a missing pathname permits initial history. Capture no-follow stack
+// scratch so an absent file does not retain os.is_link's failed-stat error.
+fn history_file_missing(path string) bool {
+	mut info := C.stat{}
+	return C.lstat(path.str, unsafe { &info }) != 0 && C.errno == C.ENOENT
 }
 
 fn index_digest(text string) string {

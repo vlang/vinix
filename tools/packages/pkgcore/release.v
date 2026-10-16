@@ -59,10 +59,16 @@ fn publisher_lock(repository string) !Lock {
 
 fn release_history(repository string) !TrustHistory {
 	path := repository + '/.publisher/history.json'
-	if !os.exists(path) && !os.is_link(path) { return TrustHistory{} }
+	defer { unsafe { path.free() } }
+	if history_file_missing(path) { return TrustHistory{} }
 	text := read_metadata(path)!
 	defer { unsafe { text.free() } }
-	return decode_history(text, true) or { return error('invalid publisher release history: ${err}') }
+	if history := decode_history(text, true) { return history } else {
+		message := unsafe { (&err).msg() }
+		diagnostic := 'invalid publisher release history: ' + message
+		unsafe { message.free(); (&err).free() }
+		return error(diagnostic)
+	}
 }
 
 // Check structural installability without accepting licenses or changing any

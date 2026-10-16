@@ -1,5 +1,10 @@
 # Replay-history ownership
 
+Follow-up [bounded history decoding](history-decode-check.md) qualifies complete
+consumer/publisher decode and file-reader lifetimes. The maintained guest suite
+also runs the decoder and schema fixtures; results below keep their original
+scope and artifact counts.
+
 History migration previously kept decoded indexes and replaced arrays while
 returning replay records that borrowed identity strings from cached snapshots.
 That mixed ownership prevented callers from safely retiring either the history

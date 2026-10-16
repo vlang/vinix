@@ -1,0 +1,46 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=27
+!>+ [11] ./sbin/init sz=210912
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/history-ownership-probe sz=1427568
+!>+ [15] ./usr/share/package-fixtures/history-ownership-core sz=1048352
+!>+ [16] ./usr/share/package-fixtures/history-decode sz=846344
+!>+ [17] ./usr/share/package-fixtures/history-schema sz=814096
+!>+ [18] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e87400
+initramfs: Done (18 entries)
+HWTEST START packages-history-ownership
+HISTORY OWNERSHIP migrated expired snapshots produce independent replay records and survive input retirement PASS
+HISTORY OWNERSHIP 64 authenticated migrations/retirements preserve source snapshots within reader budget: 0 bytes / 0 allocations PASS
+HISTORY OWNERSHIP remembered indexes detach both existing and new identity fields and preserve sorted floors PASS
+HISTORY OWNERSHIP later signature/equivocation failures retire partial results without publishing history PASS
+HISTORY OWNERSHIP newer retained floors survive authenticated older cache migration with bounded lifetimes PASS
+HISTORY OWNERSHIP full 4096-identity replacement and overflow refusal release scratch without mutating source floors PASS
+HISTORY OWNERSHIP SHA256 vectors, binary/Unicode bytes and block boundaries preserve replay digests with zero hashing scratch PASS
+HISTORY PROCESS history-ownership-core PASS
+Updating trusted repository first
+Updating trusted repository second
+Installing Seed 1.0.0 (1/1) from first
+Downloading seed/asset (4 bytes)
+Activated package generation 1
+CACHE PREFLIGHT authenticated prefix overflow stops before later repository fetch; signature precedence, active cache/history/generation and recovery data preserved PASS
+CACHE PREFLIGHT signed service/CLI refresh rejects oversized cache before later acquisition/publication and accepts a bounded retry PASS
+HISTORY PROCESS history-ownership-probe PASS
+HISTORY DECODE owned empty/growing/full 4096 identities, distinct keys per ID, u64 maximum, escaped keys and exact canonical writer bytes PASS
+HISTORY DECODE 1000-cycle partial/schema/numeric/UTF8/duplicate refusals and 4097-record/8-MiB bounds retire all owned scratch PASS
+HISTORY DECODE 1000 absent/valid/partial/alias/FIFO consumer and publisher reads retire scratch, preserve retained bytes and permit restored retry PASS
+HISTORY PROCESS history-decode PASS
+HISTORY PROCESS history-schema PASS
+HWTEST PASS packages-history-ownership

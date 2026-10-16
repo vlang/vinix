@@ -12,7 +12,7 @@ fn C.reboot(int) int
 fn C.usleep(u32) int
 
 fn check() ! {
-	for name in ['history-ownership-core', 'history-ownership-probe'] {
+	for name in ['history-ownership-core', 'history-ownership-probe', 'history-decode', 'history-schema'] {
 		mut child := os.new_process('/usr/share/package-fixtures/' + name)
 		if name == 'history-ownership-probe' { child.set_args(['/tmp/history-ownership']) }
 		child.set_redirect_stdio_merged(); child.run()

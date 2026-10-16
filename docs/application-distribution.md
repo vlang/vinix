@@ -14,6 +14,12 @@ before parsing; an atomically replaced pathname can still return its previously
 captured file. Restoring trusted ordinary metadata permits retry without deleting
 package state. See [qualification](../tests/packages/metadata-read-check.md).
 
+Consumer replay history and publisher release reservations use the bounded
+stored-metadata decoder, preserving complete format-1 records and exact writer
+output. Partial and malformed histories retire decoded scratch and refuse without
+resetting sequence floors. Only a missing pathname permits initial empty history;
+other path errors refuse. See [history decode checks](../tests/packages/history-decode-check.md).
+
 Public V status and verification calls return owned installed-state snapshots,
 including on a fresh image. Call `State.close()` after use. These reads release
 their configuration/path storage, and verification releases failed snapshots
