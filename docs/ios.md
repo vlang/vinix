@@ -7820,22 +7820,58 @@ streams/executables and joined guest evidence are retained under
 `build/ios/fortnite/hevc-format-checks`. The IPA consumer at `0x1078cab24` passes
 nil extensions in `x5` and its seventh argument, the output pointer, in `x6`.
 
-One more required import resolves. The actual IPA exits with status 1 before
-application entry at `_CGFontCopyTableForTag`. Image sample construction, codec
-execution and the system Metal device/renderer remain unavailable. Fortnite
-remains unplayable and full iOS regression remains unpassed.
+One more required import resolved. That IPA probe stopped before application
+entry at `_CGFontCopyTableForTag`.
+
+CoreGraphics fonts now own a validated copy of TrueType SFNT bytes, including
+indexed faces in TrueType collections. Table queries return owned CFData copies;
+table-tag arrays preserve directory order and contain raw FourCC integers,
+matching the native API. Fonts retain their data provider until the final font
+release. Returned arrays and table data survive independently, including after
+the caller discards the input bytes. Glyph counts, units per em, PostScript names
+and full names come from the font's tables. Font construction failures release
+partial storage; byte readers and metadata getters allocate no storage.
+
+This bounded profile accepts at most 16 MiB, 4,096 distinct tables and 64
+collection faces, with TrueType `glyf`/`loca` outlines and validated table spans.
+It supports format-zero name tables with Unicode records and the ASCII subset
+of Mac Roman. CFF/OpenType `OTTO`, WOFF and CGFont glyph rasterization remain
+outside this profile. With the optional `ios_text` backend,
+`CGFontCreateWithFontName` searches existing process-registered font descriptors
+by PostScript or full name and snapshots the matching file. Unregistered names
+return nil; the static runner still lacks this name-lookup import.
+
+V tooling used the installed HarfBuzz subsetter to produce a 1,996-byte fixture
+from the existing OFL-licensed `VinixJapanese-Regular.ttf`. Native CoreGraphics
+measurements cover directory order, exact table bytes, collections, nil and
+empty tables, names, metrics and provider callback timing. Native table CFData
+views alias the provider's input, so comparisons keep that input alive and
+immutable until the views are released. Vinix's copies are separately checked
+after input mutation and font destruction. Eight final host sanitizer runs and
+four ARM64 guest suites also cover registered lookup, concurrent retained readers,
+malformed directories and complete runtime teardown. Eleven final C streams and
+executables, native measurements and joined guest evidence are retained under
+`build/ios/fortnite/cg-font-checks`. The inspected IPA consumer calls
+`CGFontCopyTableForTag` at `0x104844970` and `0x104844ac0`, passing the raw values
+from `CFArrayGetValueAtIndex` as tags while serializing SFNT tables.
+
+Three more required imports resolve in the text runner, and two in the static
+runner. The actual IPA exits with status 1 before application entry at
+`_SCNetworkReachabilityCreateWithAddress` from SystemConfiguration. Image sample
+construction, codec execution and the system Metal device/renderer remain
+unavailable. Fortnite remains unplayable and full iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,637 | 523 | 79 |
+| Fortnite executable | 1,639 | 521 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,472 | 526 | 120 |
+| All images | 2,474 | 524 | 120 |
 
-The C++/GLES/Text variant reports 2,485 resolved imports, 513 unresolved strong
+The C++/GLES/Text variant reports 2,488 resolved imports, 510 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

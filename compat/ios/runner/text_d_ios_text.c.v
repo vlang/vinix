@@ -248,6 +248,32 @@ fn ct_line_draw(line u64, context u64) {
 	text_glyphs(line, context)
 }
 
+fn text_cg_font(name u64) u64 {
+	if name==0 || !objc_is_kind(name,ios_runtime.names['NSString']) { return 0 }
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	for descriptor in text_runtime.fonts {
+		header:=obj_header(descriptor);path:=string_text(header.fields[1])
+		if header.section<0 || header.section>=64 { continue }
+		file:=C.fopen(unsafe{&char(path.str)},c'rb')
+		if file==unsafe{nil} { continue }
+		if C.fseek(file,0,2)!=0 { C.fclose(file);continue }
+		length:=C.ftell(file)
+		if length<12 || length>16777216 || C.fseek(file,0,0)!=0 { C.fclose(file);continue }
+		mut data:=[]u8{len:int(length)}
+		read:=C.fread(data.data,1,usize(length),file);C.fclose(file)
+		font:=if read==usize(length){cg_font_bytes(u64(data.data),u64(data.len),u32(header.section),0)}else{u64(0)}
+		unsafe { data.free() }
+		if font==0 { continue }
+		if string_text(header.fields[0])==string_text(name) { return font }
+		full:=cg_font_full_name(font)
+		matched:=full!=0 && string_text(full)==string_text(name)
+		objc_release(full)
+		if matched { return font }
+		objc_release(font)
+	}
+	return 0
+}
 fn text_symbol(symbol string) ?u64 {
 	return match symbol {
 		'_CTFontManagerCreateFontDescriptorsFromURL' { u64(unsafe { voidptr(ct_descriptors) }) }

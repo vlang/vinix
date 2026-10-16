@@ -112,6 +112,9 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		}
 		if address := audio_symbol(symbol) { return address }
 	}
+	if library == '/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics' {
+		if address := cg_font_symbol(symbol) { return address }
+	}
 	if library in ['/System/Library/Frameworks/UIKit.framework/UIKit', '/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics'] {
 		if address := geometry_symbol(symbol) { return address }
 		if address := provider_image_symbol(symbol) { return address }
