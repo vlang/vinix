@@ -1,0 +1,3 @@
+tests/linux-compat/clonethreadns-check.v:372: FAIL: fn main.main: assert false, 'clonethreadns assertions must execute'
+      message: clonethreadns assertions must execute
+V panic: Assertion failed...

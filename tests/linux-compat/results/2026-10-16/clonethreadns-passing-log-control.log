@@ -1,0 +1,3 @@
+tests/linux-compat/clonethreadns-check.v:231: FAIL: fn main.failure: assert log.contains('LINUX CLONETHREADNS DETAIL:'), 'clonethreadns baseline failure markers required'
+      message: clonethreadns baseline failure markers required
+V panic: Assertion failed...

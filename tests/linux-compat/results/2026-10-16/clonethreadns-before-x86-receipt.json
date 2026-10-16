@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "77c44d4b0220127783a237944b3a70d8b021551a3a0ed1b36ab764e746e47a83",
+    "results": [
+        {
+            "name": "clonethreadns",
+            "source_sha256": "6efc9fae7f4f7696648e17285ce6c5de20031ad78e2d615da9da86612bc563e1",
+            "init_sha256": "71ad48b32dd782b4bcaad349ca19ceeeafd0d6cbcafa5ab27ad68d2d85679a18",
+            "iso_sha256": "5f3e3f4349e3cffb0ebc21ce4d3e36357a7cc5e07e633388559049dd19306c82",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

@@ -1134,6 +1134,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   native architectures against identical Linux probe ELFs.
   See [the FS/namespace receipts](docs/linux-posix-qualification.md#native-clone-fs-and-namespace-conflicts).
 
+- [x] Reject CLONE_THREAD with NEWPID/NEWUSER using Linux EINVAL through
+  clone and clone3; preserve earlier import/ABI errors, no-THREAD permission
+  admission, real fork/reap and runtime pthread creation. Qualify 1,872 controls
+  and identical-input cleanup on both native architectures against identical
+  Linux probe ELFs. See [the thread/namespace receipts](docs/linux-posix-qualification.md#native-clone-thread-and-namespace-conflicts).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -9918,3 +9918,90 @@ lifetimes, requested PID allocation, supplied-stack execution, other exit
 notifications/wait classes, cgroup descriptor ordering/placement and its
 authorization/lifetimes, GNU libc and translated/32-bit paths remain unqualified
 here. The broad libc, installation/sandbox/portal and translation gates remain open.
+
+## Native clone thread and namespace conflicts
+
+Both architectures now reject CLONE_THREAD combined with CLONE_NEWPID or
+CLONE_NEWUSER with EINVAL through the existing shared clone admission predicate.
+This replaces the earlier ENOTSUP for requests whose other sharing flags are
+valid on Linux but unsupported by Vinix. The guard applies to legacy clone
+and clone3, following clone3 import/flag/stack checks and preceding unsupported
+sharing, namespace permissions and task construction. It follows
+[Linux v6.12's thread-group namespace exclusions](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c).
+This qualifies the explicit NEWPID/NEWUSER flag conflicts. After unshare or
+setns changes the PID namespace for future children, thread creation also
+requires matching the active PID namespace. That case remains unqualified here.
+
+The `clonethreadns` probe runs 1,872 controls per architecture, 468 in each
+root/UID1000 and initial/fresh one-level PID-namespace cohort. Every caller
+is an ordinary process, with effective CAP_SYS_ADMIN cleared and read back.
+Native ARM uses 16 KiB pages; native x86 and both Linux references use 4 KiB.
+All conflict requests include VM and SIGHAND, satisfying the existing basic
+thread-sharing constraints. The six classes per cohort are:
+
+- 96 clone3 THREAD/NEWPID conflicts, crossing four ABI sizes, eight flag
+  variants and three argument layouts. Variants include FILES, SYSVSEM,
+  UNTRACED, PARENT, NEWNS, NEWNET and NEWTIME. Exit signal is zero.
+- 96 equivalent clone3 THREAD/NEWUSER conflicts. FS is absent, so the earlier
+  FS/namespace exclusion does not hide the thread conflict.
+- 108 legacy conflicts: NEWPID, NEWUSER or both, four additional-flag forms,
+  three upper-word forms and three repeated canary placements. Low flags retain
+  SIGCHLD; legacy upper register bits are ignored.
+- 60 clone3 ordering controls: structure sizes and unreadable prefixes,
+  oversized input, selected-TID vector faults/pair errors, invalid signals,
+  reserved/unknown/conflicting flags and invalid stack pairs/ranges.
+- 72 NEWPID permission-admission controls without THREAD, requiring EPERM
+  with effective SYS_ADMIN absent, through clone3 and legacy clone.
+- 36 actual ordinary forks: 24 clone3 calls spanning ABI sizes/UNTRACED and
+  12 legacy upper-word controls. Children verify PID/TID, parent and UID, exit
+  37, and are reaped by their caller.
+
+Clone3 arguments are aligned, unaligned or end exactly at a readable page
+boundary; the following page is protected. The entire two-page input canary
+must remain unchanged, and an empty nonblocking wait must return ECHILD after
+each call. Original kernels fail exactly 1,200 controls per architecture, the
+three conflict classes, with sampled diagnostics verifying ENOTSUP instead of
+EINVAL. Corrected kernels and the identical probe ELFs on Linux 6.12.51 pass
+every control. Both original and corrected phases preserve 144 legitimate
+fork/reap lifecycles in these controls per architecture and create no unintended
+children.
+
+Four cleanup cohorts run in both phases, after 64 warmup cycles and thirteen
+seconds of settling, followed by 200 measured cycles and another settle.
+Each cycle uses identical thread/namespace refusals through both APIs, a NEWPID
+permission refusal without THREAD, and one real ordinary fork/reap. Only this
+retention workload accepts original ENOTSUP or corrected EINVAL; semantic
+controls require exact Linux errors. Every live slab class and big-heap page
+total stays flat. This qualifies the targeted kernel-heap paths, while general
+page/cache retention and the earlier EXT2 rename observation remain separate.
+
+Four isolated original/corrected production builds pass. Whole generated C
+comparison confines the change to the existing scalar sharing predicate: no
+allocation, free, reference, ownership, lock or task-publication changes.
+The probe uses ten explicit stack allocas and no dynamic allocation or
+fixed-index helper. ARM preflight C matches the original guest C; its ELF is
+the canonical ARM Linux reference and must also equal the native probe.
+
+Both corrected architectures pass runtime, including actual pthread creation,
+and the 1,872-control clonefsns regression. The auditor verifies exact totals,
+original failure diagnostics, capabilities, credentials/page sizes,
+legitimate/unintended child counts, identical probe C/ELFs, Linux receipts,
+both phases' storage, all 84 retained native case files, 67 frozen dispatch
+inputs, 2,014 SDK files and 15,146 compiler pins. False-assertion and
+passing-Linux-as-original negative controls must execute and fail; compile
+without `-prod`.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/clonethreadns-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/clonethreadns-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/clonethreadns-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/clonethreadns-diagnostic-pins.json).
+Raw original/corrected/Linux, build, preflight and regression logs accompany
+the receipts. The maintained auditor is `tests/linux-compat/clonethreadns-check.v`.
+
+Different active/future-child PID namespaces, worker-thread callers, independent
+FS/descriptor/handler ownership, user-namespace creation, other namespace/thread
+combinations, concurrent arguments/mappings/credentials, shared-VM/vfork
+lifetimes, requested PID allocation, supplied-stack execution, other exit
+notifications/wait classes, cgroup descriptor ordering/placement and its
+authorization/lifetimes, GNU libc and translated/32-bit paths remain unqualified
+here. The broad libc, installation/sandbox/portal and translation gates remain open.

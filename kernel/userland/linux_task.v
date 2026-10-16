@@ -199,10 +199,12 @@ fn valid_clone3_exit_signal(flags u64, signal u64) bool {
 
 // New mount/user namespaces cannot share FS state with their parent. Shared
 // handlers require shared VM, and threads require shared handlers.
+// Threads cannot start in a new PID or user namespace.
 fn valid_clone_sharing(flags u64) bool {
 	return !(flags & clone_fs != 0 && flags & (proc.clone_newns | proc.clone_newuser) != 0)
 		&& !(flags & clone_sighand != 0 && flags & clone_vm == 0)
 		&& !(flags & clone_thread != 0 && flags & clone_sighand == 0)
+		&& !(flags & clone_thread != 0 && flags & (proc.clone_newpid | proc.clone_newuser) != 0)
 }
 
 // A PID-namespace init cannot create siblings: their parent is outside the
