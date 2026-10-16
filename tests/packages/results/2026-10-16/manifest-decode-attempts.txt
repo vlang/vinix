@@ -1,0 +1,62 @@
+The initial signed CLI run caught a diagnostic regression: six declared permissions refused with a generic array-limit message instead of the existing distinct SDK 1 grants diagnostic. The bounded string reader now accepts a field-specific overflow diagnostic; the strict five-grant limit is unchanged. The final allocation fixture checks the permission overflow message and cleanup in both source/inventory modes; the signed CLI now passes. A preliminary AArch64 build was stopped before boot and rebuilt from the final reader sources.
+
+Initial CLI diagnostic assertion:
+tests/packages/distribution-cli.v:197: FAIL: fn main.qualify_catalog_cli: assert refused.code == 1 && refused.text.contains('distinct SDK 1 grants') && !refused.text.contains('V panic:'), refused.text
+      message: vinix-package: package metadata array exceeds its entry limit
+
+V panic: Assertion failed...
+
+
+Combined-suite attempt:
+The original repository/configuration suite with the new manifest fixture appended passed AArch64 in 248.8 seconds, but x86_64 hit its 300-second deadline while still running pre-existing signed-index fixtures, before reaching the manifest fixture. Neither combined run is counted in the final dedicated qualification. The original repository suite is unchanged; a separate manifest guest suite runs the manifest groups, signed-schema maintenance and configuration ownership checks. The combined controller and serial logs, and x86 QMP timeout log, remain pinned in the work evidence.
+
+AArch64 controller:
+PASS aarch64 packages-repository-config (248.8s)
+package-repository-config aarch64: 1 passed, 0 failed, 0 skipped
+
+x86_64 controller:
+FAIL x86_64 packages-repository-config (300.5s)
+  timed out after 300 s without "INDEX DECODE exact 8 MiB and limit-minus-one accepted; limit-plus-one and 4097 packages refused PASS", "INDEX DECODE authenticated original/legacy bytes, signature-before-schema refusals and 64-cycle signed retries retire scratch PASS", "CONFIGURATION PROCESS index-decode PASS", "CONFIGURATION PROCESS index-schema PASS", "MANIFEST DECODE both architectures, owned template/inventory fields, independent results, exact canonical bytes and full 16384 payload bounds PASS", "MANIFEST DECODE omitted package/dependency/payload defaults, full integer ranges and complete-inventory refusals retire scratch PASS", "MANIFEST DECODE every truncated prefix and schema/UTF8/number/permission refusal cycles retire scratch PASS", "MANIFEST DECODE exact 8 MiB and limit-minus-one accepted; metadata/payload/argument/dependency/association/string overflows refused PASS", "MANIFEST DECODE invalid pack input preserves source and absent destination; restored template defaults and captured inventory publish unchanged canonical bytes PASS", "CONFIGURATION PROCESS manifest-decode PASS", "HWTEST PASS packages-repository-config"
+  last 40 serial lines:
+  | !>+ [5] ./etc/ sz=0
+  | !>+ [6] ./sys/ sz=0
+  | !>+ [7] ./root/ sz=0
+  | !>+ [8] ./dev/ sz=0
+  | !>+ [9] ./tmp/ sz=0
+  | !>+ [10] ./etc/hwtest-scenario sz=27
+  | !>+ [11] ./sbin/init sz=210976
+  | !>+ [12] ./usr/share/ sz=0
+  | !>+ [13] ./usr/share/package-fixtures/ sz=0
+  | !>+ [14] ./usr/share/package-fixtures/configuration-observation sz=1010664
+  | !>+ [15] ./usr/share/package-fixtures/repository-config-protocol sz=595976
+  | !>+ [16] ./usr/share/package-fixtures/manifest-decode sz=976104
+  | !>+ [17] ./usr/share/package-fixtures/repository-config-core sz=1194008
+  | !>+ [18] ./usr/share/package-fixtures/index-decode sz=995984
+  | !>+ [19] ./usr/share/package-fixtures/index-schema sz=1592592
+  | !>+ [20] ./usr/share/package-fixtures/repository-status sz=1173416
+  | !>+!>initramfs: no ustar sig at 0xff00000037e88800
+  | initramfs: Done (21 entries)
+  | HWTEST START packages-repository-config
+  | REPOSITORY CONFIG fresh/locked/corrupt configuration checks; damaged cache/history listing and reviewed revocation preserve maintenance failures PASS
+  | CONFIGURATION PROCESS repository-config-core PASS
+  | REPOSITORY CONFIG protocol explicit scope, complete bounded metadata, legacy separation and owned close PASS
+  | CONFIGURATION PROCESS repository-config-protocol PASS
+  | CONFIGURATION OBSERVATION both architectures, independent repository/policy fields, canonical policy order, unchanged wire bytes and stored offline flag PASS
+  | CONFIGURATION OBSERVATION 1000 legacy/default and growing 64-record cycles retire scratch; full 4096 repository/pin observations preserve source configuration PASS
+  | CONFIGURATION OBSERVATION maintenance FIFOs remain unopened; 1000 schema/missing/alias/FIFO/lock/busy refusal cycles retire scratch and permit restored reads PASS
+  | CONFIGURATION PROCESS configuration-observation PASS
+  | REPOSITORY STATUS both architectures, independent owned fields, repeated close, source replacement, exact protocol bytes and full 4096 repository/history bounds PASS
+  | REPOSITORY STATUS 64-cycle authenticated expired migration, newer floors, signature/equivocation refusals and exact retired-key recovery preserve configuration/cache/history PASS
+  | REPOSITORY STATUS 1000 schema/alias/FIFO configuration/cache/history and missing/unsafe/busy lock refusals retire scratch, preserve recovery data and permit restored retry PASS
+  | CONFIGURATION PROCESS repository-status PASS
+  | INDEX DECODE both architectures, empty/growing owned results, full 4096 packages, retired source buffers and exact canonical declarations PASS
+  | INDEX DECODE both architectures, empty/growing owned results, full 4096 packages, retired source buffers and exact canonical declarations PASS
+  | INDEX DECODE both architectures, empty/growing owned results, full 4096 packages, retired source buffers and exact canonical declarations PASS
+  | INDEX DECODE both architectures, empty/growing owned results, full 4096 packages, retired source buffers and exact canonical declarations PASS
+  | INDEX DECODE both architectures, empty/growing owned results, full 4096 packages, retired source buffers and exact canonical declarations PASS
+  | INDEX DECODE both architectures, empty/growing owned results, full 4096 packages, retired source buffers and exact canonical declarations PASS
+  | INDEX DECODE both architectures, empty/growing owned results, full 4096 packages, retired source buffers and exact canonical declarations PASS
+  | INDEX DECODE both architectures, empty/growing owned results, full 4096 packages, retired source buffers and exact canonical declarations PASS
+  | INDEX DECODE partial/schema/UTF8/number/validation refusals retire scratch; full unsigned sequence and signed expiry ranges PASS
+  logs: /Users/alex/code/vinix/build/pkg-manifest-decode-x86/packages-repository-config
+package-repository-config x86_64: 0 passed, 1 failed, 0 skipped

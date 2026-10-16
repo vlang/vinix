@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import json2
-
 fn index_document_field(parent string, key string) bool {
 	if parent == '' { return key in ['format', 'repository', 'sequence', 'expires', 'packages']! }
 	// Signed packages use the same fields as retained generation manifests.
@@ -106,17 +104,21 @@ fn manifest_required_fields(parent string, keys []string) ! {
 // inventories must retain every declaration emitted by the pack commands.
 fn decode_manifest(text string, inventory bool) !Package {
 	if text.len > max_metadata { return error('publisher manifest exceeds metadata limit') }
-	p := json2.decode[Package](text, strict: true)!
-	mut accepted := false
-	defer { if !accepted { close_decoded_package(p) } }
 	document_keys_schema(text, manifest_document_field,
 		if inventory { manifest_required_fields } else { document_optional_fields }, manifest_value_type)!
+	mut r := &StoredReader{ text: text }
+	defer { unsafe { free(r) } }
+	p := r.package_fields(inventory)!
+	mut accepted := false
+	defer { if !accepted { close_decoded_package(p) } }
+	r.spaces()
+	if r.position != text.len { return error('trailing publisher manifest data') }
 	check_package_permissions(p)!
 	accepted = true
 	return p
 }
 
-// Independently JSON-decoded records only: in-memory plans borrow these fields.
+// Independently decoded records only: in-memory plans borrow these fields.
 fn close_decoded_package(p Package) {
 	unsafe {
 		p.id.free(); p.version.free(); p.architecture.free(); p.name.free()

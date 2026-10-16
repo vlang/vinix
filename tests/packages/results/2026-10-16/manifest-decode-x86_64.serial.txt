@@ -1,0 +1,55 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=25
+!>+ [11] ./sbin/init sz=210976
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/configuration-observation sz=1010664
+!>+ [15] ./usr/share/package-fixtures/manifest-decode sz=976104
+!>+ [16] ./usr/share/package-fixtures/index-schema sz=1592592
+!>+ [17] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e8a000
+initramfs: Done (17 entries)
+HWTEST START packages-manifest-decode
+MANIFEST DECODE both architectures, owned template/inventory fields, independent results, exact canonical bytes and full 16384 payload bounds PASS
+MANIFEST DECODE both architectures, owned template/inventory fields, independent results, exact canonical bytes and full 16384 payload bounds PASS
+MANIFEST DECODE both architectures, owned template/inventory fields, independent results, exact canonical bytes and full 16384 payload bounds PASS
+MANIFEST DECODE both architectures, owned template/inventory fields, independent results, exact canonical bytes and full 16384 payload bounds PASS
+MANIFEST DECODE both architectures, owned template/inventory fields, independent results, exact canonical bytes and full 16384 payload bounds PASS
+MANIFEST DECODE both architectures, owned template/inventory fields, independent results, exact canonical bytes and full 16384 payload bounds PASS
+MANIFEST DECODE both architectures, owned template/inventory fields, independent results, exact canonical bytes and full 16384 payload bounds PASS
+MANIFEST DECODE both architectures, owned template/inventory fields, independent results, exact canonical bytes and full 16384 payload bounds PASS
+MANIFEST DECODE both architectures, owned template/inventory fields, independent results, exact canonical bytes and full 16384 payload bounds PASS
+MANIFEST DECODE both architectures, owned template/inventory fields, independent results, exact canonical bytes and full 16384 payload bounds PASS
+MANIFEST DECODE both architectures, owned template/inventory fields, independent results, exact canonical bytes and full 16384 payload bounds PASS
+MANIFEST DECODE both architectures, owned template/inventory fields, independent results, exact canonical bytes and full 16384 payload bounds PASS
+MANIFEST DECODE omitted package/dependency/payload defaults, full integer ranges and complete-inventory refusals retire scratch PASS
+MANIFEST DECODE every truncated prefix and schema/UTF8/number/permission refusal cycles retire scratch PASS
+MANIFEST DECODE exact 8 MiB and limit-minus-one accepted; metadata/payload/argument/dependency/association/string overflows refused PASS
+MANIFEST DECODE invalid pack input preserves source and absent destination; restored template defaults and captured inventory publish unchanged canonical bytes PASS
+MANIFEST PROCESS manifest-decode PASS
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading data/share/data (30 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+MANIFEST PROCESS index-schema PASS
+CONFIGURATION OBSERVATION both architectures, independent repository/policy fields, canonical policy order, unchanged wire bytes and stored offline flag PASS
+CONFIGURATION OBSERVATION 1000 legacy/default and growing 64-record cycles retire scratch; full 4096 repository/pin observations preserve source configuration PASS
+CONFIGURATION OBSERVATION maintenance FIFOs remain unopened; 1000 schema/missing/alias/FIFO/lock/busy refusal cycles retire scratch and permit restored reads PASS
+MANIFEST PROCESS configuration-observation PASS
+HWTEST PASS packages-manifest-decode

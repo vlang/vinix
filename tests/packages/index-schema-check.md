@@ -13,6 +13,11 @@ generic typed decoding with owned bounded primitives, retains this signed-schema
 contract and qualifies complete/partial decoder lifetimes. The recorded results
 below retain the original scanner-only allocation scope.
 
+The subsequent [publisher manifest reader](manifest-decode-check.md) also bounds
+source-template and packed-inventory decoding, preserves source defaults and
+qualifies owned results and partial failures. Signed declarations and the
+historical measurements below retain their original scope.
+
 The shared key scanner now checks each object's required fields and each known
 field's JSON value kind without decoding the whole document a second time.
 Explicit array checks cover a pinned-compiler strict-decoder gap that accepts

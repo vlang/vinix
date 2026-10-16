@@ -1,0 +1,87 @@
+clang ASan/UBSan; -gc none -manualfree; detect_leaks=0; halt_on_error=1
+MANIFEST DECODE aarch64 template 1 payloads: 1000 cycles retained 0 bytes
+MANIFEST DECODE aarch64 template 64 payloads: 1000 cycles retained 0 bytes
+MANIFEST DECODE aarch64 inventory 1 payloads: 1000 cycles retained 0 bytes
+MANIFEST DECODE aarch64 inventory 64 payloads: 1000 cycles retained 0 bytes
+MANIFEST DECODE x86_64 template 1 payloads: 1000 cycles retained 0 bytes
+MANIFEST DECODE x86_64 template 64 payloads: 1000 cycles retained 0 bytes
+MANIFEST DECODE x86_64 inventory 1 payloads: 1000 cycles retained 0 bytes
+MANIFEST DECODE x86_64 inventory 64 payloads: 1000 cycles retained 0 bytes
+MANIFEST DECODE both architectures, owned template/inventory fields, independent results, exact canonical bytes and full 16384 payload bounds PASS
+MANIFEST DECODE omitted package/dependency/payload defaults, full integer ranges and complete-inventory refusals retire scratch PASS
+MANIFEST DECODE refusal 0 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 1 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 2 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 3 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 4 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 5 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 6 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 7 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 8 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 9 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 10 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 11 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 12 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 13 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 14 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 15 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 16 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 17 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 0 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 1 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 2 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 3 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 4 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 5 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 6 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 7 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 8 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 9 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 10 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 11 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 12 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 13 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 14 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 15 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 16 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 17 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE every truncated prefix and schema/UTF8/number/permission refusal cycles retire scratch PASS
+MANIFEST DECODE exact 8 MiB and limit-minus-one accepted; metadata/payload/argument/dependency/association/string overflows refused PASS
+MANIFEST DECODE invalid pack input preserves source and absent destination; restored template defaults and captured inventory publish unchanged canonical bytes PASS
+
+Signed indexes:
+INDEX DECODE aarch64 0 packages: 1000 cycles retained 0 bytes
+INDEX DECODE aarch64 1 packages: 1000 cycles retained 0 bytes
+INDEX DECODE aarch64 64 packages: 1000 cycles retained 0 bytes
+INDEX DECODE x86_64 0 packages: 1000 cycles retained 0 bytes
+INDEX DECODE x86_64 1 packages: 1000 cycles retained 0 bytes
+INDEX DECODE x86_64 64 packages: 1000 cycles retained 0 bytes
+INDEX DECODE both architectures, empty/growing owned results, full 4096 packages, retired source buffers and exact canonical declarations PASS
+INDEX DECODE refusal 0: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 1: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 2: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 3: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 4: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 5: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 6: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 7: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 8: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 9: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 10: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 11: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 12: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 13: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 14: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 15: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 16: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 17: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 18: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 19: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 20: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 21: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 22: 1000 cycles retained 0 bytes
+INDEX DECODE partial/schema/UTF8/number/validation refusals retire scratch; full unsigned sequence and signed expiry ranges PASS
+INDEX DECODE exact 8 MiB and limit-minus-one accepted; limit-plus-one and 4097 packages refused PASS
+INDEX DECODE signed original/legacy: 64 cycles retained 0 bytes
+INDEX DECODE signed original/legacy: 64 cycles retained 0 bytes
+INDEX DECODE authenticated original/legacy bytes, signature-before-schema refusals and 64-cycle signed retries retire scratch PASS

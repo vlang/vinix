@@ -138,6 +138,10 @@ fn (mut r StoredReader) unsigned(maximum u64) !u64 {
 }
 
 fn (mut r StoredReader) strings(limit int, maximum int) ![]string {
+	return r.strings_with_limit(limit, maximum, 'package metadata array exceeds its entry limit')
+}
+
+fn (mut r StoredReader) strings_with_limit(limit int, maximum int, overflow string) ![]string {
 	r.expect(`[` )!
 	mut values := []string{cap: 16}
 	unsafe { values.flags |= .noslices }
@@ -146,7 +150,7 @@ fn (mut r StoredReader) strings(limit int, maximum int) ![]string {
 	mut first := true
 	for r.next(first, `]`)! {
 		first = false
-		if values.len == maximum { return error('package metadata array exceeds its entry limit') }
+		if values.len == maximum { return error(overflow) }
 		values << r.quoted(limit)!
 	}
 	accepted = true

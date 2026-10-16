@@ -8,7 +8,7 @@ const stored_package_keys = ['id', 'version', 'architecture', 'name', 'descripti
 	'proprietary', 'firmware', 'kind', 'runtime', 'entrypoint', 'arguments', 'permissions',
 	'associations', 'dependencies', 'files', 'sdk', 'window_protocol']
 
-fn (mut r StoredReader) dependency(complete bool) !Dependency {
+fn (mut r StoredReader) dependency(required u32) !Dependency {
 	r.expect(`{`)!
 	mut value := Dependency{}
 	mut accepted := false
@@ -24,12 +24,16 @@ fn (mut r StoredReader) dependency(complete bool) !Dependency {
 			else {}
 		}
 	}
-	if (complete && seen != 7) || (!complete && seen & 1 == 0) { return error('missing required stored dependency field') }
+	if seen & required != required { return error('missing required stored dependency field') }
 	accepted = true
 	return value
 }
 
 fn (mut r StoredReader) dependencies(maximum int, complete bool) ![]Dependency {
+	return r.dependency_list(maximum, if complete { u32(7) } else { u32(1) })
+}
+
+fn (mut r StoredReader) dependency_list(maximum int, required u32) ![]Dependency {
 	r.expect(`[` )!
 	mut values := []Dependency{cap: 16}
 	unsafe { values.flags |= .noslices }
@@ -39,7 +43,7 @@ fn (mut r StoredReader) dependencies(maximum int, complete bool) ![]Dependency {
 	for r.next(first, `]`)! {
 		first = false
 		if values.len == maximum { return error('stored dependency count exceeds its bound') }
-		value := r.dependency(complete)!
+		value := r.dependency(required)!
 		pointer := unsafe { &value }
 		unsafe { values.push_many(pointer, 1) }
 	}
@@ -47,7 +51,7 @@ fn (mut r StoredReader) dependencies(maximum int, complete bool) ![]Dependency {
 	return values
 }
 
-fn (mut r StoredReader) payload() !Payload {
+fn (mut r StoredReader) payload(complete bool) !Payload {
 	r.expect(`{`)!
 	mut value := Payload{}
 	mut accepted := false
@@ -64,12 +68,12 @@ fn (mut r StoredReader) payload() !Payload {
 			else {}
 		}
 	}
-	if seen != 15 { return error('missing required stored payload field') }
+	if complete && seen != 15 { return error('missing required stored payload field') }
 	accepted = true
 	return value
 }
 
-fn (mut r StoredReader) payloads() ![]Payload {
+fn (mut r StoredReader) payloads(complete bool) ![]Payload {
 	r.expect(`[` )!
 	mut values := []Payload{cap: 16}
 	unsafe { values.flags |= .noslices }
@@ -79,7 +83,7 @@ fn (mut r StoredReader) payloads() ![]Payload {
 	for r.next(first, `]`)! {
 		first = false
 		if values.len == max_files { return error('stored payload count exceeds its bound') }
-		value := r.payload()!
+		value := r.payload(complete)!
 		pointer := unsafe { &value }
 		unsafe { values.push_many(pointer, 1) }
 	}
@@ -88,6 +92,10 @@ fn (mut r StoredReader) payloads() ![]Payload {
 }
 
 fn (mut r StoredReader) package() !Package {
+	return r.package_fields(true)
+}
+
+fn (mut r StoredReader) package_fields(complete bool) !Package {
 	r.expect(`{`)!
 	mut p := Package{}
 	mut accepted := false
@@ -110,17 +118,17 @@ fn (mut r StoredReader) package() !Package {
 			10 { p = Package{ ...p, runtime: r.quoted(128)! } }
 			11 { p = Package{ ...p, entrypoint: r.quoted(1024)! } }
 			12 { p = Package{ ...p, arguments: r.strings(4096, 64)! } }
-			13 { p = Package{ ...p, permissions: r.strings(256, 5)! } }
+			13 { p = Package{ ...p, permissions: r.strings_with_limit(256, 5, 'package permissions must be distinct SDK 1 grants: audio, display, files, network, process')! } }
 			14 { p = Package{ ...p, associations: r.strings(128, 128)! } }
-			15 { p = Package{ ...p, dependencies: r.dependencies(128, true)! } }
-			16 { p = Package{ ...p, files: r.payloads()! } }
+			15 { p = Package{ ...p, dependencies: r.dependency_list(128, if complete { u32(7) } else { u32(0) })! } }
+			16 { p = Package{ ...p, files: r.payloads(complete)! } }
 			17 { p = Package{ ...p, sdk: int(r.unsigned(u64(max_i32))!) } }
 			18 { p = Package{ ...p, window_protocol: int(r.unsigned(u64(max_i32))!) } }
 			else {}
 		}
 	}
 	// window_protocol is SDK 1's optional extension, defaulting to zero.
-	if seen & 0x3ffff != 0x3ffff { return error('missing required stored package field') }
+	if complete && seen & 0x3ffff != 0x3ffff { return error('missing required stored package field') }
 	accepted = true
 	return p
 }

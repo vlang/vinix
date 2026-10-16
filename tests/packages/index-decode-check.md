@@ -62,6 +62,11 @@ change. Production publisher enrollment, catalog migration, graphical
 login/display integration and wider foreign-runtime qualification remain open
 for roadmap 14 acceptance.
 
+The subsequent [publisher manifest reader](manifest-decode-check.md) extends the
+shared bounded package primitives to source templates and packed inventories,
+preserving strict signed/state declarations while allowing template defaults.
+This report's results retain their original signed-index scope.
+
 ## Recorded results, 2026-10-16
 
 All **40 focused compile/run checks** passed: twelve core and one protocol pairs, two tracked-allocation pairs, two ASan/UBSan pairs, four signed CLI/driver checks and two guest-tool builds.

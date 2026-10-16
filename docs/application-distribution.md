@@ -52,6 +52,11 @@ for the original measured scope. The subsequent
 the decoder allocation and requires zero retained bytes for authenticated
 repository observations as well as direct index results and refusals.
 
+Publisher source templates and packed inventories also use bounded owned
+manifest decoding. Source omissions retain their defaults; publication inputs
+retain complete declaration requirements and the existing canonical bytes.
+See [publisher manifest checks](../tests/packages/manifest-decode-check.md).
+
 Local payload copies validate ordinary source and destination descriptors before
 writing, refuse the same file even through a hard link, and enforce the captured
 source size. Oversized offline repository objects leave existing partial data

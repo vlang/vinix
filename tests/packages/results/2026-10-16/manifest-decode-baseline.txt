@@ -1,0 +1,11 @@
+The same warmed ten-cycle probe before/after bounded source-template, packed-inventory and truncated-inventory decoding; all returned results/errors retired. No compiler or standard-library changes. Sources, executables and generated C retained and pinned.
+
+Before:
+MANIFEST DECODE probe 0: ten cycles retained 10 bytes
+MANIFEST DECODE probe 1: ten cycles retained 10 bytes
+MANIFEST DECODE probe 2: ten cycles retained 7280 bytes
+
+After:
+MANIFEST DECODE probe 0: ten cycles retained 0 bytes
+MANIFEST DECODE probe 1: ten cycles retained 0 bytes
+MANIFEST DECODE probe 2: ten cycles retained 0 bytes

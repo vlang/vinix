@@ -1343,6 +1343,14 @@ consumer refresh or enrollment leaves cached metadata, replay floors,
 configuration and activation unchanged. See
 [signed metadata qualification](../../tests/packages/index-schema-check.md).
 
+Source templates and packed inventories use the bounded stored-manifest reader.
+Source omissions keep their decoder defaults, including nested dependency and
+payload fields; inventory declarations remain complete. `pack` still substitutes
+the captured source inventory for template `files`. Both paths enforce manifest
+field/count bounds before output creation, keep canonical publication bytes and
+retire partial decoder storage. Full package validation remains in the publisher.
+See [publisher manifest qualification](../../tests/packages/manifest-decode-check.md).
+
 `pkgprotocol.decode_metadata_key` decodes one quoted JSON key into an owned
 string, with 32 UTF-8 bytes and 194 input bytes as limits. It handles Unicode
 escapes and surrogate pairs, rejects invalid UTF-8/escapes and trailing data, and

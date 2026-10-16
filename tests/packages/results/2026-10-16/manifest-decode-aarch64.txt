@@ -1,0 +1,2 @@
+PASS aarch64 packages-manifest-decode (115.4s)
+package-manifest-decode aarch64: 1 passed, 0 failed, 0 skipped
