@@ -1101,8 +1101,9 @@ fn readlink_node(node &VFSNode, buf voidptr, limit u64) (u64, u64) {
 	if stat.islnk(node.resource.stat.mode) == false {
 		return errno.err, errno.einval
 	}
-	if !procfs_may_follow(node) {
-		return errno.err, errno.eacces
+	follow_error := procfs_follow_error(node)
+	if follow_error != 0 {
+		return errno.err, follow_error
 	}
 
 	if procfs_is_dynamic_link(node) {

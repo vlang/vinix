@@ -116,6 +116,8 @@ pub mut:
 	event    eventstruct.Event
 	status   int
 	can_mmap bool
+	// The node and every description share one box, released with the backend.
+	box &resource.Resource = unsafe { nil }
 
 	kind ProcFSKind
 	// The process and thread this node describes, or zero for the machine-wide
@@ -284,7 +286,7 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	if view != unsafe { nil } {
 		root_resource.stat.ino = 1
 	}
-	root.resource = root_resource
+	root.resource = root_resource.box
 
 	// The machine-wide files never come and go, so they are made once.
 	// Machine counters are cumulative; userspace chooses its sampling interval.
@@ -348,7 +350,7 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	mut self_node := create_node(this, root, 'self', false)
 	mut self_resource := new_procfs_resource(.self_link, stat.iflnk | 0o777, 0, 0)
 	self_resource.view = view
-	self_node.resource = self_resource
+	self_node.resource = self_resource.box
 	self_node.symlink_target = 'self'
 	unsafe {
 		root.children['self'] = self_node
@@ -358,7 +360,7 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	mut thread_self_resource := new_procfs_resource(.thread_self_link, stat.iflnk | 0o777,
 		0, 0)
 	thread_self_resource.view = view
-	thread_self.resource = thread_self_resource
+	thread_self.resource = thread_self_resource.box
 	thread_self.symlink_target = 'thread-self'
 	unsafe {
 		root.children['thread-self'] = thread_self
@@ -413,7 +415,7 @@ fn new_procfs_resource(kind ProcFSKind, mode u32, pid int, tid int) &ProcFSResou
 		pid:      pid
 		tid:      tid
 		refcount: 1
-	}
+	} @[freed]
 	new_resource.stat.size = 0
 	new_resource.stat.blocks = 0
 	new_resource.stat.blksize = 512
@@ -427,12 +429,13 @@ fn new_procfs_resource(kind ProcFSKind, mode u32, pid int, tid int) &ProcFSResou
 	new_resource.stat.atim = realtime_clock
 	new_resource.stat.ctim = realtime_clock
 	new_resource.stat.mtim = realtime_clock
+	new_resource.box = new_resource @[freed]
 	return new_resource
 }
 
 fn add_procfs_directory(mut parent VFSNode, name string) &VFSNode {
 	mut node := create_node(parent.filesystem, parent, name, true)
-	node.resource = new_procfs_resource(.directory, stat.ifdir | 0o555, 0, 0)
+	node.resource = new_procfs_resource(.directory, stat.ifdir | 0o555, 0, 0).box
 	node.create_dotentries(parent)
 	unsafe {
 		parent.children[name] = node
@@ -450,7 +453,7 @@ fn add_procfs_sysctl(mut parent VFSNode, name string, default string) &VFSNode {
 	mut res := new_procfs_resource(.sysctl, stat.ifreg | 0o644, 0, 0)
 	res.text = default
 	res.stat.size = u64(default.len)
-	node.resource = res
+	node.resource = res.box
 	unsafe {
 		parent.children[name] = node
 	}
@@ -503,7 +506,7 @@ fn build_net_sysctls(mut sys_net VFSNode) {
 
 fn add_procfs_file(mut parent VFSNode, name string, kind ProcFSKind) &VFSNode {
 	mut node := create_node(parent.filesystem, parent, name, false)
-	node.resource = new_procfs_resource(kind, stat.ifreg | 0o444, 0, 0)
+	node.resource = new_procfs_resource(kind, stat.ifreg | 0o444, 0, 0).box
 	unsafe {
 		parent.children[name] = node
 	}
@@ -514,7 +517,7 @@ fn add_procfs_file(mut parent VFSNode, name string, kind ProcFSKind) &VFSNode {
 // are writable by definition; oom_score_adj is 0644 as on Linux.
 fn add_process_writable(mut parent VFSNode, name string, kind ProcFSKind, pid int) {
 	mut node := create_node(parent.filesystem, parent, name, false)
-	node.resource = new_procfs_resource(kind, stat.ifreg | 0o644, pid, 0)
+	node.resource = new_procfs_resource(kind, stat.ifreg | 0o644, pid, 0).box
 	unsafe {
 		parent.children[name] = node
 	}
@@ -1181,7 +1184,16 @@ fn (mut this ProcFSResource) unref(_handle voidptr) ? {
 		}
 		this.l.release()
 	}
-	katomic.dec(mut &this.refcount)
+	if !katomic.dec(mut &this.refcount) {
+		unsafe {
+			this.text.free()
+			this.snapshots.free()
+		}
+		// Lockless metadata readers may still hold the node's resource. Its
+		// namespace reference is released by the node reaper, after its owners.
+		free_after_grace(this.box)
+		free_after_grace(this)
+	}
 }
 
 fn (mut this ProcFSResource) link(_handle voidptr) ? {
@@ -1515,6 +1527,7 @@ fn procfs_refresh_named_locked(node &VFSNode, name string) {
 		return
 	}
 	mut directory := unsafe { &ProcFSResource(target.resource) }
+	if target.removed { return }
 
 	if directory.lazy && !directory.populated {
 		if name.len > 0 {
@@ -1551,7 +1564,7 @@ fn procfs_refresh_named_locked(node &VFSNode, name string) {
 // is validated on its own: a bulk thread-list snapshot can temporarily omit
 // live siblings while the list lock is busy.
 fn procfs_lookup_refresh_locked(node &VFSNode, name string) {
-	if unsafe { procfs_root == 0 } || node == unsafe { nil } || node.resource == unsafe { nil }
+	if unsafe { procfs_root == 0 } || node == unsafe { nil } || node.removed || node.resource == unsafe { nil }
 		|| node.children == unsafe { nil } || !is_procfs_resource(node.resource) {
 		return
 	}
@@ -1616,9 +1629,9 @@ fn procfs_lookup_refresh_locked(node &VFSNode, name string) {
 
 // Refresh and copy a directory's child under the same lock. Never pass a map
 // value-storage pointer to the path walker: another procfs lookup can grow or
-// compact that map as soon as this lock is released. Procfs pruning unlinks
-// its nodes without freeing them, so the copied node remains safe to reduce
-// after unlocking, including when reduction recursively follows a symlink.
+// compact that map as soon as this lock is released. Pruned nodes receive the
+// removed-node grace period, so the copied node remains safe to reduce after
+// unlocking, including when reduction recursively follows a symlink.
 fn lookup_child(node &VFSNode, name string) &VFSNode {
 	// /sys loses entries too, under a lock of its own.
 	if is_sysfs_resource(node.resource) {
@@ -1733,7 +1746,7 @@ fn add_process_directory(mut root VFSNode, pid int, name string, view voidptr) {
 	mut directory := new_procfs_resource(.directory, stat.ifdir | 0o555, pid, 0)
 	directory.lazy = true
 	directory.view = view
-	node.resource = directory
+	node.resource = directory.box
 	node.create_dotentries(root)
 	unsafe {
 		root.children[name] = node
@@ -1848,7 +1861,7 @@ fn add_process_entry(mut node VFSNode, pid int, name string, is_process bool) bo
 
 fn add_process_link(mut node VFSNode, name string, pid int) &VFSNode {
 	mut link := create_node(node.filesystem, node, name, false)
-	link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
+	link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0).box
 	unsafe {
 		node.children[name] = link
 	}
@@ -1964,7 +1977,7 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 		// stats these names through the directory, and which runc relies on
 		// when it re-executes itself from a memfd.
 		mut link := create_node(descriptors.filesystem, descriptors, name, false)
-		link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o700, pid, 0)
+		link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o700, pid, 0).box
 		link.magic_target = target
 		link.symlink_target = text
 		unsafe {
@@ -1999,11 +2012,22 @@ pub:
 // Recheck on every follow/readlink so an already-listed node cannot bypass
 // a later PR_SET_DUMPABLE or credential change.
 fn procfs_may_follow(node &VFSNode) bool {
+	return procfs_follow_error(node) == 0
+}
+
+// A task disappearing after lookup is distinct from a live task whose
+// credentials deny inspection. Decide both under the same process-table lock.
+fn procfs_follow_error(node &VFSNode) u64 {
 	if node.resource == unsafe { nil } || !is_procfs_resource(node.resource) {
-		return true
+		return 0
 	}
 	link := unsafe { &ProcFSResource(node.resource) }
-	return link.kind != .symlink || link.pid == 0 || proc.may_inspect(link.pid)
+	if link.kind != .symlink || link.pid == 0 { return 0 }
+	proc.lock_table()
+	defer { proc.unlock_table() }
+	target := proc.process_at(link.pid)
+	if target == unsafe { nil } { return errno.enoent }
+	return if proc.may_inspect_locked(target) { u64(0) } else { errno.eacces }
 }
 
 pub fn procfs_anonymous_descriptor(node &VFSNode) ?AnonymousDescriptor {
@@ -2052,7 +2076,7 @@ fn add_process_file(mut parent VFSNode, name string, kind ProcFSKind, pid int) {
 	mut pfile := new_procfs_resource(kind, stat.ifreg | 0o444, pid,
 		unsafe { &ProcFSResource(parent.resource) }.tid)
 	pfile.view = unsafe { &ProcFSResource(parent.resource) }.view
-	node.resource = pfile
+	node.resource = pfile.box
 	unsafe {
 		parent.children[name] = node
 	}
@@ -2084,7 +2108,7 @@ fn refresh_thread_directories(mut task VFSNode, pid int) {
 		mut directory := new_procfs_resource(.directory, stat.ifdir | 0o555, pid, tid)
 		directory.lazy = true
 		directory.view = view
-		node.resource = directory
+		node.resource = directory.box
 		node.create_dotentries(task)
 		unsafe {
 			task.children[name] = node
@@ -2094,9 +2118,8 @@ fn refresh_thread_directories(mut task VFSNode, pid int) {
 	prune_directories(mut task, numbers)
 }
 
-// Drop the directories whose process or thread has gone. Nodes and resources
-// remain retained, even at zero refcount: path walkers, cwd/root users and
-// descriptors may still hold this subtree. Pruning changes namespace reachability.
+// Drop the directories whose process or thread has gone. The removed-node
+// reaper keeps path walkers, cwd/root users and descriptors alive through grace.
 //
 // The nodes are gone through by value and known by their own names, which in
 // procfs are their keys: a loop over the keys copies every one, and nothing
@@ -2143,10 +2166,23 @@ fn prune_directories(mut parent VFSNode, live []int) {
 	}
 }
 
-// Called with procfs_lock held. Keep the existing retained-node lifetime:
-// path walkers, descriptors and cwd/root users can still hold this subtree.
+// Called with procfs_lock held. Retire children before their parent, leaving
+// owned dot redirects for free_node(). Each orphan pins its old parent, so a
+// retained descendant also protects every '..' along the detached subtree.
 fn drop_procfs_directory(mut parent VFSNode, child &VFSNode) {
 	mut node := unsafe { child }
+	if node.removed { return }
+	node.removed = true
+	if node.children != unsafe { nil } {
+		mut children := []&VFSNode{cap: node.children.len} @[freed]
+		for _, entry in node.children {
+			if entry != unsafe { nil } && entry.name != '.' && entry.name != '..' {
+				children << entry
+			}
+		}
+		for entry in children { drop_procfs_directory(mut node, entry) }
+		unsafe { children.free() }
+	}
 	// A pruned link may still be held by a lookup, and must not lead to a
 	// node that goes when its descriptor does.
 	node.magic_target = unsafe { nil }
@@ -2157,6 +2193,9 @@ fn drop_procfs_directory(mut parent VFSNode, child &VFSNode) {
 	mut node_resource := node.resource
 	if node_resource != unsafe { nil } {
 		node_resource.stat.nlink = 0
-		node_resource.unref(unsafe { nil }) or {}
+		// Keep the namespace resource reference until the node itself is
+		// reaped, including for proc files and links held through O_PATH.
+		node.directory_resource = true
+		orphan_node(mut node, node_resource.stat.mode)
 	}
 }

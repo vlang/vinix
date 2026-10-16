@@ -702,7 +702,9 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/file/file.v` | `28652a59a4a68e0fe0471e4d25104ca8eb6244083032c6f7e8c12b0a2230ad85` |
 | `kernel/fs/mount.v` | `9dee3e7ec56633049daef688d2f1852f93f8c7db731e0e7a949f0c45377beb0d` |
 | `kernel/fs/mount_policy.v` | `053bcf1f4dcab563c5643f3236d9b3f6de1844e1cea7f86347be9b8f01fa6c61` |
-| `kernel/fs/procfs.v` | `b924f6eee11e596e4abdeaf1816421ed0c2964956f9a75b1c34a3d60fe6ccb86` |
+| `kernel/fs/namespaces.v` | `4834923fb76fd965144382dfd08f4f3178ea105dea7677ec30cb72de60d1e302` |
+| `kernel/fs/procfs.v` | `e7269b6a3af4967c05817ef289d6034206aaf6e3dd3da4ea1ed14a1f673478b6` |
+| `kernel/fs/removed.v` | `bcfe397ddd09aa40f8c49f27e9f9fac33da22cbeb6e68d309c3c4cc7d1d65661` |
 | `kernel/fs/tmpfs.v` | `99a10d885597ccb745530e639685f282703332667066a28dd79f18195ec3e010` |
 | `kernel/fs/vfs.v` | `6a4f1e7b7c47ce65d5a3b8e8ca88cd81b4c52e2992b2924c1db4ec2711204361` |
 | `kernel/futex/futex.v` | `171c2e30ac47d2b0d682e00e7aca04a8a1ddd7d3c65e27fae4a2e7d7dd9e015d` |
@@ -761,6 +763,6 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/userland/userland.v` | `5f469554fcdcb8372091dab30fdd2829a7996da2c66bf2c6d7ec2190490faa7a` |
 | `kernel/userland/userland_arm64.v` | `f86f19d0f1fed3fc5d1c1350559ded02812cd78846a5c61cf76c68d9868d8544` |
 | `kernel/vmstorage/storage.v` | `df6ee1fc37aa7858401f19576d8f450278987acfc3f083f956e8e750174cea7d` |
-| `tools/linux-compat/coverage.v` | `604028cd0f7462f86f94269e08cdfe5e63b7efe4cca099611c6cdb57e99364c4` |
+| `tools/linux-compat/coverage.v` | `cf72da0beb99c8b78ca2554564ef38bf2293bd1785cb78b5603065a11ab46242` |
 | `tools/linux-compat/reference/aarch64-syscall.h` | `7b20fe57bf92c6b3cf800d4f83998419e92e19a88ead2d57c89c5725e0cfb816` |
 | `tools/linux-compat/reference/x86_64-syscall.h` | `c29e9cb15ff393eda50c320a6d96bb1132191251f8e079148a0646165bb8cabd` |

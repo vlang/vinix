@@ -188,7 +188,7 @@ fn refresh_ns_directory(mut dir VFSNode, pid int) {
 			continue
 		}
 		mut link := create_node(dir.filesystem, dir, name, false)
-		link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
+		link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0).box
 		link.symlink_target = namespace_link_text(ns)
 		link.magic_target = target
 		unsafe {
