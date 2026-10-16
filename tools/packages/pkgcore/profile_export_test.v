@@ -226,7 +226,7 @@ fn profile_export_fixture(kind string) !string {
 
 fn profile_export_run(kind string, work string, target string, options CatalogOptions) ! {
 	match kind {
-		'native' { native_catalog_with('1.0.0', work + '/roots', target, options)! }
+		'native' { mut info := native_catalog_with('1.0.0', work + '/roots', target, options)!; info.close() }
 		'sqlite' { sqlite_catalog_with('3.53.4', '1.0.0', work + '/roots', target, options)! }
 		'ffmpeg' { ffmpeg_catalog_with('1.0.0', work + '/roots', target, options)! }
 		'wine' { wine_catalog_with(work + '/recipes', work + '/roots', target, options)! }

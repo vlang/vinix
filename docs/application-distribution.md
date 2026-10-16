@@ -381,6 +381,11 @@ private tree for inspection. Only the reviewed canonical lock is published
 through the held directories; later flush or inventory cleanup failure retains
 the saved lock and reports publication. See
 [publisher profile export checks](../tests/packages/profile-export-check.md).
+The native SDK profile also owns its templates, partial inventories and
+canonicalization metadata. Its public reply survives caller argument retirement
+and provides an idempotent close operation; the CLI releases that reply after
+encoding. [Native profile ownership checks](../tests/packages/native-profile-ownership-check.md)
+measure that metadata boundary separately from remaining import/filesystem scratch.
 The workspace builder also owns its metadata/disk-budget plan and returns an
 independently closeable `CatalogInfo`. It finishes metadata admission and budgeting
 before touching prepared roots or destination parents, retaining the existing

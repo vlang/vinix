@@ -659,6 +659,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     protects native SDK, SQLite, FFmpeg, Wine and Apple inventories and locks.
     Root/child/parent replacements retain recovery data; exclusive publication
     keeps canonical output after directory flush or private cleanup failure.
+  - [x] [Owned native profile metadata](tests/packages/native-profile-ownership-check.md)
+    retires templates, partial packed inventories and canonicalization scratch,
+    returns an independently closeable reply and preserves canonical locks.
+    Complete import/packing/filesystem allocation freedom remains open.
   - [x] [Explicit catalog host selection](tests/packages/composition-target-check.md)
     combines complete single-host and dual-host profiles for a declared target,
     preserving shared packages, pinned declarations and full-input provenance.

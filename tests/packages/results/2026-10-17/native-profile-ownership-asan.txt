@@ -1,0 +1,3 @@
+NATIVE OWNERSHIP complete build preserves baseline canonical bytes and retires reply without removing published lock PASS
+NATIVE OWNERSHIP templates, partial inventories, canonicalization and late refusals retire all owned metadata PASS
+NATIVE OWNERSHIP independent replies survive caller retirement and close idempotently PASS

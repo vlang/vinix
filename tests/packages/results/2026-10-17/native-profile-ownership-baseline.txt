@@ -1,0 +1,2 @@
+NATIVE OWNERSHIP baseline whole-build retained=461873 allocations=1827
+NATIVE OWNERSHIP baseline canonical=249d6bfb150918c4586f86d68da6b6394800d150f7385c3654fadb7ab19a3fce

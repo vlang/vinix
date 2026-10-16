@@ -1,0 +1,79 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./Users/ sz=0
+!>+ [8] ./root/ sz=0
+!>+ [9] ./dev/ sz=0
+!>+ [10] ./tmp/ sz=0
+!>+ [11] ./Users/alex/ sz=0
+!>+ [12] ./Users/alex/code/ sz=0
+!>+ [13] ./Users/alex/code/vinix/ sz=0
+!>+ [14] ./Users/alex/code/vinix/examples/ sz=0
+!>+ [15] ./Users/alex/code/vinix/examples/package-hello/ sz=0
+!>+ [16] ./Users/alex/code/vinix/examples/package-counter/ sz=0
+!>+ [17] ./Users/alex/code/vinix/examples/package-memo/ sz=0
+!>+ [18] ./Users/alex/code/vinix/examples/package-memo/manifest-x86_64.json sz=287
+!>+ [19] ./Users/alex/code/vinix/examples/package-memo/manifest-aarch64.json sz=288
+!>+ [20] ./Users/alex/code/vinix/examples/package-counter/manifest-x86_64.json sz=293
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>initramfs: no ustar sig at 0xff000000370f5000
+initramfs: Done (31 entries)
+HWTEST START packages-native-ownership
+NATIVE OWNERSHIP whole-build retained=243235 allocations=725
+NATIVE OWNERSHIP complete build preserves baseline canonical bytes and retires reply without removing published lock PASS
+NATIVE OWNERSHIP imports=0 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=1 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=2 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=3 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=4 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=5 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=6 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=6 fault=duplicate retained=0 allocations=0
+NATIVE OWNERSHIP imports=0 fault=empty retained=0 allocations=0
+NATIVE OWNERSHIP templates, partial inventories, canonicalization and late refusals retire all owned metadata PASS
+NATIVE OWNERSHIP independent replies survive caller retirement and close idempotently PASS
+NATIVE OWNERSHIP PROCESS native-ownership PASS
+Updating trusted repository native
+Installing Native counter 1.0.0 (1/3) from native
+Downloading org.vinix.counter/bin/counter (512 bytes)
+Downloading org.vinix.counter/licenses/application-sdk-MIT.txt (23 bytes)
+Downloading org.vinix.counter/licenses/musl-MIT.txt (12 bytes)
+Downloading org.vinix.counter/licenses/v-MIT.txt (9 bytes)
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 1
+Activated package generation 2
+Installing Native counter 1.0.0 (1/3) from native
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository native
+Installing Native counter 1.0.0 (1/3) from native
+Downloading org.vinix.counter/bin/counter (512 bytes)
+Downloading org.vinix.counter/licenses/application-sdk-MIT.txt (23 bytes)
+Downloading org.vinix.counter/licenses/musl-MIT.txt (12 bytes)
+Downloading org.vinix.counter/licenses/v-MIT.txt (9 bytes)
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 1
+Activated package generation 2
+Installing Native counter 1.0.0 (1/3) from native
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+NATIVE OWNERSHIP PROCESS native-profile PASS
+PROFILE EXPORT baseline native refused=true replacement-preserved=true
+PROFILE EXPORT native cohort 0 16 substitutions recovery source pins exact retry 32 descriptors PASS
+PROFILE EXPORT selected profiles retain canonical saved locks after flush, moved-parent and replaced-inventory cleanup failures PASS
+PROFILE EXPORT native cohort 1 16 substitutions recovery source pins exact retry 32 descriptors PASS
+PROFILE EXPORT native cohort 2 16 substitutions recovery source pins exact retry 32 descriptors PASS
+PROFILE EXPORT native cohort 3 16 substitutions recovery source pins exact retry 32 descriptors PASS
+NATIVE OWNERSHIP PROCESS profile-export PASS
+HWTEST PASS packages-native-ownership

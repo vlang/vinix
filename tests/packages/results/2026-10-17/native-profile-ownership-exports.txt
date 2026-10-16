@@ -1,0 +1,3 @@
+PROFILE EXPORT baseline native refused=true replacement-preserved=true
+PROFILE EXPORT native 64 root/inventory/lock/parent substitutions preserve recovery, source pins and exact retry under 32 descriptors PASS
+PROFILE EXPORT selected profiles retain canonical saved locks after flush, moved-parent and replaced-inventory cleanup failures PASS

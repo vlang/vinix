@@ -1157,6 +1157,15 @@ license/runtime declarations, host coverage and canonical pins still apply. See
 for the existing Hello, Counter and Memo applications. `VERSION` is a canonical
 three-component package version applied to all three apps in this fixed profile.
 
+V callers of `pkgcore.native_catalog` own the returned `NativeProfileInfo` and
+should call `info.close()` after use. Its version, paths, digest and architecture
+names survive retirement of the caller's arguments. Close is idempotent and
+does not delete the published lock. The CLI releases its reply after encoding.
+One internal owner retires fixed templates, partial packed inventories and
+canonicalization metadata on success and refusal. See
+[native profile ownership qualification](../../tests/packages/native-profile-ownership-check.md)
+for the measured metadata boundary and remaining complete-build scratch.
+
 Each of `PREPARED_ROOTS/aarch64` and `PREPARED_ROOTS/x86_64` must contain:
 
 ```text

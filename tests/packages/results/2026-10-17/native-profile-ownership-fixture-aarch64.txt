@@ -1,0 +1,44 @@
+FAIL aarch64 packages-native-ownership (11.4s)
+  forbidden "V panic:" in the line: V panic: metadata must be a bounded regular file: /Users/alex/code/vinix/examples/package-counter/manifest-aarch64.json
+  last 40 serial lines:
+  | xhci: no USB controller
+  | virtio-gpu: no GPU transport found
+  | kmain_thread: pointer done
+  | kmain_thread: processes done
+  | kmain_thread: pty done
+  | apple-spi-kbd: no device tree; not probing
+  | kmain_thread: console done
+  | devcore: 3 VirtIO devices listed
+  | kmain_thread: writeback done
+  | 
+  | *** aarch64: Kernel initialisation complete ***
+  | *** Starting /sbin/init ***
+  | syspower: power button through the event device at 0x9080000
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | HWTEST START packages-native-ownership
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | NATIVE OWNERSHIP whole-build retained=242970 allocations=725
+  | NATIVE OWNERSHIP complete build preserves baseline canonical bytes and retires reply without removing published lock PASS
+  | NATIVE OWNERSHIP imports=0 fault=none retained=0 allocations=0
+  | NATIVE OWNERSHIP imports=1 fault=none retained=0 allocations=0
+  | NATIVE OWNERSHIP imports=2 fault=none retained=0 allocations=0
+  | NATIVE OWNERSHIP imports=3 fault=none retained=0 allocations=0
+  | NATIVE OWNERSHIP imports=4 fault=none retained=0 allocations=0
+  | NATIVE OWNERSHIP imports=5 fault=none retained=0 allocations=0
+  | NATIVE OWNERSHIP imports=6 fault=none retained=0 allocations=0
+  | NATIVE OWNERSHIP imports=6 fault=duplicate retained=0 allocations=0
+  | NATIVE OWNERSHIP imports=0 fault=empty retained=0 allocations=0
+  | NATIVE OWNERSHIP templates, partial inventories, canonicalization and late refusals retire all owned metadata PASS
+  | NATIVE OWNERSHIP independent replies survive caller retirement and close idempotently PASS
+  | NATIVE OWNERSHIP PROCESS native-ownership PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | V panic: metadata must be a bounded regular file: /Users/alex/code/vinix/examples/package-counter/manifest-aarch64.json
+  |  v hash: 826e96f
+  |     pid: 0x6fc8
+  |     tid: 0x6fc8
+  | native-profile failed (1)
+  | HWTEST FAIL packages-native-ownership
+  | syspower: power off: stopping devices
+  logs: /Users/alex/code/vinix/build/no-arm-1/packages-native-ownership

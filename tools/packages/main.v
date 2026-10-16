@@ -162,7 +162,8 @@ fn checked(arguments []string) !int {
 		}
 		'native-catalog' {
 			if names.len != 3 { return error('native-catalog requires version, prepared roots and a new lock directory') }
-			println(json2.encode(pkgcore.native_catalog(names[0], names[1], names[2])!))
+			mut info := pkgcore.native_catalog(names[0], names[1], names[2])!
+			publisher_reply(mut info)
 			return 0
 		}
 		'sqlite-catalog' {

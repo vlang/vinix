@@ -1,0 +1,44 @@
+FAIL x86_64 packages-native-ownership (10.2s)
+  forbidden "V panic:" in the line: V panic: metadata must be a bounded regular file: /Users/alex/code/vinix/examples/package-counter/manifest-aarch64.json
+  last 40 serial lines:
+  | >+ [1] ./ sz=0
+  | >+ [2] ./proc/ sz=0
+  | !>+ [3] ./usr/ sz=0
+  | !>+ [4] ./sbin/ sz=0
+  | !>+ [5] ./etc/ sz=0
+  | !>+ [6] ./sys/ sz=0
+  | !>+ [7] ./root/ sz=0
+  | !>+ [8] ./dev/ sz=0
+  | !>+ [9] ./tmp/ sz=0
+  | !>+ [10] ./etc/hwtest-scenario sz=26
+  | !>+ [11] ./sbin/init sz=210912
+  | !>+ [12] ./usr/share/ sz=0
+  | !>+ [13] ./usr/share/package-fixtures/ sz=0
+  | !>+ [14] ./usr/share/package-fixtures/profile-export sz=1325584
+  | !>+ [15] ./usr/share/package-fixtures/native-ownership sz=1077640
+  | !>+ [16] ./usr/share/package-fixtures/native-profile sz=1702128
+  | !>+ [17] ./.vinix-image-id sz=17
+  | !>initramfs: no ustar sig at 0xff000000370f5600
+  | initramfs: Done (17 entries)
+  | HWTEST START packages-native-ownership
+  | NATIVE OWNERSHIP whole-build retained=243235 allocations=725
+  | NATIVE OWNERSHIP complete build preserves baseline canonical bytes and retires reply without removing published lock PASS
+  | NATIVE OWNERSHIP imports=0 fault=none retained=0 allocations=0
+  | NATIVE OWNERSHIP imports=1 fault=none retained=0 allocations=0
+  | NATIVE OWNERSHIP imports=2 fault=none retained=0 allocations=0
+  | NATIVE OWNERSHIP imports=3 fault=none retained=0 allocations=0
+  | NATIVE OWNERSHIP imports=4 fault=none retained=0 allocations=0
+  | NATIVE OWNERSHIP imports=5 fault=none retained=0 allocations=0
+  | NATIVE OWNERSHIP imports=6 fault=none retained=0 allocations=0
+  | NATIVE OWNERSHIP imports=6 fault=duplicate retained=0 allocations=0
+  | NATIVE OWNERSHIP imports=0 fault=empty retained=0 allocations=0
+  | NATIVE OWNERSHIP templates, partial inventories, canonicalization and late refusals retire all owned metadata PASS
+  | NATIVE OWNERSHIP independent replies survive caller retirement and close idempotently PASS
+  | NATIVE OWNERSHIP PROCESS native-ownership PASS
+  | V panic: metadata must be a bounded regular file: /Users/alex/code/vinix/examples/package-counter/manifest-aarch64.json
+  |  v hash: 826e96f
+  |     pid: 0x21ff
+  |     tid: 0x21ff
+  | native-profile failed (1)
+  | HWTEST FAIL packages-native-ownership
+  logs: /Users/alex/code/vinix/build/no-x86-1/packages-native-ownership
