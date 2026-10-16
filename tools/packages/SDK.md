@@ -1431,6 +1431,17 @@ validation and explicit `close()` methods for consumers with manual memory
 management. Status has at most 4096 repository/history records and encoded
 responses are bounded to 8 MiB. Unknown formats and incomplete intents fail closed.
 
+V callers of `pkgcore.repository_configuration(root)` receive independently
+owned architecture/repository fields. Call `RepositoryConfiguration.close()`
+after use; repeated close of the same owner is harmless. The reader transfers
+only the public projection and retires unused policy/launch-account storage and
+its directory path. `Service.policy()` similarly retires source configuration
+and paths while returning the existing owned canonical `PolicyDocument`; keep
+calling its `.close()`. Neither reader opens catalog/history or creates fresh
+state, and both retain reader locking and their existing wire formats. Policy
+reads report stored settings independently of the service's offline overlay.
+See [configuration observation qualification](../../tests/packages/configuration-observation-check.md).
+
 History is keyed by ID/key, independent of mirror URL, and records exact signed
 index bytes. Reject lower sequences and changed bytes at an existing sequence;
 increase sequence for expiry renewals too. Revocation and empty refreshes retain

@@ -1,0 +1,26 @@
+The initial expanded fixture incorrectly compared canonical policy output to the unsorted constructor default. Production output preserved its existing sorted order. The retained initial-expanded-test.v and raw failure below show that expectation error; the final fixture compares against canonical_policy(Policy{}) computed before tracking. All final host, allocation, sanitizer and guest runs use the corrected source.
+
+CONFIGURATION OBSERVATION 1000 repository reads/retirements retained 0 bytes; 1000 policy reads/retirements retained 0 bytes
+CONFIGURATION OBSERVATION both architectures, independent repository/policy fields, canonical policy order, unchanged wire bytes and stored offline flag PASS
+tools/packages/pkgcore/configuration_observation_test.v:97: fn test_configuration_observations_bound_growth_and_retire_legacy_defaults
+   > assert policy.policy == Policy{}
+     Left value (len: 197): `Policy{
+    offline: false
+    allowed: []
+    pins: []
+    permissions: ['audio', 'display', 'files', 'network', 'process']
+    licenses: []
+    allow_firmware: false
+    reserve_bytes: 67108864
+}`
+    Right value (len: 197): `Policy{
+    offline: false
+    allowed: []
+    pins: []
+    permissions: ['network', 'files', 'process', 'display', 'audio']
+    licenses: []
+    allow_firmware: false
+    reserve_bytes: 67108864
+}`
+
+CONFIGURATION OBSERVATION maintenance FIFOs remain unopened; 1000 schema/missing/alias/FIFO/lock/busy refusal cycles retire scratch and permit restored reads PASS

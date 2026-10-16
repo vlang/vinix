@@ -180,16 +180,22 @@ fn policy_review_locked(root string, path string) !PolicyReview {
 	return review
 }
 
+fn read_current_policy(root string) !PolicyDocument {
+	config := load_config(root)!
+	defer { close_decoded_configuration(config) }
+	policy := canonical_policy(config.policy)!
+	return PolicyDocument{ architecture: config.architecture.clone(), policy: policy }
+}
+
 pub fn (service Service) policy() !PolicyDocument {
 	directory := service.directory()!
+	defer { unsafe { directory.free() } }
 	if state_requires_lock(directory) {
 		guard := acquire_reader(directory)!
 		defer { guard.release() }
-		config := load_config(service.root)!
-		return PolicyDocument{ architecture: config.architecture.clone(), policy: canonical_policy(config.policy)! }
+		return read_current_policy(service.root)
 	}
-	config := load_config(service.root)!
-	return PolicyDocument{ architecture: config.architecture.clone(), policy: canonical_policy(config.policy)! }
+	return read_current_policy(service.root)
 }
 
 pub fn (service Service) review_policy(path string) !PolicyReview {

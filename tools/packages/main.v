@@ -213,7 +213,9 @@ fn checked(arguments []string) !int {
 		}
 		'policy' {
 			if names.len != 0 { return error('policy takes no arguments') }
-			println(json2.encode(service.policy()!))
+			mut document := service.policy()!
+			defer { document.close() }
+			println(json2.encode(document))
 		}
 		'policy-review' {
 			if names.len != 1 { return error('policy-review requires an organization policy document') }
@@ -246,7 +248,8 @@ fn checked(arguments []string) !int {
 		}
 		'repo-config' {
 			if names.len != 0 { return error('repo-config takes no arguments') }
-			configuration := pkgcore.repository_configuration(root)!
+			mut configuration := pkgcore.repository_configuration(root)!
+			defer { configuration.close() }
 			if as_json {
 				println(json2.encode(configuration))
 			} else {

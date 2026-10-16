@@ -1,0 +1,5 @@
+Pre-change public configuration observation regression: ten repository reads retain 25,570 bytes; ten policy reads retain 38,500 bytes, after caller retirement of returned fields. Input source, production source, executable and generated C are retained and pinned.
+
+CONFIGURATION OBSERVATION ten repository reads/retirements retained 25570 bytes; ten policy reads/retirements retained 38500 bytes
+tools/packages/pkgcore/configuration_observation_test.v:43: fn test_configuration_observations_retire_results_and_reader_scratch
+    assert repository_bytes == 0 && policy_bytes == 0

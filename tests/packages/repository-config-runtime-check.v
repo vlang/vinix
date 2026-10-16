@@ -28,12 +28,17 @@ fn suite() hwhost.Suite {
 		module_paths: ['.', 'tools/accounts'], directories: ['tmp:1777'], programs: [
 			hwhost.Program{ source: 'tools/packages/pkgcore/repository_configuration_test.v', path: 'usr/share/package-fixtures/repository-config-core' },
 			hwhost.Program{ source: 'tools/packages/pkgprotocol/repository_configuration_test.v', path: 'usr/share/package-fixtures/repository-config-protocol' },
+			hwhost.Program{ source: 'tools/packages/pkgcore/configuration_observation_test.v', path: 'usr/share/package-fixtures/configuration-observation' },
 		], scenarios: [hwhost.Scenario{ name: 'packages-repository-config', arches: ['aarch64', 'x86_64'],
 			about: 'configuration-only repository discovery and reviewed revocation while maintenance metadata remains refused',
 			required: ['HWTEST START packages-repository-config',
 				'REPOSITORY CONFIG fresh/locked/corrupt configuration checks; damaged cache/history listing and reviewed revocation preserve maintenance failures PASS',
 				'REPOSITORY CONFIG protocol explicit scope, complete bounded metadata, legacy separation and owned close PASS',
 				'CONFIGURATION PROCESS repository-config-core PASS', 'CONFIGURATION PROCESS repository-config-protocol PASS',
+				'CONFIGURATION OBSERVATION both architectures, independent repository/policy fields, canonical policy order, unchanged wire bytes and stored offline flag PASS',
+				'CONFIGURATION OBSERVATION 1000 legacy/default and growing 64-record cycles retire scratch; full 4096 repository/pin observations preserve source configuration PASS',
+				'CONFIGURATION OBSERVATION maintenance FIFOs remain unopened; 1000 schema/missing/alias/FIFO/lock/busy refusal cycles retire scratch and permit restored reads PASS',
+				'CONFIGURATION PROCESS configuration-observation PASS',
 				'HWTEST PASS packages-repository-config'], ending: .poweroff, timeout: 300 }]
 	}
 }
@@ -54,6 +59,7 @@ fn check() !int {
 		receipt := Receipt{ architecture: options.arch, completed_at: time.now().unix(), artifacts: [kernel,
 			artifact('guest-init', base + '/guest/init')!, artifact('repository-config-core', root + 'repository-config-core')!,
 			artifact('repository-config-protocol', root + 'repository-config-protocol')!,
+			artifact('configuration-observation', root + 'configuration-observation')!,
 			artifact('serial-log', base + '/packages-repository-config/serial.log')!] }
 		os.write_file(base + '/qualification.json', json2.encode(receipt) + '\n')!
 	}

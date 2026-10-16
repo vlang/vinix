@@ -12,7 +12,7 @@ fn C.reboot(int) int
 fn C.usleep(u32) int
 
 fn check() ! {
-	for name in ['repository-config-core', 'repository-config-protocol'] {
+	for name in ['repository-config-core', 'repository-config-protocol', 'configuration-observation'] {
 		mut child := os.new_process('/usr/share/package-fixtures/' + name)
 		child.set_redirect_stdio_merged(); child.run()
 		output := child.stdout_slurp(); child.wait(); code := child.code; child.close()

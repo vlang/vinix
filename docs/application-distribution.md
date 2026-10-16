@@ -22,6 +22,13 @@ reader lock through integrity checks and successful completion. CLI output keeps
 its existing format. See [status ownership checks](../tests/packages/status-ownership-check.md)
 for the precise lifetime and allocation scope.
 
+The public repository-configuration and organization-policy readers also retire
+their source configuration and path scratch. V callers close returned
+`RepositoryConfiguration` and `PolicyDocument` observations after use. They keep
+their existing reader locks and remain available without opening damaged catalog
+or history files. Canonical policy output still reflects stored settings. See
+[configuration observation checks](../tests/packages/configuration-observation-check.md).
+
 Local payload copies validate ordinary source and destination descriptors before
 writing, refuse the same file even through a hard link, and enforce the captured
 source size. Oversized offline repository objects leave existing partial data

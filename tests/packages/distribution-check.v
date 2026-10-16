@@ -99,6 +99,10 @@ fn check() ! {
 		run(work + '/status-ownership-memory', [])!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
 			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/configuration-observation-memory', repository + '/tools/packages/pkgcore/configuration_observation_test.v'])!
+		run(work + '/configuration-observation-memory', [])!
+		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/diagnostics-memory', repository + '/tools/packages/pkgcore/view_test.v'])!
 		run(work + '/diagnostics-memory', [])!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',

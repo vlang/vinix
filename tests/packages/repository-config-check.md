@@ -21,6 +21,11 @@ identity validation, response bounds, full-status separation and owned cleanup.
 With heap tracking, 1000 valid/partial-invalid decode/cleanup cycles retain zero
 tracked bytes. This measures the typed reader, not every service allocation.
 
+Follow-up [configuration observation checks](configuration-observation-check.md)
+qualify the public repository/policy readers' result ownership and source scratch.
+The maintained guest suite now runs that fixture too; the recorded results below
+retain their original scope and artifact counts.
+
 The [CLI lifecycle](distribution-cli.v) compares strict and scoped listing under
 damaged cache/history, refuses enrollment/update, reviews and applies revocation,
 preserves active state/objects/recovery data, and checks malformed coordination
