@@ -1,5 +1,9 @@
 # Release image package configuration
 
+The current image controller additionally uses the production signed repository
+bundle input; see [the newer bundle qualification](image-repositories-check.md).
+The receipts below retain the configuration-only staging scope of this run.
+
 `tools/packages/stage.v` can initialize a fresh image from an explicitly reviewed
 format-1 package configuration using `--config FILE` or
 `VINIX_PACKAGE_IMAGE_CONFIG`. The option takes precedence. With neither input,

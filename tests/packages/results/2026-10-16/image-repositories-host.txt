@@ -1,0 +1,37 @@
+32 focused native compile/run checks and four production-staged image guests passed. Complete signed offline bundles are captured and published by the production V staging tool without consumer-state initialization or trust edits.
+image_repositories-compile PASS 21.966s
+image_repositories-run PASS 1.136s
+image_configuration-compile PASS 13.951s
+image_configuration-run PASS 0.696s
+release-compile PASS 17.329s
+release-run PASS 11.245s
+mirror-compile PASS 30.343s
+mirror-run PASS 3.337s
+repository_signature-compile PASS 14.422s
+repository_signature-run PASS 0.85s
+copy-compile PASS 14.929s
+copy-run PASS 0.351s
+policy-compile PASS 13.715s
+policy-run PASS 1.767s
+catalog-compile PASS 21.52s
+catalog-run PASS 0.802s
+asan-compile PASS 27.003s
+asan-run PASS 3.018s
+cache-compile PASS 11.27s
+cache-run PASS 0.59s
+cli-compile PASS 18.325s
+distribution-cli-compile PASS 13.985s
+distribution-cli-run PASS 10.589s
+controller-compile PASS 18.849s
+list-legacy PASS 0.325s
+list-image PASS 0.006s
+list-software PASS 0.005s
+stage-compile PASS 11.156s
+option-refusal PASS 0.384s
+environment-refusal PASS 0.005s
+option-precedence PASS 0.017s
+empty-option PASS 0.004s
+aarch64 packages-native-image PASS 41.261s
+aarch64 packages-software-image PASS 51.123s
+x86_64 packages-native-image PASS 51.017s
+x86_64 packages-software-image PASS 73.097s

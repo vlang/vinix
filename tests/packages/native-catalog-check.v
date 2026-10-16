@@ -26,7 +26,7 @@ fn native_suite(sandbox string, image bool, software bool) hwhost.Suite {
 		hwhost.RootFile{ path: 'etc/vinix/auth.conf', text: 'scrypt_ln = 10\n' },
 	]
 	binaries := [hwhost.RootBinary{ source: sandbox, path: 'usr/bin/vinix-sandbox' }]
-	programs := if software {
+	mut programs := if software {
 		[hwhost.Program{ source: 'tools/accounts/account.v', path: 'usr/sbin/vinix-account' },
 			hwhost.Program{ source: 'tools/accounts/authd.v', path: 'usr/sbin/vinix-authd' }]
 	} else if image {
@@ -37,6 +37,7 @@ fn native_suite(sandbox string, image bool, software bool) hwhost.Suite {
 			hwhost.Program{ source: 'tools/accounts/account.v', path: 'usr/sbin/vinix-account' },
 			hwhost.Program{ source: 'tools/accounts/session.v', path: 'usr/sbin/vinix-session' }]
 	}
+	if image { programs << hwhost.Program{ source: 'tools/packages/pkgcore/image_repositories_test.v', path: 'usr/share/package-fixtures/image-repositories' } }
 	name := if software { 'packages-software-image' } else if image { 'packages-native-image' } else { 'packages-native-catalog' }
 	mut required := ['HWTEST START ' + name,
 		'PACKAGE NATIVE CATALOG six-pinned-packages signed-review architecture notices document-grant protocols-1-2 ordinary-data PASS',
@@ -51,6 +52,7 @@ fn native_suite(sandbox string, image bool, software bool) hwhost.Suite {
 			'SOFTWARE IMAGE updates rollback uninstall registration cached-reinstall retained-memo PASS',
 			'SOFTWARE IMAGE unchanged-staged-trust root-owned-state separate-user-data clean-runtime PASS']
 	}
+	if image { required << 'PACKAGE IMAGE BUNDLE production-staged signed repository before first refresh PASS' }
 	return hwhost.Suite{ name: 'package-native-catalog', guest: 'tests/accounts/guest',
 		module_paths: ['.', 'tools/accounts', 'tools/security-events', 'tools/keyring'],
 		programs: programs,
@@ -127,17 +129,17 @@ fn stage_native_image(host hwhost.Host, inputs string, root string, work string)
 		profile := pkgcore.native_catalog(version, prepared, publisher + '/lock-' + version)!
 		workspace := publisher + '/workspace-' + version
 		pkgcore.pack_catalog(profile.catalog, prepared, workspace)!
-		pkgcore.publish_release(workspace, 'native', publisher + '/seed', u64(i + 1), time.now().unix() + 3600,
-			root + '/usr/share/native-catalog/releases/' + version)!
+		destination := if i == 0 { publisher + '/bundle/native' } else { root + '/usr/share/native-catalog/releases/' + version }
+		pkgcore.publish_release(workspace, 'native', publisher + '/seed', u64(i + 1), time.now().unix() + 3600, destination)!
 	}
 	configuration := publisher + '/image-config.json'
 	os.write_file(configuration, json2.encode(pkgcore.Config{ architecture: host.arch, launch_user: 'alex',
 		policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 },
-		repositories: [pkgcore.Repository{ id: 'native', url: 'file:///tmp/native-repository', public_key: key }] }) + '\n')!
+		repositories: [pkgcore.Repository{ id: 'native', url: 'file://' + pkgcore.image_repositories_path + '/native', public_key: key }] }) + '\n')!
 	stage := work + '/package-stage'
 	hwhost.run_tool([host.v, '-nocache', '-no-skip-unused', '-path', '@vlib|@vmodules|' + host.root + '|' + host.root + '/tools/accounts',
 		'-o', stage, host.root + '/tools/packages/stage.v'], {}, work + '/stage-build.log', 300)!
-	mut arguments := [stage, '--arch', host.arch, '--staging', root, '--config', configuration]
+	mut arguments := [stage, '--arch', host.arch, '--staging', root, '--config', configuration, '--repositories', publisher + '/bundle']
 	compiler := os.getenv('CC_' + host.arch.to_upper())
 	if compiler != '' { arguments << ['--cc', compiler] }
 	hwhost.run_tool(arguments, { 'V': host.v, 'VFLAGS': '-nocache' }, work + '/stage.log', 300)!
@@ -149,6 +151,10 @@ fn stage_native_image(host hwhost.Host, inputs string, root string, work string)
 	for path in os.walk_ext(root + '/usr/share/native-catalog/releases', '') {
 		if os.is_file(path) { artifacts << native_artifact('image/' + path[root.len + 1..], path)! }
 	}
+	for path in os.walk_ext(root + pkgcore.image_repositories_path, '') {
+		if os.is_file(path) { artifacts << native_artifact('image/' + path[root.len + 1..], path)! }
+	}
+	artifacts << native_artifact('image/usr/share/package-fixtures/image-repositories', root + '/usr/share/package-fixtures/image-repositories')!
 	return artifacts
 }
 

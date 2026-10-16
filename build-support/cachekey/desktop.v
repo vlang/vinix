@@ -67,6 +67,11 @@ pub fn desktop_prepare(root_path string, compiler_path string, env map[string]st
 		if image_config.contains('\x00') { return error('embedded null byte in image package configuration path') }
 		sources << resolve_path(expand_user(image_config)!)!
 	}
+	image_repositories := env['VINIX_PACKAGE_IMAGE_REPOSITORIES'] or { '' }
+	if image_repositories != '' {
+		if image_repositories.contains('\x00') { return error('embedded null byte in image package repository path') }
+		sources << resolve_path(expand_user(image_repositories)!)!
+	}
 	llvm_input := env['LLVM_BIN'] or { '/opt/homebrew/opt/llvm/bin' }
 	mut llvm := expand_user(llvm_input)!
 	if !path_is_file(join_path(llvm, 'clang'))! {
@@ -113,6 +118,7 @@ fn desktop_finish(input DesktopInputs, env map[string]string, platform string, p
 	add_text(mut digest, 'with-asahi', env['VINIX_WITH_ASAHI_GPU'] or { '0' })
 	add_text(mut digest, 'macho-linker', env['VINIX_MACHO_LINKER'] or { 'auto' })
 	add_text(mut digest, 'package-image-config', env['VINIX_PACKAGE_IMAGE_CONFIG'] or { '' })
+	add_text(mut digest, 'package-image-repositories', env['VINIX_PACKAGE_IMAGE_REPOSITORIES'] or { '' })
 	add_text(mut digest, 'sources', tree_key(input.sources, false, 'vinix-desktop-build-content-v1')!)
 	add_text(mut digest, 'inplace-layer-generation', tree_key(input.in_place, true, 'vinix-desktop-build-metadata-v1')!)
 	for path in input.layers { add_text(mut digest, 'layer:' + path, root_generation(path)!) }

@@ -1,0 +1,12 @@
+option-refusal:
+package staging: image repository bundle prepared root must be an ordinary directory: /Users/alex/code/vinix/build/package-image-repositories-work/absent
+
+environment-refusal:
+package staging: image repository bundle prepared root must be an ordinary directory: /Users/alex/code/vinix/build/package-image-repositories-work/absent
+
+option-precedence:
+package staging: os: failed to find executable
+
+empty-option:
+package staging: --repositories requires a reviewed signed repository bundle directory
+

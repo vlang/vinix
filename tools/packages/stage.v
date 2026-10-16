@@ -20,10 +20,11 @@ fn stage() ! {
 	mut compiler := ''
 	mut compiler_args := []string{}
 	mut configuration := os.getenv('VINIX_PACKAGE_IMAGE_CONFIG')
+	mut repositories := os.getenv('VINIX_PACKAGE_IMAGE_REPOSITORIES')
 	mut arguments := os.args[1..].clone()
 	for arguments.len > 0 {
 		if arguments.len < 2 {
-			return error('usage: stage.v --arch aarch64|x86_64 --staging DIR [--cc COMPILER] [--config REVIEWED_CONFIG.json]')
+			return error('usage: stage.v --arch aarch64|x86_64 --staging DIR [--cc COMPILER] [--config REVIEWED_CONFIG.json] [--repositories SIGNED_BUNDLE_DIRECTORY]')
 		}
 		match arguments[0] {
 			'--arch' { architecture = arguments[1] }
@@ -34,6 +35,10 @@ fn stage() ! {
 				if arguments[1] == '' { return error('--config requires a reviewed package configuration file') }
 				configuration = arguments[1]
 			}
+			'--repositories' {
+				if arguments[1] == '' { return error('--repositories requires a reviewed signed repository bundle directory') }
+				repositories = arguments[1]
+			}
 			else { return error('unknown staging option: ${arguments[0]}') }
 		}
 		arguments = arguments[2..].clone()
@@ -43,6 +48,8 @@ fn stage() ! {
 	}
 	mut image_configuration := pkgcore.prepare_image_configuration(staging, architecture, configuration)!
 	defer { image_configuration.close() }
+	mut image_repositories := unsafe { &image_configuration }.prepare_repositories(repositories)!
+	defer { image_repositories.close() }
 	if compiler == '' { compiler = os.getenv('VINIX_MUSL_CC_' + architecture.to_upper()) }
 	if compiler == '' { compiler = architecture + '-linux-musl-gcc' }
 	// A compiler is an executable path, never shell text.
@@ -92,6 +99,7 @@ fn stage() ! {
 	software := staging + '/usr/bin/vinix-software'
 	if os.exists(software) || os.is_link(software) { os.rm(software)! }
 	os.symlink('/usr/bin/vinix-desktop', software)!
+	if unsafe { &image_repositories }.publish()! { println('Published authenticated offline image repositories') }
 	created := unsafe { &image_configuration }.publish()!
 	println(if created { 'Initialized reviewed image package configuration' } else { 'Preserved existing image package configuration; release input was not applied' })
 	os.mkdir_all(staging + '/usr/share/vinix/actions')!

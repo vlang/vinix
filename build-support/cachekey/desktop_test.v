@@ -40,6 +40,7 @@ fn desktop_fixture(root string) !(string, map[string]string) {
 	}
 	mut env := os.environ()
 	env.delete('VINIX_PACKAGE_IMAGE_CONFIG')
+	env.delete('VINIX_PACKAGE_IMAGE_REPOSITORIES')
 	for name, value in {
 		'LLVM_BIN':                         llvm
 		'LD_LLD':                           root + '/tools/ld.lld'
@@ -108,6 +109,27 @@ fn test_release_package_configuration_content_and_selection_invalidate() {
 	assert C.utimensat(C.AT_FDCWD, &char(configuration.str), &stamps[0], 0) == 0
 	assert first != fixture_key(root, v, env)!
 	env.delete('VINIX_PACKAGE_IMAGE_CONFIG')
+	assert fixture_key(root, v, env)! == unenrolled
+}
+
+fn test_image_repository_content_and_selection_invalidate() {
+	root := desktop_temporary()!
+	defer { os.rmdir_all(root) or { panic(err) } }
+	v, mut env := desktop_fixture(root)!
+	unenrolled := fixture_key(root, v, env)!
+	bundle := root + '/release/repositories'
+	object := bundle + '/native/objects/payload'
+	fixture_write(object, 'first offline application payload\n')!
+	env['VINIX_PACKAGE_IMAGE_REPOSITORIES'] = bundle
+	first := fixture_key(root, v, env)!
+	assert first != unenrolled
+	mut state := C.vinix_cache_stat{}
+	assert C.vinix_cache_lstat(&char(object.str), &state) == 0
+	fixture_write(object, 'other offline application payload\n')!
+	stamps := [C.timespec{state.st_atime, state.vinix_cache_atime_nsec}, C.timespec{state.st_mtime, state.vinix_cache_mtime_nsec}]!
+	assert C.utimensat(C.AT_FDCWD, &char(object.str), &stamps[0], 0) == 0
+	assert first != fixture_key(root, v, env)!
+	env.delete('VINIX_PACKAGE_IMAGE_REPOSITORIES')
 	assert fixture_key(root, v, env)! == unenrolled
 }
 

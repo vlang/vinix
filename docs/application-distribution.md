@@ -23,6 +23,14 @@ native windows under separate user accounts, updates, rollback and cached
 reinstall. Graphical login/presentation and persistent-device acceptance remain
 separate release gates.
 
+Release staging also accepts `--repositories DIRECTORY` or
+`VINIX_PACKAGE_IMAGE_REPOSITORIES` for a complete signed offline bundle. It
+captures reviewed publisher exports before compilation and publishes them at the
+configuration's fixed target URLs after signature, dependency, policy and payload
+verification. Existing bundles are preserved or refused, and consumer package
+state stays untouched until normal Refresh. See [the bundle contract](../tools/packages/SDK.md#offline-repository-bundles-in-release-images)
+and [qualification](../tests/packages/image-repositories-check.md).
+
 Configuration, cached catalogs, trust histories, installed state and publisher
 documents share a bounded metadata reader. It captures a nonblocking descriptor,
 refuses leaf symlinks and nonregular files, and reads at most the admitted file

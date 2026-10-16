@@ -13,7 +13,10 @@ fn qualify_package_software_image(mut t Test) ! {
 	t.start_authd()
 	configuration := os.read_file('/etc/vinix-packages/config.json')!
 	assert os.ls('/var/lib/vinix-packages')!.len == 0
-	os.symlink('/usr/share/native-catalog/releases/1.0.0', '/tmp/native-repository')!
+	config := pkgcore.load_config('')!
+	assert config.repositories.len == 1 && config.repositories[0].url == 'file://' + pkgcore.image_repositories_path + '/native'
+	assert os.is_file(pkgcore.image_repositories_path + '/native/index.json') && !os.is_link(pkgcore.image_repositories_path)
+	image_repository_assertions(mut t)!
 	installed := run(['/usr/share/package-fixtures/software-image', 'install'], '', db, alex)
 	assert installed.status == 0, installed.output
 	t.say(installed.output)
@@ -23,8 +26,8 @@ fn qualify_package_software_image(mut t Test) ! {
 	standard := run(['/usr/share/package-fixtures/software-image', 'standard'], '', db, sam)
 	assert standard.status == 0, standard.output
 	t.say(standard.output)
-	os.rm('/tmp/native-repository')!
-	os.symlink('/usr/share/native-catalog/releases/1.1.0', '/tmp/native-repository')!
+	os.rename(pkgcore.image_repositories_path + '/native', pkgcore.image_repositories_path + '/native-initial')!
+	os.symlink('/usr/share/native-catalog/releases/1.1.0', pkgcore.image_repositories_path + '/native')!
 	updated := run(['/usr/share/package-fixtures/software-image', 'updates'], '', db, alex)
 	assert updated.status == 0, updated.output
 	t.say(updated.output)

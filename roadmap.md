@@ -628,6 +628,13 @@ It covers separate private data, updates, rollback and cached reinstall; full
 graphical login/presentation and persistent installed-system acceptance remain
 open.
 
+Release image builders can now [bundle signed offline repositories](tools/packages/SDK.md#offline-repository-bundles-in-release-images)
+through the production staging tool. The bundle retains the reviewed publisher
+and target URLs, checks complete closures and organization/license/firmware policy,
+and publishes atomically without initializing consumer state. The
+[bundle check](tests/packages/image-repositories-check.md) covers both target
+architectures; broader release/catalog/runtime acceptance remains open.
+
 - [ ] Harden the existing package frontend with trusted repositories, dependency
   resolution, reproducible metadata and consistent architecture support.
 - [ ] Add transactional install/remove/upgrade, rollback, disk-space checks,

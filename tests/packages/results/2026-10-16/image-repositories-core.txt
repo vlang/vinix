@@ -1,0 +1,11 @@
+Updating trusted repository native
+Installing Offline app 1.0.0 (1/2) from native
+Downloading app/share/data (38 bytes)
+Installing Offline support 1.0.0 (2/2) from native
+Activated package generation 1
+Updating trusted repository native
+Installing Offline app 1.0.0 (1/2) from native
+Downloading app/share/data (38 bytes)
+Installing Offline support 1.0.0 (2/2) from native
+Activated package generation 1
+PACKAGE IMAGE BUNDLE captured signed closure atomic publication offline dependency install both architectures PASS

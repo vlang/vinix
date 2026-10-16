@@ -1,0 +1,1 @@
+PASS x86_64 packages-software-image (73.1s)

@@ -18,6 +18,7 @@ Standalone staging and qualification are also available:
 v run tools/packages/stage.v --arch aarch64 --staging /path/to/root
 v run tools/packages/stage.v --arch x86_64 --staging /path/to/root
 v run tools/packages/stage.v --arch aarch64 --staging /path/to/fresh-root --config /release/reviewed-packages.json
+v run tools/packages/stage.v --arch aarch64 --staging /path/to/fresh-root --config /release/reviewed-packages.json --repositories /release/repository-bundle
 v run tests/packages/distribution-check.v --cross --desktop
 ```
 
@@ -29,6 +30,15 @@ remain unenrolled. Existing configuration is validated and preserved byte-for-by
 and missing configuration beside retained package state requires recovery.
 See [image configuration](SDK.md#release-image-configuration) and its
 [qualification](../../tests/packages/image-configuration-check.md).
+
+For an offline image, `--repositories DIRECTORY` or
+`VINIX_PACKAGE_IMAGE_REPOSITORIES=/absolute/DIRECTORY` captures complete signed
+release exports under their configured IDs. Their reviewed URLs must be
+`file:///usr/share/vinix-packages/repositories/ID`. The bundle is verified against
+those keys and organization/license/firmware policy, then published atomically.
+Existing identical bundles are preserved; different or damaged destinations
+refuse. See [the bundle contract](SDK.md#offline-repository-bundles-in-release-images)
+and [qualification](../../tests/packages/image-repositories-check.md).
 
 Desktop checks need generated examples under `build/app-src` and a headless ui2
 overlay under `build/vmodules`; `VINIX_PACKAGE_TEST_UI2` selects another overlay

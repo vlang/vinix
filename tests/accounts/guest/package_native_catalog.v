@@ -39,10 +39,10 @@ fn qualify_package_native_catalog(mut t Test) ! {
 	// Stable repository identity, with successive complete signed snapshots.
 	os.symlink('/tmp/native-release-1.0.0', '/tmp/native-repository')!
 	package_success(['repo-enroll', 'native', 'file:///tmp/native-repository', key])!
-	native_catalog_consume(mut t, key, architecture, '/tmp/native-release-')!
+	native_catalog_consume(mut t, key, architecture, '/tmp/native-release-', '/tmp/native-repository')!
 }
 
-fn native_catalog_consume(mut t Test, key string, architecture string, release_prefix string) ! {
+fn native_catalog_consume(mut t Test, key string, architecture string, release_prefix string, repository string) ! {
 	package_success(['update'])!
 	ids := ['org.vinix.counter', 'org.vinix.memo', 'org.vinix.package-hello']
 	reviewed_package_operation('install', ids)!
@@ -78,8 +78,8 @@ fn native_catalog_consume(mut t Test, key string, architecture string, release_p
 	assert owner_of(data + ids[1] + '/memo.txt') == 1000 && os.read_file(data + ids[1] + '/memo.txt')! == memo
 	native_catalog_reopen(memo)!
 	t.say('PACKAGE NATIVE CATALOG six-pinned-packages signed-review architecture notices document-grant protocols-1-2 ordinary-data PASS')
-	os.rm('/tmp/native-repository')!
-	os.symlink(release_prefix + '1.1.0', '/tmp/native-repository')!
+	if os.is_link(repository) { os.rm(repository)! } else { os.rename(repository, repository + '-initial')! }
+	os.symlink(release_prefix + '1.1.0', repository)!
 	package_success(['update'])!
 	reviewed_package_operation('upgrade', [])!
 	assert pkgcore.Service{}.verify()!.packages.all(it.package.version == '1.1.0')
@@ -110,16 +110,24 @@ fn qualify_package_native_image(mut t Test) ! {
 	config := pkgcore.load_config('')!
 	assert config.architecture == architecture && config.launch_user == 'alex' && config.policy.offline
 	assert config.repositories.len == 1 && config.repositories[0].id == 'native'
-	assert config.repositories[0].url == 'file:///tmp/native-repository'
+	assert config.repositories[0].url == 'file://' + pkgcore.image_repositories_path + '/native'
 	assert os.ls('/var/lib/vinix-packages')!.len == 0
-	os.symlink('/usr/share/native-catalog/releases/1.0.0', '/tmp/native-repository')!
+	assert os.is_file(pkgcore.image_repositories_path + '/native/index.json') && !os.is_link(pkgcore.image_repositories_path)
 	t.say('PACKAGE IMAGE CONFIG booted with staged trust policy and launch account before first refresh PASS')
 	fixture := run(['/usr/share/package-fixtures/image-configuration'], '', none, none)
 	assert fixture.status == 0, fixture.output
 	assert fixture.output.contains('PACKAGE IMAGE CONFIG signed catalog install remove rollback both architectures PASS')
-	native_catalog_consume(mut t, config.repositories[0].public_key, architecture, '/usr/share/native-catalog/releases/')!
+	image_repository_assertions(mut t)!
+	native_catalog_consume(mut t, config.repositories[0].public_key, architecture, '/usr/share/native-catalog/releases/', pkgcore.image_repositories_path + '/native')!
 	assert os.read_file(path)! == initial
 	t.say('PACKAGE IMAGE CONFIG unchanged staged configuration real native apps upgrade rollback offline reinstall PASS')
+}
+
+fn image_repository_assertions(mut t Test) ! {
+	fixture := run(['/usr/share/package-fixtures/image-repositories'], '', none, none)
+	assert fixture.status == 0, fixture.output
+	assert fixture.output.contains('PACKAGE IMAGE BUNDLE captured signed closure atomic publication offline dependency install both architectures PASS')
+	t.say('PACKAGE IMAGE BUNDLE production-staged signed repository before first refresh PASS')
 }
 
 fn scenario_packages_native_image(mut t Test) { qualify_package_native_image(mut t) or { t.check(false, err.msg()) } }

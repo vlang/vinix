@@ -247,6 +247,59 @@ ui2 through `VINIX_PACKAGE_TEST_UI2`; see [the integration check](../../tests/pa
 Its UI trees and service transports are qualified separately from graphical
 login, compositor presentation and foreign display/audio brokers.
 
+### Offline repository bundles in release images
+
+Add `--repositories DIRECTORY` to the staging command, or set
+`VINIX_PACKAGE_IMAGE_REPOSITORIES` to its absolute path in the desktop image
+builder. The explicit option wins. With no input, staging retains its existing
+configuration-only behavior. The desktop cache hashes the selected directory and
+all its contents, including payload bytes; timestamp restoration cannot hide a
+changed object.
+
+The reviewed configuration must explicitly enroll each bundled publisher at
+`file:///usr/share/vinix-packages/repositories/ID`. Put its complete
+`publish-release` export under `DIRECTORY/ID`, containing only `index.json`,
+`index.sig` and `objects/HASH`. Every configuration entry using that fixed prefix
+must be present, and unconfigured bundle entries refuse. Other configured online
+or removable repositories are unchanged. Supply absolute paths to the builder;
+the signed repository URLs refer to the target filesystem, not the host.
+
+Inputs must be controlled by the builder: ordinary owned directories without
+shared write access, release directories 0755, metadata/objects ordinary
+single-link files 0644. Publisher workspaces, seeds, extra files, aliases and
+special files refuse. Each bundled repository permits at most 16,384 distinct
+objects. Index identity, signature, expiry, every advertised dependency/runtime
+closure, payload sizes and hashes are checked. Every package in the full export
+must pass the configured allowlist, version pins, permission, proprietary-license
+and firmware policy. Supplying a bundle never accepts licenses, grants firmware
+permission or invents a publisher key. Builders remain responsible for permission
+to redistribute their selected payloads and notices.
+
+Before compiling, staging captures the authenticated bytes in a private temporary
+directory. Source changes or removal cannot redirect the capture. Both temporary
+and destination space are checked with 64 MiB of build headroom, including the
+two simultaneous copies when they share a filesystem. The final image bundle is
+verified again, flushed and published with an exclusive atomic directory rename.
+Expiry is rechecked before publication. Failed copies or validation remove the
+unpublished image stage and preserve any existing bundle. An identical destination
+is verified and retained; different or damaged contents refuse rather than being
+updated. Retry with the same valid source or rebuild a fresh staging image.
+
+For V image builders, call `configuration.prepare_repositories(source)` after
+`prepare_image_configuration`, publish the returned `ImageRepositories` before
+publishing configuration, and call `close()` on both plans on every path. Bundle
+close is repeatable. Publication binds the admitted image root and exact captured
+configuration; changed trust/policy or a replaced root refuses. Keep image
+ancestors controlled throughout staging. The complete tool/image build remains
+per-file staging and must succeed before its output is distributed.
+
+No consumer catalog, replay floor, generation or installed state is created by
+bundling. After boot, normal Refresh authenticates the bundled index and normal
+review/install creates package state. Signed updates and runtime versions keep
+their existing review and rollback rules. This is an initial offline source;
+later signed media or reviewed repository enrollment supplies new releases.
+See [bundle qualification](../../tests/packages/image-repositories-check.md).
+
 ## Build and publish
 
 ```sh
