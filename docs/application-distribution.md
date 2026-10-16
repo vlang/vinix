@@ -1885,6 +1885,15 @@ closure; no background updater is introduced.
 
 ## SDK and qualification
 
+Release builders can inspect the selected image package inputs with
+`stage.v --check`. Its reproducible JSON includes effective trust/organization
+policy, exact configuration and signed-index digests, bundled architecture and
+licensing counts, unique payload bytes, disk budget and publish/preserve decisions.
+It repeats captured/destination checks, leaves the image unchanged and requires
+no target compiler. The temporary authenticated capture is removed on exit.
+See [the contract](../tools/packages/SDK.md#check-release-image-package-inputs)
+and [qualification](../tests/packages/image-input-check.md).
+
 [SDK 1](../tools/packages/SDK.md) defines reproducible metadata, signing,
 publishing, format and launch interfaces. The
 [V fixtures](../tests/packages/distribution-check.v) exercise real filesystem

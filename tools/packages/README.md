@@ -19,6 +19,7 @@ v run tools/packages/stage.v --arch aarch64 --staging /path/to/root
 v run tools/packages/stage.v --arch x86_64 --staging /path/to/root
 v run tools/packages/stage.v --arch aarch64 --staging /path/to/fresh-root --config /release/reviewed-packages.json
 v run tools/packages/stage.v --arch aarch64 --staging /path/to/fresh-root --config /release/reviewed-packages.json --repositories /release/repository-bundle
+v run tools/packages/stage.v --check --arch aarch64 --staging /path/to/fresh-root --config /release/reviewed-packages.json --repositories /release/repository-bundle
 v run tests/packages/distribution-check.v --cross --desktop
 ```
 
@@ -39,6 +40,16 @@ those keys and organization/license/firmware policy, then published atomically.
 Existing identical bundles are preserved; different or damaged destinations
 refuse. See [the bundle contract](SDK.md#offline-repository-bundles-in-release-images)
 and [qualification](../../tests/packages/image-repositories-check.md).
+
+Add `--check` to validate those selected package inputs and emit a reproducible
+format-1 JSON report before service compilation or image publication. It records
+the effective configuration and its digest, bundle publication/preservation,
+signed index digests/sequences/expiry, package counts by architecture and licensing
+flags, unique payload bytes and the bundle disk budget. Existing matching bundles
+are checked; unsafe or changed destinations refuse. The target image remains
+unchanged, and target compilers are not required. Preparation uses a temporary
+authenticated capture, which is removed before exit. See
+[image input preflight](../../tests/packages/image-input-check.md).
 
 Desktop checks need generated examples under `build/app-src` and a headless ui2
 overlay under `build/vmodules`; `VINIX_PACKAGE_TEST_UI2` selects another overlay

@@ -1,0 +1,44 @@
+FAIL aarch64 packages-image-input (10.2s)
+  forbidden "HWTEST FAIL" in the line: HWTEST FAIL packages-image-input
+  last 40 serial lines:
+  | kmain_thread: fbdev done
+  | pci: Building device scan
+  | pci: Found [0:0:0:-1]
+  | pci: Found [0:1:0:-1]
+  | pci: Found [0:2:0:-1]
+  | devcore: 3 PCI functions enumerated
+  | xhci: no USB controller
+  | virtio-gpu: no GPU transport found
+  | kmain_thread: pointer done
+  | kmain_thread: processes done
+  | kmain_thread: pty done
+  | apple-spi-kbd: no device tree; not probing
+  | kmain_thread: console done
+  | devcore: 3 VirtIO devices listed
+  | kmain_thread: writeback done
+  | 
+  | *** aarch64: Kernel initialisation complete ***
+  | *** Starting /sbin/init ***
+  | syspower: power button through the event device at 0x9080000
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | HWTEST START packages-image-input
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | IMAGE INPUT CHECK reproducible both-host trust/policy, exact signed digests, architecture/license/firmware counts and deduplicated bytes without image publication PASS
+  | IMAGE INPUT CHECK preserved literal existing configuration and consumer history; no-bundle scope and zero bundle estimate PASS
+  | IMAGE INPUT CHECK capture corruption, unrelated plans, appeared consumer state and replaced roots refuse with unchanged targets; stable capture survives source removal PASS
+  | /Users/alex/code/vinix/tools/packages/pkgcore/image_check_test.v:172: fn test_image_input_check_cli_uses_preflight_before_any_compiler_lookup
+  |     assert normal_code != 0 && normal_text.contains('nonexistent-compiler') && os.ls(root)!.len == 0
+  | IMAGE INPUT CHECK publish/preserve/none decisions, occupied configuration, aliased/special/shared-write/damaged bundles refuse without overwriting destinations PASS
+  | image-check failed (1)
+  | HWTEST FAIL packages-image-input
+  | syspower: power off: stopping devices
+  logs: /Users/alex/code/vinix/build/picheck-arm-1/packages-image-input

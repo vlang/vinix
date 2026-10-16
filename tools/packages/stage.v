@@ -21,10 +21,12 @@ fn stage() ! {
 	mut compiler_args := []string{}
 	mut configuration := os.getenv('VINIX_PACKAGE_IMAGE_CONFIG')
 	mut repositories := os.getenv('VINIX_PACKAGE_IMAGE_REPOSITORIES')
+	mut check := false
 	mut arguments := os.args[1..].clone()
 	for arguments.len > 0 {
+		if arguments[0] == '--check' { check = true; arguments = arguments[1..].clone(); continue }
 		if arguments.len < 2 {
-			return error('usage: stage.v --arch aarch64|x86_64 --staging DIR [--cc COMPILER] [--config REVIEWED_CONFIG.json] [--repositories SIGNED_BUNDLE_DIRECTORY]')
+			return error('usage: stage.v --arch aarch64|x86_64 --staging DIR [--check] [--cc COMPILER] [--config REVIEWED_CONFIG.json] [--repositories SIGNED_BUNDLE_DIRECTORY]')
 		}
 		match arguments[0] {
 			'--arch' { architecture = arguments[1] }
@@ -50,11 +52,18 @@ fn stage() ! {
 	defer { image_configuration.close() }
 	mut image_repositories := unsafe { &image_configuration }.prepare_repositories(repositories)!
 	defer { image_repositories.close() }
+	if check {
+		report := unsafe { &image_configuration }.check_repositories(unsafe { &image_repositories })!
+		defer { unsafe { report.free() } }
+		print(report)
+		return
+	}
 	if compiler == '' { compiler = os.getenv('VINIX_MUSL_CC_' + architecture.to_upper()) }
 	if compiler == '' { compiler = architecture + '-linux-musl-gcc' }
 	// A compiler is an executable path, never shell text.
 	if compiler_args.len == 0 { compiler_args = [compiler] }
 	cc := os.find_abs_path_of_executable(compiler_args[0])!
+	if !os.is_file(cc) || !os.is_executable(cc) { return error('target compiler is missing or not executable: ${cc}') }
 	configured_v := os.getenv('V')
 	compiler_v := if configured_v == '' { 'v' } else { configured_v }
 	v := os.find_abs_path_of_executable(compiler_v)!

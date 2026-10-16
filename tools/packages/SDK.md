@@ -300,6 +300,62 @@ their existing review and rollback rules. This is an initial offline source;
 later signed media or reviewed repository enrollment supplies new releases.
 See [bundle qualification](../../tests/packages/image-repositories-check.md).
 
+### Check release image package inputs
+
+Pass `--check` anywhere among `stage.v`'s options to validate the selected
+configuration and optional signed repository bundle before compiling services:
+
+```sh
+v run tools/packages/stage.v --check --arch aarch64 --staging /build/fresh-root \
+  --config /release/reviewed-packages.json --repositories /release/bundle
+```
+
+The target directory must exist. Configuration/bundle environment variables and
+explicit-option precedence are the same as staging. The check uses the normal
+admission, signatures, complete dependency/runtime closure, policy, payload and
+space checks, including a private authenticated temporary capture. Captured
+contents are verified again before reporting. That capture is removed on exit.
+The image, its configuration, consumer history and package state are unchanged.
+Target compilers are neither looked up nor invoked, and remote repository URLs
+are not fetched. Run normal staging afterward to compile and publish tools and
+inputs; a successful check is a point-in-time input validation, not a completed
+image build or authorization to skip later validation.
+
+Standard output is one newline-terminated format-1 JSON document. Diagnostics go
+to standard error with a nonzero exit status. Reports are reproducible for the
+same captured inputs and target path; the current time, free-space observations
+and random capture names are excluded.
+
+| Field | Meaning |
+| --- | --- |
+| `format`, `architecture`, `root` | Report version 1, selected host architecture and canonical image root. |
+| `configuration_path`, `configuration_action` | Target configuration path; `initialize` or `preserve`. |
+| `configuration_sha256`, `configuration` | Digest of the exact bytes that will be initialized or preserved, plus the complete effective trust, launch-account and organization-policy settings. Existing configuration keeps its literal bytes. |
+| `bundle_supplied`, `bundle_action` | Whether a bundle was selected; `publish`, `preserve` for an identical verified destination, or `none` with no selected bundle. |
+| `bundle_required_bytes`, `bundle_reserve_bytes` | Existing conservative bundle-publication budget and 64 MiB build headroom; both zero without a bundle. These exclude the yet-unbuilt service binaries. |
+| `bundled_repositories` | Only the authenticated bundled repositories, sorted by ID. Other configured repositories remain visible in `configuration` but are not acquired. |
+
+Each bundled row records `id`, `sequence`, `expires`, `index_sha256`, `packages`,
+`aarch64_packages`, `x86_64_packages`, `shared_packages`, `proprietary_packages`,
+`firmware_packages`, `objects` and `payload_bytes`. Object count and bytes are
+deduplicated within that repository. Counts cover the full signed export,
+including other host variants. The configuration records the publisher key/URL
+and explicit license/firmware policy; this summary does not accept new terms or
+grant permissions. Private seeds and temporary capture paths are excluded.
+
+An existing configuration is validated and reported as preserved, even when a
+different `--config` was supplied. A fresh plan refuses if its configuration
+appears before reporting. Selected bundles must match any existing destination;
+damaged, different, linked, special or shared-write destinations refuse. Retained
+state without its trusted configuration and replaced roots retain their normal
+recovery/refusal rules.
+
+V image builders can call `configuration.check_repositories(&repositories)`
+between preparation and publication. It returns owned JSON text, independent of
+both plans. Free the text and close both plans on every path. Neither the method
+nor `--check` publishes a bundle/configuration or creates consumer package state.
+See [preflight qualification](../../tests/packages/image-input-check.md).
+
 ## Build and publish
 
 ```sh

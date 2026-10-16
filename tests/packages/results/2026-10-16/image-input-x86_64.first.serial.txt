@@ -1,0 +1,34 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=21
+!>+ [11] ./sbin/init sz=210864
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/image-configuration sz=1621104
+!>+ [15] ./usr/share/package-fixtures/stage-check sz=1043056
+!>+ [16] ./usr/share/package-fixtures/catalog sz=1613392
+!>+ [17] ./usr/share/package-fixtures/release sz=1547888
+!>+ [18] ./usr/share/package-fixtures/image-repositories sz=1604472
+!>+ [19] ./usr/share/package-fixtures/image-check sz=1358808
+!>+ [20] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037102600
+initramfs: Done (20 entries)
+HWTEST START packages-image-input
+IMAGE INPUT CHECK reproducible both-host trust/policy, exact signed digests, architecture/license/firmware counts and deduplicated bytes without image publication PASS
+IMAGE INPUT CHECK preserved literal existing configuration and consumer history; no-bundle scope and zero bundle estimate PASS
+IMAGE INPUT CHECK capture corruption, unrelated plans, appeared consumer state and replaced roots refuse with unchanged targets; stable capture survives source removal PASS
+/Users/alex/code/vinix/tools/packages/pkgcore/image_check_test.v:172: fn test_image_input_check_cli_uses_preflight_before_any_compiler_lookup
+    assert normal_code != 0 && normal_text.contains('nonexistent-compiler') && os.ls(root)!.len == 0
+IMAGE INPUT CHECK publish/preserve/none decisions, occupied configuration, aliased/special/shared-write/damaged bundles refuse without overwriting destinations PASS
+image-check failed (1)
+HWTEST FAIL packages-image-input
