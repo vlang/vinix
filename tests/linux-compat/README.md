@@ -2018,3 +2018,15 @@ Use `--cases clonetidcopy --timeout 1200` with fresh state.
 `clonetidcopy-check.v` without `-prod` for the executing evidence audit.
 Requested-PID allocation remains unsupported. See the
 [qualification report](../../docs/linux-posix-qualification.md#native-clone3-selected-tid-vector-import).
+
+The `cloneparent` case checks init-parent admission for clone/clone3 with
+888 controls per architecture. Global PID 1 and root/UID1000 namespace-init
+callers must reject PARENT with EINVAL; ordinary callers retain real parent
+reuse. The original kernels fail 240 controls and create 144 unintended siblings
+per architecture, all reaped by their actual parent through an acknowledged
+supervisor channel. Corrected kernels and identical ELFs on Linux pass while
+retaining 288 legitimate children. Both phases measure identical 200-cycle
+refusal/fork cleanup cohorts. Use `--cases cloneparent --timeout 1200` with
+fresh state; `cloneparent-reference.v` runs the unchanged ELF on Linux and
+`cloneparent-check.v` audits receipts when compiled without `-prod`.
+See the [qualification report](../../docs/linux-posix-qualification.md#native-clone-and-clone3-init-parent-admission).

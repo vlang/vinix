@@ -203,6 +203,12 @@ fn valid_clone_sharing(flags u64) bool {
 		&& !(flags & clone_thread != 0 && flags & clone_sighand == 0)
 }
 
+// A PID-namespace init cannot create siblings: their parent is outside the
+// namespace (or the kernel for global init), so it cannot reap them there.
+fn valid_clone_parent(flags u64) bool {
+	return flags & clone_parent == 0 || proc.own_pid(proc.current_thread().process) != 1
+}
+
 // FS, descriptor and handler ownership is currently process-scoped. Refuse
 // combinations we cannot honor instead of silently copying requested sharing
 // or silently sharing state the caller asked to keep independent.

@@ -1122,6 +1122,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   Requested-PID allocation and the broad libc/installation/translation gates
   remain open. See [the qualification](docs/linux-posix-qualification.md#native-clone3-selected-tid-vector-import).
 
+- [x] Reject CLONE_PARENT from global and PID-namespace init in clone/clone3;
+  preserve ordinary parent reuse, ABI/import error ordering and real supervised
+  child reaping. Qualify 888 controls and identical-input cleanup on both native
+  architectures against identical Linux probe ELFs.
+  See [the init-parent receipts](docs/linux-posix-qualification.md#native-clone-and-clone3-init-parent-admission).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

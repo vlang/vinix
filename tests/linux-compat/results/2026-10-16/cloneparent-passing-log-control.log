@@ -1,0 +1,3 @@
+tests/linux-compat/cloneparent-check.v:218: FAIL: fn main.failure: assert log.contains('LINUX CLONEPARENT DETAIL:'), 'cloneparent baseline failure markers required'
+      message: cloneparent baseline failure markers required
+V panic: Assertion failed...

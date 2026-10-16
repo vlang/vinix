@@ -1,0 +1,3 @@
+tests/linux-compat/cloneparent-check.v:388: FAIL: fn main.main: assert false, 'cloneparent assertions must execute'
+      message: cloneparent assertions must execute
+V panic: Assertion failed...

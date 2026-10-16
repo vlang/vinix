@@ -1,0 +1,31 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "4f74b2a8986884171c812fb9bebde4f9121ce66a7243c3d50f52eef2b5f5139e",
+    "results": [
+        {
+            "name": "cloneparent",
+            "source_sha256": "dee1cf547ec98e47788a3c499770cb79c62d8942cb87f7f43561948a74ce3d05",
+            "init_sha256": "e8af4214b14c5fdf25020a3ee66d1c76030ed5bee9a04171c52195028aed397c",
+            "iso_sha256": "d46197d43266b5417a2d6218436376cd3474de7a95dcd294b22e8ea354cf4059",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "3c22f6e44700a031e0c6e9bd04427095e423d595d3f9b81e09f07539d1ea3b9f",
+            "iso_sha256": "d48135b2e5b9e79a907015c3e13161a8fbf2527d520eba17d791fd01877a9462",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "clonetidcopy",
+            "source_sha256": "f37ae31a9518947ffe931a6bd1b63054cc9c41316ef66dfe146a06bdc4c68aff",
+            "init_sha256": "be26c644a72b4b302f9ea2bbe1cdfc024f4340632834dc2e1efe4deeb3c30d96",
+            "iso_sha256": "e86b2b176e56f059f14866785a24b2f45a519c3f2f61790da470960ecb745a17",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

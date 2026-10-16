@@ -82,6 +82,7 @@ pub fn syscall_clone3(gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 
 fn do_clone(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64, child_tid u64, tls u64, into_cgroup bool, cgroup voidptr) (u64, u64) {
 	if !valid_clone_sharing(flags) { return errno.err, errno.einval }
+	if !valid_clone_parent(flags) { return errno.err, errno.einval }
 	if !supported_clone_sharing(flags) { return errno.err, errno.enotsup }
 	// Returning a PID while leaving the requested pidfd word untouched would
 	// falsely report success. Descriptor construction/rollback is unsupported.

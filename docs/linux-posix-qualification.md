@@ -9736,3 +9736,100 @@ TID allocation, pidfds, non-SIGCHLD notifications and clone-child wait classes,
 supplied-stack execution/alignment, cgroup placement and its authorization/
 lifetimes, GNU libc and translated/32-bit paths remain unqualified here. The
 broad libc, installation/sandbox/portal and translation gates remain open.
+
+## Native clone and clone3 init-parent admission
+
+Both architectures now reject CLONE_PARENT with EINVAL at shared clone
+admission when the caller's process is PID 1 in its active PID namespace.
+The guard follows the required sharing checks and precedes unsupported
+sharing, namespace permissions and task creation. This covers legacy clone
+and clone3, including global init. It follows
+[Linux v6.12's init-parent guard](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c),
+which prevents global and container init processes from creating siblings.
+The test uses stable process and namespace identities; concurrent teardown
+and worker-thread calls remain separate.
+
+The `cloneparent` probe runs 888 controls per architecture: 24 from global
+PID 1, followed by 216 in each root/UID1000 and namespace-init/ordinary-process
+cohort. All four cohorts run in fresh one-level PID namespaces. Init callers
+are PID 1 and ordinary callers are PID 2. Each removes effective CAP_SYS_ADMIN
+and verifies the result with capget. Global controls temporarily remove that
+capability and verify its restoration before creating the cohort namespaces.
+Native ARM uses 16KiB pages; native x86 and both Linux references use 4KiB.
+
+| Class | Calls per cohort | Contract |
+| --- | ---: | --- |
+| clone3 parent reuse | 36 | Four ABI sizes 64/72/80/88, three protected argument placements and plain/CLEAR_SIGHAND/UNTRACED variants reject init with EINVAL; ordinary callers create real siblings with the expected parent. |
+| Legacy parent reuse | 36 | Four low signal words and three upper-word forms preserve legacy flag truncation. Init returns EINVAL; ordinary callers create siblings and inherit their creator's exit-notification relationship. The supervisor reaps exit-37 children normally. |
+| Namespace permission precedence | 36 | CLONE_PARENT plus NEWPID returns EINVAL from init before namespace permission checking, while ordinary callers without effective SYS_ADMIN retain EPERM. Four ABI sizes and three flag variants use the same protected placements. |
+| Import and ABI precedence | 36 | Invalid size/address, protected prefix and selected-TID vector access, malformed selected-TID pairs, exit-signal words and cgroup ABI words retain EINVAL/E2BIG/EFAULT before the init-parent guard. |
+| Invalid flags/sharing | 36 | Unknown/reserved bits, invalid sharing combinations and nonzero clone3 PARENT exit signals retain EINVAL without creating children. |
+| Ordinary forks | 36 | Plain/CLEAR_SIGHAND/UNTRACED SIGCHLD clones at four ABI sizes retain normal parent identity and real fork/reap from both init and ordinary callers. |
+
+The separate 24 global-init controls use clone and clone3 with PARENT plus
+NEWPID and no effective SYS_ADMIN. The expected EINVAL precedes namespace
+permission failure. These controls do not create children on the original
+or corrected kernels. Global init's effective capability words are restored
+and checked before any cohort setup.
+
+Arguments use aligned, byte-unaligned and native-page-tail placements on a
+read-only page followed by PROT_NONE. Each call restores the protections and
+compares the entire two-page canary. Every positive result validates child
+PID/TID, parent, UID and exit 37. Ordinary fork children are reaped by their
+caller. PARENT children are reaped through a request/acknowledgement channel
+by their actual parent: namespace init for ordinary callers, or the outer
+supervisor for original init-created siblings. No caller continues until the
+supervisor has reaped that child. An empty nonblocking caller wait must then
+return ECHILD.
+
+Original kernels fail exactly 240 controls per architecture: all 24 global
+controls and 108 in each init cohort. They create 72 unintended siblings per
+init cohort, or 144 per architecture, and the supervisor reaps all of them.
+Corrected kernels and the identical probe ELFs on Linux 6.12.51 pass every
+control and create no unintended siblings. Each ordinary cohort preserves
+108 valid children and each init cohort preserves 36 ordinary children in
+both phases, totaling 288 legitimate children per architecture. Cohort,
+supervisor and final child totals must agree.
+
+Both phases measure four cleanup cohorts after 64 warmup cycles and thirteen
+seconds of settling, followed by 200 measured cycles and another settle.
+Each cycle uses an identical PARENT/NEWPID refusal without effective SYS_ADMIN
+and one real ordinary fork/reap. Both phases refuse the first request before
+creating a child; only cleanup accepts the original EPERM or corrected EINVAL.
+Semantic controls require exact errors. All live slab classes and big-heap
+page totals stay flat. This qualifies the targeted kernel-heap paths; general
+page/cache retention and the earlier EXT2 rename observation remain separate.
+
+Four isolated original/corrected production builds pass. Exact whole-C
+comparison confines the change to the scalar predicate/prototype and two
+clone admission guards. No allocation, free, reference, ownership transfer,
+lock or process-publication changes are introduced. The probe uses thirteen
+explicit stack allocas and no dynamic allocation or fixed-index helper.
+Successful ARM compiler preflight matches the original guest C, and its ELF
+is also the canonical ARM Linux reference probe. An initial preparation helper
+had a V variable-name collision; its exact refused source and raw compiler
+reproducer are retained and pinned before the corrected preparation ran.
+
+Both corrected architectures pass runtime and the 1,728-control clonetidcopy
+regression. The auditor verifies global and cohort totals, exact original
+failures, actual parent/reaper results, legitimate/unintended child counts,
+effective-capability records, credentials/page sizes, identical probe C/ELFs,
+Linux receipts, both phases' storage, all 84 retained native case files, 67
+frozen dispatch inputs, 2,014 SDK files and 15,146 compiler pins. False-assertion
+and passing-Linux-as-original negative controls must execute and fail; compile
+without `-prod`.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/cloneparent-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/cloneparent-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/cloneparent-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/cloneparent-diagnostic-pins.json).
+Raw original/corrected/Linux, build, preflight and regression logs accompany
+the receipts. The maintained auditor is `tests/linux-compat/cloneparent-check.v`.
+
+This qualifies init-parent admission and stable ordinary parent reuse under
+the tested SIGCHLD parent lifecycles. Concurrent parent exit/reparenting,
+worker-thread calls, deeper/nested PID namespaces, selected-PID allocation,
+other exit notifications and clone-child wait classes, supplied stacks,
+shared-VM/vfork lifetimes, cgroup descriptor ordering/placement and its
+authorization/lifetimes, GNU libc and translated/32-bit paths remain unqualified
+here. The broad libc, installation/sandbox/portal and translation gates remain open.
