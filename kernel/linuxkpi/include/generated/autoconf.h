@@ -23,6 +23,10 @@
 #define CONFIG_PGTABLE_LEVELS 5
 #define CONFIG_SMP 1
 #define CONFIG_NR_CPUS 256
+/* Match the ordinary Linux base profile. BASE_SMALL is an integer selector
+ * used by genuine IDR/radix records; it must have an explicit value. */
+#define CONFIG_BASE_FULL 1
+#define CONFIG_BASE_SMALL 0
 /* Native non-RT IRQ work uses a real local-APIC interrupt on its target CPU.
  * NMI enqueue, hotplug and tickless idle are separate unsupported contexts. */
 #define CONFIG_IRQ_WORK 1

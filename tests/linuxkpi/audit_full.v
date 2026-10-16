@@ -262,7 +262,7 @@ fn run(configuration Configuration) !int {
 	kbuild := driver_sources(linux, state, make, archive, pin, configuration.timeout)!
 	sources := kbuild.sources
 	include := os.join_path(state, 'include')
-	hosttest.audit_headers(include)!
+	hosttest.audit_headers_from_source(include, linux)!
 	flags := ['--target=x86_64-unknown-none', '-std=gnu11', '-ffreestanding', '-fwrapv', '-nostdinc',
 		'-fsyntax-only', '-ferror-limit=5', '-Werror=implicit-function-declaration',
 		'-Wno-unused-parameter', '-D__KERNEL__', '-include', 'linux/kconfig.h', '-include',

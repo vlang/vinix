@@ -314,7 +314,8 @@ ifeq ($(LINUXKPI),1)
     LINUXKPI_ABI_HEADERS := obj/linuxkpi/include/vinix/spinlock_adapters.h obj/linuxkpi/include/vinix/atomic_exchange.h obj/linuxkpi/include/vinix/integer_policy.h
     # Match the generator's resolved -MQ target, including macOS /tmp aliases.
     LINUXKPI_BOUNDS_HEADER := $(realpath $(CURDIR))/obj/linuxkpi/include/generated/bounds.h
-    LINUXKPI_GENERATED_HEADERS := $(LINUXKPI_ABI_HEADERS) $(LINUXKPI_BOUNDS_HEADER)
+    LINUXKPI_SCHED_MM_HEADER := obj/linuxkpi/include/linux/sched/mm.h
+    LINUXKPI_GENERATED_HEADERS := $(LINUXKPI_ABI_HEADERS) $(LINUXKPI_SCHED_MM_HEADER) $(LINUXKPI_BOUNDS_HEADER)
     LINUXKPI_FIXTURES := cachefixture i915policyfixture pciconfigfixture runtimefixture taskfixture timefixture timerfixture syncfixture rwsemfixture conststringfixture kasprintffixture wwfixture iofixture seqfixture srcufixture workerfixture workfixture usleepfixture waitbitfixture printkfixture smpfixture workirqfixture rcufixture rcufreefixture irqworkfixture dmafencefixture fencecontainerfixture resvfixture swfencefixture cpubugfixture migrationfixture tscfixture aggregatefixture
     LINUXKPI_FIXTURE_C := $(addprefix obj/linuxkpi/,$(addsuffix .c,$(LINUXKPI_FIXTURES)))
     LINUXKPI_FIXTURE_OBJ := $(LINUXKPI_FIXTURE_C:.c=.o)
@@ -440,6 +441,15 @@ obj/linuxkpi/include/vinix/atomic_exchange.h: linuxkpi/abi/atomic-exchange.json 
 obj/linuxkpi/include/vinix/integer_policy.h: linuxkpi/abi/overflow.json $(LINUXKPI_ABI_GENERATOR) linuxkpi/headercore/policy.v
 	V="$(V)" sh ../build-support/run-v-tool.sh ../tests/linuxkpi/generate_abi.v $< $@
 
+# Keep unsupported task/MM operations as their exact original declarations.
+# The generator checks the pinned header and preserves every other original
+# byte and configuration branch; it supplies no address-space runtime.
+obj/linuxkpi/include/linux/sched/mm.h: $(LINUXKPI_SOURCE_DIR)/include/linux/sched/mm.h ../tests/linuxkpi/generate_sched_mm.v $(LINUXKPI_V_TOOL_HELPERS) linuxkpi/upstream.json GNUmakefile
+	V="$(V)" sh ../build-support/run-v-tool.sh ../tests/linuxkpi/generate_sched_mm.v $< $@
+# A successful build validation also updates dependency ordering when the
+# generator changed but its pinned output bytes remained identical.
+	touch $@
+
 # Compiler-derived bounds use the actual native MMU/config/header profile.
 # Reevaluate the command stamp on every invocation, preserving its timestamp
 # when flags are unchanged. Header dependencies include all discovered inputs.
@@ -447,7 +457,7 @@ obj/linuxkpi/include/vinix/integer_policy.h: linuxkpi/abi/overflow.json $(LINUXK
 obj/linuxkpi/.bounds-command: linuxkpi-bounds-command
 	V="$(V)" sh ../build-support/run-v-tool.sh ../tests/linuxkpi/generate_bounds.v --source-dir "$(LINUXKPI_SOURCE_DIR)" --archive "$(LINUXKPI_ARCHIVE)" --command-stamp $@ --cc "$(CC)" -- $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11
 
-$(LINUXKPI_BOUNDS_HEADER): $(LINUXKPI_ABI_HEADERS) obj/linuxkpi/.bounds-command $(LINUXKPI_BOUNDS_GENERATOR) linuxkpi/upstream.json linuxkpi/include/generated/autoconf.h $(LINUXKPI_ARCHIVE) GNUmakefile $(V_CONFIG_STAMP)
+$(LINUXKPI_BOUNDS_HEADER): $(LINUXKPI_ABI_HEADERS) $(LINUXKPI_SCHED_MM_HEADER) obj/linuxkpi/.bounds-command $(LINUXKPI_BOUNDS_GENERATOR) linuxkpi/upstream.json linuxkpi/include/generated/autoconf.h $(LINUXKPI_ARCHIVE) GNUmakefile $(V_CONFIG_STAMP)
 	V="$(V)" sh ../build-support/run-v-tool.sh ../tests/linuxkpi/generate_bounds.v --source-dir "$(LINUXKPI_SOURCE_DIR)" --archive "$(LINUXKPI_ARCHIVE)" --output $@ --cc "$(CC)" -- $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11
 # Native consumers must recompile after a compiler/config change even when
 # numeric bounds are equal. Mark successful validation newer than its inputs;
