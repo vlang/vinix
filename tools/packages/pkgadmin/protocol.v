@@ -84,33 +84,36 @@ pub fn (request &Request) encode() !string {
 
 pub fn decode(text string) !Request {
 	if text.len == 0 || text.len > request_limit { return error('invalid administrator package request size') }
-	mut request := json2.decode[Request](text)!
-	mut accepted := false
-	defer { if !accepted { request.close() } }
-	canonical := request.encode()!
-	defer { unsafe { canonical.free() } }
-	// Canonical transport refuses unknown/duplicate/escaped keys and trailing
-	// data even if the general decoder would otherwise ignore them.
-	if canonical != text { return error('administrator package request is not canonical') }
-	accepted = true
-	return request
+	return decode_request(text)
+}
+
+fn (request &Request) digest() !string {
+	encoded := request.encode()!
+	bytes := encoded.bytes()
+	mut hash := sha256.new()
+	mut checksum := []u8{len: sha256.size}
+	defer { unsafe { encoded.free(); bytes.free(); hash.free(); free(hash); checksum.free() } }
+	hash.write(bytes) or { panic(err) }
+	hash.checksum_into(mut checksum)
+	return checksum.hex()
+}
+
+fn discard_request_error(err IError) {
+	message := err.msg()
+	unsafe { message.free(); err.free() }
 }
 
 pub fn (request &Request) receipt(code int) string {
-	encoded := request.encode() or { return '' }
-	bytes := encoded.bytes()
-	digest := sha256.sum(bytes).hex()
+	digest := request.digest() or { discard_request_error(err); return '' }
 	number := code.str()
-	defer { unsafe { encoded.free(); bytes.free(); digest.free(); number.free() } }
+	defer { unsafe { digest.free(); number.free() } }
 	return result_prefix + request.nonce + ' ' + digest + ' ' + number
 }
 
 pub fn (request &Request) result(line string) !int {
-	encoded := request.encode()!
-	bytes := encoded.bytes()
-	digest := sha256.sum(bytes).hex()
+	digest := request.digest()!
 	prefix := result_prefix + request.nonce + ' ' + digest + ' '
-	defer { unsafe { encoded.free(); bytes.free(); digest.free(); prefix.free() } }
+	defer { unsafe { digest.free(); prefix.free() } }
 	if line.starts_with(prefix) {
 		number := unsafe { tos(line.str + prefix.len, line.len - prefix.len) }
 		if number.len >= 1 && number.len <= 3 && (number.len == 1 || number[0] != `0`) {

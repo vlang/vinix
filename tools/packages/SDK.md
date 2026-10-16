@@ -144,6 +144,14 @@ secret. It is sent only to the authentication
 service, separately from the action request. No password or authorization grant
 is cached.
 
+`pkgadmin.decode` returns an owned request; `Request.close()` releases its nonce
+and argument strings/table and is repeatable. The bounded, nonrecursive reader
+also retires partially decoded fields on refusal. Receipt construction and
+validation release their SHA-256 context and scratch on every return. Canonical
+bytes, 4,096-byte/69-argument limits and accepted command/status rules remain
+unchanged; malformed envelopes receive bounded administrator-protocol
+diagnostics. See [administrator envelope checks](../../tests/packages/admin-envelope-check.md).
+
 Allowed operations are `update`, reviewed `apply` for install/remove/upgrade/
 repair/rollback, `repo-apply`, `deployment-apply`, `policy-apply`, `mirror-apply` and
 `mirror-deployment-apply`. Every operation except refresh requires its exact

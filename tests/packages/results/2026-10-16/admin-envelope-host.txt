@@ -1,0 +1,33 @@
+32 focused native compile/run checks passed. All 58 final ownership windows retain zero bytes. Both architectures pass root/UID1000 ownership and real authenticated administrator guests.
+protocol-compile PASS 1.069s
+protocol-run PASS 0.248s
+authcore-compile PASS 2.316s
+authcore-run PASS 6.453s
+shipped-actions-compile PASS 2.38s
+shipped-actions-run PASS 0.278s
+root-peer-compile PASS 3.323s
+root-peer-run PASS 0.26s
+launch-protocol-compile PASS 4.399s
+launch-protocol-run PASS 0.276s
+launch-streams-compile PASS 4.383s
+launch-streams-run PASS 0.246s
+admin-protocol-compile PASS 3.238s
+admin-protocol-run PASS 0.9s
+admin-socket-compile PASS 3.103s
+admin-socket-run PASS 0.25s
+package-cli-compile PASS 5.92s
+distribution-cli-compile PASS 6.516s
+distribution-cli-run PASS 6.235s
+distribution-driver-compile PASS 1.205s
+memory-compile PASS 2.754s
+memory-run PASS 1.307s
+asan-compile PASS 3.518s
+asan-run PASS 4.489s
+baseline-compile PASS
+baseline-run PASS
+final-compile PASS
+final-run PASS
+compat-baseline-compile PASS
+compat-baseline-run PASS
+compat-final-compile PASS
+compat-final-run PASS

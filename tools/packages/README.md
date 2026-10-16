@@ -599,3 +599,8 @@ a private, kernel-peer-checked runtime socket; passwords stay off command lines
 and the desktop clears them after submission or cancellation. CLI clients use
 `vinix-package admin [--progress] [--offline] COMMAND ...` for the same bounded
 reviewed-operation transport. See [administrator qualification](../../tests/packages/admin-check.md).
+
+Administrator request decoding and completion receipts retire partial fields,
+hash state and temporary storage after success or refusal. Canonical bytes and
+reviewed-operation bounds remain unchanged; see
+[administrator envelope qualification](../../tests/packages/admin-envelope-check.md).

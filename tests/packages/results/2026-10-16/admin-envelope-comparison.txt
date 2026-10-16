@@ -1,0 +1,15 @@
+BASELINE fe668b6da: five calls per window, caller-owned inputs outside tracking
+ADMIN PROTOCOL encode retained 0 bytes
+ADMIN PROTOCOL decode retained 400 bytes
+ADMIN PROTOCOL partial refusal retained 5495 bytes
+ADMIN PROTOCOL receipt retained 1705 bytes
+ADMIN PROTOCOL result retained 1705 bytes
+ADMIN PROTOCOL result refusal retained 1705 bytes
+
+FINAL: identical five-call windows and cleanup
+ADMIN PROTOCOL encode retained 0 bytes
+ADMIN PROTOCOL decode retained 0 bytes
+ADMIN PROTOCOL partial refusal retained 0 bytes
+ADMIN PROTOCOL receipt retained 0 bytes
+ADMIN PROTOCOL result retained 0 bytes
+ADMIN PROTOCOL result refusal retained 0 bytes

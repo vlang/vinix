@@ -1962,3 +1962,9 @@ reply-check scratch and listener wrapper, including when approval or completion
 fails. Runtime-parent validation uses fixed storage. Handoffs between ordinary
 clients and a root service preserve literal arguments, three protected streams and exact
 diagnostics; see [launch client qualification](../tests/packages/launch-client-check.md).
+
+Administrator request envelopes now use an owned, bounded canonical reader
+that retires partially decoded fields. Completion receipts release hash state
+and scratch, retaining their canonical bytes and reviewed-operation limits.
+Malformed requests receive bounded protocol diagnostics. See
+[administrator envelope qualification](../tests/packages/admin-envelope-check.md).

@@ -211,6 +211,10 @@ fn check() ! {
 		run(work + '/repository-configuration-memory', [])!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/appsdk', work)!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgadmin', work)!
+		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/admin-envelope-memory', repository + '/tools/packages/pkgadmin/ownership_test.v'])!
+		run(work + '/admin-envelope-memory', [])!
 		run(v, ['-nocache', 'run', repository + '/tests/packages/space-check.v'])!
 		run(v, ['-nocache', 'run', repository + '/tests/packages/removal-space-check.v'])!
 		check_tests(v, ['-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts'], repository + '/tools/packages/pkglaunch', work)!

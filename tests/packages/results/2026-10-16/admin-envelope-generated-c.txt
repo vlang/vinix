@@ -1,0 +1,1567 @@
+Baseline generic JSON decoding owns an array grown without noslices; errors can return before partial request fields reach the caller. Matched probes establish retained bytes separately. Final fixed reader owns its heap reader and quoted buffer, transfers each string header once, releases partial fields/table on every refusal and transfers only accepted fields to Request.close. Receipt hashing releases context internals, context object, checksum, encoded string and bytes; error disposal passes the IError wrapper by value.
+
+Native baseline: pkgadmin__decode
+pkgadmin__decode(string text) {
+	char _v_unwind_owner;
+	if ((text.len == 0) || (text.len > pkgadmin__request_limit)) {
+		return (__v_result_pkgadmin__Request){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_242, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+	}
+	__v_result_pkgadmin__Request __or_opt_0 = json2__decode_T_pkgadmin__Request(text, (json2__DecoderOptions){0});
+	pkgadmin__Request __or_val_1 = {0};
+	if (__or_opt_0.ok) {
+		__or_val_1 = __or_opt_0.value;
+	} else {
+		return (__v_result_pkgadmin__Request){.ok = false, .err = __or_opt_0.err};
+	}
+	pkgadmin__Request request = __or_val_1;
+	bool accepted = false;
+	v_unwind_frame _v_pf_184160;
+	_v_pf_184160.owner = &_v_unwind_owner;
+	_v_pf_184160.jump = v_unwind_jump;
+	panic_frame_push(&_v_pf_184160);
+	v_unwind_keep(&request);
+	v_unwind_keep(&accepted);
+	if (v_unwind_setjmp(_v_pf_184160.buf)) {
+		v_unwind_reload();
+		{
+			if (!accepted) {
+				pkgadmin__Request__close(&request);
+			}
+		}
+		panic_frame_done(&_v_pf_184160);
+		return (__v_result_pkgadmin__Request){.ok = true};
+	}
+	__v_result_string __or_opt_2 = pkgadmin__Request__encode(&request);
+	string __or_val_3 = {0};
+	if (__or_opt_2.ok) {
+		__or_val_3 = __or_opt_2.value;
+	} else {
+		__v_result_pkgadmin__Request _t1 = (__v_result_pkgadmin__Request){.ok = false, .err = __or_opt_2.err};
+		panic_frame_pop(&_v_pf_184160);
+		{
+			if (!accepted) {
+				pkgadmin__Request__close(&request);
+			}
+		}
+		return _t1;
+	}
+	string canonical = __or_val_3;
+	v_unwind_frame _v_pf_184195;
+	_v_pf_184195.owner = &_v_unwind_owner;
+	_v_pf_184195.jump = v_unwind_jump;
+	panic_frame_push(&_v_pf_184195);
+	v_unwind_keep(&canonical);
+	if (v_unwind_setjmp(_v_pf_184195.buf)) {
+		v_unwind_reload();
+		{
+			{
+				string__free(&canonical);
+			}
+		}
+		panic_frame_done(&_v_pf_184195);
+		return (__v_result_pkgadmin__Request){.ok = true};
+	}
+	if (!string__eq(canonical, text)) {
+		__v_result_pkgadmin__Request _t2 = (__v_result_pkgadmin__Request){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_243, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		panic_frame_pop(&_v_pf_184195);
+		{
+			{
+				string__free(&canonical);
+			}
+		}
+		panic_frame_pop(&_v_pf_184160);
+		{
+			if (!accepted) {
+				pkgadmin__Request__close(&request);
+			}
+		}
+		return _t2;
+	}
+	accepted = true;
+	__v_result_pkgadmin__Request _t3 = (__v_result_pkgadmin__Request){.ok = true, .value = 	request};
+	panic_frame_pop(&_v_pf_184195);
+	{
+		{
+			string__free(&canonical);
+		}
+	}
+	panic_frame_pop(&_v_pf_184160);
+	{
+		if (!accepted) {
+			pkgadmin__Request__close(&request);
+		}
+	}
+	return _t3;
+	panic_frame_pop(&_v_pf_184195);
+	{
+		{
+			string__free(&canonical);
+		}
+	}
+	panic_frame_pop(&_v_pf_184160);
+	{
+		if (!accepted) {
+			pkgadmin__Request__close(&request);
+		}
+	}
+	return (__v_result_pkgadmin__Request){.ok = true};
+}
+
+Native baseline: json2__Decoder_string__decode_array
+json2__Decoder_string__decode_array(json2__Decoder* decoder, Array* val) {
+	{
+		json2__ValueInfo array_info = json2__Decoder__current_value(decoder);
+		if (array_info.value_kind == json2__ValueKind__array) {
+			decoder->current_idx++;
+			i64 array_position = array_info.position;
+			i64 array_end = array_position + array_info.length;
+			for (;;) {
+				if ((decoder->current_idx >= decoder->values_info.len) || ((json2__Decoder__current_value(decoder)).position >= array_end)) {
+					break;
+				}
+				{
+					__v_result_string __or_opt_0 = json2__Decoder_string__decode_array_element(decoder, _str_29);
+					string __or_val_1 = {0};
+					if (__or_opt_0.ok) {
+						__or_val_1 = __or_opt_0.value;
+					} else {
+						return (__v_result){.ok = false, .err = __or_opt_0.err};
+					}
+					string __arr_val_2 = __or_val_1;
+					array_push(val, &__arr_val_2);
+				}
+			}
+		} else if ((array_info.value_kind == json2__ValueKind__null) && !decoder->strict) {
+			decoder->current_idx++;
+		} else {
+			__v_result __or_opt_3 = json2__Decoder__decode_error(decoder, string__plus(_str_968, json2__ValueKind__autostr(array_info.value_kind)));
+			if (!__or_opt_3.ok) {
+				return (__v_result){.ok = false, .err = __or_opt_3.err};
+			}
+		}
+	}
+	return (__v_result){.ok = true};
+}
+
+Native baseline: pkgadmin__Request__receipt
+pkgadmin__Request__receipt(pkgadmin__Request* request, i64 code) {
+	char _v_unwind_owner;
+	__v_result_string __or_opt_0 = pkgadmin__Request__encode(request);
+	string __or_val_1 = {0};
+	if (__or_opt_0.ok) {
+		__or_val_1 = __or_opt_0.value;
+	} else {
+		IError err = __or_opt_0.err;
+		return _str_29;
+	}
+	string encoded = __or_val_1;
+	Array bytes = string__bytes(encoded);
+	string digest = Array_u8__hex(sha256__sum(bytes));
+	string number = int__str(code);
+	v_unwind_frame _v_pf_234599;
+	_v_pf_234599.owner = &_v_unwind_owner;
+	_v_pf_234599.jump = v_unwind_jump;
+	panic_frame_push(&_v_pf_234599);
+	v_unwind_keep(&number);
+	v_unwind_keep(&digest);
+	v_unwind_keep(&bytes);
+	v_unwind_keep(&encoded);
+	if (v_unwind_setjmp(_v_pf_234599.buf)) {
+		v_unwind_reload();
+		{
+			{
+				string__free(&encoded);
+				array__free(&bytes);
+				string__free(&digest);
+				string__free(&number);
+			}
+		}
+		panic_frame_done(&_v_pf_234599);
+		return _str_29;
+	}
+	string _t2 = 	({ string __v3_internal_symbol_join_0[6]; __v3_internal_symbol_join_0[0] = pkgadmin__result_prefix; __v3_internal_symbol_join_0[1] = request->nonce; __v3_internal_symbol_join_0[2] = _str_1; __v3_internal_symbol_join_0[3] = digest; __v3_internal_symbol_join_0[4] = _str_1; __v3_internal_symbol_join_0[5] = number; string_plus_many(6, __v3_internal_symbol_join_0); });
+	panic_frame_pop(&_v_pf_234599);
+	{
+		{
+			string__free(&encoded);
+			array__free(&bytes);
+			string__free(&digest);
+			string__free(&number);
+		}
+	}
+	return _t2;
+	panic_frame_pop(&_v_pf_234599);
+	{
+		{
+			string__free(&encoded);
+			array__free(&bytes);
+			string__free(&digest);
+			string__free(&number);
+		}
+	}
+}
+
+Native baseline: pkgadmin__Request__result
+pkgadmin__Request__result(pkgadmin__Request* request, string line) {
+	char _v_unwind_owner;
+	__v_result_string __or_opt_0 = pkgadmin__Request__encode(request);
+	string __or_val_1 = {0};
+	if (__or_opt_0.ok) {
+		__or_val_1 = __or_opt_0.value;
+	} else {
+		return (__v_result_i64){.ok = false, .err = __or_opt_0.err};
+	}
+	string encoded = __or_val_1;
+	Array bytes = string__bytes(encoded);
+	string digest = Array_u8__hex(sha256__sum(bytes));
+	string prefix = ({ string __v3_internal_symbol_join_0[5]; __v3_internal_symbol_join_0[0] = pkgadmin__result_prefix; __v3_internal_symbol_join_0[1] = request->nonce; __v3_internal_symbol_join_0[2] = _str_1; __v3_internal_symbol_join_0[3] = digest; __v3_internal_symbol_join_0[4] = _str_1; string_plus_many(5, __v3_internal_symbol_join_0); });
+	v_unwind_frame _v_pf_197613;
+	_v_pf_197613.owner = &_v_unwind_owner;
+	_v_pf_197613.jump = v_unwind_jump;
+	panic_frame_push(&_v_pf_197613);
+	v_unwind_keep(&prefix);
+	v_unwind_keep(&digest);
+	v_unwind_keep(&bytes);
+	v_unwind_keep(&encoded);
+	if (v_unwind_setjmp(_v_pf_197613.buf)) {
+		v_unwind_reload();
+		{
+			{
+				string__free(&encoded);
+				array__free(&bytes);
+				string__free(&digest);
+				string__free(&prefix);
+			}
+		}
+		panic_frame_done(&_v_pf_197613);
+		return (__v_result_i64){.ok = true};
+	}
+	if (string__starts_with(line, prefix)) {
+		string number = tos(line.str + prefix.len, line.len - prefix.len);
+		if ((number.len >= 1) && (number.len <= 3) && ((number.len == 1) || (string__at(number, 0) != '0'))) {
+			i64 value = 0;
+			{
+				i64 __for_idx_2 = 0;
+				for (; __for_idx_2 < number.len; __for_idx_2++) {
+					u8 byte = string__at(number, __for_idx_2);
+					if ((byte < '0') || (byte > '9')) {
+						__v_result_i64 _t2 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_244, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+						panic_frame_pop(&_v_pf_197613);
+						{
+							{
+								string__free(&encoded);
+								array__free(&bytes);
+								string__free(&digest);
+								string__free(&prefix);
+							}
+						}
+						return _t2;
+					}
+					value = (value * 10) + (i64)(byte - '0');
+				}
+			}
+			if (value < 256) {
+				__v_result_i64 _t3 = (__v_result_i64){.ok = true, .value = 				value};
+				panic_frame_pop(&_v_pf_197613);
+				{
+					{
+						string__free(&encoded);
+						array__free(&bytes);
+						string__free(&digest);
+						string__free(&prefix);
+					}
+				}
+				return _t3;
+			}
+		}
+	}
+	__v_result_i64 _t4 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_245, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+	panic_frame_pop(&_v_pf_197613);
+	{
+		{
+			string__free(&encoded);
+			array__free(&bytes);
+			string__free(&digest);
+			string__free(&prefix);
+		}
+	}
+	return _t4;
+	panic_frame_pop(&_v_pf_197613);
+	{
+		{
+			string__free(&encoded);
+			array__free(&bytes);
+			string__free(&digest);
+			string__free(&prefix);
+		}
+	}
+	return (__v_result_i64){.ok = true};
+}
+
+aarch64: pkgadmin__RequestReader__quoted
+pkgadmin__RequestReader__quoted(pkgadmin__RequestReader* reader, i64 limit) {
+	__v_result __or_opt_0 = pkgadmin__RequestReader__expect(reader, _str_238);
+	if (!__or_opt_0.ok) {
+		return (__v_result_string){.ok = false, .err = __or_opt_0.err};
+	}
+	Array bytes = __new_array_noscan(0, 64, sizeof(u8));
+	{
+		bytes.flags |= 1;
+	}
+	while (reader->at < reader->text.len) {
+		u8 byte = string__at(reader->text, reader->at);
+		reader->at++;
+		if (byte == '"') {
+			__v_result_string _t1 = (__v_result_string){.ok = true, .value = 			Array_u8__bytestr(bytes)};
+			{
+				{
+					array__free(&bytes);
+				}
+			}
+			return _t1;
+		}
+		if ((bytes.len == limit) || (byte < 32)) {
+			__v_result_string _t2 = (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_239, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+			{
+				{
+					array__free(&bytes);
+				}
+			}
+			return _t2;
+		}
+		if (byte != '\\') {
+			u8 __arr_val_1 = byte;
+			array_push(&bytes, &__arr_val_1);
+			continue;
+		}
+		if (reader->at == reader->text.len) {
+			__v_result_string _t3 = (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_240, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+			{
+				{
+					array__free(&bytes);
+				}
+			}
+			return _t3;
+		}
+		u8 escape = string__at(reader->text, reader->at);
+		reader->at++;
+		if ((escape == '"') || (escape == '\\')) {
+			u8 __arr_val_2 = escape;
+			array_push(&bytes, &__arr_val_2);
+		} else if (escape == 'b') {
+			u8 __arr_val_3 = (u8)(8);
+			array_push(&bytes, &__arr_val_3);
+		} else if (escape == 'f') {
+			u8 __arr_val_4 = (u8)(12);
+			array_push(&bytes, &__arr_val_4);
+		} else if (escape == 'n') {
+			u8 __arr_val_5 = (u8)(10);
+			array_push(&bytes, &__arr_val_5);
+		} else if (escape == 'r') {
+			u8 __arr_val_6 = (u8)(13);
+			array_push(&bytes, &__arr_val_6);
+		} else if (escape == 't') {
+			u8 __arr_val_7 = (u8)(9);
+			array_push(&bytes, &__arr_val_7);
+		} else if (escape == 'u') {
+			__v_result __or_opt_8 = pkgadmin__RequestReader__expect(reader, _str_55);
+			if (!__or_opt_8.ok) {
+				__v_result_string _t4 = (__v_result_string){.ok = false, .err = __or_opt_8.err};
+				{
+					{
+						array__free(&bytes);
+					}
+				}
+				return _t4;
+			}
+			i64 value = 0;
+			{
+				i64 __discard_53_1513_1514 = 0;
+				for (; __discard_53_1513_1514 < 2; __discard_53_1513_1514++) {
+					if (reader->at == reader->text.len) {
+						__v_result_string _t5 = (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_240, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+						{
+							{
+								array__free(&bytes);
+							}
+						}
+						return _t5;
+					}
+					u8 digit = string__at(reader->text, reader->at);
+					reader->at++;
+					i64 __order_snapshot_9 = value * 16;
+					i64 __if_val_10 = {0};
+					if ((digit >= '0') && (digit <= '9')) {
+						__if_val_10 = (i64)(digit - '0');
+					} else {
+						if ((digit >= 'a') && (digit <= 'f')) {
+							__if_val_10 = (i64)((digit - 'a') + 10);
+						} else {
+							__v_result_string _t6 = (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_241, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+							{
+								{
+									array__free(&bytes);
+								}
+							}
+							return _t6;
+						}
+					}
+					value = __order_snapshot_9 + __if_val_10;
+				}
+			}
+			if (value >= 32) {
+				__v_result_string _t7 = (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_242, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+				{
+					{
+						array__free(&bytes);
+					}
+				}
+				return _t7;
+			}
+			u8 __arr_val_11 = (u8)(value);
+			array_push(&bytes, &__arr_val_11);
+		} else {
+			__v_result_string _t8 = (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_241, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+			{
+				{
+					array__free(&bytes);
+				}
+			}
+			return _t8;
+		}
+	}
+	__v_result_string _t9 = (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_243, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+	{
+		{
+			array__free(&bytes);
+		}
+	}
+	return _t9;
+	{
+		{
+			array__free(&bytes);
+		}
+	}
+	return (__v_result_string){.ok = true};
+}
+
+aarch64: pkgadmin__decode_request
+pkgadmin__decode_request(string text) {
+	pkgadmin__RequestReader* reader = (pkgadmin__RequestReader*)memdup(&(pkgadmin__RequestReader){.text = text}, sizeof(pkgadmin__RequestReader));
+	__v_result __or_opt_0 = pkgadmin__RequestReader__expect(reader, _str_244);
+	if (!__or_opt_0.ok) {
+		__v_result_pkgadmin__Request _t1 = (__v_result_pkgadmin__Request){.ok = false, .err = __or_opt_0.err};
+		{
+			{
+				v_free(reader);
+			}
+		}
+		return _t1;
+	}
+	__v_result_string __or_opt_1 = pkgadmin__RequestReader__quoted(reader, 32);
+	string __or_val_2 = {0};
+	if (__or_opt_1.ok) {
+		__or_val_2 = __or_opt_1.value;
+	} else {
+		__v_result_pkgadmin__Request _t2 = (__v_result_pkgadmin__Request){.ok = false, .err = __or_opt_1.err};
+		{
+			{
+				v_free(reader);
+			}
+		}
+		return _t2;
+	}
+	string nonce = __or_val_2;
+	Array values = array_new(	sizeof(string), 0, 69);
+	{
+		values.flags |= 1;
+	}
+	bool accepted = false;
+	if (!pkgadmin__hex(nonce, 32)) {
+		__v_result_pkgadmin__Request _t3 = (__v_result_pkgadmin__Request){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_232, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			if (!accepted) {
+				{
+					string__free(&nonce);
+					{
+						i64 __for_idx_3 = 0;
+						for (; __for_idx_3 < values.len; __for_idx_3++) {
+							string value = *(string*)(array_get(values, __for_idx_3));
+							string__free(&value);
+						}
+					}
+					array__free(((array*)(&values)));
+				}
+			}
+		}
+		{
+			{
+				v_free(reader);
+			}
+		}
+		return _t3;
+	}
+	__v_result __or_opt_4 = pkgadmin__RequestReader__expect(reader, _str_245);
+	if (!__or_opt_4.ok) {
+		__v_result_pkgadmin__Request _t4 = (__v_result_pkgadmin__Request){.ok = false, .err = __or_opt_4.err};
+		{
+			if (!accepted) {
+				{
+					string__free(&nonce);
+					{
+						i64 __for_idx_3 = 0;
+						for (; __for_idx_3 < values.len; __for_idx_3++) {
+							string value = *(string*)(array_get(values, __for_idx_3));
+							string__free(&value);
+						}
+					}
+					array__free(((array*)(&values)));
+				}
+			}
+		}
+		{
+			{
+				v_free(reader);
+			}
+		}
+		return _t4;
+	}
+	while ((reader->at < text.len) && (string__at(text, reader->at) != ']')) {
+		if (values.len == 69) {
+			__v_result_pkgadmin__Request _t5 = (__v_result_pkgadmin__Request){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_210, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+			{
+				if (!accepted) {
+					{
+						string__free(&nonce);
+						{
+							i64 __for_idx_3 = 0;
+							for (; __for_idx_3 < values.len; __for_idx_3++) {
+								string value = *(string*)(array_get(values, __for_idx_3));
+								string__free(&value);
+							}
+						}
+						array__free(((array*)(&values)));
+					}
+				}
+			}
+			{
+				{
+					v_free(reader);
+				}
+			}
+			return _t5;
+		}
+		if (values.len != 0) {
+			__v_result __or_opt_5 = pkgadmin__RequestReader__expect(reader, _str_246);
+			if (!__or_opt_5.ok) {
+				__v_result_pkgadmin__Request _t6 = (__v_result_pkgadmin__Request){.ok = false, .err = __or_opt_5.err};
+				{
+					if (!accepted) {
+						{
+							string__free(&nonce);
+							{
+								i64 __for_idx_3 = 0;
+								for (; __for_idx_3 < values.len; __for_idx_3++) {
+									string value = *(string*)(array_get(values, __for_idx_3));
+									string__free(&value);
+								}
+							}
+							array__free(((array*)(&values)));
+						}
+					}
+				}
+				{
+					{
+						v_free(reader);
+					}
+				}
+				return _t6;
+			}
+		}
+		__v_result_string __or_opt_6 = pkgadmin__RequestReader__quoted(reader, 4096);
+		string __or_val_7 = {0};
+		if (__or_opt_6.ok) {
+			__or_val_7 = __or_opt_6.value;
+		} else {
+			__v_result_pkgadmin__Request _t7 = (__v_result_pkgadmin__Request){.ok = false, .err = __or_opt_6.err};
+			{
+				if (!accepted) {
+					{
+						string__free(&nonce);
+						{
+							i64 __for_idx_3 = 0;
+							for (; __for_idx_3 < values.len; __for_idx_3++) {
+								string value = *(string*)(array_get(values, __for_idx_3));
+								string__free(&value);
+							}
+						}
+						array__free(((array*)(&values)));
+					}
+				}
+			}
+			{
+				{
+					v_free(reader);
+				}
+			}
+			return _t7;
+		}
+		string value = __or_val_7;
+		{
+			array_push_many_ptr(&values, &value, 1);
+		}
+	}
+	__v_result __or_opt_8 = pkgadmin__RequestReader__expect(reader, _str_247);
+	if (!__or_opt_8.ok) {
+		__v_result_pkgadmin__Request _t8 = (__v_result_pkgadmin__Request){.ok = false, .err = __or_opt_8.err};
+		{
+			if (!accepted) {
+				{
+					string__free(&nonce);
+					{
+						i64 __for_idx_3 = 0;
+						for (; __for_idx_3 < values.len; __for_idx_3++) {
+							string value = *(string*)(array_get(values, __for_idx_3));
+							string__free(&value);
+						}
+					}
+					array__free(((array*)(&values)));
+				}
+			}
+		}
+		{
+			{
+				v_free(reader);
+			}
+		}
+		return _t8;
+	}
+	if (reader->at != text.len) {
+		__v_result_pkgadmin__Request _t9 = (__v_result_pkgadmin__Request){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_237, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			if (!accepted) {
+				{
+					string__free(&nonce);
+					{
+						i64 __for_idx_3 = 0;
+						for (; __for_idx_3 < values.len; __for_idx_3++) {
+							string value = *(string*)(array_get(values, __for_idx_3));
+							string__free(&value);
+						}
+					}
+					array__free(((array*)(&values)));
+				}
+			}
+		}
+		{
+			{
+				v_free(reader);
+			}
+		}
+		return _t9;
+	}
+	pkgadmin__Request request = (pkgadmin__Request){.nonce = nonce, .arguments = values, .format = 1};
+	__v_result_string __or_opt_9 = pkgadmin__Request__encode(&request);
+	string __or_val_10 = {0};
+	if (__or_opt_9.ok) {
+		__or_val_10 = __or_opt_9.value;
+	} else {
+		__v_result_pkgadmin__Request _t10 = (__v_result_pkgadmin__Request){.ok = false, .err = __or_opt_9.err};
+		{
+			if (!accepted) {
+				{
+					string__free(&nonce);
+					{
+						i64 __for_idx_3 = 0;
+						for (; __for_idx_3 < values.len; __for_idx_3++) {
+							string value = *(string*)(array_get(values, __for_idx_3));
+							string__free(&value);
+						}
+					}
+					array__free(((array*)(&values)));
+				}
+			}
+		}
+		{
+			{
+				v_free(reader);
+			}
+		}
+		return _t10;
+	}
+	string canonical = __or_val_10;
+	if (!string__eq(text, canonical)) {
+		__v_result_pkgadmin__Request _t11 = (__v_result_pkgadmin__Request){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_237, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			{
+				string__free(&canonical);
+			}
+		}
+		{
+			if (!accepted) {
+				{
+					string__free(&nonce);
+					{
+						i64 __for_idx_3 = 0;
+						for (; __for_idx_3 < values.len; __for_idx_3++) {
+							string value = *(string*)(array_get(values, __for_idx_3));
+							string__free(&value);
+						}
+					}
+					array__free(((array*)(&values)));
+				}
+			}
+		}
+		{
+			{
+				v_free(reader);
+			}
+		}
+		return _t11;
+	}
+	accepted = true;
+	__v_result_pkgadmin__Request _t12 = (__v_result_pkgadmin__Request){.ok = true, .value = 	request};
+	{
+		{
+			string__free(&canonical);
+		}
+	}
+	{
+		if (!accepted) {
+			{
+				string__free(&nonce);
+				{
+					i64 __for_idx_3 = 0;
+					for (; __for_idx_3 < values.len; __for_idx_3++) {
+						string value = *(string*)(array_get(values, __for_idx_3));
+						string__free(&value);
+					}
+				}
+				array__free(((array*)(&values)));
+			}
+		}
+	}
+	{
+		{
+			v_free(reader);
+		}
+	}
+	return _t12;
+	{
+		{
+			string__free(&canonical);
+		}
+	}
+	{
+		if (!accepted) {
+			{
+				string__free(&nonce);
+				{
+					i64 __for_idx_3 = 0;
+					for (; __for_idx_3 < values.len; __for_idx_3++) {
+						string value = *(string*)(array_get(values, __for_idx_3));
+						string__free(&value);
+					}
+				}
+				array__free(((array*)(&values)));
+			}
+		}
+	}
+	{
+		{
+			v_free(reader);
+		}
+	}
+	return (__v_result_pkgadmin__Request){.ok = true};
+}
+
+aarch64: pkgadmin__Request__digest
+pkgadmin__Request__digest(pkgadmin__Request* request) {
+	__v_result_string __or_opt_0 = pkgadmin__Request__encode(request);
+	string __or_val_1 = {0};
+	if (__or_opt_0.ok) {
+		__or_val_1 = __or_opt_0.value;
+	} else {
+		return (__v_result_string){.ok = false, .err = __or_opt_0.err};
+	}
+	string encoded = __or_val_1;
+	Array bytes = string__bytes(encoded);
+	sha256__Digest* hash = sha256__new();
+	Array checksum = __new_array_noscan(sha256__size, 0, sizeof(u8));
+	__v_result_i64 __or_opt_2 = sha256__Digest__write(hash, bytes);
+	if (!__or_opt_2.ok) {
+		IError err = __or_opt_2.err;
+		v_panic(IError__str(err));
+	}
+	sha256__Digest__checksum_into(hash, &checksum);
+	__v_result_string _t1 = (__v_result_string){.ok = true, .value = 	Array_u8__hex(checksum)};
+	{
+		{
+			string__free(&encoded);
+			array__free(&bytes);
+			sha256__Digest__free(hash);
+			v_free(hash);
+			array__free(&checksum);
+		}
+	}
+	return _t1;
+	{
+		{
+			string__free(&encoded);
+			array__free(&bytes);
+			sha256__Digest__free(hash);
+			v_free(hash);
+			array__free(&checksum);
+		}
+	}
+	return (__v_result_string){.ok = true};
+}
+
+aarch64: pkgadmin__discard_request_error
+pkgadmin__discard_request_error(IError err) {
+	string message = IError__msg(&(err));
+	{
+		string__free(&message);
+		IError__free(&err);
+	}
+}
+
+aarch64: pkgadmin__Request__receipt
+pkgadmin__Request__receipt(pkgadmin__Request* request, i64 code) {
+	__v_result_string __or_opt_0 = pkgadmin__Request__digest(request);
+	string __or_val_1 = {0};
+	if (__or_opt_0.ok) {
+		__or_val_1 = __or_opt_0.value;
+	} else {
+		IError err = __or_opt_0.err;
+		pkgadmin__discard_request_error(err);
+		return _str_29;
+	}
+	string digest = __or_val_1;
+	string number = int__str(code);
+	string _t2 = 	({ string __v3_internal_symbol_join_0[6]; __v3_internal_symbol_join_0[0] = pkgadmin__result_prefix; __v3_internal_symbol_join_0[1] = request->nonce; __v3_internal_symbol_join_0[2] = _str_1; __v3_internal_symbol_join_0[3] = digest; __v3_internal_symbol_join_0[4] = _str_1; __v3_internal_symbol_join_0[5] = number; string_plus_many(6, __v3_internal_symbol_join_0); });
+	{
+		{
+			string__free(&digest);
+			string__free(&number);
+		}
+	}
+	return _t2;
+	{
+		{
+			string__free(&digest);
+			string__free(&number);
+		}
+	}
+}
+
+aarch64: pkgadmin__Request__result
+pkgadmin__Request__result(pkgadmin__Request* request, string line) {
+	__v_result_string __or_opt_0 = pkgadmin__Request__digest(request);
+	string __or_val_1 = {0};
+	if (__or_opt_0.ok) {
+		__or_val_1 = __or_opt_0.value;
+	} else {
+		return (__v_result_i64){.ok = false, .err = __or_opt_0.err};
+	}
+	string digest = __or_val_1;
+	string prefix = ({ string __v3_internal_symbol_join_0[5]; __v3_internal_symbol_join_0[0] = pkgadmin__result_prefix; __v3_internal_symbol_join_0[1] = request->nonce; __v3_internal_symbol_join_0[2] = _str_1; __v3_internal_symbol_join_0[3] = digest; __v3_internal_symbol_join_0[4] = _str_1; string_plus_many(5, __v3_internal_symbol_join_0); });
+	if (string__starts_with(line, prefix)) {
+		string number = tos(line.str + prefix.len, line.len - prefix.len);
+		if ((number.len >= 1) && (number.len <= 3) && ((number.len == 1) || (string__at(number, 0) != '0'))) {
+			i64 value = 0;
+			{
+				i64 __for_idx_2 = 0;
+				for (; __for_idx_2 < number.len; __for_idx_2++) {
+					u8 byte = string__at(number, __for_idx_2);
+					if ((byte < '0') || (byte > '9')) {
+						__v_result_i64 _t2 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_235, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+						{
+							{
+								string__free(&digest);
+								string__free(&prefix);
+							}
+						}
+						return _t2;
+					}
+					value = (value * 10) + (i64)(byte - '0');
+				}
+			}
+			if (value < 256) {
+				__v_result_i64 _t3 = (__v_result_i64){.ok = true, .value = 				value};
+				{
+					{
+						string__free(&digest);
+						string__free(&prefix);
+					}
+				}
+				return _t3;
+			}
+		}
+	}
+	__v_result_i64 _t4 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_236, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+	{
+		{
+			string__free(&digest);
+			string__free(&prefix);
+		}
+	}
+	return _t4;
+	{
+		{
+			string__free(&digest);
+			string__free(&prefix);
+		}
+	}
+	return (__v_result_i64){.ok = true};
+}
+
+aarch64: pkgadmin__Request__close
+pkgadmin__Request__close(pkgadmin__Request* request) {
+	{
+		string__free(&request->nonce);
+		{
+			i64 __for_idx_0 = 0;
+			for (; __for_idx_0 < request->arguments.len; __for_idx_0++) {
+				string value = *(string*)(array_get(request->arguments, __for_idx_0));
+				string__free(&value);
+			}
+		}
+		array__free(((array*)(&request->arguments)));
+	}
+	*request = (pkgadmin__Request){.format = 1, .nonce = _str_29, .arguments = array_new(sizeof(string), 0, 0)};
+}
+
+x86_64: pkgadmin__RequestReader__quoted
+pkgadmin__RequestReader__quoted(pkgadmin__RequestReader* reader, i64 limit) {
+	__v_result __or_opt_0 = pkgadmin__RequestReader__expect(reader, _str_238);
+	if (!__or_opt_0.ok) {
+		return (__v_result_string){.ok = false, .err = __or_opt_0.err};
+	}
+	Array bytes = __new_array_noscan(0, 64, sizeof(u8));
+	{
+		bytes.flags |= 1;
+	}
+	while (reader->at < reader->text.len) {
+		u8 byte = string__at(reader->text, reader->at);
+		reader->at++;
+		if (byte == '"') {
+			__v_result_string _t1 = (__v_result_string){.ok = true, .value = 			Array_u8__bytestr(bytes)};
+			{
+				{
+					array__free(&bytes);
+				}
+			}
+			return _t1;
+		}
+		if ((bytes.len == limit) || (byte < 32)) {
+			__v_result_string _t2 = (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_239, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+			{
+				{
+					array__free(&bytes);
+				}
+			}
+			return _t2;
+		}
+		if (byte != '\\') {
+			u8 __arr_val_1 = byte;
+			array_push(&bytes, &__arr_val_1);
+			continue;
+		}
+		if (reader->at == reader->text.len) {
+			__v_result_string _t3 = (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_240, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+			{
+				{
+					array__free(&bytes);
+				}
+			}
+			return _t3;
+		}
+		u8 escape = string__at(reader->text, reader->at);
+		reader->at++;
+		if ((escape == '"') || (escape == '\\')) {
+			u8 __arr_val_2 = escape;
+			array_push(&bytes, &__arr_val_2);
+		} else if (escape == 'b') {
+			u8 __arr_val_3 = (u8)(8);
+			array_push(&bytes, &__arr_val_3);
+		} else if (escape == 'f') {
+			u8 __arr_val_4 = (u8)(12);
+			array_push(&bytes, &__arr_val_4);
+		} else if (escape == 'n') {
+			u8 __arr_val_5 = (u8)(10);
+			array_push(&bytes, &__arr_val_5);
+		} else if (escape == 'r') {
+			u8 __arr_val_6 = (u8)(13);
+			array_push(&bytes, &__arr_val_6);
+		} else if (escape == 't') {
+			u8 __arr_val_7 = (u8)(9);
+			array_push(&bytes, &__arr_val_7);
+		} else if (escape == 'u') {
+			__v_result __or_opt_8 = pkgadmin__RequestReader__expect(reader, _str_55);
+			if (!__or_opt_8.ok) {
+				__v_result_string _t4 = (__v_result_string){.ok = false, .err = __or_opt_8.err};
+				{
+					{
+						array__free(&bytes);
+					}
+				}
+				return _t4;
+			}
+			i64 value = 0;
+			{
+				i64 __discard_53_1513_1514 = 0;
+				for (; __discard_53_1513_1514 < 2; __discard_53_1513_1514++) {
+					if (reader->at == reader->text.len) {
+						__v_result_string _t5 = (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_240, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+						{
+							{
+								array__free(&bytes);
+							}
+						}
+						return _t5;
+					}
+					u8 digit = string__at(reader->text, reader->at);
+					reader->at++;
+					i64 __order_snapshot_9 = value * 16;
+					i64 __if_val_10 = {0};
+					if ((digit >= '0') && (digit <= '9')) {
+						__if_val_10 = (i64)(digit - '0');
+					} else {
+						if ((digit >= 'a') && (digit <= 'f')) {
+							__if_val_10 = (i64)((digit - 'a') + 10);
+						} else {
+							__v_result_string _t6 = (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_241, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+							{
+								{
+									array__free(&bytes);
+								}
+							}
+							return _t6;
+						}
+					}
+					value = __order_snapshot_9 + __if_val_10;
+				}
+			}
+			if (value >= 32) {
+				__v_result_string _t7 = (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_242, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+				{
+					{
+						array__free(&bytes);
+					}
+				}
+				return _t7;
+			}
+			u8 __arr_val_11 = (u8)(value);
+			array_push(&bytes, &__arr_val_11);
+		} else {
+			__v_result_string _t8 = (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_241, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+			{
+				{
+					array__free(&bytes);
+				}
+			}
+			return _t8;
+		}
+	}
+	__v_result_string _t9 = (__v_result_string){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_243, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+	{
+		{
+			array__free(&bytes);
+		}
+	}
+	return _t9;
+	{
+		{
+			array__free(&bytes);
+		}
+	}
+	return (__v_result_string){.ok = true};
+}
+
+x86_64: pkgadmin__decode_request
+pkgadmin__decode_request(string text) {
+	pkgadmin__RequestReader* reader = (pkgadmin__RequestReader*)memdup(&(pkgadmin__RequestReader){.text = text}, sizeof(pkgadmin__RequestReader));
+	__v_result __or_opt_0 = pkgadmin__RequestReader__expect(reader, _str_244);
+	if (!__or_opt_0.ok) {
+		__v_result_pkgadmin__Request _t1 = (__v_result_pkgadmin__Request){.ok = false, .err = __or_opt_0.err};
+		{
+			{
+				v_free(reader);
+			}
+		}
+		return _t1;
+	}
+	__v_result_string __or_opt_1 = pkgadmin__RequestReader__quoted(reader, 32);
+	string __or_val_2 = {0};
+	if (__or_opt_1.ok) {
+		__or_val_2 = __or_opt_1.value;
+	} else {
+		__v_result_pkgadmin__Request _t2 = (__v_result_pkgadmin__Request){.ok = false, .err = __or_opt_1.err};
+		{
+			{
+				v_free(reader);
+			}
+		}
+		return _t2;
+	}
+	string nonce = __or_val_2;
+	Array values = array_new(	sizeof(string), 0, 69);
+	{
+		values.flags |= 1;
+	}
+	bool accepted = false;
+	if (!pkgadmin__hex(nonce, 32)) {
+		__v_result_pkgadmin__Request _t3 = (__v_result_pkgadmin__Request){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_232, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			if (!accepted) {
+				{
+					string__free(&nonce);
+					{
+						i64 __for_idx_3 = 0;
+						for (; __for_idx_3 < values.len; __for_idx_3++) {
+							string value = *(string*)(array_get(values, __for_idx_3));
+							string__free(&value);
+						}
+					}
+					array__free(((array*)(&values)));
+				}
+			}
+		}
+		{
+			{
+				v_free(reader);
+			}
+		}
+		return _t3;
+	}
+	__v_result __or_opt_4 = pkgadmin__RequestReader__expect(reader, _str_245);
+	if (!__or_opt_4.ok) {
+		__v_result_pkgadmin__Request _t4 = (__v_result_pkgadmin__Request){.ok = false, .err = __or_opt_4.err};
+		{
+			if (!accepted) {
+				{
+					string__free(&nonce);
+					{
+						i64 __for_idx_3 = 0;
+						for (; __for_idx_3 < values.len; __for_idx_3++) {
+							string value = *(string*)(array_get(values, __for_idx_3));
+							string__free(&value);
+						}
+					}
+					array__free(((array*)(&values)));
+				}
+			}
+		}
+		{
+			{
+				v_free(reader);
+			}
+		}
+		return _t4;
+	}
+	while ((reader->at < text.len) && (string__at(text, reader->at) != ']')) {
+		if (values.len == 69) {
+			__v_result_pkgadmin__Request _t5 = (__v_result_pkgadmin__Request){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_210, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+			{
+				if (!accepted) {
+					{
+						string__free(&nonce);
+						{
+							i64 __for_idx_3 = 0;
+							for (; __for_idx_3 < values.len; __for_idx_3++) {
+								string value = *(string*)(array_get(values, __for_idx_3));
+								string__free(&value);
+							}
+						}
+						array__free(((array*)(&values)));
+					}
+				}
+			}
+			{
+				{
+					v_free(reader);
+				}
+			}
+			return _t5;
+		}
+		if (values.len != 0) {
+			__v_result __or_opt_5 = pkgadmin__RequestReader__expect(reader, _str_246);
+			if (!__or_opt_5.ok) {
+				__v_result_pkgadmin__Request _t6 = (__v_result_pkgadmin__Request){.ok = false, .err = __or_opt_5.err};
+				{
+					if (!accepted) {
+						{
+							string__free(&nonce);
+							{
+								i64 __for_idx_3 = 0;
+								for (; __for_idx_3 < values.len; __for_idx_3++) {
+									string value = *(string*)(array_get(values, __for_idx_3));
+									string__free(&value);
+								}
+							}
+							array__free(((array*)(&values)));
+						}
+					}
+				}
+				{
+					{
+						v_free(reader);
+					}
+				}
+				return _t6;
+			}
+		}
+		__v_result_string __or_opt_6 = pkgadmin__RequestReader__quoted(reader, 4096);
+		string __or_val_7 = {0};
+		if (__or_opt_6.ok) {
+			__or_val_7 = __or_opt_6.value;
+		} else {
+			__v_result_pkgadmin__Request _t7 = (__v_result_pkgadmin__Request){.ok = false, .err = __or_opt_6.err};
+			{
+				if (!accepted) {
+					{
+						string__free(&nonce);
+						{
+							i64 __for_idx_3 = 0;
+							for (; __for_idx_3 < values.len; __for_idx_3++) {
+								string value = *(string*)(array_get(values, __for_idx_3));
+								string__free(&value);
+							}
+						}
+						array__free(((array*)(&values)));
+					}
+				}
+			}
+			{
+				{
+					v_free(reader);
+				}
+			}
+			return _t7;
+		}
+		string value = __or_val_7;
+		{
+			array_push_many_ptr(&values, &value, 1);
+		}
+	}
+	__v_result __or_opt_8 = pkgadmin__RequestReader__expect(reader, _str_247);
+	if (!__or_opt_8.ok) {
+		__v_result_pkgadmin__Request _t8 = (__v_result_pkgadmin__Request){.ok = false, .err = __or_opt_8.err};
+		{
+			if (!accepted) {
+				{
+					string__free(&nonce);
+					{
+						i64 __for_idx_3 = 0;
+						for (; __for_idx_3 < values.len; __for_idx_3++) {
+							string value = *(string*)(array_get(values, __for_idx_3));
+							string__free(&value);
+						}
+					}
+					array__free(((array*)(&values)));
+				}
+			}
+		}
+		{
+			{
+				v_free(reader);
+			}
+		}
+		return _t8;
+	}
+	if (reader->at != text.len) {
+		__v_result_pkgadmin__Request _t9 = (__v_result_pkgadmin__Request){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_237, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			if (!accepted) {
+				{
+					string__free(&nonce);
+					{
+						i64 __for_idx_3 = 0;
+						for (; __for_idx_3 < values.len; __for_idx_3++) {
+							string value = *(string*)(array_get(values, __for_idx_3));
+							string__free(&value);
+						}
+					}
+					array__free(((array*)(&values)));
+				}
+			}
+		}
+		{
+			{
+				v_free(reader);
+			}
+		}
+		return _t9;
+	}
+	pkgadmin__Request request = (pkgadmin__Request){.nonce = nonce, .arguments = values, .format = 1};
+	__v_result_string __or_opt_9 = pkgadmin__Request__encode(&request);
+	string __or_val_10 = {0};
+	if (__or_opt_9.ok) {
+		__or_val_10 = __or_opt_9.value;
+	} else {
+		__v_result_pkgadmin__Request _t10 = (__v_result_pkgadmin__Request){.ok = false, .err = __or_opt_9.err};
+		{
+			if (!accepted) {
+				{
+					string__free(&nonce);
+					{
+						i64 __for_idx_3 = 0;
+						for (; __for_idx_3 < values.len; __for_idx_3++) {
+							string value = *(string*)(array_get(values, __for_idx_3));
+							string__free(&value);
+						}
+					}
+					array__free(((array*)(&values)));
+				}
+			}
+		}
+		{
+			{
+				v_free(reader);
+			}
+		}
+		return _t10;
+	}
+	string canonical = __or_val_10;
+	if (!string__eq(text, canonical)) {
+		__v_result_pkgadmin__Request _t11 = (__v_result_pkgadmin__Request){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_237, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			{
+				string__free(&canonical);
+			}
+		}
+		{
+			if (!accepted) {
+				{
+					string__free(&nonce);
+					{
+						i64 __for_idx_3 = 0;
+						for (; __for_idx_3 < values.len; __for_idx_3++) {
+							string value = *(string*)(array_get(values, __for_idx_3));
+							string__free(&value);
+						}
+					}
+					array__free(((array*)(&values)));
+				}
+			}
+		}
+		{
+			{
+				v_free(reader);
+			}
+		}
+		return _t11;
+	}
+	accepted = true;
+	__v_result_pkgadmin__Request _t12 = (__v_result_pkgadmin__Request){.ok = true, .value = 	request};
+	{
+		{
+			string__free(&canonical);
+		}
+	}
+	{
+		if (!accepted) {
+			{
+				string__free(&nonce);
+				{
+					i64 __for_idx_3 = 0;
+					for (; __for_idx_3 < values.len; __for_idx_3++) {
+						string value = *(string*)(array_get(values, __for_idx_3));
+						string__free(&value);
+					}
+				}
+				array__free(((array*)(&values)));
+			}
+		}
+	}
+	{
+		{
+			v_free(reader);
+		}
+	}
+	return _t12;
+	{
+		{
+			string__free(&canonical);
+		}
+	}
+	{
+		if (!accepted) {
+			{
+				string__free(&nonce);
+				{
+					i64 __for_idx_3 = 0;
+					for (; __for_idx_3 < values.len; __for_idx_3++) {
+						string value = *(string*)(array_get(values, __for_idx_3));
+						string__free(&value);
+					}
+				}
+				array__free(((array*)(&values)));
+			}
+		}
+	}
+	{
+		{
+			v_free(reader);
+		}
+	}
+	return (__v_result_pkgadmin__Request){.ok = true};
+}
+
+x86_64: pkgadmin__Request__digest
+pkgadmin__Request__digest(pkgadmin__Request* request) {
+	__v_result_string __or_opt_0 = pkgadmin__Request__encode(request);
+	string __or_val_1 = {0};
+	if (__or_opt_0.ok) {
+		__or_val_1 = __or_opt_0.value;
+	} else {
+		return (__v_result_string){.ok = false, .err = __or_opt_0.err};
+	}
+	string encoded = __or_val_1;
+	Array bytes = string__bytes(encoded);
+	sha256__Digest* hash = sha256__new();
+	Array checksum = __new_array_noscan(sha256__size, 0, sizeof(u8));
+	__v_result_i64 __or_opt_2 = sha256__Digest__write(hash, bytes);
+	if (!__or_opt_2.ok) {
+		IError err = __or_opt_2.err;
+		v_panic(IError__str(err));
+	}
+	sha256__Digest__checksum_into(hash, &checksum);
+	__v_result_string _t1 = (__v_result_string){.ok = true, .value = 	Array_u8__hex(checksum)};
+	{
+		{
+			string__free(&encoded);
+			array__free(&bytes);
+			sha256__Digest__free(hash);
+			v_free(hash);
+			array__free(&checksum);
+		}
+	}
+	return _t1;
+	{
+		{
+			string__free(&encoded);
+			array__free(&bytes);
+			sha256__Digest__free(hash);
+			v_free(hash);
+			array__free(&checksum);
+		}
+	}
+	return (__v_result_string){.ok = true};
+}
+
+x86_64: pkgadmin__discard_request_error
+pkgadmin__discard_request_error(IError err) {
+	string message = IError__msg(&(err));
+	{
+		string__free(&message);
+		IError__free(&err);
+	}
+}
+
+x86_64: pkgadmin__Request__receipt
+pkgadmin__Request__receipt(pkgadmin__Request* request, i64 code) {
+	__v_result_string __or_opt_0 = pkgadmin__Request__digest(request);
+	string __or_val_1 = {0};
+	if (__or_opt_0.ok) {
+		__or_val_1 = __or_opt_0.value;
+	} else {
+		IError err = __or_opt_0.err;
+		pkgadmin__discard_request_error(err);
+		return _str_29;
+	}
+	string digest = __or_val_1;
+	string number = int__str(code);
+	string _t2 = 	({ string __v3_internal_symbol_join_0[6]; __v3_internal_symbol_join_0[0] = pkgadmin__result_prefix; __v3_internal_symbol_join_0[1] = request->nonce; __v3_internal_symbol_join_0[2] = _str_1; __v3_internal_symbol_join_0[3] = digest; __v3_internal_symbol_join_0[4] = _str_1; __v3_internal_symbol_join_0[5] = number; string_plus_many(6, __v3_internal_symbol_join_0); });
+	{
+		{
+			string__free(&digest);
+			string__free(&number);
+		}
+	}
+	return _t2;
+	{
+		{
+			string__free(&digest);
+			string__free(&number);
+		}
+	}
+}
+
+x86_64: pkgadmin__Request__result
+pkgadmin__Request__result(pkgadmin__Request* request, string line) {
+	__v_result_string __or_opt_0 = pkgadmin__Request__digest(request);
+	string __or_val_1 = {0};
+	if (__or_opt_0.ok) {
+		__or_val_1 = __or_opt_0.value;
+	} else {
+		return (__v_result_i64){.ok = false, .err = __or_opt_0.err};
+	}
+	string digest = __or_val_1;
+	string prefix = ({ string __v3_internal_symbol_join_0[5]; __v3_internal_symbol_join_0[0] = pkgadmin__result_prefix; __v3_internal_symbol_join_0[1] = request->nonce; __v3_internal_symbol_join_0[2] = _str_1; __v3_internal_symbol_join_0[3] = digest; __v3_internal_symbol_join_0[4] = _str_1; string_plus_many(5, __v3_internal_symbol_join_0); });
+	if (string__starts_with(line, prefix)) {
+		string number = tos(line.str + prefix.len, line.len - prefix.len);
+		if ((number.len >= 1) && (number.len <= 3) && ((number.len == 1) || (string__at(number, 0) != '0'))) {
+			i64 value = 0;
+			{
+				i64 __for_idx_2 = 0;
+				for (; __for_idx_2 < number.len; __for_idx_2++) {
+					u8 byte = string__at(number, __for_idx_2);
+					if ((byte < '0') || (byte > '9')) {
+						__v_result_i64 _t2 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_235, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+						{
+							{
+								string__free(&digest);
+								string__free(&prefix);
+							}
+						}
+						return _t2;
+					}
+					value = (value * 10) + (i64)(byte - '0');
+				}
+			}
+			if (value < 256) {
+				__v_result_i64 _t3 = (__v_result_i64){.ok = true, .value = 				value};
+				{
+					{
+						string__free(&digest);
+						string__free(&prefix);
+					}
+				}
+				return _t3;
+			}
+		}
+	}
+	__v_result_i64 _t4 = (__v_result_i64){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_236, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+	{
+		{
+			string__free(&digest);
+			string__free(&prefix);
+		}
+	}
+	return _t4;
+	{
+		{
+			string__free(&digest);
+			string__free(&prefix);
+		}
+	}
+	return (__v_result_i64){.ok = true};
+}
+
+x86_64: pkgadmin__Request__close
+pkgadmin__Request__close(pkgadmin__Request* request) {
+	{
+		string__free(&request->nonce);
+		{
+			i64 __for_idx_0 = 0;
+			for (; __for_idx_0 < request->arguments.len; __for_idx_0++) {
+				string value = *(string*)(array_get(request->arguments, __for_idx_0));
+				string__free(&value);
+			}
+		}
+		array__free(((array*)(&request->arguments)));
+	}
+	*request = (pkgadmin__Request){.format = 1, .nonce = _str_29, .arguments = array_new(sizeof(string), 0, 0)};
+}
