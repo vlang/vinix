@@ -494,8 +494,13 @@ IDs/keys, minimum signed sequences and complete manifest digests. Without an
 export, both output-receipt fields are empty.
 
 Distribute the file with the authenticated repository bundle or organization
-deployment. In Software, open **Deployment**, select its absolute installed/media
-path and **Review deployment**. CLI users run `deployment-review FILE` and the
+deployment. In Software, open **Deployment**, use **Choose file…** or enter its
+absolute installed/media path, then **Review deployment**. Selection fills the
+path without starting a review or changes. Cancellation preserves the draft;
+intervening editing, navigation or review discards late dialog results. Missing
+session services leave manual entry available. See
+[chooser qualification](../../tests/packages/software-deployment-chooser-check.md).
+CLI users run `deployment-review FILE` and the
 approved `deployment-apply`. Both workflows authenticate the pinned manifests
 with current enrolled keys and policy and review the entire resulting set,
 including removals; export grants no permission to apply it automatically.

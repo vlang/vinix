@@ -361,6 +361,8 @@ fn check() ! {
 	os.cp(repository + '/desktop/software_verify_navigation.v', work + '/software/software_verify_navigation.v')!
 	os.cp(repository + '/tests/packages/software_verify_navigation_fixture.v', work + '/software/verify_navigation_fixture.v')!
 	os.cp(repository + '/desktop/software_deployment.v', work + '/software/software_deployment.v')!
+	os.cp(repository + '/desktop/software_deployment_chooser.v', work + '/software/software_deployment_chooser.v')!
+	os.cp(repository + '/tests/packages/software_deployment_chooser_fixture.v', work + '/software/deployment_chooser_fixture.v')!
 	os.cp(repository + '/desktop/software_deployment_navigation.v', work + '/software/software_deployment_navigation.v')!
 	os.cp(repository + '/tests/packages/software_deployment_navigation_fixture.v', work + '/software/deployment_navigation_fixture.v')!
 	os.cp(repository + '/desktop/software_audit.v', work + '/software/software_audit.v')!
@@ -394,13 +396,19 @@ fn check() ! {
 	if !os.is_file(modules + '/ui2/v.mod') {
 		return error('Software UI checks need a staged headless ui2 module; set VINIX_PACKAGE_TEST_UI2 to its parent directory')
 	}
+	// The UI overlay supplies ui2 only. Resolve repository modules before it
+	// so older helper copies cannot hide current desktop/package interfaces.
+	software_modules := '@vlib|' + repository + '|' + repository + '/tools/accounts|' + modules + '|@vmodules'
 	run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-enable-globals', '-d', 'ui2_headless', '-path',
-		'@vlib|' + modules + '|@vmodules|' + repository, '-o', work + '/software-check',
+		software_modules, '-o', work + '/software-check',
 		work + '/software'])!
 	run(work + '/software-check', [])!
+	run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-enable-globals', '-path', '@vlib|@vmodules|' + repository,
+		'-o', work + '/session-broker', repository + '/desktop/services/session/main.v'])!
+	run(work + '/software-check', ['deployment-chooser', work + '/session-broker'])!
 	run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-enable-globals', '-d', 'ui2_headless', '-d', 'track_heap',
 		'-cflags', '-I' + repository + '/desktop', '-path',
-		'@vlib|' + modules + '|@vmodules|' + repository, '-o', work + '/window-broker-memory', work + '/software'])!
+		software_modules, '-o', work + '/window-broker-memory', work + '/software'])!
 	run(work + '/window-broker-memory', ['window-memory'])!
 	run(work + '/window-broker-memory', ['admin-memory'])!
 	run(work + '/window-broker-memory', ['data-memory'])!
@@ -419,6 +427,7 @@ fn check() ! {
 	run(work + '/window-broker-memory', ['snapshot-export-memory'])!
 	run(work + '/window-broker-memory', ['mirror-navigation-memory'])!
 	run(work + '/window-broker-memory', ['deployment-navigation-memory'])!
+	run(work + '/window-broker-memory', ['deployment-chooser-memory'])!
 	run(work + '/window-broker-memory', ['repository-navigation-memory'])!
 	run(work + '/window-broker-memory', ['package-navigation-memory'])!
 	run(work + '/window-broker-memory', ['policy-navigation-memory'])!
@@ -462,7 +471,7 @@ fn check() ! {
 		for architecture in ['arm64', 'amd64'] {
 			run(v, ['-check', '-os', 'linux', '-arch', architecture, '-gc', 'none', '-manualfree',
 				'-enable-globals', '-d', 'ui2_headless', '-path',
-				'@vlib|' + modules + '|@vmodules|' + repository + '|' + repository + '/third_party',
+				software_modules + '|' + repository + '/third_party',
 				overlay])!
 		}
 		run(v, [...helper_flags, '-path', '@vlib|@vmodules|' + repository + '/tests/linuxkpi|' + repository,

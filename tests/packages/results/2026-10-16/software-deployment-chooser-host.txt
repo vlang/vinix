@@ -1,0 +1,17 @@
+14 focused compile/run checks passed:
+PASS ui-compile
+PASS ui-broker-compile
+PASS ui-chooser
+PASS ui-memory
+PASS ui-navigation-memory
+PASS ui-functional
+PASS asan-compile
+PASS asan-broker-compile
+PASS asan-chooser
+PASS asan-memory
+PASS asan-navigation-memory
+PASS asan-functional
+PASS launcher-compile
+PASS launcher-run
+PASS maintained Software functional suite, all 26 allocation modes and both full Linux desktop architecture typechecks
+PASS independently rebuilt launcher check after fixing its nested account-module lookup; full driver raw output retains that final helper failure before correction

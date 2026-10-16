@@ -31,7 +31,7 @@ fn check() ! {
 	workflowbuild.run(v, ['-nocache', '-no-skip-unused', '-gc', 'none', '-manualfree', '-enable-globals', '-d', 'ui2_headless',
 		'-d', 'no_segfault_handler',
 		'-d', 'track_heap', '-path',
-		'@vlib|' + work + '/modules|@vmodules|' + repository + '|' + repository + '/third_party',
+		'@vlib|' + repository + '|' + repository + '/tools/accounts|' + work + '/modules|@vmodules|' + repository + '/third_party',
 		'-o', work + '/test.c', work + '/package_launcher_test.v'])!
 	mut source := os.read_file(work + '/test.c')!
 	source = source.replace('\t#endif#define V_MANUAL_STDLIB_HEADERS 1', '\t#endif\n};\n#endif\n#undef V_CRT_STDIO_LINKAGE\n#undef V_CRT_LINKAGE\n#undef V_CRT_CALL\n#define V_MANUAL_STDLIB_HEADERS 1')

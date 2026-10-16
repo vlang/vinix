@@ -679,6 +679,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
   interrupted-download recovery and coherent persistent package state.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,
   permissions, progress, uninstall, updates and useful failure diagnostics.
+  - [x] [Deployment file selection](tests/packages/software-deployment-chooser-check.md)
+    uses the session file dialog for organization manifests and exported locks,
+    preserves drafts on cancellation/failure, and discards late selections after
+    editing, navigation or review. Selection requires a separate review and
+    confirmation; full graphical-session acceptance remains open.
 - [ ] Package native, Linux, Windows and Apple-compatible apps with isolated
   runtimes, launcher/association registration and clean uninstall behavior.
   - [x] [A Win64 publisher profile](tools/packages/SDK.md#wine-win64-publisher-profile)

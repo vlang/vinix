@@ -165,6 +165,8 @@ mut:
 	deployment_mode bool
 	deployment_path []u8
 	deployment_pending string // frozen file path for deployment-review/apply
+	deployment_choice_pending bool
+	deployment_choice_current bool // intervening input/navigation invalidates a late selection
 	mirror_mode bool
 	mirror_path []u8
 	mirror_all bool
@@ -556,10 +558,11 @@ fn (mut a SoftwareApp) retire_worker() {
 }
 
 fn (mut a SoftwareApp) poll() bool {
-	if a.window_mode { return a.poll_window() }
-	if a.terminal_app != unsafe { nil } { return a.terminal_app.poll() }
-	if a.worker == unsafe { nil } { return false }
-	mut changed := false
+	choice_changed := a.poll_deployment_choice()
+	if a.window_mode { return a.poll_window() || choice_changed }
+	if a.terminal_app != unsafe { nil } { return a.terminal_app.poll() || choice_changed }
+	if a.worker == unsafe { nil } { return choice_changed }
+	mut changed := choice_changed
 	// Drain a bounded number of chunks per UI poll, including after exit.
 	for _ in 0 .. 16 {
 		chunk := a.worker.stdout_read()
@@ -777,6 +780,9 @@ fn (mut a SoftwareApp) run_requested() {
 fn (a &SoftwareApp) next_poll_ms() u64 { return 100 }
 
 fn (mut a SoftwareApp) handle(event_id string) ! {
+	if a.deployment_choice_pending && event_id != 'software.deployment.choose' {
+		a.deployment_choice_current = false
+	}
 	if a.admin_prompt { a.handle_admin(event_id); return }
 	if a.window_mode { a.handle_window(event_id); return }
 	if a.terminal_app != unsafe { nil } {
@@ -1071,6 +1077,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 }
 
 fn (mut a SoftwareApp) key_input(input string) {
+	if input != '' { a.deployment_choice_current = false }
 	if a.admin_prompt { a.admin_key_input(input); return }
 	if a.window_mode { a.window_key_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
@@ -1123,6 +1130,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 }
 
 fn (mut a SoftwareApp) paste_input(input string) {
+	if input != '' { a.deployment_choice_current = false }
 	if a.admin_prompt { a.admin_paste_input(input); return }
 	if a.window_mode { a.window_paste_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }

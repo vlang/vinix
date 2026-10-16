@@ -51,6 +51,7 @@ fn (mut a SoftwareApp) begin_deployment_review() {
 
 fn (mut a SoftwareApp) handle_deployment(event_id string) {
 	match event_id {
+		'software.deployment.choose' { a.choose_deployment_file() }
 		'software.deployment.path' {
 			a.focus = true
 			a.select_all = false
@@ -123,7 +124,12 @@ fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
 		children << software_button('software.deployment.back', 'Back to catalog', width - 174, 8, 160)
 	}
 	children << software_label('Deployment file (absolute path)', 14, 52, width - 28, 28, false)
-	children << console_field('software.deployment.path', editor_bytes_text(a.deployment_path), 14, 86, width - 28, a.focus)
+	children << console_field('software.deployment.path', editor_bytes_text(a.deployment_path), 14, 86, width - 202, a.focus)
+	if a.deployment_choice_pending {
+		children << software_label('Choosing file…', width - 174, 86, 160, 28, false)
+	} else if a.worker == unsafe { nil } {
+		children << software_button('software.deployment.choose', 'Choose file…', width - 174, 86, 160)
+	}
 	children << software_label('Use a deployment file supplied by your organization. Check installed compares an exact lock with recorded installed metadata. Review deployment checks the full application set before any changes.', 14, 128, width - 28, 60, false)
 	children << software_label('The review includes installs, retained packages, updates and removals, with publisher keys, permissions, licenses and disk requirements. Empty deployments remove all packages. Personal data stays on disk.', 14, 204, width - 28, 60, false)
 	if a.worker == unsafe { nil } {

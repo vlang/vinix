@@ -1,0 +1,40 @@
+The initial full desktop typecheck selected an older desktop.workflowcore from the ui2 test overlay and could not find the current launcher_query interface. The maintained driver now resolves repository modules and account interfaces before that overlay. Fresh controller/broker, allocation and sanitizer runs use that source lookup order. The maintained rerun passed all 26 allocation modes and both target typechecks before its final launcher helper failed because its nested compiler omitted tools/accounts. That helper now uses the same repository/account-first lookup; its independent fresh compile/run passed. Raw combined driver/retry output is retained. Unrelated desktop implementation was left unchanged.
+
+Initial architecture typecheck diagnostic:
+desktop/quick_launch_search.v:161:17: error: unknown method or field: `SearchIndex.launcher_query`.
+10 possibilities: `begin`, `close`, `content_allowed`, `publish`, `query`, `root_for`, `save_unlocked`, `save`, `set_tags`, `tick`.
+  159 |     }
+  160 |     mut index := workflowcore.load_index(d.home) or { workflowcore.SearchIndex{} }
+  161 |     paths := index.launcher_query(query, d.home, quick_launch_max_results)
+      |                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  162 |     mut results := []QuickLaunchPath{}
+  163 |     for path in paths {
+desktop/quick_launch_search.v:161:8: error: assignment mismatch: 1 variable but `launcher_query()` returns 0 values
+  159 |     }
+  160 |     mut index := workflowcore.load_index(d.home) or { workflowcore.SearchIndex{} }
+  161 |     paths := index.launcher_query(query, d.home, quick_launch_max_results)
+      |           ~~
+  162 |     mut results := []QuickLaunchPath{}
+  163 |     for path in paths {
+desktop/quick_launch_search.v:163:14: error: for in: cannot index `()`
+  161 |     paths := index.launcher_query(query, d.home, quick_launch_max_results)
+  162 |     mut results := []QuickLaunchPath{}
+  163 |     for path in paths {
+      |                 ~~~~~
+  164 |         if current := workflowcore.identify(path) {
+  165 |             results << QuickLaunchPath{path: path, directory: current.directory(), identity: current}
+desktop/quick_launch_search.v:164:39: error: `path` (no value) used as value in argument 1 to `desktop.workflowcore.identify`
+  162 |     mut results := []QuickLaunchPath{}
+  163 |     for path in paths {
+  164 |         if current := workflowcore.identify(path) {
+      |                                             ~~~~
+  165 |             results << QuickLaunchPath{path: path, directory: current.directory(), identity: current}
+  166 |         }
+desktop/quick_launch_search.v:165:31: error: `path` (no value) used as value
+  163 |     for path in paths {
+  164 |         if current := workflowcore.identify(path) {
+  165 |             results << QuickLaunchPath{path: path, directory: current.directory(), identity: current}
+      |                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  166 |         }
+  167 |     }
+/Users/alex/code/vinix/build/package-release-work/v-toolchain/v failed with status 1

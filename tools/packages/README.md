@@ -77,6 +77,14 @@ the saved path and newline-inclusive digest. The target image remains unchanged.
 See [the export contract](SDK.md#export-an-image-application-deployment) and
 [qualification](../../tests/packages/image-export-check.md).
 
+Software's **Deployment → Choose file…** selects an organization manifest,
+release deployment lock or saved installed snapshot through the session file
+dialog. Selection fills the literal path; **Review deployment** and confirmation
+remain explicit. Cancellation preserves the draft, and intervening editing,
+navigation or review discards late selections. If the dialog is unavailable,
+the absolute-path field remains usable. See
+[chooser checks](../../tests/packages/software-deployment-chooser-check.md).
+
 Desktop checks need generated examples under `build/app-src` and a headless ui2
 overlay under `build/vmodules`; `VINIX_PACKAGE_TEST_UI2` selects another overlay
 parent. Package implementation, publishing, staging and qualification use V.

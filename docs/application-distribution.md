@@ -1832,8 +1832,14 @@ also cover owned filesystem paths and stack-based stat scratch; see
 [stored metadata qualification](../tests/packages/stored-decode-check.md) for
 the exact scope, malformed-input checks and allocation measurements.
 
-In **Software**, select **Deployment**, enter the absolute file path and choose
-**Review deployment**. The review shows the entire resulting set, including
+In **Software**, select **Deployment**, use **Choose file…** or enter the absolute
+file path, then choose **Review deployment**. The session file dialog accepts
+organization manifests, release locks and saved installed snapshots without
+requiring a particular filename extension. Selection only fills the path.
+Cancellation preserves the draft; editing, navigation or a started review
+discards any late selection. A missing/disconnected dialog leaves the manual
+path available. See [chooser qualification](../tests/packages/software-deployment-chooser-check.md).
+The review shows the entire resulting set, including
 dependencies, runtime updates, retained packages and removals, with publisher
 keys, permissions, licenses, firmware flags and disk requirements. Confirm uses
 the reviewed file path and deployment fingerprint through `deployment-apply`;
