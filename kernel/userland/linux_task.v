@@ -146,6 +146,27 @@ fn valid_clone3_tid_pair(address u64, count u64) bool {
 	return count <= 32 && ((address == 0) == (count == 0))
 }
 
+// Import the selected-TID vector before flag, stack or task admission checks.
+// Signal/cgroup ABI words precede the vector copy in Linux's importer.
+// This validates user memory; requested-PID allocation is still unsupported.
+fn import_clone3_tid_vector(args &CloneArgs, size u64) u64 {
+	if !valid_clone3_tid_pair(args.set_tid, args.set_tid_size) || args.exit_signal > 64 {
+		return errno.einval
+	}
+	if args.flags & clone_into_cgroup != 0
+		&& (size < sizeof(CloneArgs) || args.cgroup > 0x7fffffff) {
+		return errno.einval
+	}
+	if args.set_tid_size != 0 {
+		mut tids := [32]i32{}
+		if !usercopy.copy_from_user(unsafe { voidptr(&tids[0]) }, args.set_tid,
+			args.set_tid_size * sizeof(i32)) {
+			return errno.efault
+		}
+	}
+	return 0
+}
+
 // CLONE_CLEAR_SIGHAND resets the child's private copy before it can run.
 // Linux preserves SIG_IGN but clears every action's flags, restorer and mask.
 fn reset_clone_sighand(mut child proc.Thread, flags u64) {

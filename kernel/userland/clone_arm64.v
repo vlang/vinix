@@ -42,8 +42,9 @@ pub fn syscall_clone3(_gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 	if failure != 0 {
 		return errno.err, failure
 	}
-	if !valid_clone3_tid_pair(args.set_tid, args.set_tid_size) {
-		return errno.err, errno.einval
+	tid_failure := import_clone3_tid_vector(unsafe { &args }, size)
+	if tid_failure != 0 {
+		return errno.err, tid_failure
 	}
 	if !valid_clone3_flags(args.flags) {
 		return errno.err, errno.einval
@@ -67,10 +68,6 @@ pub fn syscall_clone3(_gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 
 	mut cgroup := voidptr(unsafe { nil })
 	if args.flags & clone_into_cgroup != 0 {
-		// Linux restricts this 64-bit ABI word to a nonnegative signed 32-bit fd.
-		if size < sizeof(CloneArgs) || args.cgroup > 0x7fffffff {
-			return errno.err, errno.einval
-		}
 		mut cgroup_fd := file.fd_from_fdnum(unsafe { nil }, int(args.cgroup)) or {
 			return errno.err, errno.ebadf
 		}

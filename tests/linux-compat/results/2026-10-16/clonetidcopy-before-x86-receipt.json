@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "e6fe1017533c8b0c869a2571187dea8e6c473d2be3af864b2827df0a37bbc1a3",
+    "results": [
+        {
+            "name": "clonetidcopy",
+            "source_sha256": "f37ae31a9518947ffe931a6bd1b63054cc9c41316ef66dfe146a06bdc4c68aff",
+            "init_sha256": "be26c644a72b4b302f9ea2bbe1cdfc024f4340632834dc2e1efe4deeb3c30d96",
+            "iso_sha256": "1f8a1bed75d248aafd38ee05153d388768075e2f3d0bb4a4486cda6d2c8d8749",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

@@ -1,0 +1,3 @@
+tests/linux-compat/clonetidcopy-check.v:386: FAIL: fn main.main: assert false, 'clonetidcopy assertions must execute'
+      message: clonetidcopy assertions must execute
+V panic: Assertion failed...

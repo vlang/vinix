@@ -1116,6 +1116,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   probe ELFs. Requested-TID allocation remains separate.
   See [the pair validation receipts](docs/linux-posix-qualification.md#native-clone3-selected-tid-pair-validation).
 
+- [x] Import clone3 selected-TID vectors with bounded four-byte entries and Linux
+  fault ordering on both architectures; qualify 1,728 controls, exact Linux
+  references, direct refusal/fork behavior and identical-input cleanup cohorts.
+  Requested-PID allocation and the broad libc/installation/translation gates
+  remain open. See [the qualification](docs/linux-posix-qualification.md#native-clone3-selected-tid-vector-import).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

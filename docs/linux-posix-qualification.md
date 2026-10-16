@@ -9651,3 +9651,88 @@ import and allocation, pidfds, non-SIGCHLD exit notification and clone-child
 wait classes, supplied-stack execution/alignment, cgroup placement and its
 authorization/lifetimes, GNU libc and translated/32-bit paths remain separate.
 The broad libc, installation/sandbox/portal and translation gates remain open.
+
+## Native clone3 selected-TID vector import
+
+Both native clone3 entry points now read the selected-TID vector before
+flag, signal/flag-combination, stack, descriptor or namespace admission.
+The shared importer first validates the pointer/count pair, the exit-signal
+word and the cgroup ABI word/version. It then copies exactly count × four
+bytes into a fixed 32-entry i32 kernel-stack buffer, returning EFAULT for
+inaccessible user memory. It follows
+[Linux v6.12's importer and validation order](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c).
+The vector is currently used to validate memory access only: requested-PID
+allocation and its namespace/capability rules remain unimplemented.
+
+The `clonetidcopy` probe runs 1,728 controls per architecture: 432 in each
+root/UID1000 and initial/one-level PID namespace cohort. Every cohort removes
+effective CAP_SYS_ADMIN and verifies that with capget. Three argument layouts
+cover aligned, byte-unaligned and native-page-tail structures on a read-only
+page followed by PROT_NONE. Native ARM uses 16KiB pages; native x86 and both
+Linux references use 4KiB.
+
+| Class | Calls per cohort | Contract |
+| --- | ---: | --- |
+| Inaccessible vectors | 96 | Every count 1–32 with low, protected or wrapping vector addresses returns EFAULT before namespace EPERM. |
+| Truncated vectors | 96 | Every count 1–32 with exactly one byte inaccessible at the following page returns EFAULT. |
+| Readable vectors | 96 | Every count 1–32 with aligned, byte-unaligned or exact-page-end vectors reaches NEWPID EPERM without effective SYS_ADMIN. The page-end controls establish four-byte pid_t width and no extra read. |
+| Error precedence | 72 | Vector EFAULT wins over twelve later flag, sharing, signal/flag, stack, missing-FD or namespace failures. Twelve earlier malformed signal/cgroup ABI words, versions or pointer/count pairs retain EINVAL without vector access. |
+| Structure import | 36 | Short/excessive sizes and null/low/wrapping/protected argument addresses retain EINVAL/E2BIG/EFAULT before vector import. |
+| Direct requests | 36 | Empty pairs at sizes 64/72/80/88 create twelve real SIGCHLD children per cohort. Eight inaccessible nonempty requests at sizes 80/88 return EFAULT without children. |
+
+Readable-vector admission intentionally stops at namespace permission checking
+before requested-PID validation/allocation. Vector contents can overlap the
+argument block and are not asserted to be valid PID selections. These cases
+qualify memory import, length and ordering, not successful PID selection.
+
+Original kernels fail exactly 1,008 controls per architecture: 96 inaccessible
+and 96 truncated vectors, 36 later-error precedence controls and 24 direct
+refusals per cohort. Original direct requests create 24 unintended children
+per cohort, or 96 per architecture. The probe checks their PID/TID, parent,
+UID and exit-37 records and reaps them. Corrected kernels and the identical
+original probe ELFs on Linux 6.12.51 pass every control with no unintended
+children. Both phases retain twelve ordinary fork/reap controls per cohort;
+cohort and supervisor child totals must agree.
+
+Every attempt restores protections, checks the entire two-page input canary
+and requires ECHILD from an empty nonblocking wait. Both phases measure four
+cleanup cohorts: 64 warmup cycles, thirteen seconds of settling, 200 measured
+cycles and another settle. Each cycle repeats inaccessible/truncated vector
+requests, a vector-versus-later-validation request, a readable-vector admission
+refusal and a real empty-pair fork/reap. Inputs and child lifecycles are identical
+in both phases. Only cleanup accepts original EPERM/EINVAL in place of corrected
+EFAULT; semantic controls require exact errors. All live slab classes and
+big-heap page totals stay flat. This is targeted kernel-heap evidence; general
+page/cache retention and the earlier EXT2 rename observation remain separate.
+
+Four isolated original/corrected production builds pass. Exact whole-C
+comparison confines the patch to the shared import helper and prototype,
+the fixed i32 array typedef and the two clone3 entry points. The copied vector
+and argument structure remain on the stack. No heap allocation, free, reference,
+ownership transfer or lock changes are introduced. The probe has ten explicit
+stack allocas and no dynamic allocation or fixed-index helper. Successful ARM
+compiler preflight matches the original guest C.
+
+Both corrected architectures pass runtime and the 1,248-control clonetidpair
+regression. The auditor checks case/cohort totals, exact original failures,
+legitimate/unintended children, effective-capability records, credentials/page
+sizes, identical probe C/ELFs, Linux receipts, both phases' storage, all 84
+retained native case files, 67 frozen dispatch inputs, 2,014 SDK files and
+15,146 compiler pins. False-assertion and passing-Linux-as-original negative
+controls must execute and fail; compile without `-prod`.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/clonetidcopy-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/clonetidcopy-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/clonetidcopy-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/clonetidcopy-diagnostic-pins.json).
+Raw original/corrected/Linux, build, preflight and regression logs accompany
+the receipts. The maintained auditor is `tests/linux-compat/clonetidcopy-check.v`.
+
+This qualifies stable selected-TID vector import and the tested ordering.
+Readable vectors are still ignored for PID assignment; a successful ordinary
+clone does not establish requested-PID support. Concurrent arguments/mappings,
+tagged pointers and exact architecture-specific address limits, actual selected
+TID allocation, pidfds, non-SIGCHLD notifications and clone-child wait classes,
+supplied-stack execution/alignment, cgroup placement and its authorization/
+lifetimes, GNU libc and translated/32-bit paths remain unqualified here. The
+broad libc, installation/sandbox/portal and translation gates remain open.

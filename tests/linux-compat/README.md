@@ -2004,3 +2004,17 @@ corrected EINVAL. Use `--cases clonetidpair --timeout 1200` with fresh state.
 `clonetidpair-check.v` without `-prod` for the executing evidence audit.
 These admission controls do not qualify vector import or requested-TID allocation.
 See [the pair report](../../docs/linux-posix-qualification.md#native-clone3-selected-tid-pair-validation).
+
+The `clonetidcopy` case checks clone3 selected-TID vector import: 1,728
+controls per architecture cover every count 1–32, four-byte pid_t width,
+inaccessible/truncated/readable vectors, ABI and later-error precedence,
+and direct fork/rejection. Four root/UID1000 and initial/PID-namespace
+cohorts remove effective SYS_ADMIN. Original kernels fail 1,008 controls
+and create 96 unintended children per architecture; corrected kernels and
+identical ELFs on Linux pass. Both phases measure identical 200-cycle cleanup
+requests and real empty-pair forks; only cleanup accepts original errors.
+Use `--cases clonetidcopy --timeout 1200` with fresh state.
+`clonetidcopy-reference.v` runs the unchanged ELF on Linux; compile
+`clonetidcopy-check.v` without `-prod` for the executing evidence audit.
+Requested-PID allocation remains unsupported. See the
+[qualification report](../../docs/linux-posix-qualification.md#native-clone3-selected-tid-vector-import).

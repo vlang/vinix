@@ -751,12 +751,12 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/usercopy/usercopy.v` | `4c36b49cd3abe25aa70897981d0d1695edc1244c2d449c4c849fb0750e712f9e` |
 | `kernel/usercopy/word_atomic_amd64.v` | `bf4c0c08a9d6e8251fdd62d50e3d698bb3799c1aae0e0752a06ea23ff9936048` |
 | `kernel/usercopy/word_atomic_arm64.v` | `640435b8cc95418defce02e672943f19383b98566c02f130d9a917837193d7f2` |
-| `kernel/userland/clone_amd64.v` | `f3d71bdc832a37eddb23f19d0a0992cb6bc636e84feab02647491def303131d0` |
-| `kernel/userland/clone_arm64.v` | `ebd91f2bd5eef1e56f196b56f3207fcfc430bc269887a46bd8ff05328f060454` |
+| `kernel/userland/clone_amd64.v` | `d77fee1c91051a174392f0e06dd2d9d4470b0cdd1454c201eeff87bf6ac723d0` |
+| `kernel/userland/clone_arm64.v` | `47c3ffe8b769fd500a77157db1dcc75fdd05ffa7fbc028b3408802a0bbd72828` |
 | `kernel/userland/cred.v` | `4c0b15cdc1445213cb077f3ec25e80bc300b0808be038f0689838587153c3575` |
 | `kernel/userland/exit.v` | `f7788611aed2a790a60cde0789b089c5771a3dcd91c086cb1ee01932216ea635` |
 | `kernel/userland/linux_signal_amd64.v` | `cd84d3265e38cd99189a1c0c27f30b5db6c01f7dd23208daef1bdbcd51f37077` |
-| `kernel/userland/linux_task.v` | `f477f0db36c12c61a1a6b8534ce750bf4b3d0dac2de927dfc9102d16b27ed638` |
+| `kernel/userland/linux_task.v` | `e0833ac55495968bbd66e9e069c472f2bb5c9a59ea6858dfc5f3a8b1448453ad` |
 | `kernel/userland/seccomp_signal.v` | `b6fb6b23e10c8663d88b6d3fd6794eae1d906e162797b0c298e9bc674182f1f4` |
 | `kernel/userland/userland.v` | `5f469554fcdcb8372091dab30fdd2829a7996da2c66bf2c6d7ec2190490faa7a` |
 | `kernel/userland/userland_arm64.v` | `f86f19d0f1fed3fc5d1c1350559ded02812cd78846a5c61cf76c68d9868d8544` |
