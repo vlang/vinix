@@ -582,6 +582,9 @@ if [ "$DESKTOP_CACHE_HIT" -eq 0 ]; then
     "$SCRIPT_DIR/build-support/staging-cache" record "${DESKTOP_CACHE_ARGS[@]}"
 fi
 
+VFLAGS="${VFLAGS:-} -nocache" V="$V" "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/desktop/tools/build-services.v" \
+    --arch=arm64 --sysroot="$SYSROOT" --output="$BUILD_DIR/services"
+
 if [ "$MAKE_INITRAMFS" -eq 0 ]; then
     exit 0
 fi
@@ -1592,6 +1595,9 @@ cp "$BUILD_DIR/wifi-ctl" "$STAGING/usr/bin/wifi-ctl"
 chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
     "$STAGING/usr/bin/wifi-ctl"
 
+VFLAGS="${VFLAGS:-} -nocache" "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/desktop/tools/build-services.v" \
+    --install-only --output="$BUILD_DIR/services" --staging="$STAGING"
+
 # One immutable multicall image, one exec name and process per application.
 # Vinix records the path passed to execve, so these relative symlinks produce
 # distinct names and truthful per-app accounting without storing a copy of the
@@ -1653,6 +1659,8 @@ cp -L "$APP_SRC"/*.v "$APP_SRC"/*.vml "$APP_SRC"/*.h \
 cp -a "$SCRIPT_DIR/desktop/execinfocore" "$SCRIPT_DIR/desktop/gpucore" "$DESKTOP_DEV_ROOT/desktop/"
 mkdir -p "$DESKTOP_DEV_ROOT/vmodules/ui2"
 cp -aL "$UI2_MODULES/ui2/." "$DESKTOP_DEV_ROOT/vmodules/ui2/"
+VFLAGS="${VFLAGS:-} -nocache" "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/desktop/tools/build-services.v" \
+    --client-modules-only --staging="$STAGING"
 if [ ! -f "$DESKTOP_DEV_ROOT/desktop/main.v" ] || \
    [ ! -f "$DESKTOP_DEV_ROOT/vmodules/ui2/v.mod" ]; then
     echo "ERROR: system desktop development tree is incomplete" >&2
@@ -1705,6 +1713,7 @@ else
     GPU_CONTENT_KEY_INPUT="$BUILD_DIR/.vinix-desktop-gpu-not-built"
 fi
 CONTENT_KEY_INPUTS=(
+    "$BUILD_DIR/services"
     "$BUILD_DIR/desktop-init"
     "$BUILD_DIR/vinix-desktop"
     "$GPU_CONTENT_KEY_INPUT"

@@ -2,19 +2,10 @@
 module main
 
 import desktop.sessioncore
+import desktop.sessionipc
 import ui2
 import os
 import time
-
-struct SessionDialogTicket {
-mut:
-	pid     int
-	key     sessioncore.Text
-	kind    int
-	path    sessioncore.Text
-	status  int
-	expires i64
-}
 
 struct ShellDialog {
 mut:
@@ -37,35 +28,10 @@ mut:
 }
 
 fn session_dialog_open(key string, kind int, title string, directory string, filename string, filter string) bool {
-	type_text := kind.str()
-	args := [key, type_text, title, directory, filename, filter]
-	defer {
-		unsafe {
-			type_text.free()
-			(&array(&args)).free()
-		}
-	}
-	return session_call_ok('dialog.open', args)
+	return sessionipc.dialog_open(key, kind, title, directory, filename, filter)
 }
 
-fn session_dialog_take(key string) ?string {
-	args := [key]
-	reply := session_call('dialog.take', args) or {
-		unsafe { (&array(&args)).free() }
-		return ''
-	}
-	defer {
-		unsafe {
-			(&array(&args)).free()
-			reply.free()
-		}
-	}
-	if reply == 'pending' { return none }
-	f := sessioncore.fields(reply) or { return '' }
-	if f.count != 2 || f.values[0] != 'selected' { return '' }
-	path := sessioncore.unfield(f.values[1]) or { return '' }
-	return path.str().clone()
-}
+fn session_dialog_take(key string) ?string { return sessionipc.dialog_take(key) }
 
 fn session_dialog_cli(kind int, directory string, filter string) {
 	if !session_dialog_open('portal', kind, 'Choose a file or folder', directory, '', filter) {

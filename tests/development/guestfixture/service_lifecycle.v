@@ -149,7 +149,7 @@ fn service_broker() i32 {
 			log := C.open(c'/home/developer/service-broker.log', C.O_WRONLY | C.O_CREAT | C.O_APPEND, u32(0o600))
 			if log < 0 || C.dup2(log, 1) != 1 || C.dup2(log, 2) != 2 { C._exit(125) }
 			if log > 2 { C.close(log) }
-			argv := [&char(c'/usr/bin/vinix-desktop'), &char(c'--session-services'),
+			argv := [&char(c'/usr/bin/vinix-session'),
 				&char(c'--session-home=/home/developer'), &char(nil)]!
 			C.execv(argv[0], &argv[0])
 			C._exit(127)
@@ -179,7 +179,7 @@ fn service_broker() i32 {
 fn service_lifecycle_checks() {
 	unsafe {
 		// This optional input is selected and pinned by the host controller.
-		broker_file := C.open(c'/usr/bin/vinix-desktop', C.O_RDONLY)
+		broker_file := C.open(c'/usr/bin/vinix-session', C.O_RDONLY)
 		if broker_file < 0 { return }
 		check(C.close(broker_file) == 0 && C.mkdir(c'/home/developer/service-runtime', 0o700) == 0
 			&& C.setenv(c'VINIX_SESSION_RUNTIME', c'/home/developer/service-runtime', 1) == 0, 468)

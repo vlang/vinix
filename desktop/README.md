@@ -307,6 +307,23 @@ and mapped-memory values for every app. The build uses `VINIX_UI2_SOURCE` when
 set, otherwise a sibling `../ui2` checkout when present, and finally
 `third_party/ui2`.
 
+The background services are separate static V executables:
+`vinix-session` owns session policy, notifications and service state;
+`vinix-timesync` synchronizes the system clock; and `vinix-service-runner`
+supervises each service and stops its process group when its broker lease closes.
+They share the `sessionipc` and `sessioncore` modules and contain no ui2,
+compositor, fonts or application artwork. ARM64 and x86-64 image builds compile
+and install all three. The desktop's older `--session-services` and
+`--time-service` commands exec the corresponding helper for compatibility;
+saved built-in clock service records migrate while preserving their policy.
+
+Run `V=/path/to/v v run desktop/tools/test-services.v` for the standalone
+authorization, persistence, restart, crash-cleanup and allocation checks.
+`v run desktop/tools/build-services.v --arch=arm64|amd64 --sysroot=DIR --output=DIR`
+cross-builds the helpers independently of the desktop. Native tests can select
+their helper directory with `VINIX_SESSION_BIN_DIR`; installed sessions use
+`/usr/bin`.
+
 VOffice is not built with the image. `../scripts/build-voffice-aarch64.sh` uses
 `tools/build_voffice` and `tools/ui2_vinix_backend.v` to cross-compile
 Writer and Calc as static musl applications from `VINIX_OFFICE_SOURCE`, a

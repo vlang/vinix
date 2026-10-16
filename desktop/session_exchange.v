@@ -2,37 +2,10 @@
 module main
 
 import desktop.sessioncore
-import os
-
-fn session_random_token() !u64 {
-	mut file := os.open('/dev/urandom')!
-	defer { file.close() }
-	mut bytes := []u8{len: 8}
-	defer { unsafe { bytes.free() } }
-	if file.read(mut bytes)! != 8 { return error('exchange randomness unavailable') }
-	mut token := u64(0)
-	for i in 0 .. 8 { token |= u64(bytes[i]) << (8 * i) }
-	token &= 0x7fffffffffffffff
-	if token == 0 { return error('invalid random exchange token') }
-	return token
-}
+import desktop.sessionipc
 
 fn session_offer_data(kind sessioncore.DataKind, data string, sensitive bool) bool {
-	fd := session_connect() or { return false }
-	defer { desktop_close(fd) }
-	mut w := sessioncore.Writer{}
-	w.add('clipboard.offer\t')
-	w.number(int(kind))
-	w.add('\t')
-	w.number(int(sensitive))
-	w.add('\t')
-	w.field(data)
-	request := w.finish()
-	defer { unsafe { request.free() } }
-	if !session_send_message(fd, request) { return false }
-	reply := session_receive(fd) or { return false }
-	defer { unsafe { reply.free() } }
-	return reply == 'ok'
+	return sessionipc.offer_data(kind, data, sensitive)
 }
 
 fn (d &Desktop) session_sender_has_gesture(pid int) bool {

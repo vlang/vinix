@@ -154,20 +154,9 @@ fn main() {
 		return
 	}
 	for i,arg in all_args { if arg=='--session-dialog' && i+2<all_args.len { kind:=all_args[i+1].int(); session_dialog_cli(kind,all_args[i+2],if i+3<all_args.len { all_args[i+3] } else { '' }); return } }
-	if '--time-service' in all_args {
-		mut server := 'pool.ntp.org'
-		for arg in all_args { if arg.starts_with('--time-server=') { server = arg['--time-server='.len..] } }
-		run_time_service(server)
-		return
-	}
-	if '--session-services' in all_args {
-		mut home := desktop_home
-		mut owner:=0
-		for arg in all_args { if arg.starts_with('--session-home=') { home = arg['--session-home='.len..] } }
-		for arg in all_args { if arg.starts_with('--session-owner=') { owner=arg['--session-owner='.len..].int() } }
-		run_session_services(home,owner)
-		return
-	}
+	// Retain old command lines while executing the dedicated service binaries.
+	if '--time-service' in all_args { session_exec_helper('vinix-timesync', all_args[1..]); return }
+	if '--session-services' in all_args { session_exec_helper('vinix-session', all_args[1..]); return }
 	if '--session-control' in all_args {
 		for i, arg in all_args {
 			if arg == '--session-control' && i + 1 < all_args.len {

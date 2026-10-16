@@ -278,7 +278,7 @@ fn run() !int {
 		hashes[tool] = hash
 	}
 	if broker := os.getenv_opt('VINIX_DEVELOPMENT_SERVICE_BROKER') {
-		hashes['vinix-desktop'] = servicecore.stage(broker, root, arch)!
+		for name, hash in servicecore.stage(broker, root, arch)! { hashes[name] = hash }
 	}
 	if source := os.getenv_opt('VINIX_DEVELOPMENT_V_SMOKE_ROOT') {
 		v_root := os.real_path(source)
@@ -761,7 +761,7 @@ fn run() !int {
 				return error('native job deadline, signal, watch or recovery state failed validation')
 			}
 		}
-		if 'vinix-desktop' in hashes {
+		if 'vinix-session' in hashes {
 			servicecore.verify(receipts['/home/developer/service-proof.json'])!
 			for cycle in 1 .. 4 {
 				job_record := json2.decode[NativeSchedule](receipts['/home/developer/service-stop-${cycle}.json'], strict: true)!

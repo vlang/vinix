@@ -21,20 +21,26 @@ pub:
 
 // Prepared brokers are explicit inputs, copied and pinned before the guest
 // starts. Qualification never substitutes a mock broker or bypasses its IPC.
-pub fn stage(source string, root string, arch string) !string {
-	bytes := os.read_bytes(source)!
+pub fn stage(source string, root string, arch string) !map[string]string {
 	machine := if arch == 'aarch64' { u16(183) } else { u16(62) }
-	if arch !in ['aarch64', 'x86_64'] || bytes.len < 20
-		|| bytes[..6] != [u8(0x7f), `E`, `L`, `F`, 2, 1]
-		|| (u16(bytes[18]) | (u16(bytes[19]) << 8)) != machine {
-		return error('service broker needs a matching native ELF64 executable')
+	if arch !in ['aarch64', 'x86_64'] { return error('unsupported service architecture') }
+	mut hashes := map[string]string{}
+	os.mkdir_all(root + '/usr/bin')!
+	for name in ['vinix-session', 'vinix-timesync', 'vinix-service-runner'] {
+		input := if name == 'vinix-session' { source } else { os.dir(source) + '/' + name }
+		bytes := os.read_bytes(input)!
+		if bytes.len < 20 || bytes[..6] != [u8(0x7f), `E`, `L`, `F`, 2, 1]
+			|| (u16(bytes[18]) | (u16(bytes[19]) << 8)) != machine {
+			return error('${name} needs a matching native ELF64 executable')
+		}
+		hash := sha256.sum(bytes).hex()
+		path := root + '/usr/bin/' + name
+		os.write_file_array(path, bytes)!
+		os.chmod(path, 0o755)!
+		if sha256.sum(os.read_bytes(path)!).hex() != hash { return error('service executable copy changed') }
+		hashes[name] = hash
 	}
-	hash := sha256.sum(bytes).hex()
-	path := root + '/usr/bin/vinix-desktop'
-	os.write_file_array(path, bytes)!
-	os.chmod(path, 0o755)!
-	if sha256.sum(os.read_bytes(path)!).hex() != hash { return error('service broker copy changed') }
-	return hash
+	return hashes
 }
 
 pub fn verify(body string) ! {

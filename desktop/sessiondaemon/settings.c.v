@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-module main
+module sessiondaemon
 
 import desktop.sessioncore
+import desktop.sessionipc
+import desktop.serviceprocess
 import os
 import time
 
@@ -16,14 +18,14 @@ mut:
 }
 
 fn session_volume(value int) !int {
-	fd := desktop_open_rw('/dev/mixer')
+	fd := sessionipc.desktop_open_rw('/dev/mixer')
 	if fd < 0 { return error('No supported output mixer') }
-	defer { desktop_close(fd) }
+	defer { sessionipc.desktop_close(fd) }
 	mut setting := SessionMixerValue{ value: value }
-	if value >= 0 && desktop_ioctl(fd, u64(0xc0345806), &setting) < 0 {
+	if value >= 0 && sessionipc.desktop_ioctl(fd, u64(0xc0345806), &setting) < 0 {
 		return error('Output level refused by the mixer')
 	}
-	if desktop_ioctl(fd, u64(0xc0345805), &setting) < 0 {
+	if sessionipc.desktop_ioctl(fd, u64(0xc0345805), &setting) < 0 {
 		return error('Output mixer cannot be read')
 	}
 	return setting.value
@@ -124,7 +126,9 @@ fn (mut daemon SessionDaemon) settings_status(category string) string {
 			s.control('storage.mounts', 'View mounted filesystems', os.exists('/proc/mounts'), false)
 		}
 		'updates' {
-			release := read_release_tag(installed_release_path)
+			release_record := sessioncore.load('/etc/vinix-release', 256) or { '' }
+			release := release_record.trim_space().clone()
+			unsafe { release_record.free() }
 			if release.len > 0 {
 				s.line(release)
 			} else {
@@ -170,7 +174,7 @@ fn (mut daemon SessionDaemon) settings_status(category string) string {
 				s.control(action, name, true, false)
 				unsafe { action.free() }
 			}
-			s.control('shortcut.reset','Restore default shortcuts',true,false)
+			s.control('shortcut.reset', 'Restore default shortcuts', true, false)
 		}
 		'gestures' {
 			s.control('gestures.enable', 'Pointer gestures', true, daemon.policy.gestures)
@@ -208,7 +212,7 @@ fn (mut daemon SessionDaemon) save_policy() ! {
 	sessioncore.save(path, record)!
 }
 
-fn (mut daemon SessionDaemon) settings_apply(message SessionMessage) ! {
+fn (mut daemon SessionDaemon) settings_apply(message sessionipc.SessionMessage) ! {
 	previous := daemon.policy
 	daemon.settings_apply_inner(message) or {
 		daemon.policy = previous
@@ -222,7 +226,7 @@ fn (mut daemon SessionDaemon) settings_apply(message SessionMessage) ! {
 	}
 }
 
-fn (mut daemon SessionDaemon) settings_apply_inner(message SessionMessage) ! {
+fn (mut daemon SessionDaemon) settings_apply_inner(message sessionipc.SessionMessage) ! {
 	action := message.fields[1].str()
 	value := if message.count > 2 { message.fields[2].str() } else { '' }
 	if action.starts_with('sound.') {
@@ -395,11 +399,11 @@ fn (mut daemon SessionDaemon) settings_apply_inner(message SessionMessage) ! {
 		mut service := sessioncore.Service{ name: sessioncore.text('settings-operation')!, executable: sessioncore.text(program)! }
 		for i, arg in args { service.arguments[i].set(arg)! }
 		service.argument_count = args.len
-		process := session_spawn_service(service, daemon.home)
+		process := serviceprocess.start(service, daemon.home)
 		daemon.operation_pid = process.pid
 		daemon.operation_lease = process.lease
 		if daemon.operation_pid <= 0 { return error('could not start settings operation') }
-		daemon.operation_deadline = monotonic_millis() + 30000
+		daemon.operation_deadline = sessionipc.monotonic_millis() + 30000
 		daemon.settings_result.set('Operation running. View settings-operation.log for details.')!
 		return
 	}

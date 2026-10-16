@@ -164,6 +164,9 @@ echo "==> Compiling for x86_64-linux-musl..."
     -fuse-ld=lld -o "$BUILD_DIR/vinix-desktop"
 "$LLVM_STRIP" "$BUILD_DIR/vinix-desktop"
 
+VFLAGS="${VFLAGS:-} -nocache" V="$V" "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/desktop/tools/build-services.v" \
+    --arch=amd64 --sysroot="$SYSROOT" --output="$BUILD_DIR/services"
+
 echo "==> Staging the amd64 desktop initramfs..."
 STAGING="$BUILD_DIR/initramfs-root"
 rm -rf "$STAGING"
@@ -221,6 +224,8 @@ rm -f "$STAGING"/usr/lib/libOSMesa.so* "$STAGING"/usr/lib/libGLU.so* \
 mkdir -p "$STAGING/usr/bin" "$STAGING/usr/share/vinix/wallpapers" \
     "$STAGING/usr/share/vinix/icons" "$STAGING/root/desktop" "$STAGING/run"
 install -m755 "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
+VFLAGS="${VFLAGS:-} -nocache" "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/desktop/tools/build-services.v" \
+    --install-only --output="$BUILD_DIR/services" --staging="$STAGING"
 rm -f "$STAGING/usr/bin"/vinix-ui2-*
 install -m644 "$SCRIPT_DIR/desktop/assets/chromium.qoi" \
     "$STAGING/usr/share/vinix/icons/chromium.qoi"

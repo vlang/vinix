@@ -33,13 +33,14 @@ This base gate checks native export and parser compatibility. Select the real
 Services broker explicitly to add import/start/stop and broker-restart checks:
 
 ```
-VINIX_DEVELOPMENT_SERVICE_BROKER=/path/to/native/vinix-desktop \
+VINIX_DEVELOPMENT_SERVICE_BROKER=/path/to/native/vinix-session \
 tests/development/run-guest aarch64 /path/to/kernel /path/to/staged-tools /path/to/new-state
 ```
 
-Supply a static broker with embedded VML assets for the selected architecture. The
-controller copies the exact ELF into the guest and records its SHA-256 beside
-the four development commands. An unsuitable or missing broker cannot satisfy
+Supply the static broker alongside `vinix-timesync` and `vinix-service-runner`
+for the selected architecture. The controller copies all three executables into
+the guest and records their SHA-256 values beside the four development commands.
+An unsuitable or missing helper cannot satisfy
 the optional verdict or its four extra receipts.
 
 The ordinary account exports and imports its schedule disabled. Import before

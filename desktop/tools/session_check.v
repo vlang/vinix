@@ -146,7 +146,9 @@ fn stage(root string, dest string) ! {
 		if baseline.exit_code != 0 { return error('could not isolate module ${path}') }
 		os.write_file(output, baseline.output)!
 	}
-	os.cp_all('${root}/desktop/sessioncore', '${dest}/modules/desktop/sessioncore', true)!
+	for name in ['sessioncore', 'sessionipc'] {
+		os.cp_all('${root}/desktop/${name}', '${dest}/modules/desktop/${name}', true)!
+	}
 	// Its ABI is generated independently of the desktop's libc declarations.
 	hosttest.generate_module('${root}/desktop/gpucore', '${dest}/presenter.c', 'arm64', [])!
 	hosttest.emit_module_header('${root}/desktop/gpucore', '${dest}/presenter.c', '${dest}/gpu_present.h')!
@@ -282,8 +284,10 @@ fn main() {
 	}
 	mut args := ['-new-compiler', '-nocache', '-cc', 'clang', '-gc', 'none', '-manualfree',
 		'-enable-globals', '-d', 'ui2_headless', '-path',
-		'@vlib|${dest}/modules|@vmodules|${root}|${root}/third_party']
+		'@vlib|${dest}/modules|@vmodules|${root}|${root}/third_party|${root}/tools/accounts']
 	if os.args.len > 1 && os.args[1] == 'build' {
+		run(v, ['run', '${root}/desktop/tools/build-services.v', '--arch=native',
+			'--output=${root}/build/session-runtime']) or { panic(err) }
 		args << ['-o', '${dest}/vinix-desktop', dest]
 		run(v, args) or {
 			eprintln(err)
@@ -304,6 +308,7 @@ fn main() {
 		exit(1)
 	}
 	if integration {
+		os.setenv('VINIX_SESSION_BIN_DIR', '${root}/build/session-runtime', true)
 		os.cp('${root}/desktop/tools/tests/session_test.v', '${dest}/session_test.v') or {
 			eprintln(err)
 			exit(1)

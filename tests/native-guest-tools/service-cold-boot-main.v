@@ -99,7 +99,7 @@ fn run() ! {
 	os.mkdir_all(state + '/fixture')!
 	init := guesthost.compile_init(guesthost.root() + '/tests/development/guestfixture/core.v', state + '/fixture', arch, false)!
 	os.mkdir_all(state + '/inputs/usr/bin')!
-	broker_hash := servicecore.stage(broker, state + '/inputs', arch)!
+	service_hashes := servicecore.stage(broker, state + '/inputs', arch)!
 	jobs := os.read_bytes(stage + '/usr/bin/vinix-jobs')!
 	if jobs.len < 20 || jobs[..6] != [u8(0x7f), `E`, `L`, `F`, 2, 1]
 		|| (u16(jobs[18]) | (u16(jobs[19]) << 8)) != if arch == 'aarch64' { u16(183) } else { u16(62) } {
@@ -117,7 +117,9 @@ fn run() ! {
 	}]})
 	mut receipt := Receipt{architecture: arch, options: selected, plan_sha256: sha256.sum(plan.bytes()).hex(), inputs: {
 		'kernel': digest(state + '/kernel/bin/vinix')!, 'fixture': digest(init)!,
-		'vinix-jobs': jobs_hash, 'vinix-desktop': broker_hash,
+		'vinix-jobs': jobs_hash, 'vinix-session': service_hashes['vinix-session'],
+		'vinix-timesync': service_hashes['vinix-timesync'],
+		'vinix-service-runner': service_hashes['vinix-service-runner'],
 		'mke2fs': digest(formatter)!, 'e2fsck': digest(checker)!
 	}}
 	defer {
@@ -138,7 +140,9 @@ fn run() ! {
 		os.mkdir_all(boot + '/rootfs/usr/bin')!
 		os.mkdir_all(boot + '/rootfs/home/developer')!
 		os.mkdir_all(boot + '/rootfs/fixture')!
-		for name, hash in {'vinix-jobs': jobs_hash, 'vinix-desktop': broker_hash} {
+		mut payload_hashes := service_hashes.clone()
+		payload_hashes['vinix-jobs'] = jobs_hash
+		for name, hash in payload_hashes {
 			source := state + '/inputs/usr/bin/' + name
 			if digest(source)! != hash { return error('cold boot executable input changed') }
 			os.cp(source, boot + '/rootfs/usr/bin/' + name)!
