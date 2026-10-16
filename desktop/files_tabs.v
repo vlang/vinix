@@ -144,21 +144,26 @@ fn (a &FilesContextApp) highlight_selection(mut element ui2.Element) {
 	for i in 0 .. element.children.len { a.highlight_selection(mut element.children[i]) }
 }
 
-fn (mut a FilesContextApp) workflow_toolbar(size ui2.Rect) []ui2.Element {
+// A single folder needs no tab strip. Tab commands live in the context menu
+// and keep their keyboard shortcuts even while the strip is hidden.
+fn (a &FilesContextApp) tabs_height() int {
+	return if a.tabs.len > 1 { 30 } else { 0 }
+}
+
+fn (a &FilesContextApp) browser_height(height int) int {
+	available := height - a.tabs_height() - 34 - if a.operation_open { 66 } else { 0 }
+	return if available > 0 { available } else { 1 }
+}
+
+fn (mut a FilesContextApp) tab_strip(size ui2.Rect) []ui2.Element {
 	a.ensure_tabs()
-	mut rows := frame_elements(20)
-	width := if size.width > 124 { (int(size.width) - 124) / a.tabs.len } else { 24 }
+	mut rows := frame_elements(a.tabs.len)
+	if a.tabs.len <= 1 { return rows }
+	width := int(size.width) / a.tabs.len
+	top := if files_catalina { files_header_height() } else { 0 }
 	for i, tab in a.tabs {
 		path := if i == a.active_tab { a.files.current_path() } else { tab.path }
-		rows << ui2.button(tab.action, file_path_name(path), ui2.rect(f64(i * width), 0, f64(width), 30), ui2.BoxStyle{bg: if i == a.active_tab { body_panel } else { app_surface }}, ui2.TextStyle{color: body_text, size: 11})
-	}
-	rows << ui2.button('files.tab.new', '+', ui2.rect(size.width - 120, 0, 32, 30), ui2.BoxStyle{bg: body_panel}, ui2.TextStyle{color: body_text, size: 13})
-	rows << ui2.button('files.tab.close', 'Close tab', ui2.rect(size.width - 84, 0, 80, 30), ui2.BoxStyle{bg: body_panel}, ui2.TextStyle{color: body_text, size: 11})
-	actions := ['files.selection.toggle', 'files.selection.all', 'files.batch.copy', 'files.batch.cut', 'files.batch.paste', 'files.batch.delete', 'files.operation.undo', 'files.index.open', 'files.document.open', 'files.document.choose']!
-	labels := [if a.multi_select { 'Selecting' } else { 'Select' }, 'All', 'Copy', 'Cut', 'Paste', 'Trash', 'Undo', 'Search', 'Open', 'Open with']!
-	for i, action in actions {
-		button_width := (int(size.width) - 8) / 10
-		rows << ui2.button(action, labels[i], ui2.rect(f64(i * button_width + 4), 32, f64(button_width - 4), 28), ui2.BoxStyle{bg: body_panel}, ui2.TextStyle{color: body_text, size: 11})
+		rows << ui2.button(tab.action, file_path_name(path), ui2.rect(f64(i * width), f64(top), f64(width), 30), ui2.BoxStyle{bg: if i == a.active_tab { body_panel } else { app_surface }}, ui2.TextStyle{color: body_text, size: 11})
 	}
 	return rows
 }

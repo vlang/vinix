@@ -70,13 +70,32 @@ const create_context_item_entries = [
 ]
 
 const create_context_files_item_entries = [
-	ui2.MenuEntry{ id:'session.openwith.context',title:'Open With…' },
+	ui2.MenuEntry{ id: 'files.document.open', title: 'Open' },
+	ui2.MenuEntry{ id: 'files.document.choose', title: 'Open With…' },
 	ui2.MenuEntry{ id: file_context_rename, title: 'Rename' },
 	ui2.MenuEntry{ id: file_context_copy, title: 'Copy' },
 	ui2.MenuEntry{ id: file_context_cut, title: 'Cut' },
 	ui2.MenuEntry{ id: file_context_paste, title: 'Paste' },
 	ui2.MenuEntry{ id: file_context_tags, title: 'Tags…' },
 	ui2.MenuEntry{ id: file_context_delete, title: 'Delete' },
+	ui2.MenuEntry{ id: 'files.selection.toggle', title: 'Select Multiple Items' },
+	ui2.MenuEntry{ id: 'files.selection.all', title: 'Select All' },
+	ui2.MenuEntry{ id: 'files.operation.undo', title: 'Undo' },
+	ui2.MenuEntry{ id: 'files.index.open', title: 'Search…' },
+	ui2.MenuEntry{ id: 'files.tab.new', title: 'New Tab' },
+	ui2.MenuEntry{ id: 'files.tab.close', title: 'Close Tab' },
+]
+
+const create_context_files_background_entries = [
+	ui2.MenuEntry{ id: create_context_new_folder, title: 'New Folder' },
+	ui2.MenuEntry{ id: create_context_new_file, title: 'New File' },
+	ui2.MenuEntry{ id: file_context_paste, title: 'Paste' },
+	ui2.MenuEntry{ id: 'files.selection.toggle', title: 'Select Multiple Items' },
+	ui2.MenuEntry{ id: 'files.selection.all', title: 'Select All' },
+	ui2.MenuEntry{ id: 'files.operation.undo', title: 'Undo' },
+	ui2.MenuEntry{ id: 'files.index.open', title: 'Search…' },
+	ui2.MenuEntry{ id: 'files.tab.new', title: 'New Tab' },
+	ui2.MenuEntry{ id: 'files.tab.close', title: 'Close Tab' },
 ]
 
 const start_context_open = 'start.context.open'
@@ -709,16 +728,24 @@ fn (mut a FilesContextApp) build(size ui2.Rect) !ui2.Element {
 	if a.index_search.open { return a.index_panel(size) }
 	if a.document_choose { return a.document_open_panel(size) }
 	a.start_visible_thumbnails()
-	browser_height := if size.height > 98 { size.height - 98 - if a.operation_open { 66 } else { 0 } } else { 1.0 }
-	browser_root := a.files.build(ui2.rect(size.x, size.y, size.width, browser_height))!
+	tabs_height := a.tabs_height()
+	browser_height := a.browser_height(int(size.height))
+	browser_root := a.files.build(ui2.rect(size.x, size.y, size.width, f64(browser_height)))!
 	mut browser_children := frame_elements(8)
-	mut content := ui2.view('files.workflow.content', ui2.rect(0, 64, size.width, browser_height), ui2.BoxStyle{transparent: true}, browser_root.children)
+	mut content_children := frame_elements(browser_root.children.len)
+	// The compositor moves Finder's toolbar into the title bar only when it
+	// leads the application's tree. Keep the optional tabs below that toolbar.
+	for child in browser_root.children {
+		if child.id == app_toolbar_id { browser_children << child }
+		else { content_children << child }
+	}
+	mut content := ui2.view('files.workflow.content', ui2.rect(0, f64(tabs_height), size.width, f64(browser_height)), ui2.BoxStyle{transparent: true}, content_children)
 	a.highlight_selection(mut content)
 	browser_children << content
-	browser_children << a.workflow_toolbar(size)
+	browser_children << a.tab_strip(size)
 	browser_children << a.trash_footer(size)
 	if a.operation_open { browser_children << a.operation_panel(size) }
-	root := ui2.Element{ ...browser_root, children: browser_children }
+	root := ui2.Element{ ...browser_root, frame: size, children: browser_children }
 	if a.tag_picker {
 		mut children := frame_elements(root.children.len + 1)
 		children << root.children
@@ -737,7 +764,7 @@ fn (mut a FilesContextApp) build(size ui2.Rect) !ui2.Element {
 	if overlay := a.rename_overlay(size) {
 		mut children := frame_elements(root.children.len + 1)
 		children << root.children
-		children << ui2.Element{...overlay, frame: ui2.Rect{...overlay.frame, y: overlay.frame.y + 64}}
+		children << ui2.Element{...overlay, frame: ui2.Rect{...overlay.frame, y: overlay.frame.y + tabs_height}}
 		return ui2.Element{
 			...root
 			children: children
@@ -1024,7 +1051,9 @@ fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointe
 	a.follow_theme()
 	if a.document_choose { return }
 	if a.index_search.open { if phase == .scroll { a.index_search.scroll = files_clamp(a.index_search.scroll - scroll, if a.index_search.results.len > 0 { a.index_search.results.len - 1 } else { 0 }) }; return }
-	if !a.settings_only && !a.trash_open && !a.preview.open && !a.volumes_open && !a.files.info.open && !a.tag_picker && a.workflow_drag(phase, button, x, y - 64, width) { return }
+	tabs_height := a.tabs_height()
+	browser_y := y - if files_catalina && y < files_header_height() { 0 } else { tabs_height }
+	if !a.settings_only && !a.trash_open && !a.preview.open && !a.volumes_open && !a.files.info.open && !a.tag_picker && a.workflow_drag(phase, button, x, browser_y, width) { return }
 	if a.volumes_open { return }
 	if a.trash_open {
 		if phase == .scroll {
@@ -1069,7 +1098,11 @@ fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointe
 		}
 		return
 	}
-	a.files.pointer_event(phase, button, scroll, x, y - 64, width, height - 98 - if a.operation_open { 66 } else { 0 })
+	if tabs_height > 0 && phase != .up && phase != .move {
+		tabs_top := if files_catalina { files_header_height() } else { 0 }
+		if y >= tabs_top && y < tabs_top + tabs_height { return }
+	}
+	a.files.pointer_event(phase, button, scroll, x, browser_y, width, a.browser_height(height))
 }
 
 fn (mut a FilesContextApp) key_input(input string) {
@@ -1146,7 +1179,7 @@ fn context_menu_height(target CreateContextTarget, has_item bool) int {
 			create_context_item_entries.len
 		}
 	} else {
-		create_context_background_entries.len
+		if target == .files { create_context_files_background_entries.len } else { create_context_background_entries.len }
 	}
 	return count * create_context_row_height + 2 * create_context_padding
 }
@@ -1329,6 +1362,9 @@ fn context_menu_action(action string) bool {
 		|| action == taskbar_context_close_all || action.starts_with(jump_list_prefix)
 		|| action.starts_with('start.context.') || action == tray_context_hide
 		|| action == tray_context_show
+		|| action in ['files.selection.toggle', 'files.selection.all', 'files.operation.undo',
+			'files.index.open', 'files.document.open', 'files.document.choose', 'files.tab.new',
+			'files.tab.close']
 }
 
 fn action_starts_rename(action string) bool {
@@ -1710,6 +1746,8 @@ fn (mut d Desktop) render_create_context_overlays() {
 			} else {
 				d.render_context_entries(create_context_item_entries)
 			}
+		} else if create_context_menu.target == .files {
+			d.render_context_entries(create_context_files_background_entries)
 		} else {
 			d.render_context_entries(create_context_background_entries)
 		}
