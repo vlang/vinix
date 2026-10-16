@@ -162,6 +162,51 @@ sudo yum install -y clang llvm lld make findutils curl git file xz rsync xorriso
 ```bash
 sudo xbps-install -Suv clang llvm lld make findutils curl git file xz rsync xorriso qemu python3
 ```
+
+### Building Vinix with Docker
+
+The build prerequisites are a moving target of host packages, so the repository
+carries a `Dockerfile` that has them and both V compilers already pinned:
+
+```bash
+docker build -t vinix .
+docker run --rm -it -v "$PWD":/src -w /src vinix make all
+```
+
+The image has two V compilers, because Vinix needs two:
+
+| Compiler | Built from | Use it for |
+| --- | --- | --- |
+| `/opt/vinix-tools/v-kernel/v` | the pin in `tools/m1-wifi/get-v.sh` | the kernel |
+| `/opt/vinix-tools/v-util/v` | the release named by the `V_UTIL_VERSION` build arg (0.5.2) | `util-vinix` |
+
+`v` on `PATH` is the kernel compiler, so the build's own compiler discovery
+finds a working one with nothing set. Point the build at the other one with `V`
+or `VINIX_V_COMPILER`, exactly as above:
+
+```bash
+docker run --rm -it -v "$PWD":/src -w /src vinix sh -c '
+  cd kernel
+  make PROD=false V=/opt/vinix-tools/v-kernel/v
+  cd ../util-vinix
+  make PROD=false VFLAGS="-os vinix -gc none" VEXE=/opt/vinix-tools/v-util/v
+'
+```
+
+The image runs as UID 1000, so files the build writes into a mounted source tree
+stay owned by you. `git config --global --add safe.directory /src` is not needed
+for the build itself, but a build that runs `git` inside the mount will want it.
+
+Podman works identically and needs no daemon:
+```bash
+podman build -t vinix .
+podman run --rm -it -v "$PWD":/src -w /src vinix make all
+```
+
+Note that running the resulting ISO still needs a VM: `qemu-system-x86_64` is in
+the image, but a container cannot use KVM unless `/dev/kvm` is passed in with
+`--device /dev/kvm`.
+
 ### Building the distro
 
 The build downloads Alpine's pinned minirootfs, builds the kernel directly
