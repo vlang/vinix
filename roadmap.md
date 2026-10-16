@@ -1160,6 +1160,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   per native architecture against identical Linux probe ELFs, with flat
   identical-input cleanup. See [the namespace/cgroup receipts](docs/linux-posix-qualification.md#native-clone3-namespace-permissions-and-cgroup-descriptor-ordering).
 
+- [x] Reject clone/clone3 threads when birth and future-child PID namespaces
+  differ; qualify unshare/setns entry, genuine musl pthread refusals, namespace
+  restoration, successful joins, fork/reap and flat identical-input cleanup in
+  1,880 controls per architecture against identical Linux ELFs. Nested callers
+  remain separate. See [the future-PID receipts](docs/linux-posix-qualification.md#native-clone-thread-admission-with-a-future-pid-namespace).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -1,0 +1,6 @@
+/Users/alex/.cache/vinix-linux-compat/clonefuture-20261016/early-reference.v:10: FAIL: fn main.main: assert code==0,output;
+   left value: code = 1
+  right value: 0
+      message: failed to open file "/Users/alex/.cache/vinix-linux-compat/clonefuture-20261016/states/preflight-arm/init"
+
+V panic: Assertion failed...

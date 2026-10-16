@@ -1,0 +1,3 @@
+tests/linux-compat/clonefuture-check.v:445: FAIL: fn main.main: assert false, 'clonefuture assertions must execute'
+      message: clonefuture assertions must execute
+V panic: Assertion failed...

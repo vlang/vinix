@@ -2089,3 +2089,14 @@ clonecgparent regressions pass. Use `--cases clonecgperm --timeout 1200` with
 fresh state; `clonecgperm-reference.v` runs the unchanged ELF on Linux and
 `clonecgperm-check.v` audits receipts when compiled without `-prod`.
 See the [qualification report](../../docs/linux-posix-qualification.md#native-clone3-namespace-permissions-and-cgroup-descriptor-ordering).
+
+The `clonefuture` case checks raw clone/clone3 and real musl pthread creation
+with different birth/future-child PID namespaces, then restoration and successful
+thread joins. Four root/UID1000 unshare/setns cohorts in the initial PID namespace
+run 1,880 controls per architecture; originals fail 1,096. Fixed kernels and
+identical Linux ELFs pass, with flat identical-input transition/thread/fork cleanup.
+Runtime and clonecgperm regressions pass. Nested callers remain unqualified.
+Use `--cases clonefuture --timeout 1200` with fresh state;
+`clonefuture-reference.v` runs the unchanged ELF on Linux and
+`clonefuture-check.v` audits receipts without `-prod`, including retained refusals.
+See [receipts and limits](../../docs/linux-posix-qualification.md#native-clone-thread-admission-with-a-future-pid-namespace).

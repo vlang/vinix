@@ -213,6 +213,14 @@ fn valid_clone_parent(flags u64) bool {
 	return flags & clone_parent == 0 || proc.own_pid(proc.current_thread().process) != 1
 }
 
+// Threads must stay in their process' birth PID namespace. unshare/setns
+// can select a different namespace for future children without a NEWPID flag.
+fn valid_clone_pid_namespace(flags u64) bool {
+	if flags & clone_thread == 0 { return true }
+	process := proc.current_thread().process
+	return voidptr(process.ns.pid) == voidptr(process.ns.pid_for_children)
+}
+
 // FS, descriptor and handler ownership is currently process-scoped. Refuse
 // combinations we cannot honor instead of silently copying requested sharing
 // or silently sharing state the caller asked to keep independent.

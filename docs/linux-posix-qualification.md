@@ -10306,3 +10306,109 @@ ownership, requested PID allocation, supplied-stack execution, shared-VM/vfork
 lifetimes, other notifications/wait classes, worker callers, GNU libc and
 translated/32-bit paths remain unqualified here. The broad libc,
 installation/sandbox/portal and translation gates remain open.
+
+## Native clone thread admission with a future PID namespace
+
+Both clone APIs now reject CLONE_THREAD with EINVAL when the caller's future-child
+PID namespace differs from its birth namespace, even without a NEWPID flag.
+The clone3 check precedes namespace permissions and cgroup descriptor lookup;
+both common admission paths check before unsupported sharing or thread creation.
+This follows [Linux's copy_process check](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c).
+
+The scalar helper compares `ns.pid` with `ns.pid_for_children`. The birth PID
+namespace remains unchanged by unshare/setns. Using `numbered_in` directly would
+incorrectly reject initial-namespace callers, where Vinix represents numbering
+with nil. There are no new namespace references, locks, allocations or frees.
+
+The `clonefuture` probe runs 1,880 controls per native architecture: 1,872 raw
+requests and eight genuine musl pthread attempts. Four cohorts combine root and
+UID1000 with two entry routes. Route 0 tests the mismatch directly after unshare;
+route 1 restores the original namespace and then joins the future namespace with
+setns. All callers remain in the initial PID namespace. A blocked PID1 keeper
+keeps each future namespace alive; it reports PID/TID1, parent0 and its UID, then
+exits38 and is reaped after qualification. Namespace links prove different and
+restored identities. CAP_SYS_ADMIN is retained in the permitted set through UID
+drop, enabled/read back for setns and cleared/read back for clone/pthread calls.
+
+Each cohort has six raw classes with aligned, unaligned and exact-page-end
+inputs, whole two-page canaries and held-descriptor checks:
+
+- 96 mismatched-namespace clone3 requests against a missing cgroup descriptor:
+  eight valid THREAD sharing forms and sizes 88/96/128/256 require EINVAL.
+- 96 equivalent requests against a held `/dev/null` descriptor require EINVAL.
+- 108 legacy clone requests combine four valid thread-sharing forms, three
+  upper-word patterns and repeated placements. All require EINVAL. Originals
+  instead report ENOTSUP for 81 partial-sharing requests; the full-sharing,
+  zero-stack controls already return EINVAL.
+- 60 earlier structure/vector/flag/signal/stack errors preserve exact EFAULT,
+  E2BIG and EINVAL while the namespace mismatch is active.
+- 72 restored-namespace controls cover cgroup ABI/extension errors and twelve
+  valid thread-sharing descriptor refusals. Restored callers reach EBADF.
+- 36 restored clone3/legacy fork controls verify actual PID/TID, parent, UID,
+  exit37 and reap while ignoring unused cgroup fields and legacy upper words.
+
+The keeper is the only outstanding child between requests: nonblocking waits
+must return zero, and after keeper teardown the final wait must return ECHILD.
+Each phase retains 144 ordinary fork/reap lifecycles plus four keeper lifecycles.
+Two pthread controls per cohort prove mismatch refusal and restored success.
+Successful workers verify process/TID/UID, distinct errno addresses and join results.
+Originals wrongly create and join all four mismatched workers. Fixed kernels and
+the identical probe ELFs on Linux 6.12.51 return musl EAGAIN without running those
+workers, while all restored workers run and join successfully.
+
+Original kernels fail 1,096 controls each: 768 clone3 EBADF results, 324 legacy
+ENOTSUP results and four unwanted pthread successes. Corrected kernels and both
+Linux references pass all 1,880. Native ARM uses 16 KiB pages; native x86 and the
+Linux references use 4 KiB.
+
+Both phases measure four identical-input cleanup cohorts: 64 warmups, thirteen
+seconds of settling, 200 measured cycles and another settle. Each cycle switches
+to the future namespace, exercises raw clone3/legacy refusals and the mismatched
+pthread request, restores the original namespace, then runs a matched pthread,
+descriptor refusal and real fork/reap. Cleanup alone accepts the recorded old
+errors or corrected EINVAL, and accepts the old successful mismatched pthread
+only after verifying and joining it. Thus inputs are identical, while the
+original performs one extra actual thread lifecycle per cycle. All live slab
+classes and big-heap page counts stay flat. Namespace/keeper creation happens
+once outside the measured loop; repeated namespace construction/destruction,
+general page/cache retention and the earlier EXT2 rename observation are separate.
+
+Four isolated production builds pass. Exact whole generated-C comparison allows
+only the new scalar helper/prototype and four guards. Probe C has fourteen
+explicit stack allocas and no V dynamic-allocation or fixed-index helpers. ARM
+preflight C matches native C, and its ELF is the identical Linux reference probe.
+Both corrected architectures also pass runtime pthread and 1,872-control
+clonecgperm regressions. The auditor checks raw/pthread/keeper outcomes, namespace
+routes, capability restoration, input/descriptor preservation, matching C/ELFs,
+both phases' storage, 84 retained native case files, 67 dispatch inputs, 2,014 SDK
+files, 15,146 compiler pins and three retained Linux source files. Executing
+false-assertion and passing-Linux-as-original controls must fail; compile without
+`-prod`.
+
+Probe development refusals remain retained and audited. The first compiler
+rejected assigning through an errno function call; a second rejected unsafe
+fixed-array helpers and readlink buffer signedness. An early reference launch
+also lacked the failed preflight ELF. After repairing the probe, Linux passed
+the guest checks but the controller rejected its old cohort label. The label
+was corrected and the same ELF rerun. Exact refused sources, binaries, generated
+C, compiler receipts, logs and statuses remain in the private evidence area;
+the auditor verifies each repair and the refused Linux run's passing guest data.
+See [refusal hashes](../tests/linux-compat/results/2026-10-16/clonefuture-probe-refusal-inputs.json),
+[compiler diagnostic](../tests/linux-compat/results/2026-10-16/clonefuture-probe-compile-refusal.log),
+[C diagnostic](../tests/linux-compat/results/2026-10-16/clonefuture-probe-c-refusal.log),
+[launch refusal](../tests/linux-compat/results/2026-10-16/clonefuture-reference-launch-refusal.log)
+and [validator refusal](../tests/linux-compat/results/2026-10-16/clonefuture-reference-validator-refusal.log).
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/clonefuture-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/clonefuture-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/clonefuture-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/clonefuture-diagnostic-pins.json).
+Raw original/corrected/Linux, build, preflight and regression logs accompany them.
+
+Nested callers remain unqualified: Vinix does not represent a descendant PID
+namespace's numbers in its ancestor namespace. Worker-thread callers,
+per-thread namespace ownership and namespace/capability races,
+successful cross-namespace process construction beyond the keeper setup,
+independent sharing ownership, supplied-stack raw threads, requested PID
+allocation, GNU libc and translated/32-bit paths remain separate. The broad
+libc, installation/sandbox/portal and translation gates remain open.

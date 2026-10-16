@@ -1,0 +1,197 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=90176
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037fe7600
+initramfs: Done (9 entries)
+LINUX CLONEFUTURE CAPS: ordinary=0 route=0 sysadmin=0 permitted_sysadmin=1 keepcaps=1
+LINUX CLONEFUTURE FD: ordinary=0 route=0 wrong=6
+LINUX CLONEFUTURE PTHREAD: ordinary=0 route=0 different=1 result=0 ran=1 joined=1 valid=1
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=0 kind=0 index=0 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=0 kind=0 index=1 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=0 kind=0 index=2 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=0 kind=1 index=0 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=0 kind=1 index=1 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=0 kind=1 index=2 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=0 kind=2 index=0 result=-1 errno=95 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=0 kind=2 index=1 result=-1 errno=95 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=0 kind=2 index=2 result=-1 errno=95 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE PTHREAD: ordinary=0 route=0 different=0 result=0 ran=1 joined=1 valid=1
+LINUX CLONEFUTURE COHORT: ordinary=0 route=0 self=13860 uid=0 page=4096 raw=468 classes=6 layouts=3
+LINUX CLONEFUTURE SLAB: ordinary=0 route=0 size=16 live=1644/1644 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=0 size=32 live=2902/2902 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=0 size=48 live=332/332 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=0 size=64 live=170/170 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=0 size=96 live=22/22 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=0 size=128 live=21/21 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=0 size=192 live=390/390 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=0 size=256 live=814/814 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=0 size=384 live=580/580 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=0 size=512 live=508/508 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=0 size=768 live=17/17 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=0 size=1024 live=13/13 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=0 size=1536 live=20/20 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=0 size=2048 live=0/0 cycles=200
+LINUX CLONEFUTURE STORAGE: ordinary=0 route=0 cycles=200 big_pages=171/171 PASS
+LINUX CLONEFUTURE KEEPER: ordinary=0 route=0 outer=56895 inner=1 parent=0 reaped=1
+LINUX CLONEFUTURE CAPSRESTORED: ordinary=0 route=0 sysadmin=0
+LINUX CLONEFUTURE CASES: ordinary=0 route=0 kind=0 calls=96 failures=96
+LINUX CLONEFUTURE CASES: ordinary=0 route=0 kind=1 calls=96 failures=96
+LINUX CLONEFUTURE CASES: ordinary=0 route=0 kind=2 calls=108 failures=81
+LINUX CLONEFUTURE CASES: ordinary=0 route=0 kind=3 calls=60 failures=0
+LINUX CLONEFUTURE CASES: ordinary=0 route=0 kind=4 calls=72 failures=0
+LINUX CLONEFUTURE CASES: ordinary=0 route=0 kind=5 calls=36 failures=0
+LINUX CLONEFUTURE CHILDREN: ordinary=0 route=0 valid=36 unexpected=0
+LINUX CLONEFUTURE FINAL: ordinary=0 route=0 kind=0 calls=96 failures=96
+LINUX CLONEFUTURE FINAL: ordinary=0 route=0 kind=1 calls=96 failures=96
+LINUX CLONEFUTURE FINAL: ordinary=0 route=0 kind=2 calls=108 failures=81
+LINUX CLONEFUTURE FINAL: ordinary=0 route=0 kind=3 calls=60 failures=0
+LINUX CLONEFUTURE FINAL: ordinary=0 route=0 kind=4 calls=72 failures=0
+LINUX CLONEFUTURE FINAL: ordinary=0 route=0 kind=5 calls=36 failures=0
+LINUX CLONEFUTURE CHILDRENFINAL: ordinary=0 route=0 valid=36 unexpected=0
+LINUX CLONEFUTURE CAPS: ordinary=1 route=0 sysadmin=0 permitted_sysadmin=1 keepcaps=1
+LINUX CLONEFUTURE FD: ordinary=1 route=0 wrong=6
+LINUX CLONEFUTURE PTHREAD: ordinary=1 route=0 different=1 result=0 ran=1 joined=1 valid=1
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=0 kind=0 index=0 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=0 kind=0 index=1 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=0 kind=0 index=2 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=0 kind=1 index=0 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=0 kind=1 index=1 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=0 kind=1 index=2 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=0 kind=2 index=0 result=-1 errno=95 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=0 kind=2 index=1 result=-1 errno=95 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=0 kind=2 index=2 result=-1 errno=95 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE PTHREAD: ordinary=1 route=0 different=0 result=0 ran=1 joined=1 valid=1
+LINUX CLONEFUTURE COHORT: ordinary=1 route=0 self=37085 uid=1000 page=4096 raw=468 classes=6 layouts=3
+LINUX CLONEFUTURE SLAB: ordinary=1 route=0 size=16 live=1659/1659 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=0 size=32 live=2919/2919 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=0 size=48 live=332/332 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=0 size=64 live=173/173 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=0 size=96 live=23/23 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=0 size=128 live=22/22 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=0 size=192 live=396/396 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=0 size=256 live=832/832 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=0 size=384 live=595/595 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=0 size=512 live=520/520 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=0 size=768 live=17/17 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=0 size=1024 live=13/13 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=0 size=1536 live=20/20 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=0 size=2048 live=0/0 cycles=200
+LINUX CLONEFUTURE STORAGE: ordinary=1 route=0 cycles=200 big_pages=171/171 PASS
+LINUX CLONEFUTURE KEEPER: ordinary=1 route=0 outer=37228 inner=1 parent=0 reaped=1
+LINUX CLONEFUTURE CAPSRESTORED: ordinary=1 route=0 sysadmin=0
+LINUX CLONEFUTURE CASES: ordinary=1 route=0 kind=0 calls=96 failures=96
+LINUX CLONEFUTURE CASES: ordinary=1 route=0 kind=1 calls=96 failures=96
+LINUX CLONEFUTURE CASES: ordinary=1 route=0 kind=2 calls=108 failures=81
+LINUX CLONEFUTURE CASES: ordinary=1 route=0 kind=3 calls=60 failures=0
+LINUX CLONEFUTURE CASES: ordinary=1 route=0 kind=4 calls=72 failures=0
+LINUX CLONEFUTURE CASES: ordinary=1 route=0 kind=5 calls=36 failures=0
+LINUX CLONEFUTURE CHILDREN: ordinary=1 route=0 valid=36 unexpected=0
+LINUX CLONEFUTURE FINAL: ordinary=1 route=0 kind=0 calls=96 failures=96
+LINUX CLONEFUTURE FINAL: ordinary=1 route=0 kind=1 calls=96 failures=96
+LINUX CLONEFUTURE FINAL: ordinary=1 route=0 kind=2 calls=108 failures=81
+LINUX CLONEFUTURE FINAL: ordinary=1 route=0 kind=3 calls=60 failures=0
+LINUX CLONEFUTURE FINAL: ordinary=1 route=0 kind=4 calls=72 failures=0
+LINUX CLONEFUTURE FINAL: ordinary=1 route=0 kind=5 calls=36 failures=0
+LINUX CLONEFUTURE CHILDRENFINAL: ordinary=1 route=0 valid=36 unexpected=0
+LINUX CLONEFUTURE CAPS: ordinary=0 route=1 sysadmin=0 permitted_sysadmin=1 keepcaps=1
+LINUX CLONEFUTURE FD: ordinary=0 route=1 wrong=6
+LINUX CLONEFUTURE PTHREAD: ordinary=0 route=1 different=1 result=0 ran=1 joined=1 valid=1
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=1 kind=0 index=0 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=1 kind=0 index=1 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=1 kind=0 index=2 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=1 kind=1 index=0 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=1 kind=1 index=1 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=1 kind=1 index=2 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=1 kind=2 index=0 result=-1 errno=95 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=1 kind=2 index=1 result=-1 errno=95 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=0 route=1 kind=2 index=2 result=-1 errno=95 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE PTHREAD: ordinary=0 route=1 different=0 result=0 ran=1 joined=1 valid=1
+LINUX CLONEFUTURE COHORT: ordinary=0 route=1 self=46593 uid=0 page=4096 raw=468 classes=6 layouts=3
+LINUX CLONEFUTURE SLAB: ordinary=0 route=1 size=16 live=1674/1674 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=1 size=32 live=2937/2937 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=1 size=48 live=332/332 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=1 size=64 live=176/176 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=1 size=96 live=24/24 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=1 size=128 live=23/23 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=1 size=192 live=403/403 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=1 size=256 live=849/849 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=1 size=384 live=610/610 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=1 size=512 live=532/532 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=1 size=768 live=17/17 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=1 size=1024 live=13/13 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=1 size=1536 live=20/20 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=0 route=1 size=2048 live=0/0 cycles=200
+LINUX CLONEFUTURE STORAGE: ordinary=0 route=1 cycles=200 big_pages=171/171 PASS
+LINUX CLONEFUTURE KEEPER: ordinary=0 route=1 outer=5777 inner=1 parent=0 reaped=1
+LINUX CLONEFUTURE CAPSRESTORED: ordinary=0 route=1 sysadmin=0
+LINUX CLONEFUTURE CASES: ordinary=0 route=1 kind=0 calls=96 failures=96
+LINUX CLONEFUTURE CASES: ordinary=0 route=1 kind=1 calls=96 failures=96
+LINUX CLONEFUTURE CASES: ordinary=0 route=1 kind=2 calls=108 failures=81
+LINUX CLONEFUTURE CASES: ordinary=0 route=1 kind=3 calls=60 failures=0
+LINUX CLONEFUTURE CASES: ordinary=0 route=1 kind=4 calls=72 failures=0
+LINUX CLONEFUTURE CASES: ordinary=0 route=1 kind=5 calls=36 failures=0
+LINUX CLONEFUTURE CHILDREN: ordinary=0 route=1 valid=36 unexpected=0
+LINUX CLONEFUTURE FINAL: ordinary=0 route=1 kind=0 calls=96 failures=96
+LINUX CLONEFUTURE FINAL: ordinary=0 route=1 kind=1 calls=96 failures=96
+LINUX CLONEFUTURE FINAL: ordinary=0 route=1 kind=2 calls=108 failures=81
+LINUX CLONEFUTURE FINAL: ordinary=0 route=1 kind=3 calls=60 failures=0
+LINUX CLONEFUTURE FINAL: ordinary=0 route=1 kind=4 calls=72 failures=0
+LINUX CLONEFUTURE FINAL: ordinary=0 route=1 kind=5 calls=36 failures=0
+LINUX CLONEFUTURE CHILDRENFINAL: ordinary=0 route=1 valid=36 unexpected=0
+LINUX CLONEFUTURE CAPS: ordinary=1 route=1 sysadmin=0 permitted_sysadmin=1 keepcaps=1
+LINUX CLONEFUTURE FD: ordinary=1 route=1 wrong=6
+LINUX CLONEFUTURE PTHREAD: ordinary=1 route=1 different=1 result=0 ran=1 joined=1 valid=1
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=1 kind=0 index=0 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=1 kind=0 index=1 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=1 kind=0 index=2 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=1 kind=1 index=0 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=1 kind=1 index=1 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=1 kind=1 index=2 result=-1 errno=9 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=1 kind=2 index=0 result=-1 errno=95 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=1 kind=2 index=1 result=-1 errno=95 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE DETAIL: ordinary=1 route=1 kind=2 index=2 result=-1 errno=95 expected=22 guarded=1 child=0
+LINUX CLONEFUTURE PTHREAD: ordinary=1 route=1 different=0 result=0 ran=1 joined=1 valid=1
+LINUX CLONEFUTURE COHORT: ordinary=1 route=1 self=31946 uid=1000 page=4096 raw=468 classes=6 layouts=3
+LINUX CLONEFUTURE SLAB: ordinary=1 route=1 size=16 live=1689/1689 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=1 size=32 live=2955/2955 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=1 size=48 live=332/332 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=1 size=64 live=179/179 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=1 size=96 live=25/25 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=1 size=128 live=24/24 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=1 size=192 live=410/410 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=1 size=256 live=866/866 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=1 size=384 live=625/625 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=1 size=512 live=544/544 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=1 size=768 live=17/17 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=1 size=1024 live=13/13 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=1 size=1536 live=20/20 cycles=200
+LINUX CLONEFUTURE SLAB: ordinary=1 route=1 size=2048 live=0/0 cycles=200
+LINUX CLONEFUTURE STORAGE: ordinary=1 route=1 cycles=200 big_pages=171/171 PASS
+LINUX CLONEFUTURE KEEPER: ordinary=1 route=1 outer=30714 inner=1 parent=0 reaped=1
+LINUX CLONEFUTURE CAPSRESTORED: ordinary=1 route=1 sysadmin=0
+LINUX CLONEFUTURE CASES: ordinary=1 route=1 kind=0 calls=96 failures=96
+LINUX CLONEFUTURE CASES: ordinary=1 route=1 kind=1 calls=96 failures=96
+LINUX CLONEFUTURE CASES: ordinary=1 route=1 kind=2 calls=108 failures=81
+LINUX CLONEFUTURE CASES: ordinary=1 route=1 kind=3 calls=60 failures=0
+LINUX CLONEFUTURE CASES: ordinary=1 route=1 kind=4 calls=72 failures=0
+LINUX CLONEFUTURE CASES: ordinary=1 route=1 kind=5 calls=36 failures=0
+LINUX CLONEFUTURE CHILDREN: ordinary=1 route=1 valid=36 unexpected=0
+LINUX CLONEFUTURE FINAL: ordinary=1 route=1 kind=0 calls=96 failures=96
+LINUX CLONEFUTURE FINAL: ordinary=1 route=1 kind=1 calls=96 failures=96
+LINUX CLONEFUTURE FINAL: ordinary=1 route=1 kind=2 calls=108 failures=81
+LINUX CLONEFUTURE FINAL: ordinary=1 route=1 kind=3 calls=60 failures=0
+LINUX CLONEFUTURE FINAL: ordinary=1 route=1 kind=4 calls=72 failures=0
+LINUX CLONEFUTURE FINAL: ordinary=1 route=1 kind=5 calls=36 failures=0
+LINUX CLONEFUTURE CHILDRENFINAL: ordinary=1 route=1 valid=36 unexpected=0
+LINUX CLONEFUTURE FAIL: clone thread future PID namespace admission, import precedence, admission, fork/reap or retained storage
+QEMU: Terminated
+

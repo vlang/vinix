@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "3fc868664129f5d0639aba8fe5b7912ac7fc60fe2f45f9bbb677fd2c78d32d11",
+    "results": [
+        {
+            "name": "clonefuture",
+            "source_sha256": "89fa6c46f872739ee4a9fcae61c3b3d96fec3018acbb4b26beeebd1752ebd224",
+            "init_sha256": "a9c80ca2e0840f62a1b7cf5d3d7dc766d79722058d6a9e823e85bbf1a6065549",
+            "iso_sha256": "ea57fea4b1e603380a79125c94a5cd367eb8e668f3feb3742ea41a5d5973c85d",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

@@ -1,0 +1,14 @@
+Compiler output from the default V compiler:
+/Users/alex/.cache/vinix-linux-compat/clonefuture-20261016/tmp/vinix-v-module-AGUmM2/clonefuturefixture/core.v:243:42: error: cannot dereference a function call on the left side of an assignment, use a temporary variable
+  241 |  mut value:=&Worker(argument)
+  242 |  value.pid=C.getpid();value.tid=i32(C.syscall(C.SYS_gettid));value.uid=C.getuid()
+  243 |  value.address=u64(C.__errno_location());*C.__errno_location()=91;value.ran=1
+      |                                          ^
+  244 |  return argument
+  245 | }}
+
+V panic: Command failed
+ v hash: f6358ec
+    pid: 0xbb89
+    tid: 0xbb89
+0   dyld                                0x00000001802ebe00 start + 6992

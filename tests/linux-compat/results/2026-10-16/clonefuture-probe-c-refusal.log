@@ -1,0 +1,24 @@
+/Users/alex/.cache/vinix-linux-compat/clonefuture-20261016/states/preflight-arm/fixture.c:1510:27: error: call to undeclared function 'v_fixed_index'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1510 |                         i32 class = __in_lhs_0[v_fixed_index(__for_idx_1, 2)];
+      |                                                ^
+/Users/alex/.cache/vinix-linux-compat/clonefuture-20261016/states/preflight-arm/fixture.c:1541:19: error: call to undeclared function 'v_fixed_index'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1541 |                         if (__in_arr_7[v_fixed_index(__contains_idx_10, 2)] == __contains_needle_8) {
+      |                                        ^
+/Users/alex/.cache/vinix-linux-compat/clonefuture-20261016/states/preflight-arm/fixture.c:1589:47: error: passing 'u8 *' (aka 'unsigned char *') to parameter of type 'char *' converts between pointers to integer types where one is of the unique plain 'char' type and the other is not [-Werror,-Wpointer-sign]
+ 1589 |                 ptrdiff_t n = readlink("/proc/self/ns/pid", &active[0], 128);
+      |                                                             ^~~~~~~~~~
+/Users/alex/.cache/vinix-linux-compat/clonefuture-20261016/sdk/usr/include/unistd.h:64:58: note: passing argument to parameter here
+   64 | ssize_t readlink(const char *__restrict, char *__restrict, size_t);
+      |                                                          ^
+/Users/alex/.cache/vinix-linux-compat/clonefuture-20261016/states/preflight-arm/fixture.c:1590:60: error: passing 'u8 *' (aka 'unsigned char *') to parameter of type 'char *' converts between pointers to integer types where one is of the unique plain 'char' type and the other is not [-Werror,-Wpointer-sign]
+ 1590 |                 ptrdiff_t m = readlink("/proc/self/ns/pid_for_children", &future[0], 128);
+      |                                                                          ^~~~~~~~~~
+/Users/alex/.cache/vinix-linux-compat/clonefuture-20261016/sdk/usr/include/unistd.h:64:58: note: passing argument to parameter here
+   64 | ssize_t readlink(const char *__restrict, char *__restrict, size_t);
+      |                                                          ^
+4 errors generated.
+V panic: Command failed
+ v hash: f6358ec
+    pid: 0xc1cc
+    tid: 0xc1cc
+0   dyld                                0x00000001802ebe00 start + 6992
