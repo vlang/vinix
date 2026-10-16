@@ -7896,22 +7896,43 @@ generated-code audits and joined guest evidence are retained under
 `build/ios/fortnite/reachability-checks`. The IPA consumer at `0x10009bea8` creates
 an IPv4 default-route target before assigning its dispatch queue and callback.
 
-Seven more required imports resolve. The actual IPA exits with status 1 before
-application entry at `_DCErrorDomain` from DeviceCheck. Image sample construction,
-codec execution and the system Metal device/renderer remain unavailable. Fortnite
-remains unplayable and full iOS regression remains unpassed.
+Those seven required imports resolved; that probe stopped before application
+entry at `_DCErrorDomain` from DeviceCheck.
+
+DeviceCheck now exports that NSString pointer cell with the Mac library's measured
+value, `com.apple.devicecheck.error`. One page holds the cell, CFSTR record and
+terminated bytes. Publication is serialized and seals the page read-only; later
+lookups reuse it. The string stays registered as immortal until autorelease pools
+and Swift contexts have drained, then its registration and page retire. New
+publication is rejected once runtime retirement begins. The IPA consumer at
+`0x1022e3938` loads the cell and dereferences its string at `0x1022e3940`, before
+comparing an NSError domain and checking error code 3. This implements the error
+domain global; DeviceCheck token services and App Attest remain unavailable.
+
+Eight host sanitizer runs cover this global, Foundation keys, reachability and
+autorelease pools, with normal and deterministic Swift hashing. Four ARM64 Vinix
+suites also check concurrent first lookup, exact string equality, NSError lifetime
+across pools, pool-destructor access during shutdown and two drained runtimes.
+Eleven final C streams and executables, native measurements, generated-code audits
+and joined guest evidence are retained under
+`build/ios/fortnite/devicecheck-checks`.
+
+One more required import resolves. The actual IPA exits with status 1 before
+application entry at `_nw_interface_get_name` from Network.framework. Image sample
+construction, codec execution and the system Metal device/renderer remain
+unavailable. Fortnite remains unplayable and full iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,646 | 514 | 79 |
+| Fortnite executable | 1,647 | 513 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,481 | 517 | 120 |
+| All images | 2,482 | 516 | 120 |
 
-The C++/GLES/Text variant reports 2,495 resolved imports, 503 unresolved strong
+The C++/GLES/Text variant reports 2,496 resolved imports, 502 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
