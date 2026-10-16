@@ -1950,3 +1950,9 @@ release. Owned frames have a shared repeatable close operation, used by package
 replies and the authentication daemon. Borrowed requests still use wipe-only
 handling, and protocol bytes and authorization rules remain unchanged. See
 [authentication frame qualification](../tests/packages/auth-frame-check.md).
+
+The authentication client also retires the error-interface wrapper on failed
+reply reads. Complete transaction ownership checks cover successful calls,
+root-peer decisions and interrupted/malformed replies without changing the
+existing diagnostics or borrowed-request contract. See
+[authentication client qualification](../tests/packages/auth-client-check.md).

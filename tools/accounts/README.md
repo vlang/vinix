@@ -50,6 +50,14 @@ its own encoded temporary on success or failure. Erasure uses `explicit_bzero`
 on Linux and `memset_s` on macOS so a following free cannot eliminate it. See
 [authentication frame qualification](../../tests/packages/auth-frame-check.md).
 
+`authclient.transact`, `ask` and `ask_root` borrow the request's field buffers
+and erase their contents on every return. The caller retains the buffers and
+any explicitly supplied variadic table; the returned frame is owned and needs
+`close()`. Failed reply reads retire their internal error before returning the
+existing generic service diagnosis. Complete transactions, malformed replies
+and root-peer decisions have tracked ownership checks; see
+[authentication client qualification](../../tests/packages/auth-client-check.md).
+
 `vinix-session run --isolated USER COMMAND [ARGUMENT...]` is a root-only
 application profile. It creates a login attributed to that ordinary account,
 drops all supplementary memberships before dropping privileges, verifies the

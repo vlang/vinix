@@ -1,0 +1,15 @@
+AUTH CLIENT transact retained 0 bytes
+AUTH CLIENT ask retained 0 bytes
+AUTH CLIENT ask_root retained 0 bytes
+AUTH CLIENT successful transactions and root peer decisions preserve ownership and descriptors PASS
+AUTH CLIENT reply EOF retained 0 bytes
+AUTH CLIENT partial header retained 0 bytes
+AUTH CLIENT partial length retained 0 bytes
+AUTH CLIENT partial body retained 0 bytes
+AUTH CLIENT bad magic retained 0 bytes
+AUTH CLIENT excess field count retained 0 bytes
+AUTH CLIENT oversized late field retained 0 bytes
+AUTH CLIENT unavailable/path refusal retained 0 bytes
+AUTH CLIENT unavailable/path refusal retained 0 bytes
+AUTH CLIENT invalid request retained 0 bytes
+AUTH CLIENT interrupted replies and local refusals erase requests and preserve descriptors PASS

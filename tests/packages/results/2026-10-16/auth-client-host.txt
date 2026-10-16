@@ -1,0 +1,29 @@
+28 focused native compile/run checks passed. All 13 final client windows retain zero bytes; seven failed-reply windows previously retained 80 bytes each over five calls.
+protocol-compile PASS 0.892s
+protocol-run PASS 0.252s
+authcore-compile PASS 2.047s
+authcore-run PASS 5.491s
+shipped-actions-compile PASS 1.818s
+shipped-actions-run PASS 0.268s
+root-peer-compile PASS 2.541s
+root-peer-run PASS 0.265s
+launch-protocol-compile PASS 3.285s
+launch-protocol-run PASS 0.306s
+launch-streams-compile PASS 3.296s
+launch-streams-run PASS 0.278s
+admin-protocol-compile PASS 2.514s
+admin-protocol-run PASS 0.303s
+admin-socket-compile PASS 2.507s
+admin-socket-run PASS 0.258s
+package-cli-compile PASS 4.928s
+distribution-cli-compile PASS 5.687s
+distribution-cli-run PASS 5.812s
+distribution-driver-compile PASS 1.008s
+baseline-compile PASS
+baseline-run PASS
+comparison-compile PASS
+comparison-run PASS
+memory-compile PASS
+memory-run PASS
+asan-compile PASS
+asan-run PASS

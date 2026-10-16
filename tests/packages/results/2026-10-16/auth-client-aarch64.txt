@@ -1,0 +1,2 @@
+PASS aarch64 packages-auth-client (288.6s)
+package-auth-client aarch64: 1 passed, 0 failed, 0 skipped

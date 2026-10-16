@@ -64,10 +64,17 @@ fn transact_checked(socket_path string, mut request authproto.Frame, root_peer b
 	if root_peer { require_root_peer(fd)! }
 	authproto.write_frame(fd, request)!
 	return authproto.read_frame(fd) or {
-		message := err.msg()
-		unsafe { message.free(); err.free() }
+		discard_frame_error(err)
 		return error('the authentication service is busy or refused the request')
 	}
+}
+
+// Keep the interface as a value parameter. Calling its mutable free method on
+// the implicit `or` error makes V heap-promote that wrapper under manualfree.
+// The diagnostic remains generic; retire both the owned message and error.
+fn discard_frame_error(err IError) {
+	message := err.msg()
+	unsafe { message.free(); err.free() }
 }
 
 pub fn ask(socket_path string, code u16, fields ...[]u8) !authproto.Frame {

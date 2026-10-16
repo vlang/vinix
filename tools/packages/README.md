@@ -503,6 +503,11 @@ shared wiping `Frame.close()` contract; the authentication daemon retires its
 owned requests and replies. The wire format and borrowed-request wiping are
 unchanged. See [authentication frame checks](../../tests/packages/auth-frame-check.md).
 
+Complete authentication client calls also retire reply-error wrappers. Tracked
+transactions cover success, peer rejection, interrupted/malformed replies and
+local refusals while preserving borrowed-request erasure and descriptor counts.
+See [authentication client checks](../../tests/packages/auth-client-check.md).
+
 Small launch-option windows retain Back, status and failure access. Resizing
 preserves the draft and file-page selection; Escape leaves a field or returns
 an idle form to the catalog. Pasted control bytes cannot navigate, and running

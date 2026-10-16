@@ -1,0 +1,478 @@
+Baseline read-error arm heap-promotes the IError wrapper; its concrete object/message are retired but the wrapper is retained. Final read-error arm passes the stack interface value to a private helper.
+
+Native baseline:
+authclient__transact_checked(string socket_path, authproto__Frame* request, bool root_peer) {
+	char _v_unwind_owner;
+	v_unwind_frame _v_pf_107066;
+	_v_pf_107066.owner = &_v_unwind_owner;
+	_v_pf_107066.jump = v_unwind_jump;
+	panic_frame_push(&_v_pf_107066);
+	v_unwind_keep(&request);
+	if (v_unwind_setjmp(_v_pf_107066.buf)) {
+		v_unwind_reload();
+		{
+			authproto__Frame__wipe(request);
+		}
+		panic_frame_done(&_v_pf_107066);
+		return (__v_result_authproto__Frame){.ok = true};
+	}
+	if (socket_path.len >= 100) {
+		__v_result_authproto__Frame _t1 = (__v_result_authproto__Frame){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_217, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		panic_frame_pop(&_v_pf_107066);
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t1;
+	}
+	i64 fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (fd < 0) {
+		__v_result_authproto__Frame _t2 = (__v_result_authproto__Frame){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_218, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		panic_frame_pop(&_v_pf_107066);
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t2;
+	}
+	v_unwind_frame _v_pf_107090;
+	_v_pf_107090.owner = &_v_unwind_owner;
+	_v_pf_107090.jump = v_unwind_jump;
+	panic_frame_push(&_v_pf_107090);
+	v_unwind_keep(&fd);
+	if (v_unwind_setjmp(_v_pf_107090.buf)) {
+		v_unwind_reload();
+		{
+			close(fd);
+		}
+		panic_frame_done(&_v_pf_107090);
+		return (__v_result_authproto__Frame){.ok = true};
+	}
+	struct sockaddr_un address = (struct sockaddr_un){0};
+	address.sun_family = (u16)(AF_UNIX);
+	{
+		vmemcpy((void*)(&address.sun_path[0]), (void*)(socket_path.str), socket_path.len);
+	}
+	if (connect(fd, (void*)(&address), (u32)(sizeof(struct sockaddr_un))) != 0) {
+		__v_result_authproto__Frame _t3 = (__v_result_authproto__Frame){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_219, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		panic_frame_pop(&_v_pf_107090);
+		{
+			close(fd);
+		}
+		panic_frame_pop(&_v_pf_107066);
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t3;
+	}
+	if (root_peer) {
+		__v_result __or_opt_0 = authclient__require_root_peer(fd);
+		if (!__or_opt_0.ok) {
+			__v_result_authproto__Frame _t4 = (__v_result_authproto__Frame){.ok = false, .err = __or_opt_0.err};
+			panic_frame_pop(&_v_pf_107090);
+			{
+				close(fd);
+			}
+			panic_frame_pop(&_v_pf_107066);
+			{
+				authproto__Frame__wipe(request);
+			}
+			return _t4;
+		}
+	}
+	__v_result __or_opt_1 = authproto__write_frame(fd, *request);
+	if (!__or_opt_1.ok) {
+		__v_result_authproto__Frame _t5 = (__v_result_authproto__Frame){.ok = false, .err = __or_opt_1.err};
+		panic_frame_pop(&_v_pf_107090);
+		{
+			close(fd);
+		}
+		panic_frame_pop(&_v_pf_107066);
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t5;
+	}
+	__v_result_authproto__Frame __or_opt_2 = authproto__read_frame(fd);
+	authproto__Frame __or_val_3 = {0};
+	if (__or_opt_2.ok) {
+		__or_val_3 = __or_opt_2.value;
+	} else {
+		IError __esc_4 = __or_opt_2.err;
+		IError* err = (IError*)(memdup(&__esc_4, sizeof(IError)));
+		string message = IError__msg((err));
+		{
+			string__free(&message);
+			IError__free(err);
+		}
+		__v_result_authproto__Frame _t6 = (__v_result_authproto__Frame){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_220, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		panic_frame_pop(&_v_pf_107090);
+		{
+			close(fd);
+		}
+		panic_frame_pop(&_v_pf_107066);
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t6;
+	}
+	__v_result_authproto__Frame _t7 = 	(__v_result_authproto__Frame){.ok = true, .value = __or_val_3};
+	panic_frame_pop(&_v_pf_107090);
+	{
+		close(fd);
+	}
+	panic_frame_pop(&_v_pf_107066);
+	{
+		authproto__Frame__wipe(request);
+	}
+	return _t7;
+	panic_frame_pop(&_v_pf_107090);
+	{
+		close(fd);
+	}
+	panic_frame_pop(&_v_pf_107066);
+	{
+		authproto__Frame__wipe(request);
+	}
+	return (__v_result_authproto__Frame){.ok = true};
+}
+
+Native final:
+authclient__transact_checked(string socket_path, authproto__Frame* request, bool root_peer) {
+	char _v_unwind_owner;
+	v_unwind_frame _v_pf_99908;
+	_v_pf_99908.owner = &_v_unwind_owner;
+	_v_pf_99908.jump = v_unwind_jump;
+	panic_frame_push(&_v_pf_99908);
+	v_unwind_keep(&request);
+	if (v_unwind_setjmp(_v_pf_99908.buf)) {
+		v_unwind_reload();
+		{
+			authproto__Frame__wipe(request);
+		}
+		panic_frame_done(&_v_pf_99908);
+		return (__v_result_authproto__Frame){.ok = true};
+	}
+	if (socket_path.len >= 100) {
+		__v_result_authproto__Frame _t1 = (__v_result_authproto__Frame){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_217, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		panic_frame_pop(&_v_pf_99908);
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t1;
+	}
+	i64 fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (fd < 0) {
+		__v_result_authproto__Frame _t2 = (__v_result_authproto__Frame){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_218, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		panic_frame_pop(&_v_pf_99908);
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t2;
+	}
+	v_unwind_frame _v_pf_99932;
+	_v_pf_99932.owner = &_v_unwind_owner;
+	_v_pf_99932.jump = v_unwind_jump;
+	panic_frame_push(&_v_pf_99932);
+	v_unwind_keep(&fd);
+	if (v_unwind_setjmp(_v_pf_99932.buf)) {
+		v_unwind_reload();
+		{
+			close(fd);
+		}
+		panic_frame_done(&_v_pf_99932);
+		return (__v_result_authproto__Frame){.ok = true};
+	}
+	struct sockaddr_un address = (struct sockaddr_un){0};
+	address.sun_family = (u16)(AF_UNIX);
+	{
+		vmemcpy((void*)(&address.sun_path[0]), (void*)(socket_path.str), socket_path.len);
+	}
+	if (connect(fd, (void*)(&address), (u32)(sizeof(struct sockaddr_un))) != 0) {
+		__v_result_authproto__Frame _t3 = (__v_result_authproto__Frame){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_219, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		panic_frame_pop(&_v_pf_99932);
+		{
+			close(fd);
+		}
+		panic_frame_pop(&_v_pf_99908);
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t3;
+	}
+	if (root_peer) {
+		__v_result __or_opt_0 = authclient__require_root_peer(fd);
+		if (!__or_opt_0.ok) {
+			__v_result_authproto__Frame _t4 = (__v_result_authproto__Frame){.ok = false, .err = __or_opt_0.err};
+			panic_frame_pop(&_v_pf_99932);
+			{
+				close(fd);
+			}
+			panic_frame_pop(&_v_pf_99908);
+			{
+				authproto__Frame__wipe(request);
+			}
+			return _t4;
+		}
+	}
+	__v_result __or_opt_1 = authproto__write_frame(fd, *request);
+	if (!__or_opt_1.ok) {
+		__v_result_authproto__Frame _t5 = (__v_result_authproto__Frame){.ok = false, .err = __or_opt_1.err};
+		panic_frame_pop(&_v_pf_99932);
+		{
+			close(fd);
+		}
+		panic_frame_pop(&_v_pf_99908);
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t5;
+	}
+	__v_result_authproto__Frame __or_opt_2 = authproto__read_frame(fd);
+	authproto__Frame __or_val_3 = {0};
+	if (__or_opt_2.ok) {
+		__or_val_3 = __or_opt_2.value;
+	} else {
+		IError err = __or_opt_2.err;
+		authclient__discard_frame_error(err);
+		__v_result_authproto__Frame _t6 = (__v_result_authproto__Frame){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_220, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		panic_frame_pop(&_v_pf_99932);
+		{
+			close(fd);
+		}
+		panic_frame_pop(&_v_pf_99908);
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t6;
+	}
+	__v_result_authproto__Frame _t7 = 	(__v_result_authproto__Frame){.ok = true, .value = __or_val_3};
+	panic_frame_pop(&_v_pf_99932);
+	{
+		close(fd);
+	}
+	panic_frame_pop(&_v_pf_99908);
+	{
+		authproto__Frame__wipe(request);
+	}
+	return _t7;
+	panic_frame_pop(&_v_pf_99932);
+	{
+		close(fd);
+	}
+	panic_frame_pop(&_v_pf_99908);
+	{
+		authproto__Frame__wipe(request);
+	}
+	return (__v_result_authproto__Frame){.ok = true};
+}
+
+aarch64: read-error wrapper stays on stack; helper retires message/object; root credentials and socket address stay on stack; descriptor close and request wipe remain on each return.
+authclient__discard_frame_error(IError err) {
+	string message = IError__msg(&(err));
+	{
+		string__free(&message);
+		IError__free(&err);
+	}
+}
+authclient__transact_checked(string socket_path, authproto__Frame* request, bool root_peer) {
+	if (socket_path.len >= 100) {
+		__v_result_authproto__Frame _t1 = (__v_result_authproto__Frame){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_209, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t1;
+	}
+	i64 fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (fd < 0) {
+		__v_result_authproto__Frame _t2 = (__v_result_authproto__Frame){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_210, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t2;
+	}
+	struct sockaddr_un address = (struct sockaddr_un){0};
+	address.sun_family = (u16)(AF_UNIX);
+	{
+		vmemcpy((void*)(&address.sun_path[0]), (void*)(socket_path.str), socket_path.len);
+	}
+	if (connect(fd, (void*)(&address), (u32)(sizeof(struct sockaddr_un))) != 0) {
+		__v_result_authproto__Frame _t3 = (__v_result_authproto__Frame){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_211, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			close(fd);
+		}
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t3;
+	}
+	if (root_peer) {
+		__v_result __or_opt_0 = authclient__require_root_peer(fd);
+		if (!__or_opt_0.ok) {
+			__v_result_authproto__Frame _t4 = (__v_result_authproto__Frame){.ok = false, .err = __or_opt_0.err};
+			{
+				close(fd);
+			}
+			{
+				authproto__Frame__wipe(request);
+			}
+			return _t4;
+		}
+	}
+	__v_result __or_opt_1 = authproto__write_frame(fd, *request);
+	if (!__or_opt_1.ok) {
+		__v_result_authproto__Frame _t5 = (__v_result_authproto__Frame){.ok = false, .err = __or_opt_1.err};
+		{
+			close(fd);
+		}
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t5;
+	}
+	__v_result_authproto__Frame __or_opt_2 = authproto__read_frame(fd);
+	authproto__Frame __or_val_3 = {0};
+	if (__or_opt_2.ok) {
+		__or_val_3 = __or_opt_2.value;
+	} else {
+		IError err = __or_opt_2.err;
+		authclient__discard_frame_error(err);
+		__v_result_authproto__Frame _t6 = (__v_result_authproto__Frame){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_212, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			close(fd);
+		}
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t6;
+	}
+	__v_result_authproto__Frame _t7 = 	(__v_result_authproto__Frame){.ok = true, .value = __or_val_3};
+	{
+		close(fd);
+	}
+	{
+		authproto__Frame__wipe(request);
+	}
+	return _t7;
+	{
+		close(fd);
+	}
+	{
+		authproto__Frame__wipe(request);
+	}
+	return (__v_result_authproto__Frame){.ok = true};
+}
+authclient__require_root_peer(i64 fd) {
+	{
+		authclient__RootCredentials credentials = (authclient__RootCredentials){0};
+		u32 length = (u32)(sizeof(authclient__RootCredentials));
+		if ((getsockopt(fd, 1, 17, &credentials, &length) != 0) || (length != sizeof(authclient__RootCredentials)) || (credentials.uid != 0)) {
+			return (__v_result){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_207, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		}
+	}
+	return (__v_result){.ok = true};
+}
+
+x86_64: read-error wrapper stays on stack; helper retires message/object; root credentials and socket address stay on stack; descriptor close and request wipe remain on each return.
+authclient__discard_frame_error(IError err) {
+	string message = IError__msg(&(err));
+	{
+		string__free(&message);
+		IError__free(&err);
+	}
+}
+authclient__transact_checked(string socket_path, authproto__Frame* request, bool root_peer) {
+	if (socket_path.len >= 100) {
+		__v_result_authproto__Frame _t1 = (__v_result_authproto__Frame){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_209, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t1;
+	}
+	i64 fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (fd < 0) {
+		__v_result_authproto__Frame _t2 = (__v_result_authproto__Frame){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_210, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t2;
+	}
+	struct sockaddr_un address = (struct sockaddr_un){0};
+	address.sun_family = (u16)(AF_UNIX);
+	{
+		vmemcpy((void*)(&address.sun_path[0]), (void*)(socket_path.str), socket_path.len);
+	}
+	if (connect(fd, (void*)(&address), (u32)(sizeof(struct sockaddr_un))) != 0) {
+		__v_result_authproto__Frame _t3 = (__v_result_authproto__Frame){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_211, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			close(fd);
+		}
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t3;
+	}
+	if (root_peer) {
+		__v_result __or_opt_0 = authclient__require_root_peer(fd);
+		if (!__or_opt_0.ok) {
+			__v_result_authproto__Frame _t4 = (__v_result_authproto__Frame){.ok = false, .err = __or_opt_0.err};
+			{
+				close(fd);
+			}
+			{
+				authproto__Frame__wipe(request);
+			}
+			return _t4;
+		}
+	}
+	__v_result __or_opt_1 = authproto__write_frame(fd, *request);
+	if (!__or_opt_1.ok) {
+		__v_result_authproto__Frame _t5 = (__v_result_authproto__Frame){.ok = false, .err = __or_opt_1.err};
+		{
+			close(fd);
+		}
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t5;
+	}
+	__v_result_authproto__Frame __or_opt_2 = authproto__read_frame(fd);
+	authproto__Frame __or_val_3 = {0};
+	if (__or_opt_2.ok) {
+		__or_val_3 = __or_opt_2.value;
+	} else {
+		IError err = __or_opt_2.err;
+		authclient__discard_frame_error(err);
+		__v_result_authproto__Frame _t6 = (__v_result_authproto__Frame){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_212, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		{
+			close(fd);
+		}
+		{
+			authproto__Frame__wipe(request);
+		}
+		return _t6;
+	}
+	__v_result_authproto__Frame _t7 = 	(__v_result_authproto__Frame){.ok = true, .value = __or_val_3};
+	{
+		close(fd);
+	}
+	{
+		authproto__Frame__wipe(request);
+	}
+	return _t7;
+	{
+		close(fd);
+	}
+	{
+		authproto__Frame__wipe(request);
+	}
+	return (__v_result_authproto__Frame){.ok = true};
+}
+authclient__require_root_peer(i64 fd) {
+	{
+		authclient__RootCredentials credentials = (authclient__RootCredentials){0};
+		u32 length = (u32)(sizeof(authclient__RootCredentials));
+		if ((getsockopt(fd, 1, 17, &credentials, &length) != 0) || (length != sizeof(authclient__RootCredentials)) || (credentials.uid != 0)) {
+			return (__v_result){.ok = false, .err = (IError){._typ = 71273906, ._object = (MessageError*)memdup(&(MessageError){.msg = _str_207, .code = 0}, sizeof(MessageError)), ._object_is_boxed = true}};
+		}
+	}
+	return (__v_result){.ok = true};
+}

@@ -1,0 +1,62 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=21
+!>+ [11] ./sbin/init sz=137776
+!>+ [12] ./usr/bin/ sz=0
+!>+ [13] ./usr/sbin/ sz=0
+!>+ [14] ./usr/share/ sz=0
+!>+ [15] ./usr/share/package-fixtures/ sz=0
+!>+ [16] ./usr/share/package-fixtures/root-peer sz=549520
+!>+ [17] ./usr/share/package-fixtures/auth-client sz=263600
+!>+ [18] ./usr/share/package-fixtures/authcore sz=609352
+!>+ [19] ./usr/share/package-fixtures/protocol sz=217280
+!>+ [20] ./usr/sbin/vinix-authd sz=460920
+!>+!>+!>+!>initramfs: no ustar sig at 0xff000000370f6e00
+initramfs: Done (23 entries)
+HWTEST START packages-auth-client
+AUTH CLIENT transact retained 0 bytes
+AUTH CLIENT ask retained 0 bytes
+AUTH CLIENT ask_root retained 0 bytes
+AUTH CLIENT successful transactions and root peer decisions preserve ownership and descriptors PASS
+AUTH CLIENT reply EOF retained 0 bytes
+AUTH CLIENT partial header retained 0 bytes
+AUTH CLIENT partial length retained 0 bytes
+AUTH CLIENT partial body retained 0 bytes
+AUTH CLIENT bad magic retained 0 bytes
+AUTH CLIENT excess field count retained 0 bytes
+AUTH CLIENT oversized late field retained 0 bytes
+AUTH CLIENT unavailable/path refusal retained 0 bytes
+AUTH CLIENT unavailable/path refusal retained 0 bytes
+AUTH CLIENT invalid request retained 0 bytes
+AUTH CLIENT interrupted replies and local refusals erase requests and preserve descriptors PASS
+AUTH CLIENT ACTOR root PASS
+AUTH CLIENT transact retained 0 bytes
+AUTH CLIENT ask retained 0 bytes
+AUTH CLIENT ask_root retained 0 bytes
+AUTH CLIENT successful transactions and root peer decisions preserve ownership and descriptors PASS
+AUTH CLIENT reply EOF retained 0 bytes
+AUTH CLIENT partial header retained 0 bytes
+AUTH CLIENT partial length retained 0 bytes
+AUTH CLIENT partial body retained 0 bytes
+AUTH CLIENT bad magic retained 0 bytes
+AUTH CLIENT excess field count retained 0 bytes
+AUTH CLIENT oversized late field retained 0 bytes
+AUTH CLIENT unavailable/path refusal retained 0 bytes
+AUTH CLIENT unavailable/path refusal retained 0 bytes
+AUTH CLIENT invalid request retained 0 bytes
+AUTH CLIENT interrupted replies and local refusals erase requests and preserve descriptors PASS
+AUTH CLIENT ACTOR UID 1000 PASS
+AUTH CLIENT COMPANION protocol PASS
+AUTH CLIENT COMPANION authcore PASS
+AUTH CLIENT ordinary peer receives no authentication secret PASS
+HWTEST PASS packages-auth-client

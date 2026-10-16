@@ -1,0 +1,2 @@
+AUTH CLIENT successful transactions and root peer decisions preserve ownership and descriptors PASS
+AUTH CLIENT interrupted replies and local refusals erase requests and preserve descriptors PASS
