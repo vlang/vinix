@@ -6,6 +6,7 @@ import os
 import time
 
 fn C.mkfifo(&char, u32) int
+fn C.link(&char, &char) int
 
 fn image_apps_fixture() !(string, string) {
 	work := os.real_path(os.temp_dir()) + '/vinix-image-apps-' + os.getpid().str() + '-' + time.now().unix_micro().str()
@@ -146,7 +147,8 @@ fn test_image_application_catalog_lock_works_with_normal_reviewed_offline_deploy
 		source := image_apps_config(work, architecture, key, Policy{ offline: true, reserve_bytes: 0 })!
 		mut configuration := prepare_image_configuration(root, architecture, source)!
 		mut repositories := unsafe { &configuration }.prepare_repositories(work + '/bundle')!
-		report := json2.decode[ImageInputCheck](unsafe { &configuration }.check_applications(unsafe { &repositories }, ['editor', 'modern'])!)!
+		path := work + '/deployment.json'
+		report := json2.decode[ImageInputCheck](unsafe { &configuration }.export_applications(unsafe { &repositories }, ['editor', 'modern'], path)!)!
 		assert !os.exists(root + '/var')
 		assert unsafe { &repositories }.publish()! && unsafe { &configuration }.publish()!
 		repositories.close(); configuration.close()
@@ -163,7 +165,7 @@ fn test_image_application_catalog_lock_works_with_normal_reviewed_offline_deploy
 		os.write_file(consumer + '/etc/vinix-packages/config.json', publisher_json(Config{ architecture: architecture,
 			policy: Policy{ offline: true, reserve_bytes: 0 }, repositories: [Repository{ id: 'native', public_key: key,
 				url: 'file://' + root + image_repositories_path + '/native' }] }))!
-		path := work + '/deployment.json'; os.write_file(path, publisher_json(report.application_deployment))!
+		assert os.read_file(path)! == publisher_json(report.application_deployment)
 		service := Service{ root: consumer, offline: true }
 		service.refresh()!
 		mut review := service.review_deployment(path)!; defer { review.close() }
@@ -331,4 +333,153 @@ fn test_image_requirements_file_cli_explicit_and_environment_inputs_preserve_pre
 		assert os.ls(root)!.len == 0
 	}
 	println('IMAGE REQUIREMENTS FILE CLI both-host inherited/explicit selection, inline override, mutual exclusion and normal/check compiler gates preserve unchanged images PASS')
+}
+
+fn test_image_deployment_exports_exact_owned_locks_and_saved_digests_for_inline_and_file_requirements() {
+	for architecture in ['aarch64', 'x86_64']! {
+		work, key := image_apps_fixture()!; defer { os.rmdir_all(work) or {} }
+		root := work + '/image'; os.mkdir(root)!
+		source := image_apps_config(work, architecture, key, Policy{})!
+		mut configuration := prepare_image_configuration(root, architecture, source)!
+		mut repositories := unsafe { &configuration }.prepare_repositories(work + '/bundle')!
+		path := work + '/saved é ; $literal.json'
+		text := unsafe { &configuration }.export_applications(unsafe { &repositories }, ['modern', 'editor'], path)!
+		report := json2.decode[ImageInputCheck](text)!
+		assert report.application_deployment_destination == path && report.application_requirements_sha256 == ''
+		assert report.application_deployment_sha256 == hash_file(path)!
+		assert os.read_file(path)! == encode_deployment_lock(report.application_deployment, true)!
+		assert os.stat(path)!.mode & 0o777 == 0o644 && os.lstat(path)!.nlink == 1
+		requirements := work + '/applications.json'
+		os.write_file(requirements, '{"format":1,"architecture":"' + architecture + '","packages":["editor","modern"]}\n')!
+		file_path := work + '/from-file.json'
+		from_file := json2.decode[ImageInputCheck](unsafe { &configuration }.export_application_file(unsafe { &repositories }, requirements, file_path)!)!
+		assert from_file.application_requirements_sha256 == hash_file(requirements)! && from_file.application_deployment_destination == file_path
+		assert from_file.application_deployment == report.application_deployment && os.read_file(file_path)! == os.read_file(path)!
+		outside := json2.decode[ImageInputCheck](unsafe { &configuration }.export_applications(unsafe { &repositories }, ['editor', 'modern'], root + '/../outside.json')!)!
+		assert outside.application_deployment_destination == work + '/outside.json' && os.read_file(work + '/outside.json')! == os.read_file(path)!
+		unchecked := json2.decode[ImageInputCheck](unsafe { &configuration }.check_applications(unsafe { &repositories }, ['editor'])!)!
+		assert unchecked.application_deployment_destination == '' && unchecked.application_deployment_sha256 == ''
+		repositories.close(); configuration.close(); os.rm(requirements)!
+		assert json2.decode[ImageInputCheck](text)!.application_deployment_sha256 == hash_file(path)! && os.ls(root)!.len == 0
+	}
+	println('IMAGE DEPLOYMENT EXPORT both-host exact canonical format-2 locks, inline/file parity, independent source/result digests, exclusive atomic publication and independent receipts PASS')
+}
+
+fn test_image_deployment_export_preserves_existing_outputs_and_refuses_image_namespaces_or_invalid_sets() {
+	work, key := image_apps_fixture()!; defer { os.rmdir_all(work) or {} }
+	root := work + '/image'; os.mkdir(root)!
+	source := image_apps_config(work, 'aarch64', key, Policy{})!
+	mut configuration := prepare_image_configuration(root, 'aarch64', source)!; defer { configuration.close() }
+	mut repositories := unsafe { &configuration }.prepare_repositories(work + '/bundle')!; defer { repositories.close() }
+	os.write_file(work + '/keep', 'preserved owner bytes')!; os.chmod(work + '/keep', 0o600)!
+	for kind in ['file', 'link', 'dangling', 'fifo', 'directory', 'hardlink']! {
+		path := work + '/' + kind
+		match kind {
+			'file' { os.write_file(path, 'preserved output')! }
+			'link' { os.symlink(work + '/keep', path)! }
+			'dangling' { os.symlink(work + '/absent', path)! }
+			'fifo' { assert C.mkfifo(path.str, 0o600) == 0 }
+			'directory' { os.mkdir(path)! }
+			'hardlink' { assert C.link((work + '/keep').str, path.str) == 0 }
+			else {}
+		}
+		before := os.lstat(path)!
+		if _ := unsafe { &configuration }.export_applications(unsafe { &repositories }, ['editor'], path) { assert false } else { assert err.msg().contains('already exists') }
+		after := os.lstat(path)!; assert before.inode == after.inode && before.mode == after.mode && before.size == after.size
+	}
+	assert os.read_file(work + '/keep')! == 'preserved owner bytes' && os.stat(work + '/keep')!.mode & 0o777 == 0o600
+	assert os.read_file(work + '/file')! == 'preserved output'
+	os.mkdir(root + '/sub')!; os.symlink(root + '/sub', work + '/into-image')!
+	for path in [root + '/new.json', root + '/sub/new.json', work + '/into-image/new.json', work + '/into-image/../new.json'] {
+		if _ := unsafe { &configuration }.export_applications(unsafe { &repositories }, ['editor'], path) { assert false } else { assert err.msg().contains('outside the target image') }
+	}
+	for path in ['', '.', '..', work + '/bad\nname', work + '/bad\xff', work + '/bad\x00name', work + '/missing/new.json', work + '/trailing/'] {
+		if _ := unsafe { &configuration }.export_applications(unsafe { &repositories }, ['editor'], path) { assert false } else {}
+	}
+	for index, roots in [ []string{}, ['editor', 'editor'], ['support'], ['absent'], ['legacy', 'modern'] ] {
+		path := work + '/refused-' + index.str()
+		if _ := unsafe { &configuration }.export_applications(unsafe { &repositories }, roots, path) { assert false } else {}
+		assert !os.exists(path)
+	}
+	os.mkdir(work + '/shared')!; os.chmod(work + '/shared', 0o777)!
+	if _ := unsafe { &configuration }.export_applications(unsafe { &repositories }, ['editor'], work + '/shared/refused') { assert false } else {}
+	assert os.ls(work + '/shared')!.len == 0 && os.ls(root + '/sub')!.len == 0 && os.ls(root)! == ['sub']
+	assert os.ls(work)!.all(!it.starts_with('.package-'))
+	println('IMAGE DEPLOYMENT EXPORT existing file/link/FIFO/directory/hardlink outputs, direct/aliased image namespaces, unsafe parents, invalid paths and invalid app sets refuse unchanged PASS')
+}
+
+fn image_export_checkpoint(phase string, temporary string) ! {
+	kind := os.file_name(os.dir(temporary))
+	if kind == 'race' && phase == 'flushed' { os.write_file(os.dir(temporary) + '/result.json', 'concurrent owner bytes')! }
+	if kind == phase { return error('injected image export ' + phase + ' failure') }
+}
+
+fn image_export_no_space(_ int, _ voidptr, _ usize) isize { C.errno = C.ENOSPC; return -1 }
+fn image_export_directory_flush_failure(fd int) int {
+	mut info := C.stat{}; assert C.fstat(fd, unsafe { &info }) == 0
+	return if info.st_mode & 0o170000 == 0o040000 { -1 } else { C.fsync(fd) }
+}
+
+fn test_image_deployment_export_failure_cleanup_saved_diagnostics_and_retry_preserve_concurrent_files() {
+	work, key := image_apps_fixture()!; defer { os.rmdir_all(work) or {} }
+	root := work + '/image'; os.mkdir(root)!
+	source := image_apps_config(work, 'x86_64', key, Policy{})!
+	mut configuration := prepare_image_configuration(root, 'x86_64', source)!; defer { configuration.close() }
+	mut repositories := unsafe { &configuration }.prepare_repositories(work + '/bundle')!; defer { repositories.close() }
+	for kind in ['created', 'written', 'flushed', 'published', 'race', 'space', 'directory-flush']! {
+		parent := work + '/' + kind; os.mkdir(parent)!
+		path := parent + '/result.json'
+		options := AtomicWriteOptions{ checkpoint: image_export_checkpoint,
+			write: if kind == 'space' { image_export_no_space } else { atomic_write_bytes },
+			flush: if kind == 'directory-flush' { image_export_directory_flush_failure } else { atomic_flush } }
+		if _ := unsafe { &configuration }.check_inputs(unsafe { &repositories }, ['editor'], '', ImageDeploymentOutput{ destination: path, options: options }) { assert false } else {
+			if kind in ['published', 'directory-flush']! {
+				assert err.msg().contains('saved, but')
+				mut document := decode_deployment(os.read_file(path)!, 'x86_64')!; assert document.packages == ['editor']; document.close()
+			} else if kind == 'race' { assert os.read_file(path)! == 'concurrent owner bytes' }
+			else { assert !os.exists(path) && !os.is_link(path) }
+		}
+		assert os.ls(parent)!.all(!it.starts_with('.package-'))
+		if !os.exists(path) {
+			assert unsafe { &configuration }.export_applications(unsafe { &repositories }, ['editor'], path)!.len > 0
+		} else {
+			before := os.read_file(path)!
+			if _ := unsafe { &configuration }.export_applications(unsafe { &repositories }, ['editor'], path) { assert false } else {}
+			assert os.read_file(path)! == before
+		}
+	}
+	assert os.ls(root)!.len == 0
+	println('IMAGE DEPLOYMENT EXPORT write/space/checkpoint/flush failures and destination races retire temporary files, report saved outputs accurately and permit safe retry without image writes PASS')
+}
+
+fn test_image_deployment_export_cli_requires_explicit_context_and_saves_a_reviewable_file_without_compilers() {
+	binary := os.getenv('VINIX_PACKAGE_STAGE_CHECK_CLI'); if binary == '' { return }
+	for architecture in ['aarch64', 'x86_64']! {
+		work, key := image_apps_fixture()!; defer { os.rmdir_all(work) or {} }
+		root := work + '/image'; os.mkdir(root)!
+		source := image_apps_config(work, architecture, key, Policy{})!
+		base := ['--arch', architecture, '--staging', root, '--config', source, '--repositories', work + '/bundle', '--cc', work + '/missing-compiler']
+		path := work + '/reviewed é ; $literal.json'
+		code, text := image_apps_cli(binary, [...base, '--require-app', 'editor', '--check', '--export-deployment', path])
+		assert code == 0, text
+		report := json2.decode[ImageInputCheck](text)!
+		assert report.application_deployment_destination == path && report.application_deployment_sha256 == hash_file(path)!
+		assert os.read_file(path)! == publisher_json(report.application_deployment)
+		again, diagnostic := image_apps_cli(binary, ['--check', '--export-deployment', path, ...base, '--require-app', 'editor'])
+		assert again != 0 && diagnostic.contains('already exists'), diagnostic
+		requirements := work + '/applications.json'
+		os.write_file(requirements, '{"format":1,"architecture":"' + architecture + '","packages":["editor"]}')!
+		file_code, file_text := image_apps_cli(binary, ['--export-deployment', work + '/file.json', ...base, '--applications', requirements, '--check'])
+		assert file_code == 0, file_text
+		assert os.read_file(work + '/file.json')! == os.read_file(path)!
+		for options in [['--check'], ['--require-app', 'editor']] {
+			invalid, reason := image_apps_cli(binary, [...base, ...options, '--export-deployment', work + '/uncreated'])
+			assert invalid != 0 && reason.contains('requires --check and selected application requirements'), reason
+			assert !os.exists(work + '/uncreated')
+		}
+		in_image, image_error := image_apps_cli(binary, [...base, '--check', '--require-app', 'editor', '--export-deployment', root + '/refused.json'])
+		assert in_image != 0 && image_error.contains('outside the target image'), image_error
+		assert os.ls(root)!.len == 0
+	}
+	println('IMAGE DEPLOYMENT EXPORT real CLI both-host inline/file exports, option placement, compiler bypass, existing-file protection and required context preserve target images PASS')
 }

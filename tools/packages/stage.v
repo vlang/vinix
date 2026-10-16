@@ -25,11 +25,12 @@ fn stage() ! {
 	mut required_applications := []string{}
 	mut applications := os.getenv('VINIX_PACKAGE_IMAGE_APPLICATIONS')
 	mut applications_explicit := false
+	mut deployment_output := ''
 	mut arguments := os.args[1..].clone()
 	for arguments.len > 0 {
 		if arguments[0] == '--check' { check = true; arguments = arguments[1..].clone(); continue }
 		if arguments.len < 2 {
-			return error('usage: stage.v --arch aarch64|x86_64 --staging DIR [--check] [--cc COMPILER] [--config REVIEWED_CONFIG.json] [--repositories SIGNED_BUNDLE_DIRECTORY] [--applications REQUIREMENTS.json | --require-app ID...]')
+			return error('usage: stage.v --arch aarch64|x86_64 --staging DIR [--check] [--cc COMPILER] [--config REVIEWED_CONFIG.json] [--repositories SIGNED_BUNDLE_DIRECTORY] [--applications REQUIREMENTS.json | --require-app ID...] [--export-deployment NEW_FILE]')
 		}
 		match arguments[0] {
 			'--arch' { architecture = arguments[1] }
@@ -48,6 +49,10 @@ fn stage() ! {
 				applications = arguments[1]
 				applications_explicit = true
 			}
+			'--export-deployment' {
+				if arguments[1] == '' { return error('--export-deployment requires a new output file') }
+				deployment_output = arguments[1]
+			}
 			'--config' {
 				if arguments[1] == '' { return error('--config requires a reviewed package configuration file') }
 				configuration = arguments[1]
@@ -63,12 +68,19 @@ fn stage() ! {
 	if architecture !in ['aarch64', 'x86_64'] || staging == '' || staging == '/' || !os.is_dir(staging) {
 		return error('staging needs an existing target directory and supported architecture')
 	}
+	if deployment_output != '' && (!check || (required_applications.len == 0 && applications == '')) {
+		return error('--export-deployment requires --check and selected application requirements')
+	}
 	mut image_configuration := pkgcore.prepare_image_configuration(staging, architecture, configuration)!
 	defer { image_configuration.close() }
 	mut image_repositories := unsafe { &image_configuration }.prepare_repositories(repositories)!
 	defer { image_repositories.close() }
 	if check || required_applications.len > 0 || applications != '' {
-		report := if applications != '' {
+		report := if deployment_output != '' && applications != '' {
+			unsafe { &image_configuration }.export_application_file(unsafe { &image_repositories }, applications, deployment_output)!
+		} else if deployment_output != '' {
+			unsafe { &image_configuration }.export_applications(unsafe { &image_repositories }, required_applications, deployment_output)!
+		} else if applications != '' {
 			unsafe { &image_configuration }.check_application_file(unsafe { &image_repositories }, applications)!
 		} else if required_applications.len > 0 {
 			unsafe { &image_configuration }.check_applications(unsafe { &image_repositories }, required_applications)!

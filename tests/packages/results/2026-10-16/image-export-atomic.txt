@@ -1,0 +1,3 @@
+NEW METADATA existing file/alias/dangling/FIFO/directory/hardlink destinations refuse without replacement or blocking PASS
+NEW METADATA checkpoint/write/space/flush failures, destination races, mode/parent/final substitutions, cleanup and saved-file retry refusal PASS
+NEW METADATA concurrent publishers admit exactly one complete file with canonical final mode and no temporary leftovers PASS

@@ -662,6 +662,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Reviewed requirements files](tests/packages/image-requirements-check.md)
     carry that set through desktop staging, retaining exact source digests and
     invalidating cached images when the selected file or its contents change.
+    [Explicit deployment export](tests/packages/image-export-check.md) saves the
+    resolved lock atomically outside the image for normal reviewed deployment,
+    retaining output digests and preserving existing/concurrent files.
   - [x] [Bounded prepared-root materialization](tests/packages/import-limits-check.md)
     checks aggregate entries across selectors/aliases and output directory depth
     during import, including empty-directory trees and nested selector parents.

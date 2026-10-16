@@ -61,6 +61,13 @@ before compiling or publishing, reports their source digest, and refuses exact
 format-2 locks rather than dropping their pins. The native desktop cache tracks
 the selection and contents. See [file/cache qualification](../tests/packages/image-requirements-check.md).
 
+Preflight can explicitly export its exact resolved deployment with
+`--export-deployment NEW_FILE`. The canonical lock is saved atomically to a new
+name outside the image and comes with a destination/digest receipt. It can be
+distributed for normal Software/CLI deployment review, where current trust,
+policy and changes are checked again. Existing output files and the target image
+remain intact. See [qualification](../tests/packages/image-export-check.md).
+
 Configuration, cached catalogs, trust histories, installed state and publisher
 documents share a bounded metadata reader. It captures a nonblocking descriptor,
 refuses leaf symlinks and nonregular files, and reads at most the admitted file

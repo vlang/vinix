@@ -70,6 +70,13 @@ and contents. Exact format-2 locks are refused here so their pins cannot be
 discarded. See [the contract](SDK.md#application-requirements-files-in-desktop-builds)
 and [qualification](../../tests/packages/image-requirements-check.md).
 
+`--check --export-deployment NEW_FILE` saves that exact resolved format-2 lock
+for ordinary Software/CLI deployment review. It requires selected app requirements
+and a new file outside the image, preserves existing destinations, and reports
+the saved path and newline-inclusive digest. The target image remains unchanged.
+See [the export contract](SDK.md#export-an-image-application-deployment) and
+[qualification](../../tests/packages/image-export-check.md).
+
 Desktop checks need generated examples under `build/app-src` and a headless ui2
 overlay under `build/vmodules`; `VINIX_PACKAGE_TEST_UI2` selects another overlay
 parent. Package implementation, publishing, staging and qualification use V.

@@ -34,13 +34,15 @@ struct ImageInputCheck {
 	applications_checked bool
 	application_requirements_sha256 string
 	application_deployment DeploymentLock
+	application_deployment_destination string
+	application_deployment_sha256 string
 }
 
 // Return owned, newline-terminated JSON. Callers close both input plans and
 // free the returned text. Report encoding borrows decoded/plan fields only
 // while their owners are alive; no private capture paths enter the report.
 pub fn (configuration &ImageConfiguration) check_repositories(repositories &ImageRepositories) !string {
-	return configuration.check_inputs(repositories, [], '')
+	return configuration.check_inputs(repositories, [], '', ImageDeploymentOutput{})
 }
 
 // Check an advertised application set together, using only the captured signed
@@ -49,13 +51,17 @@ pub fn (configuration &ImageConfiguration) check_repositories(repositories &Imag
 // install packages, enroll remote publishers or authorize a deployment.
 pub fn (configuration &ImageConfiguration) check_applications(repositories &ImageRepositories, required []string) !string {
 	if required.len == 0 { return error('image application check requires at least one application ID') }
-	return configuration.check_inputs(repositories, required, '')
+	return configuration.check_inputs(repositories, required, '', ImageDeploymentOutput{})
 }
 
 // Format-1 deployment roots are a declarative advertised application set.
 // Format-2 locks must never be reduced to IDs, discarding their exact pins.
 // Capture once: resolution and the reported digest refer to the same bytes.
 pub fn (configuration &ImageConfiguration) check_application_file(repositories &ImageRepositories, source string) !string {
+	return configuration.check_application_source(repositories, source, ImageDeploymentOutput{})
+}
+
+fn (configuration &ImageConfiguration) check_application_source(repositories &ImageRepositories, source string, output ImageDeploymentOutput) !string {
 	text := read_metadata(source)!
 	defer { unsafe { text.free() } }
 	mut document := decode_deployment(text, configuration.architecture)!
@@ -64,10 +70,11 @@ pub fn (configuration &ImageConfiguration) check_application_file(repositories &
 	if document.packages.len == 0 { return error('image application requirements must name at least one application') }
 	digest := index_digest(text)
 	defer { unsafe { digest.free() } }
-	return configuration.check_inputs(repositories, document.packages, digest)
+	return configuration.check_inputs(repositories, document.packages, digest, output)
 }
 
-fn (configuration &ImageConfiguration) check_inputs(repositories &ImageRepositories, required []string, requirements_sha256 string) !string {
+fn (configuration &ImageConfiguration) check_inputs(repositories &ImageRepositories, required []string, requirements_sha256 string, output ImageDeploymentOutput) !string {
+	if output.destination != '' && required.len == 0 { return error('image deployment export requires selected application requirements') }
 	if required.len > 4096 { return error('image application check supports at most 4096 application IDs') }
 	mut seen := map[string]bool{}
 	defer { unsafe { seen.free() } }
@@ -130,10 +137,22 @@ fn (configuration &ImageConfiguration) check_inputs(repositories &ImageRepositor
 	rows.sort(a.id < b.id)
 	digest := index_digest(text)
 	defer { unsafe { digest.free() } }
-	return publisher_json(ImageInputCheck{ architecture: configuration.architecture, root: configuration.root,
+	target := if output.destination != '' { image_deployment_target(configuration.root, output.destination)! } else { '' }
+	defer { unsafe { target.free() } }
+	lock_text := if target != '' { encode_deployment_lock(deployment, true)! } else { '' }
+	defer { unsafe { lock_text.free() } }
+	lock_digest := if target != '' { index_digest(lock_text) } else { '' }
+	defer { unsafe { lock_digest.free() } }
+	report := publisher_json(ImageInputCheck{ architecture: configuration.architecture, root: configuration.root,
 		configuration_path: configuration.path, configuration_action: if configuration.existing { 'preserve' } else { 'initialize' },
 		configuration_sha256: digest, configuration: config, bundle_supplied: repositories.capture != '', bundle_action: bundle_action,
 		bundle_required_bytes: repositories.needed, bundle_reserve_bytes: if repositories.capture != '' { u64(64 * 1024 * 1024) } else { 0 },
 		bundled_repositories: rows, applications_checked: required.len > 0,
-		application_requirements_sha256: requirements_sha256, application_deployment: deployment })
+		application_requirements_sha256: requirements_sha256, application_deployment: deployment,
+		application_deployment_destination: target, application_deployment_sha256: lock_digest })
+	mut accepted := false
+	defer { if !accepted { unsafe { report.free() } } }
+	if target != '' { atomic_write_with(target, lock_text, AtomicWriteOptions{ ...output.options, exclusive: true })! }
+	accepted = true
+	return report
 }

@@ -337,6 +337,7 @@ and random capture names are excluded.
 | `applications_checked` | True only when explicit application requirements were jointly resolved against the selected signed bundle. |
 | `application_requirements_sha256` | Digest of the exact reviewed requirements-file bytes when a file was selected; empty for inline IDs or no requirements. |
 | `application_deployment` | Format-2 deployment lock for the resolved application roots and their complete closure. Without requirements, this is an empty lock for the target architecture and `applications_checked` is false. |
+| `application_deployment_destination`, `application_deployment_sha256` | Canonical saved destination and digest of the exact newline-terminated lock when explicitly exported; both empty without export. |
 
 Each bundled row records `id`, `sequence`, `expires`, `index_sha256`, `packages`,
 `aarch64_packages`, `x86_64_packages`, `shared_packages`, `proprietary_packages`,
@@ -449,6 +450,61 @@ This file is a build input. It is not copied into the image, installed as
 consumer state, or automatically authorized as a deployment. A successful
 preflight's `application_deployment` remains the exact format-2 lock for later
 ordinary review. See [file/cache qualification](../../tests/packages/image-requirements-check.md).
+
+### Export an image application deployment
+
+Add `--export-deployment NEW_FILE` to a check with selected file or inline app
+requirements to save the exact result as an ordinary format-2 deployment lock:
+
+```sh
+v run tools/packages/stage.v --check --arch aarch64 --staging /build/fresh-root \
+  --config /release/reviewed-packages.json --repositories /release/bundle \
+  --applications /release/native-apps.json \
+  --export-deployment /release/new-native-deployment.json
+```
+
+This explicit write requires `--check` and a nonempty application requirement
+selection. Environment-selected requirements work too. Default checks still
+write no report/deployment file. Export runs the same signature, payload, policy,
+target and joint dependency/runtime admission, then saves the canonical lock
+from that captured result. It requires no target compiler and changes no image,
+consumer state, trust or policy.
+
+Choose a **new file outside the target image** in an existing controlled parent
+directory. Relative filenames resolve through their actual parent. Directory
+identity checks reject image descendants reached directly or through aliases,
+including alias/parent traversal; a path that resolves outside the image remains
+usable. Parent aliases resolve once. Keep image and output ancestors controlled
+throughout the call, as with the other publisher/image operations.
+
+The common metadata writer uses a private temporary, flushes complete contents,
+publishes exclusively at mode 0644, and flushes the captured parent directory.
+Existing files, links, FIFOs, directories and hard links are preserved. Handled
+failures before publication remove the temporary. An error after publication
+explicitly reports that the file was saved; inspect it before retrying. Retrying
+an existing name refuses, so a retry cannot overwrite a concurrent writer or
+previous successful export.
+
+Successful JSON output records `application_deployment_destination` and
+`application_deployment_sha256`; the digest covers the saved newline too.
+`application_requirements_sha256` independently identifies a selected source
+manifest. The saved file exactly encodes `application_deployment`, including
+sorted roots, full closure, versions, target/shared architecture, publisher
+IDs/keys, minimum signed sequences and complete manifest digests. Without an
+export, both output-receipt fields are empty.
+
+Distribute the file with the authenticated repository bundle or organization
+deployment. In Software, open **Deployment**, select its absolute installed/media
+path and **Review deployment**. CLI users run `deployment-review FILE` and the
+approved `deployment-apply`. Both workflows authenticate the pinned manifests
+with current enrolled keys and policy and review the entire resulting set,
+including removals; export grants no permission to apply it automatically.
+
+V builders use `configuration.export_applications(&repositories, ids, destination)`
+or `configuration.export_application_file(&repositories, source, destination)`.
+Each returns the same independently owned report after successful publication;
+free the text and close both image plans. See
+[export qualification](../../tests/packages/image-export-check.md).
 
 ## Build and publish
 

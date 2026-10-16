@@ -42,6 +42,12 @@ requirements and contents. Direct `stage.v --check --applications FILE` returns
 the requirements digest and exact deployment lock without changing the image.
 See [the release contract](../../tools/packages/SDK.md#application-requirements-files-in-desktop-builds).
 
+Add `--export-deployment /release/new-native-deployment.json` to that check to
+save its exact lock directly. The new output must be outside the image. Ship it
+with the authenticated bundle, then open its path in Software's **Deployment**
+form to review the complete set before applying it. Current publisher trust and
+policy are checked again. See [deployment export](../../tools/packages/SDK.md#export-an-image-application-deployment).
+
 The version argument labels the three application manifests. Publishers must
 review source and toolchain changes when advancing it. Binary reproducibility
 across different compiler installations is not implied. Signed updates,

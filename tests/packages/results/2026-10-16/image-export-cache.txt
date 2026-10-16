@@ -1,0 +1,1 @@
+IMAGE REQUIREMENTS CACHE selected/missing/removed paths, same-size restored-time content changes and alternate identical-content inputs invalidate; invalid paths refuse PASS
