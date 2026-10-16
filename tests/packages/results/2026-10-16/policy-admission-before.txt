@@ -1,0 +1,45 @@
+FAIL x86_64 packages-policy-lifecycle (8.4s)
+  forbidden "HWTEST FAIL" in the line: HWTEST FAIL packages-policy-lifecycle
+  last 40 serial lines:
+  | POLICY LIFECYCLE STACK 17 409d66
+  | POLICY LIFECYCLE STACK 19 409dcd
+  | POLICY LIFECYCLE STACK 23 409ee4
+  | POLICY LIFECYCLE STACK 35 4123b1
+  | POLICY LIFECYCLE STACK 37 476835
+  | POLICY LIFECYCLE STACK 47 476b1e
+  | POLICY LIFECYCLE STACK 49 478f30
+  | POLICY LIFECYCLE STACK 85 47935d
+  | POLICY LIFECYCLE STACK 86 4e2fa3
+  | POLICY LIFECYCLE STACK 97 40937c
+  | POLICY LIFECYCLE STACK 99 4765a5
+  | Limit: 122892800
+  | OwnerLimit: 61446400
+  | Charged: 62478566
+  | Accounts: 2
+  | Denied: 1
+  | Kind Objects Bytes
+  | file 37 261690
+  | descriptor 11 33920
+  | socket 0 0
+  | ipc 4 147456
+  | mapping 5437 60841984
+  | process 4 54732
+  | thread 2 1128288
+  | scratch 2 10496
+  | Denied.invalid: 0
+  | Denied.accounts: 0
+  | Denied.objects: 0
+  | Denied.global: 0
+  | Denied.owner: 1
+  | Denied.cgroup: 0
+  | LastDenied: owner
+  | LastDeniedOwner: 2/2
+  | LastDeniedKind: mapping
+  | LastDeniedRequested: 4096
+  | LastDeniedGlobalBytes: 62506854
+  | LastDeniedOwnerBytes: 61445264
+  | RESOURCE-READ 0
+  | policy-lifecycle failed (139)
+  | HWTEST FAIL packages-policy-lifecycle
+  logs: /Users/alex/code/vinix/build/pkg-mmap-apply-before/packages-policy-lifecycle
+package-policy-lifecycle x86_64: 0 passed, 1 failed, 0 skipped

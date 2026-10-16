@@ -36,7 +36,7 @@ fn suite() hwhost.Suite {
 				'POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS',
 				'POLICY LIFECYCLE alternating changed apply pairs retire scratch; permission denial crosses dependency cycles, explicit firmware/licenses persist, only configuration changes PASS',
 				'POLICY LIFECYCLE configuration/state/proposal/stale/ownership/directory/lock/busy refusals retire scratch, preserve activation and permit restored retry PASS',
-				'POLICY LIFECYCLE oversized review refused before response cloning; configuration, proposal and installed generation unchanged PASS',
+				'POLICY LIFECYCLE oversized review/apply refused before canonicalization; configuration, proposal and installed generation unchanged PASS',
 				'POLICY PROCESS policy-lifecycle PASS', 'POLICY PROCESS policy PASS', 'POLICY PROCESS coordination PASS', 'POLICY PROCESS atomic PASS',
 				'HWTEST PASS packages-policy-lifecycle'], ending: .poweroff, timeout: 300 }]
 	}

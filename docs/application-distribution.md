@@ -1669,7 +1669,10 @@ state, review identity buffers and private paths. Returned fields stay independe
 of those inputs. Review fingerprints keep the existing JSON/SHA-256 identity, and
 unchanged proposals still avoid a configuration rewrite. Writer directory and
 configuration checks use captured native stat scratch. A minimum-output preflight
-refuses reviews already certain to exceed 8 MiB before cloning the response. See
+refuses reviews already certain to exceed 8 MiB before cloning the response;
+apply uses the same admission before canonicalizing or fingerprinting a proposal.
+This also returns a size diagnostic when a stale confirmation accompanies such
+a proposal. See [apply admission qualification](../tests/packages/policy-admission-check.md) and
 [policy service lifecycle qualification](../tests/packages/policy-lifecycle-check.md).
 
 A format-1 deployment manifest reconciles the requested roots atomically and

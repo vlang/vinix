@@ -250,7 +250,10 @@ pub fn (service Service) apply_policy(path string, expected string) !PolicyDocum
 	defer { unsafe { configuration.free() } }
 	state := read_state(directory, current.architecture)!
 	defer { if state.generation != 0 { close_decoded_state(state) } }
-	mut proposed := read_policy_document(path, current.architecture)!
+	// Apply accepts only policies whose required review can fit the public
+	// response limit. Refuse before canonicalization/fingerprinting as review
+	// does, including when a caller supplies a stale but well-formed digest.
+	mut proposed := read_review_policy_document(path, current, state)!
 	mut transferred := false
 	defer { if !transferred { proposed.close() } }
 	actual := policy_fingerprint(current, state, proposed)

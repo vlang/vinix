@@ -250,9 +250,15 @@ fn test_policy_lifecycle_review_size_refusal_preserves_sources() {
 	directory := state_directory(root); state_text := os.read_file(directory + '/current/state.json')!
 	proposal := os.read_file(path)!
 	assert before.len < max_metadata && state_text.len < max_metadata && proposal.len < max_metadata
+	// A well-formed stale digest must not bypass review-size admission and
+	// allocate canonical policy/fingerprint scratch before refusing apply.
+	if mut value := service.apply_policy(path, policy_lifecycle_stale) { value.close(); assert false }
+	else { message := err.msg(); assert message.contains('review exceeds metadata limit'), message; unsafe { message.free(); err.free() } }
 	if mut value := service.review_policy(path) { value.close(); assert false }
 	else { message := err.msg(); assert message.contains('review exceeds metadata limit'), message; unsafe { message.free(); err.free() } }
 	assert os.read_file(configuration)! == before && os.read_file(path)! == proposal
 	assert os.read_file(directory + '/current/state.json')! == state_text && os.readlink(directory + '/current')! == 'generations/7'
-	println('POLICY LIFECYCLE oversized review refused before response cloning; configuration, proposal and installed generation unchanged PASS')
+	assert os.ls(directory + '/objects')!.len == 0
+	guard := acquire(directory)!; guard.release()
+	println('POLICY LIFECYCLE oversized review/apply refused before canonicalization; configuration, proposal and installed generation unchanged PASS')
 }

@@ -1,0 +1,149 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=26
+!>+ [11] ./sbin/init sz=210944
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/coordination sz=1406624
+!>+ [15] ./usr/share/package-fixtures/atomic sz=770480
+!>+ [16] ./usr/share/package-fixtures/policy sz=1752976
+!>+ [17] ./usr/share/package-fixtures/policy-lifecycle sz=1199672
+!>+ [18] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e97a00
+initramfs: Done (18 entries)
+HWTEST START packages-policy-lifecycle
+POLICY LIFECYCLE maximum fixture models built
+POLICY LIFECYCLE maximum configuration written
+POLICY LIFECYCLE maximum proposal written
+POLICY LIFECYCLE maximum installed state written
+POLICY LIFECYCLE maximum fixture source owners retired
+POLICY LIFECYCLE maximum inputs captured; reviewing
+Name:	policy-lifecycle
+Umask:	022
+State:	R (running)
+Tgid:	62522
+Ngid:	0
+Pid:	62522
+PPid:	1
+TracerPid:	0
+Uid:	0	0	0	0
+Gid:	0	0	0	0
+NSpid:	62522
+Threads:	1
+VmLck:	0 kB
+CapInh:	0000000000000000
+CapPrm:	000001ffffffffff
+CapEff:	000001ffffffffff
+CapBnd:	000001ffffffffff
+CapAmb:	0000000000000000
+NoNewPrivs:	0
+Seccomp:	0
+Seccomp_filters:	0
+
+Limit                     Soft Limit           Hard Limit           Units     
+Max cpu time              unlimited            unlimited            seconds   
+Max file size             unlimited            unlimited            bytes     
+Max data size             unlimited            unlimited            bytes     
+Max stack size            8388608              unlimited            bytes     
+Max core file size        unlimited            unlimited            bytes     
+Max resident set          unlimited            unlimited            bytes     
+Max processes             65535                65535                processes 
+Max open files            1024                 1048576              files     
+Max locked memory         unlimited            unlimited            bytes     
+Max address space         unlimited            unlimited            bytes     
+Max file locks            unlimited            unlimited            locks     
+Max pending signals       unlimited            unlimited            signals   
+Max msgqueue size         unlimited            unlimited            bytes     
+Max nice priority         unlimited            unlimited            
+Max realtime priority     0                    0                    
+Max realtime timeout      unlimited            unlimited            us        
+
+MemTotal:       960100 kB
+MemFree:        843656 kB
+MemAvailable:   843656 kB
+Buffers:               0 kB
+Cached:         0 kB
+SwapTotal:      0 kB
+SwapFree:       0 kB
+Zswap:          0 kB
+Zswapped:       0 kB
+VinixPageouts:  0
+VinixRefaults:  0
+VinixSwapErrors: 0
+Slab:           3424 kB
+VinixMemoryPressure: 0
+
+Limit: 122892800
+OwnerLimit: 61446400
+Charged: 22417508
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 37 261690
+descriptor 11 33920
+socket 0 0
+ipc 4 147456
+mapping 1853 20783104
+process 4 54732
+thread 2 1128288
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+
+POLICY LIFECYCLE FAULT rip=4c59c5 rsp=6fff7f5e580 rdi=1b rsi=8000e7de000 rdx=1b fault=0x8000e7de000
+POLICY LIFECYCLE STACK 11 4c5fb1
+POLICY LIFECYCLE STACK 17 409d66
+POLICY LIFECYCLE STACK 19 409dcd
+POLICY LIFECYCLE STACK 23 409ee4
+POLICY LIFECYCLE STACK 35 4123b1
+POLICY LIFECYCLE STACK 37 476835
+POLICY LIFECYCLE STACK 47 476b1e
+POLICY LIFECYCLE STACK 49 478f30
+POLICY LIFECYCLE STACK 85 47935d
+POLICY LIFECYCLE STACK 86 4e2fa3
+POLICY LIFECYCLE STACK 97 40937c
+POLICY LIFECYCLE STACK 99 4765a5
+Limit: 122892800
+OwnerLimit: 61446400
+Charged: 62478566
+Accounts: 2
+Denied: 1
+Kind Objects Bytes
+file 37 261690
+descriptor 11 33920
+socket 0 0
+ipc 4 147456
+mapping 5437 60841984
+process 4 54732
+thread 2 1128288
+scratch 2 10496
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 1
+Denied.cgroup: 0
+LastDenied: owner
+LastDeniedOwner: 2/2
+LastDeniedKind: mapping
+LastDeniedRequested: 4096
+LastDeniedGlobalBytes: 62506854
+LastDeniedOwnerBytes: 61445264
+RESOURCE-READ 0
+policy-lifecycle failed (139)
+HWTEST FAIL packages-policy-lifecycle

@@ -77,6 +77,11 @@ source/generated C/registers and isolated preflight results remain pinned. This
 does not claim to fix the underlying frozen-kernel/allocator behavior for other
 workloads.
 
+The [apply admission follow-up](policy-admission-check.md) identifies that fault
+as a per-process kernel mapping-metadata budget refusal during lazy page
+population, and applies the same early size gate to policy apply. It retains
+the pre-fix apply crash/denial and fresh passing results on both architectures.
+
 Roadmap 14 remains open for production publisher enrollment, catalog migration,
 graphical login/display integration and broader foreign-runtime acceptance.
 

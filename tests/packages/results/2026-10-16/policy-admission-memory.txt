@@ -1,0 +1,35 @@
+
+memory-run
+POLICY LIFECYCLE aarch64 0 entries: 1000 review and no-op apply cycles retained 0 bytes
+POLICY LIFECYCLE aarch64 1 entries: 1000 review and no-op apply cycles retained 0 bytes
+POLICY LIFECYCLE aarch64 64 entries: 1000 review and no-op apply cycles retained 0 bytes
+POLICY LIFECYCLE x86_64 0 entries: 1000 review and no-op apply cycles retained 0 bytes
+POLICY LIFECYCLE x86_64 1 entries: 1000 review and no-op apply cycles retained 0 bytes
+POLICY LIFECYCLE x86_64 64 entries: 1000 review and no-op apply cycles retained 0 bytes
+POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+POLICY LIFECYCLE aarch64 1000 changed apply pairs retained 0 bytes
+POLICY LIFECYCLE x86_64 1000 changed apply pairs retained 0 bytes
+POLICY LIFECYCLE alternating changed apply pairs retire scratch; permission denial crosses dependency cycles, explicit firmware/licenses persist, only configuration changes PASS
+POLICY LIFECYCLE configuration: 1000 refusals retained 0 bytes
+POLICY LIFECYCLE state: 1000 refusals retained 0 bytes
+POLICY LIFECYCLE proposal: 1000 refusals retained 0 bytes
+POLICY LIFECYCLE proposal-alias: 1000 refusals retained 0 bytes
+POLICY LIFECYCLE proposal-fifo: 1000 refusals retained 0 bytes
+POLICY LIFECYCLE proposal-size: 1000 refusals retained 0 bytes
+POLICY LIFECYCLE stale: 1000 refusals retained 0 bytes
+POLICY LIFECYCLE digest: 1000 refusals retained 0 bytes
+POLICY LIFECYCLE unsafe-file: 1000 refusals retained 0 bytes
+POLICY LIFECYCLE unsafe-parent: 1000 refusals retained 0 bytes
+POLICY LIFECYCLE missing-parent: 1000 refusals retained 0 bytes
+POLICY LIFECYCLE objects: 1000 refusals retained 0 bytes
+POLICY LIFECYCLE generations: 1000 refusals retained 0 bytes
+POLICY LIFECYCLE lock: 1000 refusals retained 0 bytes
+POLICY LIFECYCLE busy: 1000 refusals retained 0 bytes
+POLICY LIFECYCLE configuration/state/proposal/stale/ownership/directory/lock/busy refusals retire scratch, preserve activation and permit restored retry PASS
+POLICY LIFECYCLE oversized review/apply refused before canonicalization; configuration, proposal and installed generation unchanged PASS
+
+memory-config-run
+CONFIGURATION OBSERVATION 1000 repository reads/retirements retained 0 bytes; 1000 policy reads/retirements retained 0 bytes
+CONFIGURATION OBSERVATION both architectures, independent repository/policy fields, canonical policy order, unchanged wire bytes and stored offline flag PASS
+CONFIGURATION OBSERVATION 1000 legacy/default and growing 64-record cycles retire scratch; full 4096 repository/pin observations preserve source configuration PASS
+CONFIGURATION OBSERVATION maintenance FIFOs remain unopened; 1000 schema/missing/alias/FIFO/lock/busy refusal cycles retire scratch and permit restored reads PASS

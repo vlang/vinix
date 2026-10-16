@@ -2365,8 +2365,14 @@ typed JSON without a persisted newline or a new combined-input limit. Full
 review output retains the existing 8 MiB bound, and an unchanged apply does not
 rewrite configuration. A conservative minimum-output preflight refuses responses
 already certain to exceed that bound before canonicalizing/cloning their output;
-the final encoded-size check remains authoritative for other overflows. See
+apply uses the same preflight before canonicalizing or fingerprinting its
+proposal, including with a well-formed stale confirmation. Such proposals fail
+with `organization policy review exceeds metadata limit` without changing
+configuration or installed state. The final review encoded-size check remains
+authoritative for other overflows. See
 [policy lifecycle checks](../../tests/packages/policy-lifecycle-check.md).
+The [apply admission checks](../../tests/packages/policy-admission-check.md)
+retain the x86_64 metadata-budget diagnosis and both native guest results.
 
 The lightweight `pkgprotocol` presentation module also supplies `PolicyDocument`,
 `PolicySettings`, `PolicyPin`, `PolicyReview`, `PolicyImpact`,
