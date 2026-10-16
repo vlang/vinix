@@ -1,0 +1,149 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./run/ sz=0
+!>+ [10] ./tmp/ sz=0
+!>+ [11] ./run/user/ sz=0
+!>+ [12] ./etc/hwtest-scenario sz=22
+!>+ [13] ./sbin/init sz=137704
+!>+ [14] ./usr/bin/ sz=0
+!>+ [15] ./usr/sbin/ sz=0
+!>+ [16] ./usr/share/ sz=0
+!>+ [17] ./usr/share/package-fixtures/ sz=0
+!>+ [18] ./usr/share/package-fixtures/streams sz=627112
+!>+ [19] ./usr/share/package-fixtures/protocol sz=621504
+!>+ [20] ./usr/share/package-fixtures/admin-socket sz=595136
+!>+!>+!>+!>+!>+!>initramfs: no ustar sig at 0xff00000037104200
+initramfs: Done (25 entries)
+HWTEST START packages-admin-client
+ADMIN CLIENT password input success/refusal retained 300 bytes
+ADMIN CLIENT password input success/refusal retained 300 bytes
+ADMIN CLIENT password input success/refusal retained 300 bytes
+ADMIN CLIENT password input success/refusal retained 300 bytes
+ADMIN CLIENT password input success/refusal retained 300 bytes
+ADMIN CLIENT password input success/refusal retained 300 bytes
+ADMIN CLIENT password input success/refusal retained 300 bytes
+ADMIN CLIENT password input success/refusal retained 300 bytes
+ADMIN CLIENT unavailable authentication retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT streamed diagnostics, oversized omissions, protocol bounds and exact completion refusals PASS
+ADMIN CLIENT status 37 retained 1545 bytes
+ADMIN CLIENT description denied retained 625 bytes
+ADMIN CLIENT description fields retained 625 bytes
+ADMIN CLIENT account denied retained 625 bytes
+ADMIN CLIENT throttled retained 1365 bytes
+ADMIN CLIENT approval denied retained 1365 bytes
+ADMIN CLIENT baseline approval diagnostic use-after-free SIGSEGV confirmed
+ADMIN CLIENT baseline approval diagnostic use-after-free SIGSEGV confirmed
+ADMIN CLIENT baseline approval diagnostic use-after-free SIGSEGV confirmed
+ADMIN CLIENT invitation mismatch retained 1545 bytes
+ADMIN CLIENT approval interrupted retained 1085 bytes
+ADMIN CLIENT receipt lost retained 1545 bytes
+ADMIN CLIENT unsafe runtime retained 625 bytes
+ADMIN CLIENT status 0 retained 1545 bytes
+ADMIN CLIENT baseline diagnostic crashes confirmed; remaining outcomes and cleanup PASS
+ADMIN CLIENT ACTOR root PASS
+ADMIN CLIENT password input success/refusal retained 300 bytes
+ADMIN CLIENT password input success/refusal retained 300 bytes
+ADMIN CLIENT password input success/refusal retained 300 bytes
+ADMIN CLIENT password input success/refusal retained 300 bytes
+ADMIN CLIENT password input success/refusal retained 300 bytes
+ADMIN CLIENT password input success/refusal retained 300 bytes
+ADMIN CLIENT password input success/refusal retained 300 bytes
+ADMIN CLIENT password input success/refusal retained 300 bytes
+ADMIN CLIENT unavailable authentication retained 625 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT streamed diagnostics, oversized omissions, protocol bounds and exact completion refusals PASS
+ADMIN CLIENT ACTOR UID 1000 PASS
+ADMIN CLIENT COMPANION protocol PASS
+ADMIN ENVELOPE 16 reviewed commands/boundaries x1000 and eight statuses PASS
+ADMIN ENVELOPE 16 reviewed commands/boundaries x1000 and eight statuses PASS
+ADMIN ENVELOPE 16 reviewed commands/boundaries x1000 and eight statuses PASS
+ADMIN ENVELOPE 16 reviewed commands/boundaries x1000 and eight statuses PASS
+ADMIN ENVELOPE 16 reviewed commands/boundaries x1000 and eight statuses PASS
+ADMIN ENVELOPE 16 reviewed commands/boundaries x1000 and eight statuses PASS
+ADMIN ENVELOPE 16 reviewed commands/boundaries x1000 and eight statuses PASS
+ADMIN ENVELOPE 16 reviewed commands/boundaries x1000 and eight statuses PASS
+ADMIN ENVELOPE 16 reviewed commands/boundaries x1000 and eight statuses PASS
+ADMIN ENVELOPE 16 reviewed commands/boundaries x1000 and eight statuses PASS
+ADMIN ENVELOPE 16 reviewed commands/boundaries x1000 and eight statuses PASS
+ADMIN ENVELOPE 16 reviewed commands/boundaries x1000 and eight statuses PASS
+ADMIN ENVELOPE 16 reviewed commands/boundaries x1000 and eight statuses PASS
+ADMIN ENVELOPE 16 reviewed commands/boundaries x1000 and eight statuses PASS
+ADMIN ENVELOPE 16 reviewed commands/boundaries x1000 and eight statuses PASS
+ADMIN ENVELOPE 16 reviewed commands/boundaries x1000 and eight statuses PASS
+ADMIN ENVELOPE all 4096 truncated prefixes PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE 28 malformed/schema/limit paths x1000 PASS
+ADMIN ENVELOPE excess arguments, oversized encode/decode and invalid receipt construction x1000 PASS
+ADMIN ENVELOPE 12 invalid completion paths x1000 PASS
+ADMIN ENVELOPE 12 invalid completion paths x1000 PASS
+ADMIN ENVELOPE 12 invalid completion paths x1000 PASS
+ADMIN ENVELOPE 12 invalid completion paths x1000 PASS
+ADMIN ENVELOPE 12 invalid completion paths x1000 PASS
+ADMIN ENVELOPE 12 invalid completion paths x1000 PASS
+ADMIN ENVELOPE 12 invalid completion paths x1000 PASS
+ADMIN ENVELOPE 12 invalid completion paths x1000 PASS
+ADMIN ENVELOPE 12 invalid completion paths x1000 PASS
+ADMIN ENVELOPE 12 invalid completion paths x1000 PASS
+ADMIN ENVELOPE 12 invalid completion paths x1000 PASS
+ADMIN ENVELOPE 12 invalid completion paths x1000 PASS
+ADMIN CLIENT COMPANION streams PASS
+ADMIN CLIENT COMPANION admin-socket PASS
+HWTEST PASS packages-admin-client

@@ -84,6 +84,13 @@ fn run_with_socket(arguments []string, socket_path string) !int {
 	defer { run_request.close() }
 	mut reply := authclient.ask_root(socket_path, run_request.code, ...run_request.fields)!
 	defer { reply.close() }
+	check_approval(reply, nonce)!
+	fd := unsafe { &listener }.accept_root()!
+	defer { C.close(fd) }
+	return receive_output(fd, request)
+}
+
+fn check_approval(reply authproto.Frame, nonce string) ! {
 	if reply.code == authproto.status_wait {
 		seconds := reply.text(0)
 		defer { unsafe { seconds.free() } }
@@ -91,14 +98,12 @@ fn run_with_socket(arguments []string, socket_path string) !int {
 	}
 	if reply.code == authproto.status_denied { return error('administrator password was rejected or this account\'s access was revoked') }
 	if reply.code != authproto.status_ok || reply.fields.len != 2 || !reply_field(reply, 0, '0') {
+		// error() takes this string's owner. Freeing it here would leave the
+		// returned error pointing into released storage after reply retirement.
 		diagnostic := if reply.fields.len == 2 { reply.text(1) } else { 'administrator approval was refused or its package worker could not start'.clone() }
-		defer { unsafe { diagnostic.free() } }
 		return error(diagnostic)
 	}
 	if !reply_invitation(reply, nonce) { return error('authentication returned a different package request') }
-	fd := unsafe { &listener }.accept_root()!
-	defer { C.close(fd) }
-	return receive_output(fd, request)
 }
 
 // These comparisons borrow frame fields and require exact invitation bytes.

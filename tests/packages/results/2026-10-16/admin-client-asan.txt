@@ -1,0 +1,1 @@
+ADMIN CLIENT streamed diagnostics, oversized omissions, protocol bounds and exact completion refusals PASS

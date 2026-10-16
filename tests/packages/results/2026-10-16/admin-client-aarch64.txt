@@ -1,0 +1,2 @@
+PASS aarch64 packages-admin-client (598.8s)
+package-admin-client aarch64: 1 passed, 0 failed, 0 skipped

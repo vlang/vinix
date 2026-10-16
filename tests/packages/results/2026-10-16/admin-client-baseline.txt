@@ -1,0 +1,22 @@
+ADMIN CLIENT password input success/refusal retained 360 bytes
+ADMIN CLIENT password input success/refusal retained 360 bytes
+ADMIN CLIENT password input success/refusal retained 360 bytes
+ADMIN CLIENT password input success/refusal retained 360 bytes
+ADMIN CLIENT password input success/refusal retained 360 bytes
+ADMIN CLIENT password input success/refusal retained 360 bytes
+ADMIN CLIENT password input success/refusal retained 360 bytes
+ADMIN CLIENT password input success/refusal retained 360 bytes
+ADMIN CLIENT unavailable authentication retained 625 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT streamed diagnostics, oversized omissions, protocol bounds and exact completion refusals PASS

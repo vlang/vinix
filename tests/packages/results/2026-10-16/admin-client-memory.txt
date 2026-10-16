@@ -1,0 +1,30 @@
+ADMIN CLIENT password input success/refusal retained 0 bytes
+ADMIN CLIENT password input success/refusal retained 0 bytes
+ADMIN CLIENT password input success/refusal retained 0 bytes
+ADMIN CLIENT password input success/refusal retained 0 bytes
+ADMIN CLIENT password input success/refusal retained 0 bytes
+ADMIN CLIENT password input success/refusal retained 0 bytes
+ADMIN CLIENT password input success/refusal retained 0 bytes
+ADMIN CLIENT password input success/refusal retained 0 bytes
+ADMIN CLIENT unavailable authentication retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT bounded output, receipt and EOF retained 0 bytes
+ADMIN CLIENT streamed diagnostics, oversized omissions, protocol bounds and exact completion refusals PASS
+ADMIN CLIENT borrowed reply checks retained 0 bytes
+ADMIN CLIENT owned approval diagnostics retained 0 bytes
+ADMIN CLIENT owned approval diagnostics retained 0 bytes
+ADMIN CLIENT owned approval diagnostics retained 0 bytes
+ADMIN CLIENT owned approval diagnostics retained 0 bytes
+ADMIN CLIENT owned approval diagnostics retained 0 bytes
+ADMIN CLIENT owned approval diagnostics retained 0 bytes
+ADMIN CLIENT owned approval diagnostics retained 0 bytes

@@ -29,7 +29,7 @@ fn suite(baseline bool) hwhost.Suite {
 		scenarios: [hwhost.Scenario{ name: 'packages-admin-client', arches: ['aarch64', 'x86_64'],
 			about: 'complete administrator callers, owned password/authentication inputs and approval failure cleanup',
 			required: ['HWTEST START packages-admin-client',
-				'ADMIN CLIENT root service and ordinary caller preserve reviewed input, passwords, status, cleanup and exact diagnostics PASS',
+				if baseline { 'ADMIN CLIENT baseline diagnostic crashes confirmed; remaining outcomes and cleanup PASS' } else { 'ADMIN CLIENT root service and ordinary caller preserve reviewed input, passwords, status, cleanup and exact diagnostics PASS' },
 				'ADMIN CLIENT ACTOR root PASS', 'ADMIN CLIENT ACTOR UID 1000 PASS',
 				'ADMIN CLIENT COMPANION protocol PASS', 'ADMIN CLIENT COMPANION streams PASS', 'ADMIN CLIENT COMPANION admin-socket PASS',
 				'HWTEST PASS packages-admin-client'], ending: .poweroff, timeout: 900 }]

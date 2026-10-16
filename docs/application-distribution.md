@@ -1968,3 +1968,8 @@ that retires partially decoded fields. Completion receipts release hash state
 and scratch, retaining their canonical bytes and reviewed-operation limits.
 Malformed requests receive bounded protocol diagnostics. See
 [administrator envelope qualification](../tests/packages/admin-envelope-check.md).
+
+The administrator client also retires its owned authentication frames, nonce
+and listener storage, explicitly erases password scratch and keeps refusal
+diagnostics alive after reply cleanup. See
+[administrator client qualification](../tests/packages/admin-client-check.md).

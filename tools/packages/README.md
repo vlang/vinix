@@ -604,3 +604,8 @@ Administrator request decoding and completion receipts retire partial fields,
 hash state and temporary storage after success or refusal. Canonical bytes and
 reviewed-operation bounds remain unchanged; see
 [administrator envelope qualification](../../tests/packages/admin-envelope-check.md).
+
+The shared administrator client owns its authentication frames and credential
+scratch. Refusal errors keep their diagnostic alive after reply cleanup, and
+password retirement uses explicit erasure. See
+[administrator client qualification](../../tests/packages/admin-client-check.md).

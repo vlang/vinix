@@ -154,6 +154,42 @@ fn test_admin_reply_checks_borrow_fields_and_invitation() {
 		admin_client_window('borrowed reply checks')
 	}
 }
+
+fn test_admin_approval_errors_own_their_diagnostics_after_reply_retirement() {
+	$if !admin_client_baseline ? {
+		nonce := '0123456789abcdef0123456789abcdef'
+		invitation := nonce + '\n'; defer { unsafe { invitation.free() } }
+		for mode in 0 .. 7 {
+			$if track_heap ? { C.vinix_heap_begin() }
+			for _ in 0 .. admin_client_cycles() {
+				fields := if mode == 0 { ['0', invitation] } else if mode == 1 { ['7'] }
+					else if mode == 2 { ['0', invitation] } else if mode == 3 { ['1', 'review was refused'] }
+					else if mode == 4 { ['0'] } else if mode == 5 { ['01', 'review was refused'] } else { ['0', 'another\n'] }
+				status := if mode == 1 { authproto.status_wait } else if mode == 2 { authproto.status_denied }
+					else if mode == 3 { authproto.status_failed } else { authproto.status_ok }
+				mut reply := authproto.text_frame(status, ...fields)
+				unsafe { (&array(&fields)).free() }
+				if _ := check_approval(reply, nonce) { reply.close(); assert mode == 0 }
+				else {
+					reply.close()
+					// The diagnostic must survive destruction of both the helper's
+					// temporary string and the reply that supplied its original bytes.
+					message := admin_client_error(err)
+					wanted := match mode {
+						1 { 'authentication is throttled; retry in 7 seconds' }
+						2 { 'administrator password was rejected or this account\'s access was revoked' }
+						3, 5 { 'review was refused' }
+						4 { 'administrator approval was refused or its package worker could not start' }
+						else { 'authentication returned a different package request' }
+					}
+					assert mode != 0 && message == wanted
+					unsafe { message.free() }
+				}
+			}
+			admin_client_window('owned approval diagnostics')
+		}
+	}
+}
 fn admin_fixture_accept(listener int) !int {
 	mut readiness := Poll{ fd: i32(listener), events: 1 }
 	if C.vinix_package_admin_poll(unsafe { &readiness }, 1, 30000) <= 0 { return error('fixture accept timeout') }
@@ -265,15 +301,22 @@ fn test_root_service_exercises_complete_ordinary_administration_callers() {
 			admin_fixture_worker(path, arguments, mode)
 		}
 		mut passed := true
-		for _ in 0 .. admin_client_cycles() {
+		mut calls := admin_client_cycles()
+		$if admin_client_baseline ? { if mode in [6, 7, 8]! { calls = 1 } }
+		for _ in 0 .. calls {
 			admin_fixture_serve(listener, mode, arguments, directory) or { eprintln(err); C.kill(pid, 15); passed = false; break }
 		}
 		mut status := i32(0)
-		assert C.waitpid(pid, unsafe { &status }, 0) == pid && passed && status == 0, status.str()
+		assert C.waitpid(pid, unsafe { &status }, 0) == pid && passed, status.str()
+		$if admin_client_baseline ? {
+			if mode in [6, 7, 8]! { assert status == 11, status.str(); println('ADMIN CLIENT baseline approval diagnostic use-after-free SIGSEGV confirmed') }
+			else { assert status == 0, status.str() }
+		} $else { assert status == 0, status.str() }
 		os.chmod(directory, 0o700)!
 		entries := os.ls(directory)!; assert entries.len == 0; unsafe { entries.free() }
 		assert admin_client_fds() == before
 		admin_client_settle()
 	}
-	println('ADMIN CLIENT root service and ordinary caller preserve reviewed input, passwords, status, cleanup and exact diagnostics PASS')
+	$if admin_client_baseline ? { println('ADMIN CLIENT baseline diagnostic crashes confirmed; remaining outcomes and cleanup PASS') }
+	$else { println('ADMIN CLIENT root service and ordinary caller preserve reviewed input, passwords, status, cleanup and exact diagnostics PASS') }
 }

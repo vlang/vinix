@@ -152,6 +152,13 @@ bytes, 4,096-byte/69-argument limits and accepted command/status rules remain
 unchanged; malformed envelopes receive bounded administrator-protocol
 diagnostics. See [administrator envelope checks](../../tests/packages/admin-envelope-check.md).
 
+`pkgadmin.run(arguments)` borrows the reviewed argument vector for a synchronous
+call and owns its authentication frames, password input, nonce and listener.
+Password scratch is explicitly erased on refusal; accepted input transfers to
+an owned frame that wipes and frees it. Approval errors own their diagnostic
+after the reply is retired, including service-provided refusal text. See
+[administrator client checks](../../tests/packages/admin-client-check.md).
+
 Allowed operations are `update`, reviewed `apply` for install/remove/upgrade/
 repair/rollback, `repo-apply`, `deployment-apply`, `policy-apply`, `mirror-apply` and
 `mirror-deployment-apply`. Every operation except refresh requires its exact
