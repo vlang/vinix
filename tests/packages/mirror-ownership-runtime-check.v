@@ -19,11 +19,12 @@ fn suite() hwhost.Suite {
 	return hwhost.Suite{ name: 'package-mirror-ownership', guest: 'tests/packages/mirror-ownership-guest',
 		module_paths: ['.', 'tools/accounts'], directories: ['tmp:1777'], programs: [
 			hwhost.Program{ source: 'tools/packages/pkgcore/mirror_ownership_test.v', path: 'usr/share/package-fixtures/mirror-ownership', flags: ['-d', 'track_heap'] },
+			hwhost.Program{ source: 'tools/packages/pkgcore/export_stage_test.v', path: 'usr/share/package-fixtures/export-retirement', flags: ['-d', 'track_heap'] },
 			hwhost.Program{ source: 'tools/packages/pkgcore/mirror_test.v', path: 'usr/share/package-fixtures/mirror' },
 			hwhost.Program{ source: 'tools/packages/pkgcore/deployment_test.v', path: 'usr/share/package-fixtures/deployment' },
 			hwhost.Program{ source: 'tools/packages/pkgcore/release_test.v', path: 'usr/share/package-fixtures/release' },
 		], scenarios: [hwhost.Scenario{ name: 'packages-mirror-ownership', arches: ['aarch64', 'x86_64'],
-			about: 'mirror preparation/review ownership, fingerprint compatibility and signed ordinary/locked offline publication and installation',
+			about: 'mirror preparation/review ownership, captured export retirement/publication and signed ordinary/locked offline installation',
 			required: ['HWTEST START packages-mirror-ownership',
 				'MIRROR OWNERSHIP preflight: 1000 path cycles retained 0 bytes; 1000 space cycles retained 0 bytes; 1000 warmed prepared metadata cycles retained 0 bytes',
 				'MIRROR OWNERSHIP 1000 independent review build/retirement cycles retained 0 bytes',
@@ -31,6 +32,14 @@ fn suite() hwhost.Suite {
 				'MIRROR OWNERSHIP review fields survive prepared retirement, repeated close and intact borrowed manifests PASS',
 				'MIRROR OWNERSHIP occupied/special/unsafe paths, malformed metadata, filesystem and overflow failures preserve inputs, retire scratch and permit retry PASS',
 				'MIRROR OWNERSHIP physical aliases, selected/revoked snapshot lifetimes and byte-identical ordinary/deployment review fingerprints PASS',
+				'EXPORT RETIREMENT 1000 create/check/retire/close cycles retained 0 bytes',
+				'EXPORT RETIREMENT 128 deep-tree retirements use at most 32 descriptors and leave no staging names PASS',
+				'EXPORT RETIREMENT alias/dangling/FIFO/hard-link leaves retire without outside traversal, content or mode changes PASS',
+				'EXPORT RETIREMENT post-publication flush failure retains complete output; existing ordinary/alias/special destinations refuse without replacement PASS',
+				'EXPORT RETIREMENT unsafe roots and foreign directory inventory refuse before unlinking; restored ownership/modes permit retry PASS',
+				'EXPORT RETIREMENT 48 mirror root/parent substitutions preserve replacement and recovery trees, source state and cache; no completion and offline retry PASS',
+				'EXPORT RETIREMENT 64 release root/parent substitutions preserve replacement and recovery trees, signing inputs and reservation timing; exact retry PASS',
+				'MIRROR OWNERSHIP PROCESS export-retirement PASS',
 				'MIRROR OWNERSHIP PROCESS mirror-ownership PASS', 'MIRROR OWNERSHIP PROCESS mirror PASS',
 				'MIRROR OWNERSHIP PROCESS deployment PASS', 'MIRROR OWNERSHIP PROCESS release PASS',
 				'HWTEST PASS packages-mirror-ownership'], forbidden: ['V panic:', 'HWTEST FAIL'], ending: .poweroff, timeout: 300 }]
@@ -52,7 +61,7 @@ fn check() !int {
 	if status == 0 {
 		base := options.state_dir; root := base + '/guest/root/usr/share/package-fixtures/'
 		mut artifacts := [kernel, artifact('guest-init', base + '/guest/init')!]
-		for name in ['mirror-ownership', 'mirror', 'deployment', 'release']! { artifacts << artifact(name, root + name)! }
+		for name in ['mirror-ownership', 'export-retirement', 'mirror', 'deployment', 'release']! { artifacts << artifact(name, root + name)! }
 		artifacts << artifact('serial-log', base + '/packages-mirror-ownership/serial.log')!
 		os.write_file(base + '/qualification.json', json2.encode(Receipt{ architecture: options.arch, completed_at: time.now().unix(), artifacts: artifacts }) + '\n')!
 	}

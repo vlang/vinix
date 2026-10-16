@@ -1,0 +1,5 @@
+EXPORT RETIREMENT 1000 create/check/retire/close cycles retained 0 bytes
+EXPORT RETIREMENT 128 deep-tree retirements use at most 32 descriptors and leave no staging names PASS
+EXPORT RETIREMENT alias/dangling/FIFO/hard-link leaves retire without outside traversal, content or mode changes PASS
+EXPORT RETIREMENT post-publication flush failure retains complete output; existing ordinary/alias/special destinations refuse without replacement PASS
+EXPORT RETIREMENT unsafe roots and foreign directory inventory refuse before unlinking; restored ownership/modes permit retry PASS

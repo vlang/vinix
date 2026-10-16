@@ -32,6 +32,69 @@ fn release_fixture() !(string, string, i64) {
 	return work, key, time.now().unix() + 3600
 }
 
+fn release_retirement_replace(phase string, input string) ! {
+	if phase != os.getenv('VINIX_RELEASE_REPLACE_PHASE') { return }
+	work := os.getenv('VINIX_RELEASE_REPLACE_WORK')
+	if os.exists(work + '/stage-path') { return }
+	stage := if phase == 'copied' { os.dir(os.dir(input)) } else { input }
+	os.write_file(work + '/stage-path', stage)!
+	os.write_file(stage + '/original', 'retained original')!
+	kind := os.getenv('VINIX_RELEASE_REPLACE_KIND')
+	if kind == 'parent' {
+		os.rename(os.dir(stage), work + '/saved-parent')!; os.mkdir(os.dir(stage))!
+	} else { os.rename(stage, work + '/saved-stage')! }
+	match kind {
+		'directory', 'parent' { os.mkdir(stage)!; os.write_file(stage + '/keep', 'preserved')! }
+		'alias' { os.symlink(work + '/outside', stage)! }
+		'dangling' { os.symlink(work + '/absent', stage)! }
+		'fifo' { assert C.mkfifo(stage.str, 0o600) == 0 }
+		'file' { os.write_file(stage, 'preserved')! }
+		'missing' {}
+		'clone' { os.cp_all(work + '/saved-stage', stage, true)! }
+		else { panic('unknown release replacement') }
+	}
+	if os.getenv('VINIX_RELEASE_REPLACE_FAIL') == 'yes' { return error('injected release refusal') }
+}
+
+fn test_release_root_and_parent_substitution_preserve_replacements_and_sequence_reservations() {
+	work, _, expires := release_fixture()!; defer { os.rmdir_all(work) or {} }
+	defer { for name in ['VINIX_RELEASE_REPLACE_PHASE', 'VINIX_RELEASE_REPLACE_WORK', 'VINIX_RELEASE_REPLACE_KIND', 'VINIX_RELEASE_REPLACE_FAIL']! { os.unsetenv(name) } }
+	seed := os.read_file(work + '/seed')!
+	mut cases := 0
+	for phase in ['created', 'copied', 'staged', 'reserved']! {
+		for kind in ['directory', 'alias', 'dangling', 'fifo', 'file', 'missing', 'clone', 'parent']! {
+			for fail in ['yes', 'no']! {
+				case := work + '/case-' + cases.str(); os.mkdir_all(case + '/output')!
+				os.mkdir(case + '/outside')!; os.write_file(case + '/outside/keep', 'preserved')!; os.chmod(case + '/outside', 0o700)!
+				for key, value in {'VINIX_RELEASE_REPLACE_PHASE': phase, 'VINIX_RELEASE_REPLACE_WORK': case, 'VINIX_RELEASE_REPLACE_KIND': kind, 'VINIX_RELEASE_REPLACE_FAIL': fail} { os.setenv(key, value, true) }
+				mut message := ''
+				release_locked(work + '/repository', 'fixture', work + '/seed', 1, expires, case + '/output/export', ReleaseOptions{ checkpoint: release_retirement_replace }) or { message = err.msg() }
+				assert message != '' && !os.exists(case + '/output/export'), phase + '/' + kind + '/' + fail
+				stage := os.read_file(case + '/stage-path')!
+				if kind in ['directory', 'parent']! { assert os.read_file(stage + '/keep')! == 'preserved' }
+				if kind == 'file' { assert os.read_file(stage)! == 'preserved' }
+				if kind == 'alias' { assert os.readlink(stage)! == case + '/outside' }
+				if kind == 'dangling' { assert os.readlink(stage)! == case + '/absent' }
+				if kind == 'fifo' { assert os.lstat(stage)!.mode & 0o170000 == 0o010000 }
+				if kind == 'clone' { assert os.read_file(stage + '/original')! == 'retained original' }
+				if kind == 'parent' { assert os.ls(case + '/saved-parent')!.len == 0 }
+				else { assert message.contains('cleanup refused') && os.read_file(case + '/saved-stage/original')! == 'retained original' }
+				assert os.read_file(case + '/outside/keep')! == 'preserved' && os.stat(case + '/outside')!.mode & 0o777 == 0o700
+				assert os.read_file(work + '/seed')! == seed && !os.exists(work + '/repository/index.json')
+				history := release_history(work + '/repository')!
+				assert history.repositories.len == if phase == 'reserved' { 1 } else { 0 }
+				if phase == 'reserved' { assert history.repositories[0].sequence == 1 }
+				close_decoded_history(history)
+				cases++
+			}
+		}
+	}
+	assert cases == 64
+	result := publish_release(work + '/repository', 'fixture', work + '/seed', 1, expires, work + '/retry/export')!
+	assert result.sequence == 1 && result.object_count == 3
+	println('EXPORT RETIREMENT 64 release root/parent substitutions preserve replacement and recovery trees, signing inputs and reservation timing; exact retry PASS')
+}
+
 fn test_release_reproducibility_both_architectures_and_no_private_publisher_files() {
 	work, key, expires := release_fixture()!
 	defer { os.rmdir_all(work) or {} }

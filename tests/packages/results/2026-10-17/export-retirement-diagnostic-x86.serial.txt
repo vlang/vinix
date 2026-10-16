@@ -1,0 +1,39 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=26
+!>+ [11] ./sbin/init sz=210832
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/mirror-ownership sz=902608
+!>+ [15] ./usr/share/package-fixtures/release sz=1582432
+!>+ [16] ./usr/share/package-fixtures/deployment sz=1785984
+!>+ [17] ./usr/share/package-fixtures/export-retirement sz=762424
+!>+ [18] ./usr/share/package-fixtures/mirror sz=1753976
+!>+ [19] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff000000370f5800
+initramfs: Done (19 entries)
+HWTEST START packages-mirror-ownership
+MIRROR OWNERSHIP preflight: 1000 path cycles retained 0 bytes; 1000 space cycles retained 0 bytes; 1000 warmed prepared metadata cycles retained 0 bytes
+MIRROR OWNERSHIP relative/absolute dot, backlink, repeated/trailing separator normalization and 1000 relative-path retirements PASS
+MIRROR OWNERSHIP 1000 independent review build/retirement cycles retained 0 bytes
+MIRROR OWNERSHIP review fields survive prepared retirement, repeated close and intact borrowed manifests PASS
+MIRROR OWNERSHIP 2000 filesystem/overflow failure cycles retained 0 bytes
+MIRROR OWNERSHIP occupied/special/unsafe paths, malformed metadata, filesystem and overflow failures preserve inputs, retire scratch and permit retry PASS
+MIRROR OWNERSHIP physical aliases, selected/revoked snapshot lifetimes and byte-identical ordinary/deployment review fingerprints PASS
+MIRROR OWNERSHIP PROCESS mirror-ownership PASS
+V panic: export retirement cycle 663: cannot create retirement fixture (errno=12, directory=5)
+ v hash: 826e96f
+    pid: 0xa372
+    tid: 0xa372
+export-retirement failed (1)
+HWTEST FAIL packages-mirror-ownership

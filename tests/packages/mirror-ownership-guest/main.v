@@ -12,7 +12,7 @@ fn C.reboot(int) int
 fn C.usleep(u32) int
 
 fn check() ! {
-	for name in ['mirror-ownership', 'mirror', 'deployment', 'release']! {
+	for name in ['mirror-ownership', 'export-retirement', 'mirror', 'deployment', 'release']! {
 		mut child := os.new_process('/usr/share/package-fixtures/' + name)
 		child.set_redirect_stdio_merged(); child.run()
 		output := child.stdout_slurp(); child.wait(); code := child.code; child.close()

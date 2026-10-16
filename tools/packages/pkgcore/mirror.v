@@ -266,14 +266,21 @@ fn mirror_export(config Config, directory string, destination string, names []st
 	}
 	options.progress(pkgprotocol.Progress{ phase: 'resolve' })
 	target := export_target(destination, 'offline mirror')!
+	defer { unsafe { target.free() } }
 	if target != prepared.target { return error('offline mirror destination changed; review the export again') }
 	parent := os.dir(target)
-	stage := export_stage(parent, '.vinix-mirror')!
-	mut published := false
-	defer {
-		if !published { os.rmdir_all(stage) or {} }
+	defer { unsafe { parent.free() } }
+	mut exporting := create_export_stage(parent, '.vinix-mirror', 'offline mirror')!
+	defer { exporting.close() }
+	write_mirror_stage(config, directory, prepared, options, target, mut exporting) or {
+		return exporting.failure(err)
 	}
+}
+
+fn write_mirror_stage(config Config, directory string, prepared PreparedMirror, options MirrorOptions, target string, mut exporting ExportStage) ! {
+	stage := exporting.path
 	options.checkpoint('created', stage)!
+	exporting.check()!
 	if prepared.deployment_text != '' {
 		atomic_write(stage + '/' + pkgprotocol.deployment_mirror_filename, prepared.deployment_text)!
 	}
@@ -294,8 +301,10 @@ fn mirror_export(config Config, directory string, destination string, names []st
 				pkgprotocol.Progress{ phase: 'copy', package: installed.package.id, repository: installed.repository,
 					path: payload.path, total: payload.bytes }, options.progress)!
 			options.checkpoint('copied', path)!
+			exporting.check()!
 			options.progress(pkgprotocol.Progress{ phase: 'verify', package: installed.package.id,
 				repository: installed.repository, path: payload.path })
+			exporting.check()!
 			if !verified_file(path, payload) {
 				return error('offline mirror payload verification failed: ${installed.package.id}/${payload.path}')
 			}
@@ -312,18 +321,13 @@ fn mirror_export(config Config, directory string, destination string, names []st
 	}
 	flush_tree(stage)!
 	options.checkpoint('ready', stage)!
+	exporting.check()!
 	verify_mirror_stage(stage, prepared, true) or {
 		message := err.msg()
 		defer { unsafe { message.free(); err.free() } }
 		return error('offline mirror verification failed before publication: ' + message)
 	}
-	publish_new_directory(stage, target, 'offline mirror')!
-	published = true
-	// Publication already happened. A flush error must leave the complete tree
-	// intact and explain the uncertain durability instead of claiming a retry.
-	sync_directory(parent) or {
-		return error('offline mirror published at ${target}, but its directory flush failed; check storage and verify the export: ${err}')
-	}
+	exporting.publish(target)!
 	options.progress(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 })
 	println('Offline mirror ready: ${target}; enroll its file:// repository paths with the same public keys')
 }

@@ -157,10 +157,19 @@ fn release_locked(repository string, id string, seed_path string, sequence u64, 
 	}
 	parent := os.dir(target)
 	disk_check(options.available_space(parent)!, needed, 64 * 1024 * 1024)!
-	stage := export_stage(parent, '.vinix-release')!
-	mut published := false
-	defer { if !published { os.rmdir_all(stage) or {} } }
+	mut exporting := create_export_stage(parent, '.vinix-release', 'publisher release')!
+	defer { exporting.close() }
+	write_release_stage(repository, text, signature, objects, remembered, options, target, mut exporting) or {
+		return exporting.failure(err)
+	}
+	return ReleaseInfo{ repository: id, public_key: public_key, sequence: sequence, expires: expires,
+		index_sha256: index_digest(text), directory: target, package_count: index.packages.len, object_count: objects.len }
+}
+
+fn write_release_stage(repository string, text string, signature string, objects map[string]Payload, remembered TrustHistory, options ReleaseOptions, target string, mut exporting ExportStage) ! {
+	stage := exporting.path
 	options.checkpoint('created', stage)!
+	exporting.check()!
 	os.mkdir(stage + '/objects')!
 	mut hashes := objects.keys()
 	hashes.sort()
@@ -169,6 +178,7 @@ fn release_locked(repository string, id string, seed_path string, sequence u64, 
 		path := stage + '/objects/' + hash
 		copy_file(repository + '/objects/' + hash, path, 0, payload.bytes)!
 		options.checkpoint('copied', path)!
+		exporting.check()!
 		if !verified_file(path, payload) { return error('publisher release payload changed while copying: ${hash}') }
 		os.chmod(path, 0o644)!
 		sync_file(path)!
@@ -176,6 +186,7 @@ fn release_locked(repository string, id string, seed_path string, sequence u64, 
 	atomic_write(stage + '/index.json', text)!
 	atomic_write(stage + '/index.sig', signature + '\n')!
 	options.checkpoint('staged', stage)!
+	exporting.check()!
 	verify_release_stage(stage, text, signature, objects, false) or {
 		message := err.msg()
 		defer { unsafe { message.free(); err.free() } }
@@ -196,16 +207,11 @@ fn release_locked(repository string, id string, seed_path string, sequence u64, 
 	os.chmod(stage, 0o755)!
 	sync_directory(stage)!
 	options.checkpoint('reserved', stage)!
+	exporting.check()!
 	verify_release_stage(stage, text, signature, objects, true) or {
 		message := err.msg()
 		defer { unsafe { message.free(); err.free() } }
 		return error('publisher release verification failed after sequence reservation; retry the same inputs or choose a newer sequence: ' + message)
 	}
-	publish_new_directory(stage, target, 'publisher release')!
-	published = true
-	sync_directory(parent) or {
-		return error('publisher release published at ${target}, but its directory flush failed; check storage and verify the release: ${err}')
-	}
-	return ReleaseInfo{ repository: id, public_key: public_key, sequence: sequence, expires: expires,
-		index_sha256: index_digest(text), directory: target, package_count: index.packages.len, object_count: objects.len }
+	exporting.publish(target)!
 }

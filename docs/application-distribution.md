@@ -1707,6 +1707,13 @@ A retry builds fresh staging data from authenticated metadata and verified cache
 it never imports abandoned staging data or sweeps other exports. A directory-flush
 failure after publication reports that the complete mirror exists but its storage
 durability needs checking. Keep media attached until export finishes.
+Mirror and publisher release cleanup now uses a captured parent and staging-root
+identity. Replaced roots are retained with the original failure and cleanup
+diagnostic; a replaced parent cannot redirect deletion into its replacement.
+Cleanup inventories owned directories before unlinking and leaves outside alias
+and hard-link targets unchanged. Publication and its directory flush use the
+captured parent; a failure after rename keeps the saved output. See
+[export retirement checks](../tests/packages/export-retirement-check.md).
 Before flushing and after the final staging checkpoint, the service admits the
 complete export again: exact signed index/signature and deployment-lock bytes,
 the selected object set and its hashes, ordinary single-link files and readable

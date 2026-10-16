@@ -48,6 +48,95 @@ fn mirror_stages(parent string) ![]string {
 	return os.ls(parent)!.filter(it.starts_with('.vinix-mirror-'))
 }
 
+fn mirror_replace_failed_stage(phase string, stage string) ! {
+	if phase != 'created' { return }
+	parent := os.dir(stage)
+	os.write_file(parent + '/stage-path', stage)!
+	os.rename(stage, parent + '/saved-stage')!
+	os.mkdir(stage)!
+	os.write_file(stage + '/keep', 'replacement must survive')!
+	return error('injected export refusal')
+}
+
+fn test_mirror_failed_export_preserves_a_replaced_stage_root() {
+	work, config, _ := mirror_fixture()!
+	defer { os.rmdir_all(work) or {} }
+	mut refused := false
+	mirror_export(config, work + '/store', work + '/export', ['app'], MirrorOptions{ checkpoint: mirror_replace_failed_stage }) or {
+		refused = err.msg().contains('injected export refusal')
+	}
+	stage := os.read_file(work + '/stage-path')!
+	preserved := os.read_file(stage + '/keep') or { '' }
+	println('EXPORT RETIREMENT baseline mirror refused=' + refused.str() + ' replacement-preserved=' + (preserved == 'replacement must survive').str())
+	assert refused && preserved == 'replacement must survive' && os.is_dir(work + '/saved-stage') && !os.exists(work + '/export')
+	println('EXPORT RETIREMENT failed mirror preserves a replaced staging root and original unpublished tree PASS')
+}
+
+fn mirror_retirement_replace(phase string, input string) ! {
+	if phase != os.getenv('VINIX_EXPORT_REPLACE_PHASE') { return }
+	work := os.getenv('VINIX_EXPORT_REPLACE_WORK')
+	if os.exists(work + '/stage-path') { return }
+	stage := if phase == 'copied' { os.dir(os.dir(os.dir(input))) } else { input }
+	os.write_file(work + '/stage-path', stage)!
+	os.write_file(stage + '/original', 'retained original')!
+	kind := os.getenv('VINIX_EXPORT_REPLACE_KIND')
+	if kind == 'parent' {
+		os.rename(os.dir(stage), work + '/saved-parent')!
+		os.mkdir(os.dir(stage))!
+	} else { os.rename(stage, work + '/saved-stage')! }
+	match kind {
+		'directory', 'parent' { os.mkdir(stage)!; os.write_file(stage + '/keep', 'preserved')! }
+		'alias' { os.symlink(work + '/outside', stage)! }
+		'dangling' { os.symlink(work + '/absent', stage)! }
+		'fifo' { assert C.mkfifo(stage.str, 0o600) == 0 }
+		'file' { os.write_file(stage, 'preserved')! }
+		'missing' {}
+		'clone' { os.cp_all(work + '/saved-stage', stage, true)! }
+		else { panic('unknown export replacement') }
+	}
+	if os.getenv('VINIX_EXPORT_REPLACE_FAIL') == 'yes' { return error('injected export refusal') }
+}
+
+fn test_mirror_root_and_parent_substitution_refuse_without_deleting_replacements() {
+	work, config, _ := mirror_fixture()!; defer { os.rmdir_all(work) or {} }
+	store := work + '/store'; catalog := os.read_file(store + '/catalog.json')!; history := os.read_file(store + '/trust-history.json')!
+	defer { for name in ['VINIX_EXPORT_REPLACE_PHASE', 'VINIX_EXPORT_REPLACE_WORK', 'VINIX_EXPORT_REPLACE_KIND', 'VINIX_EXPORT_REPLACE_FAIL', 'VINIX_MIRROR_PROGRESS_TEST']! { os.unsetenv(name) } }
+	mut cases := 0
+	for phase in ['created', 'copied', 'ready']! {
+		for kind in ['directory', 'alias', 'dangling', 'fifo', 'file', 'missing', 'clone', 'parent']! {
+			for fail in ['yes', 'no']! {
+				case := work + '/case-' + cases.str(); os.mkdir_all(case + '/output')!
+				os.mkdir(case + '/outside')!; os.write_file(case + '/outside/keep', 'preserved')!; os.chmod(case + '/outside', 0o700)!
+				for key, value in {'VINIX_EXPORT_REPLACE_PHASE': phase, 'VINIX_EXPORT_REPLACE_WORK': case, 'VINIX_EXPORT_REPLACE_KIND': kind, 'VINIX_EXPORT_REPLACE_FAIL': fail, 'VINIX_MIRROR_PROGRESS_TEST': case + '/events'} { os.setenv(key, value, true) }
+				os.write_file(case + '/events', '')!
+				mut message := ''
+				mirror_export(config, store, case + '/output/export', ['app'], MirrorOptions{ checkpoint: mirror_retirement_replace, progress: mirror_report }) or { message = err.msg() }
+				assert message != '' && !os.exists(case + '/output/export'), phase + '/' + kind + '/' + fail
+				stage := os.read_file(case + '/stage-path')!
+				if kind in ['directory', 'parent']! { assert os.read_file(stage + '/keep')! == 'preserved' }
+				if kind == 'file' { assert os.read_file(stage)! == 'preserved' }
+				if kind == 'alias' { assert os.readlink(stage)! == case + '/outside' }
+				if kind == 'dangling' { assert os.readlink(stage)! == case + '/absent' }
+				if kind == 'fifo' { assert os.lstat(stage)!.mode & 0o170000 == 0o010000 }
+				if kind == 'clone' { assert os.read_file(stage + '/original')! == 'retained original' }
+				if kind == 'parent' { assert os.ls(case + '/saved-parent')!.len == 0 }
+				else {
+					assert message.contains('cleanup refused') && os.read_file(case + '/saved-stage/original')! == 'retained original'
+				}
+				assert os.read_file(case + '/outside/keep')! == 'preserved' && os.stat(case + '/outside')!.mode & 0o777 == 0o700
+				assert os.read_file(store + '/catalog.json')! == catalog && os.read_file(store + '/trust-history.json')! == history && read_state(store, 'aarch64')!.generation == 0
+				for line in os.read_file(case + '/events')!.split_into_lines() { assert pkgprotocol.decode_progress(line)!.phase != 'complete' }
+				cases++
+			}
+		}
+	}
+	assert cases == 48
+	os.rmdir_all(work + '/repository')!
+	mirror(config, store, work + '/retry/export', ['app'])!
+	assert os.ls(work + '/retry/export/fixture/objects')!.len == 2
+	println('EXPORT RETIREMENT 48 mirror root/parent substitutions preserve replacement and recovery trees, source state and cache; no completion and offline retry PASS')
+}
+
 fn test_mirror_private_publication_verified_closure_and_ordinary_reader_modes() {
 	work, config, packages := mirror_fixture()!
 	defer { os.rmdir_all(work) or {} }

@@ -1,0 +1,15 @@
+export_stage-compile PASS
+export_stage-run PASS
+mirror_ownership-compile PASS
+mirror_ownership-run PASS
+stage_recovery-compile PASS
+stage_recovery-run PASS
+collection_retirement-compile PASS
+collection_retirement-run PASS
+export_stage-sanitize-compile PASS
+export_stage-sanitize-run PASS
+mirror-sanitize-compile PASS
+mirror-sanitize-run PASS
+release-sanitize-compile PASS
+release-sanitize-run PASS
+Export retirement: fourteen host build/test checks PASS

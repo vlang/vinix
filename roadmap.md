@@ -721,6 +721,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
   package format, signing/publishing process and developer documentation.
 - [ ] Support offline repositories/caches and organization-managed deployment;
   keep firmware, proprietary payload licensing and runtime updates explicit.
+  - [x] [Captured mirror/release staging](tests/packages/export-retirement-check.md)
+    preserves replaced roots/parents during failed-export cleanup, inventories
+    owned trees without alias traversal and publishes through the captured
+    parent. Checkpoint substitutions, retained publisher reservations, cached
+    retry and saved output after flush failure have explicit regression checks.
   - [x] [Owned offline mirror preparation](tests/packages/mirror-ownership-check.md)
     retires catalog/snapshot/plan/path/hash scratch and preserves independent
     reviews, exact ordinary/deployment fingerprints and signed offline retries.

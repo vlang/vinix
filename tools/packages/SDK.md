@@ -743,6 +743,15 @@ requires an exact retry or a newer sequence; it never publishes the changed stag
 These additional scans share offline mirror admission and add object reads.
 See [release admission qualification](../../tests/packages/release-admission-check.md).
 
+Mirror and release publication retain no-follow parent/root descriptors and
+recheck their identities after checkpoints. Failure cleanup removes only the
+captured ordinary stage through its captured parent. Replaced or unsafe roots
+are retained with the original failure and a cleanup diagnostic; inspect that
+recovery data before removing it. A renamed parent cannot redirect cleanup into
+its replacement. Exclusive rename and the final flush use the captured parent,
+and post-publication failures keep the saved output. See
+[export retirement qualification](../../tests/packages/export-retirement-check.md).
+
 Keep `.publisher/history.json` with the workspace and back it up. `pack`, legacy
 `publish` and `publish-release` share the private `.publisher/lock`; prepared-root
 and catalog imports take it when packing their materialized payloads. Busy

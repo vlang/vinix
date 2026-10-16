@@ -1,0 +1,2 @@
+PASS x86_64 packages-mirror-ownership (75.2s)
+package-mirror-ownership x86_64: 1 passed, 0 failed, 0 skipped
