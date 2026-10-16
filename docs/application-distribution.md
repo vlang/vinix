@@ -1655,6 +1655,15 @@ order is immaterial. Existing configurations with duplicate policy entries must
 be corrected before use. License acceptance and firmware permission are explicit
 administrator choices; no package or per-command option adds them implicitly.
 
+Policy files and core review responses use bounded, owning readers under manual
+memory management. Successful reads and malformed-input refusals release their
+temporary storage; callers retire returned documents/reviews with `.close()`.
+The 8 MiB envelope, 4096 installed rows and 4096-byte before/after diagnostics are
+checked during admission. Complete administration documents still require all
+seven settings; legacy configuration defaults and optional pin range endpoints
+remain supported. Canonical output and review fingerprints retain their existing
+format. See [policy decoding qualification](../tests/packages/policy-decode-check.md).
+
 A format-1 deployment manifest reconciles the requested roots atomically and
 selects the latest satisfiable packages in the authenticated catalog:
 

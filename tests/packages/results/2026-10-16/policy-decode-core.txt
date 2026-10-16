@@ -1,0 +1,210 @@
+policy_decode:
+POLICY DECODE both architectures, owned independent file documents/reviews, repeated close, exact writer bytes and full 4096 bounds PASS
+POLICY DECODE strict declarations preserve legacy defaults, optional pin ranges, canonical settings, empty permissions and full u64 generations; borrowed validation retires scratch PASS
+POLICY DECODE every truncated prefix and required/schema/UTF8/number/late-row/semantic refusal retires scratch PASS
+POLICY DECODE exact 8 MiB, 4096 collections/rows and 4096-byte diagnostics accepted; metadata/collection/grant/string/disclosure overflow refused PASS
+policy:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+configuration:
+configuration_observation:
+CONFIGURATION OBSERVATION both architectures, independent repository/policy fields, canonical policy order, unchanged wire bytes and stored offline flag PASS
+CONFIGURATION OBSERVATION 1000 legacy/default and growing 64-record cycles retire scratch; full 4096 repository/pin observations preserve source configuration PASS
+CONFIGURATION OBSERVATION maintenance FIFOs remain unopened; 1000 schema/missing/alias/FIFO/lock/busy refusal cycles retire scratch and permit restored reads PASS
+stored_decode:
+Stored decode: partial nested cleanup, escaped duplicate keys, canonical integers and late semantic refusal PASS
+Stored decode: both architectures, owned Unicode/escaped keys, legacy policy/window defaults and full u64 counters PASS
+Stored decode: 4096-repository/package limits, excess refusal, nested dependency/argument declarations and growing payload arrays PASS
+Stored decode: inclusive 8-MiB metadata and 16384-payload bounds with overflow refusal PASS
+document_keys:
+Document scanner: sibling records, escaped keys, quoted values and repeated ownership retirement passed
+document:
+administration:
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository unreachable
+Updating trusted repository fixture
+Updating trusted repository fixture
+administration_metadata:
+ADMINISTRATION METADATA configuration and both history formats preserve exact JSON, escaping, defaults, u64 widths and reader round-trips PASS
+ADMINISTRATION METADATA limit-minus-one and exact 8 MiB accepted; newline and escape expansion overflow refused PASS
+ADMINISTRATION METADATA review fingerprints preserve legacy digests and bind configuration, history, intent, publisher and index bytes PASS
+ADMINISTRATION METADATA repeated writes remain readable; oversized and publication failures preserve prior documents and source models PASS
+service:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+deployment:
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-pins-74268-1792124735839623/locked export; $literal; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-capture-74268-1792124736915447/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-final-lock-74268-1792124737293048/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION locked export binds exact captured deployment bytes through publication; changed staged lock refuses and retry preserves pins PASS
+Updating trusted repository fixture
+Updating trusted repository deployment.json
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-namespace-74268-1792124737541465/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/2) from fixture
+Installing Runtime 2.0.0 (2/2) from fixture
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Offline mirror ready: /private/tmp/vinix-deployment-reproducible-74268-1792124738048130/mirror; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading unused/bin/runner (14 bytes)
+Activated package generation 1
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+review:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 2.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Activated package generation 4
+distribution:
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 2
+Installing app 1.0.0 (1/1) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 4
+Activated package generation 5
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 6
+Restored packages from generation 4 in generation 6; application data was retained
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Updating trusted repository fixture
+catalog_decode:
+CATALOG DECODE both architectures, independent owned complete records, exact writer bytes and full 4096 import bounds PASS
+CATALOG DECODE whitespace, escaped keys and legacy window protocol preserve writer bytes; source defaults cannot enter complete catalog locks PASS
+CATALOG DECODE every truncated prefix and schema/UTF8/number/late import and selector refusal cycles retire scratch PASS
+CATALOG DECODE exact 8 MiB accepted; metadata/import/architecture/source/selector/payload/argument/permission overflow refused PASS
+CATALOG DECODE full 1024 selectors retire tracked storage; 16384 payloads preserve complete fields and retire their single live owner PASS
+CATALOG DECODE invalid catalog preserves sources and existing/absent pack/composition destinations; restored complete and legacy locks publish unchanged canonical bytes PASS

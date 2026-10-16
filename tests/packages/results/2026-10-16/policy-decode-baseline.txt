@@ -1,0 +1,19 @@
+Matched warmed ten-cycle policy file/review decode and borrowed validation probes with returned values/errors retired. Cases: one-pin file, empty review, one-row review, 64-row review, truncated review, borrowed one-row validation, 64-pin file. Sources/executables/generated C retained and pinned; no compiler/library changes.
+
+Before:
+POLICY DECODE probe 0: ten cycles retained 10 bytes
+POLICY DECODE probe 1: ten cycles retained 10 bytes
+POLICY DECODE probe 2: ten cycles retained 560 bytes
+POLICY DECODE probe 3: ten cycles retained 180600 bytes
+POLICY DECODE probe 4: ten cycles retained 7030 bytes
+POLICY DECODE probe 5: ten cycles retained 550 bytes
+POLICY DECODE probe 6: ten cycles retained 79060 bytes
+
+After:
+POLICY DECODE probe 0: ten cycles retained 0 bytes
+POLICY DECODE probe 1: ten cycles retained 0 bytes
+POLICY DECODE probe 2: ten cycles retained 0 bytes
+POLICY DECODE probe 3: ten cycles retained 0 bytes
+POLICY DECODE probe 4: ten cycles retained 0 bytes
+POLICY DECODE probe 5: ten cycles retained 0 bytes
+POLICY DECODE probe 6: ten cycles retained 0 bytes

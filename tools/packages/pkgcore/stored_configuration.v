@@ -45,8 +45,12 @@ fn (mut r StoredReader) repositories() ![]Repository {
 }
 
 fn (mut r StoredReader) policy() !Policy {
+	return r.policy_fields(false)
+}
+
+fn (mut r StoredReader) policy_fields(complete bool) !Policy {
 	r.expect(`{`)!
-	mut value := Policy{}
+	mut value := if complete { Policy{ permissions: []string{} } } else { Policy{} }
 	mut accepted := false
 	defer { if !accepted { close_owned_policy(value) } }
 	mut seen := u32(0); mut first := true
@@ -69,6 +73,7 @@ fn (mut r StoredReader) policy() !Policy {
 			else {}
 		}
 	}
+	if complete && seen != 127 { return error('missing required organization policy field') }
 	accepted = true
 	return value
 }

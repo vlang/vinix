@@ -1,0 +1,104 @@
+POLICY DECODE aarch64 1 entries: 1000 cycles retained 0 bytes
+POLICY DECODE aarch64 64 entries: 1000 cycles retained 0 bytes
+POLICY DECODE x86_64 1 entries: 1000 cycles retained 0 bytes
+POLICY DECODE x86_64 64 entries: 1000 cycles retained 0 bytes
+POLICY DECODE both architectures, owned independent file documents/reviews, repeated close, exact writer bytes and full 4096 bounds PASS
+POLICY DECODE strict declarations preserve legacy defaults, optional pin ranges, canonical settings, empty permissions and full u64 generations; borrowed validation retires scratch PASS
+POLICY DECODE refusal false 0: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 1: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 2: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 3: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 4: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 5: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 6: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 7: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 8: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 9: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 10: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 11: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 12: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 13: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 14: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 15: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 16: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 17: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 18: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 19: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 20: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 21: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 22: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 23: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 24: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 25: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 26: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 27: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 28: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 29: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 30: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 31: 1000 cycles retained 0 bytes
+POLICY DECODE refusal false 32: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 0: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 1: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 2: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 3: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 4: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 5: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 6: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 7: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 8: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 9: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 10: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 11: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 12: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 13: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 14: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 15: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 16: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 17: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 18: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 19: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 20: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 21: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 22: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 23: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 24: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 25: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 26: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 27: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 28: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 29: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 30: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 31: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 32: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 33: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 34: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 35: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 36: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 37: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 38: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 39: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 40: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 41: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 42: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 43: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 44: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 45: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 46: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 47: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 48: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 49: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 50: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 51: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 52: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 53: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 54: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 55: 1000 cycles retained 0 bytes
+POLICY DECODE refusal true 56: 1000 cycles retained 0 bytes
+POLICY DECODE every truncated prefix and required/schema/UTF8/number/late-row/semantic refusal retires scratch PASS
+POLICY DECODE exact 8 MiB, 4096 collections/rows and 4096-byte diagnostics accepted; metadata/collection/grant/string/disclosure overflow refused PASS
+
+Configuration observation:
+CONFIGURATION OBSERVATION 1000 repository reads/retirements retained 0 bytes; 1000 policy reads/retirements retained 0 bytes
+CONFIGURATION OBSERVATION both architectures, independent repository/policy fields, canonical policy order, unchanged wire bytes and stored offline flag PASS
+CONFIGURATION OBSERVATION 1000 legacy/default and growing 64-record cycles retire scratch; full 4096 repository/pin observations preserve source configuration PASS
+CONFIGURATION OBSERVATION maintenance FIFOs remain unopened; 1000 schema/missing/alias/FIFO/lock/busy refusal cycles retire scratch and permit restored reads PASS

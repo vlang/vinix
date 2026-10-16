@@ -2345,6 +2345,17 @@ memory management. Unknown/duplicate keys in review roots, policies, pins and
 installed rows are refused; formats other than 1 are
 refused. See [organization administration](../../docs/application-distribution.md#offline-and-organization-deployment).
 
+Core policy-file and review decoding use bounded readers that own every returned
+string/array and retire partial values on failure. Admission enforces the 8 MiB
+envelope, 4096 rows and 4096-byte diagnostics before retaining oversized values.
+All seven settings remain required in administration documents/reviews; legacy
+configuration defaults are unchanged. Pin `id` is required and omitted range
+endpoints retain their empty defaults. `.close()` may be repeated and releases
+independent previous/proposed settings. Borrowed `PolicyReview.validate()` uses
+the same version diagnostics without allocating an unused version array. Writer
+bytes, ordering rules and fingerprint identity are unchanged. See
+[policy decoding checks](../../tests/packages/policy-decode-check.md).
+
 The lightweight `pkgprotocol` presentation module also supplies `PolicyDocument`,
 `PolicySettings`, `PolicyPin`, `PolicyReview`, `PolicyImpact`,
 `decode_policy_document` and `decode_policy_review` for the existing format-1

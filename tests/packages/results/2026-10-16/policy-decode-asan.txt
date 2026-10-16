@@ -1,0 +1,5 @@
+clang ASan/UBSan; -gc none -manualfree; detect_leaks=0; halt_on_error=1; functional 64-cycle fixture, separate 1000-cycle allocation fixture
+POLICY DECODE both architectures, owned independent file documents/reviews, repeated close, exact writer bytes and full 4096 bounds PASS
+POLICY DECODE strict declarations preserve legacy defaults, optional pin ranges, canonical settings, empty permissions and full u64 generations; borrowed validation retires scratch PASS
+POLICY DECODE every truncated prefix and required/schema/UTF8/number/late-row/semantic refusal retires scratch PASS
+POLICY DECODE exact 8 MiB, 4096 collections/rows and 4096-byte diagnostics accepted; metadata/collection/grant/string/disclosure overflow refused PASS

@@ -63,22 +63,6 @@ struct PolicyIdentity {
 	proposed PolicyDocument
 }
 
-struct PolicyReviewFile {
-	format       int            @[required]
-	architecture string         @[required]
-	generation   u64            @[required]
-	fingerprint  string         @[required]
-	previous     PolicyInput    @[required]
-	proposed     PolicyInput    @[required]
-	rows         []PolicyImpact @[required]
-}
-
-fn policy_from_input(input PolicyInput) Policy {
-	return Policy{ offline: input.offline, allowed: input.allowed, pins: input.pins,
-		permissions: input.permissions, licenses: input.licenses,
-		allow_firmware: input.allow_firmware, reserve_bytes: input.reserve_bytes }
-}
-
 fn canonical_policy(policy Policy) !Policy {
 	policy.validate()!
 	mut allowed := review_strings(policy.allowed)
@@ -98,15 +82,16 @@ fn canonical_policy(policy Policy) !Policy {
 fn read_policy_document(path string, architecture string) !PolicyDocument {
 	text := read_metadata(path)!
 	defer { unsafe { text.free() } }
-	input := json2.decode[PolicyFile](text, strict: true)!
-	defer { unsafe { input.architecture.free() } }
-	policy := policy_from_input(input.policy)
-	defer { close_owned_policy(policy) }
-	document_keys(text, policy_document_field)!
+	return decode_policy_document(text, architecture)
+}
+
+fn decode_policy_document(text string, architecture string) !PolicyDocument {
+	mut input := read_policy_document_input(text)!
+	defer { input.close() }
 	if input.format != 1 || input.architecture != architecture {
 		return error('organization policy format or architecture mismatch')
 	}
-	return PolicyDocument{ architecture: architecture.clone(), policy: canonical_policy(policy)! }
+	return PolicyDocument{ architecture: architecture.clone(), policy: canonical_policy(input.policy)! }
 }
 
 fn policy_document_field(parent string, key string) bool {
@@ -244,20 +229,22 @@ pub fn (review PolicyReview) validate() ! {
 			|| !digest_valid(row.public_key) || !printable(row.diagnostic_before, 4096) || !printable(row.diagnostic_after, 4096) {
 			return error('invalid installed package in organization policy review')
 		}
-		version_parts(row.version)!
+		validated_version(row.version)!
 		previous = row.id
 	}
 }
 
 pub fn decode_policy_review(text string) !PolicyReview {
-	if text.len > max_metadata { return error('organization policy review exceeds metadata limit') }
-	input := json2.decode[PolicyReviewFile](text, strict: true)!
-	mut review := PolicyReview{ format: input.format, architecture: input.architecture,
-		generation: input.generation, fingerprint: input.fingerprint,
-		previous: policy_from_input(input.previous), proposed: policy_from_input(input.proposed), rows: input.rows }
-	document_keys(text, policy_review_field) or { review.close(); return err }
+	mut review := read_policy_review_input(text)!
 	review.validate() or { review.close(); return err }
 	return review
+}
+
+fn close_policy_impact(row PolicyImpact) {
+	unsafe {
+		row.id.free(); row.name.free(); row.version.free(); row.kind.free(); row.license.free()
+		row.repository.free(); row.public_key.free(); row.diagnostic_before.free(); row.diagnostic_after.free()
+	}
 }
 
 fn close_owned_policy(policy Policy) {
@@ -283,10 +270,7 @@ pub fn (mut review PolicyReview) close() {
 	unsafe {
 		review.architecture.free()
 		review.fingerprint.free()
-		for row in review.rows {
-			row.id.free(); row.name.free(); row.version.free(); row.kind.free(); row.license.free()
-			row.repository.free(); row.public_key.free(); row.diagnostic_before.free(); row.diagnostic_after.free()
-		}
+		for row in review.rows { close_policy_impact(row) }
 		(&array(&review.rows)).free()
 	}
 	close_owned_policy(review.previous)
