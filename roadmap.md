@@ -625,8 +625,14 @@ The [ordinary Software image check](tests/packages/software-image-check.md)
 joins the real UI controller with staged trust, authenticated maintenance and
 isolated native launches under administrator/standard accounts on both targets.
 It covers separate private data, updates, rollback and cached reinstall; full
-graphical login/presentation and persistent installed-system acceptance remain
-open.
+graphical login/presentation and full installed-system acceptance remain open.
+
+The [Software cold-boot check](tests/packages/software-persistence-check.md)
+retains package state, replay history, trust, accounts and native application data
+on one ext2 volume across four boots. Ordinary Software installs, reopens,
+upgrades, rolls back, removes and reinstalls the native catalog from cache.
+Installed OS boot, graphical presentation and broader device/crash acceptance
+remain open.
 
 Release image builders can now [bundle signed offline repositories](tools/packages/SDK.md#offline-repository-bundles-in-release-images)
 through the production staging tool. The bundle retains the reviewed publisher

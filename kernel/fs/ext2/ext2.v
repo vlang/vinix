@@ -660,6 +660,9 @@ fn (mut this EXT2Filesystem) populate_checked_locked(node &vfs.VFSNode) ? {
 			refcount: 1
 		}
 
+		// Loaded and newly created inodes must identify the same filesystem.
+		// Otherwise safe descriptor-relative operations fail after a remount.
+		resource.stat.dev = this.dev_id
 		resource.stat.mode = mode
 		resource.stat.uid = inode.user_id
 		resource.stat.gid = inode.group_id

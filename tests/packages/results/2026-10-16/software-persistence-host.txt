@@ -1,0 +1,9 @@
+Six host controller checks and eight ordinary Software cold boots on two ext2 volumes passed. The same account/trust/package/home subtrees survive four orderly boots per architecture; tools still boot from initramfs.
+controller-compile PASS 11.712s
+list-legacy PASS 0.206s
+list-image PASS 0.006s
+list-software PASS 0.005s
+list-persistent PASS 0.007s
+persistent-input-refusal PASS 0.007s
+aarch64 four cold boots PASS 68.034s
+x86_64 four cold boots PASS 69.88s

@@ -144,6 +144,50 @@ fn image_memo(mut app SoftwareApp, edit bool) ! {
 	image_close_window(mut app)!
 }
 
+fn image_counter_reopen(mut app SoftwareApp) ! {
+	image_select(mut app, 'org.vinix.counter')!
+	image_control(mut app, 'software.run')!
+	image_frame(mut app, 1)!
+	assert app.window_protocol == 1 && app.window_frame.elements.any(it.text == 'Count: 1')
+	image_close_window(mut app)!
+}
+
+fn image_cold_maintenance(mut app SoftwareApp, phase string, password string) ! {
+	expected := if phase == 'cold-upgrade' { '1.0.0' } else { '1.1.0' }
+	assert app.rows.len == 3 && app.rows.all(it.installed_version == expected), app.status
+	image_counter_reopen(mut app)!
+	image_memo(mut app, false)!
+	if phase == 'cold-reopen' { return }
+	if phase == 'cold-upgrade' {
+		image_control(mut app, 'software.refresh')!
+		assert image_approve(mut app, password)!
+		image_control(mut app, 'software.catalog')!
+		image_control(mut app, 'software.search')!
+		app.key_input('\x01'); app.key_input('\x7f'); app.focus = false
+		image_control(mut app, 'software.updates')!
+		assert app.matching.len == 3 && app.rows.all(it.updatable)
+		image_apply(mut app, 'software.upgrade', password)!
+		assert app.rows.all(it.installed_version == '1.1.0'), app.status + '\n' + app.rows.map(it.id + '=' + it.installed_version).join(', ') + '\n' + app.failure_pages.map(it.text).join('\n')
+	} else {
+		assert phase == 'cold-maintain'
+		image_apply(mut app, 'software.rollback', password)!
+		assert app.rows.all(it.installed_version == '1.0.0')
+		for id in ['org.vinix.counter', 'org.vinix.memo', 'org.vinix.package-hello']! {
+			image_select(mut app, id)!
+			image_apply(mut app, 'software.remove', password)!
+			assert !os.exists('/var/lib/vinix-packages/current/share/applications/vinix-' + id + '.desktop')
+		}
+		assert app.rows.all(it.installed_version == '')
+		for id in ['org.vinix.counter', 'org.vinix.memo', 'org.vinix.package-hello']! {
+			image_select(mut app, id)!
+			image_apply(mut app, 'software.install', password)!
+		}
+		assert app.rows.all(it.installed_version == '1.1.0')
+	}
+	image_counter_reopen(mut app)!
+	image_memo(mut app, false)!
+}
+
 fn image_run() ! {
 	assert os.geteuid() in [1000, 1001]
 	password := if os.geteuid() == 1000 { 'alex has a password' } else { 'sam has another' }
@@ -155,7 +199,9 @@ fn image_run() ! {
 	image_wait(mut app)!
 	assert app.launch_label == 'Launch' // the root image's launch_user cannot change this identity
 	phase := os.args[1]
-	if phase == 'install' {
+	if phase.starts_with('cold-') {
+		image_cold_maintenance(mut app, phase, password)!
+	} else if phase == 'install' {
 		image_control(mut app, 'software.refresh')!
 		image_control(mut app, 'software.admin.cancel')!
 		assert app.worker == unsafe { nil } && app.status.contains('cancelled')

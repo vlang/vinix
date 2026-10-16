@@ -1,0 +1,266 @@
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FC86000 start failed: Unsupported
+Error: Image at 0007FC0B000 start failed: Not Found
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: failed to load Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,0038000A00000000): Not Found
+BdsDxe: loading Boot0002 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+BdsDxe: starting Boot0002 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x760b0000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x760b0000 to 0xffffffff80000000, length: 0x2f0000
+vmm: Kernel: Mapping 0x763a0000 to 0xffffffff802f0000, length: 0x2c000
+vmm: Kernel: Mapping 0x763cc000 to 0xffffffff8031c000, length: 0x15e6000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x760b0000 +0x31c000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 29
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 30
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 1000000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+init smp...
+smp: BSP MPIDR:       0
+smp: Discovered CPUs: 4
+smp: Starting CPUs:   4
+security: PAN enabled
+smp: CPU 0 online!
+smp: CPU 1 online!
+smp: CPU 2 online!
+smp: CPU 3 online!
+smp: 4 CPUs online
+smp done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+initramfs: Module:  1
+initramfs: Address: 0xffff000074fa2000
+initramfs: Size:    17881600
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./home/ sz=0
+!>+ [4] ./usr/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./etc/ sz=0
+!>+ [7] ./var/ sz=0
+!>+ [8] ./sys/ sz=0
+!>+ [9] ./root/ sz=0
+!>+ [10] ./dev/ sz=0
+!>+ [11] ./run/ sz=0
+!>+ [12] ./tmp/ sz=0
+!>+ [13] ./var/lib/ sz=0
+!>+ [14] ./var/log/ sz=0
+!>+ [15] ./var/lib/vinix-packages/ sz=0
+!>+ [16] ./etc/vinix/ sz=0
+!>+ [17] ./etc/vinix-packages/ sz=0
+!>+ [18] ./etc/group sz=19
+!>+ [19] ./etc/passwd sz=30
+!>+ [20] ./etc/hwtest-scenario sz=30
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>initramfs: no ustar sig at 0xffff0000760af600
+initramfs: Done (78 entries)
+kmain_thread: initramfs done
+ext2: filesystem detected on device /dev/vda
+ext2: inode count: 32768
+ext2: inodes per group: 8000
+ext2: block count: 8000
+ext2: blocks per group: 8000
+ext2: block size: 1000
+ext2: bgd count: 1
+vfs: Mounted `/dev/vda` to `/root` with filesystem `qemu-persist`
+virtio-blk: persistent ext2 mounted at /root from /dev/vda
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 1000000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+pci: Found [0:2:0:-1]
+devcore: 3 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+HWTEST START packages-software-persistence
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+vinix-authd: listening on /run/vinix/auth.sock
+unix accept: waiting for connection
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4002d8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4002d8
+unix accept: got connection, setting up peer
+unix accept: done
+unix accept: waiting for connection
+unix accept: waiting for connection
+unix accept: got connection, setting up peer
+unix accept: done
+unix accept: waiting for connection
+unix accept: waiting for connection
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x400cf8
+unix accept: got connection, setting up peer
+unix accept: done
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4002d8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4001dc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x400250
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4002d8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4002d8
+unix accept: got connection, setting up peer
+unix accept: done
+unix accept: waiting for connection
+unix accept: waiting for connection
+unix accept: got connection, setting up peer
+unix accept: done
+unix accept: waiting for connection
+unix accept: waiting for connection
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x400cf8
+unix accept: got connection, setting up peer
+unix accept: done
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4002d8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4001dc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x400250
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4002d8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4002d8
+unix accept: got connection, setting up peer
+unix accept: done
+unix accept: waiting for connection
+unix accept: waiting for connection
+unix accept: got connection, setting up peer
+unix accept: done
+unix accept: waiting for connection
+unix accept: waiting for connection
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4002d8
+unix accept: got connection, setting up peer
+unix accept: done
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4002d8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4002d8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4002d8
+unix accept: got connection, setting up peer
+unix accept: done
+unix accept: waiting for connection
+unix accept: waiting for connection
+unix accept: got connection, setting up peer
+unix accept: done
+unix accept: waiting for connection
+unix accept: waiting for connection
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4002d8
+unix accept: got connection, setting up peer
+unix accept: done
+HWTEST FAIL packages-software-persistence: Software cold-upgrade failed: SOFTWARE CONTROL software.catalog
+SOFTWARE CONTROL software.search
+SOFTWARE CONTROL software.row.0
+SOFTWARE CONTROL software.run
+SOFTWARE CONTROL software.window.close
+SOFTWARE CONTROL software.window.back
+SOFTWARE CONTROL software.window.close
+SOFTWARE CONTROL software.window.back
+SOFTWARE CONTROL software.refresh
+SOFTWARE CONTROL software.admin.password
+SOFTWARE CONTROL software.admin.approve
+SOFTWARE CONTROL software.catalog
+SOFTWARE CONTROL software.search
+SOFTWARE CONTROL software.updates
+SOFTWARE CONTROL software.upgrade
+SOFTWARE CONTROL software.confirm
+SOFTWARE CONTROL software.admin.password
+SOFTWARE CONTROL software.admin.approve
+/Users/alex/code/vinix/build/psp-4-arm/software-source/main.v:170: FAIL: fn main.image_cold_maintenance: assert app.rows.all(it.installed_version == '1.1.0'), app.status + '\n' + app.rows.map(it.id + '=' + it.installed_version).join(', ') + '\n' + app.failure_pages.map(it.text).join('\n')
+      message: vinix-package: unsafe unpublished package stage .stage-4; retain it for inspection and restore an ordinary administrator-owned directory before retrying
+org.vinix.counter=1.0.0, org.vinix.memo=1.0.0, org.vinix.package-hello=1.0.0
+vinix-package: unsafe unpublished package stage 
+.stage-4; retain it for inspection and restore a
+n ordinary administrator-owned directory before 
+retrying
+V panic: Assertion failed...
+
+stage admission: uid=0 parent=0/0/54 relative=0/5/146/0/16832 absolute=0/5/146/0/16832
+HWTEST FAIL packages-software-persistence
+syspower: power off: stopping devices

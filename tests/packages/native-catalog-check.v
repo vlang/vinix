@@ -9,7 +9,7 @@ import time
 import tools.packages.pkgcore
 
 struct NativeArtifact { role string bytes u64 sha256 string }
-struct NativeReceipt { format int = 1 architecture string completed_at i64 seconds f64 artifacts []NativeArtifact }
+struct NativeReceipt { format int = 1 architecture string completed_at i64 seconds f64 platform string = 'qemu-initramfs' boots int = 1 artifacts []NativeArtifact }
 struct NativeInputArtifact { path string bytes u64 sha256 string }
 struct NativeInputs { format int profile string version string catalog_sha256 string artifacts []NativeInputArtifact }
 
@@ -61,6 +61,25 @@ fn native_suite(sandbox string, image bool, software bool) hwhost.Suite {
 			about: if software { 'ordinary Software controller with real administration, native-window launch and maintenance services' }
 				else { 'signed six-variant native catalog with real SDK apps, update/rollback and cached reinstall' }, timeout: 300, ending: .poweroff,
 			required: required, forbidden: ['V panic:'] }] }
+}
+
+fn persistent_software_suite(sandbox string, disk string) hwhost.Suite {
+	base := native_suite(sandbox, true, true)
+	return hwhost.Suite{ ...base, name: 'package-software-persistence', scenarios: [hwhost.Scenario{
+		name: 'packages-software-persistence', arches: ['aarch64', 'x86_64'],
+		about: 'four cold boots with ordinary Software, ext2 package/account state and native app data',
+		cmdline: 'vinix.qemu_persist=1', timeout: 600, ending: .poweroff,
+		disks: [hwhost.Disk{ name: 'packages.ext2', size_mib: 128, image: disk }],
+		qemu_aarch64: ['-drive', 'if=none,id=packages,format=raw,cache=writeback,file={state}/packages.ext2', '-device', 'virtio-blk-device,drive=packages'],
+		qemu_x86_64: ['-drive', 'if=ide,format=raw,cache=writeback,file={state}/packages.ext2'],
+		reboots: [hwhost.Reboot{}, hwhost.Reboot{}, hwhost.Reboot{}],
+		required: ['HWTEST START packages-software-persistence', 'HWTEST PASS packages-software-persistence',
+			'PACKAGE COLD BOOT 1 fresh staged trust ordinary Software install separate user data PASS',
+			'PACKAGE COLD BOOT 2 exact retained state accounts trust native reopen reviewed upgrade PASS',
+			'PACKAGE COLD BOOT 3 exact retained upgrade rollback uninstall cached reinstall PASS',
+			'PACKAGE COLD BOOT 4 exact retained reinstall provenance registration private data PASS'],
+		forbidden: ['V panic:', 'HWTEST FAIL'],
+	}] }
 }
 
 fn stage_software_image(host hwhost.Host, root string, work string) !NativeArtifact {
@@ -159,11 +178,12 @@ fn stage_native_image(host hwhost.Host, inputs string, root string, work string)
 }
 
 fn check() !int {
-	software := '--software' in os.args
+	persistent := '--persistent' in os.args
+	software := '--software' in os.args || persistent
 	image := '--image' in os.args || software
-	arguments := os.args[1..].filter(it !in ['--image', '--software'])
+	arguments := os.args[1..].filter(it !in ['--image', '--software', '--persistent'])
 	options := hwhost.parse_options(arguments)!
-	if options.help || options.list { return hwhost.run_suite(native_suite('', image, software), arguments, @FILE) }
+	if options.help || options.list { return hwhost.run_suite(if persistent { persistent_software_suite('', '') } else { native_suite('', image, software) }, arguments, @FILE) }
 	inputs := os.getenv('VINIX_NATIVE_CATALOG_INPUTS')
 	sandbox := os.getenv('VINIX_NATIVE_CATALOG_SANDBOX')
 	if os.getenv('VINIX_HWTEST_TCG') != '1' || !os.is_file(options.kernel) || !os.is_dir(inputs)
@@ -171,18 +191,26 @@ fn check() !int {
 		return error('provide VINIX_HWTEST_TCG=1, VINIX_NATIVE_CATALOG_INPUTS, target VINIX_NATIVE_CATALOG_SANDBOX, --kernel and a new --state-dir')
 	}
 	repository := hwhost.find_root(@FILE)!
-	definition := native_suite(sandbox, image, software)
+	definition := if persistent { persistent_software_suite(sandbox, '') } else { native_suite(sandbox, image, software) }
 	hwhost.validate_scenarios(definition.scenarios)!
 	selection := hwhost.select_scenarios(definition.scenarios, options.arch, options.scenarios)!
-	if selection.run.len != 1 { return error('select packages-native-catalog, --image packages-native-image or --software packages-software-image') }
+	if selection.run.len != 1 { return error('select packages-native-catalog, --image packages-native-image, --software packages-software-image or --persistent packages-software-persistence') }
 	host := hwhost.find_host(repository, options.arch, options.qemu)!
 	os.mkdir_all(options.state_dir)!
 	work := os.real_path(options.state_dir)
 	os.cp(options.kernel, work + '/kernel')!
+	if persistent {
+		disk := work + '/initial.ext2'
+		os.write_file(disk, '')!; os.truncate(disk, u64(128) << 20)!
+		formatter := os.getenv_opt('VINIX_MKE2FS') or { os.find_abs_path_of_executable('mke2fs') or { '/opt/homebrew/opt/e2fsprogs/sbin/mke2fs' } }
+		hwhost.run_tool([formatter, '-q', '-F', '-t', 'ext2', '-b', '4096', '-I', '128', '-m', '0', '-O',
+			'none,filetype,sparse_super,large_file', disk], {}, work + '/format.log', 60)!
+	}
 	hwhost.watch_interrupts()
 	guest := hwhost.build_program(host, repository + '/' + definition.guest, work + '/guest', 'init', definition.module_paths)!
 	root := hwhost.build_extras(host, definition, work + '/guest')!
 	mut artifacts := [native_artifact('kernel', work + '/kernel')!, native_artifact('guest-init', guest)!]
+	if persistent { artifacts << native_artifact('initial-ext2', work + '/initial.ext2')! }
 	for file in definition.files { artifacts << native_artifact(file.path, root + '/' + file.path)! }
 	artifacts << if image { stage_native_image(host, inputs, root, work)! } else { stage_native_inputs(inputs, root)! }
 	if software {
@@ -192,14 +220,20 @@ fn check() !int {
 	for path in ['usr/bin/vinix-package', 'usr/bin/vinix-sandbox', 'usr/sbin/vinix-account', 'usr/sbin/vinix-session'] {
 		artifacts << native_artifact(path, root + '/' + path)!
 	}
-	outcome := hwhost.run_scenario(host, selection.run[0], hwhost.Run{ kernel: work + '/kernel', guest: guest, extras: root,
-		state: work + '/native', timeout: if options.timeout > 300 { options.timeout } else { 300 }, keep: true })
+	scenario := if persistent { persistent_software_suite(sandbox, work + '/initial.ext2').scenarios[0] } else { selection.run[0] }
+	outcome := hwhost.run_scenario(host, scenario, hwhost.Run{ kernel: work + '/kernel', guest: guest, extras: root,
+		state: work + '/native', timeout: if options.timeout > scenario.timeout { options.timeout } else { scenario.timeout }, keep: true })
 	println(hwhost.report(options.arch, outcome))
 	if outcome.interrupted { return 130 }
 	if !outcome.passed { return 1 }
 	for role, path in {'serial-log': 'serial.log', 'qmp-log': 'qmp.log'} { artifacts << native_artifact(role, work + '/native/' + path)! }
+	if persistent {
+		for boot in 2 .. 5 { artifacts << native_artifact('serial-log-' + boot.str(), work + '/native/serial-' + boot.str() + '.log')! }
+		artifacts << native_artifact('final-ext2', work + '/native/packages.ext2')!
+	}
 	os.write_file(work + '/qualification.json', json2.encode(NativeReceipt{ architecture: options.arch, completed_at: time.now().unix(),
-		seconds: outcome.seconds, artifacts: artifacts }) + '\n')!
+		seconds: outcome.seconds, platform: if persistent { 'qemu-ext2-retained-subtrees' } else { 'qemu-initramfs' },
+		boots: scenario.boots(), artifacts: artifacts }) + '\n')!
 	return 0
 }
 

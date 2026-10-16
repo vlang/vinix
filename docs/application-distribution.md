@@ -23,6 +23,14 @@ native windows under separate user accounts, updates, rollback and cached
 reinstall. Graphical login/presentation and persistent-device acceptance remain
 separate release gates.
 
+The [Software cold-boot check](../tests/packages/software-persistence-check.md)
+keeps the package store, configuration, account database and homes on the same
+ext2 disk across four guest boots. It checks exact retained bytes and ownership
+before maintenance, native app reopening, reviewed upgrade, rollback, uninstall
+and cached reinstall through the ordinary Software controller. Tools still boot
+from initramfs; installed OS boot and physical-device/crash acceptance remain
+separate work.
+
 Release staging also accepts `--repositories DIRECTORY` or
 `VINIX_PACKAGE_IMAGE_REPOSITORIES` for a complete signed offline bundle. It
 captures reviewed publisher exports before compilation and publishes them at the

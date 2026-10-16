@@ -4,6 +4,10 @@ The current controller also stages its initial catalog through the supported
 signed bundle input. [Bundle qualification](image-repositories-check.md) records
 those newer runs; the receipts below retain their original scope.
 
+`--persistent` additionally runs the [four-boot Software lifecycle](software-persistence-check.md)
+with retained ext2 trust, account database, package state and native application
+data. The original single-boot receipts below retain their original scope.
+
 `native-catalog-check.v --software` boots the production-staged package tools,
 a signed native catalog and a reviewed image configuration, then runs the actual
 Software controller as ordinary administrator and standard accounts. This joins
