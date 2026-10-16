@@ -1253,6 +1253,23 @@ diagnostics remain unchanged. The 256-argument/document, 4096-byte value and
 64 KiB aggregate limits, literal ordering and error precedence remain unchanged. See
 [command request ownership checks](../../tests/packages/command-ownership-check.md).
 
+The sandbox planners (`launch_plan`, `terminal_launch_plan`,
+`command_launch_plan`) and `launch_session` return independently owned `Launch`
+values. Keep each result in a mutable variable and call `plan.close()` after
+inspection or after the child finishes. Close releases the argument strings,
+vector and paths, resets every field and can be repeated. Source requests,
+decoded state, account names and directory strings may be retired as soon as
+planning returns. Planner inputs remain borrowed; manually assembled `Launch`
+values with borrowed fields must not close those borrowed values. Do not close
+copies of the same owned result as separate owners.
+
+Planning retires dependency traversal, intermediate paths, environment and
+template substitutions on success and refusal. The synchronous application and
+account-session runners close their plan after the child has finished, including
+pre-execution failures. This ownership contract preserves the sandbox argument
+order, generation context, document grants and literal command tail. See
+[launch-plan ownership qualification](../../tests/packages/launch-ownership-check.md).
+
 Software's **Launch options…** form exposes these commands for installed apps.
 Enter arguments using single/double quotes to group values and backslash to
 escape the following character outside single quotes. Empty quoted arguments

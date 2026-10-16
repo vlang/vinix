@@ -476,6 +476,11 @@ The form defaults to private data for relative outputs; CLI clients select that
 folder with the additive `--data-cwd` flag. See the
 [launch-options qualification](../../tests/packages/launch-options-check.md).
 
+V launch planners return independent `Launch` values with repeatable `close()`
+cleanup. Temporary dependency, path, environment and argument storage is retired
+after success or refusal; synchronous runners close their plans after the child
+finishes. See [launch ownership qualification](../../tests/packages/launch-ownership-check.md).
+
 Small launch-option windows retain Back, status and failure access. Resizing
 preserves the draft and file-page selection; Escape leaves a field or returns
 an idle form to the catalog. Pasted control bytes cannot navigate, and running

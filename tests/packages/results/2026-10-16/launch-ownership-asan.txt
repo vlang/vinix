@@ -1,0 +1,5 @@
+LAUNCH OWNERSHIP plans survive request/state/path/account and sibling retirement; repeated close resets all fields PASS
+LAUNCH OWNERSHIP both architectures and native/Linux/Windows/Apple plans preserve promises, environment, templates and literal tails PASS
+LAUNCH OWNERSHIP 0/1/64 dependencies, shared edges/cycles, 256 documents and 256 literal arguments retire vector growth PASS
+LAUNCH OWNERSHIP policy, revoked/weak publishers, SDK directories and regular-file/permission refusals retire partial plans PASS
+LAUNCH OWNERSHIP five isolated session modes and 0/1/64/256 documents release independent vectors PASS

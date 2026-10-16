@@ -46,13 +46,14 @@ fn launch_session_request(config Config, executable string, id string, input Lau
 	if input.command { validate_command(CommandLaunch{ arguments: input.arguments, documents: input.documents })! }
 	command := if input.window { 'run-window' } else if input.command { if input.terminal { 'run-terminal-args' } else { 'run-args' } }
 		else { if input.terminal { 'run-terminal' } else { 'run' } }
-	mut argv := ['run', '--isolated', config.launch_user, executable, command, id]
+	mut argv := ['run', '--isolated', config.launch_user.clone(), executable.clone(), command.clone(), id.clone()]
+	unsafe { argv.flags |= .noslices }
 	if input.command {
 		if input.data_cwd { argv << '--data-cwd' }
-		for document in input.documents { argv << ['--file', document] }
+		for document in input.documents { argv << '--file'; argv << document.clone() }
 		argv << '--'
-		argv << input.arguments
-	} else { argv << input.documents }
+		for argument in input.arguments { argv << argument.clone() }
+	} else { for document in input.documents { argv << document.clone() } }
 	return Launch{
 		program:   '/usr/sbin/vinix-session'
 		directory: '/'
@@ -72,7 +73,10 @@ fn run_in_session_request(config Config, id string, input LaunchInput) !int {
 	if os.geteuid() != 0 {
 		return error('only the administrator can create an isolated package session')
 	}
-	launch := launch_session_request(config, os.executable(), id, input)!
+	executable := os.executable()
+	defer { unsafe { executable.free() } }
+	mut launch := launch_session_request(config, executable, id, input)!
+	defer { launch.close() }
 	if !os.is_executable(launch.program) {
 		return error('the account session tool is missing: ${launch.program}')
 	}

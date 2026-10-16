@@ -1906,3 +1906,12 @@ cloning accepted fields, and releases scratch after malformed or oversized input
 The CLI closes parsed requests after launch returns. Limits, sandbox grants,
 session reconstruction and application context values keep their existing
 behavior. See [command ownership qualification](../tests/packages/command-ownership-check.md).
+
+Sandbox and account-session launch plans now own their argument vectors and
+paths independently of caller requests and installed-state snapshots.
+`Launch.close()` releases and resets a returned plan, including on repeated
+close. Planning releases partial construction after policy, publisher, SDK or
+document refusal, and the synchronous launch runners close their plan when
+finished. Exact plan comparisons and allocation/sanitizer fixtures retain the
+existing argument order and permission boundaries. See
+[launch-plan ownership qualification](../tests/packages/launch-ownership-check.md).

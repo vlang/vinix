@@ -1,0 +1,105 @@
+
+launch_ownership-run
+LAUNCH OWNERSHIP plans survive request/state/path/account and sibling retirement; repeated close resets all fields PASS
+LAUNCH OWNERSHIP both architectures and native/Linux/Windows/Apple plans preserve promises, environment, templates and literal tails PASS
+LAUNCH OWNERSHIP 0/1/64 dependencies, shared edges/cycles, 256 documents and 256 literal arguments retire vector growth PASS
+LAUNCH OWNERSHIP policy, revoked/weak publishers, SDK directories and regular-file/permission refusals retire partial plans PASS
+LAUNCH OWNERSHIP five isolated session modes and 0/1/64/256 documents release independent vectors PASS
+
+command_ownership-run
+COMMAND OWNERSHIP independent literal arguments/documents survive source and sibling retirement; repeated close resets both vectors and data-cwd PASS
+COMMAND OWNERSHIP repeated empty/one/64/256-document requests and twelve syntax/string/count/aggregate refusal paths retire all scratch PASS
+COMMAND OWNERSHIP exact 256 arguments/documents, 4096-byte values and 65535/65536/65537 aggregate bytes preserve limits and error precedence PASS
+COMMAND OWNERSHIP isolated transport borrows bounded prefixes, preserves literal source vectors and exact 772-value/document refusal diagnostics PASS
+
+command-run
+
+context-run
+
+session-run
+
+distribution-run
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 2
+Installing app 1.0.0 (1/1) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 4
+Activated package generation 5
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 6
+Restored packages from generation 4 in generation 6; application data was retained
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Updating trusted repository fixture
+
+document-run
+
+state-run
+
+window-run
+
+launch_data-run
+Launch data: private owned creation, retained contents, existing modes, inventory, purge and recreation passed
+Launch data: every parent/app/tmp alias, dangling link, FIFO, regular file and app/tmp socket refuses within two seconds
+Launch data: 128 success/refusal cycles under a 32-descriptor limit and restored-directory retry passed
+Launch alias probe: refused=true outside_tmp=false outside_mode=493
+
+installed_namespace-run
+INSTALLED NAMESPACE extra-runtime refused=true repair=true
+INSTALLED NAMESPACE 24 app/runtime/data extra-entry, alias, mode, hard-link and missing-entry refusals bind exact repair IDs; restored trees pass without mutation PASS
+INSTALLED NAMESPACE generation/apps parent aliases refuse all package checks; root guest also checks package/directory/file foreign ownership PASS
+INSTALLED NAMESPACE ordinary launch refuses undeclared app/runtime/dependency entries before private-data creation or execution; restored administrator-owned trees verify PASS
+INSTALLED NAMESPACE 64-level and 1024-file inventories plus 128 successful/refused checks retire descriptors below 32 PASS
+
+registration_parent-run
+LAUNCHER PARENTS identical external launchers through share/application aliases refuse Verify, classify health and bind repairs; restored parents pass PASS
+LAUNCHER PARENTS directory modes and special entries refuse without mutation; private staged admission and canonical hard-linked launchers remain supported PASS
+LAUNCHER PARENTS 24 captured/opened/read root, parent and leaf identity/mode mutations refuse PASS
+LAUNCHER PARENTS ordinary launch refuses damaged registration before private data or execution; restored administrator-owned launchers verify; guest root checks foreign ownership PASS
+LAUNCHER PARENTS 128 healthy and 128 refused checks pass below 32 descriptors; tracked host retains zero checker bytes PASS
+
+service-run
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained

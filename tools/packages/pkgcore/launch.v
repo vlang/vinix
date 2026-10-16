@@ -11,16 +11,41 @@ pub:
 	directory string
 }
 
+// Plans returned by the launch planners own all fields independently of their
+// inputs. Retire after the process has finished using the argument vector.
+pub fn (mut launch Launch) close() {
+	mut owned_arguments := unsafe { launch.arguments }
+	appsdk.free_values(mut owned_arguments)
+	unsafe { launch.program.free(); launch.directory.free() }
+	launch = Launch{}
+}
+
+// Transfer one owned string (or a literal) without V's implicit append clone.
+fn launch_take(mut values []string, value string) {
+	unsafe { values.push_many(&value, 1) }
+}
+
+fn launch_unveil(mut args []string, path string, permissions string) {
+	args << '--unveil'
+	args << path.clone()
+	args << permissions.clone()
+}
+
+// value is transferred to the argument vector, including on later refusal.
+fn launch_environment(mut args []string, value string) {
+	args << '--env'
+	launch_take(mut args, value)
+}
+
 fn validate_launch_document(path string) ! {
 	if !path.starts_with('/') || !printable(path, 4096) {
 		return error('document must be an existing absolute regular file')
 	}
 	// Follow document aliases as before, but inspect the target type. os.is_file
 	// only excludes directories and would also admit devices, FIFOs and sockets.
-	info := os.stat(path) or {
-		return error('document must be an existing absolute regular file: ${path}')
-	}
-	if info.get_filetype() != .regular {
+	// Keep the native stat scratch on the stack under the manual-free compiler.
+	mut info := C.stat{}
+	if C.fstatat(C.AT_FDCWD, path.str, unsafe { &info }, 0) != 0 || info.st_mode & 0o170000 != 0o100000 {
 		return error('document must be an existing absolute regular file: ${path}')
 	}
 }
@@ -29,14 +54,19 @@ fn application_closure(state State, id string) []Installed {
 	mut pending := [id]
 	mut seen := map[string]bool{}
 	mut result := []Installed{}
+	unsafe { pending.flags |= .noslices; result.flags |= .noslices }
+	// Pending names and result manifests borrow state; only seen owns key copies.
+	defer { unsafe { (&array(&pending)).free(); seen.free() } }
 	for pending.len > 0 {
 		name := pending.pop()
 		if name in seen { continue }
 		seen[name] = true
 		for installed in state.packages {
 			if installed.package.id != name { continue }
-			result << installed
-			for dependency in installed.package.dependencies { pending << dependency.id }
+			unsafe { result.push_many(&installed, 1) }
+			for dependency in installed.package.dependencies {
+				unsafe { pending.push_many(&dependency.id, 1) }
+			}
 		}
 	}
 	return result
@@ -61,11 +91,12 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 		return error('launch requires a non-root identity and an absolute application data directory')
 	}
 	validate_state(state, config.architecture)!
-	selected := state.packages.filter(it.package.id == id)
-	if selected.len != 1 || selected[0].package.kind in ['data', 'runtime'] {
+	mut selected := -1
+	for index, item in state.packages { if item.package.id == id { selected = index; break } }
+	if selected < 0 || state.packages[selected].package.kind in ['data', 'runtime'] {
 		return error('application is not installed: ${id}')
 	}
-	installed := selected[0]
+	installed := state.packages[selected]
 	p := installed.package
 	if input.window && (p.window_protocol !in [1, 2] || p.kind != 'native' || 'display' !in p.permissions) {
 		return error('${id}: the installed application does not support a native window protocol')
@@ -75,21 +106,33 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 		return error('${id}: publisher key has been revoked')
 	}
 	closure := application_closure(state, id)
+	defer { unsafe { (&array(&closure)).free() } }
 	require_publisher_keys(closure)!
-	generation := directory + '/generations/' + state.generation.str()
+	number := state.generation.str()
+	generation := directory + '/generations/' + number
 	app := generation + '/apps/' + id
-	runtime := if p.runtime == '' { app } else { generation + '/apps/' + p.runtime }
+	runtime := if p.runtime == '' { app.clone() } else { generation + '/apps/' + p.runtime }
+	defer { unsafe { number.free(); generation.free(); app.free(); runtime.free() } }
 	mut args := ['--uid', uid.str(), '--gid', gid.str()]
+	unsafe { args.flags |= .noslices }
+	mut accepted := false
+	defer { if !accepted { appsdk.free_values(mut args) } }
 	// Advisory locks coordinate writes to already unveiled app data. They grant
 	// no additional paths or inherited descriptors; SQLite requires F_SETLK.
-	mut promises := ['stdio', 'rpath', 'wpath', 'cpath', 'flock', 'exec', 'prot_exec']
+	mut promises := []string{cap: 12}
+	for value in ['stdio', 'rpath', 'wpath', 'cpath', 'flock', 'exec', 'prot_exec']! { promises << value.clone() }
+	defer { appsdk.free_values(mut promises) }
 	if input.terminal { promises << 'tty' }
-	if 'network' in p.permissions { promises << ['inet', 'dns'] }
+	if 'network' in p.permissions { promises << 'inet'; promises << 'dns' }
 	if 'process' in p.permissions { promises << 'proc' }
 	if 'display' in p.permissions && !input.window { promises << 'unix' }
-	args << ['--promises', promises.join(' '), '--unveil', app, 'rx', '--unveil', data, 'rwc']
-	if runtime != app { args << ['--unveil', runtime, 'rx'] }
+	args << '--promises'; args << promises.join(' ')
+	launch_unveil(mut args, app, 'rx')
+	launch_unveil(mut args, data, 'rwc')
+	if runtime != app { launch_unveil(mut args, runtime, 'rx') }
 	mut libraries := [app + '/lib', app + '/usr/lib', runtime + '/lib', runtime + '/usr/lib']
+	unsafe { libraries.flags |= .noslices }
+	defer { appsdk.free_values(mut libraries) }
 	for dependency in closure {
 		check_policy(dependency.package, config.policy)!
 		if !config.repositories.any(it.id == dependency.repository && it.public_key == dependency.public_key) {
@@ -97,39 +140,53 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 		}
 		if dependency.package.id in [id, p.runtime] { continue }
 		path := generation + '/apps/' + dependency.package.id
-		args << ['--unveil', path, 'rx']
+		defer { unsafe { path.free() } }
+		launch_unveil(mut args, path, 'rx')
 		libraries << path + '/lib'
 		libraries << path + '/usr/lib'
 	}
-	args << ['--env', 'HOME=' + data, '--env', 'TMPDIR=' + data + '/tmp', '--env',
-		'PATH=' + runtime + '/bin', '--env', 'LD_LIBRARY_PATH=' + libraries.join(':'), '--env',
-		'WINEPREFIX=' + data + '/wine', '--env', 'LANG=C.UTF-8']
-	runtime_version := if p.runtime == '' { p.version } else { state.packages.filter(it.package.id == p.runtime)[0].package.version }
+	library_path := libraries.join(':')
+	defer { unsafe { library_path.free() } }
+	launch_environment(mut args, 'HOME=' + data)
+	launch_environment(mut args, 'TMPDIR=' + data + '/tmp')
+	launch_environment(mut args, 'PATH=' + runtime + '/bin')
+	launch_environment(mut args, 'LD_LIBRARY_PATH=' + library_path)
+	launch_environment(mut args, 'WINEPREFIX=' + data + '/wine')
+	launch_environment(mut args, 'LANG=C.UTF-8')
+	mut runtime_version := p.version
+	for item in state.packages { if item.package.id == p.runtime { runtime_version = item.package.version; break } }
 	context := appsdk.Context{ id: p.id, version: p.version, architecture: config.architecture, kind: p.kind,
 		generation: state.generation, repository: installed.repository, public_key: installed.public_key, sequence: installed.sequence,
 		app_directory: app, data_directory: data, runtime_id: p.runtime, runtime_version: runtime_version,
 		runtime_directory: runtime, permissions: p.permissions }
 	mut environment := context.environment()!
 	defer { appsdk.free_values(mut environment) }
-	for value in environment { args << '--env'; args << value.clone() }
-	if input.terminal { args << ['--env', 'TERM=linux'] }
-	if input.window { args << ['--env', if p.window_protocol == 1 { 'VINIX_WINDOW_PROTOCOL=1' } else { 'VINIX_WINDOW_PROTOCOL=2' }] }
+	for value in environment { launch_environment(mut args, value.clone()) }
+	if input.terminal { launch_environment(mut args, 'TERM=linux') }
+	if input.window { launch_environment(mut args, if p.window_protocol == 1 { 'VINIX_WINDOW_PROTOCOL=1' } else { 'VINIX_WINDOW_PROTOCOL=2' }) }
 	if 'display' in p.permissions && !input.window {
-		args << ['--unveil', '/tmp/.X11-unix', 'rw', '--env', 'DISPLAY=' + os.getenv('DISPLAY')]
+		launch_unveil(mut args, '/tmp/.X11-unix', 'rw')
+		display := os.getenv('DISPLAY')
+		defer { unsafe { display.free() } }
+		launch_environment(mut args, 'DISPLAY=' + display)
 	}
-	if 'audio' in p.permissions { args << ['--unveil', '/dev/snd', 'rw'] }
+	if 'audio' in p.permissions { launch_unveil(mut args, '/dev/snd', 'rw') }
 	for document in input.documents {
 		validate_launch_document(document)!
 		if 'files' !in p.permissions { return error('${id}: file permission is not declared') }
-		args << ['--unveil', document, 'rw']
+		launch_unveil(mut args, document, 'rw')
 	}
-	args << ['--', runtime + '/' + p.entrypoint]
+	args << '--'; args << runtime + '/' + p.entrypoint
 	for argument in p.arguments {
-		args << argument.replace('@APP@', app).replace('@DATA@', data).replace('@RUNTIME@', runtime)
+		app_argument := argument.replace('@APP@', app)
+		data_argument := app_argument.replace('@DATA@', data)
+		defer { unsafe { app_argument.free(); data_argument.free() } }
+		args << data_argument.replace('@RUNTIME@', runtime)
 	}
-	args << input.arguments
-	if !input.command { args << input.documents }
-	return Launch{ program: '/usr/bin/vinix-sandbox', arguments: args, directory: if input.command && input.data_cwd { data } else { app } }
+	for argument in input.arguments { args << argument.clone() }
+	if !input.command { for document in input.documents { args << document.clone() } }
+	accepted = true
+	return Launch{ program: '/usr/bin/vinix-sandbox', arguments: args, directory: if input.command && input.data_cwd { data.clone() } else { app.clone() } }
 }
 
 pub fn run_application(config Config, directory string, id string, documents []string) !int {
@@ -145,7 +202,7 @@ pub fn run_application(config Config, directory string, id string, documents []s
 		return err
 	}
 	guard.release()
-	defer { C.close(lease) }
+	defer { C.close(lease); close_decoded_state(state) }
 	return run_leased_application(config, directory, state, id, documents)
 }
 
@@ -157,8 +214,9 @@ fn generation_lease(directory string, architecture string, id string) !(State, i
 	if state.generation == 0 || !state.packages.any(it.package.id == id) {
 		return error('application is not installed: ${id}')
 	}
-	lease_path := directory + '/generations/' + state.generation.str() + '/lease'
-	defer { unsafe { lease_path.free() } }
+	number := state.generation.str()
+	lease_path := directory + '/generations/' + number + '/lease'
+	defer { unsafe { lease_path.free(); number.free() } }
 	lease := C.open(lease_path.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
 	if lease < 0 { return error('cannot open application generation lease; repair package state before retrying') }
 	check_coordination_file(lease, lease_path, 'application generation lease') or { C.close(lease); return err }
@@ -180,25 +238,32 @@ fn run_leased_mode(config Config, directory string, state State, id string, inpu
 	gid := int(C.getegid())
 	if uid == 0 || gid == 0 { return error('run applications from an ordinary user session') }
 	home := os.home_dir()
+	defer { unsafe { home.free() } }
 	if home == '' || !home.starts_with('/') { return error('user home directory is unavailable') }
-	data := home.trim_right('/') + '/.local/share/vinix-apps/' + id
-	launch := application_launch_plan(config, directory, state, id, data, uid, gid, input)!
-	for installed in application_closure(state, id) {
+	home_prefix := home.trim_right('/')
+	data := home_prefix + '/.local/share/vinix-apps/' + id
+	defer { unsafe { data.free(); home_prefix.free() } }
+	mut launch := application_launch_plan(config, directory, state, id, data, uid, gid, input)!
+	defer { launch.close() }
+	closure := application_closure(state, id)
+	defer { unsafe { (&array(&closure)).free() } }
+	number := state.generation.str()
+	generation := directory + '/generations/' + number
+	defer { unsafe { number.free(); generation.free() } }
+	for installed in closure {
 		check_policy(installed.package, config.policy)!
 		if !config.repositories.any(it.id == installed.repository && it.public_key == installed.public_key) {
 			return error('runtime publisher key has been revoked')
 		}
 		verify_installed_namespace(directory, state.generation, installed.package)!
 		for file in installed.package.files {
-			path := directory + '/generations/' + state.generation.str() + '/apps/' + installed.package.id + '/' + file.path
+			path := generation + '/apps/' + installed.package.id + '/' + file.path
+			defer { unsafe { path.free() } }
 			if !verified_installed_file(path, file) {
 				return error('installed application payload changed: ${path}')
 			}
 		}
-		number := state.generation.str()
-		generation := directory + '/generations/' + number
 		registration_valid := verified_registration(generation, installed.package)
-		unsafe { generation.free(); number.free() }
 		if !registration_valid {
 			return error('${installed.package.id}: installed application registration verification failed; use Repair installed or vinix-package repair')
 		}
