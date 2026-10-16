@@ -262,7 +262,8 @@ fn checked(arguments []string) !int {
 		}
 		'repo-list' {
 			if names.len != 0 { return error('repo-list takes no arguments') }
-			status := pkgcore.repository_status(root)!
+			mut status := pkgcore.repository_status(root)!
+			defer { status.close() }
 			if as_json {
 				println(json2.encode(status))
 			} else {

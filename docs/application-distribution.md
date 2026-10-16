@@ -41,6 +41,14 @@ their existing reader locks and remain available without opening damaged catalog
 or history files. Canonical policy output still reflects stored settings. See
 [configuration observation checks](../tests/packages/configuration-observation-check.md).
 
+Strict `repository_status(root)` observations also have an owned `.close()`
+contract. They retire unused configuration and path storage on success, and the
+complete configuration on cache/history refusal. `repo-list` closes its result
+after output. Locking, authenticated legacy-history recovery and strict metadata
+admission retain their existing behavior. See
+[repository status ownership checks](../tests/packages/repository-status-ownership-check.md)
+for measured scope and the remaining signed-index decoder allocation.
+
 Local payload copies validate ordinary source and destination descriptors before
 writing, refuse the same file even through a hard link, and enforce the captured
 source size. Oversized offline repository objects leave existing partial data

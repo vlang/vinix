@@ -1,0 +1,11 @@
+Pre-change strict repository observation ownership regression: ten fresh and ten retained-history reads each retain 25,430 bytes; ten malformed-cache and ten malformed-history refusals each retain 38,280 bytes, after caller retirement of results/errors. Input source, production source, executable and generated C are retained and pinned.
+
+REPOSITORY STATUS ten fresh reads/retirements retained 25430 bytes
+REPOSITORY STATUS ten retained reads/retirements retained 25430 bytes
+REPOSITORY STATUS ten bad-cache reads/retirements retained 38280 bytes
+REPOSITORY STATUS ten bad-history reads/retirements retained 38280 bytes
+tools/packages/pkgcore/repository_status_ownership_test.v:52: fn test_repository_status_retires_results_and_observation_scratch
+   > assert retained == 0
+     Left value (len: 6): `127420`
+    Right value (len: 1): `0`
+

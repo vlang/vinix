@@ -1442,6 +1442,16 @@ state, and both retain reader locking and their existing wire formats. Policy
 reads report stored settings independently of the service's offline overlay.
 See [configuration observation qualification](../../tests/packages/configuration-observation-check.md).
 
+`pkgcore.repository_status(root)` returns an owned strict `RepositoryStatus`:
+call `.close()` after use. Its architecture, configured repositories and replay
+floors remain valid independently of source files and other observations. The
+reader retires unused configuration fields and paths, including complete source
+configuration on refusal. Format, wire ordering, reader locking and authenticated
+legacy-floor recovery are unchanged. Synthetic documents can borrow fields and
+must keep their caller-managed lifetime. See
+[strict repository observation qualification](../../tests/packages/repository-status-ownership-check.md),
+including the separately measured signed-index decoder residual.
+
 History is keyed by ID/key, independent of mirror URL, and records exact signed
 index bytes. Reject lower sequences and changed bytes at an existing sequence;
 increase sequence for expiry renewals too. Revocation and empty refreshes retain

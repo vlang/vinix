@@ -1,0 +1,21 @@
+The first expanded fixture attempted zero retention for authenticated observations and found 64 one-byte allocations across 64 legacy migrations. The isolated probe reproduces 64 bytes for decode_signed_index and verify_index without status/configuration handling; remember_index retains zero. The final fixture bounds this unchanged dependency to at most one one-byte record per decode and continues to require zero for metadata/refusal observations. The failed expanded source/output and both probe variants generated C are pinned; the final probe uses direct branches.
+
+Initial expanded assertion:
+REPOSITORY STATUS both architectures, independent owned fields, repeated close, source replacement, exact protocol bytes and full 4096 repository/history bounds PASS
+tools/packages/pkgcore/repository_status_ownership_test.v:93: fn test_repository_status_preserves_authenticated_migration_and_retired_replay_floors
+   > assert kept == 0, phase + ' retained ' + kept.str()
+     Left value (len: 2): `64`
+    Right value (len: 1): `0`
+        Message: legacy retained 64
+
+REPOSITORY STATUS 1000 schema/alias/FIFO configuration/cache/history and missing/unsafe/busy lock refusals retire scratch, preserve recovery data and permit restored retry PASS
+REPOSITORY STATUS 1000 fresh reads/retirements retained 0 bytes
+REPOSITORY STATUS 1000 retained reads/retirements retained 0 bytes
+REPOSITORY STATUS 1000 bad-cache reads/retirements retained 0 bytes
+REPOSITORY STATUS 1000 bad-history reads/retirements retained 0 bytes
+
+Independent signed-index probe:
+decode: 64 bytes, 64 records, first size 1
+verify: 64 bytes, 64 records, first size 1
+remember: 0 bytes, 0 records, first size 0
+{"format":1,"repository":"","sequence":0,"expires":0,"packages":[]}

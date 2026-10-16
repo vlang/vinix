@@ -26,6 +26,11 @@ qualify the public repository/policy readers' result ownership and source scratc
 The maintained guest suite now runs that fixture too; the recorded results below
 retain their original scope and artifact counts.
 
+The follow-up [strict repository observation checks](repository-status-ownership-check.md)
+add owned `RepositoryStatus.close()` and qualify configuration/path retirement
+while preserving strict cache/history admission. The maintained guest suite also
+runs that fixture; its recorded receipt includes the additional artifact.
+
 The [CLI lifecycle](distribution-cli.v) compares strict and scoped listing under
 damaged cache/history, refuses enrollment/update, reviews and applies revocation,
 preserves active state/objects/recovery data, and checks malformed coordination

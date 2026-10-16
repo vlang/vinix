@@ -11,10 +11,18 @@ pub:
 	history      []RepositoryFloor
 }
 
-fn configured_repository_status(config Config, directory string) !RepositoryStatus {
+fn configured_repository_status(root string, directory string) !RepositoryStatus {
+	config := load_config(root)!
+	mut transferred := false
+	defer {
+		if transferred { close_owned_policy(config.policy); unsafe { config.launch_user.free() } }
+		else { close_decoded_configuration(config) }
+	}
 	snapshots := read_snapshots(directory)!
 	defer { close_decoded_snapshots(snapshots) }
 	history := history_with_snapshots(config, directory, snapshots)!
+	// These independently owned fields now belong to the returned observation.
+	transferred = true
 	return RepositoryStatus{
 		architecture: config.architecture
 		repositories: config.repositories
@@ -24,14 +32,27 @@ fn configured_repository_status(config Config, directory string) !RepositoryStat
 
 pub fn repository_status(root string) !RepositoryStatus {
 	directory := state_directory(root)
+	defer { unsafe { directory.free() } }
 	// Listing a fresh image does not initialize its store. Once a writer has
 	// created durable state, configuration and retained history require a lock.
 	if state_requires_lock(directory) {
 		guard := acquire_reader(directory)!
 		defer { guard.release() }
-		return configured_repository_status(load_config(root)!, directory)
+		return configured_repository_status(root, directory)
 	}
-	return configured_repository_status(load_config(root)!, directory)
+	return configured_repository_status(root, directory)
+}
+
+// Public observations own these fields. Synthetic documents can borrow them
+// and must keep their caller-managed lifetime instead.
+pub fn (mut status RepositoryStatus) close() {
+	unsafe {
+		status.architecture.free()
+		for repository in status.repositories { repository.id.free(); repository.url.free(); repository.public_key.free() }
+		(&array(&status.repositories)).free()
+	}
+	close_decoded_history(TrustHistory{ repositories: status.history })
+	status = RepositoryStatus{}
 }
 
 fn writable_configuration(root string) !string {

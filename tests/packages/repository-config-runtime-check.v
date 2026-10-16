@@ -29,6 +29,7 @@ fn suite() hwhost.Suite {
 			hwhost.Program{ source: 'tools/packages/pkgcore/repository_configuration_test.v', path: 'usr/share/package-fixtures/repository-config-core' },
 			hwhost.Program{ source: 'tools/packages/pkgprotocol/repository_configuration_test.v', path: 'usr/share/package-fixtures/repository-config-protocol' },
 			hwhost.Program{ source: 'tools/packages/pkgcore/configuration_observation_test.v', path: 'usr/share/package-fixtures/configuration-observation' },
+			hwhost.Program{ source: 'tools/packages/pkgcore/repository_status_ownership_test.v', path: 'usr/share/package-fixtures/repository-status' },
 		], scenarios: [hwhost.Scenario{ name: 'packages-repository-config', arches: ['aarch64', 'x86_64'],
 			about: 'configuration-only repository discovery and reviewed revocation while maintenance metadata remains refused',
 			required: ['HWTEST START packages-repository-config',
@@ -39,6 +40,10 @@ fn suite() hwhost.Suite {
 				'CONFIGURATION OBSERVATION 1000 legacy/default and growing 64-record cycles retire scratch; full 4096 repository/pin observations preserve source configuration PASS',
 				'CONFIGURATION OBSERVATION maintenance FIFOs remain unopened; 1000 schema/missing/alias/FIFO/lock/busy refusal cycles retire scratch and permit restored reads PASS',
 				'CONFIGURATION PROCESS configuration-observation PASS',
+				'REPOSITORY STATUS both architectures, independent owned fields, repeated close, source replacement, exact protocol bytes and full 4096 repository/history bounds PASS',
+				'REPOSITORY STATUS 64-cycle authenticated expired migration, newer floors, signature/equivocation refusals and exact retired-key recovery preserve configuration/cache/history PASS',
+				'REPOSITORY STATUS 1000 schema/alias/FIFO configuration/cache/history and missing/unsafe/busy lock refusals retire scratch, preserve recovery data and permit restored retry PASS',
+				'CONFIGURATION PROCESS repository-status PASS',
 				'HWTEST PASS packages-repository-config'], ending: .poweroff, timeout: 300 }]
 	}
 }
@@ -60,6 +65,7 @@ fn check() !int {
 			artifact('guest-init', base + '/guest/init')!, artifact('repository-config-core', root + 'repository-config-core')!,
 			artifact('repository-config-protocol', root + 'repository-config-protocol')!,
 			artifact('configuration-observation', root + 'configuration-observation')!,
+			artifact('repository-status', root + 'repository-status')!,
 			artifact('serial-log', base + '/packages-repository-config/serial.log')!] }
 		os.write_file(base + '/qualification.json', json2.encode(receipt) + '\n')!
 	}
