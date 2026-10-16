@@ -231,12 +231,12 @@ COMMUNITY_PKGS=(
     mesa-utils
 )
 
-if [ "$VINIX_ARCH" = x86_64 ]; then
-    # x86 Mesa's DRI megadriver also carries the Intel and Radeon drivers.
-    # They link libdrm_intel, which needs libpciaccess, and libelf; without
-    # both swrast_dri.so fails to dlopen.
-    MAIN_PKGS+=(libpciaccess libelf)
-fi
+# Mesa's DRI megadriver carries the Radeon drivers (and on x86 the Intel ones,
+# through libdrm_intel and its libpciaccess), which link libelf: without them
+# swrast_dri.so fails to dlopen, and Xorg and Xvfb lose GLX. libSM, which
+# libXt and so the classic X clients load, needs libuuid. No other layer an
+# image always carries provides these.
+MAIN_PKGS+=(libpciaccess libelf libuuid)
 
 echo "--- Downloading main packages ---"
 for pkg in "${MAIN_PKGS[@]}"; do
