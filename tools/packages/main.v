@@ -44,6 +44,17 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX\n' +
 	'  publish-release REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY\n'
 
+fn composition_reply(mut info pkgcore.CompositionInfo) {
+	defer { info.close() }
+	mut bytes := []u8{cap: 2048}
+	unsafe { bytes.flags |= .noslices }
+	defer { unsafe { bytes.free() } }
+	json2.encode_append(info, mut bytes)
+	text := bytes.bytestr()
+	defer { unsafe { text.free() } }
+	println(text)
+}
+
 fn checked(arguments []string) !int {
 	mut args := arguments.clone()
 	mut root := ''
@@ -131,8 +142,10 @@ fn checked(arguments []string) !int {
 				return error('compose-catalog requires a new lock directory and 1 to 64 PROFILE CATALOG.json pairs')
 			}
 			mut sources := []pkgcore.CatalogSource{}
+			defer { unsafe { (&array(&sources)).free() } }
 			for i := 1; i < names.len; i += 2 { sources << pkgcore.CatalogSource{ id: names[i], catalog: names[i + 1] } }
-			println(json2.encode(pkgcore.compose_catalog(sources, names[0])!))
+			mut info := pkgcore.compose_catalog(sources, names[0])!
+			composition_reply(mut info)
 			return 0
 		}
 		'compose-catalog-for' {
@@ -140,8 +153,10 @@ fn checked(arguments []string) !int {
 				return error('compose-catalog-for requires aarch64 or x86_64, a new lock directory and 1 to 64 PROFILE CATALOG.json pairs')
 			}
 			mut sources := []pkgcore.CatalogSource{}
+			defer { unsafe { (&array(&sources)).free() } }
 			for i := 2; i < names.len; i += 2 { sources << pkgcore.CatalogSource{ id: names[i], catalog: names[i + 1] } }
-			println(json2.encode(pkgcore.compose_catalog_for(names[0], sources, names[1])!))
+			mut info := pkgcore.compose_catalog_for(names[0], sources, names[1])!
+			composition_reply(mut info)
 			return 0
 		}
 		'native-catalog' {

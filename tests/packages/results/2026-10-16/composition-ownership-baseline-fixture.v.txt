@@ -1,0 +1,113 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module pkgcore
+
+import json2
+import os
+import time
+
+$if track_heap ? {
+	#include "@VMODROOT/../../../desktop/tools/tests/heap_tracker.h"
+	fn C.vinix_heap_begin()
+	fn C.vinix_heap_end() u64
+	fn C.vinix_heap_count() u32
+}
+
+fn composition_owned_fixture(count int, fault string) !(string, []CatalogSource) {
+	work := os.real_path(os.temp_dir()) + '/vinix-composition-owned-' + os.getpid().str() + '-' + time.now().unix_micro().str()
+	os.mkdir(work)!
+	mut sources := []CatalogSource{cap: 2}
+	for profile in ['alpha', 'beta']! {
+		mut imports := []CatalogImport{cap: count * 2 + 1}
+		for architecture in ['aarch64', 'x86_64']! {
+			if fault == 'missing-host' && profile == 'beta' && architecture == 'x86_64' { continue }
+			for i in 0 .. count {
+				digits := i.str(); defer { unsafe { digits.free() } }
+				id := (if fault == 'duplicate' && profile == 'beta' { 'alpha' } else { profile }) + '-item-' + digits
+				imports << CatalogImport{ source: if fault == 'depth' { 'a/b/c/d/e/f/g/' + architecture } else { architecture }, recipe: RootRecipe{
+					manifest: Package{ id: id, name: id.clone(), description: 'd'.repeat(2048), version: '1.0.0', architecture: architecture,
+						kind: 'native', entrypoint: 'bin/app', license: 'MIT', permissions: ['files'], associations: ['text/plain'],
+						dependencies: [Dependency{ id: profile + '-notice' }],
+						files: [Payload{ path: 'bin/app', sha256: 'a'.repeat(64), bytes: 1, executable: true }] },
+					entries: [RootEntry{ source: 'bin/app', path: 'bin/app' }] } }
+			}
+		}
+		imports << CatalogImport{ source: 'shared', recipe: RootRecipe{
+			manifest: Package{ id: profile + '-notice', name: 'Notice', version: '1.0.0', architecture: 'all', kind: 'data',
+				license: 'Fixture-EULA', proprietary: true, firmware: true,
+				files: [Payload{ path: 'NOTICE', sha256: 'b'.repeat(64), bytes: 1 }] }, entries: [RootEntry{ source: 'NOTICE', path: 'NOTICE' }] } }
+		recipe := CatalogRecipe{ format: 1, architectures: if fault == 'missing-host' && profile == 'beta' { ['aarch64'] } else { ['aarch64', 'x86_64'] }, packages: imports }
+		encoded := json2.encode(recipe)
+		defer { close_decoded_catalog(recipe); unsafe { encoded.free() } }
+		path := work + '/' + profile + '.json'
+		os.write_file(path, if fault == 'schema' && profile == 'beta' { encoded.replace_once('"format":1', '"format":1,"unknown":true') } else { encoded })!
+		sources << CatalogSource{ id: profile.clone(), catalog: path }
+	}
+	return work, sources
+}
+
+fn close_composition_sources(sources []CatalogSource) {
+	unsafe { for source in sources { source.id.free(); source.catalog.free() }; (&array(&sources)).free() }
+}
+
+// Baseline: the original publisher planning body, before filesystem staging.
+fn composition_owned_probe(sources []CatalogSource, architecture string) ! {
+	if sources.len == 0 || sources.len > 64 { return error('catalog composition requires between 1 and 64 named catalogs') }
+	mut ordered := sources.clone()
+	ordered.sort(a.id < b.id)
+	mut architectures := []string{}
+	mut imports := []CatalogImport{}
+	mut records := []CompositionSource{}
+	mut previous := ''
+	for source in ordered {
+		if !identifier(source.id) || source.id == previous { return error('catalog composition requires distinct valid profile IDs') }
+		previous = source.id
+		input := catalog_recipe(read_metadata(source.catalog)!)!
+		if architecture == '' {
+			if architectures.len == 0 { architectures = input.architectures.clone() }
+			if architectures != input.architectures { return error('composed catalogs must cover the same architectures: ${source.id}') }
+		} else {
+			if architecture !in input.architectures { return error('catalog profile ${source.id} does not support requested architecture ${architecture}') }
+			if architectures.len == 0 { architectures << architecture }
+		}
+		for item in input.packages {
+			if architecture != '' && item.recipe.manifest.architecture !in [architecture, 'all'] { continue }
+			if imports.len == 4096 { return error('composed catalog exceeds the 4096 package limit') }
+			imports << CatalogImport{ source: source.id + '/' + item.source, recipe: item.recipe }
+		}
+		records << CompositionSource{ id: source.id, catalog_sha256: index_digest(json2.encode(input) + '\n') }
+	}
+	merged := catalog_recipe(json2.encode(CatalogRecipe{ format: 1, architectures: architectures, packages: imports }))!
+	text := json2.encode(merged) + '\n'
+	if text.len > max_metadata { return error('composed catalog exceeds metadata limit') }
+	digest := index_digest(text)
+	provenance := json2.encode(CompositionRecord{ catalog_sha256: digest, architectures: architectures,
+		package_count: merged.packages.len, sources: records }) + '\n'
+	defer { unsafe { text.free(); provenance.free() } }
+	golden := os.getenv('VINIX_COMPOSITION_GOLDEN')
+	if golden != '' {
+		key := sources[0].catalog.all_after_last('/') + '-' + architecture
+		os.write_file(golden + '/' + key + '-catalog.json', text)!
+		os.write_file(golden + '/' + key + '-composition.json', provenance)!
+	}
+}
+
+fn test_composition_planning_retires_inputs_results_and_refusal_scratch() {
+	for count in [1, 32]! {
+		for fault in ['', 'schema', 'duplicate', 'missing-host', 'depth']! {
+			work, sources := composition_owned_fixture(count, fault)!
+			defer { os.rmdir_all(work) or {}; close_composition_sources(sources); unsafe { work.free() } }
+			architecture := if fault == 'missing-host' { 'x86_64' } else { 'aarch64' }
+			mut maximum := u64(0); mut records := u32(0)
+			for _ in 0 .. 10 {
+				$if track_heap ? { C.vinix_heap_begin() }
+				if _ := composition_owned_probe(sources, architecture) { assert fault == '' }
+				else { message := err.msg(); unsafe { message.free(); err.free() }; assert fault != '' }
+				$if track_heap ? {
+					kept := C.vinix_heap_end(); allocations := C.vinix_heap_count()
+					if kept > maximum { maximum = kept }; if allocations > records { records = allocations }
+				}
+			}
+			println('COMPOSITION OWNERSHIP variants-per-host=' + count.str() + ' fault=' + if fault == '' { 'none' } else { fault } + ' retained=' + maximum.str() + ' allocations=' + records.str())
+		}
+	}
+}

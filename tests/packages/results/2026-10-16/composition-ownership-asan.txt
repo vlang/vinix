@@ -1,0 +1,18 @@
+COMPOSITION OWNERSHIP variants-per-host=1 target=both fault=none functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=1 target=aarch64 fault=none functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=1 target=x86_64 fault=none functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=1 target=aarch64 fault=schema functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=1 target=aarch64 fault=duplicate functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=1 target=x86_64 fault=missing-host functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=1 target=aarch64 fault=depth functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=1 target=aarch64 fault=profile functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=32 target=both fault=none functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=32 target=aarch64 fault=none functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=32 target=x86_64 fault=none functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=32 target=aarch64 fault=schema functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=32 target=aarch64 fault=duplicate functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=32 target=x86_64 fault=missing-host functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=32 target=aarch64 fault=depth functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=32 target=aarch64 fault=profile functional-cycles=4 PASS
+COMPOSITION OWNERSHIP strict/selected planning and late metadata/identity/host/depth/profile refusals retire owned scratch PASS
+COMPOSITION OWNERSHIP independent plans and closeable replies survive retired inputs; canonical bytes, disclosures and idempotent close PASS

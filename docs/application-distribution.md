@@ -299,6 +299,11 @@ binds complete input locks, including omitted variants. See
 [combined-catalog qualification](../tests/packages/composition-check.md) exercises
 SQLite, FFmpeg and FFprobe in one signed release, including a SQLite-only runtime
 update, rollback, offline cache reinstall and data-preserving uninstall.
+The composer retires each decoded input after selection and returns metadata
+independent of its arguments and temporary plan. Its explicit close operation,
+bounded planning and unchanged catalog/provenance bytes are covered by the
+[ownership qualification](../tests/packages/composition-ownership-check.md),
+including rebuilt CLI checks inside AArch64 and x86-64 guests.
 
 ## Trust and configuration
 

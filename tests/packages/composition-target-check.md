@@ -7,6 +7,10 @@ dual-host profiles without inventing an x86-64 Apple runtime. The original
 `compose-catalog` retains its identical-target-set requirement. See the
 [SDK contract](../../tools/packages/SDK.md#compose-application-catalogs).
 
+The later [composition ownership qualification](composition-ownership-check.md)
+measures planning and refusal lifetimes while preserving these canonical bytes
+and exercises the rebuilt composition CLI inside both target guests.
+
 The maintained V host driver builds the CLI, runs five core assertion suites
 and the complete distribution CLI fixture, then repeats composition and Apple
 profile assertions under clang ASan/UBSan (leak detection disabled). Its seventeen

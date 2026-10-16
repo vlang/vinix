@@ -1,0 +1,10 @@
+COMPOSITION OWNERSHIP variants-per-host=1 fault=none retained=199855 allocations=299
+COMPOSITION OWNERSHIP variants-per-host=1 fault=schema retained=66862 allocations=92
+COMPOSITION OWNERSHIP variants-per-host=1 fault=duplicate retained=143604 allocations=182
+COMPOSITION OWNERSHIP variants-per-host=1 fault=missing-host retained=84934 allocations=142
+COMPOSITION OWNERSHIP variants-per-host=1 fault=depth retained=143866 allocations=182
+COMPOSITION OWNERSHIP variants-per-host=32 fault=none retained=5100202 allocations=5209
+COMPOSITION OWNERSHIP variants-per-host=32 fault=schema retained=1774532 allocations=1745
+COMPOSITION OWNERSHIP variants-per-host=32 fault=duplicate retained=3903049 allocations=3488
+COMPOSITION OWNERSHIP variants-per-host=32 fault=missing-host retained=1940699 allocations=2601
+COMPOSITION OWNERSHIP variants-per-host=32 fault=depth retained=3911433 allocations=3488

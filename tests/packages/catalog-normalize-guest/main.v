@@ -12,7 +12,8 @@ fn C.reboot(int) int
 fn C.usleep(u32) int
 
 fn check() ! {
-	for name in ['catalog-normalize', 'catalog', 'composition', 'release']! {
+	os.setenv('VINIX_PACKAGE_COMPOSITION_CLI', '/usr/bin/vinix-package', true)
+	for name in ['catalog-normalize', 'composition-ownership', 'catalog', 'composition', 'release']! {
 		mut child := os.new_process('/usr/share/package-fixtures/' + name)
 		child.set_redirect_stdio_merged(); child.run()
 		output := child.stdout_slurp(); child.wait(); code := child.code; child.close()

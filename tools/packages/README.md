@@ -589,6 +589,10 @@ and full input-lock provenance. Every input must support the selected host.
 See [catalog composition](SDK.md#compose-application-catalogs) and
 [qualification](../../tests/packages/composition-check.md), including
 [explicit host selection](../../tests/packages/composition-target-check.md).
+Composition retires each validated input before reading the next and returns
+independently owned metadata with an idempotent `CompositionInfo.close()`.
+See [composition ownership qualification](../../tests/packages/composition-ownership-check.md)
+for measured planner lifetimes, unchanged canonical bytes and both target guests.
 
 The [application SDK module](appsdk/context.v) supplies an owned launch context
 with installed app/runtime versions, publisher provenance, admitted generation,

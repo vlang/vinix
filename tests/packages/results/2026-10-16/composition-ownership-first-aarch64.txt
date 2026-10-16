@@ -1,0 +1,22 @@
+/Users/alex/code/vinix/build/package-release-work/v-toolchain/v -os linux -arch arm64 -gc none -d no_backtrace -d no_segfault_handler -path @vlib|@vmodules|/Users/alex/code/vinix/.|/Users/alex/code/vinix/tools/accounts -o /Users/alex/code/vinix/build/pco-arm-1/guest/program-3/release.c /Users/alex/code/vinix/tools/packages/pkgcore/release_test.v
+v: exit status 1
+   78 | fn composition_result(info CompositionInfo, directory string) CompositionInfo {
+   79 |     mut sources := []CompositionSource{cap: info.sources.len}
+   80 |     for source in info.sources { sources << CompositionSource{ id: source.id.clone(), catalog_sha256: source.catalog_sha256.clone() } }
+      |            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   81 |     return CompositionInfo{ directory: directory.clone(), catalog: directory + '/catalog.json',
+   82 |         catalog_sha256: info.catalog_sha256.clone(), architectures: review_strings(info.architectures), package_count: info.package_count, sources: sources }
+tools/packages/pkgcore/composition.v:155:24: error: unknown module `item`
+  153 |             if count > 0 { bytes << `,` }
+  154 |             prefix := source.id + '/' + item.source
+  155 |             defer { unsafe { prefix.free() } }
+      |                                 ~~~~
+  156 |             json2.encode_append(CatalogImport{ source: prefix, recipe: item.recipe }, mut bytes)
+  157 |             if bytes.len > max_metadata { return error('composed catalog exceeds metadata limit') }
+tools/packages/pkgcore/composition.v:173:9: error: unknown module `count: merged.packages`
+  171 |     digest = index_digest(text)
+  172 |     provenance = composition_json(CompositionRecord{ catalog_sha256: digest, architectures: architectures, package_count: merged.packages.len, sources: records })
+  173 |     accepted = true
+      |            ~~~~~~~~
+  174 |     return CompositionPlan{ text: text, provenance: provenance,
+  175 |         info: CompositionInfo{ catalog_sha256: digest, architectures: architectures, package_count: merged.packages.len, sources: records } }

@@ -745,6 +745,23 @@ returns format-1 JSON with `directory`, `catalog`, `catalog_sha256`,
 Keep the provenance file with the reviewed lock; `pack-catalog` imports the
 combined lock through its existing pinned workflow.
 
+The V APIs `pkgcore.compose_catalog` and `pkgcore.compose_catalog_for` return
+owned `CompositionInfo` metadata. Retire it after its last use:
+
+```v
+mut info := pkgcore.compose_catalog_for('aarch64', sources, destination)!
+defer { info.close() }
+```
+
+Its strings, architecture list and source records are independent of caller
+arguments and temporary plans. `close()` is idempotent and only releases metadata;
+the published directory remains available. Each complete input catalog is
+validated and retired before the next is read. Selected records accumulate as
+bounded JSON bytes, then undergo the same combined validation and canonical
+encoding. Format-1 catalog, provenance and CLI result bytes remain unchanged.
+See [composition ownership qualification](../../tests/packages/composition-ownership-check.md)
+for tracked planning/refusal lifetimes and target checks.
+
 An existing destination is never replaced. Failures remove the private staging
 directory; an abrupt kill can leave an unpublished `.vinix-composition-*`
 directory. A parent-flush diagnostic after publication requires storage

@@ -64,11 +64,14 @@ VINIX_HWTEST_TCG=1 V=/path/to/reviewed/v VFLAGS=-nocache \
 ```
 
 Repeat the guest command for `x86_64` with its matching kernel and a fresh state
-directory. The controller builds the guest and four assertion runners afresh,
-copies the supplied kernel, checks every required marker and guest-initiated
-poweroff, then records seven artifact hashes. Guests exercise functional
+directory. The current controller builds the guest, five assertion runners and
+the package CLI afresh, copies the supplied kernel, checks every required marker
+and guest-initiated poweroff, then records nine artifact hashes. Guests exercise functional
 normalization, owned-result lifetimes, signed release admission and composed
-offline maintenance; allocation tracking runs on the host.
+offline maintenance; allocation tracking runs on the host. The additional
+composition ownership runner and literal CLI/API checks are qualified in the
+[follow-up report](composition-ownership-check.md). The original receipts below
+predate those additions and retain their seven-artifact scope.
 
 ## Qualification, 2026-10-16
 
@@ -105,6 +108,8 @@ literal CLI arguments through that helper.
   and [V evidence verifier](results/2026-10-16/catalog-normalize-retain.v).
 
 This scope covers normalization and structural release validation after returned
-owners/errors are retired. Payload acquisition, complete builder/composer result
-ownership, graphical sessions, production catalog enrollment and crash/device
-acceptance remain separate work in roadmap section 14.
+owners/errors are retired. Composer planning/result ownership has a
+[separate follow-up](composition-ownership-check.md). Payload acquisition,
+complete builder/publication-helper lifetimes, graphical sessions, production
+catalog enrollment and crash/device acceptance remain separate work in roadmap
+section 14.
