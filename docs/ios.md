@@ -7960,23 +7960,47 @@ The actual IPA callback invokes `_nw_interface_get_name` at `0x1005ada54`.
 The native test driver also bounds QEMU shutdown: if its owned child ignores
 SIGTERM, it sends SIGKILL after two seconds and reaps it before removing payloads.
 
-Fifteen more required imports resolve. The actual IPA exits with status 1 before
-application entry at `_CHHapticDynamicParameterIDHapticIntensityControl` from
-CoreHaptics. Image sample construction, codec execution and the system Metal
-device/renderer remain unavailable. Fortnite remains unplayable and full iOS
-regression remains unpassed.
+Those fifteen required imports resolved; the following probe stopped before
+application entry at `_CHHapticDynamicParameterIDHapticIntensityControl`.
+
+CoreHaptics now exports the five NSString pointer cells imported by the IPA:
+`CHHapticDynamicParameterIDHapticIntensityControl`,
+`CHHapticDynamicParameterIDHapticSharpnessControl`,
+`CHHapticEventParameterIDHapticIntensity`,
+`CHHapticEventParameterIDHapticSharpness` and `CHHapticEventTypeHapticContinuous`.
+Their measured values are `HapticIntensityControl`, `HapticSharpnessControl`,
+`HapticIntensity`, `HapticSharpness` and `HapticContinuous`. One sealed read-only
+page holds stable cells, immortal CFSTR records and UTF-8 bytes. Publication is
+serialized; retirement waits for collection, pool-destructor and Swift-context
+owners to drain before unregistering the strings and unmapping the page. Exports
+are scoped to CoreHaptics. Haptic parameter objects, engine playback and device
+output remain unavailable.
+
+The installed Mac library and V runtime pass the same concurrent-reader,
+retain/release, autorelease, string-equality and retained-dictionary checks.
+Eight host sanitizer runs and four ARM64 Vinix suites additionally cover two
+runtime lifetimes, pool-destructor availability, DeviceCheck, Network path
+monitoring and autorelease pools. Eleven generated C streams and executables,
+native measurements and joined guest evidence are retained under
+`build/ios/fortnite/corehaptics-constants-checks`. The actual IPA dereferences the
+intensity-control cell at `0x100804008`.
+
+Five further required imports resolve. The actual IPA exits with status 1 before
+application entry at `_CACurrentMediaTime`. Image sample construction, codec
+execution and the system Metal device/renderer remain unavailable. Fortnite
+remains unplayable and full iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,662 | 498 | 79 |
+| Fortnite executable | 1,667 | 493 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,497 | 501 | 120 |
+| All images | 2,502 | 496 | 120 |
 
-The C++/GLES/Text variant reports 2,511 resolved imports, 487 unresolved strong
+The C++/GLES/Text variant reports 2,516 resolved imports, 482 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

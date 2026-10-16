@@ -6,6 +6,9 @@ import os
 // Framework class descriptors provide inheritance and native subclass layout.
 // Their API methods are implemented individually; absent methods still fail.
 fn framework_symbol(library string, symbol string) ?u64 {
+	if library == '/System/Library/Frameworks/CoreHaptics.framework/CoreHaptics' {
+		if address := corehaptics_constant_symbol(symbol) { return address }
+	}
 	if library == '/System/Library/Frameworks/Network.framework/Network' {
 		if address := nw_symbol(symbol) { return address }
 	}

@@ -297,6 +297,7 @@ mut:
 	avfoundation_constants_arena u64 // Sealed AVFoundation NSString cells and records.
 	foundation_keys_arena u64 // Sealed ubiquity, underlying-error and web-activity NSString cells.
 	devicecheck_arena u64 // Sealed DeviceCheck error-domain cell, CFSTR record and bytes.
+	corehaptics_constants_arena u64 // Sealed CoreHaptics NSString cells, records and bytes.
 	file_manager u64 // One owned NSFileManager cache reference, retired at shutdown.
 	process_info u64 // One owned NSProcessInfo singleton reference.
 	process_arguments u64 // Owned app arguments, configured before image initialization.
@@ -701,6 +702,7 @@ fn objc_stop() {
 	ns_url_session_constants_stop()
 	ns_foundation_keys_stop()
 	devicecheck_stop()
+	corehaptics_constants_stop()
 	avfoundation_constants_stop()
 	corevideo_constants_stop()
 	coremedia_constants_stop()
