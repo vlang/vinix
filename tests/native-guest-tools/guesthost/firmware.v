@@ -6,12 +6,6 @@ module guesthost
 #include <sys/stat.h>
 #include <unistd.h>
 
-struct C.stat {
-	st_size i64
-	st_mode u32
-	st_blocks i64
-}
-
 fn C.open(&char, int, ...) i32
 fn C.read(i32, voidptr, usize) isize
 fn C.write(i32, voidptr, usize) isize
