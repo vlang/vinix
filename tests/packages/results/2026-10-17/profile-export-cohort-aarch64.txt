@@ -1,0 +1,44 @@
+FAIL aarch64 packages-native-image (91.3s)
+  forbidden "V panic:" in the line: V panic: cannot read prepared payload: licenses/application-sdk-MIT.txt
+  last 40 serial lines:
+  | mapping 1644 42595328
+  | process 4 55036
+  | thread 5 528800
+  | scratch 2 16638
+  | Denied.invalid: 0
+  | Denied.accounts: 0
+  | Denied.objects: 0
+  | Denied.global: 0
+  | Denied.owner: 1
+  | Denied.cgroup: 0
+  | LastDenied: owner
+  | LastDeniedOwner: 8/8
+  | LastDeniedKind: scratch
+  | LastDeniedRequested: 131200
+  | LastDeniedGlobalBytes: 59515346
+  | LastDeniedOwnerBytes: 57933458
+  | 
+  | /proc/meminfo
+  | MemTotal:       907184 kB
+  | MemFree:        759520 kB
+  | MemAvailable:   759520 kB
+  | Buffers:               0 kB
+  | Cached:         0 kB
+  | SwapTotal:      0 kB
+  | SwapFree:       0 kB
+  | Zswap:          0 kB
+  | Zswapped:       0 kB
+  | VinixPageouts:  0
+  | VinixRefaults:  0
+  | VinixSwapErrors: 0
+  | Slab:           8000 kB
+  | VinixMemoryPressure: 0
+  | 
+  | PROFILE EXPORT open descriptors ['0', '1', '2', '3']
+  | V panic: cannot read prepared payload: licenses/application-sdk-MIT.txt
+  |  v hash: 826e96f
+  |     pid: 0x1c0d
+  |     tid: 0x1c0d
+  | 
+  | V panic: Assertion failed...
+  logs: /Users/alex/code/vinix/build/pe-arm-2/native

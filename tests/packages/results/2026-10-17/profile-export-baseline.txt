@@ -1,0 +1,10 @@
+PROFILE EXPORT baseline native refused=true replacement-preserved=false
+PROFILE EXPORT baseline sqlite refused=true replacement-preserved=false
+PROFILE EXPORT baseline ffmpeg refused=true replacement-preserved=false
+PROFILE EXPORT baseline wine refused=true replacement-preserved=false
+PROFILE EXPORT baseline apple refused=true replacement-preserved=false
+tools/packages/pkgcore/profile_export_test.v:220: fn test_profile_export_failed_cleanup_preserves_replacements
+   > assert preserved == 5
+     Left value (len: 1): `0`
+    Right value (len: 1): `5`
+

@@ -1,0 +1,44 @@
+FAIL aarch64 packages-native-image (81.2s)
+  forbidden "V panic:" in the line: V panic: failed to open file "/tmp/vinix-native-profile-24676-1792192675831026/roots/x86_64/bin/counter"
+  last 40 serial lines:
+  | 
+  | *** aarch64: Kernel initialisation complete ***
+  | *** Starting /sbin/init ***
+  | syspower: power button through the event device at 0x9080000
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | HWTEST START packages-native-image
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | PACKAGE IMAGE CONFIG booted with staged trust policy and launch account before first refresh PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | PACKAGE IMAGE CAPTURE guarded preparation publication checked retirement replacement preservation retry and saved output PASS
+  | PACKAGE IMAGE BUNDLE production-staged signed repository before first refresh PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | random: reseeded from 70183 events, 4 hardware words
+  | PACKAGE CATALOG EXPORT guarded workspace composition host selection recovery retry saved output and signed offline consumption PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | /Users/alex/code/vinix/tests/accounts/guest/package_native_catalog.v:143: FAIL: fn main.image_repository_assertions: assert profiles.status == 0, profiles.output
+  |    left value: profiles.status = 1
+  |   right value: 0
+  |       message: PROFILE EXPORT baseline native refused=true replacement-preserved=true
+  | PROFILE EXPORT baseline sqlite refused=true replacement-preserved=true
+  | PROFILE EXPORT baseline ffmpeg refused=true replacement-preserved=true
+  | PROFILE EXPORT baseline wine refused=true replacement-preserved=true
+  | PROFILE EXPORT baseline apple refused=true replacement-preserved=true
+  | /Users/alex/code/vinix/tools/packages/pkgcore/profile_export_test.v:323: fn test_profile_export_captured_roots_children_parent_and_exact_retry failed propagation with error: cannot read prepared payload: bin/counter
+  | V panic: failed to open file "/tmp/vinix-native-profile-24676-1792192675831026/roots/x86_64/bin/counter"
+  |  v hash: 826e96f
+  |     pid: 0x6064
+  |     tid: 0x6064
+  | 
+  | V panic: Assertion failed...
+  logs: /Users/alex/code/vinix/build/pe-arm-1/native

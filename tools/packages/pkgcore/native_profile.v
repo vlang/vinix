@@ -80,9 +80,18 @@ fn native_catalog_with(version string, source_roots string, destination string, 
 	scratch = mirror_cost(scratch, scratch)!
 	disk_check(options.available_space(parent)!, mirror_cost(needed, scratch)!, 64 * 1024 * 1024)!
 	disk_check(options.available_space(os.temp_dir())!, scratch, 64 * 1024 * 1024)!
-	stage := export_stage(parent, '.vinix-native-profile')!
-	defer { os.rmdir_all(stage) or {} }
-	options.checkpoint('created', stage)!
+	mut exporting := create_profile_stage(parent, '.vinix-native-profile', 'native SDK profile')!
+	defer { exporting.close() }
+	canonical := write_native_profile(version, roots, target, options, mut exporting) or { return exporting.failure(err) }
+	defer { unsafe { canonical.free() } }
+	exporting.finish(target)!
+	return NativeProfileInfo{ directory: target, catalog: target + '/catalog.json', catalog_sha256: index_digest(canonical),
+		version: version, architectures: ['aarch64', 'x86_64'] }
+}
+
+fn write_native_profile(version string, roots map[string]int, target string, options CatalogOptions, mut exporting ProfileStage) !string {
+	stage := exporting.stage.path
+	exporting.checkpoint('created', options)!
 	mut packages := []CatalogImport{}
 	for architecture in ['aarch64', 'x86_64'] {
 		for recipe in native_profile_templates(architecture, version) {
@@ -100,18 +109,12 @@ fn native_catalog_with(version string, source_roots string, destination string, 
 			}
 			C.close(objects)
 			packages << CatalogImport{ source: architecture, recipe: RootRecipe{ ...recipe, manifest: p } }
+			exporting.checkpoint('packed', options)!
 		}
 	}
 	text := json2.encode(CatalogRecipe{ format: 1, architectures: ['aarch64', 'x86_64'], packages: packages })
 	canonical := json2.encode(catalog_recipe(text)!) + '\n'
 	if canonical.len > max_metadata { return error('native SDK catalog lock exceeds metadata limit') }
-	os.mkdir(stage + '/lock')!
-	os.chmod(stage + '/lock', 0o700)!
-	atomic_write(stage + '/lock/catalog.json', canonical)!
-	options.checkpoint('ready', stage)!
-	if read_metadata(stage + '/lock/catalog.json')! != canonical { return error('native SDK catalog lock changed before publication') }
-	publish_new_directory(stage + '/lock', target, 'native SDK profile')!
-	sync_directory(parent) or { return error('native SDK profile published at ${target}, but its directory flush failed: ${err}') }
-	return NativeProfileInfo{ directory: target, catalog: target + '/catalog.json', catalog_sha256: index_digest(canonical),
-		version: version, architectures: ['aarch64', 'x86_64'] }
+	exporting.publish(canonical, target, options)!
+	return canonical
 }

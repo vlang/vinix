@@ -1,0 +1,44 @@
+FAIL aarch64 packages-native-image (70.2s)
+  forbidden "V panic:" in the line: V panic: Assertion failed...
+  last 40 serial lines:
+  | kmain_thread: pty done
+  | apple-spi-kbd: no device tree; not probing
+  | kmain_thread: console done
+  | devcore: 3 VirtIO devices listed
+  | kmain_thread: writeback done
+  | 
+  | *** aarch64: Kernel initialisation complete ***
+  | *** Starting /sbin/init ***
+  | syspower: power button through the event device at 0x9080000
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | HWTEST START packages-native-image
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | PACKAGE IMAGE CONFIG booted with staged trust policy and launch account before first refresh PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | PACKAGE IMAGE CAPTURE guarded preparation publication checked retirement replacement preservation retry and saved output PASS
+  | PACKAGE IMAGE BUNDLE production-staged signed repository before first refresh PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | random: reseeded from 75959 events, 4 hardware words
+  | PACKAGE CATALOG EXPORT guarded workspace composition host selection recovery retry saved output and signed offline consumption PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | /Users/alex/code/vinix/tests/accounts/guest/package_native_catalog.v:143: FAIL: fn main.image_repository_assertions: assert profiles.status == 0, profiles.output
+  |    left value: profiles.status = 139
+  |   right value: 0
+  |       message: PROFILE EXPORT baseline native refused=true replacement-preserved=true
+  | PROFILE EXPORT baseline sqlite refused=true replacement-preserved=true
+  | PROFILE EXPORT baseline ffmpeg refused=true replacement-preserved=true
+  | PROFILE EXPORT baseline wine refused=true replacement-preserved=true
+  | PROFILE EXPORT baseline apple refused=true replacement-preserved=true
+  | 
+  | V panic: Assertion failed...
+  logs: build/pe-arm-diagnostic-3/native

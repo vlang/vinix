@@ -1,0 +1,1 @@
+PASS x86_64 packages-native-image (550.0s)

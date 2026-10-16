@@ -138,6 +138,18 @@ fn image_repository_assertions(mut t Test) ! {
 	assert catalog.output.contains('CATALOG EXPORT directory-flush and post-rename parent failures retain complete canonical artifacts and accurate saved diagnostics for workspace and all composition target modes PASS')
 	assert catalog.output.contains('CATALOG EXPORT canonical composition and workspace preserve signed release closure and offline install/remove for both consumer architectures PASS')
 	t.say('PACKAGE CATALOG EXPORT guarded workspace composition host selection recovery retry saved output and signed offline consumption PASS')
+	if os.is_file('/usr/share/package-fixtures/profile-exports') {
+		for name in ['native', 'sqlite', 'ffmpeg', 'wine', 'apple']! {
+			for cohort in 0 .. 4 {
+				profiles := run(['/usr/share/package-fixtures/profile-exports', name, cohort.str()], '', none, none)
+				assert profiles.status == 0, profiles.output
+				assert profiles.output.contains('PROFILE EXPORT ' + name + ' cohort ' + cohort.str() + ' 16 substitutions recovery source pins exact retry 32 descriptors PASS')
+				if cohort == 0 { assert profiles.output.contains('PROFILE EXPORT selected profiles retain canonical saved locks after flush, moved-parent and replaced-inventory cleanup failures PASS') }
+			}
+			t.say('PACKAGE PROFILE EXPORT ' + name + ' recovery retry saved output PASS')
+		}
+		t.say('PACKAGE PROFILE EXPORT five captured publisher profiles recovery exact retry and saved output PASS')
+	}
 }
 
 fn scenario_packages_native_image(mut t Test) { qualify_package_native_image(mut t) or { t.check(false, err.msg()) } }

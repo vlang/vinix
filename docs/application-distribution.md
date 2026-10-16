@@ -375,6 +375,12 @@ Catalog workspaces and both composition modes also retain their staging
 parent/root identities. Failed exports preserve replacement and recovery trees;
 publication uses the held parent and keeps saved output after flush or parent
 path failures. See [catalog export checks](../tests/packages/catalog-export-check.md).
+The five publisher profiles apply the same checks to their outer stage and its
+separate inventory/lock directories. Substituted children retain the complete
+private tree for inspection. Only the reviewed canonical lock is published
+through the held directories; later flush or inventory cleanup failure retains
+the saved lock and reports publication. See
+[publisher profile export checks](../tests/packages/profile-export-check.md).
 The workspace builder also owns its metadata/disk-budget plan and returns an
 independently closeable `CatalogInfo`. It finishes metadata admission and budgeting
 before touching prepared roots or destination parents, retaining the existing

@@ -92,9 +92,19 @@ fn sqlite_catalog_with(sqlite_version string, runtime_version string, source_roo
 	scratch = mirror_cost(scratch, scratch)!
 	disk_check(options.available_space(parent)!, mirror_cost(needed, scratch)!, 64 * 1024 * 1024)!
 	disk_check(options.available_space(os.temp_dir())!, scratch, 64 * 1024 * 1024)!
-	stage := export_stage(parent, '.vinix-sqlite-profile')!
-	defer { os.rmdir_all(stage) or {} }
-	options.checkpoint('created', stage)!
+	mut exporting := create_profile_stage(parent, '.vinix-sqlite-profile', 'SQLite profile')!
+	defer { exporting.close() }
+	canonical := write_sqlite_profile(sqlite_version, runtime_version, roots, target, options, mut exporting) or { return exporting.failure(err) }
+	defer { unsafe { canonical.free() } }
+	exporting.finish(target)!
+	return SqliteProfileInfo{ directory: target, catalog: target + '/catalog.json',
+		catalog_sha256: index_digest(canonical), sqlite_version: sqlite_version, runtime_version: runtime_version,
+		architectures: ['aarch64', 'x86_64'] }
+}
+
+fn write_sqlite_profile(sqlite_version string, runtime_version string, roots map[string]int, target string, options CatalogOptions, mut exporting ProfileStage) !string {
+	stage := exporting.stage.path
+	exporting.checkpoint('created', options)!
 	mut packages := []CatalogImport{}
 	for architecture in ['aarch64', 'x86_64'] {
 		for recipe in sqlite_profile_templates(architecture, sqlite_version, runtime_version) {
@@ -116,6 +126,7 @@ fn sqlite_catalog_with(sqlite_version string, runtime_version string, source_roo
 			}
 			C.close(objects)
 			packages << CatalogImport{ source: architecture, recipe: RootRecipe{ ...recipe, manifest: p } }
+			exporting.checkpoint('packed', options)!
 		}
 	}
 	text := json2.encode(CatalogRecipe{ format: 1, architectures: ['aarch64', 'x86_64'], packages: packages })
@@ -123,12 +134,6 @@ fn sqlite_catalog_with(sqlite_version string, runtime_version string, source_roo
 	if canonical.len > max_metadata { return error('SQLite catalog lock exceeds metadata limit') }
 	// Only the reviewed lock is published. Temporary payload copies are removed;
 	// pack-catalog rechecks these exact pins when constructing the workspace.
-	os.mkdir(stage + '/lock')!
-	os.chmod(stage + '/lock', 0o700)!
-	atomic_write(stage + '/lock/catalog.json', canonical)!
-	publish_new_directory(stage + '/lock', target, 'SQLite profile')!
-	sync_directory(parent) or { return error('SQLite profile published at ${target}, but its directory flush failed: ${err}') }
-	return SqliteProfileInfo{ directory: target, catalog: target + '/catalog.json',
-		catalog_sha256: index_digest(canonical), sqlite_version: sqlite_version, runtime_version: runtime_version,
-		architectures: ['aarch64', 'x86_64'] }
+	exporting.publish(canonical, target, options)!
+	return canonical
 }

@@ -63,10 +63,14 @@ pub fn atomic_write_new(path string, text string) ! {
 }
 
 fn atomic_publish_new(parent int, source string, destination string) int {
+	return atomic_publish_between(parent, source, parent, destination)
+}
+
+fn atomic_publish_between(source_parent int, source string, destination_parent int, destination string) int {
 	$if macos {
-		return C.renameatx_np(parent, source.str, parent, destination.str, C.RENAME_EXCL)
+		return C.renameatx_np(source_parent, source.str, destination_parent, destination.str, C.RENAME_EXCL)
 	} $else $if linux {
-		return int(C.syscall(i64(C.SYS_renameat2), parent, source.str, parent, destination.str, u32(1)))
+		return int(C.syscall(i64(C.SYS_renameat2), source_parent, source.str, destination_parent, destination.str, u32(1)))
 	} $else { return -1 }
 }
 

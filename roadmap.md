@@ -655,6 +655,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     checked staging identities, bounded cleanup and captured-parent publication.
     Replacement recovery, source pins, canonical retry, saved-output failures
     and signed offline consumption have explicit regression checks.
+  - [x] [Captured publisher profile staging](tests/packages/profile-export-check.md)
+    protects native SDK, SQLite, FFmpeg, Wine and Apple inventories and locks.
+    Root/child/parent replacements retain recovery data; exclusive publication
+    keeps canonical output after directory flush or private cleanup failure.
   - [x] [Explicit catalog host selection](tests/packages/composition-target-check.md)
     combines complete single-host and dual-host profiles for a declared target,
     preserving shared packages, pinned declarations and full-input provenance.

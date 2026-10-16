@@ -262,11 +262,13 @@ fn stage_native_image(host hwhost.Host, inputs string, root string, work string)
 }
 
 fn check() !int {
+	profiles := '--profiles' in os.args
 	installed := '--installed' in os.args
 	persistent := '--persistent' in os.args || installed
 	software := '--software' in os.args || persistent
-	image := '--image' in os.args || software
-	arguments := os.args[1..].filter(it !in ['--image', '--software', '--persistent', '--installed'])
+	image := '--image' in os.args || software || profiles
+	arguments := os.args[1..].filter(it !in ['--image', '--software', '--persistent', '--installed', '--profiles'])
+	if profiles && software { return error('--profiles selects the native image scenario; run Software scenarios separately') }
 	options := hwhost.parse_options(arguments)!
 	if options.help || options.list { return hwhost.run_suite(if installed { installed_software_suite('', '') }
 		else if persistent { persistent_software_suite('', '') } else { native_suite('', image, software) }, arguments, @FILE) }
@@ -277,8 +279,13 @@ fn check() !int {
 		return error('provide VINIX_HWTEST_TCG=1, VINIX_NATIVE_CATALOG_INPUTS, target VINIX_NATIVE_CATALOG_SANDBOX, --kernel and a new --state-dir')
 	}
 	repository := hwhost.find_root(@FILE)!
-	definition := if installed { installed_software_suite(sandbox, '') }
+	base := if installed { installed_software_suite(sandbox, '') }
 		else if persistent { persistent_software_suite(sandbox, '') } else { native_suite(sandbox, image, software) }
+	definition := if profiles { hwhost.Suite{ ...base,
+		programs: [...base.programs, hwhost.Program{ source: 'tools/packages/pkgcore/profile_export_test.v', path: 'usr/share/package-fixtures/profile-exports' }],
+		scenarios: [hwhost.Scenario{ ...base.scenarios[0], timeout: 900, required: [...base.scenarios[0].required,
+			'PACKAGE PROFILE EXPORT five captured publisher profiles recovery exact retry and saved output PASS'] }] }
+	} else { base }
 	hwhost.validate_scenarios(definition.scenarios)!
 	selection := hwhost.select_scenarios(definition.scenarios, options.arch, options.scenarios)!
 	if selection.run.len != 1 { return error('select packages-native-catalog, --image packages-native-image, --software packages-software-image, --persistent packages-software-persistence or --installed packages-software-installed') }
@@ -301,6 +308,17 @@ fn check() !int {
 	mut artifacts := [native_artifact('kernel', work + '/kernel')!, native_artifact('guest-init', guest)!]
 	if persistent { artifacts << native_artifact(if installed { 'initial-blank-system-disk' } else { 'initial-ext2' }, disk)! }
 	for file in definition.files { artifacts << native_artifact(file.path, root + '/' + file.path)! }
+	if profiles {
+		archive := os.getenv('VINIX_PROFILE_EXPORT_SOURCE')
+		if !os.is_file(archive) || os.file_size(archive) != pkgcore.ffmpeg_source_bytes
+			|| native_artifact('source', archive)!.sha256 != pkgcore.ffmpeg_source_digest {
+			return error('provide VINIX_PROFILE_EXPORT_SOURCE with the reviewed FFmpeg 8.0.1 source archive')
+		}
+		path := root + '/usr/share/package-fixtures/ffmpeg.tar.xz'
+		os.cp(archive, path)!; os.chmod(path, 0o644)!
+		artifacts << native_artifact('image/usr/share/package-fixtures/ffmpeg.tar.xz', path)!
+		artifacts << native_artifact('image/usr/share/package-fixtures/profile-exports', root + '/usr/share/package-fixtures/profile-exports')!
+	}
 	artifacts << if image { stage_native_image(host, inputs, root, work)! } else { stage_native_inputs(inputs, root)! }
 	if software {
 		artifacts << stage_software_image(host, root, work)!

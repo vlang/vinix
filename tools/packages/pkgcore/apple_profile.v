@@ -131,9 +131,18 @@ fn apple_catalog_with(recipes string, source_roots string, destination string, o
 	scratch = mirror_cost(scratch, scratch)!
 	disk_check(options.available_space(parent)!, mirror_cost(needed, scratch)!, 64 * 1024 * 1024)!
 	disk_check(options.available_space(os.temp_dir())!, scratch, 64 * 1024 * 1024)!
-	stage := export_stage(parent, '.vinix-apple-profile')!
-	defer { os.rmdir_all(stage) or {} }
-	options.checkpoint('created', stage)!
+	mut exporting := create_profile_stage(parent, '.vinix-apple-profile', 'Apple profile')!
+	defer { exporting.close() }
+	canonical := write_apple_profile(imports, fd, target, options, mut exporting) or { return exporting.failure(err) }
+	defer { unsafe { canonical.free() } }
+	exporting.finish(target)!
+	return AppleProfileInfo{ directory: target, catalog: target + '/catalog.json', catalog_sha256: index_digest(canonical),
+		application: app.id.clone(), version: app.version.clone(), runtime: runtime.id.clone(), runtime_version: runtime.version.clone(), architectures: ['aarch64'] }
+}
+
+fn write_apple_profile(imports []RootRecipe, fd int, target string, options CatalogOptions, mut exporting ProfileStage) !string {
+	stage := exporting.stage.path
+	exporting.checkpoint('created', options)!
 	mut packages := []CatalogImport{cap: 2}
 	for recipe in imports {
 		p := pack_root_descriptor(recipe, fd, stage + '/inventory', false)!
@@ -156,15 +165,10 @@ fn apple_catalog_with(recipes string, source_roots string, destination string, o
 			}
 		}
 		packages << CatalogImport{ source: 'aarch64', recipe: RootRecipe{ ...recipe, manifest: p } }
+		exporting.checkpoint('packed', options)!
 	}
 	canonical := json2.encode(catalog_recipe(json2.encode(CatalogRecipe{ format: 1, architectures: ['aarch64'], packages: packages }))!) + '\n'
 	if canonical.len > max_metadata { return error('Apple catalog lock exceeds metadata limit') }
-	os.mkdir(stage + '/lock')!; os.chmod(stage + '/lock', 0o700)!
-	atomic_write(stage + '/lock/catalog.json', canonical)!
-	options.checkpoint('ready', stage)!
-	if read_metadata(stage + '/lock/catalog.json')! != canonical { return error('Apple catalog lock changed before publication') }
-	publish_new_directory(stage + '/lock', target, 'Apple profile')!
-	sync_directory(parent) or { return error('Apple profile published at ${target}, but its directory flush failed: ${err}') }
-	return AppleProfileInfo{ directory: target, catalog: target + '/catalog.json', catalog_sha256: index_digest(canonical),
-		application: app.id.clone(), version: app.version.clone(), runtime: runtime.id.clone(), runtime_version: runtime.version.clone(), architectures: ['aarch64'] }
+	exporting.publish(canonical, target, options)!
+	return canonical
 }

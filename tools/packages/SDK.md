@@ -1137,6 +1137,20 @@ license acceptance occur. A composed release uses its publisher's one key;
 composition does not merge independently signed repositories or authenticate
 upstream inputs. See [qualification](../../tests/packages/composition-check.md).
 
+### Publisher profile staging
+
+The native SDK, SQLite, FFmpeg, Wine and Apple publisher profiles capture their
+private root, payload inventory and catalog-lock directories. They recheck those
+identities after creation, each imported package and readiness. A replaced child
+prevents cleanup of the private tree; the diagnostic retains both the original
+error and the recovery path. Publication moves only the reviewed lock from the
+held root into the held parent using exclusive rename. Temporary inventories
+are retired separately. A flush, changed parent or inventory cleanup failure
+after rename reports that the catalog was published and retains it. Inspect
+that saved lock before retrying to a new destination. Source validation,
+license/runtime declarations, host coverage and canonical pins still apply. See
+[publisher profile export qualification](../../tests/packages/profile-export-check.md).
+
 ### Native SDK publisher profile
 
 `native-catalog VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY` emits a pinned catalog

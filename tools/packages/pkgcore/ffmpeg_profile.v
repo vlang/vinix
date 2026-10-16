@@ -114,9 +114,18 @@ fn ffmpeg_catalog_with(runtime_version string, source_roots string, destination 
 	scratch = mirror_cost(scratch, scratch)!
 	disk_check(options.available_space(parent)!, mirror_cost(needed, scratch)!, 64 * 1024 * 1024)!
 	disk_check(options.available_space(os.temp_dir())!, scratch, 64 * 1024 * 1024)!
-	stage := export_stage(parent, '.vinix-ffmpeg-profile')!
-	defer { os.rmdir_all(stage) or {} }
-	options.checkpoint('created', stage)!
+	mut exporting := create_profile_stage(parent, '.vinix-ffmpeg-profile', 'FFmpeg profile')!
+	defer { exporting.close() }
+	canonical := write_ffmpeg_profile(runtime_version, roots, target, options, mut exporting) or { return exporting.failure(err) }
+	defer { unsafe { canonical.free() } }
+	exporting.finish(target)!
+	return FfmpegProfileInfo{ directory: target, catalog: target + '/catalog.json', catalog_sha256: index_digest(canonical),
+		runtime_version: runtime_version, architectures: ['aarch64', 'x86_64'] }
+}
+
+fn write_ffmpeg_profile(runtime_version string, roots map[string]int, target string, options CatalogOptions, mut exporting ProfileStage) !string {
+	stage := exporting.stage.path
+	exporting.checkpoint('created', options)!
 	mut packages := []CatalogImport{}
 	for architecture in ['aarch64', 'x86_64'] {
 		for recipe in ffmpeg_templates(architecture, runtime_version) {
@@ -140,16 +149,12 @@ fn ffmpeg_catalog_with(runtime_version string, source_roots string, destination 
 			}
 			C.close(objects)
 			packages << CatalogImport{ source: architecture, recipe: RootRecipe{ ...recipe, manifest: p } }
+			exporting.checkpoint('packed', options)!
 		}
 	}
 	canonical := json2.encode(catalog_recipe(json2.encode(CatalogRecipe{ format: 1,
 		architectures: ['aarch64', 'x86_64'], packages: packages }))!) + '\n'
 	if canonical.len > max_metadata { return error('FFmpeg catalog lock exceeds metadata limit') }
-	os.mkdir(stage + '/lock')!
-	os.chmod(stage + '/lock', 0o700)!
-	atomic_write(stage + '/lock/catalog.json', canonical)!
-	publish_new_directory(stage + '/lock', target, 'FFmpeg profile')!
-	sync_directory(parent) or { return error('FFmpeg profile published at ${target}, but its directory flush failed: ${err}') }
-	return FfmpegProfileInfo{ directory: target, catalog: target + '/catalog.json', catalog_sha256: index_digest(canonical),
-		runtime_version: runtime_version, architectures: ['aarch64', 'x86_64'] }
+	exporting.publish(canonical, target, options)!
+	return canonical
 }

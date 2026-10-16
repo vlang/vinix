@@ -1,0 +1,19 @@
+profile_export-compile PASS
+profile_export-run PASS
+profile_export-sanitize-compile PASS
+profile_export-sanitize-run PASS
+native_profile-compile PASS
+native_profile-run PASS
+sqlite_profile-compile PASS
+sqlite_profile-run PASS
+ffmpeg_profile-compile PASS
+ffmpeg_profile-run PASS
+wine_profile-compile PASS
+wine_profile-run PASS
+apple_profile-compile PASS
+apple_profile-run PASS
+atomic-compile PASS
+atomic-run PASS
+export_stage-compile PASS
+export_stage-run PASS
+Profile export: eighteen host build/test checks PASS

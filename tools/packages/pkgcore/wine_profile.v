@@ -127,9 +127,19 @@ fn wine_catalog_with(recipes string, source_roots string, destination string, op
 	scratch = mirror_cost(scratch, scratch)!
 	disk_check(options.available_space(parent)!, mirror_cost(needed, scratch)!, 64 * 1024 * 1024)!
 	disk_check(options.available_space(os.temp_dir())!, scratch, 64 * 1024 * 1024)!
-	stage := export_stage(parent, '.vinix-wine-profile')!
-	defer { os.rmdir_all(stage) or {} }
-	options.checkpoint('created', stage)!
+	mut exporting := create_profile_stage(parent, '.vinix-wine-profile', 'Wine profile')!
+	defer { exporting.close() }
+	canonical := write_wine_profile(imports, roots, target, options, mut exporting) or { return exporting.failure(err) }
+	defer { unsafe { canonical.free() } }
+	exporting.finish(target)!
+	return WineProfileInfo{ directory: target, catalog: target + '/catalog.json', catalog_sha256: index_digest(canonical),
+		application: app.id.clone(), version: app.version.clone(), runtime: runtime.id.clone(), runtime_version: runtime.version.clone(),
+		architectures: ['aarch64', 'x86_64'] }
+}
+
+fn write_wine_profile(imports []WineImport, roots map[string]int, target string, options CatalogOptions, mut exporting ProfileStage) !string {
+	stage := exporting.stage.path
+	exporting.checkpoint('created', options)!
 	mut packages := []CatalogImport{}
 	for item in imports {
 		recipe := item.recipe
@@ -150,18 +160,11 @@ fn wine_catalog_with(recipes string, source_roots string, destination string, op
 			}
 		}
 		packages << CatalogImport{ source: item.architecture, recipe: RootRecipe{ ...recipe, manifest: p } }
+		exporting.checkpoint('packed', options)!
 	}
 	text := json2.encode(CatalogRecipe{ format: 1, architectures: ['aarch64', 'x86_64'], packages: packages })
 	canonical := json2.encode(catalog_recipe(text)!) + '\n'
 	if canonical.len > max_metadata { return error('Wine catalog lock exceeds metadata limit') }
-	os.mkdir(stage + '/lock')!
-	os.chmod(stage + '/lock', 0o700)!
-	atomic_write(stage + '/lock/catalog.json', canonical)!
-	options.checkpoint('ready', stage)!
-	if read_metadata(stage + '/lock/catalog.json')! != canonical { return error('Wine catalog lock changed before publication') }
-	publish_new_directory(stage + '/lock', target, 'Wine profile')!
-	sync_directory(parent) or { return error('Wine profile published at ${target}, but its directory flush failed: ${err}') }
-	return WineProfileInfo{ directory: target, catalog: target + '/catalog.json', catalog_sha256: index_digest(canonical),
-		application: app.id.clone(), version: app.version.clone(), runtime: runtime.id.clone(), runtime_version: runtime.version.clone(),
-		architectures: ['aarch64', 'x86_64'] }
+	exporting.publish(canonical, target, options)!
+	return canonical
 }
