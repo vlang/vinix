@@ -112,6 +112,13 @@ fn deployment_plan(config Config, directory string, current State, document Depl
 	catalog := load_catalog(config, directory)!
 	mut accepted := false
 	defer { if !accepted { close_authenticated_catalog(catalog) } }
+	plan := resolve_locked_deployment(config, catalog, current, document)!
+	accepted = true // returned plan manifests borrow the authenticated catalog
+	return plan
+}
+
+// Returned plan storage owns only its buffers; manifests borrow this catalog.
+fn resolve_locked_deployment(config Config, catalog Catalog, current State, document DeploymentLock) !Plan {
 	candidates := locked_deployment_candidates(catalog, document)!
 	defer { unsafe { (&array(&candidates)).free() } }
 	// The normal solver still enforces architecture, organization policy,
@@ -122,7 +129,6 @@ fn deployment_plan(config Config, directory string, current State, document Depl
 		unsafe { (&array(&plan.requested)).free(); (&array(&plan.packages)).free() }
 		return error('deployment lock includes packages outside the requested dependency closure')
 	}
-	accepted = true // returned plan manifests borrow the authenticated catalog
 	return plan
 }
 

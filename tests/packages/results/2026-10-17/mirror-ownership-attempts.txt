@@ -1,0 +1,11 @@
+Initial guest setup: QMP socket path too long; no guest boot. Shorter-path retries below use unchanged product and fixture source.
+FAIL aarch64 packages-mirror-ownership (0.0s)
+  /Users/alex/code/vinix/build/package-mirror-ownership-work/guest-arm-1/packages-mirror-ownership/qmp.sock is too long for a unix socket; use a shorter --state-dir
+  nothing was printed on the serial port
+  logs: /Users/alex/code/vinix/build/package-mirror-ownership-work/guest-arm-1/packages-mirror-ownership
+package-mirror-ownership aarch64: 0 passed, 1 failed, 0 skipped
+FAIL x86_64 packages-mirror-ownership (0.0s)
+  /Users/alex/code/vinix/build/package-mirror-ownership-work/guest-x86-1/packages-mirror-ownership/qmp.sock is too long for a unix socket; use a shorter --state-dir
+  nothing was printed on the serial port
+  logs: /Users/alex/code/vinix/build/package-mirror-ownership-work/guest-x86-1/packages-mirror-ownership
+package-mirror-ownership x86_64: 0 passed, 1 failed, 0 skipped

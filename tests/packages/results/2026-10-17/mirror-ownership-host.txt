@@ -1,0 +1,9 @@
+ownership-compile PASS
+ownership-run PASS
+mirror_ownership-sanitize-compile PASS
+mirror_ownership-sanitize-run PASS
+mirror-sanitize-compile PASS
+mirror-sanitize-run PASS
+deployment-sanitize-compile PASS
+deployment-sanitize-run PASS
+Mirror ownership: eight host build/test checks PASS

@@ -1685,6 +1685,14 @@ can reuse the same review if those bound inputs still match. `--progress` also
 works with `mirror` and `mirror-apply`. The direct `mirror` command remains useful
 for authorized automation.
 
+Mirror preparation explicitly owns and retires its catalog, decoded snapshots,
+plan storage, captured lock and path/hash scratch on success or refusal. Returned
+V reviews own their presentation fields independently and can be retired with
+`.close()`. Deployment roots survive retirement of the decoded lock document.
+The existing ordinary/deployment fingerprint bytes and export approval rules
+are preserved. See [mirror ownership checks](../tests/packages/mirror-ownership-check.md)
+for measured preparation components, signed export regressions and scope limits.
+
 Export requires a new destination. The service checks space for unique objects,
 metadata and policy reserves on the destination disk and for missing source-cache
 objects; when both paths share a disk it budgets both copies together. It builds

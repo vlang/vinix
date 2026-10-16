@@ -55,6 +55,27 @@ struct PreparedMirror {
 	fingerprint string
 	deployment_text string
 	deployment_sha256 string
+	catalog Catalog // owns authenticated manifests; publisher strings borrow Config
+	source_snapshots []Snapshot // owns fields borrowed by the selected snapshot array
+}
+
+fn (mut prepared PreparedMirror) close() {
+	close_authenticated_catalog(prepared.catalog)
+	close_decoded_snapshots(prepared.source_snapshots)
+	unsafe {
+		prepared.plan.requested.free(); (&array(&prepared.plan.packages)).free()
+		(&array(&prepared.snapshots)).free()
+		prepared.target.free(); prepared.ancestor.free(); prepared.fingerprint.free()
+		prepared.deployment_text.free(); prepared.deployment_sha256.free()
+	}
+	prepared = PreparedMirror{}
+}
+
+fn mirror_path_exists(path string) !bool {
+	mut info := C.stat{}
+	if C.lstat(path.str, unsafe { &info }) == 0 { return true }
+	if C.errno in [C.ENOENT, C.ENOTDIR]! { return false }
+	return error('cannot inspect offline mirror path: ' + path)
 }
 
 // Resolve missing parents without creating them. The review binds the existing
@@ -63,48 +84,82 @@ fn mirror_location(destination string) !(string, string) {
 	if destination == '' || !printable(destination, 4096) || destination.contains('\\') {
 		return error('offline mirror requires a valid destination path')
 	}
-	path := os.abs_path(destination).trim_right('/')
-	if path == '' || os.exists(path) || os.is_link(path) {
+	absolute := mirror_absolute_path(destination)!
+	path := absolute.trim_right('/')
+	defer { unsafe { absolute.free(); path.free() } }
+	if path == '' || mirror_path_exists(path)! {
 		return error('offline mirror destination must be new')
 	}
 	mut ancestor := os.dir(path)
-	for !os.exists(ancestor) && !os.is_link(ancestor) { ancestor = os.dir(ancestor) }
-	if !os.is_dir(ancestor) { return error('offline mirror parent must be a directory') }
-	real := os.real_path(ancestor)
+	defer { unsafe { ancestor.free() } }
+	for !mirror_path_exists(ancestor)! {
+		next := os.dir(ancestor); unsafe { ancestor.free() }; ancestor = next
+	}
+	mut info := C.stat{}
+	if C.fstatat(C.AT_FDCWD, ancestor.str, unsafe { &info }, 0) != 0 || info.st_mode & 0o170000 != 0o040000 { return error('offline mirror parent must be a directory') }
+	real := mirror_real_path(ancestor)!
+	mut accepted := false
+	defer { if !accepted { unsafe { real.free() } } }
 	check_export_parent(real, 'offline mirror')!
 	suffix := path[ancestor.len..]
-	target := real.trim_right('/') + if ancestor == '/' { '/' + suffix } else { suffix }
-	if os.exists(target) || os.is_link(target) { return error('offline mirror destination must be new') }
+	trimmed := real.trim_right('/')
+	ending := if ancestor == '/' { '/' + suffix } else { suffix.clone() }
+	defer { unsafe { suffix.free(); trimmed.free(); ending.free() } }
+	target := trimmed + ending
+	defer { if !accepted { unsafe { target.free() } } }
+	if mirror_path_exists(target)! { return error('offline mirror destination must be new') }
+	accepted = true
 	return target, real
 }
 
 fn prepare_mirror(config Config, directory string, destination string, names []string) !PreparedMirror {
 	if names.len == 0 || names.len > 4096 { return error('offline mirror requires 1 to 4096 package IDs') }
 	catalog := load_catalog(config, directory)!
+	mut accepted := false
+	defer { if !accepted { close_authenticated_catalog(catalog) } }
 	plan := resolve(catalog, config, State{}, names, true)!
-	return prepare_mirror_plan(config, directory, destination, names, plan, '', '')
+	defer { unsafe { (&array(&plan.requested)).free(); (&array(&plan.packages)).free() } }
+	prepared := prepare_mirror_plan(config, directory, destination, names, plan, '', '')!
+	accepted = true
+	return PreparedMirror{ ...prepared, catalog: catalog }
 }
 
 fn prepare_mirror_plan(config Config, directory string, destination string, names []string, plan Plan, deployment string, text_lock string) !PreparedMirror {
 	target, ancestor := mirror_location(destination)!
-	mut snapshots := []Snapshot{}
-	for snapshot in read_snapshots(directory)! {
-		if config.repositories.any(it == snapshot.repository) { snapshots << snapshot }
+	mut accepted := false
+	defer { if !accepted { unsafe { target.free(); ancestor.free() } } }
+	source_snapshots := read_snapshots(directory)!
+	defer { if !accepted { close_decoded_snapshots(source_snapshots) } }
+	mut snapshots := []Snapshot{cap: source_snapshots.len}
+	defer { if !accepted { unsafe { (&array(&snapshots)).free() } } }
+	for snapshot in source_snapshots {
+		if config.repositories.any(it == snapshot.repository) { unsafe { snapshots.push_many(&snapshot, 1) } }
 	}
 	base_exported, acquired := mirror_space(plan, snapshots, directory)!
 	exported := if text_lock == '' { base_exported } else { mirror_cost(base_exported, u64(text_lock.len))! }
 	lock_sha256 := if text_lock == '' { '' } else { index_digest(text_lock) }
-	info := os.stat(ancestor)!
-	text := json2.encode(MirrorIdentity{ config: config, names: names, plan: plan, snapshots: snapshots,
+	defer { if !accepted { unsafe { lock_sha256.free() } } }
+	mut info := C.stat{}; mut stored := C.stat{}
+	if C.fstatat(C.AT_FDCWD, ancestor.str, unsafe { &info }, 0) != 0 || C.fstatat(C.AT_FDCWD, directory.str, unsafe { &stored }, 0) != 0 { return error('cannot inspect offline mirror filesystems') }
+	mut bytes := []u8{cap: 2048}
+	unsafe { bytes.flags |= .noslices }
+	defer { unsafe { bytes.free() } }
+	json2.encode_append(MirrorIdentity{ config: config, names: names, plan: plan, snapshots: snapshots,
 		domain: if deployment == '' { 'vinix-mirror-review-1' } else { 'vinix-deployment-mirror-review-1' },
-		destination: destination, target: target, ancestor: ancestor, device: info.dev, inode: info.inode,
-		deployment: deployment, deployment_sha256: lock_sha256 })
-	bytes := text.bytes()
-	fingerprint := sha256.sum(bytes).hex()
-	unsafe { bytes.free(); text.free() }
-	return PreparedMirror{ target: target, ancestor: ancestor, plan: plan, snapshots: snapshots,
-		exported: exported, acquired: acquired, shared_disk: info.dev == os.stat(directory)!.dev,
-		fingerprint: fingerprint, deployment_text: text_lock, deployment_sha256: lock_sha256 }
+		destination: destination, target: target, ancestor: ancestor, device: u64(info.st_dev), inode: u64(info.st_ino),
+		deployment: deployment, deployment_sha256: lock_sha256 }, mut bytes)
+	mut hash := sha256.new(); mut digest := []u8{len: sha256.size}
+	defer { unsafe { hash.free(); free(hash); digest.free() } }
+	hash.write(bytes)!
+	hash.checksum_into(mut digest)
+	fingerprint := digest.hex()
+	accepted = true
+	return PreparedMirror{ target: target, ancestor: ancestor,
+		// Deployment roots outlive their decoded document; package fields borrow
+		// the independently retained catalog (or a live caller's fixture plan).
+		plan: Plan{ requested: review_strings(plan.requested), packages: plan.packages.clone() }, snapshots: snapshots, source_snapshots: source_snapshots,
+		exported: exported, acquired: acquired, shared_disk: info.st_dev == stored.st_dev,
+		fingerprint: fingerprint, deployment_text: text_lock.clone(), deployment_sha256: lock_sha256 }
 }
 
 fn mirror_destination_cost(prepared PreparedMirror) !u64 {
@@ -115,14 +170,21 @@ fn mirror_destination_cost(prepared PreparedMirror) !u64 {
 
 pub fn (service Service) review_mirror(destination string, names []string) !pkgprotocol.MirrorReview {
 	directory := service.directory()!
+	defer { unsafe { directory.free() } }
 	guard := acquire_reader(directory)!
 	defer { guard.release() }
 	config := service.configuration()!
-	prepared := prepare_mirror(config, directory, destination, names)!
+	defer { close_decoded_configuration(config) }
+	mut prepared := prepare_mirror(config, directory, destination, names)!
+	defer { prepared.close() }
 	return mirror_review(config, directory, destination, names, prepared)
 }
 
 fn mirror_review(config Config, directory string, destination string, names []string, prepared PreparedMirror) !pkgprotocol.MirrorReview {
+	// Finish fallible observations before allocating the independent presentation.
+	cache_available := free_bytes(directory)!
+	disk_needed := mirror_destination_cost(prepared)!
+	disk_available := free_bytes(prepared.ancestor)!
 	mut rows := []pkgprotocol.ReviewPackage{cap: prepared.plan.packages.len}
 	for installed in prepared.plan.packages {
 		rows << review_row(installed, '', installed.package.id in prepared.plan.requested, 'export')
@@ -130,11 +192,11 @@ fn mirror_review(config Config, directory string, destination string, names []st
 	rows.sort(a.id < b.id)
 	mut result := pkgprotocol.MirrorReview{
 		format: 1, destination: prepared.target.clone(), input_destination: destination.clone(),
-		cache_needed: prepared.acquired, cache_available: free_bytes(directory)!, shared_disk: prepared.shared_disk,
+		cache_needed: prepared.acquired, cache_available: cache_available, shared_disk: prepared.shared_disk,
 		review: pkgprotocol.Review{ format: 1, operation: 'mirror'.clone(), names: review_strings(names),
-			architecture: config.architecture.clone(), fingerprint: prepared.fingerprint,
+			architecture: config.architecture.clone(), fingerprint: prepared.fingerprint.clone(),
 			requested: review_strings(prepared.plan.requested), rows: rows,
-			disk_needed: mirror_destination_cost(prepared)!, disk_available: free_bytes(prepared.ancestor)!,
+			disk_needed: disk_needed, disk_available: disk_available,
 			disk_reserve: config.policy.reserve_bytes }
 	}
 	result.validate() or { result.close(); return err }
@@ -144,9 +206,11 @@ fn mirror_review(config Config, directory string, destination string, names []st
 pub fn (service Service) apply_mirror(destination string, names []string, expected string) ! {
 	if !digest_valid(expected) { return error('offline mirror apply requires a review fingerprint') }
 	directory := service.directory()!
+	defer { unsafe { directory.free() } }
 	guard := acquire(directory)!
 	defer { guard.release() }
-	mirror_export(service.configuration()!, directory, destination, names,
+	config := service.configuration()!; defer { close_decoded_configuration(config) }
+	mirror_export(config, directory, destination, names,
 		MirrorOptions{ progress: service.progress, expected_review: expected })!
 }
 
@@ -164,19 +228,23 @@ fn mirror_space(plan Plan, snapshots []Snapshot, directory string) !(u64, u64) {
 	mut acquired := u64(0)
 	mut objects := map[string]bool{}
 	mut cached := map[string]bool{}
+	defer { unsafe { objects.free(); cached.free() } }
 	for snapshot in snapshots {
 		exported = mirror_cost(exported, u64(snapshot.text.len + snapshot.signature.len))!
 	}
 	for installed in plan.packages {
 		for payload in installed.package.files {
 			key := installed.repository + '/' + payload.sha256
+			defer { unsafe { key.free() } }
 			if key !in objects {
 				exported = mirror_cost(exported, payload.bytes)!
 				objects[key] = true
 			}
 			if payload.sha256 !in cached {
 				cached[payload.sha256] = true
-				if !verified_file(directory + '/objects/' + payload.sha256, payload) {
+				path := directory + '/objects/' + payload.sha256
+				defer { unsafe { path.free() } }
+				if !verified_file(path, payload) {
 					acquired = mirror_cost(acquired, payload.bytes)!
 				}
 			}
@@ -186,8 +254,9 @@ fn mirror_space(plan Plan, snapshots []Snapshot, directory string) !(u64, u64) {
 }
 
 fn mirror_export(config Config, directory string, destination string, names []string, options MirrorOptions) ! {
-	prepared := if options.deployment == '' { prepare_mirror(config, directory, destination, names)! }
+	mut prepared := if options.deployment == '' { prepare_mirror(config, directory, destination, names)! }
 		else { prepare_deployment_mirror(config, directory, destination, options.deployment)! }
+	defer { prepared.close() }
 	if options.expected_review != '' && options.expected_review != prepared.fingerprint {
 		return error('offline mirror review is stale: destination, publisher metadata, policy or resolved packages changed; review the export again')
 	}

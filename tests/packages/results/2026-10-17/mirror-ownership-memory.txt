@@ -1,0 +1,7 @@
+MIRROR OWNERSHIP preflight: 1000 path cycles retained 0 bytes; 1000 space cycles retained 0 bytes; 1000 warmed prepared metadata cycles retained 0 bytes
+MIRROR OWNERSHIP relative/absolute dot, backlink, repeated/trailing separator normalization and 1000 relative-path retirements PASS
+MIRROR OWNERSHIP 1000 independent review build/retirement cycles retained 0 bytes
+MIRROR OWNERSHIP review fields survive prepared retirement, repeated close and intact borrowed manifests PASS
+MIRROR OWNERSHIP 2000 filesystem/overflow failure cycles retained 0 bytes
+MIRROR OWNERSHIP occupied/special/unsafe paths, malformed metadata, filesystem and overflow failures preserve inputs, retire scratch and permit retry PASS
+MIRROR OWNERSHIP physical aliases, selected/revoked snapshot lifetimes and byte-identical ordinary/deployment review fingerprints PASS

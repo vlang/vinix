@@ -1,0 +1,3 @@
+MIRROR OWNERSHIP preflight: 64 path cycles retained 496256 bytes; 64 space cycles retained 156800 bytes; 8 prepared metadata cycles retained 1129563 bytes
+tools/packages/pkgcore/mirror_ownership_test.v:50: fn test_mirror_preflight_retires_path_space_and_prepared_metadata_scratch
+    assert paths == 0 && space == 0 && metadata == 0

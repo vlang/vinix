@@ -72,9 +72,12 @@ pub fn (service Service) collect() ! {
 
 pub fn (service Service) mirror(destination string, names []string) ! {
 	directory := service.directory()!
+	defer { unsafe { directory.free() } }
 	guard := acquire(directory)!
 	defer { guard.release() }
-	mirror_export(service.configuration()!, directory, destination, names, MirrorOptions{ progress: service.progress })!
+	config := service.configuration()!
+	defer { close_decoded_configuration(config) }
+	mirror_export(config, directory, destination, names, MirrorOptions{ progress: service.progress })!
 }
 
 fn (service Service) installed_locked(directory string, verify bool) !State {

@@ -4,18 +4,22 @@ module pkgcore
 import os
 
 fn check_export_parent(parent string, kind string) ! {
-	mut path := parent
+	mut path := parent.clone()
+	defer { unsafe { path.free() } }
 	for {
-		info := os.lstat(path)!
+		mut info := C.stat{}
+		if C.lstat(path.str, unsafe { &info }) != 0 { return error('cannot inspect export parent: ' + path) }
 		// Sticky shared directories protect an exclusive child. Other users must
 		// not be able to replace its ancestors while the administrator writes it.
-		if os.is_link(path) || !os.is_dir(path)
-			|| (info.uid != 0 && info.uid != u32(os.geteuid()))
-			|| (info.mode & 0o022 != 0 && info.mode & 0o1000 == 0) {
+		if info.st_mode & 0o170000 != 0o040000
+			|| (info.st_uid != 0 && info.st_uid != u32(os.geteuid()))
+			|| (info.st_mode & 0o022 != 0 && info.st_mode & 0o1000 == 0) {
 			return error('${kind} parent must be controlled by this administrator; writable shared directories require the sticky bit: ${path}')
 		}
 		if path == '/' { return }
-		path = os.dir(path)
+		next := os.dir(path)
+		unsafe { path.free() }
+		path = next
 	}
 }
 

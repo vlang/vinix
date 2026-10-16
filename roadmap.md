@@ -721,6 +721,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
   package format, signing/publishing process and developer documentation.
 - [ ] Support offline repositories/caches and organization-managed deployment;
   keep firmware, proprietary payload licensing and runtime updates explicit.
+  - [x] [Owned offline mirror preparation](tests/packages/mirror-ownership-check.md)
+    retires catalog/snapshot/plan/path/hash scratch and preserves independent
+    reviews, exact ordinary/deployment fingerprints and signed offline retries.
+    Tracked components and both target suites qualify the cleanup; complete
+    service allocation freedom and broader release acceptance remain open.
   - [x] [Release-image package preflight](tests/packages/image-input-check.md)
     validates selected trust/policy and signed bundles without changing the
     image or requiring target compilers. Reproducible reports include provenance,
