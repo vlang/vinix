@@ -7985,8 +7985,29 @@ native measurements and joined guest evidence are retained under
 `build/ios/fortnite/corehaptics-constants-checks`. The actual IPA dereferences the
 intensity-control cell at `0x100804008`.
 
-Five further required imports resolve. The actual IPA exits with status 1 before
-application entry at `_CACurrentMediaTime`. Image sample construction, codec
+Those five required imports resolved; the following probe stopped before
+application entry at `_CACurrentMediaTime`.
+
+QuartzCore now exports `CACurrentMediaTime` with its native double return ABI.
+It converts the runner's nanosecond Mach clock to seconds, without creating
+Objective-C state or allocating a cache. On the Mac host, the Mach shim now reads
+absolute raw uptime instead of V's process-relative monotonic clock. Mach and
+media time therefore share the same uptime origin, including across runtime
+initialization and shutdown. The Vinix backend continues to use its existing
+monotonic nanosecond clock and 1/1 Mach timebase.
+
+Native measurements bracket media time with Mach ticks and the installed timebase.
+The same eight-thread checks compare the V function's units, finite double
+results, monotonic progression and elapsed sleep; the Mac also compares absolute
+values directly against QuartzCore. Eight host sanitizer runs and four ARM64
+Vinix suites cover dispatch deadlines, calls before/after two drained runtimes,
+CoreHaptics constants, Network paths and autorelease pools. Eleven generated C
+streams and executables, native measurements and joined guest evidence are
+retained under `build/ios/fortnite/media-time-checks`. The actual IPA calls
+`CACurrentMediaTime` at `0x10a64d53c`.
+
+One further required import resolves. The actual IPA exits with status 1 before
+application entry at `_VTDecompressionSessionCanAcceptFormatDescription`. Image sample construction, codec
 execution and the system Metal device/renderer remain unavailable. Fortnite
 remains unplayable and full iOS regression remains unpassed.
 
@@ -7995,12 +8016,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,667 | 493 | 79 |
+| Fortnite executable | 1,668 | 492 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,502 | 496 | 120 |
+| All images | 2,503 | 495 | 120 |
 
-The C++/GLES/Text variant reports 2,516 resolved imports, 482 unresolved strong
+The C++/GLES/Text variant reports 2,517 resolved imports, 481 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

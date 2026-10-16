@@ -140,7 +140,15 @@ fn C.lrint(f64) i64
 fn C.lrintf(f32) i64
 fn C.llrint(f64) i64
 fn C.llrintf(f32) i64
-fn darwin_mach_absolute_time() u64 { return u64(time.sys_mono_now()) }
+fn C.clock_gettime_nsec_np(i32) u64
+fn darwin_mach_absolute_time() u64 {
+	$if macos {
+		// V's Darwin monotonic helper subtracts process start. Mach time and
+		// Core Animation instead share the system's absolute uptime origin.
+		return C.clock_gettime_nsec_np(C.CLOCK_UPTIME_RAW)
+	}
+	return u64(time.sys_mono_now())
+}
 fn darwin_timebase_info(info &u32) i32 {
     if info == unsafe { nil } { return 4 }
     unsafe { info[0] = 1; info[1] = 1 }
