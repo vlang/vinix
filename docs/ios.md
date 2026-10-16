@@ -7747,10 +7747,48 @@ sample buffers, block buffers and autorelease pools. Eleven final generated C
 streams and executables are retained with native measurements, generated-function
 audits and joined guest evidence under `build/ios/fortnite/cm-time-checks`.
 
-Three more required imports resolve. The actual IPA probe still exits with status
-1 before application entry, now at
-`_CMVideoFormatDescriptionCreateFromH264ParameterSets`. H.264/HEVC parameter-set
-descriptions, image sample construction, codec processing and the system Metal
+Three more required imports resolved. That IPA probe stopped before application
+entry at `_CMVideoFormatDescriptionCreateFromH264ParameterSets`.
+
+H.264 parameter-set descriptions now own an immutable `avcC` decoder configuration
+record and metadata derived from the SPS. Creation accepts raw SPS/PPS NAL units,
+removes emulation-prevention bytes while reading bits, and derives cropped
+dimensions, progressive/interlaced fields, pixel aspect ratio, chroma location,
+range and supported color tags. The configuration record preserves duplicate
+sets, groups SPS records before PPS records and supports one-, two- and four-byte
+sample length prefixes. Caller buffers can be discarded immediately after a
+successful constructor. Constructor failures leave the output handle untouched.
+
+Parameter queries borrow bytes from the description's owned `avcC` atom, including
+an equivalent atom supplied through the generic format constructor. Count/header
+queries ignore the index when no parameter bytes or size are requested. Out-of-range
+parameter queries clear the requested pointer/size while still returning the
+record count and length-header size. Sample buffers retain the format independently;
+retaining the atom's CFData also preserves its bytes after the format is released.
+Getters and RBSP readers allocate no storage.
+
+This bounded profile accepts 2..64 SPS/PPS records, at most 65,535 bytes per NAL
+and a one-MiB aggregate NAL budget. Supported SPS profiles are Baseline, Main,
+Extended and eight-bit 4:2:0 High, with compatible metadata across multiple SPS
+records. Color values support unspecified or BT.709 primaries/transfer/matrix;
+other profiles, chroma/bit-depth/color combinations and SPS-extension NAL units
+remain outside this profile. The installed libx264/libavcodec libraries generated
+eleven native fixtures through V tooling. CoreMedia comparisons verify the full
+metadata dictionaries and exact configuration bytes, including an explicit 1:1
+pixel-aspect tag, extended aspect ratios, centered chroma and full-range video
+without color tags. The inspected IPA consumer at `0x1078cab10` supplies the sixth
+constructor argument, its output pointer, in `x5`.
+
+Eight final host sanitizer runs and four ARM64 guest suites cover H.264 formats,
+generic formats, sample-buffer ownership and autorelease pools. The earlier two
+host runs and their seven-fixture sources are also retained. Eleven final C
+streams and executables, native encoder/CoreMedia measurements, generated-code
+audits and joined guest evidence are retained under
+`build/ios/fortnite/h264-format-checks`.
+
+One more required import resolves. The actual IPA still exits with status 1 before
+application entry at `_CMVideoFormatDescriptionCreateFromHEVCParameterSets`.
+HEVC descriptions, image sample construction, codec execution and the system Metal
 device/renderer remain unavailable. Fortnite remains unplayable and full iOS
 regression remains unpassed.
 
@@ -7759,12 +7797,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,635 | 525 | 79 |
+| Fortnite executable | 1,636 | 524 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,470 | 528 | 120 |
+| All images | 2,471 | 527 | 120 |
 
-The C++/GLES/Text variant reports 2,483 resolved imports, 515 unresolved strong
+The C++/GLES/Text variant reports 2,484 resolved imports, 514 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

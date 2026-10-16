@@ -110,7 +110,7 @@ fn mf_private_failures(){
  objc_release(dict);objc_release(key);objc_release(value)
  format:=AudioFormat{48000,0x6c70636d,12,4,1,4,2,16,0};out=0xfeed;assert cm_audio_create(0,&format,12,0,0,0,0,&out)==-12718&&out==0
  assert (runtime_symbol('/System/Library/Frameworks/CoreMedia.framework/CoreMedia','_CMBlockBufferCreateWithMemoryBlock')or{panic(err)})!=0
- for name in ['_CMVideoFormatDescriptionCreateFromH264ParameterSets']!{if _:=runtime_symbol('/System/Library/Frameworks/CoreMedia.framework/CoreMedia',name){assert false}}
+ for name in ['_CMVideoFormatDescriptionCreateFromHEVCParameterSets']!{if _:=runtime_symbol('/System/Library/Frameworks/CoreMedia.framework/CoreMedia',name){assert false}}
  for name in ['_CMAudioFormatDescriptionGetStreamBasicDescription','_CMFormatDescriptionGetExtensions','_kCMFormatDescriptionTransferFunction_sRGB']!{for lib in ['/System/Library/Frameworks/Foundation.framework/Foundation','/System/Library/Frameworks/CoreVideo.framework/CoreVideo','/usr/lib/libSystem.B.dylib']!{if _:=runtime_symbol(lib,name){assert false}}}
 }
 fn mf_constant_reader(){for _ in 0..32{cell:=coremedia_constant_symbol('_kCMFormatDescriptionTransferFunction_sRGB')or{panic('missing CoreMedia key')};assert string_text(read64(cell))=='IEC_sRGB'}}
