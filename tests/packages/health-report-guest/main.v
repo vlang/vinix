@@ -12,7 +12,7 @@ fn C.reboot(int) int
 fn C.usleep(u32) int
 
 fn check() ! {
-	for name in ['health-core', 'health-protocol', 'health-probe'] {
+	for name in ['health-core', 'health-protocol', 'health-probe', 'status-ownership'] {
 		mut child := os.new_process('/usr/share/package-fixtures/' + name)
 		if name == 'health-probe' { child.set_args(['/tmp/health-report']) }
 		child.set_redirect_stdio_merged(); child.run()

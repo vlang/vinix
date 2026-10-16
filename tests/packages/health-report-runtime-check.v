@@ -29,6 +29,7 @@ fn suite() hwhost.Suite {
 			hwhost.Program{ source: 'tools/packages/pkgcore/health_test.v', path: 'usr/share/package-fixtures/health-core' },
 			hwhost.Program{ source: 'tools/packages/pkgprotocol/health_test.v', path: 'usr/share/package-fixtures/health-protocol' },
 			hwhost.Program{ source: 'tests/packages/health-report-check.v', path: 'usr/share/package-fixtures/health-probe' },
+			hwhost.Program{ source: 'tools/packages/pkgcore/status_ownership_test.v', path: 'usr/share/package-fixtures/status-ownership' },
 		], scenarios: [hwhost.Scenario{ name: 'packages-health-report', arches: ['aarch64', 'x86_64'],
 			about: 'complete installed integrity reports, owned bounded metadata, read-only locking, catalog independence and reviewed repair',
 			required: ['HWTEST START packages-health-report',
@@ -36,6 +37,10 @@ fn suite() hwhost.Suite {
 				'HEALTH PROTOCOL 4096 maximally escaped rows fit the reply bound; excess rows refuse PASS',
 				'HEALTH REPORT signed service/CLI, all simultaneous app/runtime/data/launcher issues, read-only locking and retained state, trust/catalog independence, malformed state refusal, fresh offline repair and clean uninstall PASS',
 				'HEALTH PROCESS health-core PASS', 'HEALTH PROCESS health-protocol PASS', 'HEALTH PROCESS health-probe PASS',
+				'STATUS SNAPSHOT both architectures, independent fresh/installed ownership, repeated close, exact state bytes and read-only offline observations PASS',
+				'STATUS SNAPSHOT status skips integrity scans; verify holds its reader lock through progress, refuses damage and emits completion only on success PASS',
+				'STATUS SNAPSHOT 1000-cycle configuration/state/registration/namespace/activation/busy refusals retire scratch and permit restored retry PASS',
+				'HEALTH PROCESS status-ownership PASS',
 				'HWTEST PASS packages-health-report'], ending: .poweroff, timeout: 600 }]
 	}
 }
@@ -56,6 +61,7 @@ fn check() !int {
 		receipt := Receipt{ architecture: options.arch, completed_at: time.now().unix(), artifacts: [kernel,
 			artifact('guest-init', base + '/guest/init')!, artifact('health-core', root + 'health-core')!, artifact('health-protocol', root + 'health-protocol')!,
 			artifact('health-probe', root + 'health-probe')!,
+			artifact('status-ownership', root + 'status-ownership')!,
 			artifact('serial-log', base + '/packages-health-report/serial.log')!] }
 		os.write_file(base + '/qualification.json', json2.encode(receipt) + '\n')!
 	}

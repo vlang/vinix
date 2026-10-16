@@ -320,7 +320,8 @@ fn checked(arguments []string) !int {
 			if command == 'updates' && view.update_error != '' { return error(view.update_error) }
 		}
 		'status', 'list', 'verify' {
-			state := if command == 'verify' { service.verify()! } else { service.state()! }
+			mut state := if command == 'verify' { service.verify()! } else { service.state()! }
+			defer { state.close() }
 			if as_json || command == 'status' {
 				println(json2.encode(state))
 				return 0

@@ -53,8 +53,8 @@ fn decode_persistent_state(text string, architecture string) !State {
 	return read_stored_state(text, architecture)
 }
 
-// Only for independently owned JSON-decoded states. Plans and in-memory fixture
-// states can share manifests; this is deliberately not a general State.close().
+// Only for independently owned decoded states or service observations. Plans
+// and in-memory fixture states can share manifests and retain their own lifetime.
 fn close_decoded_state(state State) {
 	unsafe {
 		state.architecture.free()
@@ -66,6 +66,14 @@ fn close_decoded_state(state State) {
 		}
 		(&array(&state.packages)).free()
 	}
+}
+
+// Retire an independently owned observation returned by Service.state/verify.
+// Transaction, plan and caller-built states can borrow fields: do not close
+// those values through this method. Repeated close of one owner is harmless.
+pub fn (mut state State) close() {
+	close_decoded_state(state)
+	state = State{}
 }
 
 fn numeric_generation_name(name string) bool {

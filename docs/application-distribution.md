@@ -14,6 +14,14 @@ before parsing; an atomically replaced pathname can still return its previously
 captured file. Restoring trusted ordinary metadata permits retry without deleting
 package state. See [qualification](../tests/packages/metadata-read-check.md).
 
+Public V status and verification calls return owned installed-state snapshots,
+including on a fresh image. Call `State.close()` after use. These reads release
+their configuration/path storage, and verification releases failed snapshots
+before returning an error. Status only inspects metadata; verification keeps its
+reader lock through integrity checks and successful completion. CLI output keeps
+its existing format. See [status ownership checks](../tests/packages/status-ownership-check.md)
+for the precise lifetime and allocation scope.
+
 Local payload copies validate ordinary source and destination descriptors before
 writing, refuse the same file even through a hard link, and enforce the captured
 source size. Oversized offline repository objects leave existing partial data

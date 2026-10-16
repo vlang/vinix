@@ -1,0 +1,5 @@
+Pre-change public status ownership regression: ten fresh state/verify pairs retain 73,640 bytes; ten installed pairs retain 73,800; ten failed verifies retain 242,040, after caller retirement of results/errors. Input source, production source, executable and generated C are retained and pinned.
+
+STATUS SNAPSHOT ten fresh state/verify cycles retained 73640 bytes; ten installed cycles retained 73800 bytes; ten failed verifies retained 242040 bytes
+tools/packages/pkgcore/status_ownership_test.v:85: fn test_status_snapshots_retire_fresh_installed_and_failed_verification_storage
+    assert fresh_bytes == 0 && installed_bytes == 0 && failed_bytes == 0

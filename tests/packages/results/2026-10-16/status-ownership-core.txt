@@ -1,0 +1,138 @@
+status_ownership:
+STATUS SNAPSHOT both architectures, independent fresh/installed ownership, repeated close, exact state bytes and read-only offline observations PASS
+STATUS SNAPSHOT status skips integrity scans; verify holds its reader lock through progress, refuses damage and emits completion only on success PASS
+STATUS SNAPSHOT 1000-cycle configuration/state/registration/namespace/activation/busy refusals retire scratch and permit restored retry PASS
+service:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+state:
+state_schema:
+Stored state probe: aarch64 missing firmware accepted=false
+Stored state probe: aarch64 missing proprietary accepted=false
+Stored state probe: aarch64 null permissions accepted=false
+Stored state probe: aarch64 missing sdk accepted=false
+Stored state probe: x86_64 missing firmware accepted=false
+Stored state probe: x86_64 missing proprietary accepted=false
+Stored state probe: x86_64 null permissions accepted=false
+Stored state probe: x86_64 missing sdk accepted=false
+Stored state: complete nested declarations, explicit types, ambiguity refusal and legacy window compatibility passed on both architectures
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Downloading app/bin/app (14 bytes)
+Activated package generation 1
+Updating trusted repository publisher
+Installing Application 2.0.0 (1/1) from publisher
+Activated package generation 2
+Activated package generation 4
+Installing Application 2.0.0 (1/1) from publisher
+Activated package generation 5
+Restored packages from generation 2 in generation 5; application data was retained
+Stored state: malformed active/previous metadata preserves activation, trust, payloads, cache and recovery; restoration permits reviewed removal, rollback and collection
+stored_decode:
+Stored decode: partial nested cleanup, escaped duplicate keys, canonical integers and late semantic refusal PASS
+Stored decode: both architectures, owned Unicode/escaped keys, legacy policy/window defaults and full u64 counters PASS
+Stored decode: 4096-repository/package limits, excess refusal, nested dependency/argument declarations and growing payload arrays PASS
+Stored decode: inclusive 8-MiB metadata and 16384-payload bounds with overflow refusal PASS
+verify:
+VERIFY PROGRESS payload/launcher identity, compatible counters, empty state and no completion on byte/mode/registration failure PASS
+health:
+HEALTH REPORT all app/runtime/data packages inspected, sorted owned provenance, namespace/payload/registration classification, empty state and no filesystem mutation PASS
+HEALTH REPORT control/invalid bytes escaped and long UTF-8 diagnostics bounded with truncation disclosure PASS
+installed_health:
+INSTALLATION HEALTH canonical executable/data modes, special bits, captured permission changes and cache isolation PASS
+INSTALLATION HEALTH canonical launcher/MIME bytes, independent runtime/data, permissions/type/content refusal and unchanged outside files PASS
+installed_namespace:
+INSTALLED NAMESPACE extra-runtime refused=true repair=true
+INSTALLED NAMESPACE 24 app/runtime/data extra-entry, alias, mode, hard-link and missing-entry refusals bind exact repair IDs; restored trees pass without mutation PASS
+INSTALLED NAMESPACE generation/apps parent aliases refuse all package checks; root guest also checks package/directory/file foreign ownership PASS
+INSTALLED NAMESPACE ordinary launch refuses undeclared app/runtime/dependency entries before private-data creation or execution; restored administrator-owned trees verify PASS
+INSTALLED NAMESPACE 64-level and 1024-file inventories plus 128 successful/refused checks retire descriptors below 32 PASS
+deployment_empty:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Empty deployment: formats 1/2 both architectures offline/revoked/damaged/absent catalog remove complete closure, disclose policy, retain data and enforce rollback admission PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Empty deployment: nonempty/surplus lock refusal, generic/file review domains, stale config, invalid state, busy lock and interrupted-stage recovery PASS
+Empty deployment: initialized fresh store no activation or acquisition; invalid configuration and empty remove still refuse PASS
+HEALTH PROTOCOL complete typed fields, escaped duplicate/unknown keys, canonical numbers, sorted unique rows, issue coherence, UTF-8 and bounds PASS
+HEALTH PROTOCOL 4096 maximally escaped rows fit the reply bound; excess rows refuse PASS

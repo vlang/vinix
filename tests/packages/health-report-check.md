@@ -44,6 +44,11 @@ decode/order/page/render/select/retire cycles. Whole-service allocation freedom,
 guest graphical sessions, publisher enrollment and foreign runtime release are
 not claimed.
 
+The follow-up [status ownership checks](status-ownership-check.md) qualify
+`Service.state()`/`verify()` result retirement and their public reader scratch.
+The maintained guest suite also runs that fixture; the historical health-report
+results below retain their original scope and artifact counts.
+
 
 ## Recorded results, 2026-10-15
 

@@ -1,0 +1,34 @@
+Package CLI: signed policy fallback reports the current missing requirement and dependency path on both targets; plan/review/install refusal preserves trust and activation, and release closure refusal stays explicit PASS
+Package CLI: signed offline install backtracks past 20 unrelated installed identities; exact installed preference, missing-requirement refusal, reviewed activation and rollback pass on both targets PASS
+Package CLI: exact older deployment pins survive newer catalog variants; sequence/digest/version/architecture/repository/key refusals preserve state and reviewed activation/rollback pass on both targets PASS
+Package CLI: explicit and implicit removal refusals name a retained requested package on both targets; offline/revoked/damaged-cache refusals preserve state and reviewed dependent removal remains available PASS
+Package CLI: empty formats 1/2 on both targets remove offline revoked app/runtime closures with damaged cache; review domains, surplus refusal, data retention, no-op and authorized rollback PASS
+Package CLI: durable private key creation, existing-seed refusal and read-only public-key recovery passed
+Package CLI: malformed publisher history refuses release without changing prior publication
+Package CLI: scoped repository configuration survives damaged cache/history; strict listing/enrollment/update still refuse; reviewed revocation preserves active state and recovery data
+Package CLI: hard-linked locks refuse all read/write commands before chmod and preserve trust, state, cache and recovery data
+Package CLI: malformed locks refuse within two seconds, preserve state/cache/history and permit verified recovery
+Package CLI: special and oversized configuration, catalog, history and state refuse promptly, preserve recovery data and permit restored verification
+Package CLI: ambiguous configuration refused without activation, cache or trust changes
+Package CLI: malformed cached snapshots preserve trust/state/recovery and permit verified refresh after restoration
+Package CLI: malformed deployment review/apply/deploy/audit/mirror inputs preserve trust, catalog, activation, objects and recovery data before destination creation PASS
+Package CLI: malformed retained history refuses replay after revocation and empty refresh
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed
+Updating trusted repository trusted
+Installing Package é🚀 app 1.0.0 (1/4) from trusted
+Downloading app/bin/app (22 bytes)
+Installing Package é🚀 assets 1.0.0 (2/4) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing Package é🚀 runtime 1.0.0 (3/4) from trusted
+Downloading runtime/bin/app (26 bytes)
+Installing Package é🚀 utility 1.0.0 (4/4) from trusted
+Downloading utility/bin/app (26 bytes)
+Activated package generation 1
+Installing Package é🚀 app 1.0.0 (1/4) from trusted
+Installing Package é🚀 assets 1.0.0 (2/4) from trusted
+Installing Package é🚀 runtime 1.0.0 (3/4) from trusted
+Installing Package é🚀 utility 1.0.0 (4/4) from trusted
+Activated package generation 2
+Activated package generation 3
+HEALTH REPORT signed service/CLI, all simultaneous app/runtime/data/launcher issues, read-only locking and retained state, trust/catalog independence, malformed state refusal, fresh offline repair and clean uninstall PASS
+HEALTH PROGRESS real CLI: separate stdout/stderr, typed per-package frames and completion, unchanged JSON/human output, empty/damaged/revoked/offline/uninstalled states and fatal state refusal PASS

@@ -1,0 +1,2 @@
+PASS x86_64 packages-health-report (49.0s)
+package-health-report x86_64: 1 passed, 0 failed, 0 skipped

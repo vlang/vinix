@@ -1,0 +1,5 @@
+clang ASan/UBSan; -gc none -manualfree; detect_leaks=0; halt_on_error=1
+STATUS SNAPSHOT 1000 fresh state/verify cycles retained 0 bytes; 1000 installed cycles retained 0 bytes; 1000 failed verifies retained 0 bytes
+STATUS SNAPSHOT both architectures, independent fresh/installed ownership, repeated close, exact state bytes and read-only offline observations PASS
+STATUS SNAPSHOT status skips integrity scans; verify holds its reader lock through progress, refuses damage and emits completion only on success PASS
+STATUS SNAPSHOT 1000-cycle configuration/state/registration/namespace/activation/busy refusals retire scratch and permit restored retry PASS

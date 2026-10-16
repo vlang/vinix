@@ -79,15 +79,25 @@ pub fn (service Service) mirror(destination string, names []string) ! {
 
 fn (service Service) installed_locked(directory string, verify bool) !State {
 	config := service.configuration()!
-	state := read_state(directory, config.architecture)!
+	defer { close_decoded_configuration(config) }
+	current := read_state(directory, config.architecture)!
+	// A fresh read_state borrows its architecture argument. Public observations
+	// own it too, so configuration storage can retire before the caller returns.
+	state := if current.generation == 0 {
+		State{ ...current, architecture: current.architecture.clone() }
+	} else { current }
 	if verify {
-		verify_installed(directory, state, service.progress)!
+		verify_installed(directory, state, service.progress) or {
+			close_decoded_state(state)
+			return err
+		}
 	}
 	return state
 }
 
 fn (service Service) installed(verify bool) !State {
 	directory := service.directory()!
+	defer { unsafe { directory.free() } }
 	if state_requires_lock(directory) {
 		guard := acquire_reader(directory)!
 		defer { guard.release() }
@@ -97,6 +107,7 @@ fn (service Service) installed(verify bool) !State {
 	return service.installed_locked(directory, verify)
 }
 
+// These read-only results own their fields. Retire them with State.close().
 pub fn (service Service) state() !State {
 	return service.installed(false)
 }

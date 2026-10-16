@@ -1518,6 +1518,26 @@ row per line. Consumers ignore additional fields and reject unknown formats.
 Success is exit 0; failures are nonzero with stderr diagnostics. Human progress
 text is not a machine protocol.
 
+V clients receive independently owned snapshots from `Service.state()` and
+`Service.verify()`, including the fresh empty state. Retire each result with
+`State.close()`; repeated close of the same owner is harmless. Configuration and
+directory scratch retire before returning, and verification failures release
+their captured state before returning the caller-owned error. For example:
+
+```v
+mut installed := service.state()!
+defer { installed.close() }
+println(installed.generation)
+```
+
+This close contract applies to owned status/verification observations. Transaction
+and plan results, low-level fresh `read_state` values and caller-built states can
+borrow metadata and must retain their existing lifetimes. Status skips payload
+scanning; verify holds its reader lock through completion. Returned metadata is a
+captured observation, rather than a continuing lease on installed files. Wire
+fields and output bytes are unchanged. See
+[status ownership qualification](../../tests/packages/status-ownership-check.md).
+
 [`pkgprotocol.decode_software_view`](pkgprotocol/view_reader.v) returns an owned
 `SoftwareView`; call `.close()` on cancellation, replacement or retirement.
 All eight header fields and eighteen base row fields are required, including
