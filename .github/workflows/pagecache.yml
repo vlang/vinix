@@ -13,9 +13,15 @@ permissions:
 jobs:
   host-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
+        id: uses_checkout_v6
       - name: Build current V
+        id: build_current_v
+        if: ${{ success() && !cancelled() && steps.uses_checkout_v6.outcome == 'success' }}
         run: git clone --depth=1 https://github.com/vlang/v.git /tmp/v && make -C /tmp/v
       - name: Test the kernel cache with instrumented backing I/O
+        id: test_the_kernel_cache_with_instrumented_backing_i_o
+        if: ${{ success() && !cancelled() && steps.build_current_v.outcome == 'success' }}
         run: V=/tmp/v/v sh tests/pagecache/run.sh
