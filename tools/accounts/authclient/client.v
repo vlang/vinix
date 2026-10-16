@@ -64,6 +64,8 @@ fn transact_checked(socket_path string, mut request authproto.Frame, root_peer b
 	if root_peer { require_root_peer(fd)! }
 	authproto.write_frame(fd, request)!
 	return authproto.read_frame(fd) or {
+		message := err.msg()
+		unsafe { message.free(); err.free() }
 		return error('the authentication service is busy or refused the request')
 	}
 }

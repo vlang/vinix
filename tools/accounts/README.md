@@ -40,6 +40,16 @@ stand-in for starting programs, and the shipped action files.
 [`tests/accounts`](../../tests/accounts/README.md) boots a kernel and runs
 the real programs as real accounts.
 
+`authproto.text_frame`, `decode` and `read_frame` return owned frames. Call
+`Frame.close()` once the result is no longer needed; it erases field bytes,
+releases their buffers and resets the frame, including on repeated close.
+`Frame.wipe()` keeps the caller's containers and lengths, so it also works on
+borrowed requests. `encode` returns caller-owned bytes and `Frame.text` returns
+an independent owned string. `write_frame` borrows its input and erases/releases
+its own encoded temporary on success or failure. Erasure uses `explicit_bzero`
+on Linux and `memset_s` on macOS so a following free cannot eliminate it. See
+[authentication frame qualification](../../tests/packages/auth-frame-check.md).
+
 `vinix-session run --isolated USER COMMAND [ARGUMENT...]` is a root-only
 application profile. It creates a login attributed to that ordinary account,
 drops all supplementary memberships before dropping privileges, verifies the

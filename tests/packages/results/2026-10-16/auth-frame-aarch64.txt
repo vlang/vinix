@@ -1,0 +1,2 @@
+PASS aarch64 packages-auth-frame (211.3s)
+package-auth-frame aarch64: 1 passed, 0 failed, 0 skipped

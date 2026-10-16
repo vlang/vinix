@@ -1,0 +1,96 @@
+Native tracked executable imports:
+___chkstk_darwin
+___error
+___memset_chk
+___stack_chk_fail
+___stack_chk_guard
+___stderrp
+___stdoutp
+___udivti3
+___umodti3
+__dyld_get_image_header
+__exit
+__longjmp
+__setjmp
+__tlv_bootstrap
+_aligned_alloc
+_atexit
+_backtrace
+_backtrace_symbols_fd
+_bzero
+_calloc
+_close
+_dup2
+_execvp
+_exit
+_fcntl
+_fflush
+_fork
+_fprintf
+_free
+_fwrite
+_getchar
+_getenv
+_getpid
+_longjmp
+_malloc
+_memcmp
+_memcpy
+_memmove
+_memset
+_memset_s
+_mmap
+_mprotect
+_munmap
+_pipe
+_pthread_get_stackaddr_np
+_pthread_get_stacksize_np
+_pthread_mutex_init
+_pthread_mutex_lock
+_pthread_mutex_unlock
+_pthread_self
+_putchar
+_raise
+_read
+_realloc
+_setenv
+_setjmp
+_setsockopt
+_setvbuf
+_shutdown
+_sigaction
+_sigaltstack
+_socketpair
+_strerror
+_strlen
+_sysconf
+_waitpid
+_write
+
+
+build/af-frames-arm/guest/program-0/auth-frame:	file format elf64-littleaarch64
+
+Disassembly of section .text:
+
+0000000000400a54 <authproto__wipe_bytes>:
+  400a54: b5000041     	cbnz	x1, 0x400a5c <authproto__wipe_bytes+0x8>
+  400a58: d65f03c0     	ret
+  400a5c: a9bf7bfd     	stp	x29, x30, [sp, #-0x10]!
+  400a60: 910003fd     	mov	x29, sp
+  400a64: 94005ffc     	bl	0x418a54 <explicit_bzero>
+  400a68: a8c17bfd     	ldp	x29, x30, [sp], #0x10
+  400a6c: d65f03c0     	ret
+
+
+build/af-frames-x86/guest/program-0/auth-frame:	file format elf64-x86-64
+
+Disassembly of section .text:
+
+000000000040095a <authproto__wipe_bytes>:
+  40095a: 48 85 f6                     	testq	%rsi, %rsi
+  40095d: 75 01                        	jne	0x400960 <authproto__wipe_bytes+0x6>
+  40095f: c3                           	retq
+  400960: 48 83 ec 08                  	subq	$0x8, %rsp
+  400964: e8 0f 8f 01 00               	callq	0x419878 <explicit_bzero>
+  400969: 48 83 c4 08                  	addq	$0x8, %rsp
+  40096d: c3                           	retq

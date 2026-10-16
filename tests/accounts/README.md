@@ -7,6 +7,10 @@ serial port. The controller is the hardware tests'
 `hwhost`); `run.v` here is the suite: the scenarios, the programs and the
 files. Nothing here is Python.
 
+The [authentication frame check](../packages/auth-frame-check.md) adds repeated
+allocation and interrupted-wire fixtures as root and UID 1000. Its qualification
+also runs this suite's `elevation` scenario with freshly built account tools.
+
     tests/accounts/run --arch aarch64 --kernel kernel/bin/vinix
     tests/accounts/run --arch x86_64 --kernel build-amd64-kernel/bin/vinix --scenario elevation
 

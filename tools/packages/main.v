@@ -533,8 +533,7 @@ fn admin_password() ![]u8 {
 }
 
 fn free_auth_reply(mut reply authproto.Frame) {
-	reply.wipe()
-	unsafe { for field in reply.fields { field.free() }; (&array(&reply.fields)).free() }
+	reply.close()
 }
 
 fn admin_client(arguments []string) !int {

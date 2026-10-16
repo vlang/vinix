@@ -1304,6 +1304,13 @@ so a partial launch frame reports interruption without waiting for its input
 deadline. See [socket EOF and resource recovery](../../tests/packages/launch-socket-check.md)
 for both-architecture regression coverage and the deferred socket-budget limit.
 
+The account authentication framing used for package actions keeps its VAUT
+version-1 bytes and bounds. Its V `text_frame`, `decode` and `read_frame` results
+own their fields and support wiping, repeatable `Frame.close()` cleanup.
+Borrowed requests retain the existing wipe-only contract. Stream writes erase
+and release their encoded scratch; failed receives erase and release partial
+fields. See [authentication frame qualification](../../tests/packages/auth-frame-check.md).
+
 On Linux, account-session launch reads its executable identity directly from
 `/proc/self/exe` with bounded stack storage. An unavailable, empty or oversized
 identity refuses with a diagnostic before the session helper starts.

@@ -1,0 +1,4 @@
+AUTH FRAME owned text counts 0..12 and independent maximum binary frames x1000 retained 0 bytes PASS
+AUTH FRAME every prefix and 16 malformed/trailing cases, oversized late field and excess count x1000 retained 0 bytes PASS
+AUTH FRAME maximum binary wire roundtrips x1000 retained 0 bytes and no descriptors PASS
+AUTH FRAME eight interrupted stream positions, three malformed wire paths and invalid-descriptor reads/writes x1000 retained 0 bytes and no descriptors PASS

@@ -1943,3 +1943,10 @@ Half-closed interrupted launch requests now retain EOF readiness after their
 last buffered byte, allowing prompt diagnostics. Both target guests exercise
 1,000 wire cycles per case with bounded cohorts and endpoint reclamation waits.
 See [socket EOF and resource recovery](../tests/packages/launch-socket-check.md).
+
+Authentication framing used by package launch and administration now retires
+encoded buffers and partially received fields, with non-elidable erasure before
+release. Owned frames have a shared repeatable close operation, used by package
+replies and the authentication daemon. Borrowed requests still use wipe-only
+handling, and protocol bytes and authorization rules remain unchanged. See
+[authentication frame qualification](../tests/packages/auth-frame-check.md).

@@ -46,9 +46,12 @@ pub mut:
 pub fn text_frame(code u16, fields ...string) Frame {
 	mut frame := Frame{
 		code: code
+		fields: [][]u8{cap: fields.len}
 	}
+	unsafe { frame.fields.flags |= .noslices }
 	for field in fields {
-		frame.fields << field.bytes()
+		bytes := field.bytes()
+		unsafe { frame.fields.push_many(&bytes, 1) }
 	}
 	return frame
 }
@@ -63,10 +66,19 @@ pub fn (f &Frame) text(index int) string {
 // Overwrite every field: they may have held a password.
 pub fn (mut f Frame) wipe() {
 	for mut field in f.fields {
-		for i in 0 .. field.len {
-			field[i] = 0
-		}
+		wipe_bytes(field.data, field.len)
 	}
+}
+
+// Release an owned text_frame/decode/read_frame result, wiping its fields
+// first. A frame borrowing caller fields must only be wiped, not closed.
+pub fn (mut f Frame) close() {
+	f.wipe()
+	unsafe {
+		for field in f.fields { field.free() }
+		(&array(&f.fields)).free()
+	}
+	f = Frame{}
 }
 
 fn put_u32(mut out []u8, value u32) {
@@ -84,7 +96,14 @@ pub fn encode(frame Frame) ![]u8 {
 	if frame.fields.len > max_fields {
 		return error('too many fields')
 	}
-	mut out := []u8{cap: header_bytes + 64}
+	// Validate before allocating or copying any field, including a password.
+	mut size := header_bytes
+	for field in frame.fields {
+		if field.len > max_field { return error('field too long') }
+		size += 4 + field.len
+	}
+	mut out := []u8{cap: size}
+	unsafe { out.flags |= .noslices }
 	put_u32(mut out, magic)
 	out << u8(version)
 	out << u8(version >> 8)
@@ -92,9 +111,6 @@ pub fn encode(frame Frame) ![]u8 {
 	out << u8(frame.code >> 8)
 	put_u32(mut out, u32(frame.fields.len))
 	for field in frame.fields {
-		if field.len > max_field {
-			return error('field too long')
-		}
 		put_u32(mut out, u32(field.len))
 		out << field
 	}
@@ -127,7 +143,11 @@ pub fn decode(data []u8) !Frame {
 	code, count := decode_header(data[..header_bytes])!
 	mut frame := Frame{
 		code: code
+		fields: [][]u8{cap: count}
 	}
+	unsafe { frame.fields.flags |= .noslices }
+	mut accepted := false
+	defer { if !accepted { frame.close() } }
 	mut at := header_bytes
 	for _ in 0 .. count {
 		if data.len - at < 4 {
@@ -138,11 +158,13 @@ pub fn decode(data []u8) !Frame {
 		if length > u32(max_field) || u32(data.len - at) < length {
 			return error('truncated frame')
 		}
-		frame.fields << data[at..at + int(length)].clone()
+		field := unsafe { data[at..at + int(length)] }.clone()
+		unsafe { frame.fields.push_many(&field, 1) }
 		at += int(length)
 	}
 	if at != data.len {
 		return error('bytes after the frame')
 	}
+	accepted = true
 	return frame
 }

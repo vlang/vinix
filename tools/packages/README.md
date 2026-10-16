@@ -497,6 +497,12 @@ Half-closed partial launch requests report interruption promptly. Guest wire
 stress runs 1,000 cycles per case with explicit endpoint reclamation waits;
 see [socket qualification](../../tests/packages/launch-socket-check.md).
 
+The account authentication frames used by package launch and administration
+also release encoded scratch and partial receives. Owned replies use the
+shared wiping `Frame.close()` contract; the authentication daemon retires its
+owned requests and replies. The wire format and borrowed-request wiping are
+unchanged. See [authentication frame checks](../../tests/packages/auth-frame-check.md).
+
 Small launch-option windows retain Back, status and failure access. Resizing
 preserves the draft and file-page selection; Escape leaves a field or returns
 an idle form to the catalog. Pasted control bytes cannot navigate, and running

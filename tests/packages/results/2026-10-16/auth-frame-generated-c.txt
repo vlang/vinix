@@ -1,0 +1,54 @@
+aarch64: field/header buffers transfer without implicit cloning; partial owner cleanup covers propagated failures; write erase precedes free; close erases owned fields.
+authproto__wipe_bytes(void* data, i64 length) {
+	if (length == 0) {
+		return;
+	}
+	{
+		explicit_bzero(data, (size_t)(length));
+	}
+}
+authproto__Frame__close(authproto__Frame* f) {
+	authproto__Frame__wipe(f);
+	{
+		{
+			i64 __for_idx_0 = 0;
+			for (; __for_idx_0 < f->fields.len; __for_idx_0++) {
+				Array field = *(Array*)(array_get(f->fields, __for_idx_0));
+				array__free(&field);
+			}
+		}
+		array__free(((array*)(&f->fields)));
+	}
+	*f = (authproto__Frame){.fields = array_new(sizeof(Array), 0, 0)};
+}
+aarch64 encode body sha256=7ab0dab22ee55d8f4d739480ad52189fe8ff1c69ed029b26a84214ae180ba5ec
+aarch64 decode body sha256=c0462c7e100f8d8e00c01c836913886cd5c45d69020aceb4c8aa4fd0b8d0d191
+aarch64 read_frame body sha256=bf3f4df6df39b4765a40c4f23f20b399569c341c52defb42f86ec8040c7b00c7
+aarch64 write_frame body sha256=b43358b82c2ef0c7d9d890d0e6714951f1c1b5ac659302d10b9e962484a43662
+x86_64: field/header buffers transfer without implicit cloning; partial owner cleanup covers propagated failures; write erase precedes free; close erases owned fields.
+authproto__wipe_bytes(void* data, i64 length) {
+	if (length == 0) {
+		return;
+	}
+	{
+		explicit_bzero(data, (size_t)(length));
+	}
+}
+authproto__Frame__close(authproto__Frame* f) {
+	authproto__Frame__wipe(f);
+	{
+		{
+			i64 __for_idx_0 = 0;
+			for (; __for_idx_0 < f->fields.len; __for_idx_0++) {
+				Array field = *(Array*)(array_get(f->fields, __for_idx_0));
+				array__free(&field);
+			}
+		}
+		array__free(((array*)(&f->fields)));
+	}
+	*f = (authproto__Frame){.fields = array_new(sizeof(Array), 0, 0)};
+}
+x86_64 encode body sha256=7ab0dab22ee55d8f4d739480ad52189fe8ff1c69ed029b26a84214ae180ba5ec
+x86_64 decode body sha256=c0462c7e100f8d8e00c01c836913886cd5c45d69020aceb4c8aa4fd0b8d0d191
+x86_64 read_frame body sha256=bf3f4df6df39b4765a40c4f23f20b399569c341c52defb42f86ec8040c7b00c7
+x86_64 write_frame body sha256=b43358b82c2ef0c7d9d890d0e6714951f1c1b5ac659302d10b9e962484a43662

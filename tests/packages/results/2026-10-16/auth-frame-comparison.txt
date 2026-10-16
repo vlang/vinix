@@ -1,0 +1,17 @@
+BASELINE 0a6d5bdf1: five cycles with returned owners/errors explicitly retired
+AUTH FRAME probe 0 five cycles retained 1450 bytes
+AUTH FRAME probe 1 five cycles retained 3825 bytes
+AUTH FRAME probe 2 five cycles retained 9585 bytes
+AUTH FRAME probe 3 five cycles retained 7685 bytes
+AUTH FRAME probe 4 five cycles retained 13180 bytes
+AUTH FRAME probe 5 five cycles retained 18940 bytes
+AUTH FRAME probe 6 five cycles retained 3825 bytes
+
+FINAL: identical caller-owned inputs and cleanup
+AUTH FRAME probe 0 five cycles retained 0 bytes
+AUTH FRAME probe 1 five cycles retained 0 bytes
+AUTH FRAME probe 2 five cycles retained 0 bytes
+AUTH FRAME probe 3 five cycles retained 0 bytes
+AUTH FRAME probe 4 five cycles retained 0 bytes
+AUTH FRAME probe 5 five cycles retained 0 bytes
+AUTH FRAME probe 6 five cycles retained 0 bytes

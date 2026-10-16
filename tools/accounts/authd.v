@@ -128,10 +128,11 @@ fn serve(env authcore.Env, connection int, peer authcore.Peer) {
 	// A caller that connects and says nothing is not waited for long.
 	C.alarm(read_seconds)
 	mut request := authproto.read_frame(connection) or { return }
+	defer { request.close() }
 	C.alarm(request_seconds)
 	mut response := authcore.handle(env, peer, mut request)
+	defer { response.close() }
 	authproto.write_frame(connection, response) or {}
-	response.wipe()
 }
 
 fn fail(message string) {
