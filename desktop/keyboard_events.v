@@ -130,26 +130,78 @@ fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 		d.pump_key_text(keyboard.fd, text, -1, 0, 1)
 	}
 	for byte in raw {
-		keyboard.packet[keyboard.packet_used] = byte
-		keyboard.packet_used++
-		keyboard.packet_ms = monotonic_millis()
-		count := keyboard.packet_used
-		physical := count >= 3 && keyboard.packet[0] == 27 && keyboard.packet[1] == `[` && keyboard.packet[2] == `?`
-		complete := if physical {
-			byte == `k` || byte == `h`
-		} else {
-			keyboard.packet[0] != 27 || (count == 2 && byte != `[` && byte != `O`) || (count > 2 && byte >= 0x40 && byte <= 0x7e)
-		}
-		if !complete && count < keyboard.packet.len { continue }
-		if physical {
+		count := keyboard.feed(byte)
+		if count == 0 { continue }
+		if keyboard.packet_physical(count) {
 			key, value := physical_packet(unsafe { &keyboard.packet[0] }, count)
 			if value >= 0 { d.pump_physical_key(mut keyboard, key, value) }
 		} else {
 			text := unsafe { tos(&keyboard.packet[0], count).clone() }
 			d.pump_key_text(keyboard.fd, text, -1, 0, 1)
 		}
-		keyboard.packet_used = 0
 	}
+}
+
+// feed adds one byte of console input to the packet being assembled. It
+// returns the length of the packet that byte completes, or 0. The completed
+// packet stays in kbd.packet until the next byte is fed.
+fn (mut kbd Keyboard) feed(byte u8) int {
+	kbd.packet[kbd.packet_used] = byte
+	kbd.packet_used++
+	kbd.packet_ms = monotonic_millis()
+	count := kbd.packet_used
+	complete := if kbd.packet_physical(count) {
+		byte == `k` || byte == `h`
+	} else {
+		kbd.packet[0] != 27 || (count == 2 && byte != `[` && byte != `O`) || (count > 2 && byte >= 0x40 && byte <= 0x7e)
+	}
+	if !complete && count < kbd.packet.len { return 0 }
+	kbd.packet_used = 0
+	return count
+}
+
+fn (kbd &Keyboard) packet_physical(count int) bool {
+	return count >= 3 && kbd.packet[0] == 27 && kbd.packet[1] == `[` && kbd.packet[2] == `?`
+}
+
+// poll_text returns what the waiting keys type, for the setup screens that
+// read the keyboard before the desktop's own key handling runs. With physical
+// key events on, the console sends key records instead of text; type them as
+// the console would have, in the US layout, and leave out key releases.
+fn (mut kbd Keyboard) poll_text() string {
+	raw := kbd.poll()
+	if !kbd.key_events { return raw }
+	defer { if raw.len > 0 { unsafe { raw.free() } } }
+	mut out := []u8{cap: 64}
+	out.flags |= .noslices
+	if raw.len == 0 && kbd.packet_used > 0 && monotonic_millis() - kbd.packet_ms >= keyboard_sequence_gap_ms {
+		// A lone Escape, or serial input beside the physical records.
+		for i in 0 .. kbd.packet_used { out << kbd.packet[i] }
+		kbd.packet_used = 0
+	}
+	for byte in raw {
+		count := kbd.feed(byte)
+		if count == 0 { continue }
+		if !kbd.packet_physical(count) {
+			for i in 0 .. count { out << kbd.packet[i] }
+			continue
+		}
+		key, value := physical_packet(unsafe { &kbd.packet[0] }, count)
+		if value < 0 || key <= 0 || key >= kbd.held.len { continue }
+		kbd.held[key] = value != 0
+		if value == 1 && key == 58 { kbd.caps = !kbd.caps }
+		if value == 1 && key == 69 { kbd.num = !kbd.num }
+		if value == 0 || key == 255 { continue }
+		legacy := legacy_physical_key(key, kbd.modifiers(), value)
+		for i in 0 .. legacy.length { out << legacy.bytes[i] }
+	}
+	if out.len == 0 {
+		unsafe { out.free() }
+		return ''
+	}
+	text := out.bytestr()
+	unsafe { out.free() }
+	return text
 }
 
 fn (mut d Desktop) pump_key_text(fd int, raw string, key int, modifiers int, value int) int {

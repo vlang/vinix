@@ -844,7 +844,7 @@ fn (mut d Desktop) choose_first_run_apps(mut fb Framebuffer, mut pointer Pointer
 		if selection.poll_pointer(mut d, mut pointer) {
 			dirty = true
 		}
-		keys := keyboard.poll()
+		keys := keyboard.poll_text()
 		if keys.len > 0 {
 			selection.key_input(keys)
 			dirty = true

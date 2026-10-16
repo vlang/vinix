@@ -443,7 +443,7 @@ fn (mut d Desktop) ensure_registered_user(mut fb Framebuffer, mut pointer Pointe
 		if registration.poll_pointer(mut d, mut pointer, desktop_home) {
 			dirty = true
 		}
-		keys := keyboard.poll()
+		keys := keyboard.poll_text()
 		if keys.len > 0 {
 			registration.key_input(keys, desktop_home)
 			dirty = true
