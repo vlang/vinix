@@ -195,6 +195,29 @@ for layer in "${MERGE[@]}"; do
 done
 rm -f "$STAGING/.PKGINFO" "$STAGING/.INSTALL" "$STAGING"/.SIGN.* \
     "$STAGING"/.pre-* "$STAGING"/.post-* "$STAGING"/.trigger*
+# What the image leaves out of the layers above, as the arm64 compact image
+# does: Vim (vi is BusyBox's); GCC's C++ and link-time-optimisation compilers
+# with the C++ headers and static libraries (C and its LTO linker plugin stay);
+# V's own test suites; and Mesa libraries nothing here can load, since they
+# need the Mesa 24.2 Gallium and LLVM 19 that the X11 layer leaves out.
+echo "    trimming Vim, C++ compilers, V tests and unloadable Mesa libraries"
+for vim_link in ex rvim view vimdiff rvimdiff vimtutor; do
+    if [ "$(readlink "$STAGING/usr/bin/$vim_link" 2>/dev/null)" = vim ]; then
+        rm -f "$STAGING/usr/bin/$vim_link"
+    fi
+done
+rm -rf "$STAGING/usr/bin/vim" "$STAGING/usr/share/vim" "$STAGING/etc/vim"
+rm -f "$STAGING/usr/bin/lto-dump" "$STAGING/usr/bin/g++" "$STAGING/usr/bin/c++" \
+    "$STAGING/usr/bin/x86_64-alpine-linux-musl-g++" "$STAGING/usr/bin/x86_64-alpine-linux-musl-c++" \
+    "$STAGING"/usr/libexec/gcc/*/*/cc1plus "$STAGING"/usr/libexec/gcc/*/*/lto1 \
+    "$STAGING"/usr/libexec/gcc/*/*/lto-wrapper \
+    "$STAGING/usr/lib/libstdc++.a" "$STAGING/usr/lib/libsupc++.a"
+rm -rf "$STAGING/usr/include/c++"
+find "$STAGING/usr/lib/vlang" -type d \( -name tests -o -name slow_tests -o -name testdata \) \
+    -prune -exec rm -rf {} +
+find "$STAGING/usr/lib/vlang" -type f \( -name '*_test.v' -o -name '*_test.*.v' \) -delete
+rm -f "$STAGING"/usr/lib/libOSMesa.so* "$STAGING"/usr/lib/libGLU.so* \
+    "$STAGING"/usr/lib/libxatracker.so*
 mkdir -p "$STAGING/usr/bin" "$STAGING/usr/share/vinix/wallpapers" \
     "$STAGING/usr/share/vinix/icons" "$STAGING/root/desktop" "$STAGING/run"
 install -m755 "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
@@ -301,8 +324,7 @@ for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings vinix
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done
 
-"$SCRIPT_DIR/build-support/dictionary/prepare" \
-    --destination "$STAGING/usr/share/vinix/dictionary"
+# Images carry no dictionary data (29 MiB); the Dictionary app says so.
 
 echo "==> Wallpapers..."
 "$SCRIPT_DIR/desktop/tools/fetch_wallpapers" "$BUILD_DIR/wallpapers" \

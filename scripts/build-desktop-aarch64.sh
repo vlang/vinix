@@ -810,7 +810,7 @@ REUSE_STAGING=0
 if [ "$REFRESH_STAGING" -eq 0 ] &&
    [ -d "$STAGING" ] && [ -f "$STAGING_CACHE" ] &&
    cmp -s "$STAGING_CACHE_EXPECTED" "$STAGING_CACHE" &&
-   [ -x "$STAGING/bin/busybox" ] && [ -x "$STAGING/usr/bin/vim" ]; then
+   [ -x "$STAGING/bin/busybox" ] && [ -x "$STAGING/usr/bin/gcc" ]; then
     REUSE_STAGING=1
     echo "    reusing staged base/application layers"
 else
@@ -1180,6 +1180,30 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
     fi
 fi
 
+# What images leave out of the layers above, trimmed after them so that a
+# reused staging tree loses it too: Vim (vi is BusyBox's), the C++ headers and
+# libraries a compact image has no C++ compiler for, V's own test suites, and
+# Mesa libraries nothing on the image can load (they need the Mesa 24.2
+# Gallium and LLVM 19 that the X11 layer leaves out).
+echo "    trimming Vim, V tests, unloadable Mesa libraries and unused C++ files"
+for vim_link in ex rvim view vimdiff rvimdiff vimtutor; do
+    if [ "$(readlink "$STAGING/usr/bin/$vim_link" 2>/dev/null)" = vim ]; then
+        rm -f "$STAGING/usr/bin/$vim_link"
+    fi
+done
+rm -rf "$STAGING/usr/bin/vim" "$STAGING/usr/share/vim" "$STAGING/etc/vim"
+if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
+    rm -rf "$STAGING/usr/include/c++"
+    rm -f "$STAGING/usr/lib/libstdc++.a" "$STAGING/usr/lib/libsupc++.a"
+fi
+if [ -d "$STAGING/usr/lib/vlang" ]; then
+    find "$STAGING/usr/lib/vlang" -type d \( -name tests -o -name slow_tests -o -name testdata \) \
+        -prune -exec rm -rf {} +
+    find "$STAGING/usr/lib/vlang" -type f \( -name '*_test.v' -o -name '*_test.*.v' \) -delete
+fi
+rm -f "$STAGING"/usr/lib/libOSMesa.so* "$STAGING"/usr/lib/libGLU.so* \
+    "$STAGING"/usr/lib/libxatracker.so*
+
 # These files are owned by this checkout, not by a compiled staging layer, so
 # refresh them even when the expensive tree above is reused.
 if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
@@ -1401,8 +1425,8 @@ for firefox_app_dir in "$STAGING/usr/lib/firefox" "$STAGING/usr/lib/firefox-esr"
     fi
 done
 
-if [ ! -x "$STAGING/bin/busybox" ] || [ ! -x "$STAGING/usr/bin/vim" ]; then
-    echo "ERROR: base userland has no executable /bin/busybox or /usr/bin/vim" >&2
+if [ ! -x "$STAGING/bin/busybox" ]; then
+    echo "ERROR: base userland has no executable /bin/busybox" >&2
     exit 1
 fi
 if [ ! -x "$STAGING/bin/zsh" ]; then
@@ -1470,7 +1494,7 @@ elif ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-obs usr/bin/run-chromium usr/bin/run-libreoffice usr/libexec/vinix-minecraft/fetch-minecraft usr/bin/gcc usr/bin/tcc usr/bin/ldd usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload usr/bin/vinix-host-sync; do
+    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-obs usr/bin/run-chromium usr/bin/run-libreoffice usr/libexec/vinix-minecraft/fetch-minecraft usr/bin/gcc usr/bin/tcc usr/bin/ldd usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload usr/bin/vinix-host-sync; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1
@@ -1583,8 +1607,8 @@ for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done
 
-"$SCRIPT_DIR/build-support/dictionary/prepare" \
-    --destination "$STAGING/usr/share/vinix/dictionary"
+# Images carry no dictionary data (29 MiB); the Dictionary app says so.
+rm -rf "$STAGING/usr/share/vinix/dictionary"
 
 # The bundle is mutable command-line input, so do not let a previous selection
 # survive a cached-layer build that no longer asks for it.
@@ -1618,7 +1642,8 @@ fi
 
 # Keep a system-owned development copy outside persistent /root. It lets an
 # upgraded machine build even when its carried home predates /root/vmodules.
-# The editable home copy is seeded from the same exact host-build sources.
+# It is the only copy an image carries: vinix-desktop-build uses it whenever
+# /root/desktop is missing, so a second one in /root would only double 37 MiB.
 DESKTOP_DEV_ROOT="$STAGING/usr/share/vinix/desktop-dev"
 rm -rf "$DESKTOP_DEV_ROOT"
 mkdir -p "$DESKTOP_DEV_ROOT/desktop"
@@ -1636,10 +1661,7 @@ fi
 "$SCRIPT_DIR/build-support/content-key" \
     "$DESKTOP_DEV_ROOT/desktop" "$DESKTOP_DEV_ROOT/vmodules" \
     > "$DESKTOP_DEV_ROOT/.source-version"
-rm -rf "$STAGING/root/desktop" "$STAGING/root/vmodules"
-cp -a "$DESKTOP_DEV_ROOT/desktop" "$STAGING/root/desktop"
-cp -a "$DESKTOP_DEV_ROOT/vmodules" "$STAGING/root/vmodules"
-install -m644 "$DESKTOP_DEV_ROOT/.source-version" \
+rm -rf "$STAGING/root/desktop" "$STAGING/root/vmodules" \
     "$STAGING/root/.vinix-desktop-dev-version"
 
 # Vinix's loader opens a shared object without following links, and current
