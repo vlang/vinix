@@ -49,6 +49,12 @@ retain declarations to avoid pruning required crypto types. The launcher heap
 fixture disables the compiler's crash handler in its separately linked C unit;
 assertions and process exit failures still fail the check.
 
+Prepared-root imports recheck file/directory identity, size, executable bits and
+directory names in the captured guest namespace. Unpinned imports compare the
+copied bytes with a source digest; catalog imports use their locked inventory.
+Changed sources refuse before packing, with private-workspace cleanup and exact
+retry. See [source consistency checks](../../tests/packages/import-capture-check.md).
+
 `--https` adds the [real TLS transport fixture](../../tests/packages/https-check.md);
 `--https-only` runs it without desktop/UI prerequisites. It uses native curl and
 OpenSSL to check range recovery, certificate/redirect refusal and signed

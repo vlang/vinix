@@ -240,6 +240,15 @@ Empty-directory trees refuse during import, before the later pack walk. The
 depth/entry boundaries, bounded enumeration, descriptor/private-workspace cleanup
 and retry, retaining ordinary alias resolution and canonical package metadata.
 
+Prepared-root imports also recheck source identity, size and executable bits
+through the captured guest namespace, then compare each directory's names after
+copying. Unpinned files are hashed before copying and compared with the
+materialized bytes; catalog imports retain their locked digest checks. Changed
+sources refuse before packing and private staging is removed for retry. This
+preserves guest-absolute links and captured-root behavior after a host rename.
+Publishers still need stable source contents rather than relying on an atomic
+snapshot. See [source consistency checks](../tests/packages/import-capture-check.md).
+
 The lower-level `pack` command also captures its source root and walks children
 through descriptors relative to their captured parents. Hashing and copying
 share each regular file's descriptor, with identity, length and executable-mode

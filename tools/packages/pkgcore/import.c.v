@@ -165,11 +165,32 @@ struct RootImport {
 	root   int
 	output string
 	pins map[string]Payload // populated only by a catalog lock
+	options PackSourceOptions
 mut:
 	entries   int // includes selected roots and every materialized alias visit
 	files     int
 	bytes     u64
 	ancestors []string
+}
+
+// The returned descriptor is owned by the caller. Resolve through the captured
+// guest namespace again: a host pathname check would misinterpret guest-absolute
+// links and could inspect an entirely different prepared root after a rename.
+fn recheck_import_node(root int, source string, node ImportNode) !int {
+	mut opened := C.stat{}
+	if C.fstat(node.fd, &opened) != 0 || u64(opened.st_dev) != node.device
+		|| u64(opened.st_ino) != node.inode || u32(opened.st_mode) & 0o170111 != node.mode & 0o170111
+		|| (node.mode & 0o170000 == 0o100000 && (opened.st_size < 0 || u64(opened.st_size) != node.bytes)) {
+		return error('prepared source identity, size or executable mode changed during import: ${source}')
+	}
+	current := import_node(root, source)!
+	if current.device != node.device || current.inode != node.inode
+		|| current.mode & 0o170111 != node.mode & 0o170111
+		|| (node.mode & 0o170000 == 0o100000 && current.bytes != node.bytes) {
+		C.close(current.fd)
+		return error('prepared source identity, size or executable mode changed during import: ${source}')
+	}
+	return current.fd
 }
 
 fn (mut importer RootImport) copy(source string, target string) ! {
@@ -187,6 +208,8 @@ fn (mut importer RootImport) copy_at(source string, target string, depth int) ! 
 	importer.entries++
 	node := import_node(importer.root, source)!
 	defer { C.close(node.fd) }
+	importer.options.checkpoint('opened', source)!
+	C.close(recheck_import_node(importer.root, source, node)!)
 	if node.mode & 0o170000 == 0o040000 {
 		if depth >= max_pack_depth { return error('prepared import exceeds directory depth limit: ${target}') }
 		identity := '${node.device}:${node.inode}'
@@ -199,6 +222,8 @@ fn (mut importer RootImport) copy_at(source string, target string, depth int) ! 
 		remaining := max_pack_entries - importer.entries
 		names := import_names_limit(node.fd, if remaining < max_files { remaining } else { max_files })!
 		defer { unsafe { names.free() } }
+		importer.options.checkpoint('directory', source)!
+		C.close(recheck_import_node(importer.root, source, node)!)
 		path := importer.output + '/' + target
 		defer { unsafe { path.free() } }
 		os.mkdir_all(path)!
@@ -208,6 +233,11 @@ fn (mut importer RootImport) copy_at(source string, target string, depth int) ! 
 			defer { unsafe { child_source.free(); child_target.free() } }
 			importer.copy_at(child_source, child_target, depth + 1)!
 		}
+		current := recheck_import_node(importer.root, source, node)!
+		defer { C.close(current) }
+		final_names := import_names_limit(current, if remaining < max_files { remaining } else { max_files })!
+		defer { unsafe { final_names.free() } }
+		if final_names != names { return error('prepared directory entries changed during import: ${source}') }
 		return
 	}
 	if node.mode & 0o170000 != 0o100000 {
@@ -225,6 +255,17 @@ fn (mut importer RootImport) copy_at(source string, target string, depth int) ! 
 	}
 	importer.bytes += node.bytes
 	importer.files++
+	importer.options.checkpoint('sized', source)!
+	// A catalog lock supplies the expected digest. Unpinned imports
+	// first hash the captured file, so a same-size rewrite between that read and
+	// materialization cannot silently become a new reproducible declaration.
+	digest := if importer.pins.len > 0 { importer.pins[target].sha256.clone() } else {
+		hash_opened(node.fd, node.bytes, source, HashReadOptions{ checkpoint: importer.options.checkpoint })!
+	}
+	defer { unsafe { digest.free() } }
+	importer.options.checkpoint('hashed', source)!
+	C.close(recheck_import_node(importer.root, source, node)!)
+	if C.lseek(node.fd, 0, C.SEEK_SET) != 0 { return error('cannot seek prepared payload: ${source}') }
 	path := importer.output + '/' + target
 	parent := os.dir(path)
 	defer { unsafe { path.free(); parent.free() } }
@@ -250,11 +291,17 @@ fn (mut importer RootImport) copy_at(source string, target string, depth int) ! 
 			if written == 0 { return error('short import write; check disk space') }
 			sent += written
 		}
+		importer.options.checkpoint('copy-block', source)!
 	}
 	if copied != node.bytes { return error('prepared payload changed during import: ${source}') }
+	importer.options.checkpoint('copied', source)!
+	C.close(recheck_import_node(importer.root, source, node)!)
 	os.chmod(path, if node.mode & 0o111 != 0 { 0o755 } else { 0o644 })!
-	if importer.pins.len > 0 && hash_file(path)! != importer.pins[target].sha256 {
-		return error('catalog payload inventory differs from its lock: ${target}')
+	materialized := hash_file(path)!
+	defer { unsafe { materialized.free() } }
+	if materialized != digest {
+		if importer.pins.len > 0 { return error('catalog payload inventory differs from its lock: ${target}') }
+		return error('prepared payload changed contents during import: ${source}')
 	}
 }
 
@@ -281,18 +328,27 @@ fn validate_root_recipe(recipe RootRecipe) ! {
 }
 
 pub fn pack_root(recipe_file string, source_root string, repository string) !Package {
+	return pack_root_with(recipe_file, source_root, repository, PackSourceOptions{})
+}
+
+fn pack_root_with(recipe_file string, source_root string, repository string, options PackSourceOptions) !Package {
 	text := read_metadata(recipe_file)!
 	defer { unsafe { text.free() } }
 	recipe := decode_root_recipe(text)!
 	defer { close_decoded_root_recipe(recipe) }
 	root := capture_prepared_root(source_root, 'package import')!
 	defer { C.close(root) }
-	return pack_root_descriptor(recipe, root, repository, false)
+	options.checkpoint('root', source_root)!
+	return pack_root_descriptor_with(recipe, root, repository, false, options)
 }
 
 // The catalog captures each architecture root once, so namespace aliases cannot
 // switch its source directory between package imports.
 fn pack_root_descriptor(recipe RootRecipe, root int, repository string, pinned bool) !Package {
+	return pack_root_descriptor_with(recipe, root, repository, pinned, PackSourceOptions{})
+}
+
+fn pack_root_descriptor_with(recipe RootRecipe, root int, repository string, pinned bool, options PackSourceOptions) !Package {
 	validate_root_recipe(recipe)!
 	temporary := os.temp_dir()
 	process := os.getpid().str()
@@ -311,7 +367,7 @@ fn pack_root_descriptor(recipe RootRecipe, root int, repository string, pinned b
 	payload := work + '/payload'
 	manifest_path := work + '/manifest.json'
 	defer { unsafe { payload.free(); manifest_path.free() } }
-	mut importer := RootImport{ root: root, output: payload, pins: pins, ancestors: []string{cap: max_pack_depth} }
+	mut importer := RootImport{ root: root, output: payload, pins: pins, options: options, ancestors: []string{cap: max_pack_depth} }
 	defer { unsafe { (&array(&importer.ancestors)).free() } }
 	for entry in recipe.entries { importer.copy(entry.source, entry.path)! }
 	manifest := publisher_json(recipe.manifest)

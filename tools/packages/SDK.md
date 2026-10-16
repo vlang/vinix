@@ -574,6 +574,21 @@ budget. Source files, aliases and consumer state are untouched. See
 [import traversal qualification](../../tests/packages/import-limits-check.md)
 for exact boundaries, alias/selector accounting, descriptor cleanup and retry.
 
+During materialization, each file and directory is resolved again through the
+captured guest root and compared with its open descriptor. Changed identity,
+length or executable bits refuse before packing. Directory names are compared
+again after copying the subtree, so added, removed or renamed entries also
+refuse. Guest-absolute aliases keep their guest meaning during these checks.
+
+Unpinned `pack-root` imports hash each admitted regular file before copying and
+compare the materialized bytes with that digest. Catalog imports use their
+locked inventory digest instead. Same-size rewrites between hashing and
+copying therefore refuse, as do changed pinned contents. A refusal removes the
+private workspace before any package repository is published; retry after
+stabilizing the source. These checks detect changes during traversal; they do
+not take an atomic filesystem snapshot. Keep prepared contents stable throughout
+publishing. See [source consistency qualification](../../tests/packages/import-capture-check.md).
+
 `pack-root`, `pack-catalog` and the Native, SQLite and FFmpeg profile builders
 share input-root admission. Empty and NUL-containing paths refuse. Redundant
 trailing separators are stripped while preserving `/`, so a symlink at the
