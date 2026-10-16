@@ -1,0 +1,18 @@
+COMPOSITION OWNERSHIP variants-per-host=1 target=both fault=none retained=0 allocations=0
+COMPOSITION OWNERSHIP variants-per-host=1 target=aarch64 fault=none retained=0 allocations=0
+COMPOSITION OWNERSHIP variants-per-host=1 target=x86_64 fault=none retained=0 allocations=0
+COMPOSITION OWNERSHIP variants-per-host=1 target=aarch64 fault=schema retained=0 allocations=0
+COMPOSITION OWNERSHIP variants-per-host=1 target=aarch64 fault=duplicate retained=0 allocations=0
+COMPOSITION OWNERSHIP variants-per-host=1 target=x86_64 fault=missing-host retained=0 allocations=0
+COMPOSITION OWNERSHIP variants-per-host=1 target=aarch64 fault=depth retained=0 allocations=0
+COMPOSITION OWNERSHIP variants-per-host=1 target=aarch64 fault=profile retained=0 allocations=0
+COMPOSITION OWNERSHIP variants-per-host=32 target=both fault=none retained=0 allocations=0
+COMPOSITION OWNERSHIP variants-per-host=32 target=aarch64 fault=none retained=0 allocations=0
+COMPOSITION OWNERSHIP variants-per-host=32 target=x86_64 fault=none retained=0 allocations=0
+COMPOSITION OWNERSHIP variants-per-host=32 target=aarch64 fault=schema retained=0 allocations=0
+COMPOSITION OWNERSHIP variants-per-host=32 target=aarch64 fault=duplicate retained=0 allocations=0
+COMPOSITION OWNERSHIP variants-per-host=32 target=x86_64 fault=missing-host retained=0 allocations=0
+COMPOSITION OWNERSHIP variants-per-host=32 target=aarch64 fault=depth retained=0 allocations=0
+COMPOSITION OWNERSHIP variants-per-host=32 target=aarch64 fault=profile retained=0 allocations=0
+COMPOSITION OWNERSHIP strict/selected planning and late metadata/identity/host/depth/profile refusals retire owned scratch PASS
+COMPOSITION OWNERSHIP independent plans and closeable replies survive retired inputs; canonical bytes, disclosures and idempotent close PASS

@@ -132,6 +132,12 @@ fn image_repository_assertions(mut t Test) ! {
 	assert fixture.output.contains('IMAGE CAPTURE flush refusal retains complete output; unsafe capture retirement preserves recovery, reports refusal, closes metadata and permits repeated close PASS')
 	t.say('PACKAGE IMAGE CAPTURE guarded preparation publication checked retirement replacement preservation retry and saved output PASS')
 	t.say('PACKAGE IMAGE BUNDLE production-staged signed repository before first refresh PASS')
+	catalog := run(['/usr/share/package-fixtures/catalog-exports'], '', none, none)
+	assert catalog.status == 0, catalog.output
+	assert catalog.output.contains('CATALOG EXPORT 144 workspace/composition/selected-host root and parent substitutions preserve replacements, complete recovery snapshots and source pins; fresh retry under 32 descriptors PASS')
+	assert catalog.output.contains('CATALOG EXPORT directory-flush and post-rename parent failures retain complete canonical artifacts and accurate saved diagnostics for workspace and all composition target modes PASS')
+	assert catalog.output.contains('CATALOG EXPORT canonical composition and workspace preserve signed release closure and offline install/remove for both consumer architectures PASS')
+	t.say('PACKAGE CATALOG EXPORT guarded workspace composition host selection recovery retry saved output and signed offline consumption PASS')
 }
 
 fn scenario_packages_native_image(mut t Test) { qualify_package_native_image(mut t) or { t.check(false, err.msg()) } }

@@ -650,6 +650,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
 
 - [ ] Harden the existing package frontend with trusted repositories, dependency
   resolution, reproducible metadata and consistent architecture support.
+  - [x] [Captured catalog publication](tests/packages/catalog-export-check.md)
+    protects workspace construction and strict/selected-host composition with
+    checked staging identities, bounded cleanup and captured-parent publication.
+    Replacement recovery, source pins, canonical retry, saved-output failures
+    and signed offline consumption have explicit regression checks.
   - [x] [Explicit catalog host selection](tests/packages/composition-target-check.md)
     combines complete single-host and dual-host profiles for a declared target,
     preserving shared packages, pinned declarations and full-input provenance.

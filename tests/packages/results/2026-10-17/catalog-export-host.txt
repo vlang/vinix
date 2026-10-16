@@ -1,0 +1,9 @@
+catalog_export-compile PASS
+catalog_export-run PASS
+catalog_export-sanitize-compile PASS
+catalog_export-sanitize-run PASS
+catalog-sanitize-compile PASS
+catalog-sanitize-run PASS
+composition-sanitize-compile PASS
+composition-sanitize-run PASS
+Catalog export: eight host build/test checks PASS

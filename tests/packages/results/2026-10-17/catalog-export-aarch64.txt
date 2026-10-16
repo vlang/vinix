@@ -1,0 +1,1 @@
+PASS aarch64 packages-native-image (46.9s)

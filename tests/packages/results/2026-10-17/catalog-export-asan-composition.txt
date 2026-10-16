@@ -1,0 +1,58 @@
+Updating trusted repository composed
+Installing alpha 1.0.0 (1/4) from composed
+Downloading alpha/bin/app (13 bytes)
+Installing Notice 1.0.0 (2/4) from composed
+Downloading alpha-notice/NOTICE (12 bytes)
+Installing beta 1.0.0 (3/4) from composed
+Downloading beta/bin/app (12 bytes)
+Installing Notice 1.0.0 (4/4) from composed
+Downloading beta-notice/NOTICE (11 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository composed
+Installing alpha 1.0.0 (1/4) from composed
+Downloading alpha/bin/app (12 bytes)
+Installing Notice 1.0.0 (2/4) from composed
+Downloading alpha-notice/NOTICE (12 bytes)
+Installing beta 1.0.0 (3/4) from composed
+Downloading beta/bin/app (11 bytes)
+Installing Notice 1.0.0 (4/4) from composed
+Downloading beta-notice/NOTICE (11 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository selected
+Installing alpha 1.0.0 (1/4) from selected
+Downloading alpha/bin/app (13 bytes)
+Installing Notice 1.0.0 (2/4) from selected
+Downloading alpha-notice/NOTICE (12 bytes)
+Installing beta 1.0.0 (3/4) from selected
+Downloading beta/bin/app (12 bytes)
+Installing Notice 1.0.0 (4/4) from selected
+Downloading beta-notice/NOTICE (11 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing alpha 1.0.0 (1/4) from selected
+Installing Notice 1.0.0 (2/4) from selected
+Installing beta 1.0.0 (3/4) from selected
+Installing Notice 1.0.0 (4/4) from selected
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository selected
+Installing alpha 1.0.0 (1/4) from selected
+Downloading alpha/bin/app (12 bytes)
+Installing Notice 1.0.0 (2/4) from selected
+Downloading alpha-notice/NOTICE (12 bytes)
+Installing beta 1.0.0 (3/4) from selected
+Downloading beta/bin/app (11 bytes)
+Installing Notice 1.0.0 (4/4) from selected
+Downloading beta-notice/NOTICE (11 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing alpha 1.0.0 (1/4) from selected
+Installing Notice 1.0.0 (2/4) from selected
+Installing beta 1.0.0 (3/4) from selected
+Installing Notice 1.0.0 (4/4) from selected
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+COMPOSITION TARGET: both host selections preserve shared dependencies, manifests/pins/policy, signed offline maintenance and full-input provenance PASS
+COMPOSITION TARGET: incomplete, malformed, unsafe and unresolved omitted variants plus shared identity collisions refuse before publication PASS

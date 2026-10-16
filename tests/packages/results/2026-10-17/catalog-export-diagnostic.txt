@@ -1,0 +1,46 @@
+CATALOG EXPORT baseline catalog refused=true replacement-preserved=true
+CATALOG EXPORT baseline composition refused=true replacement-preserved=true
+CATALOG EXPORT 144 workspace/composition/selected-host root and parent substitutions preserve replacements, complete recovery snapshots and source pins; fresh retry under 32 descriptors PASS
+CATALOG EXPORT directory-flush and post-rename parent failures retain complete canonical artifacts and accurate saved diagnostics for workspace and all composition target modes PASS
+Updating trusted repository fixture
+Installing alpha 1.0.0 (1/2) from fixture
+Downloading alpha/share/data (32 bytes)
+Installing beta 1.0.0 (2/2) from fixture
+Downloading beta/share/data (31 bytes)
+Activated package generation 1
+=================================================================
+==94507==ERROR: AddressSanitizer: attempting double-free on 0x6070002f70b0 in thread T0:
+    #0 0x000104305258 in free+0x7c (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x41258)
+    #1 0x000102c70350 in v_free+0x1ec (core-sanitize:arm64+0x100034350)
+    #2 0x000102c6792c in string__free+0x33c (core-sanitize:arm64+0x10002b92c)
+    #3 0x000103084ad8 in pkgcore__close_decoded_state+0x4ec (core-sanitize:arm64+0x100448ad8)
+    #4 0x00010312c9e0 in pkgcore__State__close+0x17c (core-sanitize:arm64+0x1004f09e0)
+    #5 0x0001033df80c in pkgcore__test_catalog_export_preserved_composition_and_workspace_feed_signed_offline_consumers+0x2db8 (core-sanitize:arm64+0x1007a380c)
+    #6 0x000103662598 in main+0x344 (core-sanitize:arm64+0x100a26598)
+    #7 0x0001802ebdfc in start+0x1b4c (dyld:arm64e+0x1fdfc)
+
+0x6070002f70b0 is located 0 bytes inside of 65-byte region [0x6070002f70b0,0x6070002f70f1)
+freed by thread T0 here:
+    #0 0x000104305258 in free+0x7c (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x41258)
+    #1 0x000102c70350 in v_free+0x1ec (core-sanitize:arm64+0x100034350)
+    #2 0x000102c6792c in string__free+0x33c (core-sanitize:arm64+0x10002b92c)
+    #3 0x000103084ad8 in pkgcore__close_decoded_state+0x4ec (core-sanitize:arm64+0x100448ad8)
+    #4 0x00010312c9e0 in pkgcore__State__close+0x17c (core-sanitize:arm64+0x1004f09e0)
+    #5 0x0001033df80c in pkgcore__test_catalog_export_preserved_composition_and_workspace_feed_signed_offline_consumers+0x2db8 (core-sanitize:arm64+0x1007a380c)
+    #6 0x000103662598 in main+0x344 (core-sanitize:arm64+0x100a26598)
+    #7 0x0001802ebdfc in start+0x1b4c (dyld:arm64e+0x1fdfc)
+
+previously allocated by thread T0 here:
+    #0 0x000104305164 in malloc+0x78 (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x41164)
+    #1 0x000102c6949c in malloc_noscan+0x1b4 (core-sanitize:arm64+0x10002d49c)
+    #2 0x000102c6a9a0 in data_to_hex_string+0x38 (core-sanitize:arm64+0x10002e9a0)
+    #3 0x000102c6a954 in Array_u8__hex+0x168 (core-sanitize:arm64+0x10002e954)
+    #4 0x0001032f0048 in pkgcore__signing_seed_public+0x4d0 (core-sanitize:arm64+0x1006b4048)
+    #5 0x0001032f77e8 in pkgcore__keygen_with+0x73c4 (core-sanitize:arm64+0x1006bb7e8)
+    #6 0x0001032f034c in pkgcore__keygen+0x1c8 (core-sanitize:arm64+0x1006b434c)
+    #7 0x0001033de228 in pkgcore__test_catalog_export_preserved_composition_and_workspace_feed_signed_offline_consumers+0x17d4 (core-sanitize:arm64+0x1007a2228)
+    #8 0x000103662598 in main+0x344 (core-sanitize:arm64+0x100a26598)
+    #9 0x0001802ebdfc in start+0x1b4c (dyld:arm64e+0x1fdfc)
+
+SUMMARY: AddressSanitizer: double-free (core-sanitize:arm64+0x100034350) in v_free+0x1ec
+==94507==ABORTING

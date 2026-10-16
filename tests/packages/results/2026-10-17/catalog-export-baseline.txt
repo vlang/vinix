@@ -1,0 +1,6 @@
+CATALOG EXPORT baseline catalog refused=true replacement-preserved=false
+tools/packages/pkgcore/catalog_export_test.v:57: fn catalog_export_baseline
+    assert refused && preserved == 'replacement must survive' && os.is_dir(work + '/output/saved-stage') && !os.exists(work + '/output/export')
+CATALOG EXPORT baseline composition refused=true replacement-preserved=false
+tools/packages/pkgcore/catalog_export_test.v:57: fn catalog_export_baseline
+    assert refused && preserved == 'replacement must survive' && os.is_dir(work + '/output/saved-stage') && !os.exists(work + '/output/export')

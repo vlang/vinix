@@ -1,0 +1,4 @@
+Published authenticated offline image repositories
+Initialized reviewed image package configuration
+Declared reviewed release applications for Software deployment review
+Staged signed package service and Software launcher (aarch64)

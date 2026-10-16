@@ -61,6 +61,7 @@ fn (plan CatalogPlan) result(directory string) CatalogInfo {
 struct CatalogOptions {
 	checkpoint fn (string, string) ! = mirror_no_checkpoint
 	available_space fn (string) !u64 = free_bytes
+	flush fn (int) int = atomic_flush
 }
 
 fn catalog_key(context string, key string) bool {
@@ -247,11 +248,16 @@ fn catalog_build(recipe_file string, source_roots string, destination string, op
 		fd := catalog_source_root(root, item.source)!
 		roots[item.source] = fd
 	}
-	stage := export_stage(parent, '.vinix-catalog')!
-	defer { unsafe { stage.free() } }
-	mut published := false
-	defer { if !published { os.rmdir_all(stage) or {} } }
+	mut exporting := create_export_stage(parent, '.vinix-catalog', 'catalog workspace')!
+	defer { exporting.close() }
+	write_catalog_stage(plan, roots, target, options, mut exporting) or { return exporting.failure(err) }
+	return plan.result(target)
+}
+
+fn write_catalog_stage(plan CatalogPlan, roots map[string]int, target string, options CatalogOptions, mut exporting ExportStage) ! {
+	stage := exporting.path
 	options.checkpoint('created', stage)!
+	exporting.check()!
 	for item in plan.recipe.packages {
 		expected := item.recipe.manifest
 		packed := pack_root_descriptor(item.recipe, roots[item.source], stage, true) or {
@@ -266,6 +272,7 @@ fn catalog_build(recipe_file string, source_roots string, destination string, op
 		defer { unsafe { manifest_path.free(); manifest.free() } }
 		atomic_write(manifest_path, manifest)!
 		options.checkpoint('packed', stage)!
+		exporting.check()!
 	}
 	catalog_path := stage + '/catalog.json'
 	objects_path := stage + '/objects'
@@ -276,6 +283,7 @@ fn catalog_build(recipe_file string, source_roots string, destination string, op
 	flush_tree(manifests_path)!
 	sync_directory(stage)!
 	options.checkpoint('ready', stage)!
+	exporting.check()!
 	names := os.ls(manifests_path)!
 	defer { unsafe { names.free() } }
 	if names.len != plan.recipe.packages.len { return error('catalog manifest set changed during import') }
@@ -298,10 +306,5 @@ fn catalog_build(recipe_file string, source_roots string, destination string, op
 	staged := read_metadata(catalog_path)!
 	defer { unsafe { staged.free() } }
 	if staged != plan.text { return error('catalog recipe changed during import') }
-	publish_new_directory(stage, target, 'catalog workspace')!
-	published = true
-	sync_directory(parent) or {
-		return error('catalog workspace published at ${target}, but its directory flush failed; verify storage and the workspace before signing: ${err}')
-	}
-	return plan.result(target)
+	exporting.publish_with(target, options.flush)!
 }

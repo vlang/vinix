@@ -1,0 +1,26 @@
+cli-compile PASS
+composition_ownership-compile PASS
+composition_ownership-run PASS
+composition-compile PASS
+composition-run PASS
+catalog-compile PASS
+catalog-run PASS
+catalog_normalize-compile PASS
+catalog_normalize-run PASS
+publisher_schema-compile PASS
+publisher_schema-run PASS
+native_profile-compile PASS
+native_profile-run PASS
+apple_profile-compile PASS
+apple_profile-run PASS
+release-compile PASS
+release-run PASS
+distribution-cli-compile PASS
+distribution-cli-run PASS
+tracked-compile PASS
+tracked-run PASS
+composition_ownership-sanitize-compile PASS
+composition_ownership-sanitize-run PASS
+composition-sanitize-compile PASS
+composition-sanitize-run PASS
+Composition ownership: twenty-five host build/test checks PASS

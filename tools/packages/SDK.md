@@ -980,11 +980,21 @@ metadata, the largest materialized package and a 64 MiB reserve, with a separate
 check of the temporary filesystem. Before publication, the builder verifies all
 manifests, objects and canonical recipe again. Success atomically publishes a
 new 0700 workspace containing `objects`, `manifests` and `catalog.json`; an
-existing destination is never replaced. Failed builds remove their staging
-directory. An abrupt process kill can leave an unpublished private
+existing destination is never replaced. Failed builds retire their captured
+ordinary staging directory. An abrupt process kill can leave an unpublished private
 `.vinix-catalog-*` directory; inspect/remove that owned directory and retry with
 a new destination. A reported parent-directory flush failure means the workspace
 is already visible and needs storage verification before signing.
+
+Workspace construction, strict composition and explicit-host composition retain
+no-follow parent/root descriptors and recheck their identities after checkpoints.
+Cleanup inventories the captured tree through its held parent before unlinking;
+replaced or unsafe roots remain for inspection with the original failure and a
+cleanup-refusal diagnostic. Renaming the parent cannot redirect cleanup into a
+replacement. Exclusive rename and its final flush use that same parent; failures
+after publication retain the complete artifact, including when the visible
+parent has changed. Inspect the captured directory and restore stable paths
+before retrying. See [catalog export qualification](../../tests/packages/catalog-export-check.md).
 
 Success emits one format-1 JSON object with `directory`, sorted `architectures`,
 `package_count`, `object_count` and `catalog_sha256`. The digest covers the exact

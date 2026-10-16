@@ -68,7 +68,8 @@ fn native_suite(sandbox string, image bool, software bool) hwhost.Suite {
 			hwhost.Program{ source: 'tools/accounts/account.v', path: 'usr/sbin/vinix-account' },
 			hwhost.Program{ source: 'tools/accounts/session.v', path: 'usr/sbin/vinix-session' }]
 	}
-	if image { programs << hwhost.Program{ source: 'tools/packages/pkgcore/image_repositories_test.v', path: 'usr/share/package-fixtures/image-repositories' } }
+	if image { programs << [hwhost.Program{ source: 'tools/packages/pkgcore/image_repositories_test.v', path: 'usr/share/package-fixtures/image-repositories' },
+		hwhost.Program{ source: 'tools/packages/pkgcore/catalog_export_test.v', path: 'usr/share/package-fixtures/catalog-exports' }] }
 	name := if software { 'packages-software-image' } else if image { 'packages-native-image' } else { 'packages-native-catalog' }
 	mut required := ['HWTEST START ' + name,
 		'PACKAGE NATIVE CATALOG six-pinned-packages signed-review architecture notices document-grant protocols-1-2 ordinary-data PASS',
@@ -87,7 +88,8 @@ fn native_suite(sandbox string, image bool, software bool) hwhost.Suite {
 		required << 'SOFTWARE IMAGE compact-deployment 320x240 keyboard paging visible release review and audit separate approval PASS'
 	}
 	if image { required << ['PACKAGE IMAGE BUNDLE production-staged signed repository before first refresh PASS',
-		'PACKAGE IMAGE CAPTURE guarded preparation publication checked retirement replacement preservation retry and saved output PASS'] }
+		'PACKAGE IMAGE CAPTURE guarded preparation publication checked retirement replacement preservation retry and saved output PASS',
+		'PACKAGE CATALOG EXPORT guarded workspace composition host selection recovery retry saved output and signed offline consumption PASS'] }
 	return hwhost.Suite{ name: 'package-native-catalog', guest: 'tests/accounts/guest',
 		module_paths: ['.', 'tools/accounts', 'tools/security-events', 'tools/keyring'],
 		programs: programs,
@@ -255,6 +257,7 @@ fn stage_native_image(host hwhost.Host, inputs string, root string, work string)
 		if os.is_file(path) { artifacts << native_artifact('image/' + path[root.len + 1..], path)! }
 	}
 	artifacts << native_artifact('image/usr/share/package-fixtures/image-repositories', root + '/usr/share/package-fixtures/image-repositories')!
+	artifacts << native_artifact('image/usr/share/package-fixtures/catalog-exports', root + '/usr/share/package-fixtures/catalog-exports')!
 	return artifacts
 }
 

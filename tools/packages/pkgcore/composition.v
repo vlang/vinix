@@ -171,17 +171,24 @@ fn compose_catalog_selected(sources []CatalogSource, destination string, archite
 	parent := os.dir(target)
 	defer { unsafe { target.free(); parent.free() } }
 	disk_check(options.available_space(parent)!, u64(plan.text.len + plan.provenance.len) + 4 * 1024 * 1024, 64 * 1024 * 1024)!
-	stage := export_stage(parent, '.vinix-composition')!
+	mut exporting := create_export_stage(parent, '.vinix-composition', 'catalog composition')!
+	defer { exporting.close() }
+	write_composition_stage(plan, target, options, mut exporting) or { return exporting.failure(err) }
+	return composition_result(plan.info, target)
+}
+
+fn write_composition_stage(plan CompositionPlan, target string, options CatalogOptions, mut exporting ExportStage) ! {
+	stage := exporting.path
 	catalog_path := stage + '/catalog.json'
 	provenance_path := stage + '/composition.json'
-	defer { unsafe { stage.free(); catalog_path.free(); provenance_path.free() } }
-	mut published := false
-	defer { if !published { os.rmdir_all(stage) or {} } }
+	defer { unsafe { catalog_path.free(); provenance_path.free() } }
 	options.checkpoint('created', stage)!
+	exporting.check()!
 	atomic_write(catalog_path, plan.text)!
 	atomic_write(provenance_path, plan.provenance)!
 	sync_directory(stage)!
 	options.checkpoint('ready', stage)!
+	exporting.check()!
 	staged_text := read_metadata(catalog_path)!
 	defer { unsafe { staged_text.free() } }
 	staged_provenance := read_metadata(provenance_path)!
@@ -189,8 +196,5 @@ fn compose_catalog_selected(sources []CatalogSource, destination string, archite
 	if staged_text != plan.text || staged_provenance != plan.provenance {
 		return error('catalog composition changed before publication')
 	}
-	publish_new_directory(stage, target, 'catalog composition')!
-	published = true
-	sync_directory(parent) or { return error('catalog composition published at ${target}, but its directory flush failed: ${err}') }
-	return composition_result(plan.info, target)
+	exporting.publish_with(target, options.flush)!
 }
