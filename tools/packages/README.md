@@ -474,6 +474,15 @@ versioned musl/library runtime, with notices, upstream source and V build tools.
 See the [profile](SDK.md#ffmpeg-local-media-publisher-profile) and
 [qualification](../../tests/packages/ffmpeg-profile-check.md).
 
+`wine-catalog RECIPE_DIRECTORY PREPARED_ROOTS NEW_LOCK_DIRECTORY` pins a reviewed
+Win64 application and explicit Wine runtime for both hosts. It checks PE32+
+application structure, matching native static launchers, notices, runtime bounds
+and consistent license/permission declarations before publishing a catalog lock.
+It supplies no Wine runtime or consumer license grants. See the
+[profile contract](SDK.md#wine-win64-publisher-profile) and
+[publisher qualification](../../tests/packages/wine-profile-check.md); actual
+Wine/translated/graphical execution remains a separate gate.
+
 Fixed native, SQLite and FFmpeg profiles recheck the complete imported file list
 and bounded, nonempty notices before publishing a lock. Replacing a required
 file with a directory cannot omit a notice or bypass the FFmpeg source pin.

@@ -656,6 +656,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
   permissions, progress, uninstall, updates and useful failure diagnostics.
 - [ ] Package native, Linux, Windows and Apple-compatible apps with isolated
   runtimes, launcher/association registration and clean uninstall behavior.
+  - [x] [A Win64 publisher profile](tools/packages/SDK.md#wine-win64-publisher-profile)
+    pins publisher-supplied application/runtime closures for both hosts, checks
+    PE32+ payloads and native launchers, and retains explicit licensing and
+    runtime bounds. [Publisher lifecycle checks](tests/packages/wine-profile-check.md)
+    cover signed offline install, registration, removal and rollback.
+  - [ ] Qualified isolated Wine/translation and Apple runtime catalogs, including
+    ordinary-user graphical execution and their required IPC/device services.
 - [ ] Establish a supported application SDK/protocol, stable public interfaces,
   package format, signing/publishing process and developer documentation.
 - [ ] Support offline repositories/caches and organization-managed deployment;

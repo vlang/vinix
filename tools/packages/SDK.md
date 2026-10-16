@@ -980,6 +980,116 @@ Authenticate upstream delivery and review the configuration before public
 publication. [Qualification](../../tests/packages/ffmpeg-profile-check.md)
 covers the retained compiler/kernel tuple and enabled media subset.
 
+### Wine Win64 publisher profile
+
+`wine-catalog RECIPE_DIRECTORY PREPARED_ROOTS NEW_LOCK_DIRECTORY` inventories a
+publisher-supplied Win64 application and a separately versioned Wine runtime for
+both hosts. It produces the same canonical lock consumed by `pack-catalog`,
+`compose-catalog` and `publish-release`. It does not download Wine, select a
+publisher, accept proprietary terms or turn a host-wide Wine installation into
+an isolated runtime.
+
+Supply four ordinary bounded prepared-root recipe files:
+
+```text
+recipes/aarch64/application.json     roots/aarch64/...
+recipes/aarch64/runtime.json
+recipes/x86_64/application.json      roots/x86_64/...
+recipes/x86_64/runtime.json
+```
+
+Each application template must declare `kind: "windows"`, its exact host
+`architecture`, `runtime`, `entrypoint: "bin/wine-runner"`, and a first argument
+of `"@APP@/bin/program.exe"`. Its sole dependency names that runtime and provides
+both `minimum` and `before` version bounds. Select individual source files for
+`bin/program.exe` and `licenses/application-LICENSE.txt`, plus any resources and
+additional notices. The program must be an ordinary x86-64 PE32+ GUI or console
+application with a file-backed executable entrypoint; DLLs, PE32/i386, ARM64 PE,
+EFI images, truncated headers and out-of-file sections refuse. Unix executable
+permission on the PE payload is unnecessary.
+
+Each runtime template declares `kind: "runtime"`, its exact host architecture,
+version and license. It selects a statically linked **native host ELF** at
+`bin/wine-runner`, `licenses/runtime-LICENSE.txt`, and every loader, translator,
+Wine binary, library and resource needed by its launcher. Enumerate individual
+files, not recursive directories, with at most 1024 selectors per recipe.
+Runtime dependencies, app-launch metadata and
+permissions are empty: the application's declared grants control execution.
+The AArch64 launcher must supply its own x86-64 translation path. No architecture
+alias or automatic host/guest substitution exists. The profile checks the native
+launcher and PE structure, not arbitrary runtime library formats or API coverage.
+
+For example, an application recipe can use:
+
+```json
+{
+  "manifest": {
+    "id": "org.example.editor", "version": "1.0.0",
+    "architecture": "aarch64", "name": "Example editor",
+    "license": "Example-EULA", "proprietary": true, "kind": "windows",
+    "runtime": "org.example.wine", "entrypoint": "bin/wine-runner",
+    "arguments": ["@APP@/bin/program.exe"],
+    "permissions": ["files", "process", "display"], "associations": ["text/plain"],
+    "dependencies": [{"id":"org.example.wine","minimum":"1.0.0","before":"2.0.0"}]
+  },
+  "entries": [
+    {"source":"app/editor.exe","path":"bin/program.exe"},
+    {"source":"licenses/editor.txt","path":"licenses/application-LICENSE.txt"}
+  ]
+}
+```
+
+The corresponding runtime recipe starts with:
+
+```json
+{
+  "manifest": {
+    "id": "org.example.wine", "version": "1.0.0", "architecture": "aarch64",
+    "name": "Example isolated Wine runtime", "license": "LGPL-2.1-or-later",
+    "kind": "runtime"
+  },
+  "entries": [
+    {"source":"runtime/wine-runner","path":"bin/wine-runner"},
+    {"source":"licenses/wine.txt","path":"licenses/runtime-LICENSE.txt"}
+  ]
+}
+```
+
+Add the complete reviewed runtime closure to `entries`; these two selectors
+alone are not a usable Wine runtime. Duplicate both templates for x86_64 with
+that explicit architecture and its matching native launcher. All other manifest
+declarations must agree across hosts, including licenses, proprietary flags,
+permissions, arguments and dependency ranges. Source selectors and payload bytes
+may differ. Templates have no `files` pins: the profile records exact imported
+hashes, lengths and executable flags. All `licenses/` payloads must be nonempty
+and at most 1 MiB. The runtime's license expression and notices must cover its
+complete closure; the profile cannot determine redistribution rights.
+
+```sh
+vinix-package wine-catalog /build/recipes /build/roots /build/new-wine-lock
+vinix-package pack-catalog /build/new-wine-lock/catalog.json /build/roots /build/new-wine-workspace
+vinix-package publish-release /build/new-wine-workspace company /secure/publisher.seed 1 EXPIRES_UNIX /srv/new-wine-release
+```
+
+Success returns format-1 JSON with `profile: "wine-win64"`, `directory`,
+`catalog`, `catalog_sha256`, `application`, `version`, `runtime`,
+`runtime_version` and `architectures`. Inputs remain unchanged. Both targets,
+file selectors, space and required notices are checked before staging. Imported
+PE/launcher bytes and complete inventories are checked again before canonical
+lock publication. A handled failure removes private staging and leaves no new
+lock; existing/concurrently created destinations are preserved. An abrupt kill
+can leave a private `.vinix-wine-profile-*` staging directory for inspection.
+
+The runtime remains an ordinary signed dependency. Updating its version within
+the declared compatibility interval need not change the application; normal
+review, rollback, policy, provenance and launcher/removal rules apply. Publishing
+never grants consumer license acceptance. Wine prefix state uses the existing
+per-user `WINEPREFIX` under private app data and follows the normal retained-data
+contract. The launcher must keep generation leases valid while child processes
+use runtime files and must not depend on host-global paths or unrequested grants.
+Wine IPC, display, process lifetime, translated execution and real upstream
+applications still require target qualification. See [profile checks](../../tests/packages/wine-profile-check.md).
+
 ## Runtimes and launch
 
 ### Native window protocol 1

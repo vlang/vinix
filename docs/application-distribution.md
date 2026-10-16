@@ -209,6 +209,14 @@ enroll a publisher or accept proprietary/firmware terms for consumers.
 The [catalog qualification](../tests/packages/catalog-build-check.md) covers
 canonical release reproduction, refusal/cleanup and real Linux guest execution.
 
+The [Wine Win64 publisher profile](../tools/packages/SDK.md#wine-win64-publisher-profile)
+adds explicit application/runtime recipes for both hosts, structural PE32+
+admission and matching native static launchers. It preserves publisher-declared
+permissions, notices, proprietary licensing and bounded runtime updates in the
+normal signed catalog. It does not supply or qualify Wine itself. See
+[publisher checks](../tests/packages/wine-profile-check.md) for reproducible
+offline maintenance, policy and failure coverage.
+
 Prepared-root imports, catalog builds and the three fixed publisher profiles
 share source-root admission before creating destination parents. Empty/NUL
 paths and leaf directory aliases refuse even with trailing separators. Ordinary
