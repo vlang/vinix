@@ -71,6 +71,11 @@ pub fn syscall_clone3(_gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 		return errno.err, errno.einval
 	}
 
+	// Init cannot create siblings, even when the cgroup descriptor is invalid.
+	if !valid_clone_parent(args.flags) {
+		return errno.err, errno.einval
+	}
+
 	mut cgroup := voidptr(unsafe { nil })
 	if args.flags & clone_into_cgroup != 0 {
 		mut cgroup_fd := file.fd_from_fdnum(unsafe { nil }, int(args.cgroup)) or {

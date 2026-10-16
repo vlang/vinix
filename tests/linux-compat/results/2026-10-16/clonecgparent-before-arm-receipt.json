@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "7c7ff01d3fba93ece522d8b9529f2015091a8a99592e7426baa7d170ca7acc8a",
+    "results": [
+        {
+            "name": "clonecgparent",
+            "source_sha256": "69a090b69c1178279d6bff8197627b766ca69f78c40b358d4fc27eeb7d4042f3",
+            "init_sha256": "3af7f5f2171a2c8577c1757375e88554164387a0e37f7466dcef28260e1eee17",
+            "iso_sha256": "ee39ecc2558463d682c84fd211795f3d3290adfde18afd89e75509e6b59fac83",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

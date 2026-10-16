@@ -2065,3 +2065,15 @@ pass. Use `--cases clonecgshare --timeout 1200` with fresh state;
 `clonecgshare-reference.v` runs the unchanged ELF on Linux and
 `clonecgshare-check.v` audits receipts when compiled without `-prod`.
 See the [qualification report](../../docs/linux-posix-qualification.md#native-clone3-sharing-and-cgroup-descriptor-ordering).
+
+The `clonecgparent` case checks clone3 init-parent errors before cgroup
+descriptor lookup. Global PID1 plus four root/UID1000 namespace-init/ordinary
+cohorts run 1,896 controls per architecture, preserving ordinary EBADF admission,
+earlier import/ABI errors, held descriptors and 144 real fork/reap lifecycles.
+Originals fail 408; corrected kernels and identical ELFs on Linux pass. Both
+phases have flat identical-input 200-cycle cleanup. Runtime pthread and
+clonecgshare regressions pass. Initial Linux namespace-permission expectation
+failures remain retained and audited. Use `--cases clonecgparent --timeout 1200`
+with fresh state; `clonecgparent-reference.v` runs the unchanged ELF on Linux and
+`clonecgparent-check.v` audits receipts when compiled without `-prod`.
+See the [qualification report](../../docs/linux-posix-qualification.md#native-clone3-init-parent-and-cgroup-descriptor-ordering).

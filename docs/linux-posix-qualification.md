@@ -10095,3 +10095,117 @@ descriptor/node teardown, independent sharing ownership, requested PID allocatio
 supplied-stack execution, shared-VM/vfork lifetimes, other notifications/wait
 classes, worker callers, GNU libc and translated/32-bit paths remain unqualified
 here. The broad libc, installation/sandbox/portal and translation gates remain open.
+
+## Native clone3 init-parent and cgroup descriptor ordering
+
+Both native clone3 paths now reject CLONE_PARENT from global or PID-namespace
+init before resolving a CLONE_INTO_CGROUP descriptor. They return EINVAL for
+missing and wrong-type descriptors, matching Linux. Previously EBADF hid the
+init-parent prohibition. Structure/vector imports, flag/signal/stack checks and
+contradictory-sharing checks retain their precedence. The existing common
+parent check remains for legacy clone and later admission.
+
+This follows [Linux v6.12's early copy_process init-parent check](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c)
+and [later cgroup descriptor lookup](https://github.com/torvalds/linux/blob/v6.12/kernel/cgroup/cgroup.c).
+It qualifies init-parent versus descriptor errors. Namespace-creation permission
+checks also precede descriptor lookup on Linux and remain a separate Vinix gap.
+
+The `clonecgparent` probe runs 1,896 controls per architecture. Global PID1 runs
+24 parent/cgroup requests using eight flag combinations, two missing descriptor
+numbers and a held `/dev/null` descriptor, with sizes 88/96/128/256. It checks an
+unchanged 256-byte canary, the held descriptor and an empty child wait. Effective
+CAP_SYS_ADMIN is cleared/read back for these calls and restored/read back before
+starting other cohorts.
+
+Four fresh one-level PID-namespace cohorts run 468 controls each: root/UID1000
+and namespace init PID1/ordinary PID2. Each clears and reads back effective
+CAP_SYS_ADMIN. A `/dev/null` descriptor stays open throughout the cohort, must
+survive F_GETFD after every call and must close successfully at the end. The
+six classes per cohort are:
+
+- 96 CLONE_PARENT requests using a missing cgroup descriptor. Eight combinations
+  cover plain PARENT, SYSVSEM, UNTRACED, CLEAR_SIGHAND, VM, FS|FILES, FS and FILES.
+  Sizes 88/96/128/256 have zero-filled extensions and aligned, unaligned and
+  exact-page-end layouts. Init must return EINVAL; ordinary callers reach EBADF.
+- 96 equivalent requests using the held wrong-type descriptor.
+- 108 requests without PARENT: twelve valid-sharing flag combinations, three
+  missing/wrong-type descriptor forms and three layouts must reach EBADF. This
+  includes forms whose later sharing support remains incomplete in Vinix.
+- 60 earlier structure/vector/flag/signal/stack errors retain exact EFAULT,
+  E2BIG or EINVAL, including PARENT with a nonzero exit signal.
+- 72 cgroup ABI/extension controls retain oversized-descriptor, short-prefix,
+  nonzero-tail and inaccessible-tail errors, plus no-INTO_CGROUP contradictory
+  sharing controls.
+- 36 real fork/reap controls through clone3 and legacy clone. Clone3 sizes
+  64/72/80/88 ignore unused cgroup words; legacy clone retains upper-word
+  truncation. Children verify PID/TID, parent, UID and exit 37 before caller reap.
+
+Protected clone3 inputs end at readable-page boundaries, with whole two-page
+canaries and an empty ECHILD wait after each request. Native ARM uses 16 KiB
+pages; native x86 and Linux references use 4 KiB. Originals fail 408 controls per
+architecture: 24 global-init requests and 384 namespace-init requests. Sampled
+namespace diagnostics show EBADF instead of EINVAL. Ordinary callers and all
+other classes retain their expected behavior. Corrected kernels and the same
+probe ELFs on Linux 6.12.51 pass all 1,896 controls. Both phases retain 144 valid
+fork/reap lifecycles in these controls and create no unintended children.
+
+Both phases measure four identical-input cleanup cohorts: 64 warmup cycles,
+thirteen seconds of settling, 200 measured cycles and another settle. Each cycle
+mixes two parent/cgroup descriptor refusals, one no-PARENT descriptor refusal,
+one ABI/extension error and one real fork/reap. Only cleanup accepts original
+EBADF or corrected EINVAL for the parent requests; conformance requires exact
+errors. All live slab classes and big-heap page counts stay flat. This covers
+targeted kernel-heap paths; general page/cache retention and the earlier EXT2
+rename observation remain separate.
+
+Four isolated original/corrected production builds pass. Whole generated-C
+comparison confines the change to the two early clone3 guards calling the
+unchanged scalar parent predicate. No allocation/free/reference/ownership,
+lock or task-publication path changes. Probe C contains thirteen explicit stack
+allocas and no dynamic allocation or fixed-index helper. ARM preflight C matches
+the original guest C, and its ELF is the byte-identical Linux reference probe.
+Both corrected architectures pass runtime pthread creation and the 1,872-control
+clonecgshare regression.
+
+An initial probe incorrectly expected ordinary NEWPID/NEWNS requests to reach
+EBADF. Both Linux references instead returned EPERM for 96 requests while init
+correctly returned EINVAL. The initial probe, all four native runs, both failed
+Linux references, receipts, C/ELFs and retained-input hashes are preserved under
+`clonecgparent-20261016/p0`. The final probe replaces those two namespace-creation
+variants with VM and FS|FILES, retaining equal counts while isolating this fix.
+The [original ARM serial](../tests/linux-compat/results/2026-10-16/clonecgparent-prototype-reference-arm-serial.log),
+[original x86 serial](../tests/linux-compat/results/2026-10-16/clonecgparent-prototype-reference-x86-serial.log),
+[prototype source](../tests/linux-compat/results/2026-10-16/clonecgparent-prototype-core.v)
+and [prototype hashes](../tests/linux-compat/results/2026-10-16/clonecgparent-prototype-inputs.json)
+remain published. The auditor requires those exact initial mismatches; it does
+not reinterpret the failed references as passing qualification.
+
+A prototype-integrity audit initially rejected ordinary-cohort descriptor rows
+because its parser accidentally required the init cohort selector. The parser
+now accepts both selectors. Its exact refused source, binary, status and
+[raw assertion](../tests/linux-compat/results/2026-10-16/clonecgparent-parser-refusal.log)
+are retained, with [published hashes](../tests/linux-compat/results/2026-10-16/clonecgparent-parser-refusal-inputs.json).
+The final auditor verifies the one-condition parser correction and the retained
+refusal. No kernel, probe or serial data changed for that correction.
+
+The auditor checks totals, original diagnostics, global capability restoration,
+namespace identities, held descriptors, child counts, page sizes, identical
+C/ELFs, Linux receipts and both phases' storage. It verifies 84 retained final
+native case files, 67 frozen dispatch inputs, 2,014 SDK files, 15,146 compiler
+pins and both retained Linux sources, as well as the prototype records.
+False-assertion and passing-Linux-as-original negative controls must execute and
+fail; compile without `-prod`.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/clonecgparent-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/clonecgparent-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/clonecgparent-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/clonecgparent-diagnostic-pins.json).
+Raw original/corrected/Linux, build, preflight and regression logs accompany
+the receipts. The maintained auditor is `tests/linux-compat/clonecgparent-check.v`.
+
+Namespace/TLS permission ordering against cgroup errors, active versus
+future-child PID namespaces, actual cgroup placement/authorization and concurrent
+descriptor/node teardown, independent sharing ownership, requested PID allocation,
+supplied-stack execution, shared-VM/vfork lifetimes, other notifications/wait
+classes, worker callers, GNU libc and translated/32-bit paths remain unqualified
+here. The broad libc, installation/sandbox/portal and translation gates remain open.
