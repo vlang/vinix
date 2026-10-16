@@ -35,10 +35,48 @@ struct ImportNode {
 	inode  u64
 }
 
+// Build one owned restart path without temporary joins or borrowed array
+// slices. Prefix components belong to the current split, not to this helper.
+fn import_restart(prefix []string, target string, parts []string, next int) !string {
+	absolute := target.starts_with('/')
+	mut size := target.len
+	if !absolute {
+		for index, part in prefix { size += part.len + if index > 0 { 1 } else { 0 } }
+		if target != '' { size++ }
+	}
+	if next < parts.len {
+		size++
+		for index := next; index < parts.len; index++ { size += parts[index].len + if index > next { 1 } else { 0 } }
+	}
+	if size > 4096 { return error('unsafe or oversized guest symlink target') }
+	mut bytes := []u8{cap: size}
+	defer { unsafe { bytes.free() } }
+	if !absolute {
+		for index, part in prefix {
+			if index > 0 { bytes << `/` }
+			for byte in part { bytes << byte }
+		}
+		if target != '' { bytes << `/` }
+	}
+	for byte in target { bytes << byte }
+	if next < parts.len {
+		bytes << `/`
+		for index := next; index < parts.len; index++ {
+			if index > next { bytes << `/` }
+			for byte in parts[index] { bytes << byte }
+		}
+	}
+	return bytes.bytestr()
+}
+
 // Every component is opened relative to the captured root, without following
 // host symlinks. Link resolution restarts from that descriptor's namespace.
 fn import_node(root int, source string) !ImportNode {
-	mut pending := source
+	if !printable(source, 4096) || source.contains('\\') {
+		return error('unsafe or oversized guest symlink target')
+	}
+	mut pending := source.clone()
+	defer { unsafe { pending.free() } }
 	mut links := 0
 	for {
 		if !printable(pending, 4096) || pending.contains('\\') {
@@ -48,18 +86,19 @@ fn import_node(root int, source string) !ImportNode {
 		if directory < 0 { return error('cannot retain import root') }
 		mut restart := false
 		parts := pending.split('/')
-		mut prefix := []string{}
+		defer { unsafe { parts.free() } }
+		mut prefix := []string{cap: parts.len}
+		// Only the buffer is owned: its strings are borrowed from parts.
+		defer { unsafe { (&array(&prefix)).free() } }
 		for index, part in parts {
 			if part in ['', '.'] { continue }
 			if part == '..' {
 				C.close(directory)
 				if prefix.len == 0 { return error('guest symlink escapes its source root') }
 				prefix.pop()
-				pending = prefix.join('/') + if index + 1 < parts.len {
-					'/' + parts[index + 1..].join('/')
-				} else {
-					''
-				}
+				next_pending := import_restart(prefix, '', parts, index + 1)!
+				unsafe { pending.free() }
+				pending = next_pending
 				restart = true
 				break
 			}
@@ -79,17 +118,11 @@ fn import_node(root int, source string) !ImportNode {
 					return error('invalid or oversized guest symlink: ${pending}')
 				}
 				target := unsafe { tos(&link[0], int(count)).clone() }
-				base := if target.starts_with('/') {
-					target
-				} else {
-					prefix.join('/') + '/' + target
-				}
+				defer { unsafe { target.free() } }
 				// Follow an intermediate alias before interpreting any later '..'.
-				pending = base + if index + 1 < parts.len {
-					'/' + parts[index + 1..].join('/')
-				} else {
-					''
-				}
+				next_pending := import_restart(prefix, target, parts, index + 1)!
+				unsafe { pending.free() }
+				pending = next_pending
 				restart = true
 				break
 			}
@@ -99,7 +132,9 @@ fn import_node(root int, source string) !ImportNode {
 			C.close(directory)
 			if next < 0 { return error('cannot open prepared guest path: ${pending}') }
 			directory = next
-			prefix << part
+			// A normal string append clones each component in manual-free builds.
+			// Keep borrowed views until parts is retired at this iteration's end.
+			unsafe { prefix.push_many(&part, 1) }
 		}
 		if restart { continue }
 		if prefix.len == 0 {
@@ -107,7 +142,7 @@ fn import_node(root int, source string) !ImportNode {
 			return error('guest symlink resolves to its source root')
 		}
 		mut info := C.stat{}
-		if C.fstat(directory, &info) != 0 {
+		if C.fstat(directory, unsafe { &info }) != 0 {
 			C.close(directory)
 			return error('cannot inspect prepared guest path: ${pending}')
 		}
@@ -178,7 +213,7 @@ mut:
 // links and could inspect an entirely different prepared root after a rename.
 fn recheck_import_node(root int, source string, node ImportNode) !int {
 	mut opened := C.stat{}
-	if C.fstat(node.fd, &opened) != 0 || u64(opened.st_dev) != node.device
+	if C.fstat(node.fd, unsafe { &opened }) != 0 || u64(opened.st_dev) != node.device
 		|| u64(opened.st_ino) != node.inode || u32(opened.st_mode) & 0o170111 != node.mode & 0o170111
 		|| (node.mode & 0o170000 == 0o100000 && (opened.st_size < 0 || u64(opened.st_size) != node.bytes)) {
 		return error('prepared source identity, size or executable mode changed during import: ${source}')

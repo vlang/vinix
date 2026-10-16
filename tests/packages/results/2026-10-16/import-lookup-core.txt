@@ -1,0 +1,32 @@
+IMPORT LOOKUP case=ordinary functional-cycles=8 PASS
+IMPORT LOOKUP case=directory functional-cycles=8 PASS
+IMPORT LOOKUP case=absolute-link functional-cycles=8 PASS
+IMPORT LOOKUP case=relative-parent-link functional-cycles=8 PASS
+IMPORT LOOKUP case=parent-after-link functional-cycles=8 PASS
+IMPORT LOOKUP case=parent-component functional-cycles=8 PASS
+IMPORT LOOKUP case=empty-dot-components functional-cycles=8 PASS
+IMPORT LOOKUP case=forty-links functional-cycles=8 PASS
+IMPORT LOOKUP case=nonblocking-fifo functional-cycles=8 PASS
+IMPORT LOOKUP case=missing functional-cycles=8 PASS
+IMPORT LOOKUP case=not-directory functional-cycles=8 PASS
+IMPORT LOOKUP case=trailing-file-slash functional-cycles=8 PASS
+IMPORT LOOKUP case=root-link functional-cycles=8 PASS
+IMPORT LOOKUP case=root-parent functional-cycles=8 PASS
+IMPORT LOOKUP case=escape functional-cycles=8 PASS
+IMPORT LOOKUP case=cycle functional-cycles=8 PASS
+IMPORT LOOKUP case=forty-one-links functional-cycles=8 PASS
+IMPORT LOOKUP case=backslash functional-cycles=8 PASS
+IMPORT LOOKUP case=control functional-cycles=8 PASS
+IMPORT LOOKUP case=oversized functional-cycles=8 PASS
+IMPORT LOOKUP ordinary/guest-alias/parent/40-link/FIFO paths and late refusals retire scratch and descriptors PASS
+IMPORT LOOKUP independent descriptors survive retired source text, path scratch and host namespace replacement PASS
+IMPORT RECHECK fault=none functional-cycles=8 PASS
+IMPORT RECHECK fault=directory functional-cycles=8 PASS
+IMPORT RECHECK fault=alias functional-cycles=8 PASS
+IMPORT RECHECK fault=execute functional-cycles=8 PASS
+IMPORT RECHECK fault=size functional-cycles=8 PASS
+IMPORT RECHECK fault=replacement functional-cycles=8 PASS
+IMPORT RECHECK fault=missing functional-cycles=8 PASS
+IMPORT RECHECK fault=closed-root functional-cycles=8 PASS
+IMPORT LOOKUP source rechecks retire complete and refused identity/size/execute/namespace scratch PASS
+IMPORT LOOKUP owned restart paths preserve parent/suffix order and exact 4096-byte boundary before allocation PASS

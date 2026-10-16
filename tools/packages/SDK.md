@@ -589,6 +589,14 @@ stabilizing the source. These checks detect changes during traversal; they do
 not take an atomic filesystem snapshot. Keep prepared contents stable throughout
 publishing. See [source consistency qualification](../../tests/packages/import-capture-check.md).
 
+Source lookup and its consistency rechecks retire pending paths, split components,
+borrowed prefix buffers and link targets on success, restart and refusal. Expanded
+restart paths are limited to 4096 bytes before allocating their output. Repeated
+lookups therefore do not retain path scratch under the manual-free toolchain;
+returned descriptors remain independent of that scratch. Guest-root, parent and
+40-link rules stay unchanged. See [lookup ownership qualification](../../tests/packages/import-lookup-check.md).
+This measures resolver/recheck storage, not complete import or packer retention.
+
 `pack-root`, `pack-catalog` and the Native, SQLite and FFmpeg profile builders
 share input-root admission. Empty and NUL-containing paths refuse. Redundant
 trailing separators are stripped while preserving `/`, so a symlink at the

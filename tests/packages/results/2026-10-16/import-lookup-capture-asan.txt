@@ -1,0 +1,6 @@
+IMPORT CAPTURE retained root and guest-absolute aliases survive host namespace replacement with identical retry metadata PASS
+IMPORT CAPTURE 49 file identity/size/execute mutations refuse before publication; 32-descriptor cleanup and exact retry PASS
+IMPORT CAPTURE multi-block same-size rewrites during hashing and copying fail content comparison before publication PASS
+IMPORT CAPTURE directory replacement and added/removed/renamed entries refuse; guest targets survive and retries succeed PASS
+IMPORT CAPTURE pinned digest/execute admission, empty files, stripped special modes and canonical declarations survive exact retry PASS
+IMPORT CAPTURE nine injected checkpoint failures retire descriptors and private scratch before successful public retry PASS

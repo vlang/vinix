@@ -662,6 +662,8 @@ architectures; broader release/catalog/runtime acceptance remains open.
     rechecks file/directory identity, size, executable bits and directory names
     in the captured guest namespace. Unpinned hash/copy comparison and pinned
     inventory checks reject changed payloads before packing, with cleanup/retry.
+    [Owned lookups and rechecks](tests/packages/import-lookup-check.md) retire
+    temporary path storage on success, parent/link restart and late refusal.
 - [ ] Add transactional install/remove/upgrade, rollback, disk-space checks,
   interrupted-download recovery and coherent persistent package state.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,

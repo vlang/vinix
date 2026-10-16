@@ -54,6 +54,9 @@ directory names in the captured guest namespace. Unpinned imports compare the
 copied bytes with a source digest; catalog imports use their locked inventory.
 Changed sources refuse before packing, with private-workspace cleanup and exact
 retry. See [source consistency checks](../../tests/packages/import-capture-check.md).
+The resolver also retires path scratch on success, link/parent restart and
+refusal; repeated [lookups and rechecks](../../tests/packages/import-lookup-check.md)
+retain no tracked temporary storage under the manual-free toolchain.
 
 `--https` adds the [real TLS transport fixture](../../tests/packages/https-check.md);
 `--https-only` runs it without desktop/UI prerequisites. It uses native curl and

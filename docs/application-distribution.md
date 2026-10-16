@@ -249,6 +249,14 @@ preserves guest-absolute links and captured-root behavior after a host rename.
 Publishers still need stable source contents rather than relying on an atomic
 snapshot. See [source consistency checks](../tests/packages/import-capture-check.md).
 
+The resolver now retires pending paths, split components, link targets and its
+borrowed prefix buffer on success, restart and refusal. Restart construction
+checks the 4096-byte limit before allocating output. Repeated lookup/recheck
+measurements retain zero tracked scratch while preserving independent returned
+descriptors, guest-root resolution and late refusal diagnostics. See
+[lookup ownership checks](../tests/packages/import-lookup-check.md); this does not
+measure complete import/packer retention.
+
 The lower-level `pack` command also captures its source root and walks children
 through descriptors relative to their captured parents. Hashing and copying
 share each regular file's descriptor, with identity, length and executable-mode

@@ -1,0 +1,22 @@
+IMPORT LOOKUP case=ordinary retained=503 allocations=10
+IMPORT LOOKUP case=directory retained=318 allocations=7
+IMPORT LOOKUP case=absolute-link retained=707 allocations=18
+IMPORT LOOKUP case=relative-parent-link retained=1106 allocations=31
+IMPORT LOOKUP case=parent-after-link retained=1535 allocations=46
+IMPORT LOOKUP case=parent-component retained=869 allocations=23
+IMPORT LOOKUP case=empty-dot-components retained=603 allocations=13
+IMPORT LOOKUP case=forty-links retained=5028 allocations=249
+IMPORT LOOKUP case=nonblocking-fifo retained=312 allocations=5
+IMPORT LOOKUP case=missing retained=230 allocations=7
+IMPORT LOOKUP case=not-directory retained=233 allocations=8
+IMPORT LOOKUP case=trailing-file-slash retained=228 allocations=8
+IMPORT LOOKUP case=root-link retained=256 allocations=10
+IMPORT LOOKUP case=root-parent retained=249 allocations=7
+IMPORT LOOKUP case=escape retained=629 allocations=23
+IMPORT LOOKUP case=cycle retained=8574 allocations=365
+IMPORT LOOKUP case=forty-one-links retained=4609 allocations=242
+IMPORT LOOKUP case=backslash retained=227 allocations=9
+IMPORT LOOKUP case=control retained=228 allocations=9
+IMPORT LOOKUP case=oversized retained=0 allocations=0
+IMPORT LOOKUP ordinary/guest-alias/parent/40-link/FIFO paths and late refusals retire scratch and descriptors PASS
+IMPORT LOOKUP independent descriptors survive retired source text, path scratch and host namespace replacement PASS
