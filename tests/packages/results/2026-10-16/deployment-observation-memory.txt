@@ -1,0 +1,6 @@
+Deployment observation: 1000 16-package export/encode/hash cycles retained 0 bytes; 1000 comparisons retained 0 bytes
+Deployment observation: exact SDK JSON and optional LF; inclusive metadata bound and overflow refusal release growth buffers PASS
+Deployment observation: complete 4096-root/record snapshots and 8192-row disjoint audit union PASS
+Deployment observation: 1000 borrowed selections, owned snapshots and missing-root refusals retained 0 bytes
+Deployment observation: selected manifests borrow source state; exported records survive selection-buffer retirement PASS
+Deployment observation: public owned snapshots, durable saved receipts, exact offline audits and existing-file refusals preserve store PASS

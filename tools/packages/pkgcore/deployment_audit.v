@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import crypto.sha256
 import tools.packages.pkgprotocol
 
 fn compare_deployment(expected DeploymentLock, installed DeploymentLock, generation u64, digest string) !pkgprotocol.DeploymentAudit {
@@ -54,8 +53,7 @@ fn audit_deployment_locked(service Service, directory string, path string) !pkgp
 	defer { if current.generation != 0 { close_decoded_state(current) } }
 	mut installed := owned_deployment_lock(config.architecture, Plan{ requested: current.requested, packages: current.packages })!
 	defer { installed.close() }
-	bytes := text.bytes(); defer { unsafe { bytes.free() } }
-	digest := sha256.sum(bytes).hex(); defer { unsafe { digest.free() } }
+	digest := index_digest(text); defer { unsafe { digest.free() } }
 	return compare_deployment(expected, installed, current.generation, digest)
 }
 

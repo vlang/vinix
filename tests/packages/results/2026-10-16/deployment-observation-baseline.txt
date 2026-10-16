@@ -1,0 +1,5 @@
+Pre-change snapshot construction regression: ten 16-package exports retain 144,290 bytes despite closing returned documents; comparison scratch retains zero. Input source, production source, executable and generated C are retained and pinned.
+
+Deployment observation: ten 16-package exports retained 144290 bytes; ten comparisons retained 0 bytes
+tools/packages/pkgcore/deployment_observation_test.v:42: fn test_deployment_observations_retire_owned_documents_and_audit_scratch
+    assert owned_bytes == 0 && audit_bytes == 0

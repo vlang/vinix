@@ -3,6 +3,18 @@ module pkgcore
 
 import json2
 
+// Own the encoding buffer, including growth, until the caller's independent
+// string is ready. Saved documents include their LF in the same size check.
+fn encode_deployment_lock(document DeploymentLock, newline bool) !string {
+	mut bytes := []u8{cap: 2048}
+	unsafe { bytes.flags |= .noslices }
+	defer { unsafe { bytes.free() } }
+	json2.encode_append(document, mut bytes)
+	if newline { bytes << u8(`\n`) }
+	if bytes.len > max_metadata { return error('deployment snapshot exceeds metadata limit') }
+	return bytes.bytestr()
+}
+
 // The returned document owns every presentation field independently of its
 // source state/catalog. No payload, configuration or repository is exported.
 fn owned_deployment_lock(architecture string, plan Plan) !DeploymentLock {
@@ -21,9 +33,8 @@ fn owned_deployment_lock(architecture string, plan Plan) !DeploymentLock {
 	roots.sort()
 	locked.sort(a.id < b.id)
 	document := DeploymentLock{ architecture: owned_architecture, packages: roots, locked: locked }
-	text := json2.encode(document)
+	text := encode_deployment_lock(document, false)!
 	defer { unsafe { text.free() } }
-	if text.len > max_metadata { return error('deployment snapshot exceeds metadata limit') }
 	accepted = true
 	return document
 }
@@ -52,7 +63,10 @@ fn installed_deployment_plan(current State, names []string) !Plan {
 	for next < pending.len {
 		id := pending[next]; next++
 		installed := current.packages[positions[id]]
-		selected << installed
+		// This temporary plan borrows the decoded state until its caller builds
+		// an independently owned lock. A normal push deep-clones manifests.
+		pointer := unsafe { &installed }
+		unsafe { selected.push_many(pointer, 1) }
 		for dependency in installed.package.dependencies {
 			if dependency.id in reached { continue }
 			reached[dependency.id] = true

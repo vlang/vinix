@@ -1907,6 +1907,13 @@ Use `Service.snapshot_deployment(names)` from V. Both this method and
 fields; `.close()` retires the returned document. See
 [installed snapshot qualification](../../tests/packages/deployment-snapshot-check.md).
 
+Construction borrows installed manifests only until the independent lock is
+built. Selection and JSON encoding scratch, including buffer growth, retire on
+success or refusal. Saved receipts and audit input digests retire hash scratch
+while preserving exact bytes. These scoped lifetime checks do not establish
+zero allocation retention across the full public API; see
+[construction qualification](../../tests/packages/deployment-observation-check.md).
+
 `deployment-snapshot-save NEW_FILE [INSTALLED_ID...]` saves that same sorted
 format-2 snapshot plus one terminating LF. The reader lock covers generation
 capture and publication. Catalogs, replay history, cache objects, payload health

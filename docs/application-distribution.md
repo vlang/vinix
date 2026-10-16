@@ -1623,6 +1623,13 @@ reuses owned storage, and completed documents can be closed independently of the
 input bytes. The allocation fixture covers both formats, malformed/truncated
 input and collection growth; see [decoder qualification](../tests/packages/deployment-decoder-check.md).
 
+Snapshot construction uses borrowed installed manifests until it builds the
+independent lock, and releases selection, encoding and hash scratch after use.
+Saved JSON and audit digests retain their exact byte contracts, with the saved
+file's LF included in its size check. See the scoped
+[construction qualification](../tests/packages/deployment-observation-check.md),
+including the remaining whole-API allocation measurements.
+
 In **Software**, select **Deployment**, enter the absolute file path and choose
 **Review deployment**. The review shows the entire resulting set, including
 dependencies, runtime updates, retained packages and removals, with publisher

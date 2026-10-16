@@ -30,6 +30,7 @@ fn suite() hwhost.Suite {
 			hwhost.Program{ source: 'tools/packages/pkgcore/deployment_audit_test.v', path: 'usr/share/package-fixtures/audit-core' },
 			hwhost.Program{ source: 'tools/packages/pkgprotocol/deployment_audit_test.v', path: 'usr/share/package-fixtures/audit-protocol' },
 			hwhost.Program{ source: 'tests/packages/deployment-snapshot-check.v', path: 'usr/share/package-fixtures/audit-probe' },
+			hwhost.Program{ source: 'tools/packages/pkgcore/deployment_observation_test.v', path: 'usr/share/package-fixtures/observation-core' },
 		], scenarios: [hwhost.Scenario{ name: 'packages-deployment-audit', arches: ['aarch64', 'x86_64'],
 			about: 'read-only installed deployment drift, exact pins, sequence floors, ordinary readers and strict bounded reports',
 			required: ['HWTEST START packages-deployment-audit',
@@ -39,6 +40,10 @@ fn suite() hwhost.Suite {
 				'DEPLOYMENT AUDIT PROTOCOL complete typed fields, duplicate/unknown keys, bounded sorted union rows and coherent drift result PASS',
 				'DEPLOYMENT AUDIT ordinary UID 1000 reads exact root-owned comparison without administrator authorization PASS',
 				'DEPLOYMENT AUDIT CLI exact offline metadata and sequence-floor matches, missing/changed drift exit 3, no fresh-state initialization and authenticated reproduction PASS',
+				'Deployment observation: exact SDK JSON and optional LF; inclusive metadata bound and overflow refusal release growth buffers PASS',
+				'Deployment observation: complete 4096-root/record snapshots and 8192-row disjoint audit union PASS',
+				'Deployment observation: public owned snapshots, durable saved receipts, exact offline audits and existing-file refusals preserve store PASS',
+				'AUDIT PROCESS observation-core PASS',
 				'AUDIT PROCESS audit-core PASS', 'AUDIT PROCESS audit-protocol PASS', 'AUDIT PROCESS audit-probe PASS',
 				'HWTEST PASS packages-deployment-audit'], ending: .poweroff, timeout: 600 }]
 	}
@@ -60,6 +65,7 @@ fn check() !int {
 		receipt := Receipt{ architecture: options.arch, completed_at: time.now().unix(), artifacts: [kernel,
 			artifact('guest-init', base + '/guest/init')!, artifact('package-cli', base + '/guest/root/usr/bin/vinix-package')!, artifact('audit-core', root + 'audit-core')!,
 			artifact('audit-protocol', root + 'audit-protocol')!, artifact('audit-probe', root + 'audit-probe')!,
+			artifact('observation-core', root + 'observation-core')!,
 			artifact('serial-log', base + '/packages-deployment-audit/serial.log')!] }
 		os.write_file(base + '/qualification.json', json2.encode(receipt) + '\n')!
 	}

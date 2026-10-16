@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import crypto.sha256
-import json2
 import encoding.utf8
 import tools.packages.pkgprotocol
 
@@ -13,11 +11,9 @@ fn save_deployment_snapshot_locked(service Service, directory string, path strin
 	plan := installed_deployment_plan(current, names)!
 	defer { unsafe { for root in plan.requested { root.free() }; (&array(&plan.requested)).free(); (&array(&plan.packages)).free() } }
 	mut document := owned_deployment_lock(config.architecture, plan)!; defer { document.close() }
-	encoded := json2.encode(document); defer { unsafe { encoded.free() } }
-	text := encoded + '\n'; defer { unsafe { text.free() } }
-	bytes := text.bytes(); defer { unsafe { bytes.free() } }
+	text := encode_deployment_lock(document, true)!; defer { unsafe { text.free() } }
 	mut saved := pkgprotocol.DeploymentSnapshotSaved{ generation: current.generation, architecture: config.architecture.clone(),
-		destination: path.clone(), sha256: sha256.sum(bytes).hex(), roots: u64(document.packages.len), packages: u64(document.locked.len) }
+		destination: path.clone(), sha256: index_digest(text), roots: u64(document.packages.len), packages: u64(document.locked.len) }
 	mut accepted := false
 	defer { if !accepted { saved.close() } }
 	saved.validate()!
