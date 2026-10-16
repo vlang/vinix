@@ -654,6 +654,24 @@ whitespace do not change canonical output. Identical pinned inputs produce
 identical workspace manifests; the normal release publisher then produces the
 same index/signature for the same sequence, expiry and seed.
 
+The V API returns owned `CatalogInfo` metadata. Its directory, digest and
+architecture strings remain valid after the builder retires its decoded plan:
+
+```v
+mut info := pkgcore.pack_catalog(recipe_file, prepared_roots, destination)!
+defer { info.close() }
+```
+
+`close()` is idempotent, resets the reply and leaves the published workspace
+available. Metadata admission, canonical encoding and disk-budget planning finish
+before opening prepared roots or creating destination parents. The plan owns
+its decoded catalog and deduplication map; handled refusals retire partial state.
+Budget estimates retain the original unique-object accounting, largest-package
+scratch space, 8 KiB per budgeted entry and 64 MiB reserve. Catalog import also
+retires each independently packed manifest after checking it against the lock.
+See [workspace ownership qualification](../../tests/packages/catalog-plan-check.md)
+for measured planning lifetimes and publication/result checks.
+
 ```sh
 vinix-package pack-catalog catalog.json /build/prepared-roots /build/new-workspace
 vinix-package publish-release /build/new-workspace company /secure/publisher-seed 1 EXPIRES_UNIX /build/new-release

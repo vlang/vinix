@@ -1,0 +1,14 @@
+CATALOG PLAN imports=1 fault=none retained=35216 allocations=42
+CATALOG PLAN imports=1 fault=unique retained=35281 allocations=43
+CATALOG PLAN imports=1 fault=length retained=35216 allocations=42
+CATALOG PLAN imports=1 fault=schema retained=0 allocations=0
+CATALOG PLAN imports=1 fault=architecture retained=0 allocations=0
+CATALOG PLAN imports=1 fault=depth retained=0 allocations=0
+CATALOG PLAN imports=1 fault=closure retained=0 allocations=0
+CATALOG PLAN imports=64 fault=none retained=1719209 allocations=1938
+CATALOG PLAN imports=64 fault=unique retained=1739976 allocations=2065
+CATALOG PLAN imports=64 fault=length retained=1692791 allocations=1929
+CATALOG PLAN imports=64 fault=schema retained=0 allocations=0
+CATALOG PLAN imports=64 fault=architecture retained=0 allocations=0
+CATALOG PLAN imports=64 fault=depth retained=0 allocations=0
+CATALOG PLAN imports=64 fault=closure retained=0 allocations=0

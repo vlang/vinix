@@ -69,6 +69,10 @@ runners, CLI and serial log. Metadata-only ownership fixtures do not execute
 their synthetic application payloads. Existing composition/release assertions
 also exercise signed offline maintenance.
 
+The current controller additionally runs the workspace-plan assertions and pins
+ten artifacts. The receipts below retain this qualification's nine-artifact
+scope; the [workspace follow-up](catalog-plan-check.md) records the expanded run.
+
 The 2026-10-16 qualification passed **25 host build/run checks**, including the
 2,048 tracked attempts, publisher schema, native/Apple profiles, distribution CLI
 regression and AddressSanitizer/UndefinedBehaviorSanitizer ownership/composition

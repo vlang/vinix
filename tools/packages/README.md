@@ -443,6 +443,10 @@ prepared-root recipes and pinned inventories atomically, with complete declared
 architecture/version/runtime coverage. It emits a canonical catalog lock and a
 private publisher workspace for `publish-release`. See the
 [catalog contract](SDK.md#build-a-pinned-application-catalog).
+Workspace metadata/budget preparation owns its decoded state and returns an
+independent `CatalogInfo` reply with an idempotent `close()`. The original
+canonical bytes, object accounting and disk headroom are preserved. See
+[workspace planning qualification](../../tests/packages/catalog-plan-check.md).
 
 Catalog normalization retains one owned decoded result, sorts its buffers in
 place and retires validation scratch on success or refusal. Structural release

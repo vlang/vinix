@@ -1,0 +1,16 @@
+CATALOG PLAN imports=1 fault=none functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=unique functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=length functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=schema functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=architecture functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=depth functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=closure functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=none functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=unique functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=length functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=schema functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=architecture functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=depth functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=closure functional-cycles=4 PASS
+CATALOG PLAN owned metadata/budget planning and schema/architecture/depth/closure/object-length refusals PASS
+CATALOG PLAN legacy bytes, deduplicated workspace/largest-package budgets, disclosures and independent idempotently closeable results PASS

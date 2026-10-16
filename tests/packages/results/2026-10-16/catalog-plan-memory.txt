@@ -1,0 +1,16 @@
+CATALOG PLAN imports=1 fault=none retained=0 allocations=0
+CATALOG PLAN imports=1 fault=unique retained=0 allocations=0
+CATALOG PLAN imports=1 fault=length retained=0 allocations=0
+CATALOG PLAN imports=1 fault=schema retained=0 allocations=0
+CATALOG PLAN imports=1 fault=architecture retained=0 allocations=0
+CATALOG PLAN imports=1 fault=depth retained=0 allocations=0
+CATALOG PLAN imports=1 fault=closure retained=0 allocations=0
+CATALOG PLAN imports=64 fault=none retained=0 allocations=0
+CATALOG PLAN imports=64 fault=unique retained=0 allocations=0
+CATALOG PLAN imports=64 fault=length retained=0 allocations=0
+CATALOG PLAN imports=64 fault=schema retained=0 allocations=0
+CATALOG PLAN imports=64 fault=architecture retained=0 allocations=0
+CATALOG PLAN imports=64 fault=depth retained=0 allocations=0
+CATALOG PLAN imports=64 fault=closure retained=0 allocations=0
+CATALOG PLAN owned metadata/budget planning and schema/architecture/depth/closure/object-length refusals PASS
+CATALOG PLAN legacy bytes, deduplicated workspace/largest-package budgets, disclosures and independent idempotently closeable results PASS

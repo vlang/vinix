@@ -64,13 +64,14 @@ VINIX_HWTEST_TCG=1 V=/path/to/reviewed/v VFLAGS=-nocache \
 ```
 
 Repeat the guest command for `x86_64` with its matching kernel and a fresh state
-directory. The current controller builds the guest, five assertion runners and
+directory. The current controller builds the guest, six assertion runners and
 the package CLI afresh, copies the supplied kernel, checks every required marker
-and guest-initiated poweroff, then records nine artifact hashes. Guests exercise functional
+and guest-initiated poweroff, then records ten artifact hashes. Guests exercise functional
 normalization, owned-result lifetimes, signed release admission and composed
 offline maintenance; allocation tracking runs on the host. The additional
 composition ownership runner and literal CLI/API checks are qualified in the
-[follow-up report](composition-ownership-check.md). The original receipts below
+[composer report](composition-ownership-check.md); catalog workspace planning
+is qualified in the [workspace report](catalog-plan-check.md). The original receipts below
 predate those additions and retain their seven-artifact scope.
 
 ## Qualification, 2026-10-16

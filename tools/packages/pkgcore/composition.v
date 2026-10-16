@@ -64,17 +64,6 @@ fn composition_append(mut bytes []u8, text string) {
 	unsafe { bytes.push_many(text.str, text.len) }
 }
 
-// Reuse the caller-owned encoder buffer; json2.encode retains its builder in
-// manual-free programs. The returned newline-terminated string is independent.
-fn composition_json[T](value T) string {
-	mut bytes := []u8{cap: 2048}
-	unsafe { bytes.flags |= .noslices }
-	defer { unsafe { bytes.free() } }
-	json2.encode_append(value, mut bytes)
-	bytes << `\n`
-	return bytes.bytestr()
-}
-
 fn composition_result(info CompositionInfo, directory string) CompositionInfo {
 	mut sources := []CompositionSource{cap: info.sources.len}
 	for source in info.sources { sources << CompositionSource{ id: source.id.clone(), catalog_sha256: source.catalog_sha256.clone() } }
@@ -157,7 +146,7 @@ fn prepare_composition(sources []CatalogSource, architecture string) !Compositio
 			if bytes.len > max_metadata { return error('composed catalog exceeds metadata limit') }
 			count++
 		}
-		canonical := composition_json(input)
+		canonical := publisher_json(input)
 		defer { unsafe { canonical.free() } }
 		records << CompositionSource{ id: source.id.clone(), catalog_sha256: index_digest(canonical) }
 	}
@@ -166,10 +155,10 @@ fn prepare_composition(sources []CatalogSource, architecture string) !Compositio
 	// runtime closures again, including any conflict introduced by composition.
 	merged := catalog_recipe(unsafe { tos(&u8(bytes.data), bytes.len) })!
 	defer { close_decoded_catalog(merged) }
-	text = composition_json(merged)
+	text = publisher_json(merged)
 	if text.len > max_metadata { return error('composed catalog exceeds metadata limit') }
 	digest = index_digest(text)
-	provenance = composition_json(CompositionRecord{ catalog_sha256: digest, architectures: architectures, package_count: merged.packages.len, sources: records })
+	provenance = publisher_json(CompositionRecord{ catalog_sha256: digest, architectures: architectures, package_count: merged.packages.len, sources: records })
 	accepted = true
 	return CompositionPlan{ text: text, provenance: provenance,
 		info: CompositionInfo{ catalog_sha256: digest, architectures: architectures, package_count: merged.packages.len, sources: records } }

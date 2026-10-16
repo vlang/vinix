@@ -44,7 +44,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX\n' +
 	'  publish-release REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY\n'
 
-fn composition_reply(mut info pkgcore.CompositionInfo) {
+fn publisher_reply[T](mut info T) {
 	defer { info.close() }
 	mut bytes := []u8{cap: 2048}
 	unsafe { bytes.flags |= .noslices }
@@ -134,7 +134,8 @@ fn checked(arguments []string) !int {
 		}
 		'pack-catalog' {
 			if names.len != 3 { return error('pack-catalog requires a catalog recipe, prepared roots and a new workspace directory') }
-			println(json2.encode(pkgcore.pack_catalog(names[0], names[1], names[2])!))
+			mut info := pkgcore.pack_catalog(names[0], names[1], names[2])!
+			publisher_reply(mut info)
 			return 0
 		}
 		'compose-catalog' {
@@ -145,7 +146,7 @@ fn checked(arguments []string) !int {
 			defer { unsafe { (&array(&sources)).free() } }
 			for i := 1; i < names.len; i += 2 { sources << pkgcore.CatalogSource{ id: names[i], catalog: names[i + 1] } }
 			mut info := pkgcore.compose_catalog(sources, names[0])!
-			composition_reply(mut info)
+			publisher_reply(mut info)
 			return 0
 		}
 		'compose-catalog-for' {
@@ -156,7 +157,7 @@ fn checked(arguments []string) !int {
 			defer { unsafe { (&array(&sources)).free() } }
 			for i := 2; i < names.len; i += 2 { sources << pkgcore.CatalogSource{ id: names[i], catalog: names[i + 1] } }
 			mut info := pkgcore.compose_catalog_for(names[0], sources, names[1])!
-			composition_reply(mut info)
+			publisher_reply(mut info)
 			return 0
 		}
 		'native-catalog' {

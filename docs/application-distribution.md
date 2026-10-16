@@ -304,6 +304,11 @@ independent of its arguments and temporary plan. Its explicit close operation,
 bounded planning and unchanged catalog/provenance bytes are covered by the
 [ownership qualification](../tests/packages/composition-ownership-check.md),
 including rebuilt CLI checks inside AArch64 and x86-64 guests.
+The workspace builder also owns its metadata/disk-budget plan and returns an
+independently closeable `CatalogInfo`. It finishes metadata admission and budgeting
+before touching prepared roots or destination parents, retaining the existing
+deduplication, scratch-space and reserve estimates. See
+[workspace planning checks](../tests/packages/catalog-plan-check.md).
 
 ## Trust and configuration
 

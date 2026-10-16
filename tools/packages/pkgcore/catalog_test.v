@@ -213,3 +213,21 @@ fn test_catalog_requires_explicit_pins_and_license_flags_and_refuses_unknown_dup
 		catalog_refusal(work, 'schema', '')
 	}
 }
+
+fn test_catalog_reply_close_leaves_published_workspace_and_other_results_usable() {
+	work, _ := catalog_fixture()!
+	defer { os.rmdir_all(work) or {} }
+	mut first := pack_catalog(work + '/catalog.json', work + '/roots', work + '/owned-first')!
+	mut second := pack_catalog(work + '/catalog.json', work + '/roots', work + '/owned-second')!
+	digest := first.catalog_sha256.clone()
+	defer { unsafe { digest.free() } }
+	first.close(); first.close()
+	assert first.directory == '' && first.architectures.len == 0
+	assert second.directory == work + '/owned-second' && second.architectures == ['aarch64', 'x86_64']
+	assert second.package_count == 5 && second.object_count == 5 && second.catalog_sha256 == digest
+	second.close(); second.close()
+	assert index_digest(read_metadata(work + '/owned-first/catalog.json')!) == digest
+	assert index_digest(read_metadata(work + '/owned-second/catalog.json')!) == digest
+	assert os.ls(work + '/owned-first/manifests')!.len == 5 && os.ls(work + '/owned-second/objects')!.len == 5
+	println('CATALOG WORKSPACE owned replies close independently without removing published manifests, objects or catalog PASS')
+}

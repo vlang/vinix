@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import json2
 import os
 
 pub struct CatalogImport {
@@ -25,6 +24,38 @@ pub:
 	package_count int
 	object_count int
 	catalog_sha256 string
+}
+
+// Releases owned reply metadata. The published workspace remains available.
+pub fn (mut info CatalogInfo) close() {
+	unsafe {
+		info.directory.free(); info.catalog_sha256.free()
+		for architecture in info.architectures { architecture.free() }
+		(&array(&info.architectures)).free()
+	}
+	info = CatalogInfo{}
+}
+
+struct CatalogPlan {
+	recipe CatalogRecipe
+	text string
+	needed u64
+	scratch u64
+mut:
+	objects map[string]Payload // values borrow the recipe until close
+	closed bool
+}
+
+fn (mut plan CatalogPlan) close() {
+	if plan.closed { return }
+	unsafe { plan.objects.free(); plan.text.free() }
+	close_decoded_catalog(plan.recipe)
+	plan.closed = true
+}
+
+fn (plan CatalogPlan) result(directory string) CatalogInfo {
+	return CatalogInfo{ directory: directory.clone(), architectures: review_strings(plan.recipe.architectures),
+		package_count: plan.recipe.packages.len, object_count: plan.objects.len, catalog_sha256: index_digest(plan.text) }
 }
 
 struct CatalogOptions {
@@ -79,7 +110,9 @@ fn order_catalog_import(item CatalogImport) {
 fn catalog_source_root(root int, source string) !int {
 	mut directory := C.dup(root)
 	if directory < 0 { return error('cannot retain catalog roots') }
-	for component in source.split('/') {
+	components := source.split('/')
+	defer { unsafe { components.free() } }
+	for component in components {
 		next := C.openat(directory, component.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
 		C.close(directory)
 		if next < 0 { return error('catalog source must be an ordinary directory at every component: ${source}') }
@@ -146,19 +179,27 @@ pub fn pack_catalog(recipe_file string, source_roots string, destination string)
 	return catalog_build(recipe_file, source_roots, destination, CatalogOptions{})
 }
 
-fn catalog_build(recipe_file string, source_roots string, destination string, options CatalogOptions) !CatalogInfo {
-	recipe := catalog_recipe(read_metadata(recipe_file)!)!
-	text := json2.encode(recipe) + '\n'
-	if text.len > max_metadata { return error('canonical catalog recipe exceeds metadata limit') }
-	root := capture_prepared_root(source_roots, 'catalog')!
-	defer { C.close(root) }
-	target := export_target(destination, 'catalog workspace')!
-	parent := os.dir(target)
+// Admit metadata and budget unique objects before touching prepared roots or
+// creating a destination parent. One owner retires all partial plan state.
+fn prepare_catalog(text_input string) !CatalogPlan {
+	recipe := catalog_recipe(text_input)!
 	mut objects := map[string]Payload{}
+	mut text := ''
+	mut accepted := false
+	defer {
+		if !accepted {
+			mut retired := CatalogPlan{ recipe: recipe, text: text, objects: objects }
+			retired.close()
+		}
+	}
+	text = publisher_json(recipe)
+	if text.len > max_metadata { return error('canonical catalog recipe exceeds metadata limit') }
 	mut needed := mirror_cost(u64(4 * 1024 * 1024), u64(text.len))!
 	mut scratch := u64(0)
 	for item in recipe.packages {
-		needed = mirror_cost(needed, u64(json2.encode(item.recipe.manifest).len + 1))!
+		manifest := publisher_json(item.recipe.manifest)
+		defer { unsafe { manifest.free() } }
+		needed = mirror_cost(needed, u64(manifest.len))!
 		mut size := u64(0)
 		for file in item.recipe.manifest.files {
 			size = mirror_cost(size, file.bytes)!
@@ -171,53 +212,96 @@ fn catalog_build(recipe_file string, source_roots string, destination string, op
 		}
 		if size > scratch { scratch = size }
 	}
+	accepted = true
+	return CatalogPlan{ recipe: recipe, text: text, objects: objects, needed: needed, scratch: scratch }
+}
+
+fn catalog_packed_matches(packed Package, expected Package) !bool {
+	canonical := canonical_package(packed)!
+	// canonical_package clones only these collection buffers; fields borrow packed.
+	defer { unsafe {
+		(&array(&canonical.files)).free(); (&array(&canonical.dependencies)).free()
+		(&array(&canonical.permissions)).free(); (&array(&canonical.associations)).free()
+	} }
+	return canonical == expected
+}
+
+fn catalog_build(recipe_file string, source_roots string, destination string, options CatalogOptions) !CatalogInfo {
+	input := read_metadata(recipe_file)!
+	mut plan := prepare_catalog(input) or { unsafe { input.free() }; return err }
+	unsafe { input.free() }
+	defer { plan.close() }
+	root := capture_prepared_root(source_roots, 'catalog')!
+	defer { C.close(root) }
+	target := export_target(destination, 'catalog workspace')!
+	parent := os.dir(target)
+	defer { unsafe { target.free(); parent.free() } }
 	// Conservatively budget workspace plus the largest materialized package;
 	// also check the actual temporary filesystem, which may be another volume.
-	disk_check(options.available_space(parent)!, mirror_cost(needed, scratch)!, 64 * 1024 * 1024)!
-	disk_check(options.available_space(os.temp_dir())!, scratch, 64 * 1024 * 1024)!
+	disk_check(options.available_space(parent)!, mirror_cost(plan.needed, plan.scratch)!, 64 * 1024 * 1024)!
+	disk_check(options.available_space(os.temp_dir())!, plan.scratch, 64 * 1024 * 1024)!
 	mut roots := map[string]int{}
-	defer { for _, fd in roots { C.close(fd) } }
-	for item in recipe.packages {
+	defer { for _, fd in roots { C.close(fd) }; unsafe { roots.free() } }
+	for item in plan.recipe.packages {
 		if item.source in roots { continue }
 		fd := catalog_source_root(root, item.source)!
 		roots[item.source] = fd
 	}
 	stage := export_stage(parent, '.vinix-catalog')!
+	defer { unsafe { stage.free() } }
 	mut published := false
 	defer { if !published { os.rmdir_all(stage) or {} } }
 	options.checkpoint('created', stage)!
-	for item in recipe.packages {
+	for item in plan.recipe.packages {
 		expected := item.recipe.manifest
 		packed := pack_root_descriptor(item.recipe, roots[item.source], stage, true) or {
 			return error('catalog import ${expected.id}/${expected.architecture}/${expected.version}: ${err}')
 		}
-		if canonical_package(packed)! != expected {
+		defer { close_decoded_package(packed) }
+		if !catalog_packed_matches(packed, expected)! {
 			return error('catalog payload inventory differs from its lock: ${expected.id}/${expected.architecture}/${expected.version}; verify prepared sources and regenerate/review the lock')
 		}
-		atomic_write(stage + '/manifests/${expected.id}-${expected.architecture}-${expected.version}.json', json2.encode(expected) + '\n')!
+		manifest_path := stage + '/manifests/${expected.id}-${expected.architecture}-${expected.version}.json'
+		manifest := publisher_json(expected)
+		defer { unsafe { manifest_path.free(); manifest.free() } }
+		atomic_write(manifest_path, manifest)!
 		options.checkpoint('packed', stage)!
 	}
-	atomic_write(stage + '/catalog.json', text)!
-	flush_tree(stage + '/objects')!
-	flush_tree(stage + '/manifests')!
+	catalog_path := stage + '/catalog.json'
+	objects_path := stage + '/objects'
+	manifests_path := stage + '/manifests'
+	defer { unsafe { catalog_path.free(); objects_path.free(); manifests_path.free() } }
+	atomic_write(catalog_path, plan.text)!
+	flush_tree(objects_path)!
+	flush_tree(manifests_path)!
 	sync_directory(stage)!
 	options.checkpoint('ready', stage)!
-	if os.ls(stage + '/manifests')!.len != recipe.packages.len { return error('catalog manifest set changed during import') }
-	for item in recipe.packages {
+	names := os.ls(manifests_path)!
+	defer { unsafe { names.free() } }
+	if names.len != plan.recipe.packages.len { return error('catalog manifest set changed during import') }
+	for item in plan.recipe.packages {
 		p := item.recipe.manifest
-		if read_metadata(stage + '/manifests/${p.id}-${p.architecture}-${p.version}.json')! != json2.encode(p) + '\n' {
+		path := manifests_path + '/${p.id}-${p.architecture}-${p.version}.json'
+		defer { unsafe { path.free() } }
+		actual := read_metadata(path)!
+		expected := publisher_json(p)
+		defer { unsafe { actual.free(); expected.free() } }
+		if actual != expected {
 			return error('catalog manifest changed during import: ${p.id}')
 		}
 	}
-	for hash, file in objects {
-		if !verified_file(stage + '/objects/' + hash, file) { return error('catalog object changed during import: ${hash}') }
+	for hash, file in plan.objects {
+		path := objects_path + '/' + hash
+		defer { unsafe { path.free() } }
+		if !verified_file(path, file) { return error('catalog object changed during import: ${hash}') }
 	}
-	if read_metadata(stage + '/catalog.json')! != text { return error('catalog recipe changed during import') }
+	staged := read_metadata(catalog_path)!
+	defer { unsafe { staged.free() } }
+	if staged != plan.text { return error('catalog recipe changed during import') }
 	publish_new_directory(stage, target, 'catalog workspace')!
 	published = true
 	sync_directory(parent) or {
 		return error('catalog workspace published at ${target}, but its directory flush failed; verify storage and the workspace before signing: ${err}')
 	}
-	return CatalogInfo{ directory: target, architectures: recipe.architectures,
-		package_count: recipe.packages.len, object_count: objects.len, catalog_sha256: index_digest(text) }
+	return plan.result(target)
 }

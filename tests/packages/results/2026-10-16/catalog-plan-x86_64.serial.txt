@@ -1,0 +1,178 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=27
+!>+ [11] ./sbin/init sz=210864
+!>+ [12] ./usr/bin/ sz=0
+!>+ [13] ./usr/share/ sz=0
+!>+ [14] ./usr/share/package-fixtures/ sz=0
+!>+ [15] ./usr/share/package-fixtures/catalog-plan sz=914480
+!>+ [16] ./usr/share/package-fixtures/catalog sz=1604760
+!>+ [17] ./usr/share/package-fixtures/release sz=1539280
+!>+ [18] ./usr/share/package-fixtures/composition sz=1742328
+!>+ [19] ./usr/share/package-fixtures/composition-ownership sz=955096
+!>+ [20] ./usr/share/package-fixtures/catalog-normalize sz=909456
+!>+!>+!>initramfs: no ustar sig at 0xff000000370f5200
+initramfs: Done (22 entries)
+HWTEST START packages-catalog-normalize
+CATALOG NORMALIZE imports=1 fault=none functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=none functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=duplicate functional-cycles=16 PASS
+CATALOG NORMALIZE imports=1 fault=closure functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=closure functional-cycles=16 PASS
+CATALOG NORMALIZE imports=1 fault=architectures functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=architectures functional-cycles=16 PASS
+CATALOG NORMALIZE imports=1 fault=source functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=source functional-cycles=16 PASS
+CATALOG NORMALIZE imports=1 fault=permissions functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=permissions functional-cycles=16 PASS
+CATALOG NORMALIZE imports=1 fault=selectors functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=selectors functional-cycles=16 PASS
+CATALOG NORMALIZE imports=1 fault=coverage functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=coverage functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=shared-mix functional-cycles=16 PASS
+CATALOG NORMALIZE complete and refused single/64-import catalogs retire normalization and dependency-closure scratch PASS
+CATALOG NORMALIZE independent owned output survives retired source/results with unchanged canonical declarations and ordering PASS
+CATALOG NORMALIZE PROCESS catalog-normalize PASS
+COMPOSITION OWNERSHIP variants-per-host=1 target=both fault=none functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=1 target=aarch64 fault=none functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=1 target=x86_64 fault=none functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=1 target=aarch64 fault=schema functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=1 target=aarch64 fault=duplicate functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=1 target=x86_64 fault=missing-host functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=1 target=aarch64 fault=depth functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=1 target=aarch64 fault=profile functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=32 target=both fault=none functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=32 target=aarch64 fault=none functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=32 target=x86_64 fault=none functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=32 target=aarch64 fault=schema functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=32 target=aarch64 fault=duplicate functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=32 target=x86_64 fault=missing-host functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=32 target=aarch64 fault=depth functional-cycles=4 PASS
+COMPOSITION OWNERSHIP variants-per-host=32 target=aarch64 fault=profile functional-cycles=4 PASS
+COMPOSITION OWNERSHIP strict/selected planning and late metadata/identity/host/depth/profile refusals retire owned scratch PASS
+COMPOSITION OWNERSHIP independent plans and closeable replies survive retired inputs; canonical bytes, disclosures and idempotent close PASS
+CATALOG NORMALIZE PROCESS composition-ownership PASS
+CATALOG PLAN imports=1 fault=none functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=unique functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=length functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=schema functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=architecture functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=depth functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=closure functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=none functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=unique functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=length functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=schema functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=architecture functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=depth functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=closure functional-cycles=4 PASS
+CATALOG PLAN owned metadata/budget planning and schema/architecture/depth/closure/object-length refusals PASS
+CATALOG PLAN legacy bytes, deduplicated workspace/largest-package budgets, disclosures and independent idempotently closeable results PASS
+CATALOG NORMALIZE PROCESS catalog-plan PASS
+Updating trusted repository fixture
+Installing app 1.0.0 (1/3) from fixture
+Downloading app/bin/application (19 bytes)
+Installing License 1.0.0 (2/3) from fixture
+Downloading license/COPYING (23 bytes)
+Installing runtime 1.0.0 (3/3) from fixture
+Downloading runtime/bin/runner (23 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing app 1.0.0 (1/3) from fixture
+Downloading app/bin/application (18 bytes)
+Installing License 1.0.0 (2/3) from fixture
+Downloading license/COPYING (23 bytes)
+Installing runtime 1.0.0 (3/3) from fixture
+Downloading runtime/bin/runner (22 bytes)
+Activated package generation 1
+Activated package generation 2
+CATALOG WORKSPACE owned replies close independently without removing published manifests, objects or catalog PASS
+CATALOG NORMALIZE PROCESS catalog PASS
+Updating trusted repository composed
+Installing alpha 1.0.0 (1/4) from composed
+Downloading alpha/bin/app (13 bytes)
+Installing Notice 1.0.0 (2/4) from composed
+Downloading alpha-notice/NOTICE (12 bytes)
+Installing beta 1.0.0 (3/4) from composed
+Downloading beta/bin/app (12 bytes)
+Installing Notice 1.0.0 (4/4) from composed
+Downloading beta-notice/NOTICE (11 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository composed
+Installing alpha 1.0.0 (1/4) from composed
+Downloading alpha/bin/app (12 bytes)
+Installing Notice 1.0.0 (2/4) from composed
+Downloading alpha-notice/NOTICE (12 bytes)
+Installing beta 1.0.0 (3/4) from composed
+Downloading beta/bin/app (11 bytes)
+Installing Notice 1.0.0 (4/4) from composed
+Downloading beta-notice/NOTICE (11 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository selected
+Installing alpha 1.0.0 (1/4) from selected
+Downloading alpha/bin/app (13 bytes)
+Installing Notice 1.0.0 (2/4) from selected
+Downloading alpha-notice/NOTICE (12 bytes)
+Installing beta 1.0.0 (3/4) from selected
+Downloading beta/bin/app (12 bytes)
+Installing Notice 1.0.0 (4/4) from selected
+Downloading beta-notice/NOTICE (11 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing alpha 1.0.0 (1/4) from selected
+Installing Notice 1.0.0 (2/4) from selected
+Installing beta 1.0.0 (3/4) from selected
+Installing Notice 1.0.0 (4/4) from selected
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository selected
+Installing alpha 1.0.0 (1/4) from selected
+Downloading alpha/bin/app (12 bytes)
+Installing Notice 1.0.0 (2/4) from selected
+Downloading alpha-notice/NOTICE (12 bytes)
+Installing beta 1.0.0 (3/4) from selected
+Downloading beta/bin/app (11 bytes)
+Installing Notice 1.0.0 (4/4) from selected
+Downloading beta-notice/NOTICE (11 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing alpha 1.0.0 (1/4) from selected
+Installing Notice 1.0.0 (2/4) from selected
+Installing beta 1.0.0 (3/4) from selected
+Installing Notice 1.0.0 (4/4) from selected
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+COMPOSITION TARGET: both host selections preserve shared dependencies, manifests/pins/policy, signed offline maintenance and full-input provenance PASS
+COMPOSITION TARGET: incomplete, malformed, unsafe and unresolved omitted variants plus shared identity collisions refuse before publication PASS
+COMPOSITION TARGET: explicit CLI/API equivalence, literal paths, unsupported host, argument counts and existing-output refusals PASS
+CATALOG NORMALIZE PROCESS composition PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+RELEASE ADMISSION late-index refused=true unpublished=true
+RELEASE ADMISSION changed staged metadata refuses after reservation; exact retry preserves publisher floor PASS
+RELEASE ADMISSION 34 staged/reserved refusals preserve workspace and outside data; history timing, no publication, cleanup and exact retry PASS
+CATALOG NORMALIZE PROCESS release PASS
+HWTEST PASS packages-catalog-normalize

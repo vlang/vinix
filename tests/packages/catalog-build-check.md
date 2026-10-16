@@ -7,6 +7,10 @@ hashes and executable flags. The canonical workspace is consumed by the existing
 signed release publisher. The [SDK contract](../../tools/packages/SDK.md#build-a-pinned-application-catalog)
 describes input roots, disclosures, space checks, recovery and publishing.
 
+The later [workspace planning qualification](catalog-plan-check.md) measures
+metadata/budget lifetimes, preserves the original canonical bytes and space
+formula, and checks independently closeable results on both targets.
+
 The maintained `pkgcore/catalog_test.v` runner checks:
 
 - Canonical metadata and equal release signatures after reordering the catalog.
