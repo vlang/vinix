@@ -483,6 +483,14 @@ It supplies no Wine runtime or consumer license grants. See the
 [publisher qualification](../../tests/packages/wine-profile-check.md); actual
 Wine/translated/graphical execution remains a separate gate.
 
+`apple-catalog RECIPE_DIRECTORY PREPARED_ROOTS NEW_LOCK_DIRECTORY` produces a
+reproducible AArch64 iOS app/runtime lock. It checks thin ARM64 Mach-O mappings,
+XML/binary bundle identity, a native static launcher, complete file inventories
+and explicit notices/licenses/runtime bounds before publishing. See the
+[profile contract](SDK.md#apple-ios-arm64-publisher-profile) and
+[publisher checks](../../tests/packages/apple-profile-check.md). It supplies no
+Apple SDK, proprietary payload or x86-64 translation variant.
+
 Apple launches now derive the iOS compatibility runtime's Documents and keychain
 overrides from admitted private app data. They retain their containers through
 updates, rollback and uninstall without adding sandbox grants. The

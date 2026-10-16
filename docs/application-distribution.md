@@ -217,7 +217,16 @@ normal signed catalog. It does not supply or qualify Wine itself. See
 [publisher checks](../tests/packages/wine-profile-check.md) for reproducible
 offline maintenance, policy and failure coverage.
 
-Prepared-root imports, catalog builds and the three fixed publisher profiles
+The [Apple iOS ARM64 publisher profile](../tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
+adds a bounded thin-Mach-O header/map check, matching XML/binary bundle identity,
+a static native launcher and explicit licensed runtime closure. It creates only
+the AArch64 catalog it can represent, retaining normal signing, policy and
+offline maintenance. The [publisher checks](../tests/packages/apple-profile-check.md)
+cover reproducible locks and refusal paths; the real Apple package guest now
+builds both application/runtime versions through that profile before installation.
+Wider API, application and graphical qualification remain open.
+
+Prepared-root imports, catalog builds and fixed publisher profiles
 share source-root admission before creating destination parents. Empty/NUL
 paths and leaf directory aliases refuse even with trailing separators. Ordinary
 roots retain canonical metadata and a captured namespace that later pathname

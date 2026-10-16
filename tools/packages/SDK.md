@@ -1090,6 +1090,115 @@ use runtime files and must not depend on host-global paths or unrequested grants
 Wine IPC, display, process lifetime, translated execution and real upstream
 applications still require target qualification. See [profile checks](../../tests/packages/wine-profile-check.md).
 
+### Apple iOS ARM64 publisher profile
+
+`apple-catalog RECIPE_DIRECTORY PREPARED_ROOTS NEW_LOCK_DIRECTORY` pins one
+publisher-supplied iOS application and its separately versioned runtime. Supply
+`recipes/aarch64/application.json`, `recipes/aarch64/runtime.json` and prepared
+files under `roots/aarch64/`. The format-1 result has `profile: "apple-ios-arm64"`,
+`directory`, `catalog`, `catalog_sha256`, `application`, `version`, `runtime`,
+`runtime_version` and `architectures: ["aarch64"]`. Running this publisher tool
+on x86-64 does not produce an x86-64 application variant. The profile supplies
+no translation runtime, Apple SDK, signing entitlement or proprietary payload.
+
+The application template declares `kind: "apple"`, `architecture: "aarch64"`,
+`entrypoint: "bin/run-ios"` and a first argument
+`"@APP@/BUNDLE.app/EXECUTABLE"`. Use one top-level `.app` directory and a direct
+executable filename. Additional literal arguments, explicit permissions and MIME
+associations retain their normal package semantics. The sole dependency names
+`runtime` and provides both `minimum` and exclusive `before` version bounds.
+
+Select the executable, its sibling `Info.plist`,
+`licenses/application-LICENSE.txt`, and every needed bundle resource/notice as
+individual ordinary files. Templates have no `files` pins. Each recipe has at
+most 1024 selectors; every selected `licenses/` file is nonempty and at most
+1 MiB. Guest-root aliases retain the normal captured-root import semantics;
+architecture-root directory aliases are refused.
+
+The main executable must be a thin, unencrypted, plain ARM64 `MH_EXECUTE` with
+`MH_PIE`, an iOS deployment-platform command and one `LC_MAIN` without a custom
+stack size. The file is at most 512 MiB; the command area is at most 1 MiB with
+4096 commands and 128 mapped segments. The header check enforces segment/section
+ranges, a span of at most 512 MiB, no writable executable mappings, no overlapping
+segments, alignment for 4K/16K hosts and an aligned, file-backed executable entry.
+Universal binaries, ARM64e/PAC, macOS, simulator and x86 images refuse. Mach-O
+Unix executable mode is optional: the runtime reads and maps the image.
+
+`Info.plist` may be XML or binary, is at most 1 MiB and must be a dictionary.
+`CFBundleIdentifier` equals the package ID, `CFBundleExecutable` equals the
+declared executable filename, and `CFBundlePackageType` is `APPL`. These fields
+are strings. The package version remains the publisher's package version; the
+profile does not infer releases or permissions from other bundle properties.
+
+For example, the application recipe can contain:
+
+```json
+{
+  "manifest": {
+    "id": "org.example.counter", "version": "1.0.0", "architecture": "aarch64",
+    "name": "Example counter", "license": "GPL-2.0-or-later", "kind": "apple",
+    "runtime": "org.example.ios-runtime", "entrypoint": "bin/run-ios",
+    "arguments": ["@APP@/Example.app/Example"], "permissions": ["files"],
+    "dependencies": [{"id":"org.example.ios-runtime","minimum":"1.0.0","before":"2.0.0"}]
+  },
+  "entries": [
+    {"source":"app/Example","path":"Example.app/Example"},
+    {"source":"app/Info.plist","path":"Example.app/Info.plist"},
+    {"source":"licenses/app.txt","path":"licenses/application-LICENSE.txt"}
+  ]
+}
+```
+
+The runtime recipe declares `kind: "runtime"`, `architecture: "aarch64"`, its
+version and complete license expression. Select a native static ELF64 AArch64
+launcher at `bin/run-ios`, `licenses/runtime-LICENSE.txt`, and every binary,
+library, framework, resource and additional notice it needs. The launcher has
+Unix executable mode. Runtime dependencies, entrypoint, arguments, permissions
+and associations are empty; application grants control execution. The launcher
+accepts the bundle executable as its first argument, uses the admitted private
+Documents/keychain paths and keeps its generation lease alive while runtime files
+are used. It may delegate to another explicitly packaged runtime executable.
+
+```json
+{
+  "manifest": {
+    "id": "org.example.ios-runtime", "version": "1.0.0", "architecture": "aarch64",
+    "name": "Example iOS runtime", "license": "GPL-2.0-or-later AND MIT", "kind": "runtime"
+  },
+  "entries": [
+    {"source":"runtime/run-ios","path":"bin/run-ios"},
+    {"source":"licenses/runtime.txt","path":"licenses/runtime-LICENSE.txt"}
+  ]
+}
+```
+
+Add the entire reviewed runtime closure and its notices. Neither template may
+declare firmware. Proprietary flags and licenses remain explicit for both
+packages; publishing cannot establish redistribution rights or consumer consent.
+
+```sh
+vinix-package apple-catalog /build/recipes /build/roots /build/new-apple-lock
+vinix-package pack-catalog /build/new-apple-lock/catalog.json /build/roots /build/new-apple-workspace
+vinix-package publish-release /build/new-apple-workspace company /secure/publisher.seed 1 EXPIRES_UNIX /srv/new-apple-release
+```
+
+The profile captures both recipes, checks source files and disk budgets, imports
+into private staging, then rechecks copied Mach-O/plist/launcher bytes and the
+complete inventory before publishing a canonical lock atomically. Later source
+changes cause `pack-catalog` to refuse its reviewed pins. Handled failures clean
+staging without replacing an existing or concurrently created destination; an
+abrupt kill may leave `.vinix-apple-profile-*` for inspection. Normal signing,
+trust, offline caching, policy, review, runtime upgrades, rollback and retained
+private-data/uninstall rules apply. Composition requires catalogs with the same
+architecture list; this profile cannot silently join a two-host catalog.
+
+Header admission does not bind imports/fixups, inspect every runtime resource,
+verify Apple code signatures or qualify arbitrary framework/API behavior. Use
+the [publisher checks](../../tests/packages/apple-profile-check.md) and retain
+target execution receipts before advertising each app/runtime tuple. The package
+fixture exercises the profile with real Mach-O Foundation/keychain operations;
+broader applications and graphical services remain separate acceptance gates.
+
 ## Runtimes and launch
 
 ### Native window protocol 1

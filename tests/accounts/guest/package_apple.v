@@ -11,29 +11,37 @@ const apple_id = 'org.vinix.apple-probe'
 const apple_runtime_id = 'org.vinix.apple-runtime-probe'
 
 fn apple_pack(version string, runtime_version string, status u8) ! {
-	os.mkdir_all('/tmp/apple-application/Example.app')!
-	os.write_file_array('/tmp/apple-application/Example.app/Example', applefixture.framework_image(status))!
-	os.write_file('/tmp/apple-application/Example.app/Info.plist', '<plist><dict><key>CFBundleIdentifier</key><string>' + apple_id + '</string></dict></plist>')!
-	os.mkdir_all('/tmp/apple-runtime/bin')!
-	for name in ['launcher', 'run-ios'] {
-		os.cp('/usr/share/apple-fixtures/' + name, '/tmp/apple-runtime/bin/' + name)!
-		os.chmod('/tmp/apple-runtime/bin/' + name, 0o755)!
-	}
-	for recipe in [
+	root := '/tmp/apple-roots/aarch64'
+	for directory in ['app', 'runtime', 'licenses'] { os.mkdir_all(root + '/' + directory)! }
+	os.write_file_array(root + '/app/Example', applefixture.framework_image(status))!
+	os.write_file(root + '/app/Info.plist', '<plist><dict><key>CFBundleIdentifier</key><string>' + apple_id + '</string><key>CFBundleExecutable</key><string>Example</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>')!
+	for name in ['launcher', 'run-ios'] { os.cp('/usr/share/apple-fixtures/' + name, root + '/runtime/' + name)!; os.chmod(root + '/runtime/' + name, 0o755)! }
+	for name in ['COPYING', 'v-LICENSE', 'musl-COPYRIGHT'] { os.cp('/usr/share/apple-fixtures/' + name, root + '/licenses/' + name)! }
+	os.mkdir_all('/tmp/apple-recipes/aarch64')!
+	for p in [
 		pkgcore.Package{ id: apple_id, version: version, architecture: 'aarch64', name: 'Isolated Apple probe',
 			license: 'GPL-2.0-or-later AND MIT', kind: 'apple', runtime: apple_runtime_id,
-			entrypoint: 'bin/launcher', permissions: ['files'], associations: ['text/plain'],
+			entrypoint: 'bin/run-ios', arguments: ['@APP@/Example.app/Example'], permissions: ['files'], associations: ['text/plain'],
 			dependencies: [pkgcore.Dependency{ id: apple_runtime_id, minimum: '1.0.0', before: '2.0.0' }] },
 		pkgcore.Package{ id: apple_runtime_id, version: runtime_version, architecture: 'aarch64', name: 'Explicit Apple probe runtime',
 			license: 'GPL-2.0-or-later AND MIT', kind: 'runtime' },
 	] {
-		source := if recipe.kind == 'apple' { '/tmp/apple-application' } else { '/tmp/apple-runtime' }
-		os.cp('/usr/share/apple-fixtures/COPYING', source + '/COPYING')!
-		os.cp('/usr/share/apple-fixtures/v-LICENSE', source + '/v-LICENSE')!
-		os.cp('/usr/share/apple-fixtures/musl-COPYRIGHT', source + '/musl-COPYRIGHT')!
-		os.write_file('/tmp/apple-manifest.json', json2.encode(recipe))!
-		pkgcore.pack('/tmp/apple-manifest.json', source, '/tmp/apple-repository')!
+		application := p.kind == 'apple'
+		mut entries := if application {
+			[pkgcore.RootEntry{ source: 'app/Example', path: 'Example.app/Example' }, pkgcore.RootEntry{ source: 'app/Info.plist', path: 'Example.app/Info.plist' }]
+		} else { [pkgcore.RootEntry{ source: 'runtime/launcher', path: 'bin/run-ios' }, pkgcore.RootEntry{ source: 'runtime/run-ios', path: 'libexec/run-ios' }] }
+		entries << pkgcore.RootEntry{ source: 'licenses/COPYING', path: if application { 'licenses/application-LICENSE.txt' } else { 'licenses/runtime-LICENSE.txt' } }
+		for name in ['v-LICENSE', 'musl-COPYRIGHT'] { entries << pkgcore.RootEntry{ source: 'licenses/' + name, path: 'licenses/' + name } }
+		os.write_file('/tmp/apple-recipes/aarch64/' + if application { 'application.json' } else { 'runtime.json' }, json2.encode(pkgcore.RootRecipe{ manifest: p, entries: entries }))!
 	}
+	profile := pkgcore.apple_catalog('/tmp/apple-recipes', '/tmp/apple-roots', '/tmp/apple-lock-' + version)!
+	workspace := '/tmp/apple-workspace-' + version
+	assert pkgcore.pack_catalog(profile.catalog, '/tmp/apple-roots', workspace)!.package_count == 2
+	for directory in ['objects', 'manifests'] {
+		os.mkdir_all('/tmp/apple-repository/' + directory)!
+		for name in os.ls(workspace + '/' + directory)! { os.cp(workspace + '/' + directory + '/' + name, '/tmp/apple-repository/' + directory + '/' + name)! }
+	}
+	println('PACKAGE APPLE PROFILE version=' + version + ' runtime=' + runtime_version + ' architecture=aarch64 sha256=' + profile.catalog_sha256 + ' PASS')
 }
 
 fn apple_run(status int, count int, document string, sam bool) ! {
@@ -103,7 +111,7 @@ fn qualify_package_apple(mut t Test) ! {
 	apple_run(23, 3, document, false)!
 	// Payload tampering is refused before the launcher can update private data.
 	state := pkgcore.read_state('/var/lib/vinix-packages', 'aarch64')!
-	runner := '/var/lib/vinix-packages/generations/' + state.generation.str() + '/apps/' + apple_runtime_id + '/bin/run-ios'
+	runner := '/var/lib/vinix-packages/generations/' + state.generation.str() + '/apps/' + apple_runtime_id + '/libexec/run-ios'
 	bytes := os.read_bytes(runner)!
 	os.write_file(runner, 'tampered runtime')!
 	bad := run(['/usr/bin/vinix-package', 'run', apple_id], '', none, none)

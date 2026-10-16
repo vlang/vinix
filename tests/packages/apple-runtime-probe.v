@@ -29,15 +29,15 @@ fn probe() ! {
 	assert os.getenv('VINIX_AUTH_UID') == ''
 	assert !os.is_file('/etc/shadow') && !os.is_file('/usr/bin/vinix-package')
 	assert !os.is_file('/usr/share/apple-fixtures/hidden.txt')
-	assert os.args.len in [1, 2]
-	if os.args.len == 2 { assert os.read_file(os.args[1])! == 'literal Apple document\n' }
+	assert os.args.len in [2, 3] && os.args[1] == context.app_directory + '/Example.app/Example'
+	if os.args.len == 3 { assert os.read_file(os.args[2])! == 'literal Apple document\n' }
 	path := context.data_directory + '/boundary-counter.txt'
 	previous := if os.exists(path) { strconv.atoi(os.read_file(path)!)! } else { 0 }
 	write_private(path, (previous + 1).str())!
 	println('PACKAGE APPLE CONTEXT uid=' + os.getuid().str() + ' app=' + context.id + ' version=' + context.version + ' runtime=' + context.runtime_version + ' counter=' + (previous + 1).str() + ' PASS')
 	flush_stdout()
-	runner := context.runtime_directory + '/bin/run-ios'
-	program := context.app_directory + '/Example.app/Example'
+	runner := context.runtime_directory + '/libexec/run-ios'
+	program := os.args[1]
 	arguments := [runner, program]
 	mut argv := []&char{}
 	for argument in arguments { argv << &char(argument.str) }

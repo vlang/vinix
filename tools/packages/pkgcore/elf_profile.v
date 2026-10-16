@@ -8,7 +8,7 @@ fn profile_read_at(fd int, offset u64, mut bytes []u8) ! {
 	for done < bytes.len {
 		count := C.pread(fd, unsafe { &u8(bytes.data) + done }, usize(bytes.len - done), i64(offset + u64(done)))
 		if count < 0 && C.errno == C.EINTR { continue }
-		if count <= 0 { return error('cannot read ELF profile executable headers') }
+		if count <= 0 { return error('cannot read executable profile headers') }
 		done += int(count)
 	}
 }

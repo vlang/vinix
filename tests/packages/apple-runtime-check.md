@@ -15,7 +15,13 @@ Security, libSystem and libobjc. Successful `LC_MAIN` code returns 23 and 24
 respectively. They use neither an Apple SDK nor proprietary payloads. Both
 application and runtime are packed, signed, enrolled and installed by the normal
 package tools.
-The runtime contains a signed native fixture launcher and `run-ios`.
+The runtime contains a signed native fixture launcher at `bin/run-ios` and the
+actual compatibility runtime at `libexec/run-ios`. Both application/runtime
+versions now pass through [`apple-catalog`](../../tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
+and `pack-catalog` before signing and installation. `Info.plist` and the literal
+bundle executable argument satisfy that publisher profile. Separate
+[publisher receipts](apple-profile-check.md) retain this integration; earlier
+receipts below predate it.
 
 The native launcher runs as the ordinary user inside the same production
 sandbox. It validates SDK context, exact Documents/keychain/HOME/TMPDIR paths,
