@@ -461,6 +461,16 @@ admission are unchanged. See
 
 ### Build a pinned application catalog
 
+Pinned catalog decoding bounds metadata to 8 MiB, imports to 4,096, target names
+to two 16-byte strings and import sources to 1,024 bytes. Existing selector and
+manifest bounds apply within each import. Catalog recipes, manifests, dependencies
+and payloads require complete declarations; source-template defaults cannot
+silently fill a lock. Only omitted `window_protocol` retains its legacy zero.
+The decoder owns its result and retires partial imports on failure. Architecture,
+coverage, dependency and source-path validation still run before construction;
+canonical locks and signatures retain their existing bytes. See
+[catalog decoding qualification](../../tests/packages/catalog-decode-check.md).
+
 `pack-catalog catalog.json /build/prepared-roots /build/new-workspace` builds an
 entire publisher workspace in one operation. Prepare authenticated upstream
 sources and their redistribution notices first. Inventory them with `pack-root`,

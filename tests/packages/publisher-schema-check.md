@@ -38,6 +38,10 @@ including owned results and zero retained scratch. The historical measurements
 below retain their original schema-scanner scope; pinned catalog decoding is
 separate from the prepared-root reader.
 
+The subsequent [bounded catalog decoder](catalog-decode-check.md) also qualifies
+complete and partial catalog admission before normalization. The recorded scanner
+measurements below keep their original scope.
+
 ```sh
 V_MACOS_V3_NO_FALLBACK=1 /path/to/v -no-skip-unused -gc none -manualfree \
   -o /tmp/publisher-schema tools/packages/pkgcore/publisher_schema_test.v

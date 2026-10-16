@@ -73,11 +73,9 @@ fn catalog_source_root(root int, source string) !int {
 }
 
 fn catalog_recipe(text string) !CatalogRecipe {
-	if text.len > max_metadata { return error('catalog recipe exceeds metadata limit') }
-	input := json2.decode[CatalogRecipe](text, strict: true)!
+	input := decode_catalog_recipe(text)!
 	mut accepted := false
 	defer { if !accepted { close_decoded_catalog(input) } }
-	document_keys_schema(text, catalog_key, catalog_required_fields, catalog_value_type)!
 	if input.format != 1 || input.architectures.len == 0 || input.architectures.len > 2
 		|| input.packages.len == 0 || input.packages.len > 4096 {
 		return error('unsupported, empty or oversized catalog recipe')

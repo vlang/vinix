@@ -1,0 +1,2 @@
+PASS x86_64 packages-catalog-decode (195.9s)
+package-catalog-decode x86_64: 1 passed, 0 failed, 0 skipped

@@ -62,6 +62,11 @@ manifest template defaults while requiring explicit selectors. Selector overlap
 validation compares path components without constructing temporary prefixes.
 See [prepared-root recipe checks](../tests/packages/root-recipe-decode-check.md).
 
+Pinned catalog locks use the same bounded primitives with complete recipe and
+manifest declarations. Decoding owns each import's source, selectors and manifest,
+and retires partial records before catalog normalization or workspace creation.
+See [catalog decoding checks](../tests/packages/catalog-decode-check.md).
+
 Local payload copies validate ordinary source and destination descriptors before
 writing, refuse the same file even through a hard link, and enforce the captured
 source size. Oversized offline repository objects leave existing partial data

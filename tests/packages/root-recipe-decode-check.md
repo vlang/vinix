@@ -64,6 +64,10 @@ catalog decoding are outside this allocation measurement. Production publisher
 enrollment, catalog migration, graphical login/display integration and broader
 foreign-runtime acceptance remain open for roadmap 14.
 
+The subsequent [bounded catalog decoder](catalog-decode-check.md) adds owned
+complete/partial pinned-lock admission. This report's decoder and validator
+measurements retain their original prepared-root scope.
+
 ## Recorded results, 2026-10-16
 
 All **40 focused compile/run checks** passed: fourteen core pairs, two tracked-allocation pairs, one ASan/UBSan pair, four signed CLI/driver checks and two guest-tool builds.

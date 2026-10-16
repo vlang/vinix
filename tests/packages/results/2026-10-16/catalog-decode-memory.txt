@@ -1,0 +1,75 @@
+CATALOG DECODE aarch64 1 imports: 1000 cycles retained 0 bytes
+CATALOG DECODE aarch64 64 imports: 1000 cycles retained 0 bytes
+CATALOG DECODE x86_64 1 imports: 1000 cycles retained 0 bytes
+CATALOG DECODE x86_64 64 imports: 1000 cycles retained 0 bytes
+CATALOG DECODE both architectures, independent owned complete records, exact writer bytes and full 4096 import bounds PASS
+CATALOG DECODE whitespace, escaped keys and legacy window protocol preserve writer bytes; source defaults cannot enter complete catalog locks PASS
+CATALOG DECODE refusal 0: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 1: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 2: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 3: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 4: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 5: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 6: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 7: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 8: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 9: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 10: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 11: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 12: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 13: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 14: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 15: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 16: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 17: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 18: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 19: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 20: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 21: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 22: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 23: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 24: 1000 cycles retained 0 bytes
+CATALOG DECODE refusal 25: 1000 cycles retained 0 bytes
+CATALOG DECODE every truncated prefix and schema/UTF8/number/late import and selector refusal cycles retire scratch PASS
+CATALOG DECODE exact 8 MiB accepted; metadata/import/architecture/source/selector/payload/argument/permission overflow refused PASS
+CATALOG DECODE full 1024 selectors retire tracked storage; 16384 payloads preserve complete fields and retire their single live owner PASS
+CATALOG DECODE invalid catalog preserves sources and existing/absent pack/composition destinations; restored complete and legacy locks publish unchanged canonical bytes PASS
+
+Prepared-root templates:
+ROOT RECIPE aarch64 1 selectors: 1000 cycles retained 0 bytes
+ROOT RECIPE aarch64 64 selectors: 1000 cycles retained 0 bytes
+ROOT RECIPE aarch64 1024 selectors: 1 cycles retained 0 bytes
+ROOT RECIPE x86_64 1 selectors: 1000 cycles retained 0 bytes
+ROOT RECIPE x86_64 64 selectors: 1000 cycles retained 0 bytes
+ROOT RECIPE x86_64 1024 selectors: 1 cycles retained 0 bytes
+ROOT RECIPE both architectures, independent owned templates, exact canonical bytes and full 1024 selector bounds PASS
+ROOT RECIPE omitted format and nested manifest defaults, full payload integers and reordered fields preserve admission and retire scratch PASS
+ROOT RECIPE refusal 0: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 1: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 2: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 3: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 4: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 5: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 6: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 7: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 8: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 9: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 10: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 11: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 12: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 13: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 14: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 15: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 16: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 17: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 18: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 19: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 20: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 21: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 22: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 23: 1000 cycles retained 0 bytes
+ROOT RECIPE every truncated prefix and schema/UTF8/number/selector/overlap refusal cycles retire scratch PASS
+ROOT RECIPE exact 8 MiB and 1024-byte selectors accepted; metadata, selector and nested manifest overflow refused PASS
+ROOT RECIPE full 16384 payload template inventories preserve fields and retire their single live owner PASS
+ROOT RECIPE 1000 borrowed selector validation cycles preserve equal/parent/child/Unicode/component boundaries and retire scratch PASS
+ROOT RECIPE invalid import preserves sources and existing/absent workspace; restored template captures payload and unchanged canonical publication PASS

@@ -1,0 +1,7 @@
+clang ASan/UBSan; -gc none -manualfree; detect_leaks=0; halt_on_error=1
+CATALOG DECODE both architectures, independent owned complete records, exact writer bytes and full 4096 import bounds PASS
+CATALOG DECODE whitespace, escaped keys and legacy window protocol preserve writer bytes; source defaults cannot enter complete catalog locks PASS
+CATALOG DECODE every truncated prefix and schema/UTF8/number/late import and selector refusal cycles retire scratch PASS
+CATALOG DECODE exact 8 MiB accepted; metadata/import/architecture/source/selector/payload/argument/permission overflow refused PASS
+CATALOG DECODE full 1024 selectors retire tracked storage; 16384 payloads preserve complete fields and retire their single live owner PASS
+CATALOG DECODE invalid catalog preserves sources and existing/absent pack/composition destinations; restored complete and legacy locks publish unchanged canonical bytes PASS

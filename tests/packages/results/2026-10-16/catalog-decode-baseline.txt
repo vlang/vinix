@@ -1,0 +1,11 @@
+Warmed ten-cycle one/64-import catalog JSON/schema admission and truncated-input refusals, before normalization, with returned values/errors retired. The baseline probe extracts the existing admission calls and cleanup unchanged. No compiler or library changes. Sources, executables and generated C retained and pinned.
+
+Before:
+CATALOG DECODE probe 0: ten cycles retained 10 bytes
+CATALOG DECODE probe 1: ten cycles retained 363640 bytes
+CATALOG DECODE probe 2: ten cycles retained 7030 bytes
+
+After:
+CATALOG DECODE probe 0: ten cycles retained 0 bytes
+CATALOG DECODE probe 1: ten cycles retained 0 bytes
+CATALOG DECODE probe 2: ten cycles retained 0 bytes

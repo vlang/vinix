@@ -1,0 +1,80 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=24
+!>+ [11] ./sbin/init sz=210976
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/catalog sz=1608960
+!>+ [15] ./usr/share/package-fixtures/composition sz=1618000
+!>+ [16] ./usr/share/package-fixtures/publisher-schema sz=1088544
+!>+ [17] ./usr/share/package-fixtures/catalog-decode sz=1102128
+!>+ [18] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e88200
+initramfs: Done (18 entries)
+HWTEST START packages-catalog-decode
+CATALOG DECODE both architectures, independent owned complete records, exact writer bytes and full 4096 import bounds PASS
+CATALOG DECODE both architectures, independent owned complete records, exact writer bytes and full 4096 import bounds PASS
+CATALOG DECODE both architectures, independent owned complete records, exact writer bytes and full 4096 import bounds PASS
+CATALOG DECODE both architectures, independent owned complete records, exact writer bytes and full 4096 import bounds PASS
+CATALOG DECODE both architectures, independent owned complete records, exact writer bytes and full 4096 import bounds PASS
+CATALOG DECODE both architectures, independent owned complete records, exact writer bytes and full 4096 import bounds PASS
+CATALOG DECODE whitespace, escaped keys and legacy window protocol preserve writer bytes; source defaults cannot enter complete catalog locks PASS
+CATALOG DECODE every truncated prefix and schema/UTF8/number/late import and selector refusal cycles retire scratch PASS
+CATALOG DECODE exact 8 MiB accepted; metadata/import/architecture/source/selector/payload/argument/permission overflow refused PASS
+CATALOG DECODE full 1024 selectors retire tracked storage; 16384 payloads preserve complete fields and retire their single live owner PASS
+CATALOG DECODE invalid catalog preserves sources and existing/absent pack/composition destinations; restored complete and legacy locks publish unchanged canonical bytes PASS
+CATALOG PROCESS catalog-decode PASS
+CATALOG PROCESS publisher-schema PASS
+Updating trusted repository fixture
+Installing app 1.0.0 (1/3) from fixture
+Downloading app/bin/application (19 bytes)
+Installing License 1.0.0 (2/3) from fixture
+Downloading license/COPYING (23 bytes)
+Installing runtime 1.0.0 (3/3) from fixture
+Downloading runtime/bin/runner (23 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing app 1.0.0 (1/3) from fixture
+Downloading app/bin/application (18 bytes)
+Installing License 1.0.0 (2/3) from fixture
+Downloading license/COPYING (23 bytes)
+Installing runtime 1.0.0 (3/3) from fixture
+Downloading runtime/bin/runner (22 bytes)
+Activated package generation 1
+Activated package generation 2
+CATALOG PROCESS catalog PASS
+Updating trusted repository composed
+Installing alpha 1.0.0 (1/4) from composed
+Downloading alpha/bin/app (13 bytes)
+Installing Notice 1.0.0 (2/4) from composed
+Downloading alpha-notice/NOTICE (12 bytes)
+Installing beta 1.0.0 (3/4) from composed
+Downloading beta/bin/app (12 bytes)
+Installing Notice 1.0.0 (4/4) from composed
+Downloading beta-notice/NOTICE (11 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository composed
+Installing alpha 1.0.0 (1/4) from composed
+Downloading alpha/bin/app (12 bytes)
+Installing Notice 1.0.0 (2/4) from composed
+Downloading alpha-notice/NOTICE (12 bytes)
+Installing beta 1.0.0 (3/4) from composed
+Downloading beta/bin/app (11 bytes)
+Installing Notice 1.0.0 (4/4) from composed
+Downloading beta-notice/NOTICE (11 bytes)
+Activated package generation 1
+Activated package generation 2
+CATALOG PROCESS composition PASS
+HWTEST PASS packages-catalog-decode
