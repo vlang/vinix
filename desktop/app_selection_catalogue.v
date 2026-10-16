@@ -53,11 +53,14 @@ enum FirstRunRequirement {
 
 // Retain the original first four identities for existing setup automation.
 // Categories control presentation independently of installation order.
+// open_source describes the app itself, including Vinix's native iOS runner,
+// rather than the services, documents or games it may connect to or run.
 const first_run_app_catalogue = [
 	FirstRunApp{
 		title:           'Firefox'
 		icon:            'asset:firefox'
 		package_name:    'firefox'
+		open_source:     true
 		action:          'apps.toggle.firefox'
 		installed_paths: ['/usr/lib/firefox-esr/firefox-esr', '/usr/lib/firefox/firefox']
 	},
@@ -65,6 +68,7 @@ const first_run_app_catalogue = [
 		title:           'Chromium'
 		icon:            'asset:chromium'
 		package_name:    'chromium'
+		open_source:     true
 		action:          'apps.toggle.chromium'
 		installed_paths: ['/usr/lib/chromium/chrome']
 	},
@@ -90,6 +94,7 @@ const first_run_app_catalogue = [
 		title:           'Blender'
 		icon:            'asset:blender'
 		package_name:    'blender'
+		open_source:     true
 		action:          'apps.toggle.blender'
 		installed_paths: ['/usr/bin/blender', '/usr/libexec/vinix-blender-native']
 		category:        .creation
@@ -98,6 +103,7 @@ const first_run_app_catalogue = [
 		title:           'VLC'
 		icon:            'asset:vlc'
 		package_name:    'vlc-qt'
+		open_source:     true
 		action:          'apps.toggle.vlc'
 		installed_paths: ['/usr/bin/qvlc']
 		category:        .media
@@ -106,6 +112,7 @@ const first_run_app_catalogue = [
 		title:           'VSCodium'
 		icon:            'asset:vscodium'
 		package_name:    'vscodium'
+		open_source:     true
 		action:          'apps.toggle.vscodium'
 		installed_paths: ['/usr/bin/codium']
 		category:        .development
@@ -115,6 +122,7 @@ const first_run_app_catalogue = [
 		title:           'Zed'
 		icon:            'asset:zed'
 		package_name:    'zed'
+		open_source:     true
 		action:          'apps.toggle.zed'
 		installed_paths: ['/usr/bin/zed-editor', '/usr/bin/zed', '/usr/bin/run-zed']
 		category:        .development
@@ -124,6 +132,7 @@ const first_run_app_catalogue = [
 		title:           'Neovim'
 		icon:            'asset:neovim'
 		package_name:    'neovim'
+		open_source:     true
 		action:          'apps.toggle.neovim'
 		installed_paths: ['/usr/bin/nvim']
 		category:        .development
@@ -132,6 +141,7 @@ const first_run_app_catalogue = [
 		title:           'KeePassXC'
 		icon:            'asset:keepassxc'
 		package_name:    'keepassxc'
+		open_source:     true
 		action:          'apps.toggle.keepassxc'
 		installed_paths: ['/usr/bin/keepassxc']
 		category:        .productivity
@@ -140,6 +150,7 @@ const first_run_app_catalogue = [
 		title:           'LibreOffice'
 		icon:            'asset:libreoffice'
 		package_name:    'libreoffice'
+		open_source:     true
 		action:          'apps.toggle.libreoffice'
 		installed_paths: ['/usr/lib/libreoffice/program/soffice.bin', '/usr/bin/libreoffice']
 		category:        .productivity
@@ -157,6 +168,7 @@ const first_run_app_catalogue = [
 		title:           'Telegram'
 		icon:            'asset:telegram'
 		package_name:    'telegram-desktop'
+		open_source:     true
 		action:          'apps.toggle.telegram'
 		installed_paths: ['/usr/bin/telegram-desktop']
 		category:        .communication
@@ -174,6 +186,7 @@ const first_run_app_catalogue = [
 		title:           'mpv'
 		icon:            'asset:mpv'
 		package_name:    'mpv'
+		open_source:     true
 		action:          'apps.toggle.mpv'
 		installed_paths: ['/usr/bin/mpv']
 		category:        .media
@@ -191,6 +204,7 @@ const first_run_app_catalogue = [
 		title:           'OBS Studio'
 		icon:            'asset:obs'
 		package_name:    'obs-studio'
+		open_source:     true
 		action:          'apps.toggle.obs'
 		installed_paths: ['/usr/bin/obs']
 		category:        .creation
@@ -208,6 +222,7 @@ const first_run_app_catalogue = [
 		title:           'iOS'
 		icon:            'asset:ios'
 		package_name:    'ios-runtime'
+		open_source:     true
 		action:          'apps.toggle.ios'
 		installed_paths: ['/usr/bin/run-ios']
 		arm64_only:      true

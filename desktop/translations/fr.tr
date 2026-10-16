@@ -139,6 +139,9 @@ Choisissez les applications à télécharger et à installer.
 app_selection.minecraft.detail
 Java Edition, avec un compte Microsoft
 -----
+app_selection.open_source_only
+Afficher uniquement les logiciels libres
+-----
 app_selection.note
 Installez-en d'autres plus tard avec pkg install dans Terminal.
 -----

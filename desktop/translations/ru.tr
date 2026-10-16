@@ -139,6 +139,9 @@ app_selection.intro
 app_selection.minecraft.detail
 Java Edition, с учётной записью Microsoft
 -----
+app_selection.open_source_only
+Показывать только открытое ПО
+-----
 app_selection.note
 Другие приложения можно установить позже командой pkg install в Терминале.
 -----

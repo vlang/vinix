@@ -139,6 +139,9 @@ Pick the apps to download and install now.
 app_selection.minecraft.detail
 Java Edition, with a Microsoft account
 -----
+app_selection.open_source_only
+Show only open source software
+-----
 app_selection.note
 You can install more later with pkg install in Terminal.
 -----

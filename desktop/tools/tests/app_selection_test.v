@@ -112,6 +112,9 @@ fn test_app_selection_offers_the_optional_apps_this_machine_can_install() {
 	assert !app_selection_test_has_action_prefix(root, 'win.')
 	assert !app_selection_test_has_action_prefix(root, 'apps.category.')
 	for heading in first_run_category_headers {
+		$if !arm64 {
+			if heading == 'apps.heading.runtimes' { continue }
+		}
 		label := app_selection_test_element(root, heading) or { panic('missing category heading') }
 		assert label.kind == .label && !label.clickable
 	}
@@ -121,7 +124,7 @@ fn test_app_selection_offers_the_optional_apps_this_machine_can_install() {
 	for category in first_run_categories {
 		for i, app in first_run_apps {
 			if app.category == category {
-				state.scroll_to(app_selection_row_y(i, state.columns) - app_selection_heading_height)
+				state.scroll_to(state.row_y(i, state.columns) - app_selection_heading_height)
 				break
 			}
 		}
@@ -281,7 +284,7 @@ fn test_app_selection_retains_choices_while_scrolling_and_counts_many_apps() {
 	}
 	assert state.selected_count() == 6
 	assert app_selection_test_button_label(mut state) == 'Install selected apps'
-	state.scroll_to(app_selection_content_height(state.columns))
+	state.scroll_to(state.content_height(state.columns))
 	state.handle_action('apps.toggle.discord')
 	state.handle_action('apps.toggle.slack')
 	state.handle_action('apps.toggle.spotify')
@@ -299,7 +302,7 @@ fn test_app_selection_scrolling_keeps_rows_and_hit_targets_inside_the_list() {
 		desktop := Desktop{ canvas: Canvas{ width: size[0], height: size[1], scale: 1 } }
 		layout := app_selection_layout(size[0], size[1])
 		state.prepare_viewport(layout.list_height, layout.columns)
-		for offset in [0, 45, 350, app_selection_content_height(state.columns)] {
+		for offset in [0, 45, 350, state.content_height(state.columns)] {
 			state.scroll_to(offset)
 			begin_frame_elements()
 			tree := state.element(&desktop)
@@ -340,6 +343,8 @@ fn test_app_selection_keyboard_reveals_each_app_in_display_order_and_wraps() {
 		state.key_input('\t')
 	}
 	assert visited == expected
+	assert state.focus == app_selection_filter_focus
+	state.key_input('\t')
 	assert state.focus == 0
 	state.key_input('\x1b[F')
 	assert state.focus == state.next_available(-1, -1)
@@ -353,7 +358,7 @@ fn test_app_selection_wheel_and_scrollbar_reach_the_bottom_without_losing_choice
 	layout := app_selection_layout(1024, 480)
 	mut desktop := Desktop{ canvas: Canvas{ width: 1024, height: 480, scale: 1 } }
 	desktop.pointer_x = layout.x + 100
-	desktop.pointer_y = layout.y + app_selection_row_top + 100
+	desktop.pointer_y = layout.y + layout.list_top + 100
 	state.pointer_input(PointerPacket{ scroll: -4 }, &desktop)
 	assert state.scroll == 144
 	assert state.selected[0]
@@ -364,9 +369,9 @@ fn test_app_selection_wheel_and_scrollbar_reach_the_bottom_without_losing_choice
 	state.pointer_input(PointerPacket{ scroll: -4 }, &desktop)
 	assert state.scroll == 0
 	desktop.hover = action_apps_scrollbar
-	desktop.pointer_y = layout.y + app_selection_row_top + layout.list_height - 1
+	desktop.pointer_y = layout.y + layout.list_top + layout.list_height - 1
 	state.pointer_input(PointerPacket{ pressed: button_left, buttons: button_left }, &desktop)
-	assert state.scroll == app_selection_content_height(state.columns) - layout.list_height
+	assert state.scroll == state.content_height(state.columns) - layout.list_height
 	assert state.scroll_drag
 	state.pointer_input(PointerPacket{ released: button_left }, &desktop)
 	assert !state.scroll_drag
@@ -380,13 +385,29 @@ fn test_app_selection_wheel_and_scrollbar_reach_the_bottom_without_losing_choice
 
 fn test_app_selection_uses_three_columns_and_adapts_to_narrow_screens() {
 	mut state := app_selection_test_state()
+	fonts := load_fonts()
 	for width in [1024, 800, 640] {
-		desktop := Desktop{ canvas: Canvas{ width: width, height: 720, scale: 1 } }
+		desktop := Desktop{ canvas: Canvas{ width: width, height: 720, scale: 1 }, fonts: fonts }
 		begin_frame_elements()
 		tree := state.element(&desktop)
 		firefox := app_selection_test_element(tree, 'apps.toggle.firefox') or { panic('missing Firefox') }
 		chromium := app_selection_test_element(tree, 'apps.toggle.chromium') or { panic('missing Chromium') }
 		browsers := app_selection_test_element(tree, 'apps.heading.browsers') or { panic('missing heading') }
+		filter := app_selection_test_element(tree, action_apps_open_source) or { panic('missing filter') }
+		title := app_selection_test_element(tree, 'apps.title') or { panic('missing title') }
+		list := app_selection_test_element(tree, 'apps.list') or { panic('missing list') }
+		card := app_selection_test_element(tree, 'apps.window') or { panic('missing card') }
+		assert filter.clickable && !filter.checked
+		assert filter.accessibility_role == 'checkbox'
+		assert filter.accessibility_label == 'Show only open source software'
+		assert desktop.face_for(filter.children[1].text_style).text_width(filter.accessibility_label) <= filter.frame.width - 24
+		assert filter.frame.x + filter.frame.width == card.frame.width - 24
+		assert filter.frame.y + filter.frame.height < list.frame.y
+		if width == 1024 {
+			assert title.frame.x + title.frame.width < filter.frame.x
+		} else {
+			assert title.frame.y + title.frame.height <= filter.frame.y
+		}
 		assert browsers.frame.x == firefox.frame.x
 		assert browsers.frame.y + browsers.frame.height < firefox.frame.y
 		expected_cell_width := match width {
@@ -423,6 +444,99 @@ fn test_app_selection_uses_three_columns_and_adapts_to_narrow_screens() {
 		}
 		free_tree(tree)
 	}
+}
+
+fn test_app_selection_open_source_filter_hides_apps_and_excludes_hidden_install_choices() {
+	assert first_run_app_catalogue.filter(!it.open_source).map(it.package_name) ==
+		['voffice', 'minecraft', 'discord', 'slack', 'spotify', 'steam']
+	mut state := app_selection_test_state()
+	desktop := app_selection_test_desktop()
+	state.handle_action('apps.toggle.firefox')
+	state.handle_action('apps.toggle.discord')
+	assert state.selected_count() == 2
+	state.prepare_viewport(200, 3)
+	state.scroll_to(state.content_height(3))
+	state.scroll_drag = true
+	state.handle_action(action_apps_open_source)
+	assert state.open_source_only
+	assert state.scroll == 0 && !state.scroll_drag
+	assert state.selected_count() == 1
+	assert state.packages() == ['firefox']
+	assert app_selection_test_button_label(mut state) == 'Install 1 app'
+	// Stale pointer actions and existing number shortcuts cannot pick hidden apps.
+	state.handle_action('apps.toggle.slack')
+	$if arm64 { state.key_input('34') }
+	assert state.packages() == ['firefox']
+	for category in first_run_categories {
+		for i, app in first_run_apps {
+			if app.category == category && state.visible(i) {
+				state.scroll_to(state.row_y(i, state.columns) - app_selection_heading_height)
+				break
+			}
+		}
+		begin_frame_elements()
+		tree := state.element(&desktop)
+		filter := app_selection_test_element(tree, action_apps_open_source) or { panic('missing filter') }
+		assert filter.checked
+		assert app_selection_test_has_image(filter, 'builtin:check')
+		assert app_selection_test_element(tree, 'apps.heading.games') == none
+		for i, app in first_run_apps {
+			if !app.open_source {
+				assert app_selection_test_element(tree, app.action) == none
+				assert state.row_y(i, state.columns) == -1
+			} else if app.category == category {
+				assert app_selection_test_element(tree, app.action) != none
+			}
+		}
+		free_tree(tree)
+	}
+	// Turning the filter off restores the previous choices.
+	state.handle_action(action_apps_open_source)
+	assert !state.open_source_only
+	assert state.packages() == ['firefox', 'discord']
+	assert state.selected_count() == 2
+}
+
+fn test_app_selection_open_source_filter_is_reachable_by_keyboard_and_reflows_navigation() {
+	mut state := app_selection_test_state()
+	state.prepare_viewport(552, 3)
+	state.key_input('\x1b[Z') // Shift-Tab from the first app reaches the filter.
+	assert state.focus == app_selection_filter_focus
+	state.key_input(' ')
+	assert state.open_source_only && !state.complete
+	state.key_input('\t')
+	assert state.focus == 0
+	mut visited := []int{}
+	for _ in 0 .. first_run_apps.len {
+		if state.focus == app_selection_filter_focus { break }
+		assert first_run_apps[state.focus].open_source
+		visited << state.focus
+		state.key_input('\t')
+	}
+	assert visited.len == first_run_apps.filter(it.open_source).len
+	assert state.focus == app_selection_filter_focus
+	state.key_input('\x1b[Z')
+	assert state.focus == visited.last()
+	state.key_input('\x1b[H')
+	state.key_input('\x1b[C') // Chromium, second column.
+	state.key_input('\x1b[B')
+	assert first_run_apps[state.focus].package_name == 'libreoffice'
+	assert state.column(state.focus, 3) == 1
+	state.key_input('\x1b[B')
+	assert first_run_apps[state.focus].package_name == 'zed'
+	// The checkbox remains reachable even when every visible app is installed.
+	for i, app in first_run_apps {
+		state.installed[i] = app.open_source
+	}
+	state.set_focus(state.next_available(-1, 1))
+	state.key_input('\t')
+	assert state.focus == app_selection_filter_focus
+	state.key_input('\t')
+	assert state.focus == app_selection_filter_focus
+	state.key_input(' ')
+	assert !state.open_source_only
+	state.key_input('\t')
+	assert state.focus >= 0 && !first_run_apps[state.focus].open_source
 }
 
 fn test_app_selection_vertical_arrows_follow_grid_columns_and_skip_unavailable_apps() {

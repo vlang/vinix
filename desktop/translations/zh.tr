@@ -139,6 +139,9 @@ app_selection.intro
 app_selection.minecraft.detail
 Java 版，需要 Microsoft 账户
 -----
+app_selection.open_source_only
+仅显示开源软件
+-----
 app_selection.note
 以后可在终端中使用 pkg install 安装更多应用。
 -----

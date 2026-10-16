@@ -347,6 +347,12 @@ toggles a choice, and Enter confirms. Existing number shortcuts 1–9 keep their
 catalog identities. Downloads run separately in
 Terminal, so a failed package does not cancel the remaining choices.
 
+The top-right **Show only open source software** checkbox hides apps without an
+open-source license and removes empty categories. Hidden choices are excluded
+from installation while the filter is enabled; turning it off restores their
+previous selections. Tab or Shift-Tab reaches the checkbox and Space toggles it.
+The iOS option refers to Vinix's open-source compatibility runner.
+
 The Alpine choices include LibreOffice, Blender, VLC's `vlc-qt` desktop frontend, `mpv`, Neovim,
 KeePassXC, Telegram's `telegram-desktop`, and `obs-studio`. All offered apps are
 selectable. VSCodium, Zed, Discord, Slack, Spotify and Steam use official Linux

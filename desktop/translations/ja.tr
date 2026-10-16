@@ -139,6 +139,9 @@ app_selection.intro
 app_selection.minecraft.detail
 Java Edition、Microsoftアカウントで利用
 -----
+app_selection.open_source_only
+オープンソースソフトウェアのみ表示
+-----
 app_selection.note
 後からターミナルでpkg installを使って追加できます。
 -----

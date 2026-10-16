@@ -198,7 +198,7 @@ fn test_app_selection_in_spanish() {
 	button := i18n_apps_element(root, action_apps_install) or { panic('missing install button') }
 	assert button.text == 'Instalar 2 aplicaciones'
 	free_tree(root)
-	state.scroll_to(app_selection_row_y(3, state.columns) - app_selection_heading_height)
+	state.scroll_to(state.row_y(3, state.columns) - app_selection_heading_height)
 	begin_frame_elements()
 	installed := state.element(&desktop)
 	assert i18n_apps_has_text(installed, 'Instalada')

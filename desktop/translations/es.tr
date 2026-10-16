@@ -139,6 +139,9 @@ Marca las que quieres descargar e instalar ahora.
 app_selection.minecraft.detail
 Java Edition, con una cuenta de Microsoft
 -----
+app_selection.open_source_only
+Mostrar solo software de código abierto
+-----
 app_selection.note
 Puedes instalar más adelante con pkg install en Terminal.
 -----
