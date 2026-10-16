@@ -153,6 +153,13 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	launch_environment(mut args, 'LD_LIBRARY_PATH=' + library_path)
 	launch_environment(mut args, 'WINEPREFIX=' + data + '/wine')
 	launch_environment(mut args, 'LANG=C.UTF-8')
+	if p.kind == 'apple' {
+		// Foundation and the compatibility keychain have their own container
+		// overrides. Derive them from admitted private data, never ambient env
+		// or the immutable application bundle. Existing unveil grants suffice.
+		launch_environment(mut args, 'VINIX_IOS_DOCUMENTS=' + data + '/Documents')
+		launch_environment(mut args, 'VINIX_IOS_KEYCHAIN=' + data + '/Keychains')
+	}
 	mut runtime_version := p.version
 	for item in state.packages { if item.package.id == p.runtime { runtime_version = item.package.version; break } }
 	context := appsdk.Context{ id: p.id, version: p.version, architecture: config.architecture, kind: p.kind,

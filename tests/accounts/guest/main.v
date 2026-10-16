@@ -72,6 +72,7 @@ fn main() {
 		'packages-ffmpeg' { scenario_packages_ffmpeg(mut t) }
 		'packages-composition' { scenario_packages_composition(mut t) }
 		'packages-context' { scenario_packages_context(mut t) }
+		'packages-apple' { scenario_packages_apple(mut t) }
 		'packages-window' { scenario_packages_window(mut t) }
 		'packages-window-input' { scenario_packages_window_input(mut t) }
 		'packages-native-catalog' { scenario_packages_native_catalog(mut t) }

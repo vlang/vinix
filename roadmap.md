@@ -663,6 +663,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     cover signed offline install, registration, removal and rollback.
   - [ ] Qualified isolated Wine/translation and Apple runtime catalogs, including
     ordinary-user graphical execution and their required IPC/device services.
+  - [x] [An AArch64 Apple package launch/container boundary](tests/packages/apple-runtime-check.md)
+    executes ARM64 iOS Mach-O instructions through a signed static runtime in
+    the real sandbox. Private Documents/keychain overrides, user separation,
+    upgrade, rollback, tamper refusal and cached reinstall are checked. Wider
+    Apple framework/application and graphical coverage remain open.
 - [ ] Establish a supported application SDK/protocol, stable public interfaces,
   package format, signing/publishing process and developer documentation.
 - [ ] Support offline repositories/caches and organization-managed deployment;

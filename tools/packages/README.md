@@ -483,6 +483,14 @@ It supplies no Wine runtime or consumer license grants. See the
 [publisher qualification](../../tests/packages/wine-profile-check.md); actual
 Wine/translated/graphical execution remains a separate gate.
 
+Apple launches now derive the iOS compatibility runtime's Documents and keychain
+overrides from admitted private app data. They retain their containers through
+updates, rollback and uninstall without adding sandbox grants. The
+[Apple package check](../../tests/packages/apple-runtime-check.md) executes real
+ARM64 Mach-O instructions through a signed static runtime on AArch64, with
+separate ordinary users, ambient-override refusal and cached reinstall. Wider
+Apple APIs, graphical sessions and other host architectures remain unqualified.
+
 Fixed native, SQLite and FFmpeg profiles recheck the complete imported file list
 and bounded, nonempty notices before publishing a lock. Replacing a required
 file with a directory cannot omit a notice or bypass the FFmpeg source pin.

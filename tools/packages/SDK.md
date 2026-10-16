@@ -1262,6 +1262,31 @@ access and write/create private-data access, including advisory file locking.
 Organization policy can refuse requests.
 See [actual enforcement limits](../sandbox/README.md).
 
+For `apple` packages, the service also supplies
+`VINIX_IOS_DOCUMENTS=@DATA@/Documents` and
+`VINIX_IOS_KEYCHAIN=@DATA@/Keychains` (expanded absolute paths). These override
+ambient settings in normal, literal-command and terminal launches. The existing
+iOS compatibility runtime uses them for Foundation's container/home/search and
+temporary-directory APIs and its private keychain files. The bundle stays in
+the immutable generation; these locations stay under the ordinary user's
+existing private-data grant. No extra paths, devices or promises are granted.
+The normal service prepares private `tmp`; Foundation creates Documents when
+needed. Keychain storage retains its existing ownership, mode and no-follow
+checks. These are private application files without encryption or hardware key
+protection.
+
+The existing Foundation path profile remains bounded to 1023 bytes. Ordinary
+uninstall retains this app data; deliberate data removal uses the normal
+separate purge operation.
+
+The [Apple package check](../../tests/packages/apple-runtime-check.md) executes
+V-generated ARM64 iOS Mach-O images through a signed copy of the real static
+runtime under the production sandbox. Its packaged native launcher checks the
+admitted context and writes fixture container files before exec. This qualifies
+the launch/container boundary and maintenance lifecycle, not arbitrary Apple
+frameworks or keychain API behavior. The current runner executes on AArch64;
+no x86-64 translation, macOS/AppKit or graphical compatibility is implied.
+
 Apps must handle denied access/missing services and save in private data or a
 supplied document. Keep on-disk data compatible with version rollback. A service
 lease preserves the generation until the launched process exits; runners must

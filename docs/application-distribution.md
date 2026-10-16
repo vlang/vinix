@@ -1948,6 +1948,15 @@ sessions, qualify wider filesystem/device crash windows and measure wider
 runtime sandbox profiles. Apple packaging does not provide general macOS/AppKit
 compatibility; Windows/Linux packaging does not expand runtime API coverage.
 
+The [Apple package boundary check](../tests/packages/apple-runtime-check.md)
+adds signed ARM64 iOS Mach-O execution through the real static compatibility
+runtime in the production sandbox. Apple launch plans now derive the runtime's
+Documents and keychain overrides from admitted private data. The fixture checks
+two ordinary users, explicit document grants, updates, rollback, tamper refusal,
+clean removal and cached reinstall. Its native launcher writes container test
+files before exec; it does not qualify Foundation/keychain API operations,
+arbitrary Apple applications, graphical sessions or x86-64 translation.
+
 Literal launch-command requests now provide explicit ownership and repeatable
 cleanup. Parsing validates borrowed prefix paths and the complete request before
 cloning accepted fields, and releases scratch after malformed or oversized input.
