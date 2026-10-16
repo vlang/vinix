@@ -1,0 +1,2 @@
+PASS aarch64 package-socket-probe (33.5s)
+package-socket-probe aarch64: 1 passed, 0 failed, 0 skipped

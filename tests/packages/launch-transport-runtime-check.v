@@ -39,13 +39,13 @@ fn suite() hwhost.Suite {
 				'LAUNCH TRANSPORT independent owned requests, five modes, all non-NUL byte values, 772-value envelope and escaped 64-KiB boundary PASS',
 				'LAUNCH TRANSPORT tracked refusals: 33 malformed/schema/limit paths x1000 retained 0 bytes',
 				'LAUNCH TRANSPORT every truncated prefix, noncanonical fields/escapes/types, NUL, argument/document/byte and envelope limits refuse with retired scratch PASS',
-				'LAUNCH TRANSPORT tracked wire: six status paths x16 and two invalid receipt paths x1000 retained 0 bytes and no descriptors',
+				'LAUNCH TRANSPORT tracked wire: six status paths x1000 and two invalid receipt paths x1000 retained 0 bytes and no descriptors',
 				'LAUNCH TRANSPORT request/rights/completion roundtrips preserve nonce, literal argv, three CLOEXEC streams and 0/37/126/127/143/255 statuses PASS',
-				'LAUNCH TRANSPORT tracked wire refusals: nine receipts and five packets x16, read errors x1000 retained 0 bytes and no descriptors',
+				'LAUNCH TRANSPORT tracked wire refusals: nine receipts, five request packets and read errors x1000 retained 0 bytes and no descriptors',
 				'LAUNCH TRANSPORT truncated/oversized request frames, tampered/noncanonical/overlong completion and closed-descriptor errors retire scratch PASS',
 				'LAUNCH TRANSPORT ACTOR root PASS', 'LAUNCH TRANSPORT ACTOR UID 1000 PASS',
 				'LAUNCH TRANSPORT COMPANION protocol PASS', 'LAUNCH TRANSPORT COMPANION streams PASS', 'LAUNCH TRANSPORT COMPANION command PASS',
-				'HWTEST PASS packages-launch-transport'], ending: .poweroff, timeout: 600 }]
+				'HWTEST PASS packages-launch-transport'], ending: .poweroff, timeout: 900 }]
 	}
 }
 

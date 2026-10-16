@@ -1,0 +1,13 @@
+12 focused native compile/run checks passed. ASan/UBSan uses detect_leaks=0; user allocation assertions run separately.
+protocol-compile PASS 3.569s
+protocol-run PASS 0.152s
+streams-compile PASS 3.682s
+streams-run PASS 0.252s
+ownership-compile PASS 3.742s
+ownership-run PASS 0.459s
+memory-compile PASS 3.728s
+memory-run PASS 2.166s
+asan-streams-compile PASS 4.721s
+asan-streams-run PASS 0.326s
+asan-ownership-compile PASS 4.742s
+asan-ownership-run PASS 0.873s

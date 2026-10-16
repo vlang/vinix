@@ -1938,3 +1938,8 @@ release partial records and growth buffers. Receipt generation releases its
 hash state and digest, and completion reads release their bounded scratch.
 The envelope, receipt bytes and literal argument contract are unchanged. See
 [launch-transport qualification](../tests/packages/launch-transport-check.md).
+
+Half-closed interrupted launch requests now retain EOF readiness after their
+last buffered byte, allowing prompt diagnostics. Both target guests exercise
+1,000 wire cycles per case with bounded cohorts and endpoint reclamation waits.
+See [socket EOF and resource recovery](../tests/packages/launch-socket-check.md).

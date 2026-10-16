@@ -1,0 +1,176 @@
+Baseline and patched allocation-site counts match for every file/kind. Both repository-wide allowlist runs fail; no allowlist was changed.
+aarch64/virtio_blk/virtio_blk.v: conversion to interface baseline=2 patched=2
+aarch64/virtio_blk/virtio_blk.v: struct on the heap baseline=1 patched=1
+aarch64/virtio_gpu/virtio_gpu.v: array initialization baseline=1 patched=1
+aarch64/virtio_gpu/virtio_gpu.v: struct on the heap baseline=3 patched=3
+aarch64/virtio_snd/virtio_snd.v: conversion to interface baseline=2 patched=2
+aarch64/virtio_snd/virtio_snd.v: string interpolation baseline=1 patched=1
+apple/ans/ans.v: conversion to interface baseline=1 patched=1
+apple/ans/ans.v: struct on the heap baseline=1 patched=1
+apple/ans/datafs.v: conversion to interface baseline=7 patched=7
+apple/ans/datafs.v: struct on the heap baseline=3 patched=3
+apple/ans/platform.v: local of a `@[heap]` struct baseline=1 patched=1
+apple/ans/rootfs.v: conversion to interface baseline=5 patched=5
+apple/ans/rootfs.v: struct on the heap baseline=3 patched=3
+apple/dart/dart.v: string interpolation baseline=1 patched=1
+apple/smc/class.v: struct on the heap baseline=1 patched=1
+apple/smc/smc.v: conversion to interface baseline=2 patched=2
+apple/smc/smc.v: struct on the heap baseline=2 patched=2
+apple/speakers/speakers.v: conversion to interface baseline=2 patched=2
+apple/speakers/speakers.v: local of a `@[heap]` struct baseline=2 patched=2
+apple/typec/typec.v: conversion to interface baseline=1 patched=1
+apple/typec/typec.v: local of a `@[heap]` struct baseline=1 patched=1
+apple/typec/typec.v: struct on the heap baseline=1 patched=1
+apple/wifi/wifi.v: conversion to interface baseline=1 patched=1
+apple/wifi/wifi.v: struct on the heap baseline=1 patched=1
+block/partition/partition.v: conversion to interface baseline=2 patched=2
+block/partition/partition.v: struct on the heap baseline=2 patched=2
+block/verity/verity.v: cast to interface baseline=1 patched=1
+block/verity/verity.v: struct on the heap baseline=1 patched=1
+dev/ahci/ahci.v: conversion to interface baseline=2 patched=2
+dev/ahci/ahci.v: struct on the heap baseline=2 patched=2
+dev/ata/ata.v: conversion to interface baseline=1 patched=1
+dev/ata/ata.v: struct on the heap baseline=1 patched=1
+dev/ath10k/platform_amd64.v: cast to interface baseline=1 patched=1
+dev/console/terminal.v: cast to interface baseline=1 patched=1
+dev/console/terminal.v: struct on the heap baseline=1 patched=1
+dev/fbdev/fbdev.v: conversion to interface baseline=1 patched=1
+dev/fbdev/fbdev.v: string interpolation baseline=1 patched=1
+dev/hda/hda.v: conversion to interface baseline=2 patched=2
+dev/hda/hda.v: struct on the heap baseline=2 patched=2
+dev/mouse/mouse.v: conversion to interface baseline=2 patched=2
+dev/nvme/nvme.v: conversion to interface baseline=2 patched=2
+dev/nvme/nvme.v: struct on the heap baseline=4 patched=4
+dev/oss/dsp.v: conversion to interface baseline=1 patched=1
+dev/oss/dsp.v: struct on the heap baseline=1 patched=1
+dev/oss/mixer.v: conversion to interface baseline=1 patched=1
+dev/oss/mixer.v: struct on the heap baseline=1 patched=1
+dev/pointerdev/pointerdev.v: conversion to interface baseline=1 patched=1
+dev/pointerdev/pointerdev.v: struct on the heap baseline=1 patched=1
+dev/procdev/procdev.v: conversion to interface baseline=1 patched=1
+dev/procdev/procdev.v: struct on the heap baseline=1 patched=1
+dev/pty/pty.v: conversion to interface baseline=2 patched=2
+dev/pty/pty.v: struct on the heap baseline=4 patched=4
+dev/random/random.v: conversion to interface baseline=1 patched=1
+dev/random/random.v: struct on the heap baseline=1 patched=1
+dev/serial/serial.v: conversion to interface baseline=2 patched=2
+dev/serial/serial.v: struct on the heap baseline=2 patched=2
+dev/streams/streams.v: conversion to interface baseline=3 patched=3
+dev/streams/streams.v: struct on the heap baseline=3 patched=3
+dev/tty/tty.v: conversion to interface baseline=1 patched=1
+dev/tty/tty.v: struct on the heap baseline=1 patched=1
+dev/xhci/xhci.v: local of a `@[heap]` struct baseline=1 patched=1
+devicetree/devicetree.v: array initialization baseline=3 patched=3
+devicetree/devicetree.v: string slice baseline=1 patched=1
+devicetree/devicetree.v: struct on the heap baseline=1 patched=1
+dma/amdvi_amd64.v: array initialization baseline=1 patched=1
+dma/amdvi_amd64.v: struct on the heap baseline=1 patched=1
+dma/amdvi_ivrs_amd64.v: array initialization baseline=1 patched=1
+dma/vtd_amd64.v: struct on the heap baseline=1 patched=1
+drm/drm.v: conversion to interface baseline=1 patched=1
+drm/drm.v: struct on the heap baseline=4 patched=4
+drm/gem/gem.v: struct on the heap baseline=1 patched=1
+drm/mode/mode.v: struct on the heap baseline=5 patched=5
+drm/simple/simple.v: array initialization baseline=1 patched=1
+drm/simple/simple.v: struct on the heap baseline=2 patched=2
+drm/syncobj/syncobj.v: struct on the heap baseline=2 patched=2
+file/epoll.v: struct on the heap baseline=1 patched=1
+file/eventfd.v: struct on the heap baseline=1 patched=1
+file/file.v: struct on the heap baseline=2 patched=2
+file/memory_pressure.v: cast to interface baseline=1 patched=1
+file/memory_pressure.v: struct on the heap baseline=1 patched=1
+file/timerfd.v: struct on the heap baseline=1 patched=1
+fs/cgroup.v: array initialization baseline=1 patched=1
+fs/cgroup.v: cast to interface baseline=1 patched=1
+fs/cgroup.v: conversion to interface baseline=1 patched=1
+fs/cgroup.v: local of a `@[heap]` struct baseline=1 patched=1
+fs/cgroup.v: struct on the heap baseline=3 patched=3
+fs/cgroup_io.v: local of a `@[heap]` struct baseline=1 patched=1
+fs/devtmpfs.v: cast to interface baseline=1 patched=1
+fs/devtmpfs.v: string interpolation baseline=1 patched=1
+fs/devtmpfs.v: struct on the heap baseline=4 patched=4
+fs/disk_root.v: array initialization baseline=2 patched=2
+fs/ext2/ext2.v: cast to interface baseline=1 patched=1
+fs/ext2/ext2.v: conversion to interface baseline=1 patched=1
+fs/ext2/ext2.v: struct on the heap baseline=7 patched=7
+fs/ext2/mkfs.v: array initialization baseline=4 patched=4
+fs/ext2/namespace.v: struct on the heap baseline=1 patched=1
+fs/inotify.v: struct on the heap baseline=1 patched=1
+fs/mknod.v: cast to interface baseline=1 patched=1
+fs/mknod.v: struct on the heap baseline=1 patched=1
+fs/mount.v: array initialization baseline=7 patched=7
+fs/mount.v: struct on the heap baseline=4 patched=4
+fs/namespaces.v: conversion to interface baseline=2 patched=2
+fs/namespaces.v: struct on the heap baseline=1 patched=1
+fs/overlay.v: conversion to interface baseline=2 patched=2
+fs/overlay.v: struct on the heap baseline=6 patched=6
+fs/procfs.v: array initialization baseline=1 patched=1
+fs/procfs.v: conversion to interface baseline=15 patched=15
+fs/procfs.v: string concatenation baseline=2 patched=2
+fs/procfs.v: struct on the heap baseline=1 patched=1
+fs/ssd_root_arm64.v: struct on the heap baseline=1 patched=1
+fs/sysfs.v: conversion to interface baseline=6 patched=6
+fs/sysfs.v: struct on the heap baseline=2 patched=2
+fs/tmpfs.v: cast to interface baseline=1 patched=1
+fs/tmpfs.v: struct on the heap baseline=4 patched=4
+fs/verified_root.v: struct on the heap baseline=1 patched=1
+fs/vfs.v: conversion to interface baseline=6 patched=6
+fs/vfs.v: struct on the heap baseline=6 patched=6
+fs/xattr.v: struct on the heap baseline=1 patched=1
+futex/futex.v: struct on the heap baseline=1 patched=1
+gpu/agx/alloc/alloc.v: struct on the heap baseline=2 patched=2
+gpu/agx/driver/driver.v: struct on the heap baseline=1 patched=1
+gpu/agx/fake/driver.v: array initialization baseline=1 patched=1
+gpu/agx/fake/driver.v: struct on the heap baseline=4 patched=4
+gpu/agx/fake/vm.v: struct on the heap baseline=1 patched=1
+gpu/agx/file/file.v: array initialization baseline=1 patched=1
+gpu/agx/file/file.v: struct on the heap baseline=3 patched=3
+gpu/agx/fw/g13_initdata_layout.v: array initialization baseline=1 patched=1
+gpu/agx/fw/g13_initdata_layout_use.v: slice of a fixed array baseline=4 patched=4
+gpu/agx/gpu/g13.v: struct on the heap baseline=3 patched=3
+gpu/agx/gpu/g17.v: struct on the heap baseline=2 patched=2
+gpu/agx/gpu/gpu.v: struct on the heap baseline=2 patched=2
+gpu/agx/mmu/mmu.v: struct on the heap baseline=3 patched=3
+gpu/agx/pgtable/pgtable.v: struct on the heap baseline=2 patched=2
+gpu/agx/workqueue/workqueue.v: struct on the heap baseline=1 patched=1
+gpu/dcp/backlight/backlight.v: conversion to interface baseline=1 patched=1
+gpu/dcp/backlight/backlight.v: struct on the heap baseline=1 patched=1
+gpu/dcp/backlight_transport.v: struct on the heap baseline=1 patched=1
+gpu/dcp/dcp.v: struct on the heap baseline=1 patched=1
+initramfs/initramfs.v: string interpolation baseline=2 patched=2
+krandom/random.v: struct on the heap baseline=1 patched=1
+main_amd64.v: array initialization baseline=2 patched=2
+main_amd64.v: string interpolation baseline=4 patched=4
+main_arm64.v: array initialization baseline=2 patched=2
+memory/mmap/mmap.v: array initialization baseline=1 patched=1
+memory/virtual_amd64.v: struct on the heap baseline=1 patched=1
+memory/virtual_arm64.v: string interpolation baseline=2 patched=2
+memory/virtual_arm64.v: struct on the heap baseline=1 patched=1
+pagecache/pagecache.v: struct on the heap baseline=1 patched=1
+pci/scan.v: array initialization baseline=1 patched=1
+pipe/pipe.v: struct on the heap baseline=2 patched=2
+proc/cgroup_account.v: struct on the heap baseline=1 patched=1
+proc/container.v: struct on the heap baseline=2 patched=2
+proc/pledge.v: string slice baseline=1 patched=1
+proc/proc.v: array initialization baseline=2 patched=2
+proc/proc.v: string slice baseline=1 patched=1
+proc/unveil.v: struct on the heap baseline=2 patched=2
+sched/inherit.v: struct on the heap baseline=1 patched=1
+sched/sched_amd64.v: array initialization baseline=1 patched=1
+sched/sched_amd64.v: struct on the heap baseline=1 patched=1
+sched/sched_arm64.v: array initialization baseline=1 patched=1
+sched/sched_arm64.v: struct on the heap baseline=1 patched=1
+socket/inet/inet.v: struct on the heap baseline=1 patched=1
+socket/netlink/netlink.v: struct on the heap baseline=1 patched=1
+socket/socket.v: conversion to interface baseline=15 patched=15
+socket/unix/unix.v: struct on the heap baseline=4 patched=4
+sysvsem/sysvsem.v: struct on the heap baseline=1 patched=1
+sysvshm/sysvshm.v: struct on the heap baseline=1 patched=1
+time/time.v: struct on the heap baseline=1 patched=1
+uacpi/uacpi.v: struct on the heap baseline=1 patched=1
+userland/signalfd.v: struct on the heap baseline=1 patched=1
+userland/userland.v: struct on the heap baseline=6 patched=6
+userland/userland_arm64.v: struct on the heap baseline=6 patched=6
+x86/cpu/features.v: array initialization baseline=9 patched=9
+x86/hypervisor/device.v: conversion to interface baseline=1 patched=1
+x86/hypervisor/device.v: struct on the heap baseline=1 patched=1

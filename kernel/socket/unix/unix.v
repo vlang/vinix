@@ -510,7 +510,8 @@ fn (mut this UnixSocket) read_stream_once(_handle voidptr, buf voidptr, _count u
 		event.trigger(mut this.event, false)
 	}
 
-	if this.used == 0 {
+	// EOF remains readable after the last buffered byte has been consumed.
+	if this.used == 0 && !this.peer_finished && !this.read_closed {
 		this.status &= ~file.pollin
 	}
 
@@ -622,7 +623,7 @@ pub fn (mut this UnixSocket) recv_seqpacket(_handle voidptr, buf voidptr, count 
 			event.trigger(mut this.peer.event, false)
 		}
 		event.trigger(mut this.event, false)
-		if this.nothing_queued() {
+		if this.nothing_queued() && !this.peer_finished && !this.read_closed {
 			this.status &= ~file.pollin
 		}
 	}
@@ -1143,19 +1144,31 @@ fn (mut this UnixSocket) shutdown(_handle voidptr, how int) ? {
 		return none
 	}
 
+	// Receive paths clear readiness under this lock. Publish shutdown under
+	// the same lock so draining the queue cannot erase its EOF notification.
+	this.l.acquire()
 	if how == sock_pub.shut_rd || how == sock_pub.shut_rdwr {
 		this.read_closed = true
 		this.status |= file.pollin
-		event.trigger(mut &this.event, false)
 	}
-
 	if how == sock_pub.shut_wr || how == sock_pub.shut_rdwr {
 		this.write_closed = true
-
-		mut peer := this.peer
-		if this.connected && peer != unsafe { nil } {
+	}
+	mut peer := this.peer
+	connected := this.connected
+	this.l.release()
+	if how == sock_pub.shut_rd || how == sock_pub.shut_rdwr {
+		event.trigger(mut &this.event, false)
+	}
+	if how == sock_pub.shut_wr || how == sock_pub.shut_rdwr {
+		// The syscall holds this endpoint's open description, which keeps its
+		// peer link alive. Never hold both endpoint locks: simultaneous shutdown
+		// of opposite ends must be able to complete.
+		if connected && peer != unsafe { nil } {
+			peer.l.acquire()
 			peer.peer_finished = true
 			peer.status |= file.pollin
+			peer.l.release()
 			event.trigger(mut &peer.event, false)
 		}
 	}
@@ -1813,7 +1826,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 
 	C.printf(c'Successfully received %llu bytes\n', transferred)
 
-	if this.nothing_queued() {
+	if this.nothing_queued() && !this.peer_finished && !this.read_closed {
 		this.status &= ~file.pollin
 	}
 

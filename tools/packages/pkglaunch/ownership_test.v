@@ -6,6 +6,7 @@ import json2
 #include <sys/socket.h>
 fn C.socketpair(int, int, int, &i32) int
 fn C.shutdown(int, int) int
+fn C.usleep(u32) int
 
 $if track_heap ? {
 	#include "@VMODROOT/../../../desktop/tools/tests/heap_tracker.h"
@@ -15,10 +16,10 @@ $if track_heap ? {
 
 fn transport_cycles() int { return $if track_heap ? { 1000 } $else { 16 } }
 
-// The pinned guests exhaust socket resources during sustained pair churn,
-// despite flat user heaps and descriptor counts. Qualify their wire behavior
-// separately from the native x1000 stress; keep pure decoding at x1000.
-fn transport_wire_cycles() int { return $if transport_guest ? { 16 } $else { transport_cycles() } }
+// Closed target endpoints retain their socket budget until the reader grace
+// expires. Keep each cohort below that budget, then let it reclaim before the
+// next one. This is fixture pacing, not a retry of a failed socket allocation.
+fn transport_settle() { $if transport_guest ? { assert C.usleep(7_000_000) == 0 } }
 
 fn transport_error(err IError) { message := err.msg(); unsafe { message.free(); err.free() } }
 
@@ -129,7 +130,7 @@ fn test_transport_receipts_and_wire_roundtrips_retire_all_storage() {
 	before := transport_fd_count()
 	for code in [0, 37, 126, 127, 143, 255]! {
 		$if track_heap ? { C.vinix_heap_begin() }
-		for _ in 0 .. transport_wire_cycles() {
+		for _ in 0 .. transport_cycles() {
 			pair := transport_pair(); defer { C.close(pair[0]); C.close(pair[1]) }
 			send_request(pair[0], request)!
 			mut captured := receive_request(pair[1])!; defer { captured.close() }
@@ -142,6 +143,7 @@ fn test_transport_receipts_and_wire_roundtrips_retire_all_storage() {
 		}
 		$if track_heap ? { kept := C.vinix_heap_end(); assert kept == 0, kept.str() }
 		assert transport_fd_count() == before
+		transport_settle()
 	}
 	for invalid in [Request{ nonce: 'bad', arguments: ['run', 'app'] }, Request{ nonce: request.nonce, arguments: ['update', 'app'] }] {
 		$if track_heap ? { C.vinix_heap_begin() }
@@ -149,8 +151,7 @@ fn test_transport_receipts_and_wire_roundtrips_retire_all_storage() {
 		$if track_heap ? { kept := C.vinix_heap_end(); assert kept == 0, kept.str() }
 	}
 	$if track_heap ? {
-		$if transport_guest ? { println('LAUNCH TRANSPORT tracked wire: six status paths x16 and two invalid receipt paths x1000 retained 0 bytes and no descriptors') }
-		$else { println('LAUNCH TRANSPORT tracked wire: six status paths x1000 and two invalid receipt paths x1000 retained 0 bytes and no descriptors') }
+		println('LAUNCH TRANSPORT tracked wire: six status paths x1000 and two invalid receipt paths x1000 retained 0 bytes and no descriptors')
 	}
 	println('LAUNCH TRANSPORT request/rights/completion roundtrips preserve nonce, literal argv, three CLOEXEC streams and 0/37/126/127/143/255 statuses PASS')
 }
@@ -164,7 +165,7 @@ fn test_transport_incomplete_wire_and_completion_refusals_retire_storage() {
 	before := transport_fd_count()
 	for text in bad_receipts {
 		$if track_heap ? { C.vinix_heap_begin() }
-		for _ in 0 .. transport_wire_cycles() {
+		for _ in 0 .. transport_cycles() {
 			pair := transport_pair()
 			assert C.write(pair[1], text.str, usize(text.len)) == text.len
 			assert C.shutdown(pair[1], C.SHUT_WR) == 0
@@ -173,11 +174,12 @@ fn test_transport_incomplete_wire_and_completion_refusals_retire_storage() {
 		}
 		$if track_heap ? { kept := C.vinix_heap_end(); assert kept == 0, kept.str() }
 		assert transport_fd_count() == before
+		transport_settle()
 	}
 	packets := [ []u8{}, [u8(1), 0], [u8(0), 0, 0, 0], [u8(1), 0, 8, 0], [u8(8), 0, 0, 0, `{`, `}`] ]
 	for packet in packets {
 		$if track_heap ? { C.vinix_heap_begin() }
-		for _ in 0 .. transport_wire_cycles() {
+		for _ in 0 .. transport_cycles() {
 			pair := transport_pair()
 			if packet.len != 0 { assert C.write(pair[1], packet.data, usize(packet.len)) == packet.len }
 			C.close(pair[1])
@@ -186,6 +188,7 @@ fn test_transport_incomplete_wire_and_completion_refusals_retire_storage() {
 		}
 		$if track_heap ? { kept := C.vinix_heap_end(); assert kept == 0, kept.str() }
 		assert transport_fd_count() == before
+		transport_settle()
 	}
 	$if track_heap ? { C.vinix_heap_begin() }
 	for _ in 0 .. transport_cycles() {
@@ -193,8 +196,7 @@ fn test_transport_incomplete_wire_and_completion_refusals_retire_storage() {
 	}
 	$if track_heap ? { kept := C.vinix_heap_end(); assert kept == 0, kept.str() }
 	$if track_heap ? {
-		$if transport_guest ? { println('LAUNCH TRANSPORT tracked wire refusals: nine receipts and five packets x16, read errors x1000 retained 0 bytes and no descriptors') }
-		$else { println('LAUNCH TRANSPORT tracked wire refusals: nine receipts, five request packets and read errors x1000 retained 0 bytes and no descriptors') }
+		println('LAUNCH TRANSPORT tracked wire refusals: nine receipts, five request packets and read errors x1000 retained 0 bytes and no descriptors')
 	}
 	println('LAUNCH TRANSPORT truncated/oversized request frames, tampered/noncanonical/overlong completion and closed-descriptor errors retire scratch PASS')
 }

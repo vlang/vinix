@@ -1299,6 +1299,11 @@ on success and refusal. The 772-value, 512 KiB envelope and existing command
 limits are unchanged, including literal non-NUL argument bytes. See
 [launch-transport checks](../../tests/packages/launch-transport-check.md).
 
+On Vinix, a peer's write shutdown remains readable after buffered input drains,
+so a partial launch frame reports interruption without waiting for its input
+deadline. See [socket EOF and resource recovery](../../tests/packages/launch-socket-check.md)
+for both-architecture regression coverage and the deferred socket-budget limit.
+
 On Linux, account-session launch reads its executable identity directly from
 `/proc/self/exe` with bounded stack storage. An unavailable, empty or oversized
 identity refuses with a diagnostic before the session helper starts.

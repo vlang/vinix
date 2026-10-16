@@ -1,0 +1,45 @@
+FAIL aarch64 packages-launch-socket (18.0s)
+  forbidden "HWTEST FAIL" in the line: HWTEST FAIL packages-launch-socket
+  last 40 serial lines:
+  | fbdev: created device node /dev/fb0
+  | drm: Registered driver vinix-dumb as card0
+  | drm: created device node /dev/dri/card0
+  | simpledrm: software GBM allocator ready
+  | simplefb: initialized
+  | kmain_thread: fbdev done
+  | pci: Building device scan
+  | pci: Found [0:0:0:-1]
+  | pci: Found [0:1:0:-1]
+  | pci: Found [0:2:0:-1]
+  | devcore: 3 PCI functions enumerated
+  | xhci: no USB controller
+  | virtio-gpu: no GPU transport found
+  | kmain_thread: pointer done
+  | kmain_thread: processes done
+  | kmain_thread: pty done
+  | apple-spi-kbd: no device tree; not probing
+  | kmain_thread: console done
+  | devcore: 3 VirtIO devices listed
+  | kmain_thread: writeback done
+  | 
+  | *** aarch64: Kernel initialisation complete ***
+  | *** Starting /sbin/init ***
+  | syspower: power button through the event device at 0x9080000
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | HWTEST START packages-launch-socket
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | /Users/alex/code/vinix/tools/packages/pkglaunch/streams_test.v:25: fn eof_readable
+  |    > assert C.vinix_launch_poll(unsafe { &polling }, 1, 250) == 1
+  |      Left value (len: 1): `0`
+  |     Right value (len: 1): `1`
+  | 
+  | /Users/alex/code/vinix/tools/packages/pkglaunch/streams_test.v:90: fn test_half_closed_partial_request_is_interrupted_promptly
+  |    > assert err.msg() == 'isolated package request was interrupted'
+  |      Left value (len: 32): `isolated package input timed out`
+  |     Right value (len: 40): `isolated package request was interrupted`
+  | 
+  | HWTEST FAIL packages-launch-socket
+  | syspower: power off: stopping devices
+  logs: /Users/alex/code/vinix/build/sock-eof-before-arm/packages-launch-socket
+package-launch-socket aarch64: 0 passed, 1 failed, 0 skipped

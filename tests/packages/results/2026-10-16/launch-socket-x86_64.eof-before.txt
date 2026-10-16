@@ -1,0 +1,37 @@
+FAIL x86_64 packages-launch-socket (15.7s)
+  forbidden "HWTEST FAIL" in the line: HWTEST FAIL packages-launch-socket
+  last 32 serial lines:
+  | BdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+  | BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+  | initramfs: Unpacking...
+  | >+ [1] ./ sz=0
+  | >+ [2] ./proc/ sz=0
+  | !>+ [3] ./usr/ sz=0
+  | !>+ [4] ./sbin/ sz=0
+  | !>+ [5] ./etc/ sz=0
+  | !>+ [6] ./sys/ sz=0
+  | !>+ [7] ./root/ sz=0
+  | !>+ [8] ./dev/ sz=0
+  | !>+ [9] ./tmp/ sz=0
+  | !>+ [10] ./etc/hwtest-scenario sz=23
+  | !>+ [11] ./sbin/init sz=131704
+  | !>+ [12] ./usr/share/ sz=0
+  | !>+ [13] ./usr/share/package-fixtures/ sz=0
+  | !>+ [14] ./usr/share/package-fixtures/streams sz=636968
+  | !>+ [15] ./.vinix-image-id sz=17
+  | !>initramfs: no ustar sig at 0xff00000037105000
+  | initramfs: Done (15 entries)
+  | HWTEST START packages-launch-socket
+  | /Users/alex/code/vinix/tools/packages/pkglaunch/streams_test.v:25: fn eof_readable
+  |    > assert C.vinix_launch_poll(unsafe { &polling }, 1, 250) == 1
+  |      Left value (len: 1): `0`
+  |     Right value (len: 1): `1`
+  | 
+  | /Users/alex/code/vinix/tools/packages/pkglaunch/streams_test.v:90: fn test_half_closed_partial_request_is_interrupted_promptly
+  |    > assert err.msg() == 'isolated package request was interrupted'
+  |      Left value (len: 32): `isolated package input timed out`
+  |     Right value (len: 40): `isolated package request was interrupted`
+  | 
+  | HWTEST FAIL packages-launch-socket
+  logs: /Users/alex/code/vinix/build/sock-eof-before-x86/packages-launch-socket
+package-launch-socket x86_64: 0 passed, 1 failed, 0 skipped

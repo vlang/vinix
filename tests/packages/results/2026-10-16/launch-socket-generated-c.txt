@@ -1,0 +1,68 @@
+aarch64: shutdown changes no allocation/free/refcount lifetime; local lock is released before peer lock.
+unix__UnixSocket__shutdown(unix__UnixSocket* this, void* _handle, i64 how) {
+	if ((how != public__shut_rd) && (how != public__shut_wr) && (how != public__shut_rdwr)) {
+		errno__set(errno__einval);
+		return (__v_option){.ok = false};
+	}
+	klock__Lock__acquire(&this->l);
+	if ((how == public__shut_rd) || (how == public__shut_rdwr)) {
+		this->read_closed = true;
+		this->status |= file__pollin;
+	}
+	if ((how == public__shut_wr) || (how == public__shut_rdwr)) {
+		this->write_closed = true;
+	}
+	unix__UnixSocket* peer = this->peer;
+	bool connected = this->connected;
+	klock__Lock__release(&this->l);
+	if ((how == public__shut_rd) || (how == public__shut_rdwr)) {
+		event__trigger(&this->event, false);
+	}
+	if ((how == public__shut_wr) || (how == public__shut_rdwr)) {
+		if (connected && (peer != NULL)) {
+			klock__Lock__acquire(&peer->l);
+			peer->peer_finished = true;
+			peer->status |= file__pollin;
+			klock__Lock__release(&peer->l);
+			event__trigger(&peer->event, false);
+		}
+	}
+	return (__v_option){.ok = true};
+}
+aarch64 read_stream_once: terminal EOF guard emitted; function sha256 060982a488332a826c00fd1b1bff3b7e1392c969090b670a40d55deb3df5ac4c
+aarch64 recv_seqpacket: terminal EOF guard emitted; function sha256 f81cca2102e7d6db68fc5d739e959ce8e9c40b9f67dcf68e5c980aabaa18a9aa
+aarch64 recvmsg: terminal EOF guard emitted; function sha256 a67fb4371a7ef44cfa84fe4d6575c77ab794b5564ff303acc13ee4901091044b
+x86_64: shutdown changes no allocation/free/refcount lifetime; local lock is released before peer lock.
+unix__UnixSocket__shutdown(unix__UnixSocket* this, void* _handle, i64 how) {
+	if ((how != public__shut_rd) && (how != public__shut_wr) && (how != public__shut_rdwr)) {
+		errno__set(errno__einval);
+		return (__v_option){.ok = false};
+	}
+	klock__Lock__acquire(&this->l);
+	if ((how == public__shut_rd) || (how == public__shut_rdwr)) {
+		this->read_closed = true;
+		this->status |= file__pollin;
+	}
+	if ((how == public__shut_wr) || (how == public__shut_rdwr)) {
+		this->write_closed = true;
+	}
+	unix__UnixSocket* peer = this->peer;
+	bool connected = this->connected;
+	klock__Lock__release(&this->l);
+	if ((how == public__shut_rd) || (how == public__shut_rdwr)) {
+		event__trigger(&this->event, false);
+	}
+	if ((how == public__shut_wr) || (how == public__shut_rdwr)) {
+		if (connected && (peer != NULL)) {
+			klock__Lock__acquire(&peer->l);
+			peer->peer_finished = true;
+			peer->status |= file__pollin;
+			klock__Lock__release(&peer->l);
+			event__trigger(&peer->event, false);
+		}
+	}
+	return (__v_option){.ok = true};
+}
+x86_64 read_stream_once: terminal EOF guard emitted; function sha256 060982a488332a826c00fd1b1bff3b7e1392c969090b670a40d55deb3df5ac4c
+x86_64 recv_seqpacket: terminal EOF guard emitted; function sha256 f81cca2102e7d6db68fc5d739e959ce8e9c40b9f67dcf68e5c980aabaa18a9aa
+x86_64 recvmsg: terminal EOF guard emitted; function sha256 a67fb4371a7ef44cfa84fe4d6575c77ab794b5564ff303acc13ee4901091044b

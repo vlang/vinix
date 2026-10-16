@@ -492,6 +492,11 @@ scratch after success or refusal. Canonical request and receipt bytes and
 literal input limits remain unchanged. See
 [launch-transport qualification](../../tests/packages/launch-transport-check.md).
 
+UNIX EOF remains readable after the final queued byte or record is consumed.
+Half-closed partial launch requests report interruption promptly. Guest wire
+stress runs 1,000 cycles per case with explicit endpoint reclamation waits;
+see [socket qualification](../../tests/packages/launch-socket-check.md).
+
 Small launch-option windows retain Back, status and failure access. Resizing
 preserves the draft and file-page selection; Escape leaves a field or returns
 an idle form to the catalog. Pasted control bytes cannot navigate, and running

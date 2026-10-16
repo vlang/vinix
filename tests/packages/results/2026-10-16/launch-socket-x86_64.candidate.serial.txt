@@ -1,0 +1,213 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./etc/ sz=0
+!>+ [5] ./sys/ sz=0
+!>+ [6] ./root/ sz=0
+!>+ [7] ./dev/ sz=0
+!>+ [8] ./tmp/ sz=0
+!>+ [9] ./etc/hwtest-scenario sz=21
+!>+ [10] ./sbin/init sz=174384
+!>+ [11] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff000000370f7400
+initramfs: Done (11 entries)
+HWTEST START package-socket-probe
+SOCKET HALF CLOSE poll 1 events 1
+SOCKET HALF CLOSE read 0
+SOCKET PAIRS 200 PASS
+SOCKET SNAPSHOT warm
+/proc/meminfo
+MemTotal:       951232 kB
+MemFree:        888420 kB
+MemAvailable:   888420 kB
+Buffers:               0 kB
+Cached:         0 kB
+SwapTotal:      0 kB
+SwapFree:       0 kB
+Zswap:          0 kB
+Zswapped:       0 kB
+VinixPageouts:  0
+VinixRefaults:  0
+VinixSwapErrors: 0
+Slab:           1944 kB
+VinixMemoryPressure: 0
+
+/proc/slabinfo
+# class      size    objects   pages
+size-16 16 1682 9
+size-32 32 2886 26
+size-48 48 331 6
+size-64 64 155 4
+size-96 96 19 2
+size-128 128 19 2
+size-192 192 389 21
+size-256 256 820 57
+size-384 384 572 60
+size-512 512 521 77
+size-768 768 15 4
+size-1024 1024 13 7
+size-1536 1536 13 9
+size-2048 2048 0 1
+large - - 201
+# written after free 0
+
+/proc/kernel-resources
+Limit: 121757696
+OwnerLimit: 60878848
+Charged: 834196
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 17 215552
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+ok
+
+SOCKET EXHAUSTED after 2048 errno 12
+SOCKET SNAPSHOT burst
+/proc/meminfo
+MemTotal:       951232 kB
+MemFree:        877160 kB
+MemAvailable:   877160 kB
+Buffers:               0 kB
+Cached:         0 kB
+SwapTotal:      0 kB
+SwapFree:       0 kB
+Zswap:          0 kB
+Zswapped:       0 kB
+VinixPageouts:  0
+VinixRefaults:  0
+VinixSwapErrors: 0
+Slab:           13172 kB
+VinixMemoryPressure: 0
+
+/proc/slabinfo
+# class      size    objects   pages
+size-16 16 1682 9
+size-32 32 2886 26
+size-48 48 331 6
+size-64 64 155 4
+size-96 96 19 2
+size-128 128 19 2
+size-192 192 389 21
+size-256 256 820 57
+size-384 384 4668 469
+size-512 512 521 77
+size-768 768 15 4
+size-1024 1024 13 7
+size-1536 1536 4109 2057
+size-2048 2048 0 1
+large - - 551
+# written after free 0
+
+/proc/kernel-resources
+Limit: 121757696
+OwnerLimit: 60878848
+Charged: 34388628
+Accounts: 1
+Denied: 1
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 4096 33554432
+ipc 0 0
+mapping 17 215552
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 1
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+LastDenied: objects
+LastDeniedOwner: 1/1
+LastDeniedKind: socket
+LastDeniedRequested: 8192
+LastDeniedGlobalBytes: 34330518
+LastDeniedOwnerBytes: 34330518
+
+SOCKET SNAPSHOT settled
+/proc/meminfo
+MemTotal:       951232 kB
+MemFree:        886960 kB
+MemAvailable:   886960 kB
+Buffers:               0 kB
+Cached:         0 kB
+SwapTotal:      0 kB
+SwapFree:       0 kB
+Zswap:          0 kB
+Zswapped:       0 kB
+VinixPageouts:  0
+VinixRefaults:  0
+VinixSwapErrors: 0
+Slab:           3348 kB
+VinixMemoryPressure: 0
+
+/proc/slabinfo
+# class      size    objects   pages
+size-16 16 1682 9
+size-32 32 2886 26
+size-48 48 332 6
+size-64 64 155 4
+size-96 96 19 2
+size-128 128 19 2
+size-192 192 390 21
+size-256 256 820 57
+size-384 384 572 61
+size-512 512 521 77
+size-768 768 16 4
+size-1024 1024 13 7
+size-1536 1536 13 9
+size-2048 2048 0 1
+large - - 551
+# written after free 0
+
+/proc/kernel-resources
+Limit: 121757696
+OwnerLimit: 60878848
+Charged: 878740
+Accounts: 1
+Denied: 1
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 21 260096
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 1
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+LastDenied: objects
+LastDeniedOwner: 1/1
+LastDeniedKind: socket
+LastDeniedRequested: 8192
+LastDeniedGlobalBytes: 34330518
+LastDeniedOwnerBytes: 34330518
+
+live 16 dropped 0
+
+SOCKET PAIRS 200 PASS
+HWTEST PASS package-socket-probe

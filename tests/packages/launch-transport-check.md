@@ -1,5 +1,10 @@
 # Isolated launch envelope ownership
 
+The later [socket EOF and resource-recovery qualification](launch-socket-check.md)
+fixes half-close readiness on current kernels and restores guest wire coverage
+to 1,000 cycles per case, with reclamation waits between bounded cohorts.
+The counts and resource limits below describe the original qualification.
+
 The existing isolated launch wire schema and completion receipt are unchanged.
 A private reader now parses the fixed canonical request envelope without the
 generic JSON decoder's retained temporary storage. Each accepted nonce and
