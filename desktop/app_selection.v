@@ -612,11 +612,12 @@ fn (mut s AppSelectionState) element(d &Desktop) ui2.Element {
 		for i, app in first_run_apps {
 			if app.category != category || !s.visible(i) { continue }
 			x := 1 + position % layout.columns * (row_width + app_selection_column_gap)
+			cell_width := if app.package_name == 'ios-runtime' { row_width * 2 } else { row_width }
 			row_y := y + position / layout.columns * (app_selection_row_height + app_selection_row_gap)
 			position++
 			if row_y < layout.list_height && row_y + app_selection_row_height > 0 {
 				if s.focus == i {
-					list_children << ui2.view('apps.focus', ui2.rect(f64(x - 1), f64(row_y - 1), f64(row_width + 2),
+					list_children << ui2.view('apps.focus', ui2.rect(f64(x - 1), f64(row_y - 1), f64(cell_width + 2),
 						app_selection_row_height + 2), ui2.BoxStyle{
 							bg: if s.selected[i] { app_selection_selected_border } else { app_accent }
 							radius: 9
@@ -626,10 +627,10 @@ fn (mut s AppSelectionState) element(d &Desktop) ui2.Element {
 				top := math.max(0, row_y)
 				bottom := math.min(layout.list_height, row_y + app_selection_row_height)
 				row := app_selection_row(app, s.installed[i], s.available[i], s.selected[i],
-					d.hover == app.action, 0, row_y - top, row_width, app_selection_row_height)
+					d.hover == app.action, 0, row_y - top, cell_width, app_selection_row_height)
 				content := ui2.Element{ ...row, id: '', clickable: false }
 				list_children << ui2.Element{
-					...ui2.view(app.action, ui2.rect(f64(x), f64(top), f64(row_width), f64(bottom - top)),
+					...ui2.view(app.action, ui2.rect(f64(x), f64(top), f64(cell_width), f64(bottom - top)),
 						ui2.BoxStyle{ transparent: true }, frame_child(content))
 					clickable: row.clickable
 					enabled: row.enabled

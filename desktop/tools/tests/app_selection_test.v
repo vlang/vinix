@@ -443,6 +443,21 @@ fn test_app_selection_uses_three_columns_and_adapts_to_narrow_screens() {
 			assert app_selection_test_has_image(voffice, 'asset:voffice')
 		}
 		free_tree(tree)
+		$if arm64 {
+			state.key_input('\x1b[F')
+			begin_frame_elements()
+			bottom := state.element(&desktop)
+			ios := app_selection_test_element(bottom, 'apps.toggle.ios') or { panic('missing iOS') }
+			focus := app_selection_test_element(bottom, 'apps.focus') or { panic('missing iOS focus ring') }
+			assert ios.frame.width == expected_cell_width * 2
+			assert focus.frame.width == ios.frame.width + 2
+			assert ios.clickable && ios.enabled
+			detail := ios.children[0].children[0].children[2]
+			assert detail.text == 'Allows running iOS apps & games'
+			assert desktop.face_for(detail.text_style).text_width(detail.text) <= detail.frame.width
+			free_tree(bottom)
+			state.set_focus(0)
+		}
 	}
 }
 
