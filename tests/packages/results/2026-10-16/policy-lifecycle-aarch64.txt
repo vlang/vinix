@@ -1,0 +1,2 @@
+PASS aarch64 packages-policy-lifecycle (36.9s)
+package-policy-lifecycle aarch64: 1 passed, 0 failed, 0 skipped

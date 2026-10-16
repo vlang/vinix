@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import crypto.sha256
 import json2
 
 pub struct PolicyDocument {
@@ -94,6 +93,42 @@ fn decode_policy_document(text string, architecture string) !PolicyDocument {
 	return PolicyDocument{ architecture: architecture.clone(), policy: canonical_policy(input.policy)! }
 }
 
+// A lower bound, not a second serializer: escaping, settings/envelope keys,
+// diagnostics and false flags can only add bytes. Count required presentation
+// fields before cloning/canonicalizing a response that cannot fit its limit.
+fn policy_review_minimum(previous Policy, proposed Policy, packages []Installed) int {
+	mut bytes := 0
+	for policy in [previous, proposed]! {
+		for values in [policy.allowed, policy.permissions, policy.licenses]! {
+			for value in values { bytes += value.len + 3 }
+		}
+		for pin in policy.pins {
+			bytes += pin.id.len + pin.minimum.len + pin.before.len + '{"id":"","minimum":"","before":""},'.len
+		}
+	}
+	for installed in packages {
+		p := installed.package
+		bytes += p.id.len + p.name.len + p.version.len + p.kind.len + p.license.len
+			+ installed.repository.len + installed.public_key.len
+			+ '{"id":"","name":"","version":"","kind":"","license":"","proprietary":true,"firmware":true,"repository":"","public_key":"","requested":true,"diagnostic_before":"","diagnostic_after":""},'.len
+	}
+	return bytes
+}
+
+fn read_review_policy_document(path string, config Config, state State) !PolicyDocument {
+	text := read_metadata(path)!
+	defer { unsafe { text.free() } }
+	mut input := read_policy_document_input(text)!
+	defer { input.close() }
+	if input.format != 1 || input.architecture != config.architecture {
+		return error('organization policy format or architecture mismatch')
+	}
+	if policy_review_minimum(config.policy, input.policy, state.packages) > max_metadata {
+		return error('organization policy review exceeds metadata limit')
+	}
+	return PolicyDocument{ architecture: config.architecture.clone(), policy: canonical_policy(input.policy)! }
+}
+
 fn policy_document_field(parent string, key string) bool {
 	return match parent {
 		'' { key in ['format', 'architecture', 'policy']! }
@@ -119,20 +154,24 @@ fn policy_review_field(parent string, key string) bool {
 }
 
 fn policy_fingerprint(config Config, state State, proposed PolicyDocument) string {
-	text := json2.encode(PolicyIdentity{ config: config, state: state, proposed: proposed })
-	bytes := text.bytes()
-	fingerprint := sha256.sum(bytes).hex()
-	unsafe {
-		bytes.free()
-		text.free()
-	}
-	return fingerprint
+	mut bytes := []u8{cap: 2048}
+	unsafe { bytes.flags |= .noslices }
+	defer { unsafe { bytes.free() } }
+	json2.encode_append(PolicyIdentity{ config: config, state: state, proposed: proposed }, mut bytes)
+	text := bytes.bytestr()
+	defer { unsafe { text.free() } }
+	// Preserve the exact existing JSON identity, without a persisted newline or
+	// a new combined-document bound. Each input already has its own bound.
+	return index_digest(text)
 }
 
-fn policy_review_locked(root string, path string) !PolicyReview {
+fn policy_review_locked(root string, directory string, path string) !PolicyReview {
 	config := load_config(root)!
-	state := read_state(state_directory(root), config.architecture)!
-	mut proposed := read_policy_document(path, config.architecture)!
+	defer { close_decoded_configuration(config) }
+	state := read_state(directory, config.architecture)!
+	// A generation-zero state borrows its architecture from configuration.
+	defer { if state.generation != 0 { close_decoded_state(state) } }
+	mut proposed := read_review_policy_document(path, config, state)!
 	defer { proposed.close() }
 	next := Config{ ...config, policy: proposed.policy }
 	before := package_diagnostics(config, state.packages)
@@ -158,10 +197,15 @@ fn policy_review_locked(root string, path string) !PolicyReview {
 		fingerprint: policy_fingerprint(config, state, proposed)
 		previous: canonical_policy(config.policy)!, proposed: canonical_policy(proposed.policy)!, rows: rows
 	}
-	review.validate() or { review.close(); return err }
-	encoded := json2.encode(review)
+	mut accepted := false
+	defer { if !accepted { review.close() } }
+	review.validate()!
+	mut encoded := []u8{cap: 2048}
+	unsafe { encoded.flags |= .noslices }
 	defer { unsafe { encoded.free() } }
-	if encoded.len > max_metadata { review.close(); return error('organization policy review exceeds metadata limit') }
+	json2.encode_append(review, mut encoded)
+	if encoded.len > max_metadata { return error('organization policy review exceeds metadata limit') }
+	accepted = true
 	return review
 }
 
@@ -185,32 +229,41 @@ pub fn (service Service) policy() !PolicyDocument {
 
 pub fn (service Service) review_policy(path string) !PolicyReview {
 	directory := service.directory()!
+	defer { unsafe { directory.free() } }
 	if state_requires_lock(directory) {
 		guard := acquire_reader(directory)!
 		defer { guard.release() }
-		return policy_review_locked(service.root, path)
+		return policy_review_locked(service.root, directory, path)
 	}
-	return policy_review_locked(service.root, path)
+	return policy_review_locked(service.root, directory, path)
 }
 
 pub fn (service Service) apply_policy(path string, expected string) !PolicyDocument {
 	if !digest_valid(expected) { return error('organization policy apply requires a review fingerprint') }
 	directory := service.directory()!
+	defer { unsafe { directory.free() } }
 	guard := acquire(directory)!
 	defer { guard.release() }
 	current := load_config(service.root)!
+	defer { close_decoded_configuration(current) }
 	configuration := writable_configuration(service.root)!
+	defer { unsafe { configuration.free() } }
 	state := read_state(directory, current.architecture)!
+	defer { if state.generation != 0 { close_decoded_state(state) } }
 	mut proposed := read_policy_document(path, current.architecture)!
-	if expected != policy_fingerprint(current, state, proposed) {
-		proposed.close()
+	mut transferred := false
+	defer { if !transferred { proposed.close() } }
+	actual := policy_fingerprint(current, state, proposed)
+	defer { unsafe { actual.free() } }
+	if expected != actual {
 		return error('organization policy review is stale: configuration, installed state or proposed policy changed; review again')
 	}
 	next := Config{ ...current, policy: proposed.policy }
 	next.validate()!
 	if current.policy != next.policy {
-		save_configuration(configuration, next) or { proposed.close(); return err }
+		save_configuration(configuration, next)!
 	}
+	transferred = true
 	return proposed
 }
 

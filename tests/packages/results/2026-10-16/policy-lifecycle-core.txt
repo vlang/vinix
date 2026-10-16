@@ -1,0 +1,226 @@
+policy_lifecycle:
+POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+POLICY LIFECYCLE alternating changed apply pairs retire scratch; permission denial crosses dependency cycles, explicit firmware/licenses persist, only configuration changes PASS
+POLICY LIFECYCLE configuration/state/proposal/stale/ownership/directory/lock/busy refusals retire scratch, preserve activation and permit restored retry PASS
+POLICY LIFECYCLE oversized review refused before response cloning; configuration, proposal and installed generation unchanged PASS
+policy:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+policy_decode:
+POLICY DECODE both architectures, owned independent file documents/reviews, repeated close, exact writer bytes and full 4096 bounds PASS
+POLICY DECODE strict declarations preserve legacy defaults, optional pin ranges, canonical settings, empty permissions and full u64 generations; borrowed validation retires scratch PASS
+POLICY DECODE every truncated prefix and required/schema/UTF8/number/late-row/semantic refusal retires scratch PASS
+POLICY DECODE exact 8 MiB, 4096 collections/rows and 4096-byte diagnostics accepted; metadata/collection/grant/string/disclosure overflow refused PASS
+coordination:
+COORDINATION IDENTITY lock/writer refused=true preserved=true
+COORDINATION IDENTITY lock/reader refused=true preserved=true
+COORDINATION IDENTITY lock/status refused=true preserved=true
+COORDINATION IDENTITY generations/1/lease/lease refused=true preserved=true
+COORDINATION IDENTITY generations/1/lease/collection refused=true preserved=true
+COORDINATION IDENTITY generations/1/lease/purge refused=true preserved=true
+COORDINATION IDENTITY state reader/writer/status and launch/collection/purge refuse hard links before mutation; restored entries retry PASS
+COORDINATION IDENTITY captured locks reject replaced/unlinked names and captured-parent lease changes without mutating replacements; restored identities retry PASS
+COORDINATION IDENTITY malformed obsolete lease refuses collection before any generation/cache removal; restored lease permits collection PASS
+COORDINATION IDENTITY 128 repeats of six hard-link refusals retire descriptors under a 32-descriptor limit; busy writer preserves permissions and restored exclusion PASS
+Package coordination: malformed locks refuse promptly without changing special entries or link targets
+Package coordination: malformed and exclusively held generation leases refuse within the deadline
+Package coordination: fresh read-only status stays available; retained metadata without its lock refuses before parsing
+Package coordination: 128 valid and repeated malformed reader/writer/lease cycles preserve exclusion and recovery under a 32-descriptor limit
+atomic:
+administration:
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository unreachable
+Updating trusted repository fixture
+Updating trusted repository fixture
+administration_metadata:
+ADMINISTRATION METADATA configuration and both history formats preserve exact JSON, escaping, defaults, u64 widths and reader round-trips PASS
+ADMINISTRATION METADATA limit-minus-one and exact 8 MiB accepted; newline and escape expansion overflow refused PASS
+ADMINISTRATION METADATA review fingerprints preserve legacy digests and bind configuration, history, intent, publisher and index bytes PASS
+ADMINISTRATION METADATA repeated writes remain readable; oversized and publication failures preserve prior documents and source models PASS
+enrollment_ownership:
+ENROLLMENT OWNERSHIP admitted snapshot text and decoded index have independent lifetimes; publisher identity remains borrowed PASS
+ENROLLMENT OWNERSHIP 16 repeats of six large signature/authentication/read failures release all reader and input scratch PASS
+ENROLLMENT OWNERSHIP expired, misidentified and zero-sequence signed metadata refuse; restored offline acquisition retries normally PASS
+ENROLLMENT OWNERSHIP proposed configuration growth and syntax/curve refusal retire array scratch and preserve borrowed source fields PASS
+ENROLLMENT OWNERSHIP accepted reviews own independent fields; rejected review construction releases all clones and fingerprints PASS
+ENROLLMENT OWNERSHIP public failure/review/apply/revocation preserve read-only trust state, independent review fields and retained replay history PASS
+repository_status_ownership:
+REPOSITORY STATUS both architectures, independent owned fields, repeated close, source replacement, exact protocol bytes and full 4096 repository/history bounds PASS
+REPOSITORY STATUS 64-cycle authenticated expired migration, newer floors, signature/equivocation refusals and exact retired-key recovery preserve configuration/cache/history PASS
+REPOSITORY STATUS 1000 schema/alias/FIFO configuration/cache/history and missing/unsafe/busy lock refusals retire scratch, preserve recovery data and permit restored retry PASS
+configuration_observation:
+CONFIGURATION OBSERVATION both architectures, independent repository/policy fields, canonical policy order, unchanged wire bytes and stored offline flag PASS
+CONFIGURATION OBSERVATION 1000 legacy/default and growing 64-record cycles retire scratch; full 4096 repository/pin observations preserve source configuration PASS
+CONFIGURATION OBSERVATION maintenance FIFOs remain unopened; 1000 schema/missing/alias/FIFO/lock/busy refusal cycles retire scratch and permit restored reads PASS
+service:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+deployment:
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-pins-58008-1792127229598473/locked export; $literal; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-capture-58008-1792127229889464/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-final-lock-58008-1792127229984563/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION locked export binds exact captured deployment bytes through publication; changed staged lock refuses and retry preserves pins PASS
+Updating trusted repository fixture
+Updating trusted repository deployment.json
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /private/tmp/vinix-deployment-mirror-namespace-58008-1792127230074492/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/2) from fixture
+Installing Runtime 2.0.0 (2/2) from fixture
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Offline mirror ready: /private/tmp/vinix-deployment-reproducible-58008-1792127230219367/mirror; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading unused/bin/runner (14 bytes)
+Activated package generation 1
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+review:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 2.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Activated package generation 4
+distribution:
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 2
+Installing app 1.0.0 (1/1) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 4
+Activated package generation 5
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 6
+Restored packages from generation 4 in generation 6; application data was retained
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Updating trusted repository fixture

@@ -1664,6 +1664,14 @@ seven settings; legacy configuration defaults and optional pin range endpoints
 remain supported. Canonical output and review fingerprints retain their existing
 format. See [policy decoding qualification](../tests/packages/policy-decode-check.md).
 
+Repeated policy review and apply also retire their loaded configuration, installed
+state, review identity buffers and private paths. Returned fields stay independent
+of those inputs. Review fingerprints keep the existing JSON/SHA-256 identity, and
+unchanged proposals still avoid a configuration rewrite. Writer directory and
+configuration checks use captured native stat scratch. A minimum-output preflight
+refuses reviews already certain to exceed 8 MiB before cloning the response. See
+[policy service lifecycle qualification](../tests/packages/policy-lifecycle-check.md).
+
 A format-1 deployment manifest reconciles the requested roots atomically and
 selects the latest satisfiable packages in the authenticated catalog:
 

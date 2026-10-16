@@ -56,15 +56,22 @@ pub fn (mut status RepositoryStatus) close() {
 }
 
 fn writable_configuration(root string) !string {
-	parent := root.trim_right('/') + '/etc/vinix-packages'
+	parent := rooted_package_path(root, '/etc/vinix-packages')
+	defer { unsafe { parent.free() } }
 	path := parent + '/config.json'
-	for entry in [parent, path] {
-		info := os.lstat(entry)!
-		if os.is_link(entry) || info.uid != u32(os.geteuid()) || info.mode & 0o022 != 0
-			|| if entry == parent { !os.is_dir(entry) } else { !os.is_file(entry) } {
+	mut accepted := false
+	defer { if !accepted { unsafe { path.free() } } }
+	for entry in [parent, path]! {
+		// Capture stack scratch once; the platform os.stat wrappers retain their
+		// address-escaped native struct under the pinned manual-free compiler.
+		mut info := C.stat{}
+		if C.lstat(entry.str, unsafe { &info }) != 0 { return error('cannot inspect administrator-owned package configuration') }
+		if info.st_uid != u32(os.geteuid()) || info.st_mode & 0o022 != 0
+			|| info.st_mode & 0o170000 != if entry == parent { 0o040000 } else { 0o100000 } {
 			return error('repository changes require administrator-owned ordinary configuration files and directories')
 		}
 	}
+	accepted = true
 	return path
 }
 

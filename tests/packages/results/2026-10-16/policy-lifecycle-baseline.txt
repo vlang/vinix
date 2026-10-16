@@ -1,0 +1,23 @@
+Matched warmed five-cycle policy service probes with returned values/errors retired. Cases: empty/one/64-package review, empty/installed no-op apply, stale/malformed-proposal apply, writer acquisition, writable configuration preflight. Sources/executables/generated C retained and pinned; no compiler/library changes.
+
+Before:
+POLICY LIFECYCLE probe 0: five cycles retained 41365 bytes
+POLICY LIFECYCLE probe 1: five cycles retained 106865 bytes
+POLICY LIFECYCLE probe 2: five cycles retained 2351590 bytes
+POLICY LIFECYCLE probe 3: five cycles retained 44190 bytes
+POLICY LIFECYCLE probe 4: five cycles retained 109690 bytes
+POLICY LIFECYCLE probe 5: five cycles retained 109690 bytes
+POLICY LIFECYCLE probe 6: five cycles retained 97265 bytes
+POLICY LIFECYCLE probe 7: five cycles retained 7625 bytes
+POLICY LIFECYCLE probe 8: five cycles retained 5230 bytes
+
+After:
+POLICY LIFECYCLE probe 0: five cycles retained 0 bytes
+POLICY LIFECYCLE probe 1: five cycles retained 0 bytes
+POLICY LIFECYCLE probe 2: five cycles retained 0 bytes
+POLICY LIFECYCLE probe 3: five cycles retained 0 bytes
+POLICY LIFECYCLE probe 4: five cycles retained 0 bytes
+POLICY LIFECYCLE probe 5: five cycles retained 0 bytes
+POLICY LIFECYCLE probe 6: five cycles retained 0 bytes
+POLICY LIFECYCLE probe 7: five cycles retained 0 bytes
+POLICY LIFECYCLE probe 8: five cycles retained 0 bytes

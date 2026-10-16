@@ -160,12 +160,16 @@ fn acquire_reader(directory string) !Lock {
 }
 
 pub fn owned_directory(path string, mode int) ! {
-	if !os.exists(path) && !os.is_link(path) { os.mkdir_all(path, mode: mode)! }
-	if os.is_link(path) || !os.is_dir(path) {
+	mut info := C.stat{}
+	if C.lstat(path.str, unsafe { &info }) != 0 {
+		if C.errno != C.ENOENT { return error('cannot inspect package state directory: ' + path) }
+		os.mkdir_all(path, mode: mode)!
+		if C.lstat(path.str, unsafe { &info }) != 0 { return error('cannot inspect created package state directory: ' + path) }
+	}
+	if info.st_mode & 0o170000 != 0o040000 {
 		return error('package state must use ordinary directories: ${path}')
 	}
-	info := os.lstat(path)!
-	if info.uid != u32(os.geteuid()) || info.mode & 0o022 != 0 {
+	if info.st_uid != u32(os.geteuid()) || info.st_mode & 0o022 != 0 {
 		return error('package state must be owned by the invoking administrator and not writable by other users: ${path}')
 	}
 	os.chmod(path, mode)!
@@ -190,11 +194,14 @@ pub fn acquire(directory string) !Lock {
 		C.close(fd)
 		return error('cannot set package lock reader permissions')
 	}
-	for name in ['objects', 'generations'] {
-		owned_directory(directory + '/' + name, 0o755) or {
+	for name in ['objects', 'generations']! {
+		entry := directory + '/' + name
+		owned_directory(entry, 0o755) or {
+			unsafe { entry.free() }
 			C.close(fd)
 			return err
 		}
+		unsafe { entry.free() }
 	}
 	check_coordination_file(fd, path, 'package state lock') or { C.close(fd); return err }
 	return Lock{ fd: fd }

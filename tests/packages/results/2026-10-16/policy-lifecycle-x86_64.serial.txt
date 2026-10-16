@@ -1,0 +1,81 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=26
+!>+ [11] ./sbin/init sz=210976
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/coordination sz=1406624
+!>+ [15] ./usr/share/package-fixtures/atomic sz=770480
+!>+ [16] ./usr/share/package-fixtures/policy sz=1761280
+!>+ [17] ./usr/share/package-fixtures/policy-lifecycle sz=1228944
+!>+ [18] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e86e00
+initramfs: Done (18 entries)
+HWTEST START packages-policy-lifecycle
+POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+POLICY LIFECYCLE alternating changed apply pairs retire scratch; permission denial crosses dependency cycles, explicit firmware/licenses persist, only configuration changes PASS
+POLICY LIFECYCLE configuration/state/proposal/stale/ownership/directory/lock/busy refusals retire scratch, preserve activation and permit restored retry PASS
+POLICY LIFECYCLE oversized review refused before response cloning; configuration, proposal and installed generation unchanged PASS
+POLICY PROCESS policy-lifecycle PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+POLICY PROCESS policy PASS
+COORDINATION IDENTITY lock/writer refused=true preserved=true
+COORDINATION IDENTITY lock/reader refused=true preserved=true
+COORDINATION IDENTITY lock/status refused=true preserved=true
+COORDINATION IDENTITY generations/1/lease/lease refused=true preserved=true
+COORDINATION IDENTITY generations/1/lease/collection refused=true preserved=true
+COORDINATION IDENTITY generations/1/lease/purge refused=true preserved=true
+COORDINATION IDENTITY state reader/writer/status and launch/collection/purge refuse hard links before mutation; restored entries retry PASS
+COORDINATION IDENTITY captured locks reject replaced/unlinked names and captured-parent lease changes without mutating replacements; restored identities retry PASS
+COORDINATION IDENTITY malformed obsolete lease refuses collection before any generation/cache removal; restored lease permits collection PASS
+COORDINATION IDENTITY 128 repeats of six hard-link refusals retire descriptors under a 32-descriptor limit; busy writer preserves permissions and restored exclusion PASS
+Package coordination: malformed locks refuse promptly without changing special entries or link targets
+Package coordination: malformed and exclusively held generation leases refuse within the deadline
+Package coordination: fresh read-only status stays available; retained metadata without its lock refuses before parsing
+Package coordination: 128 valid and repeated malformed reader/writer/lease cycles preserve exclusion and recovery under a 32-descriptor limit
+POLICY PROCESS coordination PASS
+POLICY PROCESS atomic PASS
+HWTEST PASS packages-policy-lifecycle

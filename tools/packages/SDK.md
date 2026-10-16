@@ -2356,6 +2356,18 @@ the same version diagnostics without allocating an unused version array. Writer
 bytes, ordering rules and fingerprint identity are unchanged. See
 [policy decoding checks](../../tests/packages/policy-decode-check.md).
 
+`Service.review_policy` and `Service.apply_policy` retire loaded configuration,
+installed state, identity buffers and paths on success/refusal. Fresh state borrows
+the configuration architecture internally; installed state owns its decoded
+fields. Returned documents/reviews remain independent owners. The CLI retires
+review/apply results after serialization. Fingerprints still hash the original
+typed JSON without a persisted newline or a new combined-input limit. Full
+review output retains the existing 8 MiB bound, and an unchanged apply does not
+rewrite configuration. A conservative minimum-output preflight refuses responses
+already certain to exceed that bound before canonicalizing/cloning their output;
+the final encoded-size check remains authoritative for other overflows. See
+[policy lifecycle checks](../../tests/packages/policy-lifecycle-check.md).
+
 The lightweight `pkgprotocol` presentation module also supplies `PolicyDocument`,
 `PolicySettings`, `PolicyPin`, `PolicyReview`, `PolicyImpact`,
 `decode_policy_document` and `decode_policy_review` for the existing format-1

@@ -1,0 +1,5 @@
+clang ASan/UBSan; -gc none -manualfree; detect_leaks=0; halt_on_error=1; functional 64-cycle fixture, separate 1000-cycle allocation fixture
+POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+POLICY LIFECYCLE alternating changed apply pairs retire scratch; permission denial crosses dependency cycles, explicit firmware/licenses persist, only configuration changes PASS
+POLICY LIFECYCLE configuration/state/proposal/stale/ownership/directory/lock/busy refusals retire scratch, preserve activation and permit restored retry PASS
+POLICY LIFECYCLE oversized review refused before response cloning; configuration, proposal and installed generation unchanged PASS

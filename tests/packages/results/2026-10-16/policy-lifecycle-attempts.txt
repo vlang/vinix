@@ -1,0 +1,199 @@
+The ownership-only pass left native stat wrappers: five apply calls retained 10800 bytes, writer acquisition 6480 and writable preflight 4320. Stack captures removed these retained bytes. The first expanded fixture counted 1404 bytes of immutable JSON writer metadata on first use; final fixtures warm each shape, matching original warmed probes. Initial fixture/assertions and generated C remain pinned.
+
+The first full x86_64 run crashed in the maximum output-refusal case. Isolated tracing showed musl alloc_slot faulting while policy duplicate-entry validation cloned 128-byte keys, despite more than 800 MiB free and unlimited process data/address-space limits. Required output was already larger than 8 MiB. An allocation-free conservative size preflight now rejects it before canonicalization/diagnostic/response allocation, preserving valid wire bytes and the final encoded-size guard. The same isolated case passed; all selected host checks and both complete guests were rebuilt/rerun after this production change. No kernel changes are included. Underlying frozen-kernel/allocator behavior outside this inadmissible-response path remains unqualified.
+
+Initial stat observations:
+POLICY LIFECYCLE probe 0: five cycles retained 0 bytes
+POLICY LIFECYCLE probe 1: five cycles retained 0 bytes
+POLICY LIFECYCLE probe 2: five cycles retained 0 bytes
+POLICY LIFECYCLE probe 3: five cycles retained 10800 bytes
+POLICY LIFECYCLE probe 4: five cycles retained 10800 bytes
+POLICY LIFECYCLE probe 5: five cycles retained 10800 bytes
+POLICY LIFECYCLE probe 6: five cycles retained 10800 bytes
+POLICY LIFECYCLE probe 7: five cycles retained 6480 bytes
+POLICY LIFECYCLE probe 8: five cycles retained 4320 bytes
+
+Initial cold-cache fixture:
+tools/packages/pkgcore/policy_lifecycle_test.v:107: fn test_policy_lifecycle_owned_reviews_and_unchanged_applies
+   > assert kept == 0
+     Left value (len: 4): `1404`
+    Right value (len: 1): `0`
+
+POLICY LIFECYCLE 1000 alternating changed apply pairs retire scratch; permission denial crosses dependency cycles, explicit firmware/licenses persist, only configuration changes PASS
+POLICY LIFECYCLE 1000-cycle configuration/state/proposal/stale/ownership/directory/lock/busy refusals retire scratch, preserve activation and permit restored retry PASS
+POLICY LIFECYCLE oversized complete review retires its single owner and refuses without changing configuration, proposal or installed generation PASS
+
+Initial x86_64 full-run failure:
+FAIL x86_64 packages-policy-lifecycle (37.7s)
+  forbidden "HWTEST FAIL" in the line: HWTEST FAIL packages-policy-lifecycle
+  last 36 serial lines:
+  | BdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+  | BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+  | initramfs: Unpacking...
+  | >+ [1] ./ sz=0
+  | >+ [2] ./proc/ sz=0
+  | !>+ [3] ./usr/ sz=0
+  | !>+ [4] ./sbin/ sz=0
+  | !>+ [5] ./etc/ sz=0
+  | !>+ [6] ./sys/ sz=0
+  | !>+ [7] ./root/ sz=0
+  | !>+ [8] ./dev/ sz=0
+  | !>+ [9] ./tmp/ sz=0
+  | !>+ [10] ./etc/hwtest-scenario sz=26
+  | !>+ [11] ./sbin/init sz=210976
+  | !>+ [12] ./usr/share/ sz=0
+  | !>+ [13] ./usr/share/package-fixtures/ sz=0
+  | !>+ [14] ./usr/share/package-fixtures/coordination sz=1406624
+  | !>+ [15] ./usr/share/package-fixtures/atomic sz=770480
+  | !>+ [16] ./usr/share/package-fixtures/policy sz=1752976
+  | !>+ [17] ./usr/share/package-fixtures/policy-lifecycle sz=1186088
+  | !>+ [18] ./.vinix-image-id sz=17
+  | !>initramfs: no ustar sig at 0xff00000037e97600
+  | initramfs: Done (18 entries)
+  | HWTEST START packages-policy-lifecycle
+  | POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+  | POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+  | POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+  | POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+  | POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+  | POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+  | POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+  | POLICY LIFECYCLE both architectures, independent fresh/installed results, exact legacy fingerprints/wire bytes, full 4096 bounds and unchanged no-op state PASS
+  | POLICY LIFECYCLE alternating changed apply pairs retire scratch; permission denial crosses dependency cycles, explicit firmware/licenses persist, only configuration changes PASS
+  | POLICY LIFECYCLE configuration/state/proposal/stale/ownership/directory/lock/busy refusals retire scratch, preserve activation and permit restored retry PASS
+  | policy-lifecycle failed (139)
+  | HWTEST FAIL packages-policy-lifecycle
+  logs: /Users/alex/code/vinix/build/pkg-policy-lifecycle-x86/packages-policy-lifecycle
+package-policy-lifecycle x86_64: 0 passed, 1 failed, 0 skipped
+
+Isolated fault context:
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=26
+!>+ [11] ./sbin/init sz=210944
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/coordination sz=1406624
+!>+ [15] ./usr/share/package-fixtures/atomic sz=770480
+!>+ [16] ./usr/share/package-fixtures/policy sz=1752976
+!>+ [17] ./usr/share/package-fixtures/policy-lifecycle sz=1191248
+!>+ [18] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e87800
+initramfs: Done (18 entries)
+HWTEST START packages-policy-lifecycle
+POLICY LIFECYCLE maximum fixture models built
+POLICY LIFECYCLE maximum configuration written
+POLICY LIFECYCLE maximum proposal written
+POLICY LIFECYCLE maximum installed state written
+POLICY LIFECYCLE maximum fixture source owners retired
+POLICY LIFECYCLE maximum inputs captured; reviewing
+Name:	policy-lifecycle
+Umask:	022
+State:	R (running)
+Tgid:	29054
+Ngid:	0
+Pid:	29054
+PPid:	1
+TracerPid:	0
+Uid:	0	0	0	0
+Gid:	0	0	0	0
+NSpid:	29054
+Threads:	1
+VmLck:	0 kB
+CapInh:	0000000000000000
+CapPrm:	000001ffffffffff
+CapEff:	000001ffffffffff
+CapBnd:	000001ffffffffff
+CapAmb:	0000000000000000
+NoNewPrivs:	0
+Seccomp:	0
+Seccomp_filters:	0
+
+Limit                     Soft Limit           Hard Limit           Units     
+Max cpu time              unlimited            unlimited            seconds   
+Max file size             unlimited            unlimited            bytes     
+Max data size             unlimited            unlimited            bytes     
+Max stack size            8388608              unlimited            bytes     
+Max core file size        unlimited            unlimited            bytes     
+Max resident set          unlimited            unlimited            bytes     
+Max processes             65535                65535                processes 
+Max open files            1024                 1048576              files     
+Max locked memory         unlimited            unlimited            bytes     
+Max address space         unlimited            unlimited            bytes     
+Max file locks            unlimited            unlimited            locks     
+Max pending signals       unlimited            unlimited            signals   
+Max msgqueue size         unlimited            unlimited            bytes     
+Max nice priority         unlimited            unlimited            
+Max realtime priority     0                    0                    
+Max realtime timeout      unlimited            unlimited            us        
+
+MemTotal:       960108 kB
+MemFree:        843672 kB
+MemAvailable:   843672 kB
+Buffers:               0 kB
+Cached:         0 kB
+SwapTotal:      0 kB
+SwapFree:       0 kB
+Zswap:          0 kB
+Zswapped:       0 kB
+VinixPageouts:  0
+VinixRefaults:  0
+VinixSwapErrors: 0
+Slab:           3424 kB
+VinixMemoryPressure: 0
+
+POLICY LIFECYCLE FAULT rip=4c4245 rsp=6fff98fe3b0 rdi=1b rsi=800129a9000 rdx=1b fault=0x800129a9000
+POLICY LIFECYCLE STACK 11 4c4831
+POLICY LIFECYCLE STACK 17 409ce6
+POLICY LIFECYCLE STACK 19 409d4d
+POLICY LIFECYCLE STACK 23 409e64
+POLICY LIFECYCLE STACK 35 412331
+POLICY LIFECYCLE STACK 37 4761f5
+POLICY LIFECYCLE STACK 47 4764de
+POLICY LIFECYCLE STACK 49 4788f0
+POLICY LIFECYCLE STACK 85 478d1d
+POLICY LIFECYCLE STACK 86 4e17a0
+POLICY LIFECYCLE STACK 97 4092fc
+POLICY LIFECYCLE STACK 99 475f65
+policy-lifecycle failed (139)
+HWTEST FAIL packages-policy-lifecycle
+
+Symbolized stack candidates:
+alloc_slot
+malloc.c:?
+__libc_malloc_impl
+??:?
+malloc_noscan
+??:?
+string__clone
+??:?
+map_clone_string
+??:?
+pkgcore__identifier
+??:?
+VMapData__set
+??:?
+map__set
+??:?
+pkgcore__validate_policy_entries
+??:?
+pkgcore__Policy__validate
+??:?
+v_free
+??:?
+pkgcore__read_policy_document_input
+??:?
+
+Isolated preflight check:
+PASS x86_64 packages-policy-lifecycle (7.7s)
+package-policy-lifecycle x86_64: 1 passed, 0 failed, 0 skipped

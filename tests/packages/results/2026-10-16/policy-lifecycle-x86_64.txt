@@ -1,0 +1,2 @@
+PASS x86_64 packages-policy-lifecycle (43.6s)
+package-policy-lifecycle x86_64: 1 passed, 0 failed, 0 skipped

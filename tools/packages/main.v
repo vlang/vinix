@@ -219,11 +219,15 @@ fn checked(arguments []string) !int {
 		}
 		'policy-review' {
 			if names.len != 1 { return error('policy-review requires an organization policy document') }
-			println(json2.encode(service.review_policy(names[0])!))
+			mut review := service.review_policy(names[0])!
+			defer { review.close() }
+			println(json2.encode(review))
 		}
 		'policy-apply' {
 			if names.len != 2 { return error('policy-apply requires a review fingerprint and organization policy document') }
-			println(json2.encode(service.apply_policy(names[1], names[0])!))
+			mut document := service.apply_policy(names[1], names[0])!
+			defer { document.close() }
+			println(json2.encode(document))
 		}
 		'repo-review', 'repo-apply' {
 			applying := command == 'repo-apply'
