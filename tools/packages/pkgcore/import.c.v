@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import json2
 import os
 
 #include <dirent.h>
@@ -124,6 +123,12 @@ fn import_node(root int, source string) !ImportNode {
 }
 
 fn import_names(fd int) ![]string {
+	return import_names_limit(fd, max_files)
+}
+
+// Also bound enumeration by the importer's remaining aggregate work budget.
+// Returned names are owned; a refusal retires the partially collected list.
+fn import_names_limit(fd int, limit int) ![]string {
 	duplicate := C.dup(fd)
 	if duplicate < 0 { return error('cannot retain import directory') }
 	directory := C.fdopendir(duplicate)
@@ -133,6 +138,9 @@ fn import_names(fd int) ![]string {
 	}
 	defer { C.closedir(directory) }
 	mut names := []string{}
+	unsafe { names.flags |= .noslices }
+	mut accepted := false
+	defer { if !accepted { unsafe { names.free() } } }
 	for {
 		C.errno = 0
 		entry := C.readdir(directory)
@@ -141,11 +149,15 @@ fn import_names(fd int) ![]string {
 			break
 		}
 		name := unsafe { tos_clone(&u8(&entry.d_name[0])) }
-		if name in ['.', '..'] { continue }
+		if name in ['.', '..'] { unsafe { name.free() }; continue }
+		if names.len >= limit {
+			unsafe { name.free() }
+			return error('prepared directory exceeds entry limit')
+		}
 		names << name
-		if names.len > max_files { return error('prepared directory exceeds package file limit') }
 	}
 	names.sort()
+	accepted = true
 	return names
 }
 
@@ -154,27 +166,47 @@ struct RootImport {
 	output string
 	pins map[string]Payload // populated only by a catalog lock
 mut:
+	entries   int // includes selected roots and every materialized alias visit
 	files     int
 	bytes     u64
 	ancestors []string
 }
 
 fn (mut importer RootImport) copy(source string, target string) ! {
+	importer.copy_at(source, target, target.count('/'))!
+}
+
+// Depth counts destination parents, so deeply nested selectors cannot bypass
+// the same directory bound that the final pack walk applies to its output.
+fn (mut importer RootImport) copy_at(source string, target string, depth int) ! {
 	if !relative_path(source) || !relative_path(target) {
 		return error('invalid import source/destination path')
 	}
+	if depth > max_pack_depth { return error('prepared import exceeds directory depth limit: ${target}') }
+	if importer.entries >= max_pack_entries { return error('prepared import exceeds directory entry limit') }
+	importer.entries++
 	node := import_node(importer.root, source)!
 	defer { C.close(node.fd) }
 	if node.mode & 0o170000 == 0o040000 {
+		if depth >= max_pack_depth { return error('prepared import exceeds directory depth limit: ${target}') }
 		identity := '${node.device}:${node.inode}'
+		defer { unsafe { identity.free() } }
 		if identity in importer.ancestors {
 			return error('guest directory symlink cycle: ${source}')
 		}
 		importer.ancestors << identity
 		defer { importer.ancestors.pop() }
-		os.mkdir_all(importer.output + '/' + target)!
-		for name in import_names(node.fd)! {
-			importer.copy(source + '/' + name, target + '/' + name)!
+		remaining := max_pack_entries - importer.entries
+		names := import_names_limit(node.fd, if remaining < max_files { remaining } else { max_files })!
+		defer { unsafe { names.free() } }
+		path := importer.output + '/' + target
+		defer { unsafe { path.free() } }
+		os.mkdir_all(path)!
+		for name in names {
+			child_source := source + '/' + name
+			child_target := target + '/' + name
+			defer { unsafe { child_source.free(); child_target.free() } }
+			importer.copy_at(child_source, child_target, depth + 1)!
 		}
 		return
 	}
@@ -194,7 +226,9 @@ fn (mut importer RootImport) copy(source string, target string) ! {
 	importer.bytes += node.bytes
 	importer.files++
 	path := importer.output + '/' + target
-	os.mkdir_all(os.dir(path))!
+	parent := os.dir(path)
+	defer { unsafe { path.free(); parent.free() } }
+	os.mkdir_all(parent)!
 	mut output := os.open_file(path, 'w', 0o600)!
 	defer { output.close() }
 	output.set_unbuffered()
@@ -250,6 +284,7 @@ pub fn pack_root(recipe_file string, source_root string, repository string) !Pac
 	text := read_metadata(recipe_file)!
 	defer { unsafe { text.free() } }
 	recipe := decode_root_recipe(text)!
+	defer { close_decoded_root_recipe(recipe) }
 	root := capture_prepared_root(source_root, 'package import')!
 	defer { C.close(root) }
 	return pack_root_descriptor(recipe, root, repository, false)
@@ -259,16 +294,28 @@ pub fn pack_root(recipe_file string, source_root string, repository string) !Pac
 // switch its source directory between package imports.
 fn pack_root_descriptor(recipe RootRecipe, root int, repository string, pinned bool) !Package {
 	validate_root_recipe(recipe)!
-	mut template := (os.temp_dir() + '/vinix-pack-root-XXXXXX').bytes()
+	temporary := os.temp_dir()
+	process := os.getpid().str()
+	template_path := temporary + '/vinix-pack-root-' + process + '-XXXXXX'
+	defer { unsafe { temporary.free(); process.free(); template_path.free() } }
+	mut template := template_path.bytes()
 	template << u8(0)
+	defer { unsafe { template.free() } }
 	created := C.mkdtemp(&char(template.data))
 	if created == unsafe { nil } { return error('cannot create private import workspace') }
 	work := unsafe { cstring_to_vstring(created).clone() }
-	defer { os.rmdir_all(work) or {} }
+	defer { os.rmdir_all(work) or {}; unsafe { work.free() } }
 	mut pins := map[string]Payload{}
+	defer { unsafe { pins.free() } }
 	if pinned { for file in recipe.manifest.files { pins[file.path] = file } }
-	mut importer := RootImport{ root: root, output: work + '/payload', pins: pins }
+	payload := work + '/payload'
+	manifest_path := work + '/manifest.json'
+	defer { unsafe { payload.free(); manifest_path.free() } }
+	mut importer := RootImport{ root: root, output: payload, pins: pins, ancestors: []string{cap: max_pack_depth} }
+	defer { unsafe { (&array(&importer.ancestors)).free() } }
 	for entry in recipe.entries { importer.copy(entry.source, entry.path)! }
-	os.write_file(work + '/manifest.json', json2.encode(recipe.manifest))!
-	return pack(work + '/manifest.json', work + '/payload', repository)!
+	manifest := publisher_json(recipe.manifest)
+	defer { unsafe { manifest.free() } }
+	os.write_file(manifest_path, manifest)!
+	return pack(manifest_path, payload, repository)!
 }

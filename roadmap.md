@@ -654,6 +654,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     combines complete single-host and dual-host profiles for a declared target,
     preserving shared packages, pinned declarations and full-input provenance.
     Unsupported hosts and invalid omitted variants refuse publication.
+  - [x] [Bounded prepared-root materialization](tests/packages/import-limits-check.md)
+    checks aggregate entries across selectors/aliases and output directory depth
+    during import, including empty-directory trees and nested selector parents.
+    Failure cleanup and retry preserve the source and canonical metadata.
 - [ ] Add transactional install/remove/upgrade, rollback, disk-space checks,
   interrupted-download recovery and coherent persistent package state.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,

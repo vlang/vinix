@@ -459,6 +459,11 @@ ordinary source directory before creating output parents. Empty/NUL paths and
 leaf directory aliases refuse, including aliases with trailing separators.
 Ordinary directories with redundant separators retain the same canonical
 metadata. See [root admission qualification](../../tests/packages/prepared-root-check.md).
+Prepared-root materialization also enforces a shared 32,768-entry traversal
+budget across selectors and aliases, and the final packer's 128-level output
+depth bound, before creating excessive output. See
+[import traversal qualification](../../tests/packages/import-limits-check.md)
+for exact boundaries, failure cleanup and retry.
 
 `sqlite-catalog SQLITE_VERSION RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY`
 creates the concrete SQLite CLI/musl runtime lock for both supported hosts. It

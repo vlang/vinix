@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module pkgcore
+
+import os
+import time
+
+fn import_limits_work() !string {
+	work := os.real_path(os.temp_dir()) + '/vinix-import-limits-' + os.getpid().str() + '-' + time.now().unix_micro().str()
+	os.mkdir_all(work + '/root/tree')!
+	os.mkdir(work + '/output')!
+	return work
+}
+
+fn import_limits_tree(root string, descendants int) !string {
+	mut path := root + '/tree'
+	for _ in 0 .. descendants { path += '/d'; os.mkdir(path)! }
+	os.write_file(path + '/data', 'bounded payload')!
+	return path
+}
+
+fn test_prepared_import_stops_before_materializing_excessive_directory_depth() {
+	work := import_limits_work()!
+	defer { os.rmdir_all(work) or {} }
+	leaf := import_limits_tree(work + '/root', 128)!
+	root := capture_prepared_root(work + '/root', 'test')!
+	defer { C.close(root) }
+	mut importer := RootImport{ root: root, output: work + '/output' }
+	mut diagnostic := ''
+	importer.copy('tree', 'payload') or { diagnostic = err.msg() }
+	before := os.getenv('VINIX_IMPORT_LIMITS_BEFORE') == '1'
+	if before {
+		assert diagnostic == ''
+		assert os.read_file(work + '/output/payload' + '/d'.repeat(128) + '/data')! == 'bounded payload'
+		println('IMPORT LIMITS baseline: 129 directory levels and payload materialized before the later pack walk PASS')
+	} else {
+		assert diagnostic.contains('depth limit'), diagnostic
+		assert !os.exists(work + '/output/payload' + '/d'.repeat(128))
+		assert importer.ancestors.len == 0
+		println('IMPORT LIMITS 129th directory refuses before materialization; source and ancestor state preserved PASS')
+	}
+	assert os.read_file(leaf + '/data')! == 'bounded payload'
+}

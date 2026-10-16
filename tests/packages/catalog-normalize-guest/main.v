@@ -13,7 +13,8 @@ fn C.usleep(u32) int
 
 fn check() ! {
 	os.setenv('VINIX_PACKAGE_COMPOSITION_CLI', '/usr/bin/vinix-package', true)
-	for name in ['catalog-normalize', 'composition-ownership', 'catalog-plan', 'catalog', 'composition', 'release']! {
+	os.unsetenv('VINIX_IMPORT_LIMITS_BEFORE')
+	for name in ['catalog-normalize', 'composition-ownership', 'catalog-plan', 'import-limits', 'import', 'catalog', 'composition', 'release']! {
 		mut child := os.new_process('/usr/share/package-fixtures/' + name)
 		child.set_redirect_stdio_merged(); child.run()
 		output := child.stdout_slurp(); child.wait(); code := child.code; child.close()

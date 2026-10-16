@@ -554,6 +554,26 @@ order or the upstream aliases. Do not select account databases, host settings,
 devices or unrelated applications. Proprietary and firmware flags stay explicit
 publisher declarations, subject to administrator policy.
 
+Materialization is bounded before the final pack walk: at most 32,768 selected
+or traversed entries per package, shared across every selector. Selected roots,
+empty directories and each visit through an alias consume that same budget.
+Directory enumeration stops at the smaller of 16,384 names and the remaining
+budget, retiring partial name lists on refusal. A directory subtree cannot hide
+unlimited empty-directory work behind a small regular-file inventory.
+
+Destination directories have at most 128 levels, including parents named in a
+selector destination. A file may sit beneath exactly 128 directories; a 129th
+directory refuses before materialization. These are the final packer's depth
+rules, applied during import. The final walk still checks the complete output,
+including implicit destination parents, against its own entry limit. Existing
+16,384-file, 4 GiB-per-file, 64 GiB-per-package and 40-link-hop limits remain.
+
+Handled failures remove the private import workspace; its randomized name
+includes the publisher process ID for diagnostics. A new import gets a fresh
+budget. Source files, aliases and consumer state are untouched. See
+[import traversal qualification](../../tests/packages/import-limits-check.md)
+for exact boundaries, alias/selector accounting, descriptor cleanup and retry.
+
 `pack-root`, `pack-catalog` and the Native, SQLite and FFmpeg profile builders
 share input-root admission. Empty and NUL-containing paths refuse. Redundant
 trailing separators are stripped while preserving `/`, so a symlink at the

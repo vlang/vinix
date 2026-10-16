@@ -233,6 +233,13 @@ roots retain canonical metadata and a captured namespace that later pathname
 replacement cannot redirect. See
 [root admission qualification](../tests/packages/prepared-root-check.md).
 
+Prepared-root materialization now limits selected/traversed entries across all
+selectors and alias visits, and checks output depth including selector parents.
+Empty-directory trees refuse during import, before the later pack walk. The
+[traversal qualification](../tests/packages/import-limits-check.md) covers exact
+depth/entry boundaries, bounded enumeration, descriptor/private-workspace cleanup
+and retry, retaining ordinary alias resolution and canonical package metadata.
+
 The lower-level `pack` command also captures its source root and walks children
 through descriptors relative to their captured parents. Hashing and copying
 share each regular file's descriptor, with identity, length and executable-mode

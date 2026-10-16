@@ -25,6 +25,8 @@ fn normalize_suite() hwhost.Suite {
 			hwhost.Program{ source: 'tools/packages/pkgcore/composition_ownership_test.v', path: 'usr/share/package-fixtures/composition-ownership' },
 			hwhost.Program{ source: 'tools/packages/main.v', path: 'usr/bin/vinix-package' },
 			hwhost.Program{ source: 'tools/packages/pkgcore/catalog_plan_test.v', path: 'usr/share/package-fixtures/catalog-plan' },
+			hwhost.Program{ source: 'tools/packages/pkgcore/import_limits_test.v', path: 'usr/share/package-fixtures/import-limits' },
+			hwhost.Program{ source: 'tools/packages/pkgcore/import_test.v', path: 'usr/share/package-fixtures/import' },
 		], scenarios: [hwhost.Scenario{ name: 'packages-catalog-normalize', arches: ['aarch64', 'x86_64'],
 			about: 'owned catalog normalization, late refusals and unchanged composed signed releases',
 			required: ['HWTEST START packages-catalog-normalize',
@@ -34,13 +36,19 @@ fn normalize_suite() hwhost.Suite {
 				'CATALOG NORMALIZE PROCESS composition PASS', 'CATALOG NORMALIZE PROCESS release PASS',
 				'CATALOG NORMALIZE PROCESS composition-ownership PASS',
 				'CATALOG NORMALIZE PROCESS catalog-plan PASS',
+				'CATALOG NORMALIZE PROCESS import-limits PASS', 'CATALOG NORMALIZE PROCESS import PASS',
+				'IMPORT LIMITS 129th directory refuses before materialization; source and ancestor state preserved PASS',
+				'IMPORT LIMITS exact 128-level directory/file boundary and nested selector parents match final pack rules PASS',
+				'IMPORT LIMITS shared 32768-entry budget counts selected roots, empty directories and repeated aliases; refusal precedes output and retry resets budget PASS',
+				'IMPORT LIMITS remaining-budget enumeration refuses partial lists and preserves sorted exact-boundary names PASS',
+				'IMPORT LIMITS 32 failed/successful public imports retire descriptors and private scratch, preserve source bytes and permit exact retry PASS',
 				'CATALOG PLAN owned metadata/budget planning and schema/architecture/depth/closure/object-length refusals PASS',
 				'CATALOG PLAN legacy bytes, deduplicated workspace/largest-package budgets, disclosures and independent idempotently closeable results PASS',
 				'CATALOG WORKSPACE owned replies close independently without removing published manifests, objects or catalog PASS',
 				'COMPOSITION OWNERSHIP strict/selected planning and late metadata/identity/host/depth/profile refusals retire owned scratch PASS',
 				'COMPOSITION OWNERSHIP independent plans and closeable replies survive retired inputs; canonical bytes, disclosures and idempotent close PASS',
 				'COMPOSITION TARGET: explicit CLI/API equivalence, literal paths, unsupported host, argument counts and existing-output refusals PASS',
-				'HWTEST PASS packages-catalog-normalize'], forbidden: ['V panic:', 'HWTEST FAIL'], ending: .poweroff, timeout: 300 }]
+				'HWTEST PASS packages-catalog-normalize'], forbidden: ['V panic:', 'HWTEST FAIL', 'IMPORT LIMITS baseline:'], ending: .poweroff, timeout: 300 }]
 	}
 }
 
@@ -63,7 +71,7 @@ fn normalize_guest() !int {
 	guest := hwhost.build_program(host, repository + '/' + definition.guest, work + '/guest', 'init', definition.module_paths)!
 	root := hwhost.build_extras(host, definition, work + '/guest')!
 	mut artifacts := [normalize_artifact('kernel', work + '/kernel')!, normalize_artifact('guest-init', guest)!]
-	for name in ['catalog-normalize', 'catalog', 'composition', 'release', 'composition-ownership', 'catalog-plan']! { artifacts << normalize_artifact(name, root + '/usr/share/package-fixtures/' + name)! }
+	for name in ['catalog-normalize', 'catalog', 'composition', 'release', 'composition-ownership', 'catalog-plan', 'import-limits', 'import']! { artifacts << normalize_artifact(name, root + '/usr/share/package-fixtures/' + name)! }
 	artifacts << normalize_artifact('package-cli', root + '/usr/bin/vinix-package')!
 	outcome := hwhost.run_scenario(host, selection.run[0], hwhost.Run{ kernel: work + '/kernel', guest: guest, extras: root,
 		state: work + '/packages-catalog-normalize', timeout: if options.timeout > 300 { options.timeout } else { 300 }, keep: true })

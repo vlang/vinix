@@ -65,6 +65,10 @@ markers, plus guest-initiated poweroff. Receipts pin ten artifacts: kernel, PID1
 six runners, CLI and serial log. Allocation tracking runs on the host. The new
 fixtures are metadata-only and do not execute synthetic application payloads.
 
+The current controller also runs import boundary and guest-alias assertions,
+pinning twelve artifacts. The receipts below preserve this qualification's
+ten-artifact scope; see the [import follow-up](import-limits-check.md).
+
 ## Qualification, 2026-10-16
 
 All **33 host build/run checks passed**, including 1,792 zero-retention planning

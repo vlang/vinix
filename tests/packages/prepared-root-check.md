@@ -1,5 +1,9 @@
 # Prepared publisher root admission
 
+The later [import traversal qualification](import-limits-check.md) bounds
+materialization after admission, including empty directories, repeated aliases,
+selector parents and aggregate work, while preserving these root/namespace rules.
+
 `pack-root`, `pack-catalog` and the Native, SQLite and FFmpeg profile builders
 share one source-root capture. Empty/NUL paths fail before any open. Trailing
 separators are stripped while preserving `/`, so they cannot make `O_NOFOLLOW`
