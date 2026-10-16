@@ -497,7 +497,7 @@ if [ "$DESKTOP_CACHE_HIT" -eq 0 ]; then
     "$V" -new-compiler -no-memory-limit -os linux -arch arm64 -gc none -manualfree -enable-globals -prod \
         -d glibc \
         -d ui2_headless \
-        -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
+        -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party|$SCRIPT_DIR/tools/accounts" \
         -o "$BUILD_DIR/desktop.c" "$APP_SRC"
 
     # ── C -> aarch64 static binary ──

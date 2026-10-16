@@ -148,7 +148,7 @@ BUILD_STAMP="${VINIX_BUILD_STAMP:-$(date '+%m-%d %H:%M')}"
     -gc none -d glibc -manualfree -enable-globals -prod \
     -d ui2_headless \
     -d "vinix_build_stamp=$BUILD_STAMP" \
-    -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
+    -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party|$SCRIPT_DIR/tools/accounts" \
     -o "$BUILD_DIR/desktop.c" "$APP_SRC"
 
 echo "==> Compiling for x86_64-linux-musl..."
