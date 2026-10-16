@@ -123,12 +123,12 @@ fn hf_private(){
  pointers:=[u64(page),u64(page)]!;sizes:=[u64(65536),2]!
  assert cm_h264_create(0,2,unsafe{&pointers[0]},unsafe{&sizes[0]},4,&out)==-12712&&out==0xfeed
  assert C.munmap(page,4096)==0
- for name in ['_CMVideoFormatDescriptionCreateFromHEVCParameterSets','_CMVideoFormatDescriptionCreateForImageBuffer']!{if _:=runtime_symbol('/System/Library/Frameworks/CoreMedia.framework/CoreMedia',name){assert false}}
+ for name in ['_CMVideoFormatDescriptionCreateForImageBuffer']!{if _:=runtime_symbol('/System/Library/Frameworks/CoreMedia.framework/CoreMedia',name){assert false}}
  for lib in ['/System/Library/Frameworks/Foundation.framework/Foundation','/usr/lib/libSystem.B.dylib']!{if _:=runtime_symbol(lib,'_CMVideoFormatDescriptionCreateFromH264ParameterSets'){assert false}}
  assert ios_runtime.live==before
 }
 fn test_h264_format(){
  $if macos{api:=HFAPI{true,u64(C.dlopen(c'/System/Library/Frameworks/CoreMedia.framework/CoreMedia',2)),u64(C.dlopen(c'/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation',2))};hf_cases(api);println('IOS-H264-FORMAT-NATIVE: local libx264 SPS/PPS fixtures,baseline/main/high,crop,square/extended aspect,chroma location,709/full-range,interlace,exact avcC,borrowed getters,errors,retained sample and data owners,concurrent readers')}
  for _ in 0..2{objc_start();hf_cases(HFAPI{});hf_private();assert ios_runtime.live==ios_runtime.framework_objects.len&&ios_runtime.objects.len==ios_runtime.framework_objects.len;objc_stop();assert ios_runtime.live==0&&ios_runtime.objects.len==0}
- println('IOS-H264-FORMAT: copied H264 parameters,bounded RBSP parsing,owned immutable avcC metadata,dimensions and VUI,borrowed parameter sets,CF/sample ownership,concurrent readers,two drained runtimes;HEVC descriptions and codec execution remain unavailable')
+ println('IOS-H264-FORMAT: copied H264 parameters,bounded RBSP parsing,owned immutable avcC metadata,dimensions and VUI,borrowed parameter sets,CF/sample ownership,concurrent readers,two drained runtimes;codec execution remains unavailable')
 }

@@ -7786,23 +7786,56 @@ streams and executables, native encoder/CoreMedia measurements, generated-code
 audits and joined guest evidence are retained under
 `build/ios/fortnite/h264-format-checks`.
 
-One more required import resolves. The actual IPA still exits with status 1 before
-application entry at `_CMVideoFormatDescriptionCreateFromHEVCParameterSets`.
-HEVC descriptions, image sample construction, codec execution and the system Metal
-device/renderer remain unavailable. Fortnite remains unplayable and full iOS
-regression remains unpassed.
+One more required import resolved. That IPA probe stopped before application
+entry at `_CMVideoFormatDescriptionCreateFromHEVCParameterSets`.
+
+HEVC parameter-set descriptions now own an immutable `hvcC` record and derive
+dimensions, bit depth, pixel aspect, chroma location, range and supported color
+tags from the SPS. Identical input sets collapse into one record, with VPS/SPS/PPS
+grouped in that order. Length prefixes support one, two or four bytes. Caller
+extensions are deep property-list snapshots and override derived tags; caller
+buffers and extension dictionaries can be discarded after construction. Sample
+buffers and retained atom data preserve their owners independently. Parameter
+queries borrow bytes from the owned record, also supporting generic `hvc1`/`hev1`
+descriptions. Parsers and getters allocate no storage.
+
+The bounded profile accepts 2..64 input records, one distinct VPS/SPS/PPS each
+plus identical duplicates, at most 65,535 bytes per NAL and a one-MiB record
+budget. VPS/SPS are required; PPS is optional, matching the measured native
+constructor. Supported streams are progressive single-layer Main/Main10, 4:2:0,
+eight or ten bits, with matching VPS/SPS profile information. Color tags support
+unspecified or BT.709 values. SEI, distinct replacement sets, other profiles,
+display windows, HRD, spatial segmentation, SPS extensions and caller-supplied
+sample-description atoms remain outside this profile and fail explicitly.
+
+V tooling used the installed libx265/libavcodec and CoreMedia libraries for
+twelve fixture configurations and native metadata/error measurements. Checks
+compare full dictionaries and exact `hvcC` bytes, including cropped dimensions,
+Main10, square/extended aspect, centered chroma and range without color tags.
+They cover truncated NALs, malformed atoms, unaligned pointers, raw dictionaries,
+extension mutation, concurrent readers and sample/data destruction order. Eight
+final host sanitizer runs, two retained earlier runs and four final ARM64 guest
+suites cover HEVC, H.264, sample buffers and autorelease pools. Eleven final C
+streams/executables and joined guest evidence are retained under
+`build/ios/fortnite/hevc-format-checks`. The IPA consumer at `0x1078cab24` passes
+nil extensions in `x5` and its seventh argument, the output pointer, in `x6`.
+
+One more required import resolves. The actual IPA exits with status 1 before
+application entry at `_CGFontCopyTableForTag`. Image sample construction, codec
+execution and the system Metal device/renderer remain unavailable. Fortnite
+remains unplayable and full iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,636 | 524 | 79 |
+| Fortnite executable | 1,637 | 523 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,471 | 527 | 120 |
+| All images | 2,472 | 526 | 120 |
 
-The C++/GLES/Text variant reports 2,484 resolved imports, 514 unresolved strong
+The C++/GLES/Text variant reports 2,485 resolved imports, 513 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
