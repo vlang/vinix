@@ -229,6 +229,16 @@ fn valid_clone_pid_namespace(flags u64) bool {
 	return voidptr(process.ns.pid) == voidptr(process.ns.pid_for_children)
 }
 
+// A new IPC namespace cannot share the old namespace's semaphore undo list.
+// Namespace permission precedes the conflict. NEWUSER needs separate credential
+// admission because it changes the capability domain before this check.
+fn clone_ipc_failure(flags u64) u64 {
+	pair := proc.clone_newipc | u64(0x00040000)
+	if flags & pair != pair || flags & proc.clone_newuser != 0 { return 0 }
+	if !proc.current_has_capability(proc.cap_sys_admin) { return errno.eperm }
+	return errno.einval
+}
+
 // FS, descriptor and handler ownership is currently process-scoped. Refuse
 // combinations we cannot honor instead of silently copying requested sharing
 // or silently sharing state the caller asked to keep independent.

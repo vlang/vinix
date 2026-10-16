@@ -1,0 +1,31 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "dbeb68907f11ba2ccbe4124686e52ee6e588b679f844e449e31af5793c4fb88e",
+    "results": [
+        {
+            "name": "cloneipc",
+            "source_sha256": "354cc5b33494fc03afd62b2fed811ca2f4adc39bd2290561e99e33aa8837690c",
+            "init_sha256": "031061e996fa39c19408c452a5a9c8eae65d4ffaf85dd5015089e7f02d25dffe",
+            "iso_sha256": "89f2bbf910313d7043248978a3c9bd61ac94db0c9c9af21daf14002954d44d0f",
+            "exit_code": 1,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "5d06c51b5ded2d2836e5ab383d1ebf5d6a7975236054076ea3402929e0b315ed",
+            "iso_sha256": "e11f96fa326a411c957d05b0447bc3ec32ec60353a42e16c12f5ffc8ec8ca011",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "clonepidguard",
+            "source_sha256": "8740b20d5ce9bf1ae1a3a3f73f4c0fac8c2bf5ed19475968ecd264da4c79bde2",
+            "init_sha256": "8ab499a18dc87c0cc25cc34e9dc6ad193897b1eb8618cc51653745b7af098339",
+            "iso_sha256": "56e93040f11c6ed931a8256716483799fb50583797057ca0b676cdb5b5e12ba1",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

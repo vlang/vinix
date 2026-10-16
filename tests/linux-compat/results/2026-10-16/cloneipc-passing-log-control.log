@@ -1,0 +1,3 @@
+tests/linux-compat/cloneipc-check.v:239: FAIL: fn main.failure: assert log.contains('LINUX CLONEIPC DETAIL:'), 'cloneipc baseline failure markers required'
+      message: cloneipc baseline failure markers required
+V panic: Assertion failed...

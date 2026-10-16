@@ -2112,3 +2112,17 @@ Use `--cases clonepidguard --timeout 1200` with fresh state;
 `clonepidguard-check.v` audits receipts and the preserved initial pidfd-write
 refusal when compiled without `-prod`. Actual pidfd construction/output writes
 and rollback remain unqualified. See the [qualification report](../../docs/linux-posix-qualification.md#native-clone-pidfd-conflicts-and-output-aliasing).
+
+The `cloneipc` case checks NEWIPC/SYSVSEM permission/conflict ordering in both
+clone APIs. Four root/UID1000 initial/one-level namespace cohorts run 1,872
+controls per architecture with effective SYS_ADMIN off/on and queue/IPC
+canaries. Originals fail 1,212 including 144 unwanted children, all observed
+and reaped; corrected kernels and identical Linux ELFs pass. Both phases
+preserve 144 legitimate fork/reap controls and flat identical-input 200-cycle
+refusal/fork cleanup. Runtime and clonepidguard regressions pass on the same
+retained kernel images.
+Use `--cases cloneipc --timeout 1200` with fresh state;
+`cloneipc-reference.v` runs the unchanged ELF on Linux and `cloneipc-check.v`
+audits receipts without `-prod`. NEWUSER, full SEM_UNDO/isolation and repeated
+IPC namespace construction remain unqualified. Initial proc identity-loop
+retention failures are retained. See the [qualification report](../../docs/linux-posix-qualification.md#native-clone-ipc-namespace-and-semaphore-undo-conflicts).

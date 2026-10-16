@@ -95,6 +95,11 @@ pub fn syscall_clone3(_gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 		return errno.err, errno.eperm
 	}
 
+	ipc_failure := clone_ipc_failure(args.flags)
+	if ipc_failure != 0 {
+		return errno.err, ipc_failure
+	}
+
 	mut cgroup := voidptr(unsafe { nil })
 	if args.flags & clone_into_cgroup != 0 {
 		mut cgroup_fd := file.fd_from_fdnum(unsafe { nil }, int(args.cgroup)) or {
@@ -118,6 +123,8 @@ fn do_clone_into(state &cpulocal.GPRState, flags u64, child_stack u64, parent_ti
 	if !valid_clone_sharing(flags) { return errno.err, errno.einval }
 	if !valid_clone_parent(flags) { return errno.err, errno.einval }
 	if !valid_clone_pid_namespace(flags) { return errno.err, errno.einval }
+	ipc_failure := clone_ipc_failure(flags)
+	if ipc_failure != 0 { return errno.err, ipc_failure }
 	if !supported_clone_sharing(flags) { return errno.err, errno.enotsup }
 	// Returning a PID while leaving the requested pidfd word untouched would
 	// falsely report success. Descriptor construction/rollback is unsupported.

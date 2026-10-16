@@ -10509,3 +10509,127 @@ unqualified. Worker callers, per-thread namespace ownership/races, independent
 sharing, supplied-stack threads, selected PID allocation, GNU libc, translated
 and 32-bit paths also remain separate. The broad libc, installation/sandbox/portal
 and translation gates remain open.
+
+## Native clone IPC namespace and semaphore-undo conflicts
+
+Both native clone paths now reject `CLONE_NEWIPC|CLONE_SYSVSEM` in the caller's
+existing user-namespace capability domain. Missing effective CAP_SYS_ADMIN
+returns `EPERM`; an authorized conflicting request returns `EINVAL`. The shared
+admission helper runs after the existing early sharing/parent/PID checks and
+before unsupported-sharing admission in the common path. clone3 checks it
+before cgroup descriptor lookup, after the existing ABI/flag/stack and namespace
+permission checks. NEWUSER requests retain their separate admission path.
+
+This follows Linux v6.12's
+[`copy_namespaces`](https://github.com/torvalds/linux/blob/v6.12/kernel/nsproxy.c):
+namespace permission precedes the IPC/semaphore-undo conflict. The old namespace's
+undo list cannot be shared with a new IPC namespace. The helper reads flags and
+the current effective capability bit; it introduces no allocation, ownership,
+reference or teardown path. Full SEM_UNDO behavior and semaphore namespace
+isolation remain unqualified.
+
+The V-only `cloneipc` case runs **1,872 native musl controls per architecture**
+in root/UID1000 initial/one-level PID namespace cohorts. Nested cohorts are
+ordinary PID2 callers supervised by namespace init. PR_SET_KEEPCAPS preserves
+the permitted SYS_ADMIN bit for UID1000. The probe selects and reads back the
+effective bit before each request and clears/reads it back afterward. Each
+cohort starts and finishes with it clear.
+
+| Class | Calls per cohort | Contract |
+| --- | ---: | --- |
+| Authorized conflict, missing cgroup FD | 96 | Eight valid sharing forms, sizes 88/96/128/256, zero extensions and three layouts return EINVAL before INTO_CGROUP lookup. |
+| Authorized conflict, wrong-type FD | 96 | The same forms return EINVAL while the held `/dev/null` descriptor remains usable. |
+| Authorized legacy conflict | 108 | Nine flag forms, four upper-register words and three repetitions return EINVAL; successful original requests are observed and reaped as failures. |
+| Earlier clone3 errors | 60 | Short/oversized structures, inaccessible prefixes/vectors, invalid flags/signals and stack ranges preserve EFAULT/E2BIG/EINVAL. |
+| Permission and bit-absent admission | 72 | Without effective SYS_ADMIN, clone3 (24) and legacy (24) conflicts return EPERM; NEWIPC without SYSVSEM (12) and SYSVSEM without NEWIPC (12) reach missing/wrong-type cgroup EBADF. |
+| Actual fork/reap | 36 | Ordinary clone3 prefixes, ignored cgroup words, UNTRACED and legacy upper-register controls preserve child identity, exit 37 and wait/reap. |
+
+Argument blocks occupy aligned, unaligned or exact-end placements in a read-only
+page followed by an inaccessible page. A snapshot and byte comparison cover
+both pages after each call. `F_GETFD` checks the held wrong-type FD after every
+request. Each cohort creates a private mode-0600 message queue. IPC_STAT must
+still see it after every parent request and in every ordinary child; unwanted
+original NEWIPC children must be unable to see it. An independent pipe reports
+each actual child's PID/TID, parent, UID and queue visibility. The caller's
+`/proc/self/ns/ipc` identity is checked at setup and before/after retention,
+outside its measured loop. Queue removal is verified at teardown. Every actual
+child is reaped with its exit status checked, followed by a
+`waitpid(-1, WNOHANG)` ECHILD check.
+
+The frozen originals fail **1,212 controls per architecture**: 768 cgroup EBADF
+results, 240 unsupported-sharing legacy results, 60 legacy permission-order
+results and **144 unwanted IPC-namespace children**. The test supervises,
+validates and reaps all those unwanted children; it never treats their success
+as conformance. Both phases also complete **144 legitimate fork/reap controls**.
+The corrected kernels and the **identical probe ELF on Linux 6.12.51** pass all
+1,872 controls, with no unwanted children. AArch64 Vinix uses 16 KiB pages;
+x86-64 Vinix and both Linux references use 4 KiB pages.
+
+Four production builds use isolated worktrees frozen at
+`1e90921fd6fd0394e0ba15c6a84bccf1b34f804a`, with retained dependency inputs.
+Exact whole generated-C comparison permits only the new helper/prototype and
+four admission checks. The capability-query callees remain byte-identical and
+contain no allocation/free/pin/lock operations. Probe C and ELF match across
+original/corrected boots, ARM preflight and Linux. The fixture C contains twelve
+explicit `alloca` calls and no V malloc/calloc/realloc/memdup/new-array/fixed-index
+helpers. Both corrected kernel images also pass the `runtime` pthread suite and
+`clonepidguard`'s 1,872 pidfd conflict controls in the retained initial runs.
+Those images are reused unchanged for the queue-canary qualification.
+
+Identical-input retention checks run in all four cohorts on both phases:
+64 warmup cycles, a 13-second settle, snapshot, 200 cycles and another
+13-second settle/snapshot. A cycle repeats each clone3 cgroup conflict, an
+authorized legacy conflict with unsupported FS/handler sharing, permission or
+bit-absent admission, an earlier error and a legitimate fork/reap. Only these
+retention checks accept original refusal codes; the semantic verdict requires
+the Linux errors. The legacy storage inputs are refusals in both phases, so
+repeated successful IPC namespace construction is explicitly outside the
+measurement. Namespace/queue setup, proc identity reads and the originals'
+unwanted-child controls remain outside it. All 18 ARM / 14 x86 slab classes and
+big-heap pages stay flat in this final queue-canary measurement.
+This measures targeted retained kernel storage, not general namespace,
+filesystem/page-cache retention or the previously published EXT2 rename limit.
+
+The initial probe checked proc namespace identity after every call and in each
+actual child. It reproduced the semantic gap and passed both Linux references,
+but all sixteen native cohort measurements failed strict retention on original
+and corrected kernels. For example, corrected ARM root/initial-namespace counters
+grew by 3,000 objects in the 16-byte class, 3,200 in the 256-byte class, 2,600 in
+the 384-byte class and 2,400 in the 512-byte class over 200 cycles; big-heap
+pages stayed 63/63. The watcher also refused the corrected run's nonzero verdict.
+All original sources, C, ELFs, compiler receipts, native/Linux receipts, raw
+serial/aggregate logs, reproduced watcher refusal and hashes are retained.
+
+The final probe replaces per-call proc lookups with queue visibility and checks
+proc identity only outside the measured loop. Clone requests remain identical.
+This narrows the retention qualification; the per-call namespace-identity lookup
+retention remains unresolved and needs allocation-site diagnosis. The auditor
+verifies the exact probe change, all initial semantic outcomes, each strict
+retention failure, the same kernel hashes and the initial passing regressions.
+See [initial input hashes](../tests/linux-compat/results/2026-10-16/cloneipc-identity-retention-inputs.json)
+and [corrected ARM's initial strict refusal](../tests/linux-compat/results/2026-10-16/cloneipc-identity-retention-after-arm-cloneipc.log).
+Temporary host setup failures are also retained with their sources and exact
+captured exec-tool outputs. V run removed their transient host executables;
+those executables are unavailable. The existing compiler destination guard
+remained unchanged, and the final probe uses the canonical preflight path.
+
+The executing auditor verifies all native/Linux receipts, 42 final and 84 initial
+retained native profile files, 2014 SDK inputs, 15146 compiler inputs, 67 dispatch
+inputs, exact source/C scope and raw child/storage outcomes. It runs both an intentionally
+false assertion and a passing-Linux-log-as-original-failure negative control.
+The generated syscall inventory is refreshed from the frozen source plus this
+patch; dispatch coverage remains separate from semantic qualification.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/cloneipc-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/cloneipc-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/cloneipc-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/cloneipc-diagnostic-pins.json).
+Raw original/corrected/Linux, production-build, preflight and regression logs
+accompany them.
+
+NEWUSER credential transitions, user-namespace/security policy, capability and
+namespace races, worker callers, per-thread namespace ownership, valid cgroup
+placement/lifetimes, independent sharing, supplied-stack threads, requested PID
+allocation, complete IPC/semaphore behavior, GNU libc and translated/32-bit paths
+remain separate. The broad libc, installation/sandbox/portal and translation
+gates remain open.

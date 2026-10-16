@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "739add11335a320ae759d71c87aac1bcbfd1b09e9367fab935c4ae3dfb00fc3c",
+    "results": [
+        {
+            "name": "cloneipc",
+            "source_sha256": "c4c2ed5e92fac3add7b3abae0824948cf1a388c52e392a392cd528e4f4734589",
+            "init_sha256": "2a033f33059978da91ab1eec96931d17914d4d9f1fa393e81e01bad49fa87228",
+            "iso_sha256": "3da04405c06cb773d0e22a1b19476bf0746c76f7f9ce982a91469439c397d49b",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

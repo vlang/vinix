@@ -1,0 +1,157 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=84664
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037fe7000
+initramfs: Done (9 entries)
+LINUX CLONEIPC CAPS: ordinary=0 namespace=0 sysadmin=0 permitted_sysadmin=1 keepcaps=1
+LINUX CLONEIPC FD: ordinary=0 namespace=0 wrong=3
+LINUX CLONEIPC QUEUE: ordinary=0 namespace=0 id=65536 mode=0600
+LINUX CLONEIPC COHORT: ordinary=0 namespace=0 self=65090 uid=0 page=4096 raw=468 classes=6 layouts=3 ipc=4026531839
+LINUX CLONEIPC SLAB: ordinary=0 namespace=0 size=16 live=1641/1641 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=0 size=32 live=2898/2898 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=0 size=48 live=328/328 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=0 size=64 live=156/156 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=0 size=96 live=22/22 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=0 size=128 live=20/20 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=0 size=192 live=384/384 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=0 size=256 live=813/813 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=0 size=384 live=576/576 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=0 size=512 live=507/507 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=0 size=768 live=13/13 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=0 size=1024 live=13/13 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=0 size=1536 live=16/16 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=0 size=2048 live=0/0 cycles=200
+LINUX CLONEIPC STORAGE: ordinary=0 namespace=0 cycles=200 big_pages=160/160 PASS
+LINUX CLONEIPC QUEUEREMOVED: ordinary=0 namespace=0 id=65536 removed=1 ipc_unchanged=1
+LINUX CLONEIPC CAPSRESTORED: ordinary=0 namespace=0 sysadmin=0
+LINUX CLONEIPC CASES: ordinary=0 namespace=0 kind=0 calls=96 failures=0
+LINUX CLONEIPC CASES: ordinary=0 namespace=0 kind=1 calls=96 failures=0
+LINUX CLONEIPC CASES: ordinary=0 namespace=0 kind=2 calls=108 failures=0
+LINUX CLONEIPC CASES: ordinary=0 namespace=0 kind=3 calls=60 failures=0
+LINUX CLONEIPC CASES: ordinary=0 namespace=0 kind=4 calls=72 failures=0
+LINUX CLONEIPC CASES: ordinary=0 namespace=0 kind=5 calls=36 failures=0
+LINUX CLONEIPC CHILDREN: ordinary=0 namespace=0 valid=36 unexpected=0
+LINUX CLONEIPC FINAL: ordinary=0 namespace=0 kind=0 calls=96 failures=0
+LINUX CLONEIPC FINAL: ordinary=0 namespace=0 kind=1 calls=96 failures=0
+LINUX CLONEIPC FINAL: ordinary=0 namespace=0 kind=2 calls=108 failures=0
+LINUX CLONEIPC FINAL: ordinary=0 namespace=0 kind=3 calls=60 failures=0
+LINUX CLONEIPC FINAL: ordinary=0 namespace=0 kind=4 calls=72 failures=0
+LINUX CLONEIPC FINAL: ordinary=0 namespace=0 kind=5 calls=36 failures=0
+LINUX CLONEIPC CHILDRENFINAL: ordinary=0 namespace=0 valid=36 unexpected=0
+LINUX CLONEIPC CAPS: ordinary=1 namespace=0 sysadmin=0 permitted_sysadmin=1 keepcaps=1
+LINUX CLONEIPC FD: ordinary=1 namespace=0 wrong=3
+LINUX CLONEIPC QUEUE: ordinary=1 namespace=0 id=131072 mode=0600
+LINUX CLONEIPC COHORT: ordinary=1 namespace=0 self=65499 uid=1000 page=4096 raw=468 classes=6 layouts=3 ipc=4026531839
+LINUX CLONEIPC SLAB: ordinary=1 namespace=0 size=16 live=1656/1656 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=0 size=32 live=2912/2912 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=0 size=48 live=328/328 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=0 size=64 live=157/157 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=0 size=96 live=23/23 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=0 size=128 live=20/20 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=0 size=192 live=388/388 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=0 size=256 live=830/830 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=0 size=384 live=589/589 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=0 size=512 live=519/519 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=0 size=768 live=13/13 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=0 size=1024 live=13/13 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=0 size=1536 live=16/16 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=0 size=2048 live=0/0 cycles=200
+LINUX CLONEIPC STORAGE: ordinary=1 namespace=0 cycles=200 big_pages=160/160 PASS
+LINUX CLONEIPC QUEUEREMOVED: ordinary=1 namespace=0 id=131072 removed=1 ipc_unchanged=1
+LINUX CLONEIPC CAPSRESTORED: ordinary=1 namespace=0 sysadmin=0
+LINUX CLONEIPC CASES: ordinary=1 namespace=0 kind=0 calls=96 failures=0
+LINUX CLONEIPC CASES: ordinary=1 namespace=0 kind=1 calls=96 failures=0
+LINUX CLONEIPC CASES: ordinary=1 namespace=0 kind=2 calls=108 failures=0
+LINUX CLONEIPC CASES: ordinary=1 namespace=0 kind=3 calls=60 failures=0
+LINUX CLONEIPC CASES: ordinary=1 namespace=0 kind=4 calls=72 failures=0
+LINUX CLONEIPC CASES: ordinary=1 namespace=0 kind=5 calls=36 failures=0
+LINUX CLONEIPC CHILDREN: ordinary=1 namespace=0 valid=36 unexpected=0
+LINUX CLONEIPC FINAL: ordinary=1 namespace=0 kind=0 calls=96 failures=0
+LINUX CLONEIPC FINAL: ordinary=1 namespace=0 kind=1 calls=96 failures=0
+LINUX CLONEIPC FINAL: ordinary=1 namespace=0 kind=2 calls=108 failures=0
+LINUX CLONEIPC FINAL: ordinary=1 namespace=0 kind=3 calls=60 failures=0
+LINUX CLONEIPC FINAL: ordinary=1 namespace=0 kind=4 calls=72 failures=0
+LINUX CLONEIPC FINAL: ordinary=1 namespace=0 kind=5 calls=36 failures=0
+LINUX CLONEIPC CHILDRENFINAL: ordinary=1 namespace=0 valid=36 unexpected=0
+LINUX CLONEIPC CAPS: ordinary=0 namespace=1 sysadmin=0 permitted_sysadmin=1 keepcaps=1
+LINUX CLONEIPC FD: ordinary=0 namespace=1 wrong=3
+LINUX CLONEIPC QUEUE: ordinary=0 namespace=1 id=196608 mode=0600
+LINUX CLONEIPC COHORT: ordinary=0 namespace=1 self=2 uid=0 page=4096 raw=468 classes=6 layouts=3 ipc=4026531839
+LINUX CLONEIPC SLAB: ordinary=0 namespace=1 size=16 live=1683/1683 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=1 size=32 live=2929/2929 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=1 size=48 live=339/339 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=1 size=64 live=170/170 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=1 size=96 live=24/24 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=1 size=128 live=21/21 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=1 size=192 live=407/407 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=1 size=256 live=853/853 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=1 size=384 live=607/607 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=1 size=512 live=533/533 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=1 size=768 live=22/22 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=1 size=1024 live=13/13 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=1 size=1536 live=16/16 cycles=200
+LINUX CLONEIPC SLAB: ordinary=0 namespace=1 size=2048 live=0/0 cycles=200
+LINUX CLONEIPC STORAGE: ordinary=0 namespace=1 cycles=200 big_pages=182/182 PASS
+LINUX CLONEIPC QUEUEREMOVED: ordinary=0 namespace=1 id=196608 removed=1 ipc_unchanged=1
+LINUX CLONEIPC CAPSRESTORED: ordinary=0 namespace=1 sysadmin=0
+LINUX CLONEIPC CASES: ordinary=0 namespace=1 kind=0 calls=96 failures=0
+LINUX CLONEIPC CASES: ordinary=0 namespace=1 kind=1 calls=96 failures=0
+LINUX CLONEIPC CASES: ordinary=0 namespace=1 kind=2 calls=108 failures=0
+LINUX CLONEIPC CASES: ordinary=0 namespace=1 kind=3 calls=60 failures=0
+LINUX CLONEIPC CASES: ordinary=0 namespace=1 kind=4 calls=72 failures=0
+LINUX CLONEIPC CASES: ordinary=0 namespace=1 kind=5 calls=36 failures=0
+LINUX CLONEIPC CHILDREN: ordinary=0 namespace=1 valid=36 unexpected=0
+LINUX CLONEIPC FINAL: ordinary=0 namespace=1 kind=0 calls=96 failures=0
+LINUX CLONEIPC FINAL: ordinary=0 namespace=1 kind=1 calls=96 failures=0
+LINUX CLONEIPC FINAL: ordinary=0 namespace=1 kind=2 calls=108 failures=0
+LINUX CLONEIPC FINAL: ordinary=0 namespace=1 kind=3 calls=60 failures=0
+LINUX CLONEIPC FINAL: ordinary=0 namespace=1 kind=4 calls=72 failures=0
+LINUX CLONEIPC FINAL: ordinary=0 namespace=1 kind=5 calls=36 failures=0
+LINUX CLONEIPC CHILDRENFINAL: ordinary=0 namespace=1 valid=36 unexpected=0
+LINUX CLONEIPC CAPS: ordinary=1 namespace=1 sysadmin=0 permitted_sysadmin=1 keepcaps=1
+LINUX CLONEIPC FD: ordinary=1 namespace=1 wrong=3
+LINUX CLONEIPC QUEUE: ordinary=1 namespace=1 id=262144 mode=0600
+LINUX CLONEIPC COHORT: ordinary=1 namespace=1 self=2 uid=1000 page=4096 raw=468 classes=6 layouts=3 ipc=4026531839
+LINUX CLONEIPC SLAB: ordinary=1 namespace=1 size=16 live=1704/1704 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=1 size=32 live=2944/2944 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=1 size=48 live=341/341 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=1 size=64 live=175/175 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=1 size=96 live=25/25 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=1 size=128 live=22/22 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=1 size=192 live=420/420 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=1 size=256 live=875/875 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=1 size=384 live=625/625 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=1 size=512 live=547/547 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=1 size=768 live=21/21 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=1 size=1024 live=14/14 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=1 size=1536 live=16/16 cycles=200
+LINUX CLONEIPC SLAB: ordinary=1 namespace=1 size=2048 live=0/0 cycles=200
+LINUX CLONEIPC STORAGE: ordinary=1 namespace=1 cycles=200 big_pages=182/182 PASS
+LINUX CLONEIPC QUEUEREMOVED: ordinary=1 namespace=1 id=262144 removed=1 ipc_unchanged=1
+LINUX CLONEIPC CAPSRESTORED: ordinary=1 namespace=1 sysadmin=0
+LINUX CLONEIPC CASES: ordinary=1 namespace=1 kind=0 calls=96 failures=0
+LINUX CLONEIPC CASES: ordinary=1 namespace=1 kind=1 calls=96 failures=0
+LINUX CLONEIPC CASES: ordinary=1 namespace=1 kind=2 calls=108 failures=0
+LINUX CLONEIPC CASES: ordinary=1 namespace=1 kind=3 calls=60 failures=0
+LINUX CLONEIPC CASES: ordinary=1 namespace=1 kind=4 calls=72 failures=0
+LINUX CLONEIPC CASES: ordinary=1 namespace=1 kind=5 calls=36 failures=0
+LINUX CLONEIPC CHILDREN: ordinary=1 namespace=1 valid=36 unexpected=0
+LINUX CLONEIPC FINAL: ordinary=1 namespace=1 kind=0 calls=96 failures=0
+LINUX CLONEIPC FINAL: ordinary=1 namespace=1 kind=1 calls=96 failures=0
+LINUX CLONEIPC FINAL: ordinary=1 namespace=1 kind=2 calls=108 failures=0
+LINUX CLONEIPC FINAL: ordinary=1 namespace=1 kind=3 calls=60 failures=0
+LINUX CLONEIPC FINAL: ordinary=1 namespace=1 kind=4 calls=72 failures=0
+LINUX CLONEIPC FINAL: ordinary=1 namespace=1 kind=5 calls=36 failures=0
+LINUX CLONEIPC CHILDRENFINAL: ordinary=1 namespace=1 valid=36 unexpected=0
+LINUX CLONEIPC: PASS
+QEMU: Terminated
+

@@ -1173,6 +1173,15 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   native architectures against identical Linux ELFs. Actual pidfd construction,
   output writes and rollback remain separate. See [the pidfd conflict receipts](docs/linux-posix-qualification.md#native-clone-pidfd-conflicts-and-output-aliasing).
 
+- [x] Reject NEWIPC/SYSVSEM clone conflicts with capability-first EPERM/EINVAL;
+  preserve earlier errors, bit-absent cgroup admission, queue visibility and
+  caller IPC identity.
+  Qualify 1,872 controls per native architecture against identical Linux ELFs,
+  supervise/reap the originals' unwanted children and keep identical refusal/fork
+  cleanup flat. NEWUSER, full SEM_UNDO/isolation, repeated IPC namespace
+  construction and per-call proc identity retention remain separate.
+  See [the IPC clone receipts](docs/linux-posix-qualification.md#native-clone-ipc-namespace-and-semaphore-undo-conflicts).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
