@@ -23,7 +23,7 @@ pub fn build_program(host Host, source string, directory string, name string, mo
 	return build_program_with_flags(host, source, directory, name, module_paths, [])
 }
 
-fn build_program_with_flags(host Host, source string, directory string, name string, module_paths []string, flags []string) !string {
+pub fn build_program_with_flags(host Host, source string, directory string, name string, module_paths []string, flags []string) !string {
 	os.mkdir_all(directory)!
 	c_file := os.join_path(directory, name + '.c')
 	binary := os.join_path(directory, name)

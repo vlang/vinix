@@ -1,0 +1,10 @@
+Seven focused host compile/run checks and both fresh Software image guests passed. Actual Software controller and headless UI trees use real staged package, administrator and isolated-launch services. Physical presentation, graphical login and persistent storage are outside this check.
+list-legacy PASS 0.011s
+list-image PASS 0.005s
+list-software PASS 0.005s
+boot-compile PASS 3.316s
+boot-run PASS 0.268s
+suite-compile PASS 3.347s
+suite-run PASS 0.304s
+aarch64 packages-software-image PASS 22.907s
+x86_64 packages-software-image PASS 27.492s

@@ -240,6 +240,13 @@ including real native applications maintained from a staged configuration withou
 guest-side trust-file edits. Production publisher selection and complete graphical
 login/runtime acceptance remain release responsibilities.
 
+`tests/packages/native-catalog-check.v --software` additionally exercises the
+actual Software controller as ordinary administrator and standard accounts
+against those staged services and real native applications. It requires headless
+ui2 through `VINIX_PACKAGE_TEST_UI2`; see [the integration check](../../tests/packages/software-image-check.md).
+Its UI trees and service transports are qualified separately from graphical
+login, compositor presentation and foreign display/audio brokers.
+
 ## Build and publish
 
 ```sh

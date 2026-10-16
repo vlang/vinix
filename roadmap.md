@@ -621,6 +621,13 @@ boots production-staged tools and maintains Hello, Counter and Memo without
 rewriting the staged configuration. Production publisher selection, catalog
 migration and full graphical/runtime acceptance remain open.
 
+The [ordinary Software image check](tests/packages/software-image-check.md)
+joins the real UI controller with staged trust, authenticated maintenance and
+isolated native launches under administrator/standard accounts on both targets.
+It covers separate private data, updates, rollback and cached reinstall; full
+graphical login/presentation and persistent installed-system acceptance remain
+open.
+
 - [ ] Harden the existing package frontend with trusted repositories, dependency
   resolution, reproducible metadata and consistent architecture support.
 - [ ] Add transactional install/remove/upgrade, rollback, disk-space checks,

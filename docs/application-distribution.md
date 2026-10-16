@@ -16,6 +16,13 @@ The desktop cache tracks the selected input and its contents. See
 [the image contract](../tools/packages/SDK.md#release-image-configuration) and
 [clean-image native catalog qualification](../tests/packages/image-configuration-check.md).
 
+[Ordinary Software image qualification](../tests/packages/software-image-check.md)
+now joins that staged trust with the real administrator and isolated-launch
+services. Both target guests exercise Software's actual controller and UI trees,
+native windows under separate user accounts, updates, rollback and cached
+reinstall. Graphical login/presentation and persistent-device acceptance remain
+separate release gates.
+
 Configuration, cached catalogs, trust histories, installed state and publisher
 documents share a bounded metadata reader. It captures a nonblocking descriptor,
 refuses leaf symlinks and nonregular files, and reads at most the admitted file

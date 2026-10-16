@@ -19,14 +19,17 @@ fn native_artifact(role string, path string) !NativeArtifact {
 	return NativeArtifact{ role: role, bytes: u64(bytes.len), sha256: sha256.sum(bytes).hex() }
 }
 
-fn native_suite(sandbox string, image bool) hwhost.Suite {
+fn native_suite(sandbox string, image bool, software bool) hwhost.Suite {
 	files := [
 		hwhost.RootFile{ path: 'etc/passwd', text: 'root:x:0:0:root:/root:/bin/sh\n' },
 		hwhost.RootFile{ path: 'etc/group', text: 'root:x:0:\ntty:x:5:\n' },
 		hwhost.RootFile{ path: 'etc/vinix/auth.conf', text: 'scrypt_ln = 10\n' },
 	]
 	binaries := [hwhost.RootBinary{ source: sandbox, path: 'usr/bin/vinix-sandbox' }]
-	programs := if image {
+	programs := if software {
+		[hwhost.Program{ source: 'tools/accounts/account.v', path: 'usr/sbin/vinix-account' },
+			hwhost.Program{ source: 'tools/accounts/authd.v', path: 'usr/sbin/vinix-authd' }]
+	} else if image {
 		[hwhost.Program{ source: 'tools/accounts/account.v', path: 'usr/sbin/vinix-account' },
 			hwhost.Program{ source: 'tools/packages/pkgcore/image_configuration_test.v', path: 'usr/share/package-fixtures/image-configuration' }]
 	} else {
@@ -34,19 +37,46 @@ fn native_suite(sandbox string, image bool) hwhost.Suite {
 			hwhost.Program{ source: 'tools/accounts/account.v', path: 'usr/sbin/vinix-account' },
 			hwhost.Program{ source: 'tools/accounts/session.v', path: 'usr/sbin/vinix-session' }]
 	}
-	name := if image { 'packages-native-image' } else { 'packages-native-catalog' }
+	name := if software { 'packages-software-image' } else if image { 'packages-native-image' } else { 'packages-native-catalog' }
 	mut required := ['HWTEST START ' + name,
 		'PACKAGE NATIVE CATALOG six-pinned-packages signed-review architecture notices document-grant protocols-1-2 ordinary-data PASS',
 		'PACKAGE NATIVE CATALOG upgrade rollback uninstall-registration offline-cache-reinstall retained-private-data PASS', 'HWTEST PASS ' + name]
 	if image { required << ['PACKAGE IMAGE CONFIG booted with staged trust policy and launch account before first refresh PASS',
 		'PACKAGE IMAGE CONFIG unchanged staged configuration real native apps upgrade rollback offline reinstall PASS'] }
+	if software {
+		required = ['HWTEST START ' + name, 'HWTEST PASS ' + name,
+			'SOFTWARE IMAGE ordinary-admin real-refresh cancel bad-password review install progress native-window-1-2 document-grant PASS',
+			'SOFTWARE IMAGE standard-account denied-administration own-isolated-launch private-data PASS',
+			'SOFTWARE IMAGE reviewed-update rollback retained-memo PASS',
+			'SOFTWARE IMAGE updates rollback uninstall registration cached-reinstall retained-memo PASS',
+			'SOFTWARE IMAGE unchanged-staged-trust root-owned-state separate-user-data clean-runtime PASS']
+	}
 	return hwhost.Suite{ name: 'package-native-catalog', guest: 'tests/accounts/guest',
 		module_paths: ['.', 'tools/accounts', 'tools/security-events', 'tools/keyring'],
 		programs: programs,
 		files: files, binaries: binaries, directories: ['run', 'home', 'var/log', 'tmp:1777'],
 		scenarios: [hwhost.Scenario{ name: name, arches: ['aarch64', 'x86_64'],
-			about: 'signed six-variant native catalog with real SDK apps, update/rollback and cached reinstall', timeout: 300, ending: .poweroff,
+			about: if software { 'ordinary Software controller with real administration, native-window launch and maintenance services' }
+				else { 'signed six-variant native catalog with real SDK apps, update/rollback and cached reinstall' }, timeout: 300, ending: .poweroff,
 			required: required, forbidden: ['V panic:'] }] }
+}
+
+fn stage_software_image(host hwhost.Host, root string, work string) !NativeArtifact {
+	modules := os.getenv_opt('VINIX_PACKAGE_TEST_UI2') or { host.root + '/build/vmodules' }
+	if !os.is_file(modules + '/ui2/v.mod') { return error('provide VINIX_PACKAGE_TEST_UI2 with a headless ui2 module') }
+	source := work + '/software-source'; os.mkdir(source)!
+	for name in os.ls(host.root + '/desktop')! {
+		if name.starts_with('software_') && name.ends_with('.v') { os.cp(host.root + '/desktop/' + name, source + '/' + name)! }
+	}
+	os.cp(host.root + '/tests/packages/software_image_fixture.v', source + '/main.v')!
+	os.cp(host.root + '/tests/packages/software_terminal_fixture.v', source + '/terminal_fixture.v')!
+	lookup := '@vlib|' + modules + '|@vmodules|' + host.root + '|' + host.root + '/tools/accounts'
+	binary := hwhost.build_program_with_flags(host, source, work + '/software-build', 'software-image', [],
+		['-manualfree', '-enable-globals', '-d', 'ui2_headless', '-path', lookup, '-cflags', '-I' + host.root + '/desktop'])!
+	target := root + '/usr/share/package-fixtures/software-image'
+	os.mkdir_all(os.dir(target))!
+	os.cp(binary, target)!; os.chmod(target, 0o755)!
+	return native_artifact('image/usr/share/package-fixtures/software-image', target)!
 }
 
 // Foreign-target executables are publisher data, not suite programs. Admit all
@@ -123,10 +153,11 @@ fn stage_native_image(host hwhost.Host, inputs string, root string, work string)
 }
 
 fn check() !int {
-	image := '--image' in os.args
-	arguments := os.args[1..].filter(it != '--image')
+	software := '--software' in os.args
+	image := '--image' in os.args || software
+	arguments := os.args[1..].filter(it !in ['--image', '--software'])
 	options := hwhost.parse_options(arguments)!
-	if options.help || options.list { return hwhost.run_suite(native_suite('', image), arguments, @FILE) }
+	if options.help || options.list { return hwhost.run_suite(native_suite('', image, software), arguments, @FILE) }
 	inputs := os.getenv('VINIX_NATIVE_CATALOG_INPUTS')
 	sandbox := os.getenv('VINIX_NATIVE_CATALOG_SANDBOX')
 	if os.getenv('VINIX_HWTEST_TCG') != '1' || !os.is_file(options.kernel) || !os.is_dir(inputs)
@@ -134,10 +165,10 @@ fn check() !int {
 		return error('provide VINIX_HWTEST_TCG=1, VINIX_NATIVE_CATALOG_INPUTS, target VINIX_NATIVE_CATALOG_SANDBOX, --kernel and a new --state-dir')
 	}
 	repository := hwhost.find_root(@FILE)!
-	definition := native_suite(sandbox, image)
+	definition := native_suite(sandbox, image, software)
 	hwhost.validate_scenarios(definition.scenarios)!
 	selection := hwhost.select_scenarios(definition.scenarios, options.arch, options.scenarios)!
-	if selection.run.len != 1 { return error('select packages-native-catalog or --image packages-native-image') }
+	if selection.run.len != 1 { return error('select packages-native-catalog, --image packages-native-image or --software packages-software-image') }
 	host := hwhost.find_host(repository, options.arch, options.qemu)!
 	os.mkdir_all(options.state_dir)!
 	work := os.real_path(options.state_dir)
@@ -148,6 +179,10 @@ fn check() !int {
 	mut artifacts := [native_artifact('kernel', work + '/kernel')!, native_artifact('guest-init', guest)!]
 	for file in definition.files { artifacts << native_artifact(file.path, root + '/' + file.path)! }
 	artifacts << if image { stage_native_image(host, inputs, root, work)! } else { stage_native_inputs(inputs, root)! }
+	if software {
+		artifacts << stage_software_image(host, root, work)!
+		artifacts << native_artifact('image/usr/sbin/vinix-authd', root + '/usr/sbin/vinix-authd')!
+	}
 	for path in ['usr/bin/vinix-package', 'usr/bin/vinix-sandbox', 'usr/sbin/vinix-account', 'usr/sbin/vinix-session'] {
 		artifacts << native_artifact(path, root + '/' + path)!
 	}

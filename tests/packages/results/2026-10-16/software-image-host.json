@@ -1,0 +1,1 @@
+[{"name":"list-legacy","code":0,"seconds":0.011},{"name":"list-image","code":0,"seconds":0.005},{"name":"list-software","code":0,"seconds":0.005},{"name":"boot-compile","code":0,"seconds":3.316},{"name":"boot-run","code":0,"seconds":0.268},{"name":"suite-compile","code":0,"seconds":3.347},{"name":"suite-run","code":0,"seconds":0.304}]
