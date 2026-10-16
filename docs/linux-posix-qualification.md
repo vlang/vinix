@@ -9833,3 +9833,88 @@ other exit notifications and clone-child wait classes, supplied stacks,
 shared-VM/vfork lifetimes, cgroup descriptor ordering/placement and its
 authorization/lifetimes, GNU libc and translated/32-bit paths remain unqualified
 here. The broad libc, installation/sandbox/portal and translation gates remain open.
+
+## Native clone FS and namespace conflicts
+
+Both architectures now reject CLONE_FS combined with CLONE_NEWNS or
+CLONE_NEWUSER with EINVAL through the existing shared clone admission predicate.
+This replaces the earlier ENOTSUP from unsupported sharing and applies to both
+legacy clone and clone3. The scalar check follows clone3 structure/vector,
+flag and stack validation and precedes unsupported sharing, namespace permission
+checks and task creation. It follows
+[Linux v6.12's FS/namespace exclusions](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c).
+This implements invalid-combination errors; actual independent FS ownership and
+user-namespace creation remain separate work.
+
+The `clonefsns` probe runs 1,872 controls per architecture, 468 in each
+root/UID1000 and initial/fresh one-level PID-namespace cohort. Every caller
+is an ordinary process, with effective CAP_SYS_ADMIN cleared and read back.
+Native ARM uses 16 KiB pages; native x86 and both Linux references use 4 KiB.
+The six classes per cohort are:
+
+- 96 clone3 FS/NEWNS conflicts, crossing four ABI sizes, eight flag variants
+  and three argument layouts. Variants include FILES, SYSVSEM, UNTRACED,
+  CLEAR_SIGHAND, NEWPID, NEWNET and PARENT with a zero exit signal.
+- 96 equivalent clone3 FS/NEWUSER conflicts.
+- 108 legacy conflicts: NEWNS, NEWUSER or both, four additional-flag forms,
+  three upper-word forms and three repeated canary placements. Low flags retain
+  SIGCHLD and upper register bits are ignored.
+- 60 clone3 ordering controls: structure sizes and unreadable prefixes,
+  oversized input, selected-TID vector faults/pair errors, invalid signals,
+  reserved/unknown/conflicting flags and invalid stack pairs/ranges.
+- 72 namespace-admission controls without FS, requiring EPERM with effective
+  SYS_ADMIN absent, through clone3 and legacy clone.
+- 36 actual ordinary forks: 24 clone3 calls spanning ABI sizes/UNTRACED and
+  12 legacy upper-word controls. Children verify PID/TID, parent and UID, exit
+  37, and are reaped by their caller.
+
+Clone3 arguments are aligned, unaligned or end exactly at a readable page
+boundary; the following page is protected. The entire two-page input canary must remain
+unchanged, and an empty nonblocking wait must return ECHILD after each call.
+Original kernels fail exactly 1,200 controls per architecture, the three
+conflict classes, with sampled diagnostics verifying ENOTSUP instead of EINVAL.
+Corrected kernels and the identical probe ELFs on Linux 6.12.51 pass every
+control. Both original and corrected phases retain 144 legitimate child
+lifecycles per architecture and create no unintended children.
+
+Four cleanup cohorts run in both phases, after 64 warmup cycles and thirteen
+seconds of settling, followed by 200 measured cycles and another settle.
+Each cycle uses identical FS/namespace refusals through both APIs, a namespace
+permission refusal without FS, and one real ordinary fork/reap. Only this
+retention workload accepts original ENOTSUP or corrected EINVAL; semantic
+controls require exact Linux errors. Every live slab class and big-heap page
+total stays flat. This qualifies the targeted kernel-heap paths, while general
+page/cache retention and the earlier EXT2 rename observation remain separate.
+
+Four isolated original/corrected production builds pass. Whole generated C
+comparison confines the change to the existing scalar sharing predicate: no
+allocation, free, reference, ownership, lock or task-publication changes.
+The probe uses ten explicit stack allocas and no dynamic allocation or
+fixed-index helper. ARM preflight C matches the original guest C; the preflight
+ELF is the canonical ARM Linux reference and must also equal the native probe.
+An initial direct Linux-reference launch omitted the pinned compiler environment
+and failed before boot while compiling its serial adapter. Its raw diagnostic,
+controller/probe and complete refused-state files are retained and pinned;
+the corrected environment launcher produced the successful reference.
+
+Both corrected architectures pass runtime and the 888-control cloneparent
+regression. The auditor verifies exact totals, original failure diagnostics,
+capabilities, credentials/page sizes, legitimate/unintended child counts,
+identical probe C/ELFs, Linux receipts, both phases' storage, all 84 retained
+native case files, 67 frozen dispatch inputs, 2,014 SDK files and 15,146 compiler
+pins. False-assertion and passing-Linux-as-original negative controls must execute
+and fail; compile without `-prod`.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/clonefsns-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/clonefsns-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/clonefsns-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/clonefsns-diagnostic-pins.json).
+Raw original/corrected/Linux, build, preflight, refusal and regression logs
+accompany the receipts. The maintained auditor is `tests/linux-compat/clonefsns-check.v`.
+
+Independent FS/descriptor/signal-handler ownership, user namespaces, concurrent
+argument/mapping/credential changes, worker-thread calls and shared-VM/vfork
+lifetimes, requested PID allocation, supplied-stack execution, other exit
+notifications/wait classes, cgroup descriptor ordering/placement and its
+authorization/lifetimes, GNU libc and translated/32-bit paths remain unqualified
+here. The broad libc, installation/sandbox/portal and translation gates remain open.

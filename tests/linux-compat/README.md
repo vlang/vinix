@@ -2030,3 +2030,14 @@ refusal/fork cleanup cohorts. Use `--cases cloneparent --timeout 1200` with
 fresh state; `cloneparent-reference.v` runs the unchanged ELF on Linux and
 `cloneparent-check.v` audits receipts when compiled without `-prod`.
 See the [qualification report](../../docs/linux-posix-qualification.md#native-clone-and-clone3-init-parent-admission).
+
+The `clonefsns` case checks FS/NEWNS and FS/NEWUSER conflicts through clone
+and clone3, legacy upper words, earlier ABI/import/flag/stack errors, namespace
+permission admission without FS and real fork/reap. Four root/UID1000 and
+initial/one-level PID-namespace cohorts run 1,872 controls per architecture.
+Original kernels fail 1,200; corrected kernels and identical ELFs on Linux pass.
+Both phases retain 144 legitimate children, no unintended children and flat
+identical-input 200-cycle cleanup cohorts. Use `--cases clonefsns --timeout
+1200` with fresh state; `clonefsns-reference.v` runs the unchanged ELF on Linux
+and `clonefsns-check.v` audits receipts when compiled without `-prod`.
+See the [qualification report](../../docs/linux-posix-qualification.md#native-clone-fs-and-namespace-conflicts).

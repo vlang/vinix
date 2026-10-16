@@ -1,0 +1,3 @@
+tests/linux-compat/clonefsns-check.v:371: FAIL: fn main.main: assert false, 'clonefsns assertions must execute'
+      message: clonefsns assertions must execute
+V panic: Assertion failed...

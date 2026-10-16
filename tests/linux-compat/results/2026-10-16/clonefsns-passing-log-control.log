@@ -1,0 +1,3 @@
+tests/linux-compat/clonefsns-check.v:231: FAIL: fn main.failure: assert log.contains('LINUX CLONEFSNS DETAIL:'), 'clonefsns baseline failure markers required'
+      message: clonefsns baseline failure markers required
+V panic: Assertion failed...

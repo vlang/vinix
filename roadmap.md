@@ -1128,6 +1128,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   architectures against identical Linux probe ELFs.
   See [the init-parent receipts](docs/linux-posix-qualification.md#native-clone-and-clone3-init-parent-admission).
 
+- [x] Reject CLONE_FS with NEWNS/NEWUSER using Linux EINVAL through clone
+  and clone3; preserve earlier import/ABI errors, no-FS permission admission and
+  real fork/reap. Qualify 1,872 controls and identical-input cleanup on both
+  native architectures against identical Linux probe ELFs.
+  See [the FS/namespace receipts](docs/linux-posix-qualification.md#native-clone-fs-and-namespace-conflicts).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

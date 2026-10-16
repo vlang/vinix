@@ -1,0 +1,5 @@
+/Users/alex/.cache/vinix-linux-compat/clonefsns-20261016/states/reference-arm/serial.c:27:10: fatal error: 'fcntl.h' file not found
+   27 | #include <fcntl.h>
+      |          ^~~~~~~~~
+1 error generated.
+Command failed

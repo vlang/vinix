@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "e1dd29bd2a80cb608ce78421bab5895ddbd57b0aa7b68080f4df1a81c42d2b5a",
+    "results": [
+        {
+            "name": "clonefsns",
+            "source_sha256": "3dfe5a8c8f16e5e1153d526f0be5d6bc3cb3e2ad60d248920b62dac2beccdd20",
+            "init_sha256": "abe6c59d9183e5fe98a5ace1c50fff12fdda044392a3f3aa042bc3d4a35c2b4d",
+            "iso_sha256": "a9a8b523a3f9f91d5097159edfd7dc1e00c0ba8e38df0185b6b889d0cd0df022",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

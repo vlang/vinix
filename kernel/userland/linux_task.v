@@ -197,9 +197,11 @@ fn valid_clone3_exit_signal(flags u64, signal u64) bool {
 	return signal <= 64 && (signal == 0 || flags & (clone_thread | clone_parent) == 0)
 }
 
-// Linux requires shared handlers to share VM and threads to share handlers.
+// New mount/user namespaces cannot share FS state with their parent. Shared
+// handlers require shared VM, and threads require shared handlers.
 fn valid_clone_sharing(flags u64) bool {
-	return !(flags & clone_sighand != 0 && flags & clone_vm == 0)
+	return !(flags & clone_fs != 0 && flags & (proc.clone_newns | proc.clone_newuser) != 0)
+		&& !(flags & clone_sighand != 0 && flags & clone_vm == 0)
 		&& !(flags & clone_thread != 0 && flags & clone_sighand == 0)
 }
 
