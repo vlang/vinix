@@ -1,0 +1,5 @@
+LAUNCH SERVICE tracked preparation: 1000 small and 16 large cycles per architecture retained 0 bytes
+LAUNCH SERVICE both architectures, independent 1/64-entry snapshots, offline overlay, reusable close, reader release and exact generation lease lifetime PASS
+LAUNCH SERVICE executable identity owns independent paths and retires lookup scratch PASS
+LAUNCH SERVICE tracked preparation refusals: 1000 attempts per path retained 0 bytes
+LAUNCH SERVICE root/lock/config/state/ID and missing/FIFO/hard-linked/busy lease refusals retire scratch, preserve files and permit retry PASS

@@ -15,6 +15,7 @@ pub struct Program {
 pub:
 	source string // relative to the checkout
 	path   string // in the root file system, without a leading slash
+	flags  []string // additional V options for this fixture, such as allocation tracking
 }
 
 // A file written into the root file system as it is given here.
@@ -66,8 +67,8 @@ pub fn build_extras(host Host, suite Suite, directory string) !string {
 		}
 	}
 	for index, program in suite.programs {
-		built := build_program(host, os.join_path(host.root, program.source), os.join_path(directory,
-			'program-${index}'), os.file_name(program.path), suite.module_paths)!
+		built := build_program_with_flags(host, os.join_path(host.root, program.source), os.join_path(directory,
+			'program-${index}'), os.file_name(program.path), suite.module_paths, program.flags)!
 		target := os.join_path(root, program.path)
 		os.mkdir_all(os.dir(target))!
 		os.cp(built, target)!

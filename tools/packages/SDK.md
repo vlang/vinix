@@ -1270,6 +1270,19 @@ pre-execution failures. This ownership contract preserves the sandbox argument
 order, generation context, document grants and literal command tail. See
 [launch-plan ownership qualification](../../tests/packages/launch-ownership-check.md).
 
+The service also owns its loaded launch configuration, installed-state snapshot,
+state-directory path and generation lease as one private preparation object.
+Preparation closes partial ownership after configuration/state/lease refusal;
+the runner closes the complete owner after validation or synchronous child
+completion. Repeated close does not close a subsequently reused descriptor.
+The reader still retires immediately after admission, while the generation lease
+remains held through execution. No new public interface or serialized field is
+introduced. See [launch-service lifecycle checks](../../tests/packages/launch-service-check.md).
+
+On Linux, account-session launch reads its executable identity directly from
+`/proc/self/exe` with bounded stack storage. An unavailable, empty or oversized
+identity refuses with a diagnostic before the session helper starts.
+
 Software's **Launch options…** form exposes these commands for installed apps.
 Enter arguments using single/double quotes to group values and backslash to
 escape the following character outside single quotes. Empty quoted arguments

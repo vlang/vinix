@@ -137,14 +137,39 @@ pub fn (service Service) health() !pkgprotocol.HealthReport {
 	return service.health_locked(directory)
 }
 
-fn (service Service) prepare_launch(id string) !(Config, State, int) {
-	directory := service.directory()!
-	guard := acquire_reader(directory)!
+// This private owner spans preparation, validation and the synchronous child.
+// Its empty configuration must not allocate the normal Policy defaults on
+// construction or reset; only a loaded configuration owns policy storage here.
+struct PreparedLaunch {
+mut:
+	directory string
+	config Config = Config{ policy: Policy{ permissions: [] } }
+	state State
+	lease int = -1
+}
+
+fn (mut prepared PreparedLaunch) close() {
+	if prepared.lease >= 0 { C.close(prepared.lease) }
+	if prepared.state.generation != 0 { close_decoded_state(prepared.state) }
+	close_decoded_configuration(prepared.config)
+	unsafe { prepared.directory.free() }
+	prepared = PreparedLaunch{}
+}
+
+fn (service Service) prepare_launch(id string) !PreparedLaunch {
+	mut prepared := PreparedLaunch{ directory: service.directory()! }
+	mut admitted := false
+	defer { if !admitted { prepared.close() } }
+	guard := acquire_reader(prepared.directory)!
 	defer { guard.release() }
-	config := service.configuration()!
-	if os.geteuid() == 0 { return config, State{}, -1 }
-	state, lease := generation_lease(directory, config.architecture, id)!
-	return config, state, lease
+	prepared.config = service.configuration()!
+	if os.geteuid() != 0 {
+		state, lease := generation_lease(prepared.directory, prepared.config.architecture, id)!
+		prepared.state = state
+		prepared.lease = lease
+	}
+	admitted = true
+	return prepared
 }
 
 pub fn (service Service) run(id string, documents []string) !int {
@@ -170,12 +195,12 @@ pub fn (service Service) run_command(id string, input CommandLaunch, terminal bo
 
 fn (service Service) run_mode(id string, input LaunchInput) !int {
 	if service.root != '' { return error('application launch cannot use an alternate installation root') }
-	config, state, lease := service.prepare_launch(id)!
-	if lease < 0 {
+	mut prepared := service.prepare_launch(id)!
+	defer { prepared.close() }
+	if prepared.lease < 0 {
 		// The ordinary child takes a new lock and rechecks trust. Do not hold the
 		// parent's lock while waiting for the child or its generation lease.
-		return run_in_session_request(config, id, input)
+		return run_in_session_request(prepared.config, id, input)
 	}
-	defer { C.close(lease) }
-	return run_leased_mode(config, state_directory(service.root), state, id, input)
+	return run_leased_mode(prepared.config, prepared.directory, prepared.state, id, input)
 }

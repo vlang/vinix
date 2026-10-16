@@ -69,11 +69,24 @@ fn run_in_session_mode(config Config, id string, documents []string, terminal bo
 	return run_in_session_request(config, id, LaunchInput{ documents: documents, terminal: terminal })
 }
 
+fn session_executable() !string {
+	$if linux {
+		// The pinned os.executable moves its path buffer to an unretired heap
+		// allocation. Read the kernel identity with bounded stack scratch instead.
+		mut bytes := [4097]u8{}
+		count := C.readlinkat(C.AT_FDCWD, c'/proc/self/exe', unsafe { &bytes[0] }, usize(bytes.len))
+		if count <= 0 || count > 4096 {
+			return error('cannot determine package service executable from /proc/self/exe')
+		}
+		return unsafe { tos(&bytes[0], int(count)).clone() }
+	} $else { return os.executable() }
+}
+
 fn run_in_session_request(config Config, id string, input LaunchInput) !int {
 	if os.geteuid() != 0 {
 		return error('only the administrator can create an isolated package session')
 	}
-	executable := os.executable()
+	executable := session_executable()!
 	defer { unsafe { executable.free() } }
 	mut launch := launch_session_request(config, executable, id, input)!
 	defer { launch.close() }

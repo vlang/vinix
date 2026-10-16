@@ -1915,3 +1915,10 @@ document refusal, and the synchronous launch runners close their plan when
 finished. Exact plan comparisons and allocation/sanitizer fixtures retain the
 existing argument order and permission boundaries. See
 [launch-plan ownership qualification](../tests/packages/launch-ownership-check.md).
+
+Launch services group the loaded configuration, installed state, directory path
+and generation lease in one private owner. Failed preparation releases partial
+state; runners retire complete ownership after validation or child completion.
+The reader-lock and generation-lease order is retained, including root's fresh
+ordinary-account handoff. See
+[launch-service lifecycle qualification](../tests/packages/launch-service-check.md).

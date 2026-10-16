@@ -1,0 +1,74 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=24
+!>+ [11] ./sbin/init sz=210896
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/state-schema sz=1548776
+!>+ [15] ./usr/share/package-fixtures/coordination sz=1406864
+!>+ [16] ./usr/share/package-fixtures/launch-service sz=1072768
+!>+ [17] ./usr/share/package-fixtures/command sz=823384
+!>+ [18] ./usr/share/package-fixtures/session sz=702544
+!>+ [19] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e87800
+initramfs: Done (19 entries)
+HWTEST START packages-launch-service
+LAUNCH SERVICE tracked preparation: 1000 small and 16 large cycles per architecture retained 0 bytes
+LAUNCH SERVICE both architectures, independent 1/64-entry snapshots, offline overlay, reusable close, reader release and exact generation lease lifetime PASS
+LAUNCH SERVICE executable identity owns independent paths and retires lookup scratch PASS
+LAUNCH SERVICE tracked preparation refusals: 1000 attempts per path retained 0 bytes
+LAUNCH SERVICE root/lock/config/state/ID and missing/FIFO/hard-linked/busy lease refusals retire scratch, preserve files and permit retry PASS
+LAUNCH SERVICE tracked root: five modes, 1000 refusals each retained 0 bytes
+LAUNCH SERVICE tracked UID 1000: five modes, 1000 refusals each retained 0 bytes
+LAUNCH SERVICE real-root root and UID 1000 runners retire all five launch modes before session/data creation or execution PASS
+LAUNCH SERVICE PROCESS launch-service PASS
+COORDINATION IDENTITY lock/writer refused=true preserved=true
+COORDINATION IDENTITY lock/reader refused=true preserved=true
+COORDINATION IDENTITY lock/status refused=true preserved=true
+COORDINATION IDENTITY generations/1/lease/lease refused=true preserved=true
+COORDINATION IDENTITY generations/1/lease/collection refused=true preserved=true
+COORDINATION IDENTITY generations/1/lease/purge refused=true preserved=true
+COORDINATION IDENTITY state reader/writer/status and launch/collection/purge refuse hard links before mutation; restored entries retry PASS
+COORDINATION IDENTITY captured locks reject replaced/unlinked names and captured-parent lease changes without mutating replacements; restored identities retry PASS
+COORDINATION IDENTITY malformed obsolete lease refuses collection before any generation/cache removal; restored lease permits collection PASS
+COORDINATION IDENTITY 128 repeats of six hard-link refusals retire descriptors under a 32-descriptor limit; busy writer preserves permissions and restored exclusion PASS
+Package coordination: malformed locks refuse promptly without changing special entries or link targets
+Package coordination: malformed and exclusively held generation leases refuse within the deadline
+Package coordination: fresh read-only status stays available; retained metadata without its lock refuses before parsing
+Package coordination: 128 valid and repeated malformed reader/writer/lease cycles preserve exclusion and recovery under a 32-descriptor limit
+LAUNCH SERVICE PROCESS coordination PASS
+Stored state probe: aarch64 missing firmware accepted=false
+Stored state probe: aarch64 missing proprietary accepted=false
+Stored state probe: aarch64 null permissions accepted=false
+Stored state probe: aarch64 missing sdk accepted=false
+Stored state probe: x86_64 missing firmware accepted=false
+Stored state probe: x86_64 missing proprietary accepted=false
+Stored state probe: x86_64 null permissions accepted=false
+Stored state probe: x86_64 missing sdk accepted=false
+Stored state: complete nested declarations, explicit types, ambiguity refusal and legacy window compatibility passed on both architectures
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Downloading app/bin/app (14 bytes)
+Activated package generation 1
+Updating trusted repository publisher
+Installing Application 2.0.0 (1/1) from publisher
+Activated package generation 2
+Activated package generation 4
+Installing Application 2.0.0 (1/1) from publisher
+Activated package generation 5
+Restored packages from generation 2 in generation 5; application data was retained
+Stored state: malformed active/previous metadata preserves activation, trust, payloads, cache and recovery; restoration permits reviewed removal, rollback and collection
+LAUNCH SERVICE PROCESS state-schema PASS
+LAUNCH SERVICE PROCESS session PASS
+LAUNCH SERVICE PROCESS command PASS
+HWTEST PASS packages-launch-service

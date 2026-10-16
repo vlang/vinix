@@ -1,0 +1,17 @@
+BEFORE b6d50e8c1: five calls per path; returned owners/descriptors and errors retired
+PREPARE retained 0 415
+PREPARE retained 1 415
+PREPARE retained 2 19215
+PREPARE retained 3 19215
+PREPARE retained 4 19215
+PREPARE retained 5 19215
+PREPARE retained 6 19215
+
+AFTER: same preparation probes; all seven retain zero
+PREPARE retained 0 0
+PREPARE retained 1 0
+PREPARE retained 2 0
+PREPARE retained 3 0
+PREPARE retained 4 0
+PREPARE retained 5 0
+PREPARE retained 6 0

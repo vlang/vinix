@@ -1,0 +1,3 @@
+LAUNCH SERVICE both architectures, independent 1/64-entry snapshots, offline overlay, reusable close, reader release and exact generation lease lifetime PASS
+LAUNCH SERVICE executable identity owns independent paths and retires lookup scratch PASS
+LAUNCH SERVICE root/lock/config/state/ID and missing/FIFO/hard-linked/busy lease refusals retire scratch, preserve files and permit retry PASS

@@ -1,0 +1,2 @@
+PASS aarch64 packages-launch-service (79.8s)
+package-launch-service aarch64: 1 passed, 0 failed, 0 skipped

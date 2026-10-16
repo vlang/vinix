@@ -31,8 +31,9 @@ fn decode_configuration(text string) !Config {
 	return read_stored_configuration(text)
 }
 
-// Only independently JSON-decoded configurations own these allocations.
-// Service overlays and plans can borrow them and must not call this helper.
+// Independently decoded configurations own these allocations. A service overlay
+// takes those fields from its decoded base and retires them through this helper.
+// Caller-built snapshots and plans can borrow fields and must not retire them.
 fn close_decoded_configuration(config Config) {
 	unsafe {
 		config.architecture.free(); config.launch_user.free()
