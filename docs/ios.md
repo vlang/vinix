@@ -7718,23 +7718,53 @@ C streams and executables, native measurements, IPA consumer inspection and
 joined guest evidence are retained under
 `build/ios/fortnite/sample-buffer-checks`.
 
-Eight more required imports resolve. The actual IPA probe still exits with status
-1 before application entry, now at `_CMTimeGetSeconds`. General CMTime operations,
-image sample construction, codec processing and the system Metal device/renderer
-remain unavailable. Fortnite remains unplayable and full iOS regression remains
-unpassed.
+Eight more required imports resolved. That IPA probe exited with status 1 before
+application entry at `_CMTimeGetSeconds`.
+
+CoreMedia time values now support `CMTimeMake`, `CMTimeMakeWithEpoch`,
+`CMTimeMakeWithSeconds` and `CMTimeGetSeconds`. The 24-byte value uses the iOS
+ARM64 indirect argument/result convention and composes with sample-buffer timing.
+Integer constructors preserve signed 64-bit values and epochs, and clear every
+field for nonpositive timescales. Seconds queries ignore the epoch, honor invalid
+and indefinite flags before infinity flags, and divide numeric values in double
+precision.
+
+The seconds constructor follows measurements of this Mac's CoreMedia library:
+fractional ticks truncate toward zero, including half ticks; conversion back to
+seconds controls the rounded flag. Overflow repeatedly halves the preferred
+timescale, then produces signed infinity if scale one still overflows. The exact
+double-precision boundary at either sign of 2^63 clamps symmetrically to
+plus/minus `INT64_MAX`. NaN produces a rounded zero at the requested positive
+scale. These conversions allocate no objects or backing storage. General time
+arithmetic, scale conversion and mixed-scale sample arithmetic remain unavailable.
+
+The IPA consumer at `0x10a64b418` passes the sample query's stack result directly
+to `CMTimeGetSeconds` before scaling its floating-point result. Native comparisons
+cover constructors, epochs, flag precedence, invalid scales, rounding, subnormals,
+overflow and sample-duration composition, plus 4,096 deterministic bit patterns.
+Eight final host sanitizer runs and four ARM64 guest suites cover time values,
+sample buffers, block buffers and autorelease pools. Eleven final generated C
+streams and executables are retained with native measurements, generated-function
+audits and joined guest evidence under `build/ios/fortnite/cm-time-checks`.
+
+Three more required imports resolve. The actual IPA probe still exits with status
+1 before application entry, now at
+`_CMVideoFormatDescriptionCreateFromH264ParameterSets`. H.264/HEVC parameter-set
+descriptions, image sample construction, codec processing and the system Metal
+device/renderer remain unavailable. Fortnite remains unplayable and full iOS
+regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,632 | 528 | 79 |
+| Fortnite executable | 1,635 | 525 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,467 | 531 | 120 |
+| All images | 2,470 | 528 | 120 |
 
-The C++/GLES/Text variant reports 2,480 resolved imports, 518 unresolved strong
+The C++/GLES/Text variant reports 2,483 resolved imports, 515 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

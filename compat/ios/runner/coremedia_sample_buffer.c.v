@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
-struct CMTime {
-	value i64
-	scale i32
-	flags u32
-	epoch i64
-}
 struct CMSampleTiming {
 	duration CMTime
 	pts CMTime

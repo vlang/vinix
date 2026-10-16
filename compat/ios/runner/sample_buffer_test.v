@@ -128,7 +128,7 @@ fn sb_cases(api SBAPI){
  sb_owners(api)
 }
 fn sb_private(){
- for name in ['_CMSampleBufferCreateForImageBuffer','_CMSampleBufferCopyPCMDataIntoAudioBufferList','_CMTimeMake']!{if _:=runtime_symbol('/System/Library/Frameworks/CoreMedia.framework/CoreMedia',name){assert false}}
+ for name in ['_CMSampleBufferCreateForImageBuffer','_CMSampleBufferCopyPCMDataIntoAudioBufferList','_CMTimeAdd']!{if _:=runtime_symbol('/System/Library/Frameworks/CoreMedia.framework/CoreMedia',name){assert false}}
  for library in ['/System/Library/Frameworks/Foundation.framework/Foundation','/usr/lib/libSystem.B.dylib']!{if _:=runtime_symbol(library,'_CMSampleBufferCreate'){assert false}}
  before:=ios_runtime.live;mut out:=u64(0xfeed);assert cm_sample_create(0,0,0,0,0,0,3,1,unsafe{nil},0,unsafe{nil},&out)==-12731&&out==0
  out=0xfeed;assert cm_sample_create(0,0,0,0,0,0,65537,0,unsafe{nil},0,unsafe{nil},&out)==-12731&&out==0
@@ -151,5 +151,5 @@ fn sb_private(){
 fn test_sample_buffer(){
  $if macos{api:=SBAPI{true,u64(C.dlopen(c'/System/Library/Frameworks/CoreMedia.framework/CoreMedia',2)),u64(C.dlopen(c'/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation',2))};sb_cases(api);println('IOS-SAMPLE-BUFFER-NATIVE: copied timing/sizes,24-byte time return,12-argument creation,owners,readiness callback retry,invalidation and concurrent readers')}
  for _ in 0..2{objc_start();sb_cases(SBAPI{});sb_private();assert ios_runtime.live==ios_runtime.framework_objects.len&&ios_runtime.objects.len==ios_runtime.framework_objects.len;objc_stop();assert ios_runtime.live==0&&ios_runtime.objects.len==0}
- println('IOS-SAMPLE-BUFFER: block data and format owners,copied packed timing/sizes,checked duration/timestamps,readiness callbacks,invalidation,concurrent readers,two drained runtimes;image sample construction,codecs and general CMTime operations remain unavailable')
+ println('IOS-SAMPLE-BUFFER: block data and format owners,copied packed timing/sizes,checked duration/timestamps,readiness callbacks,invalidation,concurrent readers,two drained runtimes;image sample construction,codecs and general CMTime arithmetic remain unavailable')
 }
