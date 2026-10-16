@@ -99,6 +99,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	cm_format_dispose(mut header)
 	cm_block_dispose(mut header)
 	cm_sample_dispose(mut header)
+	reachability_dispose(mut header)
 	bitmap_dispose(object)
 	cg_provider_dispose(object)
 	layout_dispose(object, mut header)

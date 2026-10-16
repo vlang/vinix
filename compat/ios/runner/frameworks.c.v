@@ -6,6 +6,9 @@ import os
 // Framework class descriptors provide inheritance and native subclass layout.
 // Their API methods are implemented individually; absent methods still fail.
 fn framework_symbol(library string, symbol string) ?u64 {
+	if library == '/System/Library/Frameworks/SystemConfiguration.framework/SystemConfiguration' {
+		if address := reachability_symbol(symbol) { return address }
+	}
 	if !library.starts_with('/System/Library/Frameworks/') { return none }
 	if library == '/System/Library/Frameworks/Foundation.framework/Foundation' {
 		if address := ns_url_error_symbol(symbol) { return address }

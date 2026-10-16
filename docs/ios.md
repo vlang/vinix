@@ -7855,23 +7855,63 @@ executables, native measurements and joined guest evidence are retained under
 `CGFontCopyTableForTag` at `0x104844970` and `0x104844ac0`, passing the raw values
 from `CFArrayGetValueAtIndex` as tags while serializing SFNT tables.
 
-Three more required imports resolve in the text runner, and two in the static
-runner. The actual IPA exits with status 1 before application entry at
-`_SCNetworkReachabilityCreateWithAddress` from SystemConfiguration. Image sample
-construction, codec execution and the system Metal device/renderer remain
-unavailable. Fortnite remains unplayable and full iOS regression remains unpassed.
+Three more required imports resolved in the text runner, and two in the static
+runner. That IPA probe stopped before application entry at
+`_SCNetworkReachabilityCreateWithAddress` from SystemConfiguration.
+
+SystemConfiguration reachability targets now snapshot IPv4/IPv6 socket addresses
+and names. Flags come from real routes and interface addresses: default targets
+read the route table, and nonzero addresses use a UDP route lookup without sending
+application data. Local and directly connected flags use the interface snapshot.
+Queries distinguish an unreachable destination from an unavailable query, and
+leave the caller's flags untouched on failure. The Mac implementation reads BSD
+route dumps; Vinix uses bounded rtnetlink dumps with a one-second receive budget.
+Every temporary socket, interface list and native route buffer is released.
+
+Address monitoring polls at 100 ms between scans and delivers observed changes
+on the requested dispatch queue, including main-queue delivery for the existing
+main run loop's default or common mode. An unchanged target produces no synthetic
+initial callback. Pending changes coalesce, and unscheduling invalidates queued
+notifications. Scheduling owns the target and queue until cancellation. Callback
+contexts have independent ownership, so replacement during a running callback
+cannot destroy its info prematurely. Framework dispatch work now cleans up its
+context both after execution and when shutdown cancels it. The watcher joins
+before dispatch workers stop and object metadata is released.
+
+The bounded profile supports 64 simultaneous monitors and names up to 1,024
+bytes. Numeric names and `localhost` use address monitoring. Other unscheduled
+names use the optimistic default-route result without DNS traffic; scheduling
+generic DNS names, secondary run loops and additional run-loop registrations
+remains unsupported and returns failure. Cellular, dial-on-demand, NAT64/DNS64
+and policy-routing semantics remain outside this profile. Route changes shorter
+than a scan can be missed; reachability does not establish server availability.
+
+V tooling measured the installed SystemConfiguration library's address-length
+validation, loopback/default flags, context replacement and scheduled ownership.
+Ten final host sanitizer runs cover reachability, dispatch scheduling, fonts,
+sample buffers and autorelease pools. Four ARM64 suites also cover cancellation,
+reentrant context replacement, background queue delivery, run-loop modes and
+drained runtimes. Twelve final C streams and executables, native measurements,
+generated-code audits and joined guest evidence are retained under
+`build/ios/fortnite/reachability-checks`. The IPA consumer at `0x10009bea8` creates
+an IPv4 default-route target before assigning its dispatch queue and callback.
+
+Seven more required imports resolve. The actual IPA exits with status 1 before
+application entry at `_DCErrorDomain` from DeviceCheck. Image sample construction,
+codec execution and the system Metal device/renderer remain unavailable. Fortnite
+remains unplayable and full iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,639 | 521 | 79 |
+| Fortnite executable | 1,646 | 514 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,474 | 524 | 120 |
+| All images | 2,481 | 517 | 120 |
 
-The C++/GLES/Text variant reports 2,488 resolved imports, 510 unresolved strong
+The C++/GLES/Text variant reports 2,495 resolved imports, 503 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

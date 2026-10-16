@@ -27,6 +27,7 @@ mut:
 	block u64
 	context voidptr
 	function DispatchFunction = unsafe { nil }
+	cleanup DispatchFunction = unsafe { nil }
 	synchronous bool
 	done bool
 }
@@ -306,11 +307,27 @@ fn dispatch_submit(identity u64, when u64, block u64, context voidptr, function 
 	C.pthread_mutex_unlock(dispatch_runtime.mutex)
 }
 
+// Framework work owns its context until execution or cancellation at shutdown.
+// Both cleanup paths run outside the scheduler lock, like block destructors.
+fn dispatch_submit_owned(identity u64, context voidptr, function DispatchFunction, cleanup DispatchFunction) {
+	C.pthread_mutex_lock(dispatch_runtime.mutex)
+	if dispatch_runtime.stopping {
+		C.pthread_mutex_unlock(dispatch_runtime.mutex)
+		cleanup(context)
+		return
+	}
+	queue:=dispatch_queue_locked(identity)
+	mut job:=dispatch_add_locked(queue,0,0,context,function,false)
+	job.cleanup=cleanup
+	C.pthread_mutex_unlock(dispatch_runtime.mutex)
+}
+
 fn dispatch_run(job &DispatchJob) {
 	previous := C.pthread_getspecific(dispatch_runtime.key)
 	C.pthread_setspecific(dispatch_runtime.key, job.queue)
 	pool := if !job.synchronous { objc_pool_push() } else { u64(0) }
 	if job.block != 0 { block_invoke_void(job.block) } else { job.function(job.context) }
+	if job.cleanup != unsafe { nil } { job.cleanup(job.context) }
 	if !job.synchronous { block_release(job.block) }
 	if pool != 0 { objc_pool_pop(pool) }
 	C.pthread_setspecific(dispatch_runtime.key, previous)
@@ -469,6 +486,7 @@ fn dispatch_stop() {
 		dispatch_queue_drop_locked(mut job.queue)
 		C.pthread_mutex_unlock(dispatch_runtime.mutex)
 		block_release(job.block)
+		if job.cleanup != unsafe { nil } { job.cleanup(job.context) }
 		unsafe { free(job) }
 	}
 	dispatch_retire()

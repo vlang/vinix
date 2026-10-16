@@ -98,6 +98,7 @@ mut:
 	cm_format &CMFormatState = unsafe { nil }
 	cm_block &CMBlockState = unsafe { nil }
 	cm_sample &CMSampleState = unsafe { nil }
+	reachability &ReachabilityState = unsafe { nil }
 	provider_info voidptr
 	provider_release u64
 	real_number f64
@@ -371,7 +372,7 @@ fn objc_start() {
         'CAMetalLayer', 'GLKView', 'EAGLContext', 'CMMotionManager', 'CLLocationManager',
         'AVAudioSession', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession',
         'AVCaptureVideoDataOutput', 'AVCaptureVideoPreviewLayer', 'PHPhotoLibrary',
-		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGFont', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor', 'VinixCGImage', 'VinixCGDataProvider', 'VinixSecCertificate', 'VinixSecKey', 'VinixSecPolicy', 'VinixSecTrust', 'VinixCFDate', 'VinixCFError'] {
+		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGFont', 'VinixReachability', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor', 'VinixCGImage', 'VinixCGDataProvider', 'VinixSecCertificate', 'VinixSecKey', 'VinixSecPolicy', 'VinixSecTrust', 'VinixCFDate', 'VinixCFError'] {
 		parent := match name {
 			'NSObject' { u64(0) }
 			'OS_dispatch_object' { ios_runtime.names['OS_object'] }
@@ -630,7 +631,9 @@ fn objc_stop() {
 	connection_require_shutdown()
 	ns_threads_join()
 	swift_tasks_join()
+	reachability_stop()
 	dispatch_stop()
+	reachability_free()
 	connection_stop()
 	audio_stop()
 	ui_context_stop()
