@@ -86,7 +86,8 @@ fn native_suite(sandbox string, image bool, software bool) hwhost.Suite {
 		required << release_audit_markers()[..3]
 		required << 'SOFTWARE IMAGE compact-deployment 320x240 keyboard paging visible release review and audit separate approval PASS'
 	}
-	if image { required << 'PACKAGE IMAGE BUNDLE production-staged signed repository before first refresh PASS' }
+	if image { required << ['PACKAGE IMAGE BUNDLE production-staged signed repository before first refresh PASS',
+		'PACKAGE IMAGE CAPTURE guarded preparation publication checked retirement replacement preservation retry and saved output PASS'] }
 	return hwhost.Suite{ name: 'package-native-catalog', guest: 'tests/accounts/guest',
 		module_paths: ['.', 'tools/accounts', 'tools/security-events', 'tools/keyring'],
 		programs: programs,

@@ -1,0 +1,27 @@
+IMAGE CAPTURE replaced identical captures refuse application reports and declarations; independent review survives checked retirement and saved image bundle remains intact PASS
+IMAGE CATALOG captured both-host exact locks, stable source removal, publish ordering, canonical bytes/digest/mode, no consumer state and identical-file preservation PASS
+IMAGE CATALOG occupied and late file/link/dangling/FIFO/directory/hardlink/shared-write destinations refuse unchanged before publication; removal and retry PASS
+IMAGE CATALOG changed trust/payloads, write/space/flush/checkpoint failures and concurrent destinations refuse safely; saved diagnostics, cleanup and retry PASS
+IMAGE APPLICATIONS reproducible both-host joint locks, signed provenance, runtime/shared closure, app-kind selection and independent reports PASS
+IMAGE APPLICATIONS individually valid conflicting runtimes, missing/wrong-host/nonapp roots, duplicate/invalid/oversized sets and absent bundles refuse without publication; retry PASS
+IMAGE APPLICATIONS organization permissions/allowlist/pins and captured payload integrity remain mandatory before app resolution; restoration/retry PASS
+Updating trusted repository native
+Installing Editor 1.0.0 (1/4) from native
+Downloading editor/bin/runner (43 bytes)
+Installing modern 1.0.0 (2/4) from native
+Installing Runtime 2.0.0 (3/4) from native
+Installing Support 1.0.0 (4/4) from native
+Activated package generation 1
+Updating trusted repository native
+Installing Editor 1.0.0 (1/4) from native
+Downloading editor/bin/runner (43 bytes)
+Installing modern 1.0.0 (2/4) from native
+Installing Runtime 2.0.0 (3/4) from native
+Installing Support 1.0.0 (4/4) from native
+Activated package generation 1
+IMAGE APPLICATIONS exported format-2 locks drive ordinary reviewed offline install and integrity verification for both hosts; staged trust and consumer state remain separate PASS
+IMAGE REQUIREMENTS FILE exact-byte digests, canonical both-host joint locks, inline parity, whitespace/order provenance and independent reports without publication PASS
+IMAGE REQUIREMENTS FILE format-2 pin downgrades, schema/host/empty/invalid/oversized/conflicting sets and missing/aliased/special/oversized files refuse unchanged; restore/retry PASS
+IMAGE DEPLOYMENT EXPORT both-host exact canonical format-2 locks, inline/file parity, independent source/result digests, exclusive atomic publication and independent receipts PASS
+IMAGE DEPLOYMENT EXPORT existing file/link/FIFO/directory/hardlink outputs, direct/aliased image namespaces, unsafe parents, invalid paths and invalid app sets refuse unchanged PASS
+IMAGE DEPLOYMENT EXPORT write/space/checkpoint/flush failures and destination races retire temporary files, report saved outputs accurately and permit safe retry without image writes PASS

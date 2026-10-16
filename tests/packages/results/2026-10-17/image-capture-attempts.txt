@@ -1,0 +1,183 @@
+host attempt 1:
+image_repositories-compile PASS
+image_repositories-run PASS
+image_repositories-sanitize-compile PASS
+image_repositories-sanitize-run PASS
+image_applications-sanitize-compile PASS
+image_applications-sanitize-run failed (1):
+/Users/alex/code/vinix/tools/packages/pkgcore/image_applications_test.v:69: fn test_image_catalog_refuses_identical_replaced_capture_before_report_and_declaration
+    assert denied
+IMAGE CATALOG captured both-host exact locks, stable source removal, publish ordering, canonical bytes/digest/mode, no consumer state and identical-file preservation PASS
+IMAGE CATALOG occupied and late file/link/dangling/FIFO/directory/hardlink/shared-write destinations refuse unchanged before publication; removal and retry PASS
+IMAGE CATALOG changed trust/payloads, write/space/flush/checkpoint failures and concurrent destinations refuse safely; saved diagnostics, cleanup and retry PASS
+IMAGE APPLICATIONS reproducible both-host joint locks, signed provenance, runtime/shared closure, app-kind selection and independent reports PASS
+IMAGE APPLICATIONS individually valid conflicting runtimes, missing/wrong-host/nonapp roots, duplicate/invalid/oversized sets and absent bundles refuse without publication; retry PASS
+IMAGE APPLICATIONS organization permissions/allowlist/pins and captured payload integrity remain mandatory before app resolution; restoration/retry PASS
+Updating trusted repository native
+Installing Editor 1.0.0 (1/4) from native
+Downloading editor/bin/runner (43 bytes)
+Installing modern 1.0.0 (2/4) from native
+Installing Runtime 2.0.0 (3/4) from native
+Installing Support 1.0.0 (4/4) from native
+Activated package generation 1
+Updating trusted repository native
+Installing Editor 1.0.0 (1/4) from native
+Downloading editor/bin/runner (43 bytes)
+Installing modern 1.0.0 (2/4) from native
+Installing Runtime 2.0.0 (3/4) from native
+Installing Support 1.0.0 (4/4) from native
+Activated package generation 1
+IMAGE APPLICATIONS exported format-2 locks drive ordinary reviewed offline install and integrity verification for both hosts; staged trust and consumer state remain separate PASS
+IMAGE REQUIREMENTS FILE exact-byte digests, canonical both-host joint locks, inline parity, whitespace/order provenance and independent reports without publication PASS
+IMAGE REQUIREMENTS FILE format-2 pin downgrades, schema/host/empty/invalid/oversized/conflicting sets and missing/aliased/special/oversized files refuse unchanged; restore/retry PASS
+IMAGE DEPLOYMENT EXPORT both-host exact canonical format-2 locks, inline/file parity, independent source/result digests, exclusive atomic publication and independent receipts PASS
+IMAGE DEPLOYMENT EXPORT existing file/link/FIFO/directory/hardlink outputs, direct/aliased image namespaces, unsafe parents, invalid paths and invalid app sets refuse unchanged PASS
+IMAGE DEPLOYMENT EXPORT write/space/checkpoint/flush failures and destination races retire temporary files, report saved outputs accurately and permit safe retry without image writes PASS
+
+
+regression attempt 1:
+stage-compile PASS
+desktop-cache-compile PASS
+desktop-cache-run PASS
+image_applications-compile PASS
+image_applications-run failed (1):
+/Users/alex/code/vinix/tools/packages/pkgcore/image_applications_test.v:69: fn test_image_catalog_refuses_identical_replaced_capture_before_report_and_declaration
+    assert denied
+IMAGE CATALOG captured both-host exact locks, stable source removal, publish ordering, canonical bytes/digest/mode, no consumer state and identical-file preservation PASS
+IMAGE CATALOG occupied and late file/link/dangling/FIFO/directory/hardlink/shared-write destinations refuse unchanged before publication; removal and retry PASS
+IMAGE CATALOG changed trust/payloads, write/space/flush/checkpoint failures and concurrent destinations refuse safely; saved diagnostics, cleanup and retry PASS
+IMAGE APPLICATIONS reproducible both-host joint locks, signed provenance, runtime/shared closure, app-kind selection and independent reports PASS
+IMAGE APPLICATIONS individually valid conflicting runtimes, missing/wrong-host/nonapp roots, duplicate/invalid/oversized sets and absent bundles refuse without publication; retry PASS
+IMAGE APPLICATIONS organization permissions/allowlist/pins and captured payload integrity remain mandatory before app resolution; restoration/retry PASS
+Updating trusted repository native
+Installing Editor 1.0.0 (1/4) from native
+Downloading editor/bin/runner (43 bytes)
+Installing modern 1.0.0 (2/4) from native
+Installing Runtime 2.0.0 (3/4) from native
+Installing Support 1.0.0 (4/4) from native
+Activated package generation 1
+Updating trusted repository native
+Installing Editor 1.0.0 (1/4) from native
+Downloading editor/bin/runner (43 bytes)
+Installing modern 1.0.0 (2/4) from native
+Installing Runtime 2.0.0 (3/4) from native
+Installing Support 1.0.0 (4/4) from native
+Activated package generation 1
+IMAGE APPLICATIONS exported format-2 locks drive ordinary reviewed offline install and integrity verification for both hosts; staged trust and consumer state remain separate PASS
+IMAGE APPLICATIONS real CLI repeated/position-independent app requirements, canonical compiler-free reports and normal/check refusal before compiler lookup PASS
+IMAGE REQUIREMENTS FILE exact-byte digests, canonical both-host joint locks, inline parity, whitespace/order provenance and independent reports without publication PASS
+IMAGE REQUIREMENTS FILE format-2 pin downgrades, schema/host/empty/invalid/oversized/conflicting sets and missing/aliased/special/oversized files refuse unchanged; restore/retry PASS
+IMAGE REQUIREMENTS FILE CLI both-host inherited/explicit selection, inline override, mutual exclusion and normal/check compiler gates preserve unchanged images PASS
+IMAGE DEPLOYMENT EXPORT both-host exact canonical format-2 locks, inline/file parity, independent source/result digests, exclusive atomic publication and independent receipts PASS
+IMAGE DEPLOYMENT EXPORT existing file/link/FIFO/directory/hardlink outputs, direct/aliased image namespaces, unsafe parents, invalid paths and invalid app sets refuse unchanged PASS
+IMAGE DEPLOYMENT EXPORT write/space/checkpoint/flush failures and destination races retire temporary files, report saved outputs accurately and permit safe retry without image writes PASS
+IMAGE DEPLOYMENT EXPORT real CLI both-host inline/file exports, option placement, compiler bypass, existing-file protection and required context preserve target images PASS
+
+
+host attempt 2:
+image_repositories-compile PASS
+image_repositories-run PASS
+image_repositories-sanitize-compile PASS
+image_repositories-sanitize-run PASS
+image_applications-sanitize-compile PASS
+image_applications-sanitize-run failed (1):
+/Users/alex/code/vinix/tools/packages/pkgcore/image_applications_test.v:77: fn test_image_catalog_refuses_identical_replaced_capture_before_report_and_declaration
+    assert unsafe { &applications }.report() == report && json2.decode[ImageInputCheck](report)!.application_deployment.packages.len == 2
+IMAGE CATALOG captured both-host exact locks, stable source removal, publish ordering, canonical bytes/digest/mode, no consumer state and identical-file preservation PASS
+IMAGE CATALOG occupied and late file/link/dangling/FIFO/directory/hardlink/shared-write destinations refuse unchanged before publication; removal and retry PASS
+IMAGE CATALOG changed trust/payloads, write/space/flush/checkpoint failures and concurrent destinations refuse safely; saved diagnostics, cleanup and retry PASS
+IMAGE APPLICATIONS reproducible both-host joint locks, signed provenance, runtime/shared closure, app-kind selection and independent reports PASS
+IMAGE APPLICATIONS individually valid conflicting runtimes, missing/wrong-host/nonapp roots, duplicate/invalid/oversized sets and absent bundles refuse without publication; retry PASS
+IMAGE APPLICATIONS organization permissions/allowlist/pins and captured payload integrity remain mandatory before app resolution; restoration/retry PASS
+Updating trusted repository native
+Installing Editor 1.0.0 (1/4) from native
+Downloading editor/bin/runner (43 bytes)
+Installing modern 1.0.0 (2/4) from native
+Installing Runtime 2.0.0 (3/4) from native
+Installing Support 1.0.0 (4/4) from native
+Activated package generation 1
+Updating trusted repository native
+Installing Editor 1.0.0 (1/4) from native
+Downloading editor/bin/runner (43 bytes)
+Installing modern 1.0.0 (2/4) from native
+Installing Runtime 2.0.0 (3/4) from native
+Installing Support 1.0.0 (4/4) from native
+Activated package generation 1
+IMAGE APPLICATIONS exported format-2 locks drive ordinary reviewed offline install and integrity verification for both hosts; staged trust and consumer state remain separate PASS
+IMAGE REQUIREMENTS FILE exact-byte digests, canonical both-host joint locks, inline parity, whitespace/order provenance and independent reports without publication PASS
+IMAGE REQUIREMENTS FILE format-2 pin downgrades, schema/host/empty/invalid/oversized/conflicting sets and missing/aliased/special/oversized files refuse unchanged; restore/retry PASS
+IMAGE DEPLOYMENT EXPORT both-host exact canonical format-2 locks, inline/file parity, independent source/result digests, exclusive atomic publication and independent receipts PASS
+IMAGE DEPLOYMENT EXPORT existing file/link/FIFO/directory/hardlink outputs, direct/aliased image namespaces, unsafe parents, invalid paths and invalid app sets refuse unchanged PASS
+IMAGE DEPLOYMENT EXPORT write/space/checkpoint/flush failures and destination races retire temporary files, report saved outputs accurately and permit safe retry without image writes PASS
+
+
+regression attempt 2:
+stage-compile PASS
+desktop-cache-compile PASS
+desktop-cache-run PASS
+image_applications-compile PASS
+image_applications-run failed (1):
+/Users/alex/code/vinix/tools/packages/pkgcore/image_applications_test.v:77: fn test_image_catalog_refuses_identical_replaced_capture_before_report_and_declaration
+    assert unsafe { &applications }.report() == report && json2.decode[ImageInputCheck](report)!.application_deployment.packages.len == 2
+IMAGE CATALOG captured both-host exact locks, stable source removal, publish ordering, canonical bytes/digest/mode, no consumer state and identical-file preservation PASS
+IMAGE CATALOG occupied and late file/link/dangling/FIFO/directory/hardlink/shared-write destinations refuse unchanged before publication; removal and retry PASS
+IMAGE CATALOG changed trust/payloads, write/space/flush/checkpoint failures and concurrent destinations refuse safely; saved diagnostics, cleanup and retry PASS
+IMAGE APPLICATIONS reproducible both-host joint locks, signed provenance, runtime/shared closure, app-kind selection and independent reports PASS
+IMAGE APPLICATIONS individually valid conflicting runtimes, missing/wrong-host/nonapp roots, duplicate/invalid/oversized sets and absent bundles refuse without publication; retry PASS
+IMAGE APPLICATIONS organization permissions/allowlist/pins and captured payload integrity remain mandatory before app resolution; restoration/retry PASS
+Updating trusted repository native
+Installing Editor 1.0.0 (1/4) from native
+Downloading editor/bin/runner (43 bytes)
+Installing modern 1.0.0 (2/4) from native
+Installing Runtime 2.0.0 (3/4) from native
+Installing Support 1.0.0 (4/4) from native
+Activated package generation 1
+Updating trusted repository native
+Installing Editor 1.0.0 (1/4) from native
+Downloading editor/bin/runner (43 bytes)
+Installing modern 1.0.0 (2/4) from native
+Installing Runtime 2.0.0 (3/4) from native
+Installing Support 1.0.0 (4/4) from native
+Activated package generation 1
+IMAGE APPLICATIONS exported format-2 locks drive ordinary reviewed offline install and integrity verification for both hosts; staged trust and consumer state remain separate PASS
+IMAGE APPLICATIONS real CLI repeated/position-independent app requirements, canonical compiler-free reports and normal/check refusal before compiler lookup PASS
+IMAGE REQUIREMENTS FILE exact-byte digests, canonical both-host joint locks, inline parity, whitespace/order provenance and independent reports without publication PASS
+IMAGE REQUIREMENTS FILE format-2 pin downgrades, schema/host/empty/invalid/oversized/conflicting sets and missing/aliased/special/oversized files refuse unchanged; restore/retry PASS
+IMAGE REQUIREMENTS FILE CLI both-host inherited/explicit selection, inline override, mutual exclusion and normal/check compiler gates preserve unchanged images PASS
+IMAGE DEPLOYMENT EXPORT both-host exact canonical format-2 locks, inline/file parity, independent source/result digests, exclusive atomic publication and independent receipts PASS
+IMAGE DEPLOYMENT EXPORT existing file/link/FIFO/directory/hardlink outputs, direct/aliased image namespaces, unsafe parents, invalid paths and invalid app sets refuse unchanged PASS
+IMAGE DEPLOYMENT EXPORT write/space/checkpoint/flush failures and destination races retire temporary files, report saved outputs accurately and permit safe retry without image writes PASS
+IMAGE DEPLOYMENT EXPORT real CLI both-host inline/file exports, option placement, compiler bypass, existing-file protection and required context preserve target images PASS
+
+
+host attempt 3:
+image_repositories-compile PASS
+image_repositories-run PASS
+image_repositories-sanitize-compile PASS
+image_repositories-sanitize-run PASS
+image_applications-sanitize-compile failed (1):
+tools/packages/pkgcore/image_applications_test.v:79:58: error: type `pkgcore.DeploymentLock` has no field named `pins`.
+4 possibilities: `architecture`, `format`, `locked`, `packages`.
+   77 |         assert unsafe { &applications }.report() == report
+   78 |         deployment := json2.decode[ImageInputCheck](report)!.application_deployment
+   79 |         assert deployment.packages == ['editor'] && deployment.pins.len == 2
+      |                                                                ~~~~
+   80 |         assert !os.exists(root + '/var') && os.is_file(root + image_repositories_path + '/native/index.json')
+   81 |     }
+
+
+regression attempt 3:
+stage-compile PASS
+desktop-cache-compile PASS
+desktop-cache-run PASS
+image_applications-compile failed (1):
+tools/packages/pkgcore/image_applications_test.v:79:58: error: type `pkgcore.DeploymentLock` has no field named `pins`.
+4 possibilities: `architecture`, `format`, `locked`, `packages`.
+   77 |         assert unsafe { &applications }.report() == report
+   78 |         deployment := json2.decode[ImageInputCheck](report)!.application_deployment
+   79 |         assert deployment.packages == ['editor'] && deployment.pins.len == 2
+      |                                                                ~~~~
+   80 |         assert !os.exists(root + '/var') && os.is_file(root + image_repositories_path + '/native/index.json')
+   81 |     }
+
+

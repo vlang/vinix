@@ -721,6 +721,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
   package format, signing/publishing process and developer documentation.
 - [ ] Support offline repositories/caches and organization-managed deployment;
   keep firmware, proprietary payload licensing and runtime updates explicit.
+  - [x] [Owned image repository captures](tests/packages/image-capture-check.md)
+    bind preparation, preflight, application declarations and publication to
+    captured directories. Checked retirement preserves replaced recovery trees,
+    closes metadata/descriptors and reports refusal; export flush errors retain
+    saved bundles, and fresh captures permit explicit retry.
   - [x] [Captured mirror/release staging](tests/packages/export-retirement-check.md)
     preserves replaced roots/parents during failed-export cleanup, inventories
     owned trees without alias traversal and publishes through the captured

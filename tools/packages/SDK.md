@@ -280,18 +280,31 @@ directory. Source changes or removal cannot redirect the capture. Both temporary
 and destination space are checked with 64 MiB of build headroom, including the
 two simultaneous copies when they share a filesystem. The final image bundle is
 verified again, flushed and published with an exclusive atomic directory rename.
-Expiry is rechecked before publication. Failed copies or validation remove the
-unpublished image stage and preserve any existing bundle. An identical destination
+Expiry is rechecked before publication. Failed copies or validation retire the
+captured ordinary image stage and preserve any existing bundle. An identical destination
 is verified and retained; different or damaged contents refuse rather than being
 updated. Retry with the same valid source or rebuild a fresh staging image.
 
 For V image builders, call `configuration.prepare_repositories(source)` after
 `prepare_image_configuration`, publish the returned `ImageRepositories` before
-publishing configuration, and call `close()` on both plans on every path. Bundle
-close is repeatable. Publication binds the admitted image root and exact captured
+publishing configuration, and call `close()` on both plans on every path. Call
+`image_repositories.retire()!` before reporting successful preparation/staging
+when cleanup diagnostics must reach the caller; the production staging tool does
+this in check and normal modes. Retirement always closes descriptors and metadata,
+including when it refuses deletion. `close()` keeps its best-effort behavior;
+both calls are repeatable. Publication binds the admitted image root and exact captured
 configuration; changed trust/policy or a replaced root refuses. Keep image
 ancestors controlled throughout staging. The complete tool/image build remains
 per-file staging and must succeed before its output is distributed.
+
+The private capture and publication stage retain their parent/root identities.
+Capture checks reject even a byte-identical replacement before preflight,
+application declaration or publication, and recheck after staging checkpoints.
+Cleanup uses captured directories without following leaf aliases; replaced or
+unsafe roots remain for inspection with a refusal diagnostic from checked
+retirement or the failed export. Renamed parents cannot redirect deletion into
+their replacements. A final directory-flush failure retains the published bundle
+and reports its saved path. See [capture qualification](../../tests/packages/image-capture-check.md).
 
 No consumer catalog, replay floor, generation or installed state is created by
 bundling. After boot, normal Refresh authenticates the bundled index and normal

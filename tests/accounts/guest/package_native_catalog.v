@@ -127,6 +127,10 @@ fn image_repository_assertions(mut t Test) ! {
 	fixture := run(['/usr/share/package-fixtures/image-repositories'], '', none, none)
 	assert fixture.status == 0, fixture.output
 	assert fixture.output.contains('PACKAGE IMAGE BUNDLE captured signed closure atomic publication offline dependency install both architectures PASS')
+	assert fixture.output.contains('IMAGE CAPTURE 80 capture/prepared/publication root and parent substitutions preserve replacements, recovery, trust and source; checked retirement and retry under 32 descriptors both targets PASS')
+	assert fixture.output.contains('IMAGE CAPTURE identical capture replacement after publication copy refuses, retires only owned output scratch and preserves both capture trees PASS')
+	assert fixture.output.contains('IMAGE CAPTURE flush refusal retains complete output; unsafe capture retirement preserves recovery, reports refusal, closes metadata and permits repeated close PASS')
+	t.say('PACKAGE IMAGE CAPTURE guarded preparation publication checked retirement replacement preservation retry and saved output PASS')
 	t.say('PACKAGE IMAGE BUNDLE production-staged signed repository before first refresh PASS')
 }
 

@@ -88,6 +88,7 @@ fn stage() ! {
 			unsafe { &image_configuration }.check_applications(unsafe { &image_repositories }, required_applications)!
 		} else { unsafe { &image_configuration }.check_repositories(unsafe { &image_repositories })! }
 		defer { unsafe { report.free() } }
+		image_repositories.retire()!
 		print(report); return
 	} else if applications != '' {
 		image_applications = unsafe { &image_configuration }.prepare_application_file(unsafe { &image_repositories }, applications)!
@@ -167,6 +168,7 @@ fn stage() ! {
 	if !os.exists(registration) && !os.is_link(registration) {
 		os.symlink('/var/lib/vinix-packages/current/share/applications', registration)!
 	}
+	image_repositories.retire()!
 	println('Staged signed package service and Software launcher (${architecture})')
 }
 

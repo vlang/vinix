@@ -1,0 +1,17 @@
+IMAGE CAPTURE baseline close replacement-preserved=false
+tools/packages/pkgcore/image_repositories_test.v:68: fn test_image_bundle_close_preserves_replaced_capture_root
+    assert preserved == 'replacement must survive' && os.is_dir(work + '/saved-capture/native') && os.ls(root)!.len == 0
+IMAGE CAPTURE baseline publication refused=true replacement-preserved=false
+tools/packages/pkgcore/image_repositories_test.v:83: fn test_image_bundle_failed_publication_preserves_replaced_stage_root
+    assert refused && preserved && os.is_dir(parent + '/saved-stage/native') && !os.exists(root + image_repositories_path)
+Updating trusted repository native
+Installing Offline app 1.0.0 (1/2) from native
+Downloading app/share/data (38 bytes)
+Installing Offline support 1.0.0 (2/2) from native
+Activated package generation 1
+Updating trusted repository native
+Installing Offline app 1.0.0 (1/2) from native
+Downloading app/share/data (38 bytes)
+Installing Offline support 1.0.0 (2/2) from native
+Activated package generation 1
+PACKAGE IMAGE BUNDLE captured signed closure atomic publication offline dependency install both architectures PASS

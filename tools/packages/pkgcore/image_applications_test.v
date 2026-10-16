@@ -50,6 +50,38 @@ fn image_apps_config(work string, architecture string, key string, policy Policy
 	return path
 }
 
+fn test_image_catalog_refuses_identical_replaced_capture_before_report_and_declaration() {
+	for architecture in ['aarch64', 'x86_64']! {
+		work, key := image_apps_fixture()!; defer { os.rmdir_all(work) or {} }
+		root := work + '/image'; os.mkdir(root)!
+		source := image_apps_config(work, architecture, key, Policy{})!
+		mut configuration := prepare_image_configuration(root, architecture, source)!; defer { configuration.close() }
+		mut repositories := unsafe { &configuration }.prepare_repositories(work + '/bundle')!
+		mut applications := unsafe { &configuration }.prepare_applications(unsafe { &repositories }, ['editor'])!
+		defer { applications.close() }
+		report := unsafe { &applications }.report()
+		assert unsafe { &repositories }.publish()! && unsafe { &configuration }.publish()!
+		mut current := prepare_image_configuration(root, architecture, '')!; defer { current.close() }
+		capture := repositories.capture.clone()
+		defer { os.rmdir_all(capture) or {} }
+		os.rename(capture, work + '/saved-capture')!; os.cp_all(work + '/saved-capture', capture, true)!
+		mut denied := false
+		unsafe { &current }.check_applications(unsafe { &repositories }, ['editor']) or { denied = err.msg().contains('staging root identity changed') }
+		assert denied
+		denied = false
+		unsafe { &applications }.publish(unsafe { &repositories }) or { denied = err.msg().contains('staging root identity changed') }
+		assert denied && !os.exists(root + pkgprotocol.image_applications_path)
+		denied = false; repositories.retire() or { denied = true }
+		assert denied && repositories.capture == '' && os.is_dir(capture + '/native') && os.is_dir(work + '/saved-capture/native')
+		repositories.close()
+		assert unsafe { &applications }.report() == report
+		deployment := json2.decode[ImageInputCheck](report)!.application_deployment
+		assert deployment.packages == ['editor'] && deployment.locked.map(it.id) == ['editor', 'support']
+		assert !os.exists(root + '/var') && os.is_file(root + image_repositories_path + '/native/index.json')
+	}
+	println('IMAGE CAPTURE replaced identical captures refuse application reports and declarations; independent review survives checked retirement and saved image bundle remains intact PASS')
+}
+
 fn test_image_catalog_declaration_captures_publishes_and_preserves_exact_both_host_locks() {
 	for architecture in ['aarch64', 'x86_64']! {
 		work, key := image_apps_fixture()!; defer { os.rmdir_all(work) or {} }

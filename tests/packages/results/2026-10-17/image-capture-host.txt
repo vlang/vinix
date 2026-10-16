@@ -1,0 +1,7 @@
+image_repositories-compile PASS
+image_repositories-run PASS
+image_repositories-sanitize-compile PASS
+image_repositories-sanitize-run PASS
+image_applications-sanitize-compile PASS
+image_applications-sanitize-run PASS
+Image capture: six host build/test checks PASS

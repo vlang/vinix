@@ -24,13 +24,17 @@ pub struct ImageRepositories {
 	inode u64
 	needed u64
 mut:
+	// capture borrows the owned guard's path; the guard alone closes it.
 	capture string
+	capture_stage ExportStage
 	repositories []ImageRepository
 }
 
 struct ImageRepositoriesOptions {
 	available_space fn (string) !u64 = free_bytes
 	checkpoint fn (string, string) ! = mirror_no_checkpoint
+	temporary_directory fn () string = os.temp_dir
+	flush fn (int) int = atomic_flush
 }
 
 fn image_repository_objects(index Index) !map[string]Payload {
@@ -106,6 +110,7 @@ fn (plan &ImageRepositories) current() ! {
 }
 
 fn (plan &ImageRepositories) verify(directory string, mode u32) ! {
+	if directory == plan.capture && plan.capture != '' { plan.capture_stage.check()! }
 	mut entries := map[string]u64{}
 	defer { unsafe { entries.free() } }
 	for repository in plan.repositories { entries[repository.id] = 0 }
@@ -183,17 +188,29 @@ fn (configuration &ImageConfiguration) prepare_repositories_with(source string, 
 	}
 	// Check both filesystems before making a potentially large private capture.
 	ancestor := image_repositories_parents(plan.root)!
-	temporary := os.real_path(os.temp_dir())
-	defer { unsafe { ancestor.free(); temporary.free() } }
+	temporary_path := options.temporary_directory()
+	temporary := os.real_path(temporary_path)
+	defer { unsafe { ancestor.free(); temporary_path.free(); temporary.free() } }
 	disk_check(options.available_space(ancestor)!, needed, 64 * 1024 * 1024)!
 	scratch := if os.stat(ancestor)!.dev == os.stat(temporary)!.dev { mirror_cost(needed, needed)! } else { needed }
 	disk_check(options.available_space(temporary)!, scratch, 64 * 1024 * 1024)!
-	plan.capture = export_stage(temporary, '.vinix-image-repositories')!
-	for item in plan.repositories { image_repository_copy(physical + '/' + item.id, plan.capture + '/' + item.id, item)! }
-	unsafe { &plan }.verify(plan.capture, 0o700)!
-	options.checkpoint('captured', plan.capture)!
+	mut capturing := create_export_stage(temporary, '.vinix-image-repositories', 'image repository capture')!
+	mut transferred := false
+	defer { if !transferred { capturing.close() } }
+	unsafe { &plan }.capture_from(physical, options, mut capturing) or { return capturing.failure(err) }
+	plan.capture_stage = capturing
+	plan.capture = capturing.path
+	transferred = true
 	accepted = true
 	return ImageRepositories{ ...plan, needed: needed }
+}
+
+fn (plan &ImageRepositories) capture_from(source string, options ImageRepositoriesOptions, mut capturing ExportStage) ! {
+	for item in plan.repositories { image_repository_copy(source + '/' + item.id, capturing.path + '/' + item.id, item)! }
+	plan.verify(capturing.path, 0o700)!
+	options.checkpoint('captured', capturing.path)!
+	capturing.check()!
+	plan.verify(capturing.path, 0o700)!
 }
 
 pub fn (plan &ImageRepositories) publish() !bool { return plan.publish_with(ImageRepositoriesOptions{}) }
@@ -201,6 +218,7 @@ pub fn (plan &ImageRepositories) publish() !bool { return plan.publish_with(Imag
 fn (plan &ImageRepositories) publish_with(options ImageRepositoriesOptions) !bool {
 	if plan.capture == '' { return false }
 	plan.current()!
+	plan.verify(plan.capture, 0o700)!
 	ancestor := image_repositories_parents(plan.root)!
 	defer { unsafe { ancestor.free() } }
 	target := plan.root + image_repositories_path
@@ -211,11 +229,19 @@ fn (plan &ImageRepositories) publish_with(options ImageRepositoriesOptions) !boo
 	os.mkdir_all(parent, mode: 0o755)!
 	checked := image_repositories_parents(plan.root)!
 	unsafe { checked.free() }
-	stage := export_stage(parent, '.vinix-image-repositories')!
-	mut published := false
-	defer { if !published { os.rmdir_all(stage) or {} }; unsafe { stage.free() } }
+	mut exporting := create_export_stage(parent, '.vinix-image-repositories', 'image repositories')!
+	defer { exporting.close() }
+	plan.write_stage(target, options, mut exporting) or { return exporting.failure(err) }
+	return true
+}
+
+fn (plan &ImageRepositories) write_stage(target string, options ImageRepositoriesOptions, mut exporting ExportStage) ! {
+	stage := exporting.path
+	plan.capture_stage.check()!
 	for item in plan.repositories { image_repository_copy(plan.capture + '/' + item.id, stage + '/' + item.id, item)! }
 	options.checkpoint('staged', stage)!
+	exporting.check()!
+	plan.verify(plan.capture, 0o700)!
 	plan.verify(stage, 0o700)!
 	plan.current()!
 	checked_parent := image_repositories_parents(plan.root)!
@@ -223,18 +249,32 @@ fn (plan &ImageRepositories) publish_with(options ImageRepositoriesOptions) !boo
 	os.chmod(stage, 0o755)!
 	sync_directory(stage)!
 	plan.verify(stage, 0o755)!
-	publish_new_directory(stage, target, 'image repositories')!
-	published = true
-	sync_directory(parent) or { return error('image repositories saved, but parent flush failed; inspect the staged image before retrying') }
-	return true
+	exporting.publish_with(target, options.flush)!
+}
+
+// Report refusal while always closing descriptors/metadata. Replaced recovery
+// trees remain on disk for inspection. close() retains its best-effort contract.
+pub fn (mut plan ImageRepositories) retire() ! {
+	defer { plan.close_metadata() }
+	if plan.capture != '' {
+		plan.capture_stage.retire() or {
+			message := err.msg()
+			defer { unsafe { message.free(); err.free() } }
+			return error('image repository capture cleanup refused at ' + plan.capture + ': ' + message + '; retain recovery data for inspection')
+		}
+	}
 }
 
 pub fn (mut plan ImageRepositories) close() {
-	if plan.capture != '' { os.rmdir_all(plan.capture) or {} }
+	plan.retire() or { message := err.msg(); unsafe { message.free(); err.free() } }
+}
+
+fn (mut plan ImageRepositories) close_metadata() {
 	for item in plan.repositories {
 		unsafe { item.id.free(); item.text.free(); item.signature.free() }
 		close_decoded_index(item.index)
 	}
-	unsafe { plan.root.free(); plan.configuration.free(); plan.architecture.free(); plan.capture.free(); plan.repositories.free() }
+	plan.capture_stage.close()
+	unsafe { plan.root.free(); plan.configuration.free(); plan.architecture.free(); plan.repositories.free() }
 	plan = ImageRepositories{}
 }

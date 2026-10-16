@@ -45,6 +45,11 @@ configuration's fixed target URLs after signature, dependency, policy and payloa
 verification. Existing bundles are preserved or refused, and consumer package
 state stays untouched until normal Refresh. See [the bundle contract](../tools/packages/SDK.md#offline-repository-bundles-in-release-images)
 and [qualification](../tests/packages/image-repositories-check.md).
+Private image captures and publication stages now retain directory identities.
+Replaced captures refuse preflight, declaration and publication; cleanup preserves
+replacement/recovery trees, and a saved bundle survives a final flush failure.
+The staging tool reports checked capture-retirement refusals before declaring
+success. See [capture checks](../tests/packages/image-capture-check.md).
 
 Release builders can also require their advertised app IDs with repeated
 `stage.v --require-app ID`. Preflight and normal staging reject missing host
