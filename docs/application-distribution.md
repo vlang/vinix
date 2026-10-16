@@ -31,6 +31,13 @@ and cached reinstall through the ordinary Software controller. Tools still boot
 from initramfs; installed OS boot and physical-device/crash acceptance remain
 separate work.
 
+The [installed-system check](../tests/packages/software-installed-check.md) adds
+the kernel's real blank-disk installer and three subsequent boots of the same
+installed VJFS root. Software maintains the native catalog with unchanged tool
+hashes and retained trust, accounts, package state and user data. Test boot media
+still supplies the kernel; graphical sessions, autonomous firmware boot and
+broader catalog/runtime/device acceptance remain separate gates.
+
 Release staging also accepts `--repositories DIRECTORY` or
 `VINIX_PACKAGE_IMAGE_REPOSITORIES` for a complete signed offline bundle. It
 captures reviewed publisher exports before compilation and publishes them at the

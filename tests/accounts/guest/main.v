@@ -78,6 +78,7 @@ fn main() {
 		'packages-native-image' { scenario_packages_native_image(mut t) }
 		'packages-software-image' { scenario_packages_software_image(mut t) }
 		'packages-software-persistence' { scenario_packages_software_persistence(mut t) }
+		'packages-software-installed' { scenario_packages_software_persistence(mut t) }
 		'packages-admin' { scenario_packages_admin(mut t) }
 		'packages-isolated-launch' { scenario_packages_isolated_launch(mut t) }
 		'packages-launch-data' { scenario_packages_launch_data(mut t) }

@@ -1,0 +1,14 @@
+Nine native controller/hash checks, eight actual installed-root boots and eight ext2 subtree regression boots passed. The normal kernel installer formats each blank 4 GiB system disk as VJFS. Subsequent boots retain the complete root and maintain the native SDK catalog through ordinary Software.
+controller-compile PASS 17.46s
+list-legacy PASS 0.245s
+list-image PASS 0.002s
+list-software PASS 0.002s
+list-persistent PASS 0.002s
+list-installed PASS 0.002s
+installed-input-refusal PASS 0.002s
+hash-compile PASS 2.146s
+hash-run PASS 0.165s
+aarch64 installed four boots PASS 75.047s
+aarch64 persistent four boots PASS 62.494s
+x86_64 installed four boots PASS 76.521s
+x86_64 persistent four boots PASS 65.594s

@@ -634,6 +634,13 @@ upgrades, rolls back, removes and reinstalls the native catalog from cache.
 Installed OS boot, graphical presentation and broader device/crash acceptance
 remain open.
 
+The [installed-system Software check](tests/packages/software-installed-check.md)
+uses the real blank-disk installer and reboots the installed VJFS root to maintain
+the native SDK catalog. It checks staged tools, accounts, trust, package state
+and private data across install, upgrade, rollback, removal and cached reinstall.
+Autonomous firmware boot, graphical presentation, production catalog migration
+and broader runtime/device acceptance remain open.
+
 Release image builders can now [bundle signed offline repositories](tools/packages/SDK.md#offline-repository-bundles-in-release-images)
 through the production staging tool. The bundle retains the reviewed publisher
 and target URLs, checks complete closures and organization/license/firmware policy,

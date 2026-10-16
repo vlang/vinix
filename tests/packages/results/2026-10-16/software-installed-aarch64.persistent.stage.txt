@@ -1,0 +1,790 @@
+tools/packages/pkgadmin/socket.c.v:84:2: notice: variable `path` shadows a function declaration
+   82 |     private_directory(directory, uid)!
+   83 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+   84 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+   85 |     mut accepted := false
+   86 |     defer { if !accepted { unsafe { path.free() } } }
+tools/packages/pkgadmin/socket.c.v:103:2: notice: variable `path` shadows a function declaration
+  101 |     private_directory(directory, uid)!
+  102 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+  103 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+  104 |     defer { unsafe { path.free() } }
+  105 |     location := address(path)!
+tools/packages/pkgcore/configuration.v:4:4: notice: unused function: `configuration_field`
+    2 | module pkgcore
+    3 | 
+    4 | fn configuration_field(parent string, key string) bool {
+      |    ~~~~~~~~~~~~~~~~~~~
+    5 |     return match parent {
+    6 |         '' { key in ['format', 'architecture', 'repositories', 'policy', 'launch_user']! }
+tools/packages/pkgcore/configuration.v:14:4: notice: unused function: `configuration_value_type`
+   12 | }
+   13 | 
+   14 | fn configuration_value_type(parent string, key string, token u8) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~
+   15 |     if parent == '' {
+   16 |         if key == 'format' { return token == `-` || (token >= `0` && token <= `9`) }
+tools/packages/pkgcore/document_keys.v:27:4: notice: unused function: `document_keys`
+   25 | // independent key sets. Decode escaped
+   26 | // key spelling before comparison; never reinterpret already validated values.
+   27 | fn document_keys(text string, allowed fn (string, string) bool) ! {
+      |    ~~~~~~~~~~~~~
+   28 |     document_keys_required(text, allowed, document_optional_fields)!
+   29 | }
+tools/packages/pkgcore/history_schema.v:8:4: notice: unused function: `trust_history_field`
+    6 | }
+    7 | 
+    8 | fn trust_history_field(parent string, key string) bool {
+      |    ~~~~~~~~~~~~~~~~~~~
+    9 |     return if parent == '' { key in ['format', 'repositories']! }
+   10 |         else { parent == 'repositories' && history_floor_field(key) }
+tools/packages/pkgcore/history_schema.v:13:4: notice: unused function: `release_history_field`
+   11 | }
+   12 | 
+   13 | fn release_history_field(parent string, key string) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+   14 |     return if parent == '' { key in ['format', 'indexes']! }
+   15 |         else { parent == 'indexes' && history_floor_field(key) }
+tools/packages/pkgcore/history_schema.v:24:4: notice: unused function: `trust_history_required`
+   22 | }
+   23 | 
+   24 | fn trust_history_required(parent string, keys []string) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~~
+   25 |     if parent == '' {
+   26 |         for key in ['format', 'repositories']! {
+tools/packages/pkgcore/history_schema.v:32:4: notice: unused function: `release_history_required`
+   30 | }
+   31 | 
+   32 | fn release_history_required(parent string, keys []string) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~
+   33 |     if parent == '' {
+   34 |         for key in ['format', 'indexes']! {
+tools/packages/pkgcore/history_schema.v:40:4: notice: unused function: `history_value_type`
+   38 | }
+   39 | 
+   40 | fn history_value_type(parent string, key string, token u8) bool {
+      |    ~~~~~~~~~~~~~~~~~~
+   41 |     if parent == '' && key in ['repositories', 'indexes']! { return token == `[` }
+   42 |     if key in ['format', 'sequence']! { return token >= `0` && token <= `9` }
+tools/packages/pkgcore/policy.v:81:4: notice: unused function: `read_policy_document`
+   79 | }
+   80 | 
+   81 | fn read_policy_document(path string, architecture string) !PolicyDocument {
+      |    ~~~~~~~~~~~~~~~~~~~~
+   82 |     text := read_metadata(path)!
+   83 |     defer { unsafe { text.free() } }
+tools/packages/pkgcore/progress.v:16:4: notice: unused function: `monitor_transfer`
+   14 | // Borrowed event strings are valid during the callback; retaining observers
+   15 | // clone them. Monitoring reaps the transfer child before returning on any error.
+   16 | fn monitor_transfer(mut process os.Process, destination string, maximum u64, event pkgprotocol.Progress, report fn (pkgprotocol.Progress)) ! {
+      |    ~~~~~~~~~~~~~~~~
+   17 |     code := monitor_transfer_status(mut process, destination, maximum, event, report)!
+   18 |     if code != 0 { return error('download failed (${code}); retained partial data for retry') }
+tools/packages/pkgcore/snapshot_schema.v:4:4: notice: unused function: `snapshot_field`
+    2 | module pkgcore
+    3 | 
+    4 | fn snapshot_field(parent string, key string) bool {
+      |    ~~~~~~~~~~~~~~
+    5 |     return if parent == '' { key in ['repository', 'text', 'signature']! }
+    6 |         else { parent == 'repository' && key in ['id', 'url', 'public_key']! }
+tools/packages/pkgcore/snapshot_schema.v:9:4: notice: unused function: `snapshot_required`
+    7 | }
+    8 | 
+    9 | fn snapshot_required(parent string, keys []string) ! {
+      |    ~~~~~~~~~~~~~~~~~
+   10 |     if parent == '' {
+   11 |         for key in ['repository', 'text', 'signature']! {
+tools/packages/pkgcore/snapshot_schema.v:21:4: notice: unused function: `snapshot_value_type`
+   19 | }
+   20 | 
+   21 | fn snapshot_value_type(parent string, key string, token u8) bool {
+      |    ~~~~~~~~~~~~~~~~~~~
+   22 |     return if parent == '' && key == 'repository' { token == `{` } else { token == `"` }
+   23 | }
+tools/packages/pkgcore/state.v:21:4: notice: unused function: `state_required_fields`
+   19 | }
+   20 | 
+   21 | fn state_required_fields(parent string, keys []string) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+   22 |     if parent == '' {
+   23 |         for key in ['format', 'generation', 'previous', 'architecture', 'requested', 'packages']! {
+tools/packages/pkgcore/state.v:38:4: notice: unused function: `state_value_type`
+   36 | }
+   37 | 
+   38 | fn state_value_type(parent string, key string, token u8) bool {
+      |    ~~~~~~~~~~~~~~~~
+   39 |     if parent == '' {
+   40 |         if key in ['requested', 'packages']! { return token == `[` }
+tools/packages/pkgcore/transaction.v:189:4: notice: unused function: `cached_payload`
+  187 | }
+  188 | 
+  189 | fn cached_payload(config Config, installed Installed, payload Payload, directory string) !string {
+      |    ~~~~~~~~~~~~~~
+  190 |     return cached_payload_progress(config, installed, payload, directory, no_progress)
+  191 | }
+tools/packages/pkgcore/transaction.v:302:4: notice: unused function: `activate_plan_locked`
+  300 | // Callers validate the complete plan and any review identity under the writer
+  301 | // lock before reaching this shared transactional activation boundary.
+  302 | fn activate_plan_locked(config Config, directory string, current State, plan Plan, operation string, options TransactionOptions) !State {
+      |    ~~~~~~~~~~~~~~~~~~~~
+  303 |     repairs := transaction_repairs(directory, current, plan, operation)
+  304 |     defer { close_transaction_repairs(repairs) }
+tools/packages/signing/internal/edwards25519/element.v:736:4: notice: unused function: `swap_endianness`
+  734 | }
+  735 | 
+  736 | fn swap_endianness(mut buf []u8) []u8 {
+      |    ~~~~~~~~~~~~~~~
+  737 |     for i := 0; i < buf.len / 2; i++ {
+  738 |         buf[i], buf[buf.len - i - 1] = buf[buf.len - i - 1], buf[i]
+tools/packages/signing/internal/edwards25519/point.v:478:4: notice: unused function: `check_on_curve`
+  476 | }
+  477 | 
+  478 | fn check_on_curve(points ...Point) bool {
+      |    ~~~~~~~~~~~~~~
+  479 |     for p in points {
+  480 |         mut xx := Element{}
+tools/packages/signing/internal/edwards25519/scalar.v:1151:4: notice: unused function: `generate_notzero_scalar`
+ 1149 | type NotZeroScalar = Scalar
+ 1150 | 
+ 1151 | fn generate_notzero_scalar(size int) !NotZeroScalar {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+ 1152 |     mut s := Scalar{}
+ 1153 |     for s == sc_zero {
+/tmp/vinix-package-stage-90824/vinix-package.c:6327:9: warning: "atomic_thread_fence" redefined
+ 6327 | #define atomic_thread_fence(order) __atomic_thread_fence(order)
+      |         ^~~~~~~~~~~~~~~~~~~
+In file included from /tmp/vinix-package-stage-90824/vinix-package.c:1551:
+/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/lib/gcc/aarch64-linux-musl/14.2.0/include/stdatomic.h:98:9: note: this is the location of the previous definition
+   98 | #define atomic_thread_fence(MO) __atomic_thread_fence (MO)
+      |         ^~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c:6483:9: warning: "v_signal_with_handler_cast" redefined
+ 6483 | #define v_signal_with_handler_cast(sig, handler) signal((sig), ((void (*)(int))(handler)))
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c:1826:9: note: this is the location of the previous definition
+ 1826 | #define v_signal_with_handler_cast(sig, handler) signal((sig), (void (*)(int))(handler))
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c:11860:450: warning: integer constant is so large that it is unsigned
+11860 | const u64 strconv__ten_pow_table_64[20] = {((u64)(1)), ((u64)(10)), ((u64)(100)), ((u64)(1000)), ((u64)(10000)), ((u64)(100000)), ((u64)(1000000)), ((u64)(10000000)), ((u64)(100000000)), ((u64)(1000000000)), ((u64)(10000000000)), ((u64)(100000000000)), ((u64)(1000000000000)), ((u64)(10000000000000)), ((u64)(100000000000000)), ((u64)(1000000000000000)), ((u64)(10000000000000000)), ((u64)(100000000000000000)), ((u64)(1000000000000000000)), ((u64)(10000000000000000000))};
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                  ^~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c:12502:56: warning: integer constant is so large that it is unsigned
+12502 | const unsigned__Uint128 unsigned__uint128_max = {.lo = 18446744073709551615, .hi = 18446744073709551615};
+      |                                                        ^~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c:12502:84: warning: integer constant is so large that it is unsigned
+12502 | const unsigned__Uint128 unsigned__uint128_max = {.lo = 18446744073709551615, .hi = 18446744073709551615};
+      |                                                                                    ^~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'rune__map_to':
+/tmp/vinix-package-stage-90824/vinix-package.c:87075:32: warning: initialization discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+87075 |                 i32* cur_map = &builtin__rune_maps[middle * builtin__rune_maps_columns_in_row];
+      |                                ^
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'strconv__atou64':
+/tmp/vinix-package-stage-90824/vinix-package.c:88621:61: warning: integer constant is so large that it is unsigned
+88621 |         __v_result_u64 __or_opt_0 = strconv__atou_common(s, builtin__max_u64);
+      |                                                             ^~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'strconv__common_parse_uint2':
+/tmp/vinix-package-stage-90824/vinix-package.c:88838:42: warning: integer constant is so large that it is unsigned
+88838 |         u64 cutoff = (({ u64 _t1 = (u64)(builtin__max_u64); u64 _t2 = (u64)((u64)(base)); if (_t2 == 0) v_panic(_S("division by zero")); (u64)(_t1 / _t2); })) + (u64)(1);
+      |                                          ^~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c:88841:30: warning: integer constant is so large that it is unsigned
+88841 |                 __if_val_0 = builtin__max_u64;
+      |                              ^~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'strconv__dec_digits':
+/tmp/vinix-package-stage-90824/vinix-package.c:89128:50: warning: integer constant is so large that it is unsigned
+89128 |                                         if (n <= 9999999999999999999) {
+      |                                                  ^~~~~~~~~~~~~~~~~~~
+In function 'v3_string_zpad',
+    inlined from 'v3_i64_zpad.constprop' at /tmp/vinix-package-stage-90824/vinix-package.c:6620:61:
+/tmp/vinix-package-stage-90824/vinix-package.c:6618:319: warning: 'memcpy' specified bound between 9223372036854775808 and 18446744073709551615 exceeds maximum object size 9223372036854775807 [-Wstringop-overflow=]
+ 6618 | static inline string v3_string_zpad(string s, int width) { if (s.len >= width) return s; int sign = s.len > 0 && (s.str[0] == '-' || s.str[0] == '+'); int pad = width - s.len; u8* out = malloc_noscan((ptrdiff_t)width + 1); int pos = 0; if (sign) out[pos++] = s.str[0]; memset(out + pos, '0', (size_t)pad); pos += pad; memcpy(out + pos, s.str + sign, (size_t)(s.len - sign)); out[width] = 0; return (string){.str = out, .len = width, .is_lit = 0}; }
+      |                                                                                                                                                                                                                                                                                                                               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17432:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'json2__Json5Scanner__scan_string' at /tmp/vinix-package-stage-90824/vinix-package.c:35554:5:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 2 bytes from a region of size 1 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'json2__Json5Scanner__scan_string':
+/tmp/vinix-package-stage-90824/vinix-package.c:35553:36: note: source object '__arr_val_5' of size 1
+35553 |                                 u8 __arr_val_5 = byte;
+      |                                    ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17434:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'json2__Json5Scanner__scan_string' at /tmp/vinix-package-stage-90824/vinix-package.c:35554:5:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 4 bytes from a region of size 1 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'json2__Json5Scanner__scan_string':
+/tmp/vinix-package-stage-90824/vinix-package.c:35553:36: note: source object '__arr_val_5' of size 1
+35553 |                                 u8 __arr_val_5 = byte;
+      |                                    ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17436:4,
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17427:13,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'json2__Json5Scanner__scan_string' at /tmp/vinix-package-stage-90824/vinix-package.c:35554:5:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 8 bytes from a region of size 1 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'json2__Json5Scanner__scan_string':
+/tmp/vinix-package-stage-90824/vinix-package.c:35553:36: note: source object '__arr_val_5' of size 1
+35553 |                                 u8 __arr_val_5 = byte;
+      |                                    ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17438:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'json2__Json5Scanner__scan_string' at /tmp/vinix-package-stage-90824/vinix-package.c:35554:5:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 16 bytes from a region of size 1 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'json2__Json5Scanner__scan_string':
+/tmp/vinix-package-stage-90824/vinix-package.c:35553:36: note: source object '__arr_val_5' of size 1
+35553 |                                 u8 __arr_val_5 = byte;
+      |                                    ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17440:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'json2__Json5Scanner__scan_string' at /tmp/vinix-package-stage-90824/vinix-package.c:35554:5:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 3 or more bytes from a region of size 1 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'json2__Json5Scanner__scan_string':
+/tmp/vinix-package-stage-90824/vinix-package.c:35553:36: note: source object '__arr_val_5' of size 1
+35553 |                                 u8 __arr_val_5 = byte;
+      |                                    ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17436:4,
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17427:13,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'seed__time_seed_array' at /tmp/vinix-package-stage-90824/vinix-package.c:87148:4:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 8 bytes from a region of size 4 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'seed__time_seed_array':
+/tmp/vinix-package-stage-90824/vinix-package.c:87147:29: note: source object '__arr_val_0' of size 4
+87147 |                         u32 __arr_val_0 = seed__nr_next(seed);
+      |                             ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17438:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'seed__time_seed_array' at /tmp/vinix-package-stage-90824/vinix-package.c:87148:4:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 16 bytes from a region of size 4 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'seed__time_seed_array':
+/tmp/vinix-package-stage-90824/vinix-package.c:87147:29: note: source object '__arr_val_0' of size 4
+87147 |                         u32 __arr_val_0 = seed__nr_next(seed);
+      |                             ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17436:4,
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17427:13,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'seed__time_seed_array' at /tmp/vinix-package-stage-90824/vinix-package.c:87148:4,
+    inlined from 'seed__time_seed_64' at /tmp/vinix-package-stage-90824/vinix-package.c:87129:20:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 8 bytes from a region of size 4 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'seed__time_seed_64':
+/tmp/vinix-package-stage-90824/vinix-package.c:87147:29: note: source object '__arr_val_0' of size 4
+87147 |                         u32 __arr_val_0 = seed__nr_next(seed);
+      |                             ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17438:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'seed__time_seed_array' at /tmp/vinix-package-stage-90824/vinix-package.c:87148:4,
+    inlined from 'seed__time_seed_64' at /tmp/vinix-package-stage-90824/vinix-package.c:87129:20:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 16 bytes from a region of size 4 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'seed__time_seed_64':
+/tmp/vinix-package-stage-90824/vinix-package.c:87147:29: note: source object '__arr_val_0' of size 4
+87147 |                         u32 __arr_val_0 = seed__nr_next(seed);
+      |                             ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17436:4,
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17427:13,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'seed__time_seed_array' at /tmp/vinix-package-stage-90824/vinix-package.c:87148:4,
+    inlined from 'rand__init' at /tmp/vinix-package-stage-90824/vinix-package.c:86946:76:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 8 bytes from a region of size 4 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'rand__init':
+/tmp/vinix-package-stage-90824/vinix-package.c:87147:29: note: source object '__arr_val_0' of size 4
+87147 |                         u32 __arr_val_0 = seed__nr_next(seed);
+      |                             ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17438:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'seed__time_seed_array' at /tmp/vinix-package-stage-90824/vinix-package.c:87148:4,
+    inlined from 'rand__init' at /tmp/vinix-package-stage-90824/vinix-package.c:86946:76:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 16 bytes from a region of size 4 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'rand__init':
+/tmp/vinix-package-stage-90824/vinix-package.c:87147:29: note: source object '__arr_val_0' of size 4
+87147 |                         u32 __arr_val_0 = seed__nr_next(seed);
+      |                             ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17438:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'math__digits' at /tmp/vinix-package-stage-90824/vinix-package.c:39234:3:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 16 bytes from a region of size 8 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'math__digits':
+/tmp/vinix-package-stage-90824/vinix-package.c:39233:21: note: source object '__arr_val_1' of size 8
+39233 |                 i64 __arr_val_1 = (i64)(n - (next_n * b));
+      |                     ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17432:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'json2__Encoder__encode_unicode_escape' at /tmp/vinix-package-stage-90824/vinix-package.c:25064:4:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 2 bytes from a region of size 1 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'json2__Encoder__encode_unicode_escape':
+/tmp/vinix-package-stage-90824/vinix-package.c:25063:28: note: source object '__arr_val_3' of size 1
+25063 |                         u8 __arr_val_3 = string__at(hex, (i64)((({ u32 _t1 = (u32)(                     code); u64 _t2 = (u64)(shift); _t2 >= 32 ? (u32)0 : (u32)(_t1 >> _t2); })) & 0xf));
+      |                            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17434:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'json2__Encoder__encode_unicode_escape' at /tmp/vinix-package-stage-90824/vinix-package.c:25064:4:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 4 bytes from a region of size 1 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'json2__Encoder__encode_unicode_escape':
+/tmp/vinix-package-stage-90824/vinix-package.c:25063:28: note: source object '__arr_val_3' of size 1
+25063 |                         u8 __arr_val_3 = string__at(hex, (i64)((({ u32 _t1 = (u32)(                     code); u64 _t2 = (u64)(shift); _t2 >= 32 ? (u32)0 : (u32)(_t1 >> _t2); })) & 0xf));
+      |                            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17436:4,
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17427:13,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'json2__Encoder__encode_unicode_escape' at /tmp/vinix-package-stage-90824/vinix-package.c:25064:4:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 8 bytes from a region of size 1 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'json2__Encoder__encode_unicode_escape':
+/tmp/vinix-package-stage-90824/vinix-package.c:25063:28: note: source object '__arr_val_3' of size 1
+25063 |                         u8 __arr_val_3 = string__at(hex, (i64)((({ u32 _t1 = (u32)(                     code); u64 _t2 = (u64)(shift); _t2 >= 32 ? (u32)0 : (u32)(_t1 >> _t2); })) & 0xf));
+      |                            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17438:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'json2__Encoder__encode_unicode_escape' at /tmp/vinix-package-stage-90824/vinix-package.c:25064:4:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 16 bytes from a region of size 1 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'json2__Encoder__encode_unicode_escape':
+/tmp/vinix-package-stage-90824/vinix-package.c:25063:28: note: source object '__arr_val_3' of size 1
+25063 |                         u8 __arr_val_3 = string__at(hex, (i64)((({ u32 _t1 = (u32)(                     code); u64 _t2 = (u64)(shift); _t2 >= 32 ? (u32)0 : (u32)(_t1 >> _t2); })) & 0xf));
+      |                            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17440:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'json2__Encoder__encode_unicode_escape' at /tmp/vinix-package-stage-90824/vinix-package.c:25064:4:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 3 or more bytes from a region of size 1 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'json2__Encoder__encode_unicode_escape':
+/tmp/vinix-package-stage-90824/vinix-package.c:25063:28: note: source object '__arr_val_3' of size 1
+25063 |                         u8 __arr_val_3 = string__at(hex, (i64)((({ u32 _t1 = (u32)(                     code); u64 _t2 = (u64)(shift); _t2 >= 32 ? (u32)0 : (u32)(_t1 >> _t2); })) & 0xf));
+      |                            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17436:4,
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17427:13,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'string__runes' at /tmp/vinix-package-stage-90824/vinix-package.c:90499:552:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 8 bytes from a region of size 4 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'string__runes':
+/tmp/vinix-package-stage-90824/vinix-package.c:90499:88: note: source object '__v3_internal_symbol_scalar_push_value_0' of size 4
+90499 |                         { Array* __v3_internal_symbol_scalar_push_base_0 = &runes; u32 __v3_internal_symbol_scalar_push_value_0 = __arr_val_1; if (__v3_internal_symbol_scalar_push_base_0->len >= 0 && __v3_internal_symbol_scalar_push_base_0->len < __v3_internal_symbol_scalar_push_base_0->cap && !(__v3_internal_symbol_scalar_push_base_0->flags & ArrayFlags__is_slice)) { ((u32*)__v3_internal_symbol_scalar_push_base_0->data)[__v3_internal_symbol_scalar_push_base_0->len] = __v3_internal_symbol_scalar_push_value_0; __v3_internal_symbol_scalar_push_base_0->len++; } else { array_push(__v3_internal_symbol_scalar_push_base_0, &__v3_internal_symbol_scalar_push_value_0); } }
+      |                                                                                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17438:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'string__runes' at /tmp/vinix-package-stage-90824/vinix-package.c:90499:552:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 16 bytes from a region of size 4 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'string__runes':
+/tmp/vinix-package-stage-90824/vinix-package.c:90499:88: note: source object '__v3_internal_symbol_scalar_push_value_0' of size 4
+90499 |                         { Array* __v3_internal_symbol_scalar_push_base_0 = &runes; u32 __v3_internal_symbol_scalar_push_value_0 = __arr_val_1; if (__v3_internal_symbol_scalar_push_base_0->len >= 0 && __v3_internal_symbol_scalar_push_base_0->len < __v3_internal_symbol_scalar_push_base_0->cap && !(__v3_internal_symbol_scalar_push_base_0->flags & ArrayFlags__is_slice)) { ((u32*)__v3_internal_symbol_scalar_push_base_0->data)[__v3_internal_symbol_scalar_push_base_0->len] = __v3_internal_symbol_scalar_push_value_0; __v3_internal_symbol_scalar_push_base_0->len++; } else { array_push(__v3_internal_symbol_scalar_push_base_0, &__v3_internal_symbol_scalar_push_value_0); } }
+      |                                                                                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17438:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'big__positive_integer' at /tmp/vinix-package-stage-90824/vinix-package.c:15663:2:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 16 bytes from a region of size 8 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'big__positive_integer':
+/tmp/vinix-package-stage-90824/vinix-package.c:15662:13: note: source object '__arr_val_1' of size 8
+15662 |         u64 __arr_val_1 = (u64)(x);
+      |             ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17432:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'pkgcore__new_snapshot_encoding' at /tmp/vinix-package-stage-90824/vinix-package.c:67100:2:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 2 bytes from a region of size 1 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'pkgcore__new_snapshot_encoding':
+/tmp/vinix-package-stage-90824/vinix-package.c:67099:12: note: source object '__arr_val_0' of size 1
+67099 |         u8 __arr_val_0 = (u8)('[');
+      |            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17434:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'pkgcore__new_snapshot_encoding' at /tmp/vinix-package-stage-90824/vinix-package.c:67100:2:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 4 bytes from a region of size 1 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'pkgcore__new_snapshot_encoding':
+/tmp/vinix-package-stage-90824/vinix-package.c:67099:12: note: source object '__arr_val_0' of size 1
+67099 |         u8 __arr_val_0 = (u8)('[');
+      |            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17436:4,
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17427:13,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'pkgcore__new_snapshot_encoding' at /tmp/vinix-package-stage-90824/vinix-package.c:67100:2:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 8 bytes from a region of size 1 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'pkgcore__new_snapshot_encoding':
+/tmp/vinix-package-stage-90824/vinix-package.c:67099:12: note: source object '__arr_val_0' of size 1
+67099 |         u8 __arr_val_0 = (u8)('[');
+      |            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17438:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'pkgcore__new_snapshot_encoding' at /tmp/vinix-package-stage-90824/vinix-package.c:67100:2:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 16 bytes from a region of size 1 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'pkgcore__new_snapshot_encoding':
+/tmp/vinix-package-stage-90824/vinix-package.c:67099:12: note: source object '__arr_val_0' of size 1
+67099 |         u8 __arr_val_0 = (u8)('[');
+      |            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-package.c:17440:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-package.c:14871:3,
+    inlined from 'pkgcore__new_snapshot_encoding' at /tmp/vinix-package-stage-90824/vinix-package.c:67100:2:
+/tmp/vinix-package-stage-90824/vinix-package.c:93512:24: warning: 'memcpy' reading 3 or more bytes from a region of size 1 [-Wstringop-overread]
+93512 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-package.c: In function 'pkgcore__new_snapshot_encoding':
+/tmp/vinix-package-stage-90824/vinix-package.c:67099:12: note: source object '__arr_val_0' of size 1
+67099 |         u8 __arr_val_0 = (u8)('[');
+      |            ^~~~~~~~~~~
+tools/packages/pkgadmin/socket.c.v:84:2: notice: variable `path` shadows a function declaration
+   82 |     private_directory(directory, uid)!
+   83 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+   84 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+   85 |     mut accepted := false
+   86 |     defer { if !accepted { unsafe { path.free() } } }
+tools/packages/pkgadmin/socket.c.v:103:2: notice: variable `path` shadows a function declaration
+  101 |     private_directory(directory, uid)!
+  102 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+  103 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+  104 |     defer { unsafe { path.free() } }
+  105 |     location := address(path)!
+/tmp/vinix-package-stage-90824/vinix-session.c:5194:9: warning: "atomic_thread_fence" redefined
+ 5194 | #define atomic_thread_fence(order) __atomic_thread_fence(order)
+      |         ^~~~~~~~~~~~~~~~~~~
+In file included from /tmp/vinix-package-stage-90824/vinix-session.c:1403:
+/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/lib/gcc/aarch64-linux-musl/14.2.0/include/stdatomic.h:98:9: note: this is the location of the previous definition
+   98 | #define atomic_thread_fence(MO) __atomic_thread_fence (MO)
+      |         ^~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c:5350:9: warning: "v_signal_with_handler_cast" redefined
+ 5350 | #define v_signal_with_handler_cast(sig, handler) signal((sig), ((void (*)(int))(handler)))
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c:1678:9: note: this is the location of the previous definition
+ 1678 | #define v_signal_with_handler_cast(sig, handler) signal((sig), (void (*)(int))(handler))
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c:8437:450: warning: integer constant is so large that it is unsigned
+ 8437 | const u64 strconv__ten_pow_table_64[20] = {((u64)(1)), ((u64)(10)), ((u64)(100)), ((u64)(1000)), ((u64)(10000)), ((u64)(100000)), ((u64)(1000000)), ((u64)(10000000)), ((u64)(100000000)), ((u64)(1000000000)), ((u64)(10000000000)), ((u64)(100000000000)), ((u64)(1000000000000)), ((u64)(10000000000000)), ((u64)(100000000000000)), ((u64)(1000000000000000)), ((u64)(10000000000000000)), ((u64)(100000000000000000)), ((u64)(1000000000000000000)), ((u64)(10000000000000000000))};
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                  ^~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'rune__map_to':
+/tmp/vinix-package-stage-90824/vinix-session.c:23839:32: warning: initialization discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+23839 |                 i32* cur_map = &builtin__rune_maps[middle * builtin__rune_maps_columns_in_row];
+      |                                ^
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'strconv__atou64':
+/tmp/vinix-package-stage-90824/vinix-session.c:25601:61: warning: integer constant is so large that it is unsigned
+25601 |         __v_result_u64 __or_opt_0 = strconv__atou_common(s, builtin__max_u64);
+      |                                                             ^~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'strconv__common_parse_uint2':
+/tmp/vinix-package-stage-90824/vinix-session.c:25818:42: warning: integer constant is so large that it is unsigned
+25818 |         u64 cutoff = (({ u64 _t1 = (u64)(builtin__max_u64); u64 _t2 = (u64)((u64)(base)); if (_t2 == 0) v_panic(_S("division by zero")); (u64)(_t1 / _t2); })) + (u64)(1);
+      |                                          ^~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c:25821:30: warning: integer constant is so large that it is unsigned
+25821 |                 __if_val_0 = builtin__max_u64;
+      |                              ^~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'strconv__dec_digits':
+/tmp/vinix-package-stage-90824/vinix-session.c:26108:50: warning: integer constant is so large that it is unsigned
+26108 |                                         if (n <= 9999999999999999999) {
+      |                                                  ^~~~~~~~~~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13276:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'json2__Json5Scanner__scan_string' at /tmp/vinix-package-stage-90824/vinix-session.c:18624:5:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 2 bytes from a region of size 1 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'json2__Json5Scanner__scan_string':
+/tmp/vinix-package-stage-90824/vinix-session.c:18623:36: note: source object '__arr_val_5' of size 1
+18623 |                                 u8 __arr_val_5 = byte;
+      |                                    ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13278:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'json2__Json5Scanner__scan_string' at /tmp/vinix-package-stage-90824/vinix-session.c:18624:5:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 4 bytes from a region of size 1 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'json2__Json5Scanner__scan_string':
+/tmp/vinix-package-stage-90824/vinix-session.c:18623:36: note: source object '__arr_val_5' of size 1
+18623 |                                 u8 __arr_val_5 = byte;
+      |                                    ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13280:4,
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13271:13,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'json2__Json5Scanner__scan_string' at /tmp/vinix-package-stage-90824/vinix-session.c:18624:5:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 8 bytes from a region of size 1 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'json2__Json5Scanner__scan_string':
+/tmp/vinix-package-stage-90824/vinix-session.c:18623:36: note: source object '__arr_val_5' of size 1
+18623 |                                 u8 __arr_val_5 = byte;
+      |                                    ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13282:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'json2__Json5Scanner__scan_string' at /tmp/vinix-package-stage-90824/vinix-session.c:18624:5:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 16 bytes from a region of size 1 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'json2__Json5Scanner__scan_string':
+/tmp/vinix-package-stage-90824/vinix-session.c:18623:36: note: source object '__arr_val_5' of size 1
+18623 |                                 u8 __arr_val_5 = byte;
+      |                                    ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13284:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'json2__Json5Scanner__scan_string' at /tmp/vinix-package-stage-90824/vinix-session.c:18624:5:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 3 or more bytes from a region of size 1 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'json2__Json5Scanner__scan_string':
+/tmp/vinix-package-stage-90824/vinix-session.c:18623:36: note: source object '__arr_val_5' of size 1
+18623 |                                 u8 __arr_val_5 = byte;
+      |                                    ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13276:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'accountcore__printable' at /tmp/vinix-package-stage-90824/vinix-session.c:10911:4:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 2 bytes from a region of size 1 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'accountcore__printable':
+/tmp/vinix-package-stage-90824/vinix-session.c:10910:28: note: source object '__arr_val_1' of size 1
+10910 |                         u8 __arr_val_1 = __if_val_0;
+      |                            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13278:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'accountcore__printable' at /tmp/vinix-package-stage-90824/vinix-session.c:10911:4:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 4 bytes from a region of size 1 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'accountcore__printable':
+/tmp/vinix-package-stage-90824/vinix-session.c:10910:28: note: source object '__arr_val_1' of size 1
+10910 |                         u8 __arr_val_1 = __if_val_0;
+      |                            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13280:4,
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13271:13,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'accountcore__printable' at /tmp/vinix-package-stage-90824/vinix-session.c:10911:4:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 8 bytes from a region of size 1 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'accountcore__printable':
+/tmp/vinix-package-stage-90824/vinix-session.c:10910:28: note: source object '__arr_val_1' of size 1
+10910 |                         u8 __arr_val_1 = __if_val_0;
+      |                            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13282:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'accountcore__printable' at /tmp/vinix-package-stage-90824/vinix-session.c:10911:4:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 16 bytes from a region of size 1 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'accountcore__printable':
+/tmp/vinix-package-stage-90824/vinix-session.c:10910:28: note: source object '__arr_val_1' of size 1
+10910 |                         u8 __arr_val_1 = __if_val_0;
+      |                            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13284:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'accountcore__printable' at /tmp/vinix-package-stage-90824/vinix-session.c:10911:4:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 3 or more bytes from a region of size 1 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'accountcore__printable':
+/tmp/vinix-package-stage-90824/vinix-session.c:10910:28: note: source object '__arr_val_1' of size 1
+10910 |                         u8 __arr_val_1 = __if_val_0;
+      |                            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13282:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'math__digits' at /tmp/vinix-package-stage-90824/vinix-session.c:20709:3:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 16 bytes from a region of size 8 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'math__digits':
+/tmp/vinix-package-stage-90824/vinix-session.c:20708:21: note: source object '__arr_val_1' of size 8
+20708 |                 i64 __arr_val_1 = (i64)(n - (next_n * b));
+      |                     ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13276:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'json2__Encoder__encode_unicode_escape' at /tmp/vinix-package-stage-90824/vinix-session.c:17738:4:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 2 bytes from a region of size 1 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'json2__Encoder__encode_unicode_escape':
+/tmp/vinix-package-stage-90824/vinix-session.c:17737:28: note: source object '__arr_val_3' of size 1
+17737 |                         u8 __arr_val_3 = string__at(hex, (i64)((({ u32 _t1 = (u32)(                     code); u64 _t2 = (u64)(shift); _t2 >= 32 ? (u32)0 : (u32)(_t1 >> _t2); })) & 0xf));
+      |                            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13278:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'json2__Encoder__encode_unicode_escape' at /tmp/vinix-package-stage-90824/vinix-session.c:17738:4:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 4 bytes from a region of size 1 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'json2__Encoder__encode_unicode_escape':
+/tmp/vinix-package-stage-90824/vinix-session.c:17737:28: note: source object '__arr_val_3' of size 1
+17737 |                         u8 __arr_val_3 = string__at(hex, (i64)((({ u32 _t1 = (u32)(                     code); u64 _t2 = (u64)(shift); _t2 >= 32 ? (u32)0 : (u32)(_t1 >> _t2); })) & 0xf));
+      |                            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13280:4,
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13271:13,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'json2__Encoder__encode_unicode_escape' at /tmp/vinix-package-stage-90824/vinix-session.c:17738:4:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 8 bytes from a region of size 1 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'json2__Encoder__encode_unicode_escape':
+/tmp/vinix-package-stage-90824/vinix-session.c:17737:28: note: source object '__arr_val_3' of size 1
+17737 |                         u8 __arr_val_3 = string__at(hex, (i64)((({ u32 _t1 = (u32)(                     code); u64 _t2 = (u64)(shift); _t2 >= 32 ? (u32)0 : (u32)(_t1 >> _t2); })) & 0xf));
+      |                            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13282:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'json2__Encoder__encode_unicode_escape' at /tmp/vinix-package-stage-90824/vinix-session.c:17738:4:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 16 bytes from a region of size 1 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'json2__Encoder__encode_unicode_escape':
+/tmp/vinix-package-stage-90824/vinix-session.c:17737:28: note: source object '__arr_val_3' of size 1
+17737 |                         u8 __arr_val_3 = string__at(hex, (i64)((({ u32 _t1 = (u32)(                     code); u64 _t2 = (u64)(shift); _t2 >= 32 ? (u32)0 : (u32)(_t1 >> _t2); })) & 0xf));
+      |                            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13284:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'json2__Encoder__encode_unicode_escape' at /tmp/vinix-package-stage-90824/vinix-session.c:17738:4:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 3 or more bytes from a region of size 1 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'json2__Encoder__encode_unicode_escape':
+/tmp/vinix-package-stage-90824/vinix-session.c:17737:28: note: source object '__arr_val_3' of size 1
+17737 |                         u8 __arr_val_3 = string__at(hex, (i64)((({ u32 _t1 = (u32)(                     code); u64 _t2 = (u64)(shift); _t2 >= 32 ? (u32)0 : (u32)(_t1 >> _t2); })) & 0xf));
+      |                            ^~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13280:4,
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13271:13,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'string__runes' at /tmp/vinix-package-stage-90824/vinix-session.c:27442:552:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 8 bytes from a region of size 4 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'string__runes':
+/tmp/vinix-package-stage-90824/vinix-session.c:27442:88: note: source object '__v3_internal_symbol_scalar_push_value_0' of size 4
+27442 |                         { Array* __v3_internal_symbol_scalar_push_base_0 = &runes; u32 __v3_internal_symbol_scalar_push_value_0 = __arr_val_1; if (__v3_internal_symbol_scalar_push_base_0->len >= 0 && __v3_internal_symbol_scalar_push_base_0->len < __v3_internal_symbol_scalar_push_base_0->cap && !(__v3_internal_symbol_scalar_push_base_0->flags & ArrayFlags__is_slice)) { ((u32*)__v3_internal_symbol_scalar_push_base_0->data)[__v3_internal_symbol_scalar_push_base_0->len] = __v3_internal_symbol_scalar_push_value_0; __v3_internal_symbol_scalar_push_base_0->len++; } else { array_push(__v3_internal_symbol_scalar_push_base_0, &__v3_internal_symbol_scalar_push_value_0); } }
+      |                                                                                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13282:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'string__runes' at /tmp/vinix-package-stage-90824/vinix-session.c:27442:552:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 16 bytes from a region of size 4 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'string__runes':
+/tmp/vinix-package-stage-90824/vinix-session.c:27442:88: note: source object '__v3_internal_symbol_scalar_push_value_0' of size 4
+27442 |                         { Array* __v3_internal_symbol_scalar_push_base_0 = &runes; u32 __v3_internal_symbol_scalar_push_value_0 = __arr_val_1; if (__v3_internal_symbol_scalar_push_base_0->len >= 0 && __v3_internal_symbol_scalar_push_base_0->len < __v3_internal_symbol_scalar_push_base_0->cap && !(__v3_internal_symbol_scalar_push_base_0->flags & ArrayFlags__is_slice)) { ((u32*)__v3_internal_symbol_scalar_push_base_0->data)[__v3_internal_symbol_scalar_push_base_0->len] = __v3_internal_symbol_scalar_push_value_0; __v3_internal_symbol_scalar_push_base_0->len++; } else { array_push(__v3_internal_symbol_scalar_push_base_0, &__v3_internal_symbol_scalar_push_value_0); } }
+      |                                                                                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-session.c:13282:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-session.c:11987:3,
+    inlined from 'big__positive_integer' at /tmp/vinix-package-stage-90824/vinix-session.c:12719:2:
+/tmp/vinix-package-stage-90824/vinix-session.c:30340:24: warning: 'memcpy' reading 16 bytes from a region of size 8 [-Wstringop-overread]
+30340 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-session.c: In function 'big__positive_integer':
+/tmp/vinix-package-stage-90824/vinix-session.c:12718:13: note: source object '__arr_val_1' of size 8
+12718 |         u64 __arr_val_1 = (u64)(x);
+      |             ^~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-linux-runner.c:2938:9: warning: "atomic_thread_fence" redefined
+ 2938 | #define atomic_thread_fence(order) __atomic_thread_fence(order)
+      |         ^~~~~~~~~~~~~~~~~~~
+In file included from /tmp/vinix-package-stage-90824/vinix-linux-runner.c:1286:
+/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/lib/gcc/aarch64-linux-musl/14.2.0/include/stdatomic.h:98:9: note: this is the location of the previous definition
+   98 | #define atomic_thread_fence(MO) __atomic_thread_fence (MO)
+      |         ^~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-linux-runner.c:3094:9: warning: "v_signal_with_handler_cast" redefined
+ 3094 | #define v_signal_with_handler_cast(sig, handler) signal((sig), ((void (*)(int))(handler)))
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-linux-runner.c:1561:9: note: this is the location of the previous definition
+ 1561 | #define v_signal_with_handler_cast(sig, handler) signal((sig), (void (*)(int))(handler))
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-linux-runner.c:4135:450: warning: integer constant is so large that it is unsigned
+ 4135 | const u64 strconv__ten_pow_table_64[20] = {((u64)(1)), ((u64)(10)), ((u64)(100)), ((u64)(1000)), ((u64)(10000)), ((u64)(100000)), ((u64)(1000000)), ((u64)(10000000)), ((u64)(100000000)), ((u64)(1000000000)), ((u64)(10000000000)), ((u64)(100000000000)), ((u64)(1000000000000)), ((u64)(10000000000000)), ((u64)(100000000000000)), ((u64)(1000000000000000)), ((u64)(10000000000000000)), ((u64)(100000000000000000)), ((u64)(1000000000000000000)), ((u64)(10000000000000000000))};
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                  ^~~~~~~~~~~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-linux-runner.c:5095:4,
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-linux-runner.c:5086:13,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-linux-runner.c:4844:3,
+    inlined from 'string__runes' at /tmp/vinix-package-stage-90824/vinix-linux-runner.c:6316:552:
+/tmp/vinix-package-stage-90824/vinix-linux-runner.c:7123:24: warning: 'memcpy' reading 8 bytes from a region of size 4 [-Wstringop-overread]
+ 7123 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-linux-runner.c: In function 'string__runes':
+/tmp/vinix-package-stage-90824/vinix-linux-runner.c:6316:88: note: source object '__v3_internal_symbol_scalar_push_value_0' of size 4
+ 6316 |                         { Array* __v3_internal_symbol_scalar_push_base_0 = &runes; u32 __v3_internal_symbol_scalar_push_value_0 = __arr_val_1; if (__v3_internal_symbol_scalar_push_base_0->len >= 0 && __v3_internal_symbol_scalar_push_base_0->len < __v3_internal_symbol_scalar_push_base_0->cap && !(__v3_internal_symbol_scalar_push_base_0->flags & ArrayFlags__is_slice)) { ((u32*)__v3_internal_symbol_scalar_push_base_0->data)[__v3_internal_symbol_scalar_push_base_0->len] = __v3_internal_symbol_scalar_push_value_0; __v3_internal_symbol_scalar_push_base_0->len++; } else { array_push(__v3_internal_symbol_scalar_push_base_0, &__v3_internal_symbol_scalar_push_value_0); } }
+      |                                                                                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In function 'vmemcpy',
+    inlined from 'copy_element_to' at /tmp/vinix-package-stage-90824/vinix-linux-runner.c:5097:4,
+    inlined from 'array__push' at /tmp/vinix-package-stage-90824/vinix-linux-runner.c:4844:3,
+    inlined from 'string__runes' at /tmp/vinix-package-stage-90824/vinix-linux-runner.c:6316:552:
+/tmp/vinix-package-stage-90824/vinix-linux-runner.c:7123:24: warning: 'memcpy' reading 16 bytes from a region of size 4 [-Wstringop-overread]
+ 7123 |                 return memcpy(dest, const_src, n);
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/vinix-package-stage-90824/vinix-linux-runner.c: In function 'string__runes':
+/tmp/vinix-package-stage-90824/vinix-linux-runner.c:6316:88: note: source object '__v3_internal_symbol_scalar_push_value_0' of size 4
+ 6316 |                         { Array* __v3_internal_symbol_scalar_push_base_0 = &runes; u32 __v3_internal_symbol_scalar_push_value_0 = __arr_val_1; if (__v3_internal_symbol_scalar_push_base_0->len >= 0 && __v3_internal_symbol_scalar_push_base_0->len < __v3_internal_symbol_scalar_push_base_0->cap && !(__v3_internal_symbol_scalar_push_base_0->flags & ArrayFlags__is_slice)) { ((u32*)__v3_internal_symbol_scalar_push_base_0->data)[__v3_internal_symbol_scalar_push_base_0->len] = __v3_internal_symbol_scalar_push_value_0; __v3_internal_symbol_scalar_push_base_0->len++; } else { array_push(__v3_internal_symbol_scalar_push_base_0, &__v3_internal_symbol_scalar_push_value_0); } }
+      |                                                                                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Published authenticated offline image repositories
+Initialized reviewed image package configuration
+Staged signed package service and Software launcher (aarch64)

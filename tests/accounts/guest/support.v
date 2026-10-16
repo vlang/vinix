@@ -8,6 +8,8 @@
 module main
 
 import accountcore
+import authclient
+import authproto
 import os
 import sessioncore
 
@@ -256,7 +258,15 @@ fn (mut t Test) start_authd() {
 	}
 	for _ in 0 .. 100 {
 		if os.exists('/run/vinix/auth.sock') {
-			return
+			// An installed root can retain yesterday's socket. Require a live,
+			// root-authenticated response rather than only the pathname.
+			mut reply := authclient.ask_root(authclient.default_socket, authproto.op_info) or {
+				C.usleep(100_000)
+				continue
+			}
+			ready := reply.code == authproto.status_ok
+			reply.close()
+			if ready { return }
 		}
 		C.usleep(100_000)
 	}

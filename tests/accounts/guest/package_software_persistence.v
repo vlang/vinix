@@ -24,9 +24,9 @@ struct PackageColdObservation {
 	files []PackageColdFile
 }
 
-fn package_cold_filesystem() ! {
+fn package_cold_filesystem(mount string) ! {
 	mut mounted := C.stat{}
-	if C.stat(package_disk.str, unsafe { &mounted }) != 0 || mounted.st_dev == 0 {
+	if C.stat(mount.str, unsafe { &mounted }) != 0 || mounted.st_dev == 0 {
 		return error('persistent ext2 mount has no filesystem device identity')
 	}
 	for path in ['/etc/passwd', '/var/lib/vinix-packages/generations',
@@ -38,7 +38,7 @@ fn package_cold_filesystem() ! {
 	}
 }
 
-fn package_cold_files() ![]PackageColdFile {
+fn package_cold_files(installed bool) ![]PackageColdFile {
 	mut paths := ['/etc/passwd', '/etc/group', '/etc/shadow', '/etc/vinix-packages/config.json',
 		'/var/lib/vinix-packages/current/state.json', '/var/lib/vinix-packages/catalog.json',
 		'/var/lib/vinix-packages/trust-history.json', '/home/alex/software document ; $literal.txt']
@@ -46,6 +46,7 @@ fn package_cold_files() ![]PackageColdFile {
 		paths << '/home/' + name + '/.local/share/vinix-apps/org.vinix.counter/counter.txt'
 	}
 	paths << '/home/alex/.local/share/vinix-apps/org.vinix.memo/memo.txt'
+	if installed { paths << package_installed_tools; paths << '/usr/share/package-fixtures/installed-only.txt' }
 	mut files := []PackageColdFile{}
 	for path in paths {
 		bytes := os.read_bytes(path)!
@@ -79,8 +80,8 @@ fn package_cold_mount() !bool {
 	return fresh
 }
 
-fn package_cold_verify(version string, key string) ! {
-	package_cold_filesystem()!
+fn package_cold_verify(version string, key string, mount string) ! {
+	package_cold_filesystem(mount)!
 	mut state := pkgcore.Service{}.verify()!
 	defer { state.close() }
 	architecture := $if arm64 { 'aarch64' } $else { 'x86_64' }
@@ -107,8 +108,11 @@ fn package_cold_verify(version string, key string) ! {
 }
 
 fn qualify_package_software_persistence(mut t Test) ! {
+	installed := t.scenario == 'packages-software-installed'
+	mount := if installed { '/' } else { package_disk }
+	observation_path := if installed { package_installed_observation } else { package_disk + '/cold-observation.json' }
 	image_configuration := os.read_file('/etc/vinix-packages/config.json')!
-	fresh := package_cold_mount()!
+	fresh := if installed { package_installed_root()! } else { package_cold_mount()! }
 	assert os.read_file('/etc/vinix-packages/config.json')! == image_configuration
 	mut boot := 1
 	mut db := accountcore.Database{}
@@ -116,11 +120,11 @@ fn qualify_package_software_persistence(mut t Test) ! {
 		assert os.ls('/var/lib/vinix-packages')!.len == 0
 		db = t.make_accounts()
 	} else {
-		observation := json2.decode[PackageColdObservation](os.read_file(package_disk + '/cold-observation.json')!)!
+		observation := json2.decode[PackageColdObservation](os.read_file(observation_path)!)!
 		assert observation.format == 1 && observation.boot in [1, 2, 3]
 		boot = observation.boot + 1
 		assert os.readlink('/var/lib/vinix-packages/current')! == observation.current
-		assert package_cold_files()! == observation.files, 'cold boot changed retained contents, ownership or modes'
+		assert package_cold_files(installed)! == observation.files, 'cold boot changed retained contents, ownership or modes'
 		// Load the retained password database. Do not recreate accounts or trust.
 		db = accountcore.Store{}.load()!
 	}
@@ -132,31 +136,40 @@ fn qualify_package_software_persistence(mut t Test) ! {
 	config := pkgcore.load_config('')!
 	assert config.repositories.len == 1 && config.repositories[0].url == 'file://' + pkgcore.image_repositories_path + '/native'
 	if boot == 1 {
-		installed := run(['/usr/share/package-fixtures/software-image', 'install'], '', db, alex)
-		if installed.status != 0 { return error('initial Software install failed: ' + installed.output) }
+		install_result := run(['/usr/share/package-fixtures/software-image', 'install'], '', db, alex)
+		if install_result.status != 0 { return error('initial Software install failed: ' + install_result.output) }
 		standard := run(['/usr/share/package-fixtures/software-image', 'standard'], '', db, sam)
 		if standard.status != 0 { return error('standard Software launch failed: ' + standard.output) }
 	} else {
-		package_cold_verify(if boot == 2 { '1.0.0' } else { '1.1.0' }, config.repositories[0].public_key)!
+		package_cold_verify(if boot == 2 { '1.0.0' } else { '1.1.0' }, config.repositories[0].public_key, mount)!
 		if boot == 2 {
 			os.rename(pkgcore.image_repositories_path + '/native', pkgcore.image_repositories_path + '/native-initial')!
 			os.symlink('/usr/share/native-catalog/releases/1.1.0', pkgcore.image_repositories_path + '/native')!
 		} else {
-			// Every boot receives the original initramfs. Hide both its initial
-			// and later media objects: reinstall must use the persistent cache.
-			for source in [pkgcore.image_repositories_path + '/native/objects', '/usr/share/native-catalog/releases/1.1.0/objects'] {
-				os.rmdir_all(source)!
+			// An installed root retains the newer-media link and removals too.
+			initial := if installed { '/native-initial/objects' } else { '/native/objects' }
+			for source in [pkgcore.image_repositories_path + initial, '/usr/share/native-catalog/releases/1.1.0/objects'] {
+				if installed && boot == 4 { assert !os.exists(source) }
+				else { os.rmdir_all(source)! }
 			}
 		}
 		phase := if boot == 2 { 'cold-upgrade' } else if boot == 3 { 'cold-maintain' } else { 'cold-reopen' }
 		result := run(['/usr/share/package-fixtures/software-image', phase], '', db, alex)
 		if result.status != 0 { return error('Software ' + phase + ' failed: ' + result.output) }
 	}
-	package_cold_verify(if boot == 1 { '1.0.0' } else { '1.1.0' }, config.repositories[0].public_key)!
+	package_cold_verify(if boot == 1 { '1.0.0' } else { '1.1.0' }, config.repositories[0].public_key, mount)!
 	assert os.read_file('/etc/vinix-packages/config.json')! == image_configuration
 	if boot < 4 {
-		pkgcore.atomic_write(package_disk + '/cold-observation.json', json2.encode(PackageColdObservation{
-			boot: boot, current: os.readlink('/var/lib/vinix-packages/current')!, files: package_cold_files()! }))!
+		pkgcore.atomic_write(observation_path, json2.encode(PackageColdObservation{
+			boot: boot, current: os.readlink('/var/lib/vinix-packages/current')!, files: package_cold_files(installed)! }))!
+	}
+	if installed {
+		markers := ['disk root staged tools trust ordinary Software install',
+			'retained tools accounts state native reopen reviewed upgrade',
+			'retained upgrade rollback uninstall cached reinstall',
+			'retained reinstall tools provenance registration private data']
+		t.say('PACKAGE INSTALLED BOOT ' + boot.str() + ' ' + markers[boot - 1] + ' PASS')
+		return
 	}
 	markers := ['fresh staged trust ordinary Software install separate user data',
 		'exact retained state accounts trust native reopen reviewed upgrade',

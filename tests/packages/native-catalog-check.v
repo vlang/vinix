@@ -14,10 +14,25 @@ struct NativeInputArtifact { path string bytes u64 sha256 string }
 struct NativeInputs { format int profile string version string catalog_sha256 string artifacts []NativeInputArtifact }
 
 fn native_artifact(role string, path string) !NativeArtifact {
-	bytes := os.read_bytes(path)!
-	defer { unsafe { bytes.free() } }
-	return NativeArtifact{ role: role, bytes: u64(bytes.len), sha256: sha256.sum(bytes).hex() }
+	mut source := os.open(path)!
+	defer { source.close() }
+	mut hash := sha256.new()
+	mut buffer := []u8{len: 1024 * 1024}
+	mut digest := []u8{len: sha256.size}
+	defer { unsafe { hash.free(); free(hash); buffer.free(); digest.free() } }
+	mut bytes := u64(0)
+	for {
+		count := source.read(mut buffer) or { if err is os.Eof { break }; return err }
+		if count == 0 { break }
+		hash.write(unsafe { buffer[..count] })!
+		bytes += u64(count)
+	}
+	hash.checksum_into(mut digest)
+	return NativeArtifact{ role: role, bytes: bytes, sha256: digest.hex() }
 }
+
+const installed_image_id = 'vinix-packages-installed-sdk-1'
+struct NativeInstalledImage { format int = 1 image string files []NativeArtifact }
 
 fn native_suite(sandbox string, image bool, software bool) hwhost.Suite {
 	files := [
@@ -80,6 +95,43 @@ fn persistent_software_suite(sandbox string, disk string) hwhost.Suite {
 			'PACKAGE COLD BOOT 4 exact retained reinstall provenance registration private data PASS'],
 		forbidden: ['V panic:', 'HWTEST FAIL'],
 	}] }
+}
+
+fn installed_software_suite(sandbox string, disk string) hwhost.Suite {
+	base := persistent_software_suite(sandbox, disk)
+	scenario := base.scenarios[0]
+	mut files := base.files.clone()
+	files << hwhost.RootFile{ path: '.vinix-image-id', text: installed_image_id + '\n' }
+	mut forbidden := scenario.forbidden.clone()
+	forbidden << ['sysdisk: updating the system on', 'sysdisk: running from memory']
+	selected := hwhost.Scenario{ name: 'packages-software-installed', arches: scenario.arches,
+			about: 'install a complete system on a blank disk, then maintain native applications across four installed-root boots',
+			cmdline: 'vinix.disk=auto', timeout: 900,
+			ending: scenario.ending, reboots: scenario.reboots,
+			qemu_aarch64: scenario.qemu_aarch64.map(it.replace('packages.ext2', 'system.vjfs')),
+			qemu_x86_64: scenario.qemu_x86_64.map(it.replace('packages.ext2', 'system.vjfs')),
+			disks: [hwhost.Disk{ name: 'system.vjfs', size_mib: 4096, image: disk }],
+			required: ['HWTEST START packages-software-installed', 'HWTEST PASS packages-software-installed',
+				'PACKAGE INSTALLED BOOT 1 disk root staged tools trust ordinary Software install PASS',
+				'PACKAGE INSTALLED BOOT 2 retained tools accounts state native reopen reviewed upgrade PASS',
+				'PACKAGE INSTALLED BOOT 3 retained upgrade rollback uninstall cached reinstall PASS',
+				'PACKAGE INSTALLED BOOT 4 retained reinstall tools provenance registration private data PASS'],
+			forbidden: forbidden,
+	}
+	return hwhost.Suite{ ...base, name: 'package-software-installed', files: files, scenarios: [selected] }
+}
+
+fn stage_installed_proof(root string, guest string) !NativeArtifact {
+	mut files := [native_artifact('/sbin/init', guest)!]
+	for path in ['/usr/bin/vinix-package', '/usr/bin/vinix-sandbox', '/usr/sbin/vinix-account', '/usr/sbin/vinix-authd',
+		'/usr/sbin/vinix-session', '/usr/share/package-fixtures/software-image',
+		'/usr/share/vinix/actions/packages-change', '/usr/share/vinix/actions/packages-launch']! {
+		files << native_artifact(path, root + path)!
+	}
+	path := '/usr/share/package-fixtures/installed-image.json'
+	os.write_file(root + path, json2.encode(NativeInstalledImage{ image: installed_image_id, files: files }) + '\n')!
+	os.chmod(root + path, 0o644)!
+	return native_artifact('image' + path, root + path)!
 }
 
 fn stage_software_image(host hwhost.Host, root string, work string) !NativeArtifact {
@@ -178,12 +230,14 @@ fn stage_native_image(host hwhost.Host, inputs string, root string, work string)
 }
 
 fn check() !int {
-	persistent := '--persistent' in os.args
+	installed := '--installed' in os.args
+	persistent := '--persistent' in os.args || installed
 	software := '--software' in os.args || persistent
 	image := '--image' in os.args || software
-	arguments := os.args[1..].filter(it !in ['--image', '--software', '--persistent'])
+	arguments := os.args[1..].filter(it !in ['--image', '--software', '--persistent', '--installed'])
 	options := hwhost.parse_options(arguments)!
-	if options.help || options.list { return hwhost.run_suite(if persistent { persistent_software_suite('', '') } else { native_suite('', image, software) }, arguments, @FILE) }
+	if options.help || options.list { return hwhost.run_suite(if installed { installed_software_suite('', '') }
+		else if persistent { persistent_software_suite('', '') } else { native_suite('', image, software) }, arguments, @FILE) }
 	inputs := os.getenv('VINIX_NATIVE_CATALOG_INPUTS')
 	sandbox := os.getenv('VINIX_NATIVE_CATALOG_SANDBOX')
 	if os.getenv('VINIX_HWTEST_TCG') != '1' || !os.is_file(options.kernel) || !os.is_dir(inputs)
@@ -191,36 +245,41 @@ fn check() !int {
 		return error('provide VINIX_HWTEST_TCG=1, VINIX_NATIVE_CATALOG_INPUTS, target VINIX_NATIVE_CATALOG_SANDBOX, --kernel and a new --state-dir')
 	}
 	repository := hwhost.find_root(@FILE)!
-	definition := if persistent { persistent_software_suite(sandbox, '') } else { native_suite(sandbox, image, software) }
+	definition := if installed { installed_software_suite(sandbox, '') }
+		else if persistent { persistent_software_suite(sandbox, '') } else { native_suite(sandbox, image, software) }
 	hwhost.validate_scenarios(definition.scenarios)!
 	selection := hwhost.select_scenarios(definition.scenarios, options.arch, options.scenarios)!
-	if selection.run.len != 1 { return error('select packages-native-catalog, --image packages-native-image, --software packages-software-image or --persistent packages-software-persistence') }
+	if selection.run.len != 1 { return error('select packages-native-catalog, --image packages-native-image, --software packages-software-image, --persistent packages-software-persistence or --installed packages-software-installed') }
 	host := hwhost.find_host(repository, options.arch, options.qemu)!
 	os.mkdir_all(options.state_dir)!
 	work := os.real_path(options.state_dir)
 	os.cp(options.kernel, work + '/kernel')!
+	disk := work + if installed { '/initial.raw' } else { '/initial.ext2' }
 	if persistent {
-		disk := work + '/initial.ext2'
-		os.write_file(disk, '')!; os.truncate(disk, u64(128) << 20)!
-		formatter := os.getenv_opt('VINIX_MKE2FS') or { os.find_abs_path_of_executable('mke2fs') or { '/opt/homebrew/opt/e2fsprogs/sbin/mke2fs' } }
-		hwhost.run_tool([formatter, '-q', '-F', '-t', 'ext2', '-b', '4096', '-I', '128', '-m', '0', '-O',
-			'none,filetype,sparse_super,large_file', disk], {}, work + '/format.log', 60)!
+		os.write_file(disk, '')!; os.truncate(disk, u64(if installed { 4096 } else { 128 }) << 20)!
+		if !installed {
+			formatter := os.getenv_opt('VINIX_MKE2FS') or { os.find_abs_path_of_executable('mke2fs') or { '/opt/homebrew/opt/e2fsprogs/sbin/mke2fs' } }
+			hwhost.run_tool([formatter, '-q', '-F', '-t', 'ext2', '-b', '4096', '-I', '128', '-m', '0', '-O',
+				'none,filetype,sparse_super,large_file', disk], {}, work + '/format.log', 60)!
+		}
 	}
 	hwhost.watch_interrupts()
 	guest := hwhost.build_program(host, repository + '/' + definition.guest, work + '/guest', 'init', definition.module_paths)!
 	root := hwhost.build_extras(host, definition, work + '/guest')!
 	mut artifacts := [native_artifact('kernel', work + '/kernel')!, native_artifact('guest-init', guest)!]
-	if persistent { artifacts << native_artifact('initial-ext2', work + '/initial.ext2')! }
+	if persistent { artifacts << native_artifact(if installed { 'initial-blank-system-disk' } else { 'initial-ext2' }, disk)! }
 	for file in definition.files { artifacts << native_artifact(file.path, root + '/' + file.path)! }
 	artifacts << if image { stage_native_image(host, inputs, root, work)! } else { stage_native_inputs(inputs, root)! }
 	if software {
 		artifacts << stage_software_image(host, root, work)!
 		artifacts << native_artifact('image/usr/sbin/vinix-authd', root + '/usr/sbin/vinix-authd')!
 	}
+	if installed { artifacts << stage_installed_proof(root, guest)! }
 	for path in ['usr/bin/vinix-package', 'usr/bin/vinix-sandbox', 'usr/sbin/vinix-account', 'usr/sbin/vinix-session'] {
 		artifacts << native_artifact(path, root + '/' + path)!
 	}
-	scenario := if persistent { persistent_software_suite(sandbox, work + '/initial.ext2').scenarios[0] } else { selection.run[0] }
+	scenario := if installed { installed_software_suite(sandbox, disk).scenarios[0] }
+		else if persistent { persistent_software_suite(sandbox, disk).scenarios[0] } else { selection.run[0] }
 	outcome := hwhost.run_scenario(host, scenario, hwhost.Run{ kernel: work + '/kernel', guest: guest, extras: root,
 		state: work + '/native', timeout: if options.timeout > scenario.timeout { options.timeout } else { scenario.timeout }, keep: true })
 	println(hwhost.report(options.arch, outcome))
@@ -229,10 +288,12 @@ fn check() !int {
 	for role, path in {'serial-log': 'serial.log', 'qmp-log': 'qmp.log'} { artifacts << native_artifact(role, work + '/native/' + path)! }
 	if persistent {
 		for boot in 2 .. 5 { artifacts << native_artifact('serial-log-' + boot.str(), work + '/native/serial-' + boot.str() + '.log')! }
-		artifacts << native_artifact('final-ext2', work + '/native/packages.ext2')!
+		artifacts << native_artifact(if installed { 'final-installed-system-disk' } else { 'final-ext2' },
+			work + '/native/' + if installed { 'system.vjfs' } else { 'packages.ext2' })!
 	}
 	os.write_file(work + '/qualification.json', json2.encode(NativeReceipt{ architecture: options.arch, completed_at: time.now().unix(),
-		seconds: outcome.seconds, platform: if persistent { 'qemu-ext2-retained-subtrees' } else { 'qemu-initramfs' },
+		seconds: outcome.seconds, platform: if installed { 'qemu-vjfs-installed-root' }
+			else if persistent { 'qemu-ext2-retained-subtrees' } else { 'qemu-initramfs' },
 		boots: scenario.boots(), artifacts: artifacts }) + '\n')!
 	return 0
 }

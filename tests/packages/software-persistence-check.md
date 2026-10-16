@@ -1,5 +1,9 @@
 # Software maintenance across cold boots
 
+The newer [installed-system check](software-installed-check.md) uses the real
+blank-disk installer and retains the complete userland root. The ext2 subtree
+mode and receipts below keep their original scope.
+
 `native-catalog-check.v --persistent` joins production image staging, the actual
 Software controller, authentication, isolated launch and persistent ext2 storage.
 It boots the same guest four times with the same 128 MiB disk. The host never

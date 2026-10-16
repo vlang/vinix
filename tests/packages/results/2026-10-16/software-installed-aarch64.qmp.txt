@@ -1,0 +1,16 @@
+[   0.026] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[   0.026] -> {"execute":"qmp_capabilities"}
+[   0.033] <- {"return": {}}
+[  19.617] <- {"timestamp": {"seconds": 1792165435, "microseconds": 482543}, "event": "SHUTDOWN", "data": {"guest": true, "reason": "guest-shutdown"}}
+[  19.642] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[  19.642] -> {"execute":"qmp_capabilities"}
+[  19.654] <- {"return": {}}
+[  33.151] <- {"timestamp": {"seconds": 1792165449, "microseconds": 38438}, "event": "SHUTDOWN", "data": {"guest": true, "reason": "guest-shutdown"}}
+[  33.177] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[  33.177] -> {"execute":"qmp_capabilities"}
+[  33.189] <- {"return": {}}
+[  56.878] <- {"timestamp": {"seconds": 1792165472, "microseconds": 753154}, "event": "SHUTDOWN", "data": {"guest": true, "reason": "guest-shutdown"}}
+[  56.902] <- {"QMP": {"version": {"qemu": {"micro": 1, "minor": 1, "major": 11}, "package": ""}, "capabilities": ["oob"]}}
+[  56.902] -> {"execute":"qmp_capabilities"}
+[  56.912] <- {"return": {}}
+[  66.486] <- {"timestamp": {"seconds": 1792165482, "microseconds": 356318}, "event": "SHUTDOWN", "data": {"guest": true, "reason": "guest-shutdown"}}
