@@ -1497,6 +1497,13 @@ cache or explicit empty array remains valid; a dangling cache link is an error.
 Restore damaged cache/history under the package writer lock instead of resetting
 them to empty records. See [cache qualification](../../tests/packages/snapshot-schema-check.md).
 
+Cached wrappers use the internal bounded stored-metadata reader. It enforces
+field bounds and the 4,096-record/8-MiB limits during parsing, retires partial
+owned records and keeps signed text and legacy signature whitespace exact.
+Cache-file reads retire source/path/error scratch and treat only `ENOENT` as an
+initial empty cache. Restoring trusted ordinary metadata permits retry without
+rewriting a damaged cache. See [complete snapshot decode checks](../../tests/packages/snapshot-decode-check.md).
+
 `view` emits one `{format:1,generation,architecture,offline,catalog_error,update_error,rows,launch_user}`
 JSON object. Rows include ID/name/description, available/installed version, target,
 kind, repository/key, license/proprietary/firmware flags, permissions, explicit

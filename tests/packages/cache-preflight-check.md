@@ -1,5 +1,9 @@
 # Incremental repository cache preflight
 
+Follow-up [bounded snapshot decoding](snapshot-decode-check.md) qualifies the
+cache reader and extends this maintained guest suite with decoder/schema fixtures.
+Recorded results below retain their original scope and artifact counts.
+
 Refresh previously fetched every configured repository and constructed a second
 decoded catalog before checking the complete cache encoding against 8 MiB.
 Individually valid signed indexes could accumulate beyond that limit and cause

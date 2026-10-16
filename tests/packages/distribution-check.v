@@ -143,6 +143,10 @@ fn check() ! {
 		run(work + '/history-decode-memory', [])!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
 			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/snapshot-decode-memory', repository + '/tools/packages/pkgcore/snapshot_decode_test.v'])!
+		run(work + '/snapshot-decode-memory', [])!
+		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/administration-metadata-memory', repository + '/tools/packages/pkgcore/administration_metadata_test.v'])!
 		run(work + '/administration-metadata-memory', [])!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',

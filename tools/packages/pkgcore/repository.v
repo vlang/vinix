@@ -130,10 +130,17 @@ fn close_authenticated_catalog(catalog Catalog) {
 pub fn read_snapshots(directory string) ![]Snapshot {
 	path := directory + '/catalog.json'
 	defer { unsafe { path.free() } }
-	if !os.exists(path) && !os.is_link(path) { return []Snapshot{} }
+	mut info := C.stat{}
+	// Only ENOENT permits an initial cache; other path failures must refuse.
+	if C.lstat(path.str, unsafe { &info }) != 0 && C.errno == C.ENOENT { return []Snapshot{} }
 	text := read_metadata(path)!
 	defer { unsafe { text.free() } }
-	return decode_snapshots(text) or { return error('invalid cached repository metadata: ${err}') }
+	if snapshots := decode_snapshots(text) { return snapshots } else {
+		message := unsafe { (&err).msg() }
+		diagnostic := 'invalid cached repository metadata: ' + message
+		unsafe { message.free(); (&err).free() }
+		return error(diagnostic)
+	}
 }
 
 pub fn load_catalog(config Config, directory string) !Catalog {

@@ -1,5 +1,9 @@
 # Cached repository snapshot admission
 
+Follow-up [bounded snapshot decoding](snapshot-decode-check.md) qualifies complete
+decode and file-reader lifetimes. The recorded results below keep their original
+schema-scanner and lifecycle scope.
+
 The baseline reader accepted a root null as an empty cache, ignored unknown and
 duplicate fields, defaulted an omitted URL and treated a dangling cache link as
 absence. The baseline probes exercise the production `read_snapshots` function.

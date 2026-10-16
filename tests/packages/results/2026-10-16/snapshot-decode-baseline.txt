@@ -1,0 +1,5 @@
+Pre-change unwarmed cached snapshot decoder regression: ten complete decodes retain 806 bytes; ten truncated-document refusals retain 7,280 bytes, after caller retirement of results/errors. Input source, production source, executable and generated C are retained and pinned.
+
+SNAPSHOT DECODE ten complete decodes retained 806 bytes; ten partial refusals retained 7280 bytes
+tools/packages/pkgcore/snapshot_decode_test.v:26: fn test_snapshot_decoder_retires_complete_and_partial_results
+    assert valid == 0 && invalid == 0

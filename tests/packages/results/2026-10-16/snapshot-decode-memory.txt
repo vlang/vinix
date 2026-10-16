@@ -1,0 +1,5 @@
+SNAPSHOT DECODE 1000 complete decodes retained 0 bytes; 1000 partial refusals retained 0 bytes
+SNAPSHOT DECODE owned empty/growing/full 4096 records, retired source buffers, escaped keys, opaque Unicode/NUL text and legacy signature bytes preserve canonical output PASS
+SNAPSHOT DECODE 1000-cycle partial/schema/UTF8/duplicate refusals retire scratch; 4097 records refuse before admission PASS
+SNAPSHOT DECODE exact 8 MiB and limit-minus-one preserve opaque text; limit-plus-one refuses before parsing PASS
+SNAPSHOT DECODE 1000 absent/valid/partial/alias/FIFO/parent file reads retire scratch, preserve retained bytes and permit restored retry PASS

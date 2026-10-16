@@ -1,0 +1,106 @@
+snapshot_decode:
+SNAPSHOT DECODE owned empty/growing/full 4096 records, retired source buffers, escaped keys, opaque Unicode/NUL text and legacy signature bytes preserve canonical output PASS
+SNAPSHOT DECODE 1000-cycle partial/schema/UTF8/duplicate refusals retire scratch; 4097 records refuse before admission PASS
+SNAPSHOT DECODE exact 8 MiB and limit-minus-one preserve opaque text; limit-plus-one refuses before parsing PASS
+SNAPSHOT DECODE 1000 absent/valid/partial/alias/FIFO/parent file reads retire scratch, preserve retained bytes and permit restored retry PASS
+snapshot_schema:
+Snapshot probe: null cache accepted=false
+Snapshot probe: unknown field accepted=false
+Snapshot probe: duplicate text accepted=false
+Snapshot probe: missing URL accepted=false
+Snapshot probe: dangling cache accepted=false
+Snapshot schema: complete typed records, ambiguity refusal, exact signed bytes, legacy whitespace and fresh/empty caches passed
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Downloading app/bin/app (14 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Activated package generation 5
+Activated package generation 6
+Snapshot schema: failed migration preserves state/cache/recovery; restored legacy floor rejects replay, authentic renewal and revoked-publisher uninstall passed
+catalog_metadata:
+CACHE PREFLIGHT exact snapshot wrapper encoding, empty cache, order, escaping and reader round-trip PASS
+CACHE PREFLIGHT limit-minus-one and exact 8 MiB accepted; closing byte, cumulative prefix and escape expansion overflow refused PASS
+catalog_ownership:
+CATALOG OWNERSHIP returned manifests and configured publisher identities survive scratch retirement PASS
+CATALOG OWNERSHIP growing catalog survives source wrapper/index retirement with intact nested manifests PASS
+CATALOG OWNERSHIP later signature/syntax/schema/expiry/floor/equivocation/ambiguity/missing/identity refusal and revoked snapshots preserve metadata and configured identities PASS
+history_ownership:
+HISTORY OWNERSHIP migrated expired snapshots produce independent replay records and survive input retirement PASS
+HISTORY OWNERSHIP 64 authenticated migrations/retirements preserve source snapshots within reader budget: 0 bytes / 0 allocations PASS
+HISTORY OWNERSHIP remembered indexes detach both existing and new identity fields and preserve sorted floors PASS
+HISTORY OWNERSHIP later signature/equivocation failures retire partial results without publishing history PASS
+HISTORY OWNERSHIP newer retained floors survive authenticated older cache migration with bounded lifetimes PASS
+HISTORY OWNERSHIP full 4096-identity replacement and overflow refusal release scratch without mutating source floors PASS
+HISTORY OWNERSHIP SHA256 vectors, binary/Unicode bytes and block boundaries preserve replay digests with zero hashing scratch PASS
+trust_recovery:
+TRUST RECOVERY exact disabled identity/digest/sequence and complete index required PASS
+TRUST RECOVERY valid retired keys still require authenticated signatures PASS
+TRUST RECOVERY empty refresh preserves retired and independent replay floors PASS
+repository_configuration:
+REPOSITORY CONFIG fresh/locked/corrupt configuration checks; damaged cache/history listing and reviewed revocation preserve maintenance failures PASS
+administration:
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository unreachable
+Updating trusted repository fixture
+Updating trusted repository fixture
+service:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+release:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+RELEASE ADMISSION late-index refused=true unpublished=true
+RELEASE ADMISSION changed staged metadata refuses after reservation; exact retry preserves publisher floor PASS
+RELEASE ADMISSION 34 staged/reserved refusals preserve workspace and outside data; history timing, no publication, cleanup and exact retry PASS

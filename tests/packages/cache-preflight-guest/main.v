@@ -12,7 +12,7 @@ fn C.reboot(int) int
 fn C.usleep(u32) int
 
 fn check() ! {
-	for name in ['cache-preflight-core', 'cache-preflight-probe'] {
+	for name in ['cache-preflight-core', 'cache-preflight-probe', 'snapshot-decode', 'snapshot-schema'] {
 		mut child := os.new_process('/usr/share/package-fixtures/' + name)
 		if name == 'cache-preflight-probe' { child.set_args(['/tmp/cache-preflight']) }
 		child.set_redirect_stdio_merged(); child.run()

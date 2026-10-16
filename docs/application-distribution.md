@@ -20,6 +20,12 @@ output. Partial and malformed histories retire decoded scratch and refuse withou
 resetting sequence floors. Only a missing pathname permits initial empty history;
 other path errors refuse. See [history decode checks](../tests/packages/history-decode-check.md).
 
+Cached snapshot wrappers also use bounded decoding and release partial records
+and file-reader scratch on refusal. They preserve exact signed text and signature
+whitespace; authentication and replay checks still follow wrapper admission.
+Malformed present caches remain intact for restoration. See
+[snapshot decode checks](../tests/packages/snapshot-decode-check.md).
+
 Public V status and verification calls return owned installed-state snapshots,
 including on a fresh image. Call `State.close()` after use. These reads release
 their configuration/path storage, and verification releases failed snapshots

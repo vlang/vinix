@@ -1,0 +1,2 @@
+PASS x86_64 packages-cache-preflight (37.7s)
+package-cache-preflight x86_64: 1 passed, 0 failed, 0 skipped

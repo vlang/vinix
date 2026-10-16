@@ -1,0 +1,63 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=25
+!>+ [11] ./sbin/init sz=210912
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/snapshot-decode sz=840080
+!>+ [15] ./usr/share/package-fixtures/snapshot-schema sz=1715752
+!>+ [16] ./usr/share/package-fixtures/cache-preflight-probe sz=1418400
+!>+ [17] ./usr/share/package-fixtures/cache-preflight-core sz=811104
+!>+ [18] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e8aa00
+initramfs: Done (18 entries)
+HWTEST START packages-cache-preflight
+CACHE PREFLIGHT exact snapshot wrapper encoding, empty cache, order, escaping and reader round-trip PASS
+CACHE PREFLIGHT limit-minus-one and exact 8 MiB accepted; closing byte, cumulative prefix and escape expansion overflow refused PASS
+CACHE PROCESS cache-preflight-core PASS
+Updating trusted repository first
+Updating trusted repository second
+Installing Seed 1.0.0 (1/1) from first
+Downloading seed/asset (4 bytes)
+Activated package generation 1
+CACHE PREFLIGHT authenticated prefix overflow stops before later repository fetch; signature precedence, active cache/history/generation and recovery data preserved PASS
+CACHE PREFLIGHT signed service/CLI refresh rejects oversized cache before later acquisition/publication and accepts a bounded retry PASS
+CACHE PROCESS cache-preflight-probe PASS
+SNAPSHOT DECODE owned empty/growing/full 4096 records, retired source buffers, escaped keys, opaque Unicode/NUL text and legacy signature bytes preserve canonical output PASS
+SNAPSHOT DECODE 1000-cycle partial/schema/UTF8/duplicate refusals retire scratch; 4097 records refuse before admission PASS
+SNAPSHOT DECODE exact 8 MiB and limit-minus-one preserve opaque text; limit-plus-one refuses before parsing PASS
+SNAPSHOT DECODE 1000 absent/valid/partial/alias/FIFO/parent file reads retire scratch, preserve retained bytes and permit restored retry PASS
+CACHE PROCESS snapshot-decode PASS
+Snapshot probe: null cache accepted=false
+Snapshot probe: unknown field accepted=false
+Snapshot probe: duplicate text accepted=false
+Snapshot probe: missing URL accepted=false
+Snapshot probe: dangling cache accepted=false
+Snapshot schema: complete typed records, ambiguity refusal, exact signed bytes, legacy whitespace and fresh/empty caches passed
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Downloading app/bin/app (14 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Activated package generation 5
+Activated package generation 6
+Snapshot schema: failed migration preserves state/cache/recovery; restored legacy floor rejects replay, authentic renewal and revoked-publisher uninstall passed
+CACHE PROCESS snapshot-schema PASS
+HWTEST PASS packages-cache-preflight
