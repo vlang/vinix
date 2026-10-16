@@ -76,6 +76,14 @@ pub fn syscall_clone3(_gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 		return errno.err, errno.einval
 	}
 
+	// Namespace creation is authorized before cgroup lookup. NEWUSER changes
+	// the child's capability domain and must use its own admission path.
+	if args.flags & proc.clone_newuser == 0
+		&& args.flags & proc.clone_namespace_flags != 0
+		&& !proc.current_has_capability(proc.cap_sys_admin) {
+		return errno.err, errno.eperm
+	}
+
 	mut cgroup := voidptr(unsafe { nil })
 	if args.flags & clone_into_cgroup != 0 {
 		mut cgroup_fd := file.fd_from_fdnum(unsafe { nil }, int(args.cgroup)) or {

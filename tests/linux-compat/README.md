@@ -2077,3 +2077,15 @@ failures remain retained and audited. Use `--cases clonecgparent --timeout 1200`
 with fresh state; `clonecgparent-reference.v` runs the unchanged ELF on Linux and
 `clonecgparent-check.v` audits receipts when compiled without `-prod`.
 See the [qualification report](../../docs/linux-posix-qualification.md#native-clone3-init-parent-and-cgroup-descriptor-ordering).
+
+The `clonecgperm` case checks clone3 namespace permission errors before cgroup
+descriptor lookup. Four root/UID1000 initial/one-level PID-namespace cohorts
+run 1,872 controls per architecture with effective CAP_SYS_ADMIN off/on while
+retaining its permitted bit. EPERM errors, capability-on EBADF, earlier imports,
+no-cgroup refusals, held descriptors and 144 real fork/reap lifecycles pass on
+corrected kernels and identical ELFs on Linux. Originals fail 792 each; both
+phases have flat identical-input 200-cycle cleanup. Runtime pthread and
+clonecgparent regressions pass. Use `--cases clonecgperm --timeout 1200` with
+fresh state; `clonecgperm-reference.v` runs the unchanged ELF on Linux and
+`clonecgperm-check.v` audits receipts when compiled without `-prod`.
+See the [qualification report](../../docs/linux-posix-qualification.md#native-clone3-namespace-permissions-and-cgroup-descriptor-ordering).

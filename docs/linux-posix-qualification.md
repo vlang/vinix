@@ -10209,3 +10209,100 @@ descriptor/node teardown, independent sharing ownership, requested PID allocatio
 supplied-stack execution, shared-VM/vfork lifetimes, other notifications/wait
 classes, worker callers, GNU libc and translated/32-bit paths remain unqualified
 here. The broad libc, installation/sandbox/portal and translation gates remain open.
+
+## Native clone3 namespace permissions and cgroup descriptor ordering
+
+Both native clone3 paths now check effective CAP_SYS_ADMIN before resolving a
+CLONE_INTO_CGROUP descriptor for namespace requests without NEWUSER.
+Without the capability, requests return EPERM instead of a later EBADF.
+The same check also gives EPERM for unprivileged no-cgroup NEWNET/NEWTIME
+requests, whose unsupported-namespace EINVAL previously hid the permission error.
+Earlier argument/vector/flag/signal/stack, contradictory-sharing and init-parent
+checks retain their precedence. Legacy clone and the later common checks remain
+unchanged.
+
+This follows [Linux v6.12 copy_namespaces](https://github.com/torvalds/linux/blob/v6.12/kernel/nsproxy.c)
+and [copy_process ordering](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c),
+before [cgroup descriptor validation](https://github.com/torvalds/linux/blob/v6.12/kernel/cgroup/cgroup.c).
+The new guard explicitly excludes requests containing NEWUSER: creating a user
+namespace changes the child's capability domain, so the caller's current
+effective capability cannot decide that path. User-namespace admission and
+construction remain separate.
+
+The `clonecgperm` probe runs 1,872 controls per architecture, 468 in each
+root/UID1000 and initial/fresh one-level PID-namespace cohort. PR_SET_KEEPCAPS
+retains permitted capabilities through the UID drop. The probe verifies that
+CAP_SYS_ADMIN remains permitted and clears its effective bit, with readback.
+For each class-2 request it sets and reads back the effective bit, then clears
+and reads it back before continuing. This distinguishes effective capability
+from UID0 and from merely holding a permitted bit. Every cohort also records
+the final cleared state.
+
+A `/dev/null` descriptor stays open throughout each cohort. F_GETFD must remain
+zero after every call and its final close must succeed. Six classes cover:
+
+- 96 capability-off requests against a missing cgroup descriptor: NEWNS, NEWUTS,
+  NEWIPC, NEWPID, NEWCGROUP, NEWNET, NEWTIME and their combined mask, sizes
+  88/96/128/256 and aligned/unaligned/exact-page-end inputs. All require EPERM.
+- 96 equivalent requests against the held wrong-type descriptor.
+- 108 capability-on descriptor controls: twelve flag combinations, three
+  missing/wrong-type descriptor forms and three layouts require EBADF. They
+  include five supported namespace kinds, combinations and ordinary VM/FS/FILES
+  sharing. These are descriptor refusals, not successful namespace construction.
+- 60 earlier structure/vector/flag/signal/stack controls retain exact EFAULT,
+  E2BIG or EINVAL before permission and descriptor handling.
+- 72 cgroup ABI/extension controls retain oversized descriptor, short prefix,
+  nonzero tail and inaccessible tail errors. Four no-INTO_CGROUP namespace
+  controls use sizes 64/72/80/88, ignored cgroup words and require EPERM.
+- 36 real clone3/legacy-clone fork/reap controls retain ignored cgroup words,
+  historical prefixes and upper legacy words. Children verify PID/TID, parent,
+  UID and exit 37 before caller reap.
+
+Readable-page boundaries, whole two-page input canaries, descriptor survival
+and an empty ECHILD wait guard each call. Native ARM uses 16 KiB pages; native
+x86 and both Linux references use 4 KiB. Original kernels fail exactly 792
+controls per architecture: 768 EBADF results in the two permission/descriptor
+classes and 24 EINVAL results for no-cgroup NEWNET/NEWTIME. Sampled diagnostics
+require those exact errors. Corrected kernels and identical probe ELFs on Linux
+6.12.51 pass every control. Both phases preserve 144 legitimate fork/reap
+lifecycles in these controls and create no unintended children.
+
+Four identical-input cleanup cohorts run in both phases: 64 warmup cycles,
+thirteen seconds of settling, 200 measured cycles and another settle. Each cycle
+mixes missing/wrong-type descriptor permission errors, an ABI/extension or
+no-cgroup error, a capability-on descriptor refusal and one real fork/reap.
+Only cleanup permits the recorded original errors alongside corrected EPERM;
+conformance requires exact Linux errors. All live slab classes and big-heap
+page counts stay flat. This qualifies targeted kernel-heap paths; general
+page/cache retention and the earlier EXT2 rename observation remain separate.
+
+Four isolated original/corrected production builds pass. Whole generated-C
+comparison confines the change to two early clone3 guards. The existing sharing,
+parent and capability predicates remain byte-identical and contain no allocation
+or lifetime operations. There are no new allocation/free/reference/ownership,
+lock or task-publication paths. Probe C has ten explicit stack allocas and no
+dynamic allocation or fixed-index helper. ARM preflight C matches the original
+guest C, and its ELF is the byte-identical Linux reference probe.
+
+Both corrected architectures pass runtime pthread creation and the 1,896-control
+clonecgparent regression. The auditor checks exact totals, original diagnostics,
+credentials/capability restoration, held descriptors, child counts, page sizes,
+identical C/ELFs, Linux receipts and both phases' storage. It verifies 84 retained
+native case files, 67 frozen dispatch inputs, 2,014 SDK files, 15,146 compiler
+pins and three retained Linux source files. False-assertion and passing-Linux-as-
+original negative controls must execute and fail; compile without `-prod`.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/clonecgperm-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/clonecgperm-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/clonecgperm-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/clonecgperm-diagnostic-pins.json).
+Raw original/corrected/Linux, build, preflight and regression logs accompany
+the receipts. The maintained auditor is `tests/linux-compat/clonecgperm-check.v`.
+
+Successful namespace/cgroup construction, NEWUSER combinations, capability or
+namespace races, active versus future-child PID namespaces, other clone
+constraints, TLS ordering, descriptor/node teardown, independent sharing
+ownership, requested PID allocation, supplied-stack execution, shared-VM/vfork
+lifetimes, other notifications/wait classes, worker callers, GNU libc and
+translated/32-bit paths remain unqualified here. The broad libc,
+installation/sandbox/portal and translation gates remain open.

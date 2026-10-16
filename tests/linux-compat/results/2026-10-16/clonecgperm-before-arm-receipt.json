@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "0c952d38b48e6e4288e75e99ca518381e149b2f648c8beef1952f4cda0be47b1",
+    "results": [
+        {
+            "name": "clonecgperm",
+            "source_sha256": "ea5d3e82172bb5bbe039789310560e3b2e4a2954ca5703cba8acfe3dcc484eb6",
+            "init_sha256": "0cf8abdd94b66ed672e39d8a0a082582d4f6bb1a978a5a2b58e0d7e723170264",
+            "iso_sha256": "4f6ff1c88d4637645e14c8938169b4101de6427e71dcd2f7995373d12d6348a1",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

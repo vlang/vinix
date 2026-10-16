@@ -1,0 +1,3 @@
+tests/linux-compat/clonecgperm-check.v:232: FAIL: fn main.failure: assert log.contains('LINUX CLONECGPERM DETAIL:'), 'clonecgperm baseline failure markers required'
+      message: clonecgperm baseline failure markers required
+V panic: Assertion failed...

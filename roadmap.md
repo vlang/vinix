@@ -1153,6 +1153,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   probe ELFs; retain initial namespace-permission expectation failures. See
   [the init-parent/cgroup receipts](docs/linux-posix-qualification.md#native-clone3-init-parent-and-cgroup-descriptor-ordering).
 
+- [x] Check clone3 namespace capability permissions before cgroup descriptor
+  lookup, preserving earlier admission errors and NEWUSER separation. Qualify
+  effective CAP_SYS_ADMIN off/on for root/UID1000, exact EPERM/EBADF errors,
+  ignored cgroup words, held descriptors and real fork/reap in 1,872 controls
+  per native architecture against identical Linux probe ELFs, with flat
+  identical-input cleanup. See [the namespace/cgroup receipts](docs/linux-posix-qualification.md#native-clone3-namespace-permissions-and-cgroup-descriptor-ordering).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

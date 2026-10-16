@@ -1,0 +1,31 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "93da47d056d1292ff33f63d67b6dde6426c8e18a7bdbce58431c598be9ab1511",
+    "results": [
+        {
+            "name": "clonecgperm",
+            "source_sha256": "ea5d3e82172bb5bbe039789310560e3b2e4a2954ca5703cba8acfe3dcc484eb6",
+            "init_sha256": "0cf8abdd94b66ed672e39d8a0a082582d4f6bb1a978a5a2b58e0d7e723170264",
+            "iso_sha256": "736d176fe8e22fa95c5825a5d4e4f53254f4ae514e6b44b2762a1fca013beddc",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "5d06c51b5ded2d2836e5ab383d1ebf5d6a7975236054076ea3402929e0b315ed",
+            "iso_sha256": "f654ee17811a111da1a5c9798647cf7853cecc8e12e376dcd1f2b9d3bdab2382",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "clonecgparent",
+            "source_sha256": "69a090b69c1178279d6bff8197627b766ca69f78c40b358d4fc27eeb7d4042f3",
+            "init_sha256": "3af7f5f2171a2c8577c1757375e88554164387a0e37f7466dcef28260e1eee17",
+            "iso_sha256": "960c82dbd577a567136c856365120b7e60cc3fa9e860bddeaa41fd142aba34d9",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}
