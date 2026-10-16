@@ -1,0 +1,39 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=21
+!>+ [11] ./sbin/init sz=210976
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/publisher-schema sz=1107520
+!>+ [15] ./usr/share/package-fixtures/import sz=1037760
+!>+ [16] ./usr/share/package-fixtures/root-recipe-decode sz=1016360
+!>+ [17] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000037e88200
+initramfs: Done (17 entries)
+HWTEST START packages-root-recipe
+ROOT RECIPE both architectures, independent owned templates, exact canonical bytes and full 1024 selector bounds PASS
+ROOT RECIPE both architectures, independent owned templates, exact canonical bytes and full 1024 selector bounds PASS
+ROOT RECIPE both architectures, independent owned templates, exact canonical bytes and full 1024 selector bounds PASS
+ROOT RECIPE both architectures, independent owned templates, exact canonical bytes and full 1024 selector bounds PASS
+ROOT RECIPE both architectures, independent owned templates, exact canonical bytes and full 1024 selector bounds PASS
+ROOT RECIPE both architectures, independent owned templates, exact canonical bytes and full 1024 selector bounds PASS
+ROOT RECIPE omitted format and nested manifest defaults, full payload integers and reordered fields preserve admission and retire scratch PASS
+ROOT RECIPE every truncated prefix and schema/UTF8/number/selector/overlap refusal cycles retire scratch PASS
+ROOT RECIPE exact 8 MiB and 1024-byte selectors accepted; metadata, selector and nested manifest overflow refused PASS
+ROOT RECIPE full 16384 payload template inventories preserve fields and retire their single live owner PASS
+ROOT RECIPE 1000 borrowed selector validation cycles preserve equal/parent/child/Unicode/component boundaries and retire scratch PASS
+ROOT RECIPE invalid import preserves sources and existing/absent workspace; restored template captures payload and unchanged canonical publication PASS
+ROOT PROCESS root-recipe-decode PASS
+ROOT PROCESS publisher-schema PASS
+ROOT PROCESS import PASS
+HWTEST PASS packages-root-recipe

@@ -1,0 +1,88 @@
+ROOT RECIPE aarch64 1 selectors: 1000 cycles retained 0 bytes
+ROOT RECIPE aarch64 64 selectors: 1000 cycles retained 0 bytes
+ROOT RECIPE aarch64 1024 selectors: 1 cycles retained 0 bytes
+ROOT RECIPE x86_64 1 selectors: 1000 cycles retained 0 bytes
+ROOT RECIPE x86_64 64 selectors: 1000 cycles retained 0 bytes
+ROOT RECIPE x86_64 1024 selectors: 1 cycles retained 0 bytes
+ROOT RECIPE both architectures, independent owned templates, exact canonical bytes and full 1024 selector bounds PASS
+ROOT RECIPE omitted format and nested manifest defaults, full payload integers and reordered fields preserve admission and retire scratch PASS
+ROOT RECIPE refusal 0: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 1: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 2: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 3: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 4: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 5: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 6: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 7: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 8: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 9: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 10: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 11: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 12: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 13: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 14: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 15: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 16: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 17: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 18: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 19: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 20: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 21: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 22: 1000 cycles retained 0 bytes
+ROOT RECIPE refusal 23: 1000 cycles retained 0 bytes
+ROOT RECIPE every truncated prefix and schema/UTF8/number/selector/overlap refusal cycles retire scratch PASS
+ROOT RECIPE exact 8 MiB and 1024-byte selectors accepted; metadata, selector and nested manifest overflow refused PASS
+ROOT RECIPE full 16384 payload template inventories preserve fields and retire their single live owner PASS
+ROOT RECIPE 1000 borrowed selector validation cycles preserve equal/parent/child/Unicode/component boundaries and retire scratch PASS
+ROOT RECIPE invalid import preserves sources and existing/absent workspace; restored template captures payload and unchanged canonical publication PASS
+
+Publisher manifests:
+MANIFEST DECODE aarch64 template 1 payloads: 1000 cycles retained 0 bytes
+MANIFEST DECODE aarch64 template 64 payloads: 1000 cycles retained 0 bytes
+MANIFEST DECODE aarch64 inventory 1 payloads: 1000 cycles retained 0 bytes
+MANIFEST DECODE aarch64 inventory 64 payloads: 1000 cycles retained 0 bytes
+MANIFEST DECODE x86_64 template 1 payloads: 1000 cycles retained 0 bytes
+MANIFEST DECODE x86_64 template 64 payloads: 1000 cycles retained 0 bytes
+MANIFEST DECODE x86_64 inventory 1 payloads: 1000 cycles retained 0 bytes
+MANIFEST DECODE x86_64 inventory 64 payloads: 1000 cycles retained 0 bytes
+MANIFEST DECODE both architectures, owned template/inventory fields, independent results, exact canonical bytes and full 16384 payload bounds PASS
+MANIFEST DECODE omitted package/dependency/payload defaults, full integer ranges and complete-inventory refusals retire scratch PASS
+MANIFEST DECODE refusal 0 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 1 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 2 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 3 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 4 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 5 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 6 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 7 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 8 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 9 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 10 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 11 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 12 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 13 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 14 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 15 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 16 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 17 inventory=false: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 0 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 1 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 2 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 3 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 4 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 5 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 6 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 7 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 8 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 9 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 10 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 11 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 12 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 13 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 14 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 15 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 16 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE refusal 17 inventory=true: 1000 cycles retained 0 bytes
+MANIFEST DECODE every truncated prefix and schema/UTF8/number/permission refusal cycles retire scratch PASS
+MANIFEST DECODE exact 8 MiB and limit-minus-one accepted; metadata/payload/argument/dependency/association/string overflows refused PASS
+MANIFEST DECODE invalid pack input preserves source and absent destination; restored template defaults and captured inventory publish unchanged canonical bytes PASS

@@ -32,6 +32,12 @@ and publisher filesystem behavior; release key enrollment, upstream payload
 authentication, application migration and graphical/runtime qualification remain
 separate work.
 
+The subsequent [bounded prepared-root recipe reader](root-recipe-decode-check.md)
+qualifies complete/default/partial recipe decoding and selector validation,
+including owned results and zero retained scratch. The historical measurements
+below retain their original schema-scanner scope; pinned catalog decoding is
+separate from the prepared-root reader.
+
 ```sh
 V_MACOS_V3_NO_FALLBACK=1 /path/to/v -no-skip-unused -gc none -manualfree \
   -o /tmp/publisher-schema tools/packages/pkgcore/publisher_schema_test.v

@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import json2
-
 fn catalog_required_fields(parent string, keys []string) ! {
 	fields := match parent {
 		'' { ['format', 'architectures', 'packages'] }
@@ -61,10 +59,14 @@ fn root_recipe_required_fields(parent string, keys []string) ! {
 
 fn decode_root_recipe(text string) !RootRecipe {
 	if text.len > max_metadata { return error('prepared-root recipe exceeds metadata limit') }
-	recipe := json2.decode[RootRecipe](text, strict: true)!
+	document_keys_schema(text, root_recipe_field, root_recipe_required_fields, root_recipe_value_type)!
+	mut r := &StoredReader{ text: text }
+	defer { unsafe { free(r) } }
+	recipe := r.root_recipe()!
 	mut accepted := false
 	defer { if !accepted { close_decoded_root_recipe(recipe) } }
-	document_keys_schema(text, root_recipe_field, root_recipe_required_fields, root_recipe_value_type)!
+	r.spaces()
+	if r.position != text.len { return error('trailing prepared-root recipe data') }
 	validate_root_recipe(recipe)!
 	accepted = true
 	return recipe

@@ -224,6 +224,10 @@ fn (mut importer RootImport) copy(source string, target string) ! {
 	}
 }
 
+fn root_destination_contains(parent string, child string) bool {
+	return child.len > parent.len && child[parent.len] == `/` && child.starts_with(parent)
+}
+
 fn validate_root_recipe(recipe RootRecipe) ! {
 	if recipe.format != 1 || recipe.entries.len == 0 || recipe.entries.len > 1024 {
 		return error('unsupported or empty prepared-root recipe')
@@ -232,9 +236,10 @@ fn validate_root_recipe(recipe RootRecipe) ! {
 		if !relative_path(entry.source) || !relative_path(entry.path) {
 			return error('invalid prepared-root selector')
 		}
-		for previous in recipe.entries[..index] {
-			if entry.path == previous.path || entry.path.starts_with(previous.path + '/')
-				|| previous.path.starts_with(entry.path + '/') {
+		for previous_index in 0 .. index {
+			previous := recipe.entries[previous_index]
+			if entry.path == previous.path || root_destination_contains(previous.path, entry.path)
+				|| root_destination_contains(entry.path, previous.path) {
 				return error('overlapping prepared-root destinations')
 			}
 		}

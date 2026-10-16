@@ -1,0 +1,13 @@
+Warmed ten-cycle one/16-selector recipe reads, truncated-recipe refusals and borrowed 16-selector validation, with returned values/errors retired. No compiler or library changes. Sources, executables and generated C retained and pinned.
+
+Before:
+ROOT RECIPE probe 0: ten cycles retained 10 bytes
+ROOT RECIPE probe 1: ten cycles retained 30160 bytes
+ROOT RECIPE probe 2: ten cycles retained 7030 bytes
+ROOT RECIPE probe 3: ten cycles retained 22500 bytes
+
+After:
+ROOT RECIPE probe 0: ten cycles retained 0 bytes
+ROOT RECIPE probe 1: ten cycles retained 0 bytes
+ROOT RECIPE probe 2: ten cycles retained 0 bytes
+ROOT RECIPE probe 3: ten cycles retained 0 bytes

@@ -1,0 +1,135 @@
+root_recipe_decode:
+ROOT RECIPE both architectures, independent owned templates, exact canonical bytes and full 1024 selector bounds PASS
+ROOT RECIPE omitted format and nested manifest defaults, full payload integers and reordered fields preserve admission and retire scratch PASS
+ROOT RECIPE every truncated prefix and schema/UTF8/number/selector/overlap refusal cycles retire scratch PASS
+ROOT RECIPE exact 8 MiB and 1024-byte selectors accepted; metadata, selector and nested manifest overflow refused PASS
+ROOT RECIPE full 16384 payload template inventories preserve fields and retire their single live owner PASS
+ROOT RECIPE 1000 borrowed selector validation cycles preserve equal/parent/child/Unicode/component boundaries and retire scratch PASS
+ROOT RECIPE invalid import preserves sources and existing/absent workspace; restored template captures payload and unchanged canonical publication PASS
+publisher_schema:
+import:
+prepared_root:
+profile_inventory:
+sqlite_profile:
+ffmpeg_profile:
+native_profile:
+Updating trusted repository native
+Installing Native counter 1.0.0 (1/3) from native
+Downloading org.vinix.counter/bin/counter (512 bytes)
+Downloading org.vinix.counter/licenses/application-sdk-MIT.txt (23 bytes)
+Downloading org.vinix.counter/licenses/musl-MIT.txt (12 bytes)
+Downloading org.vinix.counter/licenses/v-MIT.txt (9 bytes)
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 1
+Activated package generation 2
+Installing Native counter 1.0.0 (1/3) from native
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository native
+Installing Native counter 1.0.0 (1/3) from native
+Downloading org.vinix.counter/bin/counter (512 bytes)
+Downloading org.vinix.counter/licenses/application-sdk-MIT.txt (23 bytes)
+Downloading org.vinix.counter/licenses/musl-MIT.txt (12 bytes)
+Downloading org.vinix.counter/licenses/v-MIT.txt (9 bytes)
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 1
+Activated package generation 2
+Installing Native counter 1.0.0 (1/3) from native
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+catalog:
+Updating trusted repository fixture
+Installing app 1.0.0 (1/3) from fixture
+Downloading app/bin/application (19 bytes)
+Installing License 1.0.0 (2/3) from fixture
+Downloading license/COPYING (23 bytes)
+Installing runtime 1.0.0 (3/3) from fixture
+Downloading runtime/bin/runner (23 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing app 1.0.0 (1/3) from fixture
+Downloading app/bin/application (18 bytes)
+Installing License 1.0.0 (2/3) from fixture
+Downloading license/COPYING (23 bytes)
+Installing runtime 1.0.0 (3/3) from fixture
+Downloading runtime/bin/runner (22 bytes)
+Activated package generation 1
+Activated package generation 2
+composition:
+Updating trusted repository composed
+Installing alpha 1.0.0 (1/4) from composed
+Downloading alpha/bin/app (13 bytes)
+Installing Notice 1.0.0 (2/4) from composed
+Downloading alpha-notice/NOTICE (12 bytes)
+Installing beta 1.0.0 (3/4) from composed
+Downloading beta/bin/app (12 bytes)
+Installing Notice 1.0.0 (4/4) from composed
+Downloading beta-notice/NOTICE (11 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository composed
+Installing alpha 1.0.0 (1/4) from composed
+Downloading alpha/bin/app (12 bytes)
+Installing Notice 1.0.0 (2/4) from composed
+Downloading alpha-notice/NOTICE (12 bytes)
+Installing beta 1.0.0 (3/4) from composed
+Downloading beta/bin/app (11 bytes)
+Installing Notice 1.0.0 (4/4) from composed
+Downloading beta-notice/NOTICE (11 bytes)
+Activated package generation 1
+Activated package generation 2
+manifest_decode:
+MANIFEST DECODE both architectures, owned template/inventory fields, independent results, exact canonical bytes and full 16384 payload bounds PASS
+MANIFEST DECODE omitted package/dependency/payload defaults, full integer ranges and complete-inventory refusals retire scratch PASS
+MANIFEST DECODE every truncated prefix and schema/UTF8/number/permission refusal cycles retire scratch PASS
+MANIFEST DECODE exact 8 MiB and limit-minus-one accepted; metadata/payload/argument/dependency/association/string overflows refused PASS
+MANIFEST DECODE invalid pack input preserves source and absent destination; restored template defaults and captured inventory publish unchanged canonical bytes PASS
+stored_decode:
+Stored decode: partial nested cleanup, escaped duplicate keys, canonical integers and late semantic refusal PASS
+Stored decode: both architectures, owned Unicode/escaped keys, legacy policy/window defaults and full u64 counters PASS
+Stored decode: 4096-repository/package limits, excess refusal, nested dependency/argument declarations and growing payload arrays PASS
+Stored decode: inclusive 8-MiB metadata and 16384-payload bounds with overflow refusal PASS
+index_schema:
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading data/share/data (30 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+distribution:
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 2
+Installing app 1.0.0 (1/1) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 4
+Activated package generation 5
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 6
+Restored packages from generation 4 in generation 6; application data was retained
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Updating trusted repository fixture

@@ -1,0 +1,7 @@
+The intermediate bounded reader passed literal fixed arrays into the dynamic-array member reader; generated C showed a new_array_from_c_array on each member. Shared constant key arrays removed this scratch. This intermediate residual is not qualified as a pass. Its reader source, executable, generated C and probe output are retained and pinned. The final expanded fixture requires zero on success and refusal.
+
+Intermediate probe:
+ROOT RECIPE probe 0: ten cycles retained 4670 bytes
+ROOT RECIPE probe 1: ten cycles retained 28370 bytes
+ROOT RECIPE probe 2: ten cycles retained 0 bytes
+ROOT RECIPE probe 3: ten cycles retained 0 bytes

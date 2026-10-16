@@ -57,6 +57,11 @@ manifest decoding. Source omissions retain their defaults; publication inputs
 retain complete declaration requirements and the existing canonical bytes.
 See [publisher manifest checks](../tests/packages/manifest-decode-check.md).
 
+Prepared-root recipes also use bounded owned decoding, preserving format-1 and
+manifest template defaults while requiring explicit selectors. Selector overlap
+validation compares path components without constructing temporary prefixes.
+See [prepared-root recipe checks](../tests/packages/root-recipe-decode-check.md).
+
 Local payload copies validate ordinary source and destination descriptors before
 writing, refuse the same file even through a hard link, and enforce the captured
 source size. Oversized offline repository objects leave existing partial data

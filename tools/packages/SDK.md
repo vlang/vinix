@@ -451,6 +451,14 @@ root or creating an import workspace. `manifest`, `entries`, and each selector's
 `source`/`path` are explicit. The omitted format still defaults to 1, and manifest
 templates retain the same omitted-field defaults as `pack`.
 
+The bounded recipe reader admits at most 8 MiB, 1,024 selectors and 1,024 bytes
+per selector source/destination, with the existing manifest field/count bounds.
+It owns the decoded template and selector fields and retires partial results on
+refusal. Selector validation preserves equal/parent/child destination refusals
+without allocating temporary path prefixes. Canonical output and source-root
+admission are unchanged. See
+[recipe decoding qualification](../../tests/packages/root-recipe-decode-check.md).
+
 ### Build a pinned application catalog
 
 `pack-catalog catalog.json /build/prepared-roots /build/new-workspace` builds an

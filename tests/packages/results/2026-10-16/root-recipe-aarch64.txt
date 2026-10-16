@@ -1,0 +1,2 @@
+PASS aarch64 packages-root-recipe (50.1s)
+package-root-recipe aarch64: 1 passed, 0 failed, 0 skipped
