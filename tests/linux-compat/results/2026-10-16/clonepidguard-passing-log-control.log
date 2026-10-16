@@ -1,0 +1,3 @@
+tests/linux-compat/clonepidguard-check.v:233: FAIL: fn main.failure: assert log.contains('LINUX CLONEPIDGUARD DETAIL:'), 'clonepidguard baseline failure markers required'
+      message: clonepidguard baseline failure markers required
+V panic: Assertion failed...

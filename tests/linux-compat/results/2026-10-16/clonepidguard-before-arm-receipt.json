@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "71470d522d9f6a14310558ff5d5d7c4b985c505f67ace34745598be96338461d",
+    "results": [
+        {
+            "name": "clonepidguard",
+            "source_sha256": "8740b20d5ce9bf1ae1a3a3f73f4c0fac8c2bf5ed19475968ecd264da4c79bde2",
+            "init_sha256": "8ab499a18dc87c0cc25cc34e9dc6ad193897b1eb8618cc51653745b7af098339",
+            "iso_sha256": "99a2478d7b0b8085d3f981e5c144e83c4d503c5593409f567506df282f615b09",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

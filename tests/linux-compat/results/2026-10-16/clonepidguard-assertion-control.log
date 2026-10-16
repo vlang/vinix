@@ -1,0 +1,3 @@
+tests/linux-compat/clonepidguard-check.v:449: FAIL: fn main.main: assert false, 'clonepidguard assertions must execute'
+      message: clonepidguard assertions must execute
+V panic: Assertion failed...

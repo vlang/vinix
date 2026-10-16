@@ -29,6 +29,9 @@ import usercopy
 // marshals its arguments into.
 pub fn syscall_clone(_gpr_state voidptr, flags u64, child_stack u64, parent_tid u64, tls u64, child_tid u64) (u64, u64) {
 	state := unsafe { &cpulocal.GPRState(_gpr_state) }
+	if !valid_clone_pidfd(flags, parent_tid, parent_tid) {
+		return errno.err, errno.einval
+	}
 
 	return do_clone(state, flags, child_stack, parent_tid, tls, child_tid)
 }
@@ -63,6 +66,10 @@ pub fn syscall_clone3(_gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 		}
 		child_sp = lib.align_down(args.stack + args.stack_size, 16)
 	} else if args.stack_size != 0 {
+		return errno.err, errno.einval
+	}
+
+	if !valid_clone_pidfd(args.flags, args.pidfd, args.parent_tid) {
 		return errno.err, errno.einval
 	}
 

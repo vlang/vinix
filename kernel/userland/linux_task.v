@@ -197,6 +197,14 @@ fn valid_clone3_exit_signal(flags u64, signal u64) bool {
 	return signal <= 64 && (signal == 0 || flags & (clone_thread | clone_parent) == 0)
 }
 
+// Legacy clone uses parent_tid for both outputs, so PIDFD and PARENT_SETTID
+// cannot coexist there. clone3 has separate fields but cannot alias them.
+// DETACHED is reserved when PIDFD is selected, including legacy clone.
+fn valid_clone_pidfd(flags u64, pidfd u64, parent_tid u64) bool {
+	return flags & clone_pidfd == 0 || (flags & u64(0x00400000) == 0
+		&& (flags & clone_parent_settid == 0 || pidfd != parent_tid))
+}
+
 // New mount/user namespaces cannot share FS state with their parent. Shared
 // handlers require shared VM, and threads require shared handlers.
 // Threads cannot start in a new PID or user namespace.

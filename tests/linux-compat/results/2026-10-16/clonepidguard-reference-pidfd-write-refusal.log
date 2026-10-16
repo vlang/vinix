@@ -1,0 +1,301 @@
+[    0.000000] Booting Linux on physical CPU 0x0000000000 [0x610f0000]
+[    0.000000] Linux version 6.12.51-0-virt (buildozer@build-3-22-aarch64) (cc (Alpine 14.2.0) 14.2.0, GNU ld (GNU Binutils) 2.44) #1-Alpine SMP PREEMPT_DYNAMIC 2025-10-07 15:12:03
+[    0.000000] random: crng init done
+[    0.000000] Machine model: linux,dummy-virt
+[    0.000000] efi: UEFI not found.
+[    0.000000] OF: reserved mem: Reserved memory: No reserved-memory node in the DT
+[    0.000000] NUMA: Faking a node at [mem 0x0000000040000000-0x000000005fffffff]
+[    0.000000] NODE_DATA(0) allocated [mem 0x5fcf9440-0x5fcfb8bf]
+[    0.000000] Zone ranges:
+[    0.000000]   DMA      [mem 0x0000000040000000-0x000000005fffffff]
+[    0.000000]   DMA32    empty
+[    0.000000]   Normal   empty
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000040000000-0x000000005fffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000040000000-0x000000005fffffff]
+[    0.000000] psci: probing for conduit method from DT.
+[    0.000000] psci: PSCIv1.1 detected in firmware.
+[    0.000000] psci: Using standard PSCI v0.2 function IDs
+[    0.000000] psci: Trusted OS migration not required
+[    0.000000] psci: SMC Calling Convention v1.0
+[    0.000000] percpu: Embedded 34 pages/cpu s98904 r8192 d32168 u139264
+[    0.000000] Detected PIPT I-cache on CPU0
+[    0.000000] CPU features: detected: Address authentication (IMP DEF algorithm)
+[    0.000000] CPU features: detected: Spectre-v4
+[    0.000000] CPU features: detected: Spectre-BHB
+[    0.000000] alternatives: applying boot alternatives
+[    0.000000] Kernel command line: console=ttyAMA0 rdinit=/init panic=-1
+[    0.000000] Dentry cache hash table entries: 65536 (order: 7, 524288 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 32768 (order: 6, 262144 bytes, linear)
+[    0.000000] Fallback order for Node 0: 0 
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 131072
+[    0.000000] Policy zone: DMA
+[    0.000000] mem auto-init: stack:all(zero), heap alloc:on, heap free:off
+[    0.000000] software IO TLB: SWIOTLB bounce buffer size adjusted to 0MB
+[    0.000000] software IO TLB: area num 2.
+[    0.000000] software IO TLB: mapped [mem 0x000000005f2f7000-0x000000005f377000] (0MB)
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=2, Nodes=1
+[    0.000000] Dynamic Preempt: none
+[    0.000000] rcu: Preemptible hierarchical RCU implementation.
+[    0.000000] rcu: 	RCU restricting CPUs from NR_CPUS=4096 to nr_cpu_ids=2.
+[    0.000000] 	Trampoline variant of Tasks RCU enabled.
+[    0.000000] 	Tracing variant of Tasks RCU enabled.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 100 jiffies.
+[    0.000000] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=2
+[    0.000000] RCU Tasks: Setting shift to 1 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=2.
+[    0.000000] RCU Tasks Trace: Setting shift to 1 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=2.
+[    0.000000] NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[    0.000000] GICv3: 988 SPIs implemented
+[    0.000000] GICv3: 0 Extended SPIs implemented
+[    0.000000] Root IRQ handler: gic_handle_irq
+[    0.000000] GICv3: GICv3 features: 16 PPIs, RSS
+[    0.000000] GICv3: GICD_CTRL.DS=1, SCR_EL3.FIQ=0
+[    0.000000] GICv3: CPU0: found redistributor 0 region 0:0x00000000080a0000
+[    0.000000] GICv2m: range[mem 0x08020000-0x08020fff], SPI[80:143]
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] arch_timer: cp15 timer(s) running at 24.00MHz (virt).
+[    0.000000] clocksource: arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x588fe9dc0, max_idle_ns: 440795202592 ns
+[    0.000000] sched_clock: 56 bits at 24MHz, resolution 41ns, wraps every 4398046511097ns
+[    0.000201] kfence: initialized - using 2097152 bytes for 255 objects at 0x(____ptrval____)-0x(____ptrval____)
+[    0.000266] Console: colour dummy device 80x25
+[    0.000299] Calibrating delay loop (skipped), value calculated using timer frequency.. 48.00 BogoMIPS (lpj=24000)
+[    0.000300] pid_max: default: 32768 minimum: 301
+[    0.000328] LSM: initializing lsm=lockdown,capability,landlock
+[    0.000403] landlock: Up and running.
+[    0.000437] Mount-cache hash table entries: 1024 (order: 1, 8192 bytes, linear)
+[    0.000440] Mountpoint-cache hash table entries: 1024 (order: 1, 8192 bytes, linear)
+[    0.000788] cacheinfo: Unable to detect cache hierarchy for CPU 0
+[    0.001032] rcu: Hierarchical SRCU implementation.
+[    0.001032] rcu: 	Max phase no-delay instances is 400.
+[    0.001066] Timer migration: 1 hierarchy levels; 8 children per group; 1 crossnode level
+[    0.001206] EFI services will not be available.
+[    0.001237] smp: Bringing up secondary CPUs ...
+[    0.001466] Detected PIPT I-cache on CPU1
+[    0.001499] GICv3: CPU1: found redistributor 1 region 0:0x00000000080c0000
+[    0.001570] CPU1: Booted secondary processor 0x0000000001 [0x610f0000]
+[    0.001648] smp: Brought up 1 node, 2 CPUs
+[    0.001650] SMP: Total of 2 processors activated.
+[    0.001650] CPU: All CPU(s) started at EL1
+[    0.001657] CPU features: detected: Branch Target Identification
+[    0.001658] CPU features: detected: ARMv8.4 Translation Table Level
+[    0.001659] CPU features: detected: Data cache clean to the PoU not required for I/D coherence
+[    0.001660] CPU features: detected: Common not Private translations
+[    0.001660] CPU features: detected: CRC32 instructions
+[    0.001660] CPU features: detected: Data independent timing control (DIT)
+[    0.001661] CPU features: detected: E0PD
+[    0.001661] CPU features: detected: Enhanced Privileged Access Never
+[    0.001662] CPU features: detected: Generic authentication (IMP DEF algorithm)
+[    0.001663] CPU features: detected: RCpc load-acquire (LDAPR)
+[    0.001664] CPU features: detected: LSE atomic instructions
+[    0.001664] CPU features: detected: Privileged Access Never
+[    0.001664] CPU features: detected: RAS Extension Support
+[    0.001665] CPU features: detected: Speculation barrier (SB)
+[    0.001665] CPU features: detected: TLB range maintenance instructions
+[    0.001712] alternatives: applying system-wide alternatives
+[    0.002834] Memory: 473256K/524288K available (12608K kernel code, 1962K rwdata, 7780K rodata, 1920K init, 9307K bss, 48180K reserved, 0K cma-reserved)
+[    0.003017] devtmpfs: initialized
+[    0.003402] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1911260446275000 ns
+[    0.003410] futex hash table entries: 512 (order: 3, 32768 bytes, linear)
+[    0.003422] 24304 pages in range for non-PLT usage
+[    0.003422] 515824 pages in range for PLT usage
+[    0.003474] pinctrl core: initialized pinctrl subsystem
+[    0.003506] DMI not present or invalid.
+[    0.004667] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[    0.004828] DMA: preallocated 128 KiB GFP_KERNEL pool for atomic allocations
+[    0.004857] DMA: preallocated 128 KiB GFP_KERNEL|GFP_DMA pool for atomic allocations
+[    0.004881] DMA: preallocated 128 KiB GFP_KERNEL|GFP_DMA32 pool for atomic allocations
+[    0.004891] audit: initializing netlink subsys (disabled)
+[    0.005007] audit: type=2000 audit(0.004:1): state=initialized audit_enabled=0 res=1
+[    0.005034] thermal_sys: Registered thermal governor 'step_wise'
+[    0.005043] cpuidle: using governor ladder
+[    0.005046] cpuidle: using governor menu
+[    0.005061] hw-breakpoint: found 6 breakpoint and 4 watchpoint registers.
+[    0.005106] ASID allocator initialised with 65536 entries
+[    0.005133] Serial: AMBA PL011 UART driver
+[    0.005787] 9000000.pl011: ttyAMA0 at MMIO 0x9000000 (irq = 13, base_baud = 0) is a PL011 rev1
+[    0.005821] printk: legacy console [ttyAMA0] enabled
+[    0.047672] HugeTLB: registered 1.00 GiB page size, pre-allocated 0 pages
+[    0.048086] HugeTLB: 0 KiB vmemmap can be freed for a 1.00 GiB page
+[    0.048436] HugeTLB: registered 32.0 MiB page size, pre-allocated 0 pages
+[    0.048829] HugeTLB: 0 KiB vmemmap can be freed for a 32.0 MiB page
+[    0.049182] HugeTLB: registered 2.00 MiB page size, pre-allocated 0 pages
+[    0.049557] HugeTLB: 0 KiB vmemmap can be freed for a 2.00 MiB page
+[    0.049918] HugeTLB: registered 64.0 KiB page size, pre-allocated 0 pages
+[    0.050292] HugeTLB: 0 KiB vmemmap can be freed for a 64.0 KiB page
+[    0.050976] ACPI: Interpreter disabled.
+[    0.051214] iommu: Default domain type: Translated
+[    0.051479] iommu: DMA domain TLB invalidation policy: lazy mode
+[    0.052813] clocksource: Switched to clocksource arch_sys_counter
+[    0.053286] VFS: Disk quotas dquot_6.6.0
+[    0.053534] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+[    0.053975] pnp: PnP ACPI: disabled
+[    0.054784] NET: Registered PF_INET protocol family
+[    0.055127] IP idents hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[    0.062370] tcp_listen_portaddr_hash hash table entries: 256 (order: 0, 4096 bytes, linear)
+[    0.062873] Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    0.063364] TCP established hash table entries: 4096 (order: 3, 32768 bytes, linear)
+[    0.063792] TCP bind hash table entries: 4096 (order: 5, 131072 bytes, linear)
+[    0.064256] TCP: Hash tables configured (established 4096 bind 4096)
+[    0.064655] MPTCP token hash table entries: 512 (order: 1, 12288 bytes, linear)
+[    0.065086] UDP hash table entries: 256 (order: 1, 8192 bytes, linear)
+[    0.065449] UDP-Lite hash table entries: 256 (order: 1, 8192 bytes, linear)
+[    0.065888] NET: Registered PF_UNIX/PF_LOCAL protocol family
+[    0.066209] NET: Registered PF_XDP protocol family
+[    0.066477] PCI: CLS 0 bytes, default 64
+[    0.066780] Unpacking initramfs...
+[    0.066799] kvm [1]: HYP mode not available
+[    0.067122] Freeing initrd memory: 132K
+[    0.067386] Initialise system trusted keyrings
+[    0.067783] workingset: timestamp_bits=44 max_order=17 bucket_order=0
+[    0.078128] Key type asymmetric registered
+[    0.078382] Asymmetric key parser 'x509' registered
+[    0.078690] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 249)
+[    0.079195] io scheduler mq-deadline registered
+[    0.079471] io scheduler kyber registered
+[    0.079717] io scheduler bfq registered
+[    0.080261] pci-host-generic 4010000000.pcie: host bridge /pcie@10000000 ranges:
+[    0.080690] pci-host-generic 4010000000.pcie:       IO 0x003eff0000..0x003effffff -> 0x0000000000
+[    0.081204] pci-host-generic 4010000000.pcie:      MEM 0x0010000000..0x003efeffff -> 0x0010000000
+[    0.081745] pci-host-generic 4010000000.pcie:      MEM 0x8000000000..0xffffffffff -> 0x8000000000
+[    0.082277] pci-host-generic 4010000000.pcie: Memory resource size exceeds max for 32 bits
+[    0.082763] pci-host-generic 4010000000.pcie: ECAM at [mem 0x4010000000-0x401fffffff] for [bus 00-ff]
+[    0.083343] pci-host-generic 4010000000.pcie: PCI host bridge to bus 0000:00
+[    0.083737] pci_bus 0000:00: root bus resource [bus 00-ff]
+[    0.084058] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+[    0.084413] pci_bus 0000:00: root bus resource [mem 0x10000000-0x3efeffff]
+[    0.084795] pci_bus 0000:00: root bus resource [mem 0x8000000000-0xffffffffff]
+[    0.085243] pci 0000:00:00.0: [1b36:0008] type 00 class 0x060000 conventional PCI endpoint
+[    0.085890] pci 0000:00:01.0: [1af4:1000] type 00 class 0x020000 conventional PCI endpoint
+[    0.086377] pci 0000:00:01.0: BAR 0 [io  0x0000-0x001f]
+[    0.086686] pci 0000:00:01.0: BAR 1 [mem 0x00000000-0x00000fff]
+[    0.087066] pci 0000:00:01.0: BAR 4 [mem 0x00000000-0x00003fff 64bit pref]
+[    0.087462] pci 0000:00:01.0: ROM [mem 0x00000000-0x0003ffff pref]
+[    0.088093] pci 0000:00:01.0: ROM [mem 0x10000000-0x1003ffff pref]: assigned
+[    0.088495] pci 0000:00:01.0: BAR 4 [mem 0x8000000000-0x8000003fff 64bit pref]: assigned
+[    0.088976] pci 0000:00:01.0: BAR 1 [mem 0x10040000-0x10040fff]: assigned
+[    0.089354] pci 0000:00:01.0: BAR 0 [io  0x1000-0x101f]: assigned
+[    0.089698] pci_bus 0000:00: resource 4 [io  0x0000-0xffff]
+[    0.090024] pci_bus 0000:00: resource 5 [mem 0x10000000-0x3efeffff]
+[    0.090438] pci_bus 0000:00: resource 6 [mem 0x8000000000-0xffffffffff]
+[    0.091028] virtio-pci 0000:00:01.0: enabling device (0000 -> 0003)
+[    0.092117] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+[    0.093091] hv_vmbus: registering driver hyperv_keyboard
+[    0.093612] rtc-pl031 9010000.pl031: registered as rtc0
+[    0.093948] rtc-pl031 9010000.pl031: setting system clock to 2026-10-16T02:52:22 UTC (1792119142)
+[    0.094579] NET: Registered PF_INET6 protocol family
+[    0.095219] Segment Routing with IPv6
+[    0.095440] In-situ OAM (IOAM) with IPv6
+[    0.098129] registered taskstats version 1
+[    0.098443] Loading compiled-in X.509 certificates
+[    0.099460] Loaded X.509 cert 'alpinelinux.org: Alpine Linux kernel key: 87fa969a47f3e2a6aa35859eb932a17c95abcd82'
+[    0.101085] Demotion targets for Node 0: null
+[    0.103217] Key type .fscrypt registered
+[    0.103467] Key type fscrypt-provisioning registered
+[    0.106554] clk: Disabling unused clocks
+[    0.106791] PM: genpd: Disabling unused power domains
+[    0.107290] Freeing unused kernel memory: 1920K
+[    0.107660] Run /init as init process
+LINUX CLONEPIDGUARD CAPS: ordinary=0 namespace=0 sysadmin=0
+LINUX CLONEPIDGUARD FD: ordinary=0 namespace=0 wrong=3
+LINUX CLONEPIDGUARD DETAIL: ordinary=0 namespace=0 kind=4 index=0 result=-1 errno=14 expected=9 guarded=1 child=0
+LINUX CLONEPIDGUARD DETAIL: ordinary=0 namespace=0 kind=4 index=1 result=-1 errno=14 expected=9 guarded=1 child=0
+LINUX CLONEPIDGUARD DETAIL: ordinary=0 namespace=0 kind=4 index=2 result=-1 errno=14 expected=9 guarded=1 child=0
+LINUX CLONEPIDGUARD COHORT: ordinary=0 namespace=0 self=347 uid=0 page=4096 raw=468 classes=6 layouts=3
+LINUX CLONEPIDGUARD CASES: ordinary=0 namespace=0 kind=0 calls=96 failures=0
+LINUX CLONEPIDGUARD CASES: ordinary=0 namespace=0 kind=1 calls=96 failures=0
+LINUX CLONEPIDGUARD CASES: ordinary=0 namespace=0 kind=2 calls=108 failures=0
+LINUX CLONEPIDGUARD CASES: ordinary=0 namespace=0 kind=3 calls=60 failures=0
+LINUX CLONEPIDGUARD CASES: ordinary=0 namespace=0 kind=4 calls=72 failures=60
+LINUX CLONEPIDGUARD CASES: ordinary=0 namespace=0 kind=5 calls=36 failures=0
+LINUX CLONEPIDGUARD CHILDREN: ordinary=0 namespace=0 valid=36 unexpected=0
+LINUX CLONEPIDGUARD FINAL: ordinary=0 namespace=0 kind=0 calls=96 failures=0
+LINUX CLONEPIDGUARD FINAL: ordinary=0 namespace=0 kind=1 calls=96 failures=0
+LINUX CLONEPIDGUARD FINAL: ordinary=0 namespace=0 kind=2 calls=108 failures=0
+LINUX CLONEPIDGUARD FINAL: ordinary=0 namespace=0 kind=3 calls=60 failures=0
+LINUX CLONEPIDGUARD FINAL: ordinary=0 namespace=0 kind=4 calls=72 failures=60
+LINUX CLONEPIDGUARD FINAL: ordinary=0 namespace=0 kind=5 calls=36 failures=0
+LINUX CLONEPIDGUARD CHILDRENFINAL: ordinary=0 namespace=0 valid=36 unexpected=0
+LINUX CLONEPIDGUARD CAPS: ordinary=1 namespace=0 sysadmin=0
+LINUX CLONEPIDGUARD FD: ordinary=1 namespace=0 wrong=3
+LINUX CLONEPIDGUARD DETAIL: ordinary=1 namespace=0 kind=4 index=0 result=-1 errno=14 expected=9 guarded=1 child=0
+LINUX CLONEPIDGUARD DETAIL: ordinary=1 namespace=0 kind=4 index=1 result=-1 errno=14 expected=9 guarded=1 child=0
+LINUX CLONEPIDGUARD DETAIL: ordinary=1 namespace=0 kind=4 index=2 result=-1 errno=14 expected=9 guarded=1 child=0
+LINUX CLONEPIDGUARD COHORT: ordinary=1 namespace=0 self=456 uid=1000 page=4096 raw=468 classes=6 layouts=3
+LINUX CLONEPIDGUARD CASES: ordinary=1 namespace=0 kind=0 calls=96 failures=0
+LINUX CLONEPIDGUARD CASES: ordinary=1 namespace=0 kind=1 calls=96 failures=0
+LINUX CLONEPIDGUARD CASES: ordinary=1 namespace=0 kind=2 calls=108 failures=0
+LINUX CLONEPIDGUARD CASES: ordinary=1 namespace=0 kind=3 calls=60 failures=0
+LINUX CLONEPIDGUARD CASES: ordinary=1 namespace=0 kind=4 calls=72 failures=60
+LINUX CLONEPIDGUARD CASES: ordinary=1 namespace=0 kind=5 calls=36 failures=0
+LINUX CLONEPIDGUARD CHILDREN: ordinary=1 namespace=0 valid=36 unexpected=0
+LINUX CLONEPIDGUARD FINAL: ordinary=1 namespace=0 kind=0 calls=96 failures=0
+LINUX CLONEPIDGUARD FINAL: ordinary=1 namespace=0 kind=1 calls=96 failures=0
+LINUX CLONEPIDGUARD FINAL: ordinary=1 namespace=0 kind=2 calls=108 failures=0
+LINUX CLONEPIDGUARD FINAL: ordinary=1 namespace=0 kind=3 calls=60 failures=0
+LINUX CLONEPIDGUARD FINAL: ordinary=1 namespace=0 kind=4 calls=72 failures=60
+LINUX CLONEPIDGUARD FINAL: ordinary=1 namespace=0 kind=5 calls=36 failures=0
+LINUX CLONEPIDGUARD CHILDRENFINAL: ordinary=1 namespace=0 valid=36 unexpected=0
+LINUX CLONEPIDGUARD CAPS: ordinary=0 namespace=1 sysadmin=0
+LINUX CLONEPIDGUARD FD: ordinary=0 namespace=1 wrong=3
+LINUX CLONEPIDGUARD DETAIL: ordinary=0 namespace=1 kind=4 index=0 result=-1 errno=14 expected=9 guarded=1 child=0
+LINUX CLONEPIDGUARD DETAIL: ordinary=0 namespace=1 kind=4 index=1 result=-1 errno=14 expected=9 guarded=1 child=0
+LINUX CLONEPIDGUARD DETAIL: ordinary=0 namespace=1 kind=4 index=2 result=-1 errno=14 expected=9 guarded=1 child=0
+LINUX CLONEPIDGUARD COHORT: ordinary=0 namespace=1 self=2 uid=0 page=4096 raw=468 classes=6 layouts=3
+LINUX CLONEPIDGUARD CASES: ordinary=0 namespace=1 kind=0 calls=96 failures=0
+LINUX CLONEPIDGUARD CASES: ordinary=0 namespace=1 kind=1 calls=96 failures=0
+LINUX CLONEPIDGUARD CASES: ordinary=0 namespace=1 kind=2 calls=108 failures=0
+LINUX CLONEPIDGUARD CASES: ordinary=0 namespace=1 kind=3 calls=60 failures=0
+LINUX CLONEPIDGUARD CASES: ordinary=0 namespace=1 kind=4 calls=72 failures=60
+LINUX CLONEPIDGUARD CASES: ordinary=0 namespace=1 kind=5 calls=36 failures=0
+LINUX CLONEPIDGUARD CHILDREN: ordinary=0 namespace=1 valid=36 unexpected=0
+LINUX CLONEPIDGUARD FINAL: ordinary=0 namespace=1 kind=0 calls=96 failures=0
+LINUX CLONEPIDGUARD FINAL: ordinary=0 namespace=1 kind=1 calls=96 failures=0
+LINUX CLONEPIDGUARD FINAL: ordinary=0 namespace=1 kind=2 calls=108 failures=0
+LINUX CLONEPIDGUARD FINAL: ordinary=0 namespace=1 kind=3 calls=60 failures=0
+LINUX CLONEPIDGUARD FINAL: ordinary=0 namespace=1 kind=4 calls=72 failures=60
+LINUX CLONEPIDGUARD FINAL: ordinary=0 namespace=1 kind=5 calls=36 failures=0
+LINUX CLONEPIDGUARD CHILDRENFINAL: ordinary=0 namespace=1 valid=36 unexpected=0
+LINUX CLONEPIDGUARD CAPS: ordinary=1 namespace=1 sysadmin=0
+LINUX CLONEPIDGUARD FD: ordinary=1 namespace=1 wrong=3
+LINUX CLONEPIDGUARD DETAIL: ordinary=1 namespace=1 kind=4 index=0 result=-1 errno=14 expected=9 guarded=1 child=0
+LINUX CLONEPIDGUARD DETAIL: ordinary=1 namespace=1 kind=4 index=1 result=-1 errno=14 expected=9 guarded=1 child=0
+LINUX CLONEPIDGUARD DETAIL: ordinary=1 namespace=1 kind=4 index=2 result=-1 errno=14 expected=9 guarded=1 child=0
+LINUX CLONEPIDGUARD COHORT: ordinary=1 namespace=1 self=2 uid=1000 page=4096 raw=468 classes=6 layouts=3
+LINUX CLONEPIDGUARD CASES: ordinary=1 namespace=1 kind=0 calls=96 failures=0
+LINUX CLONEPIDGUARD CASES: ordinary=1 namespace=1 kind=1 calls=96 failures=0
+LINUX CLONEPIDGUARD CASES: ordinary=1 namespace=1 kind=2 calls=108 failures=0
+LINUX CLONEPIDGUARD CASES: ordinary=1 namespace=1 kind=3 calls=60 failures=0
+LINUX CLONEPIDGUARD CASES: ordinary=1 namespace=1 kind=4 calls=72 failures=60
+LINUX CLONEPIDGUARD CASES: ordinary=1 namespace=1 kind=5 calls=36 failures=0
+LINUX CLONEPIDGUARD CHILDREN: ordinary=1 namespace=1 valid=36 unexpected=0
+LINUX CLONEPIDGUARD FINAL: ordinary=1 namespace=1 kind=0 calls=96 failures=0
+LINUX CLONEPIDGUARD FINAL: ordinary=1 namespace=1 kind=1 calls=96 failures=0
+LINUX CLONEPIDGUARD FINAL: ordinary=1 namespace=1 kind=2 calls=108 failures=0
+LINUX CLONEPIDGUARD FINAL: ordinary=1 namespace=1 kind=3 calls=60 failures=0
+LINUX CLONEPIDGUARD FINAL: ordinary=1 namespace=1 kind=4 calls=72 failures=60
+LINUX CLONEPIDGUARD FINAL: ordinary=1 namespace=1 kind=5 calls=36 failures=0
+LINUX CLONEPIDGUARD CHILDRENFINAL: ordinary=1 namespace=1 valid=36 unexpected=0
+LINUX CLONEPIDGUARD FAIL: clone pidfd conflicts/output aliasing, import precedence, admission, fork/reap or retained storage
+[    0.187732] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
+[    0.188165] CPU: 0 UID: 0 PID: 1 Comm: probe Not tainted 6.12.51-0-virt #1-Alpine
+[    0.188583] Hardware name: linux,dummy-virt (DT)
+[    0.188843] Call trace:
+[    0.188985]  dump_backtrace+0xf0/0x140
+[    0.189202]  show_stack+0x28/0x4c
+[    0.189391]  dump_stack_lvl+0x60/0x94
+[    0.189610]  dump_stack+0x18/0x30
+[    0.189798]  panic+0x168/0x378
+[    0.189973]  make_task_dead+0x0/0x180
+[    0.190182]  do_group_exit+0x34/0x90
+[    0.190419]  pid_child_should_wake+0x0/0xb0
+[    0.190660]  invoke_syscall+0x78/0x120
+[    0.190875]  el0_svc_common.constprop.0+0x54/0x128
+[    0.191144]  do_el0_svc+0x28/0x58
+[    0.191333]  el0_svc+0x38/0x1a0
+[    0.191513]  el0t_64_sync_handler+0x140/0x14c
+[    0.191758]  el0t_64_sync+0x190/0x194
+[    0.191998] SMP: stopping secondary CPUs
+[    0.192269] Kernel Offset: disabled
+[    0.192485] CPU features: 0x00,00000003,00222928,26267727
+[    0.192807] Memory Limit: none

@@ -1166,6 +1166,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   1,880 controls per architecture against identical Linux ELFs. Nested callers
   remain separate. See [the future-PID receipts](docs/linux-posix-qualification.md#native-clone-thread-admission-with-a-future-pid-namespace).
 
+- [x] Reject legacy clone PIDFD/DETACHED and parent-TID output conflicts;
+  reject equal clone3 pidfd/parent_tid slots before later admission. Preserve
+  earlier errors, distinct-output namespace EPERM, ignored-pidfd cgroup EBADF
+  and real fork/reap. Qualify 1,872 controls and identical-input cleanup on both
+  native architectures against identical Linux ELFs. Actual pidfd construction,
+  output writes and rollback remain separate. See [the pidfd conflict receipts](docs/linux-posix-qualification.md#native-clone-pidfd-conflicts-and-output-aliasing).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

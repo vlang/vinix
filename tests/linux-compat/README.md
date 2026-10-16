@@ -2100,3 +2100,15 @@ Use `--cases clonefuture --timeout 1200` with fresh state;
 `clonefuture-reference.v` runs the unchanged ELF on Linux and
 `clonefuture-check.v` audits receipts without `-prod`, including retained refusals.
 See [receipts and limits](../../docs/linux-posix-qualification.md#native-clone-thread-admission-with-a-future-pid-namespace).
+
+The `clonepidguard` case checks legacy PIDFD/DETACHED and parent-TID conflicts,
+clone3 output-slot aliasing, earlier import/ABI errors and admission controls.
+Four root/UID1000 initial/one-level namespace cohorts run 1,872 controls per
+architecture. Originals fail 864; corrected kernels and identical Linux ELFs
+pass. Both phases preserve 144 valid children and flat identical-input
+200-cycle cleanup. Runtime pthread and clonefuture regressions pass.
+Use `--cases clonepidguard --timeout 1200` with fresh state;
+`clonepidguard-reference.v` runs the unchanged ELF on Linux and
+`clonepidguard-check.v` audits receipts and the preserved initial pidfd-write
+refusal when compiled without `-prod`. Actual pidfd construction/output writes
+and rollback remain unqualified. See the [qualification report](../../docs/linux-posix-qualification.md#native-clone-pidfd-conflicts-and-output-aliasing).

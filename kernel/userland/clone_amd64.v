@@ -29,6 +29,9 @@ import x86.gdt
 // arm64's order.
 pub fn syscall_clone(gpr_state voidptr, flags u64, child_stack u64, parent_tid u64, child_tid u64, tls u64) (u64, u64) {
 	state := unsafe { &cpulocal.GPRState(gpr_state) }
+	if !valid_clone_pidfd(flags, parent_tid, parent_tid) {
+		return errno.err, errno.einval
+	}
 	return do_clone(state, flags & 0xffffffff, child_stack, parent_tid, child_tid, tls, false,
 		unsafe { nil })
 }
@@ -63,6 +66,10 @@ pub fn syscall_clone3(gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 		}
 		child_sp = lib.align_down(args.stack + args.stack_size, 16)
 	} else if args.stack_size != 0 {
+		return errno.err, errno.einval
+	}
+
+	if !valid_clone_pidfd(args.flags, args.pidfd, args.parent_tid) {
 		return errno.err, errno.einval
 	}
 

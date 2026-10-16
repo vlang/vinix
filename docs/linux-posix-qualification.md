@@ -10412,3 +10412,100 @@ successful cross-namespace process construction beyond the keeper setup,
 independent sharing ownership, supplied-stack raw threads, requested PID
 allocation, GNU libc and translated/32-bit paths remain separate. The broad
 libc, installation/sandbox/portal and translation gates remain open.
+
+## Native clone pidfd conflicts and output aliasing
+
+Both native `clone` entry points now reject `CLONE_PIDFD|CLONE_DETACHED`
+and `CLONE_PIDFD|CLONE_PARENT_SETTID` before unsupported-sharing admission.
+Legacy clone uses the same output argument for the pidfd and parent TID.
+`clone3` instead rejects equal `pidfd` and `parent_tid` fields only when both
+flags are present, after ABI import/flag/stack validation and before sharing,
+namespace permission and cgroup descriptor admission. These cases return
+`EINVAL`; ordinary ignored legacy DETACHED and upper register bits retain their
+behavior. The shared helper reads scalar arguments only and adds no allocation,
+reference, ownership, lock or teardown path.
+
+The rules follow Linux v6.12's
+[`kernel_clone` and `copy_process`](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c).
+The retained source also shows why a separate-output pidfd control cannot assume
+that cgroup descriptor lookup precedes writing the pidfd: actual pidfd creation
+and `put_user` occur earlier. That lifecycle remains unsupported by Vinix and
+outside this qualification.
+
+The V-only `clonepidguard` case runs **1,872 native musl controls per architecture**
+in root/UID1000 initial/one-level PID namespace cohorts. Nested cohorts are
+ordinary PID2 callers supervised and reaped by namespace init, matching the
+existing bounded namespace tests. Effective CAP_SYS_ADMIN is cleared and read
+back before requests, including root requests. A held `/dev/null` descriptor
+survives `F_GETFD` checks after every raw call.
+
+| Class | Calls per cohort | Contract |
+| --- | ---: | --- |
+| Legacy PIDFD/DETACHED | 96 | Eight sharing forms, four upper-register words and null/invalid/read-only output layouts return EINVAL. |
+| Legacy PIDFD/PARENT_SETTID | 96 | The same sharing, register and pointer forms reject the shared output slot with EINVAL. |
+| clone3 equal output slots | 108 | Nine sharing forms, sizes 88/96/128/256, zero extensions and three layouts return EINVAL before missing/wrong-type cgroup FD lookup or unsupported sharing without INTO_CGROUP. |
+| Earlier ABI/import/flag/stack errors | 60 | Short/oversized structures, inaccessible prefixes/vectors, invalid signals/flags and invalid stack ranges retain EFAULT/E2BIG/EINVAL. |
+| Admission controls | 72 | Distinct output slots or an ignored parent slot reach NEWNET's missing-capability EPERM (60); an ignored pidfd slot reaches missing/wrong-type cgroup EBADF (12). |
+| Actual fork/reap | 36 | clone3 prefixes and ignored output/cgroup fields, plus legacy upper bits and DETACHED without PIDFD, preserve child identity, exit 37 and wait/reap. |
+
+Argument blocks use an aligned, unaligned or exact-end placement in a
+read-only input page followed by an inaccessible page. Before protecting the
+mapping, the probe snapshots both pages and compares their bytes afterward.
+An independent pipe reports actual child PID/TID/parent/UID and each expected
+child is reaped with its exit status checked. `waitpid(-1, WNOHANG)` then proves
+there is no unaccounted child. Both phases complete **144 legitimate fork/reap
+lifecycles per architecture**, with no unexpected children.
+
+The frozen originals fail **864 controls each**: 240 DETACHED and 240 legacy
+parent-TID conflicts return ENOTSUP; 288 clone3 aliases return EBADF and 96 return
+ENOTSUP. All other controls pass. Corrected native kernels and the **identical
+probe ELF on Linux 6.12.51** pass all controls. AArch64 Vinix uses 16 KiB pages;
+x86-64 Vinix and both Linux references use 4 KiB pages. This qualifies these
+native ABIs and page layouts; it does not imply foreign ABI qualification.
+
+Four production kernel builds use isolated worktrees frozen at
+`2aef04cf5224021608bccc9e63b81764934e9da5`; dependency directories are linked to
+retained inputs. Exact whole generated-C comparison permits only the helper,
+its prototype and four entry checks. Probe C and ELF hashes match before/after,
+the ARM preflight and Linux. The probe C contains ten explicit `alloca` calls
+and no V malloc/calloc/realloc/memdup/new-array/fixed-index helpers. The retained
+2014 SDK inputs, 15146 compiler inputs, 67 dispatch inputs, native receipts and
+all 84 completed native profile files are checked by the executing auditor.
+Both corrected kernels also pass `runtime` pthread and `clonefuture`'s 1,880
+future-PID/thread controls. The generated syscall inventory is refreshed from
+the frozen source plus this patch; dispatch coverage remains separate.
+
+Identical-input retention checks run in **all four cohorts on both phases**:
+64 warmup cycles, 13 seconds to settle, a snapshot, 200 cycles and a second
+13-second settle/snapshot. A cycle repeats one request from each conflicting
+class, an earlier error, an admission control and an actual fork/reap. Only this
+measurement accepts the original refusal codes as well as corrected EINVAL;
+the semantic verdict requires EINVAL. All 18 ARM / 14 x86 slab classes and
+big-heap pages stay flat. Namespace setup happens outside the measured loop.
+This is targeted retained kernel storage evidence; it does not close general
+filesystem/page-cache retention or the previously published EXT2 rename limit.
+
+The initial Linux probe remains visible as a failed qualification:
+its distinct-output controls incorrectly expected cgroup EBADF while their
+pidfd slots were read-only or inaccessible. Linux returned EFAULT for 60 such
+controls in each cohort; the other classes passed. The probe's failing PID1 exit
+then produced Linux's expected init-exit panic. The final probe changes only
+these admission controls to earlier NEWNET permission checks, retaining the
+original source, generated C, ELF, compiler receipts, failed Linux artifacts,
+controller, raw serial/aggregate logs and status. The auditor verifies the exact
+repair and refused receipt rather than altering or normalizing the evidence.
+See [refusal hashes](../tests/linux-compat/results/2026-10-16/clonepidguard-probe-refusal-inputs.json)
+and [raw refused serial](../tests/linux-compat/results/2026-10-16/clonepidguard-reference-pidfd-write-refusal.log).
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/clonepidguard-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/clonepidguard-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/clonepidguard-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/clonepidguard-diagnostic-pins.json).
+Raw original/corrected/Linux, build, preflight and regression logs accompany them.
+
+Actual pidfd construction, output-write fault precedence, descriptor publication
+and rollback, valid cgroup placement and its descriptor/node races remain
+unqualified. Worker callers, per-thread namespace ownership/races, independent
+sharing, supplied-stack threads, selected PID allocation, GNU libc, translated
+and 32-bit paths also remain separate. The broad libc, installation/sandbox/portal
+and translation gates remain open.
