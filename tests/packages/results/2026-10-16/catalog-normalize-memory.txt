@@ -1,0 +1,18 @@
+CATALOG NORMALIZE imports=1 fault=none retained=0 allocations=0
+CATALOG NORMALIZE imports=64 fault=none retained=0 allocations=0
+CATALOG NORMALIZE imports=64 fault=duplicate retained=0 allocations=0
+CATALOG NORMALIZE imports=1 fault=closure retained=0 allocations=0
+CATALOG NORMALIZE imports=64 fault=closure retained=0 allocations=0
+CATALOG NORMALIZE imports=1 fault=architectures retained=0 allocations=0
+CATALOG NORMALIZE imports=64 fault=architectures retained=0 allocations=0
+CATALOG NORMALIZE imports=1 fault=source retained=0 allocations=0
+CATALOG NORMALIZE imports=64 fault=source retained=0 allocations=0
+CATALOG NORMALIZE imports=1 fault=permissions retained=0 allocations=0
+CATALOG NORMALIZE imports=64 fault=permissions retained=0 allocations=0
+CATALOG NORMALIZE imports=1 fault=selectors retained=0 allocations=0
+CATALOG NORMALIZE imports=64 fault=selectors retained=0 allocations=0
+CATALOG NORMALIZE imports=1 fault=coverage retained=0 allocations=0
+CATALOG NORMALIZE imports=64 fault=coverage retained=0 allocations=0
+CATALOG NORMALIZE imports=64 fault=shared-mix retained=0 allocations=0
+CATALOG NORMALIZE complete and refused single/64-import catalogs retire normalization and dependency-closure scratch PASS
+CATALOG NORMALIZE independent owned output survives retired source/results with unchanged canonical declarations and ordering PASS

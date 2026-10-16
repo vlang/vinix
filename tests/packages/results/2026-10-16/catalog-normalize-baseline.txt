@@ -1,0 +1,5 @@
+CATALOG NORMALIZE imports=1 fault=none retained=23549 allocations=49
+CATALOG NORMALIZE imports=64 fault=none retained=905575 allocations=2584
+CATALOG NORMALIZE imports=64 fault=duplicate retained=798675 allocations=2229
+CATALOG NORMALIZE imports=1 fault=closure retained=15191 allocations=48
+CATALOG NORMALIZE imports=64 fault=closure retained=903997 allocations=2565

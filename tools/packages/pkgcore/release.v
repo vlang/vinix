@@ -77,28 +77,38 @@ fn release_history(repository string) !TrustHistory {
 fn release_closures(index Index, public_key string) ! {
 	mut licenses := []string{}
 	mut candidates := []Installed{}
+	unsafe { licenses.flags |= .noslices; candidates.flags |= .noslices }
+	defer { unsafe { (&array(&licenses)).free(); (&array(&candidates)).free() } }
 	for p in index.packages {
-		if p.proprietary && p.license !in licenses { licenses << p.license }
+		if p.proprietary && p.license !in licenses {
+			pointer := unsafe { &p.license }
+			unsafe { licenses.push_many(pointer, 1) }
+		}
 		candidates << Installed{ package: p, repository: index.repository, public_key: public_key, sequence: index.sequence }
 	}
 	candidates.sort_with_compare(candidate_order)
+	policy := Policy{ licenses: licenses, allow_firmware: true, reserve_bytes: 0 }
+	defer { unsafe { (&array(&policy.permissions)).free() } }
+	mut fixed := []int{len: 1}
+	defer { unsafe { fixed.free() } }
 	mut steps := 0
 	for root_index, candidate in candidates {
 		p := candidate.package
-		for architecture in ['aarch64', 'x86_64'] {
+		for architecture in ['aarch64', 'x86_64']! {
 			if p.architecture !in [architecture, 'all'] { continue }
-			config := Config{ architecture: architecture,
-				policy: Policy{ licenses: licenses, allow_firmware: true, reserve_bytes: 0 } }
+			config := Config{ architecture: architecture, policy: policy }
 			// Start with this exact root selected, rather than copying the entire
 			// catalog once per version (the CLI uses -gc none).
-			mut search := Search{ config: config, candidates: candidates, steps: steps }
-			result := search.solve_fixed(p.dependencies, [root_index]) or {
+			mut search := &Search{ config: config, candidates: candidates, steps: steps }
+			defer { unsafe { search.diagnostic.free(); free(search) } }
+			fixed[0] = root_index
+			result := search.solve_fixed(p.dependencies, fixed) or {
 				message := 'publisher dependency closure failed for ${p.id}/${p.architecture}/${p.version} on ${architecture}: ${err}'
 				cause := err.msg()
-				unsafe { search.diagnostic.free(); cause.free(); err.free() }
+				unsafe { cause.free(); err.free() }
 				return error(message)
 			}
-			unsafe { (&array(&result)).free(); search.diagnostic.free() }
+			unsafe { (&array(&result)).free() }
 			steps = search.steps
 		}
 	}

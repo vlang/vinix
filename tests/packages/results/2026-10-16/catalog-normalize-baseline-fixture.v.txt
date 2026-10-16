@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module pkgcore
+
+import json2
+import os
+
+$if track_heap ? {
+	#include "@VMODROOT/../../../desktop/tools/tests/heap_tracker.h"
+	fn C.vinix_heap_begin()
+	fn C.vinix_heap_end() u64
+	fn C.vinix_heap_count() u32
+}
+
+fn normalize_document(count int, fault string) string {
+	mut imports := []CatalogImport{cap: count}
+	for i in 0 .. count {
+		id := 'item-' + i.str()
+		dependencies := if fault == 'closure' && i == count - 1 { [Dependency{ id: 'missing' }] }
+			else if i > 0 { [Dependency{ id: 'item-0', minimum: '1.0.0', before: '2.0.0' }] } else { []Dependency{} }
+		imports << CatalogImport{ source: 'profile/shared', recipe: RootRecipe{
+			manifest: Package{ id: if fault == 'duplicate' && i == count - 1 { 'item-0' } else { id },
+				name: 'Fixture ' + id, description: 'd'.repeat(2048), version: '1.0.0', architecture: 'all', kind: 'data',
+				license: 'Fixture-EULA', proprietary: true, firmware: true, permissions: ['files', 'audio'], associations: ['text/plain', 'image/png'],
+				arguments: ['literal ; $ argument'], dependencies: dependencies,
+				files: [Payload{ path: 'share/z', sha256: 'b'.repeat(64), bytes: 1 }, Payload{ path: 'share/a', sha256: 'a'.repeat(64), bytes: 1 }] },
+			entries: [RootEntry{ source: 'source/z', path: 'share/z' }, RootEntry{ source: 'source/a', path: 'share/a' }] } }
+	}
+	return json2.encode(CatalogRecipe{ format: 1, architectures: ['x86_64', 'aarch64'], packages: imports })
+}
+
+fn normalize_once(text string, refused bool) {
+	if result := catalog_recipe(text) { close_decoded_catalog(result); assert !refused }
+	else { message := err.msg(); unsafe { message.free(); err.free() }; assert refused }
+}
+
+fn test_catalog_normalization_retires_complete_results_and_late_refusals() {
+	$if track_heap ? {
+		for fault in ['', 'duplicate', 'closure']! {
+			for count in [1, 64]! {
+				if fault == 'duplicate' && count == 1 { continue }
+				text := normalize_document(count, fault); defer { unsafe { text.free() } }
+				normalize_once(text, fault != '')
+				mut maximum := u64(0); mut allocations := u32(0)
+				for _ in 0 .. 10 {
+					C.vinix_heap_begin()
+					normalize_once(text, fault != '')
+					kept := C.vinix_heap_end(); records := C.vinix_heap_count()
+					if kept > maximum { maximum = kept }; if records > allocations { allocations = records }
+				}
+				println('CATALOG NORMALIZE imports=' + count.str() + ' fault=' + if fault == '' { 'none' } else { fault } + ' retained=' + maximum.str() + ' allocations=' + allocations.str())
+				if '--catalog-normalize-baseline' !in os.args { assert maximum == 0 && allocations == 0 }
+			}
+		}
+	}
+}

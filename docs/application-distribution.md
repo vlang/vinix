@@ -500,6 +500,11 @@ Prepared-root templates and catalog locks also reject ambiguous fields/types
 before import. Catalog composition requires complete pinned declarations and
 cannot normalize missing or null permissions into a publishable lock. See
 [publisher schema qualification](../tests/packages/publisher-schema-check.md).
+Catalog normalization now keeps one owned decoded result and explicitly retires
+normalization and structural dependency-check scratch on both success and
+refusal. The [allocation qualification](../tests/packages/catalog-normalize-check.md)
+covers repeated one/64-import validations, independent result lifetimes and
+unchanged publisher workflows under `-gc none`.
 A refused refresh or enrollment preserves the previous cached catalog, trust
 history, configuration and installed generation. See
 [signed metadata qualification](../tests/packages/index-schema-check.md).

@@ -444,6 +444,12 @@ architecture/version/runtime coverage. It emits a canonical catalog lock and a
 private publisher workspace for `publish-release`. See the
 [catalog contract](SDK.md#build-a-pinned-application-catalog).
 
+Catalog normalization retains one owned decoded result, sorts its buffers in
+place and retires validation scratch on success or refusal. Structural release
+checks also retire their borrowed candidate/license lists and each fixed-root
+search. Repeated one/64-import checks require zero retained bytes after the
+result/error is retired. See [normalization qualification](../../tests/packages/catalog-normalize-check.md).
+
 Prepared-root imports, catalog builds and all three fixed profiles capture an
 ordinary source directory before creating output parents. Empty/NUL paths and
 leaf directory aliases refuse, including aliases with trailing separators.

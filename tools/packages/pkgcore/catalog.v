@@ -53,9 +53,25 @@ fn catalog_import_order(a &CatalogImport, b &CatalogImport) int {
 
 fn catalog_source(source string, architecture string) bool {
 	if !relative_path(source) { return false }
-	parts := source.split('/')
-	if parts.len > 8 || !parts[..parts.len - 1].all(identifier(it)) { return false }
-	return parts.last() == if architecture == 'all' { 'shared' } else { architecture }
+	mut start := 0
+	mut depth := 1
+	for i, byte in source {
+		if byte != `/` { continue }
+		if depth == 8 || !identifier(unsafe { tos(source.str + start, i - start) }) { return false }
+		depth++; start = i + 1
+	}
+	leaf := unsafe { tos(source.str + start, source.len - start) }
+	return leaf == if architecture == 'all' { 'shared' } else { architecture }
+}
+
+// The decoded catalog is the sole owner. Sorting these borrowed buffers changes
+// their order without cloning headers or borrowing storage from the JSON text.
+fn order_catalog_import(item CatalogImport) {
+	mut files := unsafe { item.recipe.manifest.files }; files.sort(a.path < b.path)
+	mut dependencies := unsafe { item.recipe.manifest.dependencies }; dependencies.sort(a.id < b.id)
+	mut permissions := unsafe { item.recipe.manifest.permissions }; permissions.sort()
+	mut associations := unsafe { item.recipe.manifest.associations }; associations.sort()
+	mut entries := unsafe { item.recipe.entries }; entries.sort(a.path < b.path)
 }
 
 // O_NOFOLLOW applies only to the final component of an openat path. Capture
@@ -80,30 +96,32 @@ fn catalog_recipe(text string) !CatalogRecipe {
 		|| input.packages.len == 0 || input.packages.len > 4096 {
 		return error('unsupported, empty or oversized catalog recipe')
 	}
-	mut architectures := input.architectures.clone()
+	mut architectures := unsafe { input.architectures }
 	architectures.sort()
 	for i, architecture in architectures {
 		if architecture !in ['aarch64', 'x86_64'] || (i > 0 && architecture == architectures[i - 1]) {
 			return error('catalog requires distinct supported architectures')
 		}
 	}
-	mut imports := []CatalogImport{}
-	mut packages := []Package{}
+	mut imports := unsafe { input.packages }
+	mut packages := []Package{cap: imports.len}
 	mut seen := map[string]bool{}
+	defer { unsafe { (&array(&packages)).free(); seen.free() } }
 	for item in input.packages {
 		validate_root_recipe(item.recipe)!
-		p := canonical_package(item.recipe.manifest)!
+		p := item.recipe.manifest
+		p.validate()!
 		if !catalog_source(item.source, p.architecture)
 			|| (p.architecture != 'all' && p.architecture !in architectures) {
 			return error('catalog source must match the declared package architecture: ${p.id}')
 		}
 		identity := '${p.id}/${p.architecture}/${p.version}'
+		defer { unsafe { identity.free() } }
 		if identity in seen { return error('duplicate catalog package: ${identity}') }
 		seen[identity] = true
-		mut entries := item.recipe.entries.clone()
-		entries.sort(a.path < b.path)
-		imports << CatalogImport{ source: item.source, recipe: RootRecipe{ manifest: p, entries: entries } }
-		packages << p
+		order_catalog_import(item)
+		pointer := unsafe { &p }
+		unsafe { packages.push_many(pointer, 1) }
 	}
 	for p in packages {
 		for architecture in architectures {
@@ -116,7 +134,9 @@ fn catalog_recipe(text string) !CatalogRecipe {
 		}
 	}
 	// Structural resolution never enrolls a publisher or accepts consumer licenses.
-	release_closures(Index{ repository: 'catalog', sequence: 1, packages: packages }, '0'.repeat(64))!
+	key := '0'.repeat(64)
+	defer { unsafe { key.free() } }
+	release_closures(Index{ repository: 'catalog', sequence: 1, packages: packages }, key)!
 	imports.sort_with_compare(catalog_import_order)
 	accepted = true
 	return CatalogRecipe{ format: 1, architectures: architectures, packages: imports }

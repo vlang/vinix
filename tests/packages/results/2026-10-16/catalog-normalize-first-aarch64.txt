@@ -1,0 +1,5 @@
+/Users/alex/code/vinix/build/package-launch-transport-work/cross-cc --target=aarch64-linux-musl --sysroot=/opt/homebrew/opt/musl-cross/libexec/aarch64-linux-musl -static -O1 -w -D_GNU_SOURCE -fno-stack-protector -L/opt/homebrew/opt/musl-cross/libexec/aarch64-linux-musl/lib -fuse-ld=lld -o /Users/alex/code/vinix/build/pcn-arm/guest/program-2/composition /Users/alex/code/vinix/build/pcn-arm/guest/program-2/composition.c -lm -lpthread
+cross-cc: exit status 1
+/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/../lib/gcc/aarch64-linux-musl/14.2.0/../../../../aarch64-linux-musl/bin/ld: /var/folders/5s/gdmd5zq90y52hchygpfzp2m00000gn/T//ccUhuwLD.o: in function `os__exec':
+composition.c:(.text+0x65040): undefined reference to `v_os_exec_capture_start'
+collect2: error: ld returned 1 exit status

@@ -313,6 +313,12 @@ fn test_selected_composition_refuses_invalid_targets_space_staging_corruption_an
 	assert compose_catalog_for('aarch64', sources, work + '/refused')!.package_count == 4
 }
 
+fn composition_command(argv []string) os.Result {
+	mut child := os.new_process(argv[0]); child.set_args(argv[1..]); child.set_redirect_stdio_merged()
+	child.run(); output := child.stdout_slurp(); child.wait(); code := child.code; child.close()
+	return os.Result{ exit_code: code, output: output }
+}
+
 fn test_selected_composition_cli_matches_api_with_literal_paths_and_refuses_invalid_requests() {
 	cli := os.getenv('VINIX_PACKAGE_COMPOSITION_CLI'); if cli == '' { return }
 	work, sources := composition_fixture()!
@@ -323,7 +329,7 @@ fn test_selected_composition_cli_matches_api_with_literal_paths_and_refuses_inva
 	pairs := ['alpha', sources[0].catalog, 'beta', literal]
 	api := compose_catalog_for('aarch64', [sources[0], CatalogSource{ id: 'beta', catalog: literal }], work + '/api')!
 	destination := work + '/lock ; $literal'
-	result := os.exec([cli, 'compose-catalog-for', 'aarch64', destination, ...pairs])
+	result := composition_command([cli, 'compose-catalog-for', 'aarch64', destination, ...pairs])
 	assert result.exit_code == 0, result.output
 	actual := json2.decode[CompositionInfo](result.output)!
 	assert actual.catalog_sha256 == api.catalog_sha256 && actual.architectures == ['aarch64'] && actual.sources == api.sources
@@ -331,10 +337,10 @@ fn test_selected_composition_cli_matches_api_with_literal_paths_and_refuses_inva
 	for arguments in [ []string{}, ['aarch64'], ['aarch64', work + '/bad'], ['aarch64', work + '/bad', 'alpha'],
 		['all', work + '/bad', ...pairs], ['x86_64', work + '/bad', ...pairs],
 		['aarch64', destination, ...pairs], ['aarch64', work + '/bad', ...pairs, 'extra'] ] {
-		refused := os.exec([cli, 'compose-catalog-for', ...arguments])
+		refused := composition_command([cli, 'compose-catalog-for', ...arguments])
 		assert refused.exit_code != 0 && refused.output.trim_space() != '' && !refused.output.contains('V panic:'), refused.output
 		assert !os.exists(work + '/bad')
 	}
-	assert os.exec([cli, 'compose-catalog', work + '/bad', ...pairs]).exit_code != 0 && !os.exists(work + '/bad')
+	assert composition_command([cli, 'compose-catalog', work + '/bad', ...pairs]).exit_code != 0 && !os.exists(work + '/bad')
 	println('COMPOSITION TARGET: explicit CLI/API equivalence, literal paths, unsupported host, argument counts and existing-output refusals PASS')
 }

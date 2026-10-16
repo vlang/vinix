@@ -1,0 +1,18 @@
+CATALOG NORMALIZE imports=1 fault=none functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=none functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=duplicate functional-cycles=16 PASS
+CATALOG NORMALIZE imports=1 fault=closure functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=closure functional-cycles=16 PASS
+CATALOG NORMALIZE imports=1 fault=architectures functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=architectures functional-cycles=16 PASS
+CATALOG NORMALIZE imports=1 fault=source functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=source functional-cycles=16 PASS
+CATALOG NORMALIZE imports=1 fault=permissions functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=permissions functional-cycles=16 PASS
+CATALOG NORMALIZE imports=1 fault=selectors functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=selectors functional-cycles=16 PASS
+CATALOG NORMALIZE imports=1 fault=coverage functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=coverage functional-cycles=16 PASS
+CATALOG NORMALIZE imports=64 fault=shared-mix functional-cycles=16 PASS
+CATALOG NORMALIZE complete and refused single/64-import catalogs retire normalization and dependency-closure scratch PASS
+CATALOG NORMALIZE independent owned output survives retired source/results with unchanged canonical declarations and ordering PASS

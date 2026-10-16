@@ -71,6 +71,9 @@ is retained and does not count as qualification.
 The allocation scope is decoder/schema admission after returned values/errors
 are retired. Complete catalog normalization, dependency search, construction,
 composition and other publisher lifetimes remain outside this measurement.
+The subsequent [normalization qualification](catalog-normalize-check.md) now
+measures and retires normalization and structural release-closure scratch as a
+separate scope, retaining the original canonical catalog semantics.
 Production publisher enrollment, catalog migration, graphical login/display
 integration and wider foreign-runtime acceptance remain open for roadmap 14.
 
