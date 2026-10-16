@@ -666,7 +666,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
   - [x] [An AArch64 Apple package launch/container boundary](tests/packages/apple-runtime-check.md)
     executes ARM64 iOS Mach-O instructions through a signed static runtime in
     the real sandbox. Private Documents/keychain overrides, user separation,
-    upgrade, rollback, tamper refusal and cached reinstall are checked. Wider
+    upgrade, rollback, tamper refusal and cached reinstall are checked. The
+    Mach-O also exercises Foundation container paths/file writes and Security
+    generic-password persistence, CRUD errors and access-group refusal. Wider
     Apple framework/application and graphical coverage remain open.
 - [ ] Establish a supported application SDK/protocol, stable public interfaces,
   package format, signing/publishing process and developer documentation.

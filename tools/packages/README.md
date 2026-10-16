@@ -488,7 +488,9 @@ overrides from admitted private app data. They retain their containers through
 updates, rollback and uninstall without adding sandbox grants. The
 [Apple package check](../../tests/packages/apple-runtime-check.md) executes real
 ARM64 Mach-O instructions through a signed static runtime on AArch64, with
-separate ordinary users, ambient-override refusal and cached reinstall. Wider
+separate ordinary users, ambient-override refusal and cached reinstall. The
+Mach-O itself checks Foundation container paths and file writes, Security
+generic-password persistence, duplicate/delete errors and access-group refusal. Wider
 Apple APIs, graphical sessions and other host architectures remain unqualified.
 
 Fixed native, SQLite and FFmpeg profiles recheck the complete imported file list

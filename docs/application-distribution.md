@@ -1953,9 +1953,12 @@ adds signed ARM64 iOS Mach-O execution through the real static compatibility
 runtime in the production sandbox. Apple launch plans now derive the runtime's
 Documents and keychain overrides from admitted private data. The fixture checks
 two ordinary users, explicit document grants, updates, rollback, tamper refusal,
-clean removal and cached reinstall. Its native launcher writes container test
-files before exec; it does not qualify Foundation/keychain API operations,
-arbitrary Apple applications, graphical sessions or x86-64 translation.
+clean removal and cached reinstall. The Mach-O now calls Foundation home,
+Documents and temporary-directory APIs, writes files through their returned
+paths and maintains a Security generic-password counter across that lifecycle.
+Duplicate/delete/not-found and ungranted access-group refusal are exercised.
+Arbitrary Apple applications, wider frameworks, graphical sessions and x86-64
+translation remain unqualified.
 
 Literal launch-command requests now provide explicit ownership and repeatable
 cleanup. Parsing validates borrowed prefix paths and the complete request before

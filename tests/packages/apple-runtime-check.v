@@ -15,6 +15,7 @@ struct AppleReceipt {
 	completed_at i64
 	platform string = 'qemu-tcg'
 	scenario string = 'packages-apple'
+	coverage []string = ['Foundation container paths and file writes', 'Security generic-password CRUD and private persistence', 'signed package launch and maintenance']
 	seconds f64
 	artifacts []AppleArtifact
 }
@@ -64,7 +65,12 @@ fn apple_suite(runtime string, sandbox string, repository string) !hwhost.Suite 
 			required: ['HWTEST START packages-apple',
 				'PACKAGE APPLE signed Mach-O execution ordinary identities private containers literal document ambient overrides PASS',
 				'PACKAGE APPLE reviewed update rollback runtime tamper refusal clean uninstall cached reinstall retained private data PASS',
-				'HWTEST PASS packages-apple'], forbidden: ['V panic:', 'HWTEST FAIL'], ending: .poweroff, timeout: 300 }],
+				'PACKAGE APPLE Foundation home Documents temporary files keychain CRUD persistence entitlement damaged-store refusal PASS',
+				'PACKAGE APPLE FRAMEWORK counter=1 paths files keychain PASS',
+				'PACKAGE APPLE FRAMEWORK counter=2 paths files keychain PASS',
+				'PACKAGE APPLE FRAMEWORK counter=3 paths files keychain PASS',
+				'PACKAGE APPLE FRAMEWORK counter=4 paths files keychain PASS',
+				'HWTEST PASS packages-apple'], forbidden: ['V panic:', 'HWTEST FAIL', 'pledge "'], ending: .poweroff, timeout: 300 }],
 	}
 }
 
@@ -91,8 +97,8 @@ fn check_apple() !int {
 	definition := apple_suite(runtime, sandbox, repository)!
 	guest := hwhost.build_program(host, repository + '/' + definition.guest, work + '/guest', 'init', definition.module_paths)!
 	root := hwhost.build_extras(host, definition, work + '/guest')!
-	os.write_file_array(work + '/image-v1.macho', applefixture.image(23))!
-	os.write_file_array(work + '/image-v2.macho', applefixture.image(24))!
+	os.write_file_array(work + '/image-v1.macho', applefixture.framework_image(23))!
+	os.write_file_array(work + '/image-v2.macho', applefixture.framework_image(24))!
 	mut artifacts := []AppleArtifact{}
 	for role, path in { 'kernel': work + '/kernel', 'guest-init': guest, 'package-service': root + '/usr/bin/vinix-package',
 		'account-manager': root + '/usr/sbin/vinix-account', 'session-runner': root + '/usr/sbin/vinix-session',

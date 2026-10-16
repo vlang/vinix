@@ -27,7 +27,13 @@ fn ns_temp_directory_checked() !u64 {
 	if length + 4 > 1023 { return ns_temp_directory_failure() }
 	unsafe { C.memcpy(voidptr(scratch + u64(length)), c'tmp/', 4) }
 	result := owned_string(unsafe { tos(&u8(scratch), length + 4) })
-	if !ns_file_manager_create(result, true, 0, 0) {
+	// Package launch prepares this private directory before entering unveil.
+	// Reuse it directly: recursive creation probes/mkdirs its host ancestors,
+	// which are outside the app's data grant even when the final path exists.
+	path := string_text(result)
+	mut directory := u8(0)
+	exists := ns_file_manager_directory(unsafe { &char(path.str) }, &directory) == 0 && directory != 0
+	if !exists && !ns_file_manager_create(result, true, 0, 0) {
 		objc_release(result)
 		return ns_temp_directory_failure()
 	}

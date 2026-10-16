@@ -31,12 +31,9 @@ fn probe() ! {
 	assert !os.is_file('/usr/share/apple-fixtures/hidden.txt')
 	assert os.args.len in [1, 2]
 	if os.args.len == 2 { assert os.read_file(os.args[1])! == 'literal Apple document\n' }
-	os.mkdir_all(os.getenv('VINIX_IOS_DOCUMENTS'), mode: 0o700)!
-	os.mkdir_all(os.getenv('VINIX_IOS_KEYCHAIN'), mode: 0o700)!
-	path := os.getenv('VINIX_IOS_DOCUMENTS') + '/counter.txt'
+	path := context.data_directory + '/boundary-counter.txt'
 	previous := if os.exists(path) { strconv.atoi(os.read_file(path)!)! } else { 0 }
 	write_private(path, (previous + 1).str())!
-	write_private(os.getenv('VINIX_IOS_KEYCHAIN') + '/container-fixture', context.id)!
 	println('PACKAGE APPLE CONTEXT uid=' + os.getuid().str() + ' app=' + context.id + ' version=' + context.version + ' runtime=' + context.runtime_version + ' counter=' + (previous + 1).str() + ' PASS')
 	flush_stdout()
 	runner := context.runtime_directory + '/bin/run-ios'

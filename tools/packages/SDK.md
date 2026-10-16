@@ -1272,8 +1272,9 @@ the immutable generation; these locations stay under the ordinary user's
 existing private-data grant. No extra paths, devices or promises are granted.
 The normal service prepares private `tmp`; Foundation creates Documents when
 needed. Keychain storage retains its existing ownership, mode and no-follow
-checks. These are private application files without encryption or hardware key
-protection.
+checks. Records use the runtime's authenticated encryption with a separate local
+0600 key file. They have no hardware key protection, device lock-state service
+or shared-access-group entitlement service; see the [runtime limits](../../docs/ios.md).
 
 The existing Foundation path profile remains bounded to 1023 bytes. Ordinary
 uninstall retains this app data; deliberate data removal uses the normal
@@ -1282,10 +1283,14 @@ separate purge operation.
 The [Apple package check](../../tests/packages/apple-runtime-check.md) executes
 V-generated ARM64 iOS Mach-O images through a signed copy of the real static
 runtime under the production sandbox. Its packaged native launcher checks the
-admitted context and writes fixture container files before exec. This qualifies
-the launch/container boundary and maintenance lifecycle, not arbitrary Apple
-frameworks or keychain API behavior. The current runner executes on AArch64;
-no x86-64 translation, macOS/AppKit or graphical compatibility is implied.
+admitted context before exec. The Mach-O itself checks Foundation's home,
+Documents and temporary paths, writes files there and maintains a generic-password
+keychain counter across user-separated launches, upgrade, rollback and cached
+reinstall. Duplicate/delete/not-found and unsupported access-group behavior are
+also checked. This qualifies that API subset and the maintenance lifecycle;
+broader Apple frameworks and applications remain open. The current runner
+executes on AArch64; no x86-64 translation, macOS/AppKit or graphical compatibility
+is implied.
 
 Apps must handle denied access/missing services and save in private data or a
 supplied document. Keep on-disk data compatible with version rollback. A service

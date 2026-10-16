@@ -1,0 +1,2 @@
+IOS-TEMP-DIRECTORY-NATIVE: no-argument C ABI, protected arguments and x8, preserved contexts, file-manager path with trailing separator, +0 retain/pool ownership and eight concurrent workers
+IOS-TEMP-DIRECTORY: Foundation-only export, copied autoreleased app-container tmp paths, provisioned writable directories, guarded ABI and borrowed prefixes, Documents override, Unicode/space/root/separator/1023-byte cases, ignored TMPDIR, failure cleanup, concurrent readers and two drained runtimes

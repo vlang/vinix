@@ -12,7 +12,8 @@ const apple_runtime_id = 'org.vinix.apple-runtime-probe'
 
 fn apple_pack(version string, runtime_version string, status u8) ! {
 	os.mkdir_all('/tmp/apple-application/Example.app')!
-	os.write_file_array('/tmp/apple-application/Example.app/Example', applefixture.image(status))!
+	os.write_file_array('/tmp/apple-application/Example.app/Example', applefixture.framework_image(status))!
+	os.write_file('/tmp/apple-application/Example.app/Info.plist', '<plist><dict><key>CFBundleIdentifier</key><string>' + apple_id + '</string></dict></plist>')!
 	os.mkdir_all('/tmp/apple-runtime/bin')!
 	for name in ['launcher', 'run-ios'] {
 		os.cp('/usr/share/apple-fixtures/' + name, '/tmp/apple-runtime/bin/' + name)!
@@ -42,6 +43,23 @@ fn apple_run(status int, count int, document string, sam bool) ! {
 	result := run(command, '', none, none)
 	assert result.status == status, result.output
 	assert result.output.contains('PACKAGE APPLE CONTEXT ') && result.output.contains('counter=' + count.str() + ' PASS'), result.output
+	assert result.output.contains('PACKAGE APPLE FRAMEWORK counter=' + count.str() + ' paths files keychain PASS'), result.output
+	assert !result.output.contains('still owned at shutdown'), result.output
+	print(result.output)
+}
+
+fn apple_storage(data string, uid u32) ! {
+	keychain := data + '/Keychains/' + apple_id
+	for path in [data + '/boundary-counter.txt', keychain + '/items', keychain + '/key', keychain + '/lock'] {
+		assert owner_of(path) == uid && mode_of(path) == 0o600
+	}
+	for directory in [data, data + '/Keychains', keychain] { assert mode_of(directory) == 0o700 && owner_of(directory) == uid }
+	for path in [data + '/Documents/framework.txt', data + '/tmp/framework.tmp'] {
+		assert owner_of(path) == uid && os.read_file(path)! == 'Mach-O Foundation wrote this\n'
+	}
+	bytes := os.read_bytes(keychain + '/items')!
+	assert bytes.len >= 72 && bytes[..8].bytestr() == 'VNXKCH01'
+	assert !bytes.bytestr().contains('vinix-package-framework')
 }
 
 fn qualify_package_apple(mut t Test) ! {
@@ -69,14 +87,10 @@ fn qualify_package_apple(mut t Test) ! {
 	apple_run(23, 1, '', true)!
 	data := '/home/alex/.local/share/vinix-apps/' + apple_id
 	sam_data := '/home/sam/.local/share/vinix-apps/' + apple_id
-	for path in [data + '/Documents/counter.txt', data + '/Keychains/container-fixture'] {
-		assert owner_of(path) == alex.uid && mode_of(path) == 0o600
-	}
-	assert owner_of(sam_data + '/Documents/counter.txt') == sam.uid
-	assert mode_of(data + '/Keychains') == 0o700
+	apple_storage(data, alex.uid)!; apple_storage(sam_data, sam.uid)!
 	assert !os.exists('/root/forged') && !os.exists('/root/.local/share/vinix-apps/' + apple_id)
 	denied := run(['/usr/sbin/vinix-session', 'run', '--isolated', 'sam', '/usr/bin/vinix-package', 'run', apple_id, document], '', none, none)
-	assert denied.status != 0 && os.read_file(sam_data + '/Documents/counter.txt')! == '1'
+	assert denied.status != 0 && os.read_file(sam_data + '/boundary-counter.txt')! == '1'
 	t.say('PACKAGE APPLE signed Mach-O execution ordinary identities private containers literal document ambient overrides PASS')
 	// Signed runtime and app updates keep the same personal container. A
 	// different Mach-O return proves the new image actually executes.
@@ -94,18 +108,33 @@ fn qualify_package_apple(mut t Test) ! {
 	os.write_file(runner, 'tampered runtime')!
 	bad := run(['/usr/bin/vinix-package', 'run', apple_id], '', none, none)
 	assert bad.status != 0 && bad.output.contains('payload changed'), bad.output
-	assert os.read_file(data + '/Documents/counter.txt')! == '3'
+	assert os.read_file(data + '/boundary-counter.txt')! == '3'
 	os.write_file_array(runner, bytes)!; os.chmod(runner, 0o755)!
 	reviewed_package_operation('remove', [apple_id])!
 	assert pkgcore.read_state('/var/lib/vinix-packages', 'aarch64')!.packages.len == 0
 	assert !os.exists('/var/lib/vinix-packages/current/share/applications/vinix-' + apple_id + '.desktop')
-	assert os.read_file(data + '/Documents/counter.txt')! == '3'
-	assert os.read_file(data + '/Keychains/container-fixture')! == apple_id
+	assert os.read_file(data + '/boundary-counter.txt')! == '3'
+	assert os.is_file(data + '/Keychains/' + apple_id + '/items')
 	// Remove repository objects too: reinstall must use the verified cache.
 	os.rmdir_all('/tmp/apple-repository/objects')!
 	reviewed_package_operation('install', [apple_id])!
 	apple_run(24, 4, document, false)!
-	assert os.read_file(sam_data + '/Documents/counter.txt')! == '1'
+	assert os.read_file(sam_data + '/boundary-counter.txt')! == '1'
+	apple_storage(data, alex.uid)!; apple_storage(sam_data, sam.uid)!
+	// A damaged credential store must fail closed, without overwriting or
+	// resetting it. This last attempted launch advances only the boundary
+	// counter; the credential counter has already proved persistence at four.
+	items := data + '/Keychains/' + apple_id + '/items'
+	original := os.read_bytes(items)!
+	mut corrupt := original.clone(); corrupt[24] ^= 1
+	os.write_file_array(items, corrupt)!
+	broken := run(['/usr/bin/vinix-package', 'run', apple_id], '', none, none)
+	assert broken.status >= 70 && broken.status < 255, broken.output
+	assert !broken.output.contains('PACKAGE APPLE FRAMEWORK') && !broken.output.contains('V panic:'), broken.output
+	assert !broken.output.contains('still owned at shutdown'), broken.output
+	assert os.read_bytes(items)! == corrupt
+	os.write_file_array(items, original)!
+	t.say('PACKAGE APPLE Foundation home Documents temporary files keychain CRUD persistence entitlement damaged-store refusal PASS')
 	t.say('PACKAGE APPLE reviewed update rollback runtime tamper refusal clean uninstall cached reinstall retained private data PASS')
 }
 
