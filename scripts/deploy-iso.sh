@@ -210,14 +210,13 @@ check_layer() {
 
 if [ "$BUILD_AMD64" -eq 1 ]; then
     step "Building the amd64 image"
-    for layer in x11 firefox network-tools python v; do
+    for layer in x11 network-tools python v; do
         check_layer "$SCRIPT_DIR/build-amd64-$layer/staging" "./build-$layer-amd64.sh"
     done
     [ "$layer_missing" -eq 0 ] || die "build the missing layers in $SCRIPT_DIR first"
     rm -f "$OUT/vinix-amd64.iso"
     VINIX_UI2_SOURCE="$UI2_SOURCE" \
     VINIX_AMD64_X11_STAGING="$SCRIPT_DIR/build-amd64-x11/staging" \
-    VINIX_AMD64_FIREFOX_STAGING="$SCRIPT_DIR/build-amd64-firefox/staging" \
     VINIX_AMD64_NETWORK_TOOLS_STAGING="$SCRIPT_DIR/build-amd64-network-tools/staging" \
     VINIX_AMD64_PYTHON_STAGING="$SCRIPT_DIR/build-amd64-python/staging" \
     VINIX_AMD64_VLANG_STAGING="$SCRIPT_DIR/build-amd64-v/staging" \
@@ -240,7 +239,6 @@ if [ "$BUILD_ARM64" -eq 1 ]; then
     check_layer "$SCRIPT_DIR/build-aarch64-network-tools/staging" ./scripts/build-network-tools-aarch64.sh
     check_layer "$SCRIPT_DIR/build-aarch64-python/staging" ./scripts/build-python-aarch64.sh
     check_layer "$SCRIPT_DIR/build-aarch64-v/staging" ./scripts/build-v-aarch64.sh
-    check_layer "$SCRIPT_DIR/build-aarch64-firefox/staging" ./scripts/build-firefox-aarch64.sh
     [ "$layer_missing" -eq 0 ] || die "build the missing layers in $SCRIPT_DIR first"
 
     mkdir -p "$SRC/build-support/init-aarch64"
@@ -259,10 +257,9 @@ if [ "$BUILD_ARM64" -eq 1 ]; then
     VINIX_NETWORK_TOOLS_STAGING="$SCRIPT_DIR/build-aarch64-network-tools/staging" \
     VINIX_VLANG_STAGING="$SCRIPT_DIR/build-aarch64-v/staging" \
     VINIX_X11_STAGING="$SCRIPT_DIR/build-aarch64-x11/staging" \
-    VINIX_FIREFOX_STAGING="$SCRIPT_DIR/build-aarch64-firefox/staging" \
     VINIX_GPU_SYSROOT="$SCRIPT_DIR/build-aarch64-x11/sysroot" \
     VINIX_DESKTOP_INITRAMFS="$WORK/arm64-initramfs-desktop.tar" \
-        "$SRC/scripts/build-desktop-aarch64.sh" --compact-initramfs --without-firefox
+        "$SRC/scripts/build-desktop-aarch64.sh" --compact-initramfs
 
     rm -f "$OUT/vinix-arm64.iso"
     VINIX_AARCH64_KERNEL="$SRC/build-arm64-kernel/bin/vinix" \

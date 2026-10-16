@@ -7,7 +7,6 @@ import os
 const layer_names = {
 	'network': 'network-tools'
 	'x11':     'x11'
-	'firefox': 'firefox'
 }
 
 fn build(root string, label string) ! {
@@ -31,8 +30,7 @@ fn build(root string, label string) ! {
 			for label_, layer in layer_names {
 				variable := match label_ {
 					'network' { 'VINIX_NETWORK_TOOLS_STAGING' }
-					'x11' { 'VINIX_X11_STAGING' }
-					else { 'VINIX_FIREFOX_STAGING' }
+					else { 'VINIX_X11_STAGING' }
 				}
 				overlay := os.getenv_opt(variable) or { root + '/build-aarch64-' + layer + '/staging' }
 				if os.is_dir(overlay) { os.cp_all(overlay, stage, true)! }
@@ -46,11 +44,10 @@ fn build(root string, label string) ! {
 	stage := root + '/build-aarch64-' + layer_names[label] + '/staging'
 	files := match label {
 		'network' { ['usr/bin/pkg', 'sbin/apk', 'usr/bin/curl'] }
-		'x11' {
+		else {
 			['usr/bin/Xorg', 'usr/bin/Xvfb', 'usr/bin/startx', 'usr/bin/vinix-xinput',
 				'usr/bin/vinix-wine-host']
 		}
-		else { ['usr/bin/run-firefox', 'usr/lib/firefox-esr/firefox-esr', 'usr/bin/firefox-esr'] }
 	}
 	for name in files { bt.write(stage + '/' + name, 'fixture\n', true)! }
 	if label == 'network' { bt.write(stage + '/etc/vinix-pkg/base-world', 'fixture\n', false)! }
@@ -62,7 +59,6 @@ fn fixture(root string) !map[string]string {
 		'userland': 'build-userland-aarch64.sh'
 		'network':  'build-network-tools-aarch64.sh'
 		'x11':      'build-x11-aarch64.sh'
-		'firefox':  'build-firefox-aarch64.sh'
 	} {
 		assert label != ''
 		os.mkdir_all(root + '/scripts')!
@@ -92,8 +88,7 @@ fn check(name string) ! {
 	mut env := fixture(root)!
 	image := root + '/build-support/init-aarch64/initramfs.tar'
 	if name == 'custom-incomplete' {
-		for variable in ['VINIX_AARCH64_SYSROOT', 'VINIX_NETWORK_TOOLS_STAGING', 'VINIX_X11_STAGING',
-			'VINIX_FIREFOX_STAGING'] {
+		for variable in ['VINIX_AARCH64_SYSROOT', 'VINIX_NETWORK_TOOLS_STAGING', 'VINIX_X11_STAGING'] {
 			custom := root + '/' + variable
 			bt.write(custom + '/keep', 'caller owned', false)!
 			mut selected := env.clone()
@@ -121,14 +116,15 @@ fn check(name string) ! {
 	}
 	bootstrap(root, env)!
 	initial := bt.events(root)!
-	assert initial.map(it.builder) == ['git', 'userland', 'network', 'x11', 'firefox', 'userland']
-	assert initial.map(it.base_only) == ['', '1', '', '', '', '0']
-	for path in ['./usr/bin/vim', './usr/bin/Xorg', './usr/bin/Xvfb', './usr/bin/pkg',
-		'./usr/lib/firefox-esr/firefox-esr'] {
+	assert initial.map(it.builder) == ['git', 'userland', 'network', 'x11', 'userland']
+	assert initial.map(it.base_only) == ['', '1', '', '', '0']
+	for path in ['./usr/bin/vim', './usr/bin/Xorg', './usr/bin/Xvfb', './usr/bin/pkg'] {
 		assert path in bt.archive_files(image)!
 		contents := hosttest.capture(['tar', '-xOf', image, path], '', 30, os.environ())!
 		assert contents.code == 0 && contents.stdout == 'fixture\n'
 	}
+	// Firefox is optional: the first-run app page installs it with pkg.
+	assert './usr/lib/firefox-esr/firefox-esr' !in bt.archive_files(image)!
 	bt.clear(root)!
 	match name {
 		'fresh' { return }
@@ -150,12 +146,11 @@ fn check(name string) ! {
 			bootstrap(root, env)!
 			assert bt.events(root)!.len == 0 && os.is_file(custom + '/usr/bin/Xorg')
 		}
-		'preserve-firefox' {
+		'missing-network' {
 			os.rmdir_all(root + '/build-aarch64-network-tools/staging')!
-			os.rmdir_all(root + '/build-aarch64-firefox/staging')!
 			bootstrap(root, env)!
-			assert bt.events(root)!.map(it.builder) == ['network', 'firefox', 'userland']
-			assert './usr/lib/firefox-esr/firefox-esr' in bt.archive_files(image)!
+			assert bt.events(root)!.map(it.builder) == ['network', 'userland']
+			assert './usr/bin/pkg' in bt.archive_files(image)!
 		}
 		else { return error('unknown prepare case: ' + name) }
 	}
@@ -173,7 +168,7 @@ fn main() {
 		return
 	}
 	for name in ['fresh', 'warm', 'missing-x11', 'custom-incomplete', 'custom-ui2', 'custom-complete',
-		'preserve-firefox', 'broken-layer'] {
+		'missing-network', 'broken-layer'] {
 		check(name)!
 	}
 	println('PASS native desktop preparation checks')

@@ -92,7 +92,6 @@ if [ "$REBUILD_LAYERS" -eq 1 ]; then
     build_layer "developer tools" scripts/build-developer-tools-aarch64.sh
     build_layer "V compiler" scripts/build-v-aarch64.sh
     build_layer "X11" scripts/build-x11-aarch64.sh
-    build_layer "Firefox" scripts/build-firefox-aarch64.sh
     build_layer "Hyprland" scripts/build-hyprland-aarch64.sh
     build_layer "Codex CLI" scripts/build-codex-aarch64.sh
     build_layer "Claude Code" scripts/build-claude-aarch64.sh
@@ -116,7 +115,6 @@ require_file "network tools" build-aarch64-network-tools/staging/usr/bin/pkg
 require_file "developer tools" build-aarch64-developer-tools/staging/usr/bin/cmake
 require_file "V compiler" build-aarch64-v/staging/usr/bin/v
 require_file "X11" build-aarch64-x11/staging/usr/bin/Xorg
-require_file "Firefox" build-aarch64-firefox/staging/usr/bin/run-firefox
 require_file "Hyprland" build-aarch64-hyprland/staging/usr/bin/Hyprland
 require_file "Codex CLI" build-aarch64-codex/staging/usr/bin/codex
 require_file "Claude Code" build-aarch64-claude/staging/usr/bin/claude
@@ -169,6 +167,8 @@ done
 for image_path in \
     usr/bin/java \
     usr/bin/minecraft \
+    usr/lib/firefox-esr/firefox-esr \
+    usr/bin/firefox-esr \
     usr/bin/wine \
     usr/bin/wine32 \
     usr/bin/wine64; do
@@ -182,5 +182,5 @@ image_size="$(du -h "$FINAL_IMAGE" | cut -f1)"
 echo
 echo "=== Default AArch64 image built ==="
 echo "Image: $FINAL_IMAGE ($image_size)"
-echo "On demand: Java, Minecraft and Wine are not bundled"
+echo "On demand: Firefox, Java, Minecraft and Wine are not bundled"
 echo "Boot:  ./scripts/run-desktop-aarch64.sh --no-desktop"

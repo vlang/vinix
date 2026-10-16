@@ -3,7 +3,7 @@
 # initramfs that boots straight into it.
 #
 # Usage: ./scripts/build-desktop-aarch64.sh [--no-initramfs] [--compact-initramfs]
-#        [--without-firefox] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-dota2] [--with-asahi-gpu] [--with-x86-translation] [--with-roblox] [--wifi-bundle=DIR]
+#        [--with-firefox] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-dota2] [--with-asahi-gpu] [--with-x86-translation] [--with-roblox] [--wifi-bundle=DIR]
 # Set V or VINIX_V_COMPILER to a V executable or checkout directory to select
 # a compiler explicitly (for example V=~/code/v/v).
 #
@@ -115,9 +115,9 @@ write_staging_cache_manifest() {
 
     # Change this when the immutable-layer assembly logic changes. Desktop
     # source and launcher edits are refreshed below without restaging 6+ GiB.
-    printf 'version=8\n'
+    printf 'version=9\n'
     printf 'compact=%s\n' "$COMPACT_INITRAMFS"
-    printf 'without_firefox=%s\n' "$WITHOUT_FIREFOX"
+    printf 'firefox=%s\n' "$WITH_FIREFOX"
     printf 'chromium=%s\n' "$WITH_CHROMIUM"
     printf 'libreoffice=%s\n' "$WITH_LIBREOFFICE"
     printf 'minecraft=%s\n' "$WITH_MINECRAFT"
@@ -162,6 +162,16 @@ merge_staging_tree() {
     cp -a "$overlay/." "$STAGING/"
 }
 
+# Images leave the browser out unless --with-firefox asks for it: the first-run
+# app page and `pkg install firefox` fetch it from Alpine with its runtime.
+remove_firefox_browser() {
+    rm -rf "$STAGING/usr/lib/firefox-esr" "$STAGING/usr/lib/firefox" \
+        "$STAGING/usr/bin/firefox-esr" "$STAGING/usr/bin/firefox" \
+        "$STAGING"/usr/share/applications/firefox*.desktop \
+        "$STAGING"/usr/share/icons/hicolor/*/apps/firefox* \
+        "$STAGING"/usr/share/metainfo/*firefox*
+}
+
 MAKE_INITRAMFS=1
 COMPACT_INITRAMFS=0
 WITH_X86_TRANSLATION=0
@@ -174,7 +184,7 @@ WITH_CHROMIUM=0
 WITH_LIBREOFFICE=0
 WITH_MINECRAFT=0
 WITH_OPENGOTHIC=0
-WITHOUT_FIREFOX=0
+WITH_FIREFOX=0
 REFRESH_STAGING="${VINIX_REFRESH_DESKTOP_STAGING:-0}"
 # The Apple GPU userspace is only correct on Apple hardware; see the overlay
 # below for why its mere presence on disk must not select it.
@@ -194,14 +204,16 @@ for arg in "$@"; do
         --with-libreoffice) WITH_LIBREOFFICE=1 ;;
         --with-minecraft) WITH_MINECRAFT=1 ;;
         --with-opengothic) WITH_OPENGOTHIC=1 ;;
-        --without-firefox) WITHOUT_FIREFOX=1 ;;
+        --with-firefox) WITH_FIREFOX=1 ;;
+        # The default since images stopped carrying Firefox; kept for callers.
+        --without-firefox) WITH_FIREFOX=0 ;;
         --with-asahi-gpu) WITH_ASAHI_GPU=1 ;;
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
-            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--without-firefox] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-dota2] [--with-asahi-gpu] [--with-x86-translation] [--with-steam] [--with-qemu-system] [--with-android] [--with-roblox] [--wifi-bundle=DIR]"
-            echo "  --compact-initramfs stages the desktop, core developer tools and Firefox"
-            echo "  --without-firefox leaves the browser out of a compact image, keeping its"
-            echo "      GTK/media runtime; the first-run app page offers it through pkg"
+            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-firefox] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-dota2] [--with-asahi-gpu] [--with-x86-translation] [--with-steam] [--with-qemu-system] [--with-android] [--with-roblox] [--wifi-bundle=DIR]"
+            echo "  --compact-initramfs stages the desktop, X11 and core developer tools"
+            echo "  --with-firefox adds a previously staged Firefox and its GTK/media runtime;"
+            echo "      otherwise the first-run app page offers it through pkg"
             echo "  --with-chromium adds a previously staged Chromium; otherwise it is a pkg install"
             echo "  --with-libreoffice adds a previously staged LibreOffice; otherwise it is a pkg install"
             echo "  --with-minecraft adds a previously staged Minecraft; otherwise it is a pkg install"
@@ -224,11 +236,6 @@ for arg in "$@"; do
             ;;
     esac
 done
-
-if [ "$WITHOUT_FIREFOX" -eq 1 ] && [ "$COMPACT_INITRAMFS" -ne 1 ]; then
-    echo "ERROR: --without-firefox applies to --compact-initramfs images" >&2
-    exit 1
-fi
 
 case "$REFRESH_STAGING" in
     0|1) ;;
@@ -583,7 +590,7 @@ fi
 # Appending an overlay tar would leave duplicate paths that the kernel's
 # initramfs unpacker rejects, so stage before repacking it. A full userland is
 # useful for development but can exceed an M1 EFI partition. Compact mode keeps
-# the native GCC toolchain plus the packaged Python, network-tool and Firefox
+# the native GCC toolchain plus the packaged X11, Python and network-tool
 # closures, while leaving out unrelated large runtimes.
 if [ ! -f "$BASE_INITRAMFS" ]; then
     echo "ERROR: $BASE_INITRAMFS not found; it is the desktop's base userland."
@@ -616,11 +623,6 @@ if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
         echo "Run ./scripts/build-network-tools-aarch64.sh first." >&2
         exit 1
     fi
-    if [ ! -x "$FIREFOX_STAGING/usr/bin/run-firefox" ]; then
-        echo "ERROR: compact desktop needs $FIREFOX_STAGING/usr/bin/run-firefox" >&2
-        echo "Run ./scripts/build-x11-aarch64.sh and ./scripts/build-firefox-aarch64.sh first." >&2
-        exit 1
-    fi
     if [ ! -x "$X11_STAGING/usr/bin/Xorg" ] ||
         [ ! -x "$X11_STAGING/usr/bin/Xvfb" ] ||
         [ ! -x "$X11_STAGING/usr/bin/startx" ] ||
@@ -630,6 +632,15 @@ if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
         echo "Run ./scripts/build-x11-aarch64.sh first." >&2
         exit 1
     fi
+fi
+if [ "$WITH_FIREFOX" -eq 1 ] &&
+   ! { [ -x "$FIREFOX_STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
+       [ -x "$FIREFOX_STAGING/usr/bin/firefox-esr" ]; } &&
+   ! { [ -x "$FIREFOX_STAGING/usr/lib/firefox/firefox" ] &&
+       [ -x "$FIREFOX_STAGING/usr/bin/firefox" ]; }; then
+    echo "ERROR: --with-firefox needs a complete Firefox in $FIREFOX_STAGING" >&2
+    echo "Run ./scripts/build-firefox-aarch64.sh first." >&2
+    exit 1
 fi
 if [ "$WITH_CHROMIUM" -eq 1 ] &&
    [ ! -x "$CHROMIUM_STAGING/usr/lib/chromium/chrome" ]; then
@@ -831,7 +842,7 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
         merge_staging_tree "$LIBREOFFICE_STAGING"
     fi
     if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-        echo "    compact image: staging BusyBox, Python, Git, GCC and Firefox"
+        echo "    compact image: staging BusyBox, X11, Python, Git and GCC"
         if [ ! -f "$DEVTOOLS_ARCHIVE" ]; then
             echo "ERROR: compact desktop needs $DEVTOOLS_ARCHIVE" >&2
             echo "Run ./scripts/build-userland-aarch64.sh first." >&2
@@ -861,18 +872,9 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
             done
         done
         merge_staging_tree "$X11_STAGING"
-        merge_staging_tree "$FIREFOX_STAGING"
-        if [ "$WITHOUT_FIREFOX" -eq 1 ]; then
-            # The browser's own files: 220 MiB of a release ISO. Its runtime --
-            # GTK, the media codecs, fonts and the TLS bundle -- stays for the
-            # other GTK applications, and the first-run app page offers the
-            # browser itself through pkg.
-            echo "    leaving Firefox itself out (--without-firefox)"
-            rm -rf "$STAGING/usr/lib/firefox-esr" "$STAGING/usr/lib/firefox" \
-                "$STAGING/usr/bin/firefox-esr" "$STAGING/usr/bin/firefox" \
-                "$STAGING"/usr/share/applications/firefox*.desktop \
-                "$STAGING"/usr/share/icons/hicolor/*/apps/firefox* \
-                "$STAGING"/usr/share/metainfo/*firefox*
+        if [ "$WITH_FIREFOX" -eq 1 ]; then
+            echo "    staging Firefox (--with-firefox)"
+            merge_staging_tree "$FIREFOX_STAGING"
         fi
         merge_staging_tree "$NETWORK_TOOLS_STAGING"
         merge_staging_tree "$PYTHON_STAGING"
@@ -938,24 +940,19 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
             echo "    base image omits GCC; staging the developer-tools layer"
             tar xf "$DEVTOOLS_ARCHIVE" -C "$STAGING"
         fi
-        # Firefox is another independently published closure. A base image
-        # made before (or without) that optional integration is still a valid
-        # userland input, so recover from the dedicated layer before applying
-        # the newer network/runtime overlays below.
-        if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
-               [ -x "$STAGING/usr/bin/firefox-esr" ]; } &&
-           ! { [ -x "$STAGING/usr/lib/firefox/firefox" ] &&
-               [ -x "$STAGING/usr/bin/firefox" ]; }; then
-            if ! { [ -x "$FIREFOX_STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
-                   [ -x "$FIREFOX_STAGING/usr/bin/firefox-esr" ]; } &&
-               ! { [ -x "$FIREFOX_STAGING/usr/lib/firefox/firefox" ] &&
-                   [ -x "$FIREFOX_STAGING/usr/bin/firefox" ]; }; then
-                echo "ERROR: desktop base omits Firefox and its staging layer is incomplete: $FIREFOX_STAGING" >&2
-                echo "Run ./scripts/build-firefox-aarch64.sh first." >&2
-                exit 1
+        # Firefox is an independently published, optional closure. A base
+        # userland assembled with it still carries the browser, which only
+        # --with-firefox keeps; one assembled without it takes the layer.
+        if [ "$WITH_FIREFOX" -eq 1 ]; then
+            if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
+                   [ -x "$STAGING/usr/bin/firefox-esr" ]; } &&
+               ! { [ -x "$STAGING/usr/lib/firefox/firefox" ] &&
+                   [ -x "$STAGING/usr/bin/firefox" ]; }; then
+                echo "    base image omits Firefox; staging the Firefox layer"
+                merge_staging_tree "$FIREFOX_STAGING"
             fi
-            echo "    base image omits Firefox; staging the Firefox layer"
-            merge_staging_tree "$FIREFOX_STAGING"
+        else
+            remove_firefox_browser
         fi
         # The base archive may predate package support. Always refresh this small
         # layer so the terminal gets pkg/apk without rebuilding the full userland.
@@ -976,7 +973,7 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
 
     # Full images pick up locally built optional application layers even when the
     # base archive predates them. Compact images deliberately stop at the GPU,
-    # desktop and Firefox qualification closure unless one optional layer is
+    # desktop and X11 qualification closure unless one optional layer is
     # explicitly requested.
     if { [ "$COMPACT_INITRAMFS" -eq 0 ] || [ "$WITH_MINECRAFT" -eq 1 ]; } &&
        [ -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
@@ -1451,7 +1448,7 @@ done
 for runtime_path in usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-obs usr/bin/run-chromium usr/bin/run-libreoffice; do
     if [ ! -x "$STAGING/$runtime_path" ]; then
         echo "ERROR: desktop hosted-X11 runtime is missing /$runtime_path" >&2
-        echo "Run ./scripts/build-x11-aarch64.sh and ./scripts/build-firefox-aarch64.sh, then rebuild the desktop." >&2
+        echo "Run ./scripts/build-x11-aarch64.sh, then rebuild the desktop." >&2
         exit 1
     fi
 done
@@ -1459,23 +1456,17 @@ if [ ! -f "$STAGING/usr/lib/vinix-obs-compat.so" ]; then
     echo "ERROR: OBS compatibility library is missing" >&2
     exit 1
 fi
-if [ "$WITHOUT_FIREFOX" -eq 1 ]; then
+if [ "$WITH_FIREFOX" -eq 0 ]; then
     if [ "$firefox_app_found" -ne 0 ]; then
-        echo "ERROR: --without-firefox image still has a Firefox application directory" >&2
+        echo "ERROR: desktop image still has a Firefox application directory without --with-firefox" >&2
         exit 1
     fi
-elif [ "$firefox_app_found" -ne 1 ]; then
-    echo "ERROR: desktop image has no Firefox application directory" >&2
-    echo "Run ./scripts/build-firefox-aarch64.sh and ./scripts/build-userland-aarch64.sh first." >&2
-    exit 1
-fi
-if [ "$WITHOUT_FIREFOX" -eq 0 ] &&
-   ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
-       [ -x "$STAGING/usr/bin/firefox-esr" ]; } &&
-   ! { [ -x "$STAGING/usr/lib/firefox/firefox" ] &&
-       [ -x "$STAGING/usr/bin/firefox" ]; }; then
-    echo "ERROR: desktop image has no complete Firefox executable pair" >&2
-    echo "Run ./scripts/build-firefox-aarch64.sh and ./scripts/build-userland-aarch64.sh first." >&2
+elif ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
+         [ -x "$STAGING/usr/bin/firefox-esr" ]; } &&
+     ! { [ -x "$STAGING/usr/lib/firefox/firefox" ] &&
+         [ -x "$STAGING/usr/bin/firefox" ]; }; then
+    echo "ERROR: --with-firefox image has no complete Firefox executable pair" >&2
+    echo "Run ./scripts/build-firefox-aarch64.sh first." >&2
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then

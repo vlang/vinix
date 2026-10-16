@@ -9,7 +9,6 @@ SYSROOT="${VINIX_AARCH64_SYSROOT:-$USERLAND_BUILD_DIR/staging}"
 BASE_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 NETWORK_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
 X11_STAGING="${VINIX_X11_STAGING:-$SCRIPT_DIR/build-aarch64-x11/staging}"
-FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 
 has_executables() {
     local directory="$1" path
@@ -41,17 +40,6 @@ network_ready() {
 x11_ready() {
     has_executables "$X11_STAGING" usr/bin/Xorg usr/bin/Xvfb usr/bin/startx \
         usr/bin/vinix-xinput usr/bin/vinix-wine-host
-}
-
-firefox_ready() {
-    has_executables "$FIREFOX_STAGING" usr/bin/run-firefox &&
-        { has_executables "$FIREFOX_STAGING" usr/lib/firefox-esr/firefox-esr usr/bin/firefox-esr ||
-          has_executables "$FIREFOX_STAGING" usr/lib/firefox/firefox usr/bin/firefox; }
-}
-
-base_has_firefox() {
-    archive_has ./usr/lib/firefox-esr/firefox-esr ./usr/bin/firefox-esr ||
-        archive_has ./usr/lib/firefox/firefox ./usr/bin/firefox
 }
 
 require_default_staging() {
@@ -97,24 +85,6 @@ if ! x11_ready; then
         "$SCRIPT_DIR/build-aarch64-x11"
     NEED_X11=1
 fi
-NEED_FIREFOX=0
-if ! firefox_ready; then
-    if [ "$FIREFOX_STAGING" != "$SCRIPT_DIR/build-aarch64-firefox/staging" ]; then
-        require_default_staging Firefox "$FIREFOX_STAGING" "$SCRIPT_DIR/build-aarch64-firefox/staging"
-    fi
-    # Rebuilding userland replaces the archive. Firefox preserved only in an
-    # older base would otherwise disappear when another layer is prepared.
-    if [ "$NEED_USERLAND" -eq 1 ] || [ "$NEED_NETWORK" -eq 1 ] ||
-       [ "$NEED_X11" -eq 1 ] ||
-       ! archive_has ./usr/bin/Xorg ./usr/bin/Xvfb ./usr/bin/startx ||
-       ! base_has_firefox; then
-        require_matching_build_directory FIREFOX \
-            "${VINIX_FIREFOX_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-firefox}" \
-            "$SCRIPT_DIR/build-aarch64-firefox"
-        NEED_FIREFOX=1
-    fi
-fi
-
 if [ -n "${VINIX_UI2_SOURCE:-}" ]; then
     UI2_SOURCE="$VINIX_UI2_SOURCE"
 elif [ -f "$SCRIPT_DIR/../ui2/v.mod" ]; then
@@ -162,16 +132,11 @@ if [ "$NEED_X11" -eq 1 ]; then
     VINIX_ARCH=aarch64 VINIX_USERLAND_STAGING="$SYSROOT" "$SCRIPT_DIR/scripts/build-x11-aarch64.sh"
     x11_ready || { echo "ERROR: X11 builder left incomplete staging" >&2; exit 1; }
 fi
-if [ "$NEED_FIREFOX" -eq 1 ]; then
-    echo "==> Preparing the desktop Firefox runtime..."
-    VINIX_ARCH=aarch64 "$SCRIPT_DIR/scripts/build-firefox-aarch64.sh"
-    firefox_ready || { echo "ERROR: Firefox builder left incomplete staging" >&2; exit 1; }
-fi
 
 # X11 is incorporated into the base by the userland builder. Reassemble after
 # preparing layers, or when a pre-existing base predates X11 integration.
 if [ "$NEED_USERLAND" -eq 1 ] || [ "$NEED_NETWORK" -eq 1 ] ||
-   [ "$NEED_X11" -eq 1 ] || [ "$NEED_FIREFOX" -eq 1 ] ||
+   [ "$NEED_X11" -eq 1 ] ||
    ! archive_has ./usr/bin/Xorg ./usr/bin/Xvfb ./usr/bin/startx; then
     echo "==> Assembling the desktop base userland..."
     build_userland 0

@@ -449,13 +449,17 @@ else
     echo "==> X11 staging not found, skipping (run scripts/build-x11-aarch64.sh first)"
 fi
 
-# Firefox brings its GTK/X11 client-side dependency closure. Merge it before
-# Asahi so the hardware-specific Mesa runtime remains authoritative on M1.
-if [ -x "$FIREFOX_STAGING/usr/bin/run-firefox" ]; then
+# Firefox brings its GTK/X11 client-side dependency closure. Images leave it
+# out (the first-run app page and `pkg install firefox` fetch it), so merge it
+# only on request, and before Asahi so the hardware-specific Mesa runtime
+# remains authoritative on M1.
+if [ "${VINIX_WITH_FIREFOX:-0}" = 1 ]; then
+    if [ ! -x "$FIREFOX_STAGING/usr/bin/run-firefox" ]; then
+        echo "ERROR: VINIX_WITH_FIREFOX=1 needs $FIREFOX_STAGING; run scripts/build-firefox-aarch64.sh first" >&2
+        exit 1
+    fi
     echo "==> Integrating Firefox ESR runtime..."
     merge_staging_tree "$FIREFOX_STAGING"
-else
-    echo "==> Firefox staging not found, skipping (run scripts/build-firefox-aarch64.sh first)"
 fi
 
 # Minecraft renders with Mesa's software rasteriser. Merge it before Asahi so

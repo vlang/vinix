@@ -10,7 +10,8 @@ The launcher checks help side effects, cold dependency ordering, warm reuse,
 no-build behavior and compiler selection. Preparation retains all eight
 original scenarios: fresh and warm checkout, reassembly of an image missing
 X11, incomplete custom staging, invalid custom ui2, reuse of a complete custom
-layer, preservation of Firefox and a builder that returns incomplete output.
+layer, a rebuilt package layer and a builder that returns incomplete output.
+Firefox is not a desktop layer: images leave it to the first-run app page.
 System tar independently checks generated archive entries and file contents.
 
 Recovery checks a fresh init, a preexisting executable or archive, failure in

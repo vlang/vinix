@@ -244,8 +244,9 @@ To build and boot the native desktop from a fresh checkout:
 ```
 
 The launcher fetches the pinned kernel and firmware dependencies and ui2,
-then builds the required Alpine userland, package tools, X11 and Firefox
-layers before compiling the desktop. Subsequent runs reuse those layers.
+then builds the required Alpine userland, package tools and X11 layers before
+compiling the desktop. Firefox is not preinstalled: the first-run app page
+installs it with `pkg`. Subsequent runs reuse those layers.
 The host needs a current V compiler with V3 support, LLVM/LLD,
 `aarch64-linux-musl-gcc`, `pkg-config`, QEMU, mtools and e2fsprogs, in addition
 to the general build prerequisites above.
@@ -259,8 +260,8 @@ into one image with a single command:
 
 The resulting `build-support/init-aarch64/initramfs-desktop.tar` contains
 Python, Ruby, Go, the current pinned V compiler, network and native developer
-tools, X11, Firefox, Hyprland, x86 translation, Codex and Claude Code, in
-addition to the native Vinix desktop. Java, Minecraft and Wine are deliberately
+tools, X11, Hyprland, x86 translation, Codex and Claude Code, in addition
+to the native Vinix desktop. Firefox, Java, Minecraft and Wine are deliberately
 left out of this default image so users can install them on demand with `pkg`.
 It is the image booted by:
 
@@ -780,12 +781,14 @@ framebuffer-backed Xorg server. Firefox draws its own interface with Gecko/XUL;
 GTK 3 is staged as a userspace dependency for Linux window-system integration,
 not implemented in the kernel or in `vinix-desktop`.
 
-Build the X server and stage Firefox before assembling the full userland:
+Images do not carry Firefox: the first-run app page and `pkg install firefox`
+fetch it from Alpine with its GTK runtime. To build it into an image instead,
+build the X server and stage Firefox before assembling the full userland:
 
 ```sh
 ./scripts/build-x11-aarch64.sh
 ./scripts/build-firefox-aarch64.sh
-./scripts/build-userland-aarch64.sh
+VINIX_WITH_FIREFOX=1 ./scripts/build-userland-aarch64.sh
 ```
 
 Boot with at least 8 GiB of RAM, then launch the browser. The first command
@@ -803,7 +806,7 @@ Firefox launcher. Clicking it opens Firefox in a normal movable Vinix window;
 the native desktop and taskbar remain visible around its private Xvfb display:
 
 ```sh
-./scripts/build-desktop-aarch64.sh
+./scripts/build-desktop-aarch64.sh --with-firefox
 ./scripts/run-desktop-aarch64.sh --no-build --mem=8192
 ```
 
@@ -823,9 +826,9 @@ backend or accessibility overrides. Running `run-firefox` directly still starts
 the browser on the physical Xorg display for command-line debugging.
 Set `VINIX_FIREFOX_STAGING` to merge a different completed staging tree, or
 `ALPINE_BRANCH`/`VINIX_FIREFOX_PACKAGE` to select another compatible build.
-The compact desktop image used by the default M1 deployment merges the Firefox
-and X11 staging trees directly, alongside Python, Git and GCC, so its launcher
-works without shipping the much larger complete userland image.
+The compact desktop image used by the default M1 deployment merges the X11
+staging tree directly, alongside Python, Git and GCC, without shipping the much
+larger complete userland image; `--with-firefox` adds the Firefox tree too.
 
 On M1 and in a VirGL VM, Firefox automatically enables WebRender over X11 EGL
 when a render node and the matching Mesa runtime are present. Xorg imports the

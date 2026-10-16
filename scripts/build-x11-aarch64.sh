@@ -152,6 +152,11 @@ MAIN_PKGS=(
     fontconfig fontconfig-dev
     libffi libffi-dev
     nettle nettle-dev
+    # Runtime dependencies of the libraries above that no other required
+    # layer carries: libhogweed needs libgmp, and libXdmcp, which libxcb and
+    # so every X client loads, needs libbsd and its libmd.
+    gmp
+    libbsd libmd
     libxau libxau-dev
     libxdmcp libxdmcp-dev
     libxcb libxcb-dev
@@ -193,6 +198,8 @@ MAIN_PKGS=(
     mesa-osmesa
     mesa-xatracker
     mesa-dri-gallium
+    # libEGL's client-side Wayland dependency.
+    wayland-libs-client
     elfutils
     libxml2
     zstd-libs

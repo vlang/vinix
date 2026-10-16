@@ -26,7 +26,7 @@ session:
 
 ```sh
 VINIX_DESKTOP_INITRAMFS="$PWD/build/ps1/initramfs-desktop.tar" \
-  ./scripts/build-desktop-aarch64.sh --compact-initramfs --without-firefox
+  ./scripts/build-desktop-aarch64.sh --compact-initramfs
 VINIX_DESKTOP_INITRAMFS="$PWD/build/ps1/initramfs-desktop.tar" \
   ./scripts/run-desktop-aarch64.sh --no-build --no-persist --ephemeral
 ```
