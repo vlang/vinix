@@ -245,6 +245,7 @@ mut:
 	swift_objc_metadata map[u64]u64 // Class -> canonical sealed Swift wrapper, under the runtime lock.
 	swift_concurrency_code u64 // Sealed actor witness dispatcher and indirect priority getter.
 	swift_concurrency_retired bool // Reject new resolution after quiescent teardown.
+	network_retired bool // Reject monitor creation after the Network worker has retired.
 	swift_main_actor_arena u64 // Sealed MainActor accessor, nominal class and immortal singleton.
 	swift_main_actor_retired bool
 	swift_logger_arena u64 // Sealed Swift os.Logger entries and nongeneric metadata.
@@ -373,7 +374,7 @@ fn objc_start() {
         'CAMetalLayer', 'GLKView', 'EAGLContext', 'CMMotionManager', 'CLLocationManager',
         'AVAudioSession', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession',
         'AVCaptureVideoDataOutput', 'AVCaptureVideoPreviewLayer', 'PHPhotoLibrary',
-		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGFont', 'VinixReachability', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor', 'VinixCGImage', 'VinixCGDataProvider', 'VinixSecCertificate', 'VinixSecKey', 'VinixSecPolicy', 'VinixSecTrust', 'VinixCFDate', 'VinixCFError'] {
+		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGFont', 'VinixReachability', 'VinixNWPath', 'VinixNWInterface', 'VinixNWPathMonitor', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor', 'VinixCGImage', 'VinixCGDataProvider', 'VinixSecCertificate', 'VinixSecKey', 'VinixSecPolicy', 'VinixSecTrust', 'VinixCFDate', 'VinixCFError'] {
 		parent := match name {
 			'NSObject' { u64(0) }
 			'OS_dispatch_object' { ios_runtime.names['OS_object'] }
@@ -632,9 +633,11 @@ fn objc_stop() {
 	connection_require_shutdown()
 	ns_threads_join()
 	swift_tasks_join()
+	nw_stop()
 	reachability_stop()
 	dispatch_stop()
 	reachability_free()
+	nw_free()
 	connection_stop()
 	audio_stop()
 	ui_context_stop()

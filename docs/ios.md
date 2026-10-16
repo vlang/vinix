@@ -7917,22 +7917,66 @@ Eleven final C streams and executables, native measurements, generated-code audi
 and joined guest evidence are retained under
 `build/ios/fortnite/devicecheck-checks`.
 
-One more required import resolves. The actual IPA exits with status 1 before
-application entry at `_nw_interface_get_name` from Network.framework. Image sample
-construction, codec execution and the system Metal device/renderer remain
-unavailable. Fortnite remains unplayable and full iOS regression remains unpassed.
+That required import resolved; the following probe stopped before application
+entry at `_nw_interface_get_name` from Network.framework.
+
+Network.framework now provides the path-monitor and snapshot APIs imported by the
+IPA. Initial delivery and later changes run on the requested dispatch queue,
+including the existing main run loop. Snapshots retain immutable interface names,
+indices and types; callers can retain a path or interface beyond monitor
+cancellation. Enumeration is synchronous, borrows its block, and stops when the
+block returns false. Monitor handlers are copied, replacements release their old
+capture, and running callbacks keep their handler and path alive. Pending updates
+coalesce; unchanged snapshots produce no callback or replacement allocation.
+Cancellation invalidates queued deliveries and releases the monitor's owners.
+Shutdown joins the polling worker before stopping dispatch, drains queued work,
+and rejects new monitors through the remaining pool and capture destruction.
+
+The Vinix backend reads bounded rtnetlink dumps of main-table unicast default
+routes and live interface addresses. IPv6 requires a non-link-local address and
+matching default route. DNS support means a configured numeric nameserver in
+`/etc/resolv.conf`; the query sends no DNS or application traffic. Interface types
+come from native link data and wireless ioctls. The Mac test backend uses BSD route
+dumps and its SystemConfiguration BSD-name mapping to distinguish Wi-Fi from
+Ethernet. Temporary route buffers, sockets, native interface lists and Mac
+configuration arrays are released. Failed queries preserve the preceding
+snapshot, with initial delivery waiting for a successful query.
+
+This profile supports 64 active monitors and 64 unique default-route interfaces,
+with 100 ms between scans and a one-second netlink receive budget. Changes shorter
+than a scan can be missed. It does not model NECP or other policy routing,
+multipath nexthops, cellular cost policy,
+NAT64/DNS64 or Low Data Mode. Vinix has no constrained-data policy, so the
+constrained query returns false; these flags do not establish server availability.
+
+The installed Mac library was measured for initial delivery, block replacement,
+retained snapshots and interfaces, enumeration early exit and cancellation.
+Eight final host sanitizer runs and four ARM64 Vinix suites also exercise
+coalescing, concurrent readers, cancellation before delivery, replacement during
+a running callback, shutdown with queued work and two drained runtimes. Eleven
+final C streams and executables, native measurements, generated-code audits and
+joined guest evidence are retained under `build/ios/fortnite/network-path-checks`.
+The actual IPA callback invokes `_nw_interface_get_name` at `0x1005ada54`.
+The native test driver also bounds QEMU shutdown: if its owned child ignores
+SIGTERM, it sends SIGKILL after two seconds and reaps it before removing payloads.
+
+Fifteen more required imports resolve. The actual IPA exits with status 1 before
+application entry at `_CHHapticDynamicParameterIDHapticIntensityControl` from
+CoreHaptics. Image sample construction, codec execution and the system Metal
+device/renderer remain unavailable. Fortnite remains unplayable and full iOS
+regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,647 | 513 | 79 |
+| Fortnite executable | 1,662 | 498 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,482 | 516 | 120 |
+| All images | 2,497 | 501 | 120 |
 
-The C++/GLES/Text variant reports 2,496 resolved imports, 502 unresolved strong
+The C++/GLES/Text variant reports 2,511 resolved imports, 487 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
