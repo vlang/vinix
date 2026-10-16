@@ -151,12 +151,24 @@ find_debugfs() {
 # Fail boot "$1" unless its disk "$2" holds a system installed from an image:
 # /.vinix-image-id names it, and reads "pending" while one is being written.
 require_installed() {
-    local name="$1" disk="$2" debugfs id
+    local name="$1" disk="$2" debugfs id probe
     if ! debugfs="$(find_debugfs)"; then
         echo "    $name: no debugfs here to look at the disk with"
         return
     fi
-    id="$("$debugfs" -R 'cat /.vinix-image-id' "$disk" 2>/dev/null | tr -d ' \r\n' || true)"
+    # The system disk is VJFS: ext2 with a journal, whose superblock carries
+    # its own signature (0x4a56) so ordinary ext2 tools leave it alone. Read a
+    # copy that carries the ext2 one; a clone or a sparse copy costs nothing.
+    probe="$disk.probe"
+    rm -f "$probe"
+    cp -c "$disk" "$probe" 2>/dev/null ||
+        cp --reflink=auto --sparse=always "$disk" "$probe" 2>/dev/null ||
+        cp "$disk" "$probe"
+    if [ "$(od -An -tx1 -j $((0x438)) -N2 "$probe" 2>/dev/null | tr -d ' \n')" = 564a ]; then
+        printf '\123\357' | dd of="$probe" bs=1 seek=$((0x438)) conv=notrunc 2>/dev/null
+    fi
+    id="$("$debugfs" -R 'cat /.vinix-image-id' "$probe" 2>/dev/null | tr -d ' \r\n' || true)"
+    rm -f "$probe"
     if [ -z "$id" ] || [ "$id" = pending ]; then
         echo "    $name: no system was installed on the disk" >&2
         FAILED+=("$name (no system installed on its disk)")
@@ -173,6 +185,17 @@ require_serial() {
         echo "    $name: the serial log never says \"$pattern\"" >&2
         FAILED+=("$name (no \"$pattern\" on serial)")
     fi
+}
+
+# A boot that installs copies the whole image onto its disk before the desktop
+# starts, which takes several times as long as a boot from the ISO. Give it at
+# least 20 minutes; the caller restores TIMEOUT from boot_timeout afterwards.
+install_timeout() {
+    boot_timeout=$TIMEOUT
+    case "$1" in
+        qemu-amd64-uefi|qemu-arm64-virtio)
+            [ "$TIMEOUT" -ge 1200 ] || TIMEOUT=1200 ;;
+    esac
 }
 
 vm_image() {
@@ -336,10 +359,12 @@ qemu_amd64() {
         local disk="$OUT/qemu-amd64-disk.img" name
         blank_disk "$disk"
         for name in qemu-amd64-uefi qemu-amd64-uefi-disk; do
+            install_timeout "$name"
             run_qemu_boot "$name" "$qemu_bin" "${accel[@]}" \
                 -machine q35 -m 4096 -smp 2 -vga std \
                 -drive "if=pflash,format=raw,unit=0,readonly=on,file=$ovmf" \
                 -cdrom "$iso" -drive "file=$disk,format=raw" -nic user,model=e1000
+            TIMEOUT=$boot_timeout
             require_installed "$name" "$disk"
         done
         rm -f "$disk"
@@ -396,6 +421,7 @@ qemu_arm64() {
             storage=(-drive "if=none,id=hd0,format=raw,file=$disk"
                 -device virtio-blk-device,drive=hd0)
         fi
+        install_timeout "$name"
         run_qemu_boot "$name" "$qemu_bin" "${accel[@]}" \
             -machine virt -m 4096 -smp 4 \
             -drive "if=pflash,format=raw,readonly=on,file=$code" \
@@ -405,6 +431,7 @@ qemu_arm64() {
             -device scsi-cd,drive=cd0,bus=scsi0.0 \
             ${storage[@]+"${storage[@]}"} \
             -device ramfb "${devices[@]}"
+        TIMEOUT=$boot_timeout
         case "$name" in
             qemu-arm64-virtio)
                 require_serial "$name" 'sysdisk: installed'
