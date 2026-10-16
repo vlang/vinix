@@ -334,6 +334,8 @@ and random capture names are excluded.
 | `bundle_supplied`, `bundle_action` | Whether a bundle was selected; `publish`, `preserve` for an identical verified destination, or `none` with no selected bundle. |
 | `bundle_required_bytes`, `bundle_reserve_bytes` | Existing conservative bundle-publication budget and 64 MiB build headroom; both zero without a bundle. These exclude the yet-unbuilt service binaries. |
 | `bundled_repositories` | Only the authenticated bundled repositories, sorted by ID. Other configured repositories remain visible in `configuration` but are not acquired. |
+| `applications_checked` | True only when explicit application requirements were jointly resolved against the selected signed bundle. |
+| `application_deployment` | Format-2 deployment lock for the resolved application roots and their complete closure. Without requirements, this is an empty lock for the target architecture and `applications_checked` is false. |
 
 Each bundled row records `id`, `sequence`, `expires`, `index_sha256`, `packages`,
 `aarch64_packages`, `x86_64_packages`, `shared_packages`, `proprietary_packages`,
@@ -355,6 +357,49 @@ between preparation and publication. It returns owned JSON text, independent of
 both plans. Free the text and close both plans on every path. Neither the method
 nor `--check` publishes a bundle/configuration or creates consumer package state.
 See [preflight qualification](../../tests/packages/image-input-check.md).
+
+### Require an advertised application catalog
+
+Repeat `--require-app ID` for every application an image release advertises:
+
+```sh
+v run tools/packages/stage.v --check --arch aarch64 --staging /build/fresh-root \
+  --config /release/reviewed-packages.json --repositories /release/bundle \
+  --require-app org.vinix.counter --require-app org.vinix.memo
+```
+
+Requirements work in both check and normal staging modes. They are evaluated
+before target compiler lookup or any image publication. There must be a selected
+signed bundle; a configured remote URL alone cannot satisfy a requirement.
+Input supports 1–4096 distinct valid package IDs. Order does not affect the
+report. An advertised root must have a `native`, `linux`, `windows` or `apple`
+candidate for the selected host. A `runtime` or `data` candidate with the same
+ID cannot substitute for an application, including when its version is newer.
+
+All required applications resolve **together**, through the normal fresh-install
+solver and the effective image policy. Their complete dependency/runtime closure
+must coexist in one transaction. Bundled target/shared candidates retain the
+normal aggregate resolver limit of 32,768. Missing host variants, conflicting
+versions and policy refusals fail with normal dependency diagnostics. The full
+bundle's existing signature, expiry, payload, license and firmware checks still
+apply, including to versions outside the requested closure.
+
+On success, `applications_checked` is true and `application_deployment` is a
+canonical format-2 lock with sorted roots and closure, exact versions/architectures,
+publisher IDs/keys, minimum signed sequences and complete manifest digests.
+Reviewers can save that field as a deployment document and distribute it with
+the release or organization policy. Ordinary Software deployment review, or
+`vinix-package deployment-review FILE` followed by its approved apply, still
+authenticates the current catalog, checks current policy and requires fresh
+authorization. The report does not install or authorize applications, save a
+deployment file, or change the image's configuration/state.
+
+V builders use `configuration.check_applications(&repositories, required_ids)`
+instead of `check_repositories`. The method requires a nonempty set and returns
+independently owned JSON with the same text/plan cleanup contract. A successful
+check establishes metadata installability for those exact bundled inputs; real
+runtime, graphical and device compatibility must still be qualified. See
+[application catalog qualification](../../tests/packages/image-applications-check.md).
 
 ## Build and publish
 

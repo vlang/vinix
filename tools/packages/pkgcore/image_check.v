@@ -31,12 +31,34 @@ struct ImageInputCheck {
 	bundle_required_bytes u64
 	bundle_reserve_bytes u64
 	bundled_repositories []ImageBundleCheck
+	applications_checked bool
+	application_deployment DeploymentLock
 }
 
 // Return owned, newline-terminated JSON. Callers close both input plans and
 // free the returned text. Report encoding borrows decoded/plan fields only
 // while their owners are alive; no private capture paths enter the report.
 pub fn (configuration &ImageConfiguration) check_repositories(repositories &ImageRepositories) !string {
+	return configuration.check_inputs(repositories, [])
+}
+
+// Check an advertised application set together, using only the captured signed
+// bundle. The independent format-2 lock in the report can be saved and reviewed
+// through the ordinary deployment workflow after installation. This does not
+// install packages, enroll remote publishers or authorize a deployment.
+pub fn (configuration &ImageConfiguration) check_applications(repositories &ImageRepositories, required []string) !string {
+	if required.len == 0 { return error('image application check requires at least one application ID') }
+	return configuration.check_inputs(repositories, required)
+}
+
+fn (configuration &ImageConfiguration) check_inputs(repositories &ImageRepositories, required []string) !string {
+	if required.len > 4096 { return error('image application check supports at most 4096 application IDs') }
+	mut seen := map[string]bool{}
+	defer { unsafe { seen.free() } }
+	for id in required {
+		if !identifier(id) || id in seen { return error('invalid or duplicate required image application: ${id}') }
+		seen[id] = true
+	}
 	if configuration.root == '' || !image_configuration_root_matches(configuration.root, configuration.device, configuration.inode) {
 		return error('package image root changed before input check')
 	}
@@ -65,6 +87,9 @@ pub fn (configuration &ImageConfiguration) check_repositories(repositories &Imag
 		if image_configuration_exists(target)! { repositories.verify(target, 0o755)!; bundle_action = 'preserve' }
 		else { bundle_action = 'publish' }
 	}
+	mut deployment := if required.len > 0 { image_application_deployment(config, repositories, required)! }
+		else { DeploymentLock{ architecture: config.architecture.clone() } }
+	defer { deployment.close() }
 	mut rows := []ImageBundleCheck{cap: repositories.repositories.len}
 	defer {
 		for row in rows { unsafe { row.index_sha256.free() } }
@@ -93,5 +118,5 @@ pub fn (configuration &ImageConfiguration) check_repositories(repositories &Imag
 		configuration_path: configuration.path, configuration_action: if configuration.existing { 'preserve' } else { 'initialize' },
 		configuration_sha256: digest, configuration: config, bundle_supplied: repositories.capture != '', bundle_action: bundle_action,
 		bundle_required_bytes: repositories.needed, bundle_reserve_bytes: if repositories.capture != '' { u64(64 * 1024 * 1024) } else { 0 },
-		bundled_repositories: rows })
+		bundled_repositories: rows, applications_checked: required.len > 0, application_deployment: deployment })
 }

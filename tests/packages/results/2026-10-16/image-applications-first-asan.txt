@@ -1,0 +1,51 @@
+IMAGE APPLICATIONS reproducible both-host joint locks, signed provenance, runtime/shared closure, app-kind selection and independent reports PASS
+IMAGE APPLICATIONS individually valid conflicting runtimes, missing/wrong-host/nonapp roots, duplicate/invalid/oversized sets and absent bundles refuse without publication; retry PASS
+IMAGE APPLICATIONS organization permissions/allowlist/pins and captured payload integrity remain mandatory before app resolution; restoration/retry PASS
+Updating trusted repository native
+Installing Editor 1.0.0 (1/4) from native
+Downloading editor/bin/runner (43 bytes)
+Installing modern 1.0.0 (2/4) from native
+Installing Runtime 2.0.0 (3/4) from native
+Installing Support 1.0.0 (4/4) from native
+Activated package generation 1
+=================================================================
+==57195==ERROR: AddressSanitizer: attempting double-free on 0x60200014bdb0 in thread T0:
+    #0 0x0001058b1258 in free+0x7c (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x41258)
+    #1 0x000104038350 in v_free+0x1ec (apps-asan:arm64+0x100034350)
+    #2 0x00010402f92c in string__free+0x33c (apps-asan:arm64+0x10002b92c)
+    #3 0x000104454fcc in pkgcore__close_decoded_state+0x4e0 (apps-asan:arm64+0x100450fcc)
+    #4 0x0001044fe65c in pkgcore__State__close+0x17c (apps-asan:arm64+0x1004fa65c)
+    #5 0x0001047b6698 in pkgcore__test_image_application_catalog_lock_works_with_normal_reviewed_offline_deployment+0x48b8 (apps-asan:arm64+0x1007b2698)
+    #6 0x000104a4c698 in main+0x2e4 (apps-asan:arm64+0x100a48698)
+    #7 0x0001802ebdfc in start+0x1b4c (dyld:arm64e+0x1fdfc)
+
+0x60200014bdb0 is located 0 bytes inside of 7-byte region [0x60200014bdb0,0x60200014bdb7)
+freed by thread T0 here:
+    #0 0x0001058b1258 in free+0x7c (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x41258)
+    #1 0x000104038350 in v_free+0x1ec (apps-asan:arm64+0x100034350)
+    #2 0x00010402f92c in string__free+0x33c (apps-asan:arm64+0x10002b92c)
+    #3 0x000104454fcc in pkgcore__close_decoded_state+0x4e0 (apps-asan:arm64+0x100450fcc)
+    #4 0x0001044fe65c in pkgcore__State__close+0x17c (apps-asan:arm64+0x1004fa65c)
+    #5 0x0001047b6698 in pkgcore__test_image_application_catalog_lock_works_with_normal_reviewed_offline_deployment+0x48b8 (apps-asan:arm64+0x1007b2698)
+    #6 0x000104a4c698 in main+0x2e4 (apps-asan:arm64+0x100a48698)
+    #7 0x0001802ebdfc in start+0x1b4c (dyld:arm64e+0x1fdfc)
+
+previously allocated by thread T0 here:
+    #0 0x0001058b1164 in malloc+0x78 (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x41164)
+    #1 0x00010403149c in malloc_noscan+0x1b4 (apps-asan:arm64+0x10002d49c)
+    #2 0x000104032248 in Array_u8__bytestr+0x90 (apps-asan:arm64+0x10002e248)
+    #3 0x000104505820 in pkgcore__StoredReader__quoted+0xe6c (apps-asan:arm64+0x100501820)
+    #4 0x000104504004 in pkgcore__StoredReader__repository+0xa60 (apps-asan:arm64+0x100500004)
+    #5 0x00010452d500 in pkgcore__StoredReader__repositories+0xe60 (apps-asan:arm64+0x100529500)
+    #6 0x00010464442c in pkgcore__read_stored_configuration+0x1b04 (apps-asan:arm64+0x10064042c)
+    #7 0x00010440e4a0 in pkgcore__decode_configuration+0x144 (apps-asan:arm64+0x10040a4a0)
+    #8 0x000104479c14 in pkgcore__load_config+0x1434 (apps-asan:arm64+0x100475c14)
+    #9 0x000104484f1c in pkgcore__Service__configuration+0x26c (apps-asan:arm64+0x100480f1c)
+    #10 0x000104482750 in pkgcore__Service__deploy_document+0xb84 (apps-asan:arm64+0x10047e750)
+    #11 0x000104481adc in pkgcore__Service__apply_deployment+0x364 (apps-asan:arm64+0x10047dadc)
+    #12 0x0001047b6508 in pkgcore__test_image_application_catalog_lock_works_with_normal_reviewed_offline_deployment+0x4728 (apps-asan:arm64+0x1007b2508)
+    #13 0x000104a4c698 in main+0x2e4 (apps-asan:arm64+0x100a48698)
+    #14 0x0001802ebdfc in start+0x1b4c (dyld:arm64e+0x1fdfc)
+
+SUMMARY: AddressSanitizer: double-free (apps-asan:arm64+0x100034350) in v_free+0x1ec
+==57195==ABORTING

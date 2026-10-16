@@ -51,6 +51,15 @@ unchanged, and target compilers are not required. Preparation uses a temporary
 authenticated capture, which is removed before exit. See
 [image input preflight](../../tests/packages/image-input-check.md).
 
+Repeat `--require-app ID` in check or normal staging to gate a release's
+advertised catalog before compiler lookup or image writes. The signed bundle
+must supply actual application candidates for the target host whose complete
+runtime/dependency closures resolve together under the effective policy. Check
+output includes an exact format-2 deployment lock for subsequent ordinary review;
+remote URLs, data packages and runtime packages cannot stand in for advertised
+applications. See [the contract](SDK.md#require-an-advertised-application-catalog)
+and [qualification](../../tests/packages/image-applications-check.md).
+
 Desktop checks need generated examples under `build/app-src` and a headless ui2
 overlay under `build/vmodules`; `VINIX_PACKAGE_TEST_UI2` selects another overlay
 parent. Package implementation, publishing, staging and qualification use V.

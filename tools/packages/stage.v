@@ -22,17 +22,22 @@ fn stage() ! {
 	mut configuration := os.getenv('VINIX_PACKAGE_IMAGE_CONFIG')
 	mut repositories := os.getenv('VINIX_PACKAGE_IMAGE_REPOSITORIES')
 	mut check := false
+	mut required_applications := []string{}
 	mut arguments := os.args[1..].clone()
 	for arguments.len > 0 {
 		if arguments[0] == '--check' { check = true; arguments = arguments[1..].clone(); continue }
 		if arguments.len < 2 {
-			return error('usage: stage.v --arch aarch64|x86_64 --staging DIR [--check] [--cc COMPILER] [--config REVIEWED_CONFIG.json] [--repositories SIGNED_BUNDLE_DIRECTORY]')
+			return error('usage: stage.v --arch aarch64|x86_64 --staging DIR [--check] [--cc COMPILER] [--config REVIEWED_CONFIG.json] [--repositories SIGNED_BUNDLE_DIRECTORY] [--require-app ID]...')
 		}
 		match arguments[0] {
 			'--arch' { architecture = arguments[1] }
 			'--staging' { staging = os.abs_path(arguments[1]) }
 			'--cc' { compiler = arguments[1] }
 			'--cc-argv' { compiler_args = json2.decode[[]string](arguments[1])! }
+			'--require-app' {
+				if required_applications.len == 4096 { return error('--require-app supports at most 4096 application IDs') }
+				required_applications << arguments[1]
+			}
 			'--config' {
 				if arguments[1] == '' { return error('--config requires a reviewed package configuration file') }
 				configuration = arguments[1]
@@ -52,11 +57,12 @@ fn stage() ! {
 	defer { image_configuration.close() }
 	mut image_repositories := unsafe { &image_configuration }.prepare_repositories(repositories)!
 	defer { image_repositories.close() }
-	if check {
-		report := unsafe { &image_configuration }.check_repositories(unsafe { &image_repositories })!
+	if check || required_applications.len > 0 {
+		report := if required_applications.len > 0 {
+			unsafe { &image_configuration }.check_applications(unsafe { &image_repositories }, required_applications)!
+		} else { unsafe { &image_configuration }.check_repositories(unsafe { &image_repositories })! }
 		defer { unsafe { report.free() } }
-		print(report)
-		return
+		if check { print(report); return }
 	}
 	if compiler == '' { compiler = os.getenv('VINIX_MUSL_CC_' + architecture.to_upper()) }
 	if compiler == '' { compiler = architecture + '-linux-musl-gcc' }

@@ -1,0 +1,19 @@
+IMAGE APPLICATIONS reproducible both-host joint locks, signed provenance, runtime/shared closure, app-kind selection and independent reports PASS
+IMAGE APPLICATIONS individually valid conflicting runtimes, missing/wrong-host/nonapp roots, duplicate/invalid/oversized sets and absent bundles refuse without publication; retry PASS
+IMAGE APPLICATIONS organization permissions/allowlist/pins and captured payload integrity remain mandatory before app resolution; restoration/retry PASS
+Updating trusted repository native
+Installing Editor 1.0.0 (1/4) from native
+Downloading editor/bin/runner (43 bytes)
+Installing modern 1.0.0 (2/4) from native
+Installing Runtime 2.0.0 (3/4) from native
+Installing Support 1.0.0 (4/4) from native
+Activated package generation 1
+Updating trusted repository native
+Installing Editor 1.0.0 (1/4) from native
+Downloading editor/bin/runner (43 bytes)
+Installing modern 1.0.0 (2/4) from native
+Installing Runtime 2.0.0 (3/4) from native
+Installing Support 1.0.0 (4/4) from native
+Activated package generation 1
+IMAGE APPLICATIONS exported format-2 locks drive ordinary reviewed offline install and integrity verification for both hosts; staged trust and consumer state remain separate PASS
+IMAGE APPLICATIONS real CLI repeated/position-independent app requirements, canonical compiler-free reports and normal/check refusal before compiler lookup PASS

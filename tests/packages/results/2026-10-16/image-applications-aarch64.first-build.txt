@@ -1,0 +1,3 @@
+/Users/alex/code/vinix/build/package-release-work/v-toolchain/v -os linux -arch arm64 -gc none -d no_backtrace -d no_segfault_handler -path @vlib|@vmodules|/Users/alex/code/vinix/.|/Users/alex/code/vinix/tools/accounts -o /Users/alex/code/vinix/build/piapps-arm-1/guest/program-8/resolve.c /Users/alex/code/vinix/tools/packages/pkgcore/resolve_test.v
+v: exit status 1
+builder error: /Users/alex/code/vinix/tools/packages/pkgcore/resolve_test.v doesn't exist

@@ -46,6 +46,14 @@ verification. Existing bundles are preserved or refused, and consumer package
 state stays untouched until normal Refresh. See [the bundle contract](../tools/packages/SDK.md#offline-repository-bundles-in-release-images)
 and [qualification](../tests/packages/image-repositories-check.md).
 
+Release builders can also require their advertised app IDs with repeated
+`stage.v --require-app ID`. Preflight and normal staging reject missing host
+variants or incompatible combined dependency/runtime requirements before
+compilation or image writes. The report carries an exact signed-provenance
+deployment lock for normal reviewed offline installation. This adds a concrete
+catalog admission gate; production publisher/catalog migration and real graphical
+runtime acceptance remain open. See [qualification](../tests/packages/image-applications-check.md).
+
 Configuration, cached catalogs, trust histories, installed state and publisher
 documents share a bounded metadata reader. It captures a nonblocking descriptor,
 refuses leaf symlinks and nonregular files, and reads at most the admitted file
