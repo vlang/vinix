@@ -1,0 +1,3 @@
+tests/linux-compat/clonecgshare-check.v:387: FAIL: fn main.main: assert false, 'clonecgshare assertions must execute'
+      message: clonecgshare assertions must execute
+V panic: Assertion failed...

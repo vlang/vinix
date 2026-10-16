@@ -1140,6 +1140,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   and identical-input cleanup on both native architectures against identical
   Linux probe ELFs. See [the thread/namespace receipts](docs/linux-posix-qualification.md#native-clone-thread-and-namespace-conflicts).
 
+- [x] Validate contradictory clone3 sharing before cgroup descriptor lookup;
+  preserve valid-sharing EBADF admission, earlier ABI/import errors, ignored
+  cgroup words, held descriptors and real fork/reap. Qualify 1,872 controls and
+  identical-input cleanup on both native architectures against identical Linux
+  probe ELFs. See [the sharing/cgroup receipts](docs/linux-posix-qualification.md#native-clone3-sharing-and-cgroup-descriptor-ordering).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

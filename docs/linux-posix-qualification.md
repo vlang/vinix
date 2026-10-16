@@ -10005,3 +10005,93 @@ lifetimes, requested PID allocation, supplied-stack execution, other exit
 notifications/wait classes, cgroup descriptor ordering/placement and its
 authorization/lifetimes, GNU libc and translated/32-bit paths remain unqualified
 here. The broad libc, installation/sandbox/portal and translation gates remain open.
+
+## Native clone3 sharing and cgroup descriptor ordering
+
+Both architectures now check contradictory clone3 sharing flags after argument,
+vector, flag and stack validation but before resolving a CLONE_INTO_CGROUP
+descriptor. Invalid FS/namespace, SIGHAND/VM and THREAD/handler/namespace
+combinations return EINVAL even when the cgroup descriptor is missing or has
+the wrong type. Previously descriptor lookup returned EBADF first. The existing
+common admission checks remain in place for both clone APIs.
+
+This follows [Linux v6.12's early copy_process sharing checks](https://github.com/torvalds/linux/blob/v6.12/kernel/fork.c)
+and [later cgroup descriptor lookup](https://github.com/torvalds/linux/blob/v6.12/kernel/cgroup/cgroup.c).
+It qualifies sharing versus missing/wrong-type descriptor errors, rather than
+every clone admission constraint or actual cgroup placement.
+
+The `clonecgshare` probe runs 1,872 controls per architecture: 468 in each
+root/UID1000 and initial/fresh one-level PID-namespace cohort. Callers have
+effective CAP_SYS_ADMIN cleared and read back. A `/dev/null` descriptor stays
+open throughout each cohort; F_GETFD must still return zero after every request
+and its final close must succeed. The six classes per cohort are:
+
+- 96 invalid-sharing requests with a missing cgroup descriptor: eight flag
+  combinations, sizes 88/96/128/256 and aligned/unaligned/exact-end layouts.
+  Sizes above 88 have zero-filled extensions. FS with NEWNS/NEWUSER, handlers
+  without VM, threads without handlers/VM, and threads with NEWPID/NEWUSER all
+  require EINVAL before descriptor lookup.
+- 96 equivalent requests using the held wrong-type descriptor.
+- 108 valid-sharing admission controls: twelve flag combinations and three
+  descriptor forms in three layouts. Missing INT_MAX/1048576 descriptors and
+  the held wrong-type descriptor require EBADF. VM, FS, FILES, shared handlers
+  with VM, SYSVSEM, UNTRACED and CLEAR_SIGHAND must not be rejected early merely
+  because some sharing remains unsupported by Vinix later in admission.
+- 60 earlier structure/vector/flag/signal/stack controls, retaining EFAULT,
+  E2BIG and EINVAL before sharing or descriptor handling.
+- 72 cgroup ABI/extension controls: oversized descriptor words, prefixes too
+  short for INTO_CGROUP, earlier ABI errors paired with later faults/flags,
+  nonzero and inaccessible extensions, and invalid sharing without INTO_CGROUP.
+- 36 real ordinary fork/reap controls through clone3 and legacy clone. Clone3
+  spans sizes 64/72/80/88 and ignores unused cgroup words when the flag is absent;
+  legacy clone retains upper-word truncation. Children verify PID/TID, parent,
+  UID and exit 37, then their caller reaps them.
+
+Clone3 layouts include exact readable-page ends followed by a protected page.
+The entire two-page input canary must remain unchanged, the held descriptor
+must survive, and a nonblocking empty wait must report ECHILD after every call.
+Native ARM uses 16 KiB pages; native x86 and both Linux references use 4 KiB.
+Original kernels fail exactly 768 controls each, the two sharing/descriptor
+conflict classes. Sampled diagnostics verify original EBADF versus EINVAL.
+Corrected kernels and identical probe ELFs on Linux 6.12.51 pass every control.
+Both phases preserve 144 valid fork/reap lifecycles in these controls per
+architecture and create no unintended children.
+
+Both phases measure four identical-input cleanup cohorts: 64 warmup cycles,
+thirteen seconds of settling, 200 measured cycles and another settle. Each cycle
+mixes missing/wrong-type descriptor sharing conflicts, valid-sharing descriptor
+refusals, cgroup ABI/extension errors and one real fork/reap. Only cleanup accepts
+the original EBADF or corrected EINVAL for the first two requests; conformance
+requires exact errors. All live slab classes and big-heap page counts stay flat.
+This qualifies targeted kernel-heap paths; general page/cache retention and the
+earlier EXT2 rename observation remain separate.
+
+Four isolated original/corrected production builds pass. Exact whole-C comparison
+confines the change to two clone3 guards calling the unchanged scalar predicate
+before descriptor lookup. There are no new allocation/free/reference/ownership,
+lock or task-publication paths. Probe C has ten explicit stack allocas and no
+dynamic allocation or fixed-index helper. ARM preflight C matches the original
+guest C and its ELF is also the canonical, byte-identical Linux reference probe.
+
+Both corrected architectures pass runtime, including pthread creation, and the
+1,872-control clonethreadns regression. The auditor checks exact totals and
+original diagnostics, credentials/capabilities, held descriptors, child counts,
+page sizes, identical C/ELFs, Linux receipts, both phases' storage, 84 retained
+native case files, 67 frozen dispatch inputs, 2,014 SDK files and 15,146 compiler
+pins. Both pinned Linux source files are retained. False-assertion and
+passing-Linux-as-original negative controls must execute and fail; compile
+without `-prod`.
+
+See the [executing audit](../tests/linux-compat/results/2026-10-16/clonecgshare-audit.log),
+[ARM evidence](../tests/linux-compat/results/2026-10-16/clonecgshare-evidence-aarch64.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-16/clonecgshare-evidence-x86_64.json)
+and [diagnostic pins](../tests/linux-compat/results/2026-10-16/clonecgshare-diagnostic-pins.json).
+Raw original/corrected/Linux, build, preflight and regression logs accompany
+the receipts. The maintained auditor is `tests/linux-compat/clonecgshare-check.v`.
+
+Init-parent and namespace-permission ordering against cgroup errors, active versus
+future-child PID namespaces, actual cgroup placement/authorization and concurrent
+descriptor/node teardown, independent sharing ownership, requested PID allocation,
+supplied-stack execution, shared-VM/vfork lifetimes, other notifications/wait
+classes, worker callers, GNU libc and translated/32-bit paths remain unqualified
+here. The broad libc, installation/sandbox/portal and translation gates remain open.

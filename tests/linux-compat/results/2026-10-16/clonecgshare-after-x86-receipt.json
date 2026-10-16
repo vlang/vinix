@@ -1,0 +1,31 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "ac103a6fca537d7f3e6b845362b503775fb34c5137e9efd734ce6e3d63a483df",
+    "results": [
+        {
+            "name": "clonecgshare",
+            "source_sha256": "55df50efc880ea0e1673df95af5baa361f7708be8c3aea37a0d37b76ec671c07",
+            "init_sha256": "8d1724c5f188c78b4d3f488c939de4310a54b5da88a6376238f07dd54597622f",
+            "iso_sha256": "4f700105c4a7f90d3628f9ecf9b5b9d8c13752d44e77a8a6fcfa4d0a4eadd4ad",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "3c22f6e44700a031e0c6e9bd04427095e423d595d3f9b81e09f07539d1ea3b9f",
+            "iso_sha256": "b14ec8d0ca54ffd0ef7fb7c6daa44563dccf43fa406745ad648f722a1d37f791",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "clonethreadns",
+            "source_sha256": "6efc9fae7f4f7696648e17285ce6c5de20031ad78e2d615da9da86612bc563e1",
+            "init_sha256": "71ad48b32dd782b4bcaad349ca19ceeeafd0d6cbcafa5ab27ad68d2d85679a18",
+            "iso_sha256": "577ba9699727558efcae563316430a7a2f4744997103a83461305ebb2f568879",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

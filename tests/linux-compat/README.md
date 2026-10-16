@@ -2053,3 +2053,15 @@ and clonefsns regressions pass. Use `--cases clonethreadns --timeout 1200` with
 fresh state; `clonethreadns-reference.v` runs the unchanged ELF on Linux and
 `clonethreadns-check.v` audits receipts when compiled without `-prod`.
 See the [qualification report](../../docs/linux-posix-qualification.md#native-clone-thread-and-namespace-conflicts).
+
+The `clonecgshare` case checks clone3 sharing errors before cgroup descriptor
+lookup, valid-sharing EBADF admission, earlier import/ABI errors, zero/nonzero
+and inaccessible extensions, descriptor preservation and real fork/reap. Four
+root/UID1000 initial/one-level namespace cohorts run 1,872 controls per
+architecture. Originals fail 768; corrected kernels and identical ELFs on Linux
+pass. Both phases preserve 144 valid children in these controls and flat
+identical-input 200-cycle cleanup. Runtime pthread and clonethreadns regressions
+pass. Use `--cases clonecgshare --timeout 1200` with fresh state;
+`clonecgshare-reference.v` runs the unchanged ELF on Linux and
+`clonecgshare-check.v` audits receipts when compiled without `-prod`.
+See the [qualification report](../../docs/linux-posix-qualification.md#native-clone3-sharing-and-cgroup-descriptor-ordering).

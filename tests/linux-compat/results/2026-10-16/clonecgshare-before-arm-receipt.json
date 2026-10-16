@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "d18b89795ef393cac6fcbf99a20e030b53d8f58567280328d620928d309f00e4",
+    "results": [
+        {
+            "name": "clonecgshare",
+            "source_sha256": "55df50efc880ea0e1673df95af5baa361f7708be8c3aea37a0d37b76ec671c07",
+            "init_sha256": "99938fb2287507b03136a3fbf3b0f790ae1242ee4e377be8d72b0faead279a6a",
+            "iso_sha256": "ec5dc5c3526148354e2c0af3e4ac1c4e7fe858cc9528c9541f3db605a2e42d11",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}
