@@ -6,6 +6,10 @@ while package manifests, selectors, file pins and permission/license/firmware
 disclosures remain unchanged. Both the old unscoped source names and the new
 scoped names use the same catalog builder and signed release/store workflow.
 See the [SDK contract](../../tools/packages/SDK.md#compose-application-catalogs).
+The additive `compose-catalog-for` command explicitly selects one supported host
+from mixed single/dual-host inputs; see its
+[separate qualification](composition-target-check.md). The strict command's
+identical-target-set requirement remains unchanged.
 
 `pkgcore/composition_test.v` covers deterministic catalog/provenance bytes,
 unchanged manifests/pins/selectors, both architecture installs, ordinary consumer

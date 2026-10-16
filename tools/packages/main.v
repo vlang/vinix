@@ -35,6 +35,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
 	'  pack-catalog CATALOG.json PREPARED_ROOTS NEW_WORKSPACE\n' +
 	'  compose-catalog NEW_LOCK_DIRECTORY PROFILE CATALOG.json [PROFILE CATALOG.json...]\n' +
+	'  compose-catalog-for ARCH NEW_LOCK_DIRECTORY PROFILE CATALOG.json [PROFILE CATALOG.json...]\n' +
 	'  native-catalog VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
 	'  sqlite-catalog SQLITE_VERSION RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
 	'  ffmpeg-catalog RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
@@ -132,6 +133,15 @@ fn checked(arguments []string) !int {
 			mut sources := []pkgcore.CatalogSource{}
 			for i := 1; i < names.len; i += 2 { sources << pkgcore.CatalogSource{ id: names[i], catalog: names[i + 1] } }
 			println(json2.encode(pkgcore.compose_catalog(sources, names[0])!))
+			return 0
+		}
+		'compose-catalog-for' {
+			if names.len < 4 || names.len % 2 != 0 || names.len > 130 {
+				return error('compose-catalog-for requires aarch64 or x86_64, a new lock directory and 1 to 64 PROFILE CATALOG.json pairs')
+			}
+			mut sources := []pkgcore.CatalogSource{}
+			for i := 2; i < names.len; i += 2 { sources << pkgcore.CatalogSource{ id: names[i], catalog: names[i + 1] } }
+			println(json2.encode(pkgcore.compose_catalog_for(names[0], sources, names[1])!))
 			return 0
 		}
 		'native-catalog' {

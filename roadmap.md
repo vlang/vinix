@@ -650,6 +650,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
 
 - [ ] Harden the existing package frontend with trusted repositories, dependency
   resolution, reproducible metadata and consistent architecture support.
+  - [x] [Explicit catalog host selection](tests/packages/composition-target-check.md)
+    combines complete single-host and dual-host profiles for a declared target,
+    preserving shared packages, pinned declarations and full-input provenance.
+    Unsupported hosts and invalid omitted variants refuse publication.
 - [ ] Add transactional install/remove/upgrade, rollback, disk-space checks,
   interrupted-download recovery and coherent persistent package state.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,

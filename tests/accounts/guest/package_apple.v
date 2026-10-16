@@ -9,9 +9,10 @@ import tools.packages.pkgcore
 
 const apple_id = 'org.vinix.apple-probe'
 const apple_runtime_id = 'org.vinix.apple-runtime-probe'
+const apple_notice_id = 'org.vinix.apple-catalog-notice'
 
 fn apple_pack(version string, runtime_version string, status u8) ! {
-	root := '/tmp/apple-roots/aarch64'
+	root := '/tmp/apple-roots/apple/aarch64'
 	for directory in ['app', 'runtime', 'licenses'] { os.mkdir_all(root + '/' + directory)! }
 	os.write_file_array(root + '/app/Example', applefixture.framework_image(status))!
 	os.write_file(root + '/app/Info.plist', '<plist><dict><key>CFBundleIdentifier</key><string>' + apple_id + '</string><key>CFBundleExecutable</key><string>Example</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>')!
@@ -34,14 +35,35 @@ fn apple_pack(version string, runtime_version string, status u8) ! {
 		for name in ['v-LICENSE', 'musl-COPYRIGHT'] { entries << pkgcore.RootEntry{ source: 'licenses/' + name, path: 'licenses/' + name } }
 		os.write_file('/tmp/apple-recipes/aarch64/' + if application { 'application.json' } else { 'runtime.json' }, json2.encode(pkgcore.RootRecipe{ manifest: p, entries: entries }))!
 	}
-	profile := pkgcore.apple_catalog('/tmp/apple-recipes', '/tmp/apple-roots', '/tmp/apple-lock-' + version)!
+	profile := pkgcore.apple_catalog('/tmp/apple-recipes', '/tmp/apple-roots/apple', '/tmp/apple-lock-' + version)!
+	// This architecture-independent publisher input supports both hosts. The
+	// Apple input must be selected explicitly, without inventing an x86 runtime.
+	notice := '/tmp/apple-roots/notices/shared'
+	os.mkdir_all(notice)!
+	os.write_file(notice + '/NOTICE.txt', 'Qualification catalog: only AArch64 Apple execution is supported.\n')!
+	os.write_file('/tmp/apple-notices.json', json2.encode(pkgcore.CatalogRecipe{ format: 1, architectures: ['aarch64', 'x86_64'],
+		packages: [pkgcore.CatalogImport{ source: 'shared', recipe: pkgcore.RootRecipe{
+			manifest: pkgcore.Package{ id: apple_notice_id, version: '1.0.0', architecture: 'all', name: 'Apple catalog notice', kind: 'data', license: 'MIT',
+				files: [pkgcore.Payload{ path: 'NOTICE.txt', bytes: os.file_size(notice + '/NOTICE.txt'), sha256: pkgcore.hash_file(notice + '/NOTICE.txt')! }] },
+			entries: [pkgcore.RootEntry{ source: 'NOTICE.txt', path: 'NOTICE.txt' }] } }] }))!
+	composed := run(['/usr/bin/vinix-package', 'compose-catalog-for', 'aarch64', '/tmp/apple-composed-' + version,
+		'apple', profile.catalog, 'notices', '/tmp/apple-notices.json'], '', none, none)
+	assert composed.status == 0, composed.output
+	selected := json2.decode[pkgcore.CompositionInfo](composed.output)!
+	assert selected.architectures == ['aarch64'] && selected.package_count == 3 && selected.sources.map(it.id) == ['apple', 'notices']
+	assert selected.sources[0].catalog_sha256 == profile.catalog_sha256
+	unsupported := run(['/usr/bin/vinix-package', 'compose-catalog-for', 'x86_64', '/tmp/apple-unsupported-' + version,
+		'apple', profile.catalog, 'notices', '/tmp/apple-notices.json'], '', none, none)
+	assert unsupported.status != 0 && unsupported.output.contains('apple does not support requested architecture x86_64')
+	assert !os.exists('/tmp/apple-unsupported-' + version)
 	workspace := '/tmp/apple-workspace-' + version
-	assert pkgcore.pack_catalog(profile.catalog, '/tmp/apple-roots', workspace)!.package_count == 2
+	assert pkgcore.pack_catalog(selected.catalog, '/tmp/apple-roots', workspace)!.package_count == 3
 	for directory in ['objects', 'manifests'] {
 		os.mkdir_all('/tmp/apple-repository/' + directory)!
 		for name in os.ls(workspace + '/' + directory)! { os.cp(workspace + '/' + directory + '/' + name, '/tmp/apple-repository/' + directory + '/' + name)! }
 	}
 	println('PACKAGE APPLE PROFILE version=' + version + ' runtime=' + runtime_version + ' architecture=aarch64 sha256=' + profile.catalog_sha256 + ' PASS')
+	println('PACKAGE APPLE COMPOSITION version=' + version + ' target=aarch64 shared-notice full-provenance unsupported-x86-refusal sha256=' + selected.catalog_sha256 + ' PASS')
 }
 
 fn apple_run(status int, count int, document string, sam bool) ! {
@@ -85,7 +107,9 @@ fn qualify_package_apple(mut t Test) ! {
 		policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 } }))!
 	os.chmod('/etc/vinix-packages/config.json', 0o644)!
 	package_success(['--offline', 'update'])!
-	reviewed_package_operation('install', [apple_id])!
+	reviewed_package_operation('install', [apple_id, apple_notice_id])!
+	assert pkgcore.read_state('/var/lib/vinix-packages', 'aarch64')!.packages.len == 3
+	assert os.read_file('/var/lib/vinix-packages/current/apps/' + apple_notice_id + '/NOTICE.txt')!.contains('only AArch64 Apple execution')
 	document := '/home/alex/Apple document ; $literal.txt'
 	os.write_file(document, 'literal Apple document\n')!
 	os.chown(document, int(alex.uid), int(alex.gid))!; os.chmod(document, 0o600)!
@@ -118,14 +142,14 @@ fn qualify_package_apple(mut t Test) ! {
 	assert bad.status != 0 && bad.output.contains('payload changed'), bad.output
 	assert os.read_file(data + '/boundary-counter.txt')! == '3'
 	os.write_file_array(runner, bytes)!; os.chmod(runner, 0o755)!
-	reviewed_package_operation('remove', [apple_id])!
+	reviewed_package_operation('remove', [apple_id, apple_notice_id])!
 	assert pkgcore.read_state('/var/lib/vinix-packages', 'aarch64')!.packages.len == 0
 	assert !os.exists('/var/lib/vinix-packages/current/share/applications/vinix-' + apple_id + '.desktop')
 	assert os.read_file(data + '/boundary-counter.txt')! == '3'
 	assert os.is_file(data + '/Keychains/' + apple_id + '/items')
 	// Remove repository objects too: reinstall must use the verified cache.
 	os.rmdir_all('/tmp/apple-repository/objects')!
-	reviewed_package_operation('install', [apple_id])!
+	reviewed_package_operation('install', [apple_id, apple_notice_id])!
 	apple_run(24, 4, document, false)!
 	assert os.read_file(sam_data + '/boundary-counter.txt')! == '1'
 	apple_storage(data, alex.uid)!; apple_storage(sam_data, sam.uid)!

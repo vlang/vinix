@@ -15,7 +15,7 @@ struct AppleReceipt {
 	completed_at i64
 	platform string = 'qemu-tcg'
 	scenario string = 'packages-apple'
-	coverage []string = ['Apple publisher profile and pinned catalog packing', 'Foundation container paths and file writes', 'Security generic-password CRUD and private persistence', 'signed package launch and maintenance']
+	coverage []string = ['Apple publisher profile and pinned catalog packing', 'explicit AArch64 composition with a dual-host shared catalog', 'Foundation container paths and file writes', 'Security generic-password CRUD and private persistence', 'signed package launch and maintenance']
 	seconds f64
 	artifacts []AppleArtifact
 }
@@ -65,6 +65,8 @@ fn apple_suite(runtime string, sandbox string, repository string) !hwhost.Suite 
 			required: ['HWTEST START packages-apple',
 				'PACKAGE APPLE PROFILE version=1.0.0 runtime=1.0.0 architecture=aarch64',
 				'PACKAGE APPLE PROFILE version=1.1.0 runtime=1.1.0 architecture=aarch64',
+				'PACKAGE APPLE COMPOSITION version=1.0.0 target=aarch64 shared-notice full-provenance unsupported-x86-refusal',
+				'PACKAGE APPLE COMPOSITION version=1.1.0 target=aarch64 shared-notice full-provenance unsupported-x86-refusal',
 				'PACKAGE APPLE signed Mach-O execution ordinary identities private containers literal document ambient overrides PASS',
 				'PACKAGE APPLE reviewed update rollback runtime tamper refusal clean uninstall cached reinstall retained private data PASS',
 				'PACKAGE APPLE Foundation home Documents temporary files keychain CRUD persistence entitlement damaged-store refusal PASS',

@@ -86,6 +86,46 @@ fn test_apple_profile_reproducible_lock_signing_offline_policy_lifecycle_and_arc
 	println('APPLE-PROFILE: reproducible single-target lock, explicit grants/licenses, signed offline install, association/removal/rollback and unsupported-host refusal PASS')
 }
 
+fn test_apple_and_dual_host_native_profiles_compose_into_an_explicit_arm_release() {
+	work := apple_fixture()!
+	defer { os.rmdir_all(work) or {} }
+	os.mkdir(work + '/roots/apple')!
+	os.rename(work + '/roots/aarch64', work + '/roots/apple/aarch64')!
+	for architecture in ['aarch64', 'x86_64'] {
+		root := work + '/roots/native/' + architecture
+		os.mkdir_all(root + '/bin')!; os.mkdir_all(root + '/licenses')!
+		for name in ['package-hello', 'counter', 'memo'] {
+			os.write_file_array(root + '/bin/' + name, elffixture.image(architecture, 'static'))!
+			os.chmod(root + '/bin/' + name, 0o755)!
+		}
+		for name in ['application-sdk-MIT.txt', 'v-MIT.txt', 'musl-MIT.txt'] { os.write_file(root + '/licenses/' + name, name)! }
+	}
+	apple := apple_catalog(work + '/recipes', work + '/roots/apple', work + '/apple-lock')!
+	native := native_catalog('1.0.0', work + '/roots/native', work + '/native-lock')!
+	sources := [CatalogSource{ id: 'apple', catalog: apple.catalog }, CatalogSource{ id: 'native', catalog: native.catalog }]
+	selected := compose_catalog_for('aarch64', sources, work + '/selected')!
+	assert selected.package_count == 5 && selected.architectures == ['aarch64']
+	mut denied := false
+	compose_catalog_for('x86_64', sources, work + '/unsupported') or { denied = err.msg().contains('apple does not support requested architecture x86_64') }
+	assert denied && !os.exists(work + '/unsupported')
+	// Selecting a host does not require absent payloads for the omitted host.
+	os.rmdir_all(work + '/roots/native/x86_64')!
+	assert pack_catalog(selected.catalog, work + '/roots', work + '/workspace')!.package_count == 5
+	key := keygen(work + '/seed')!
+	publish_release(work + '/workspace', 'mixed', work + '/seed', 1, time.now().unix() + 3600, work + '/release')!
+	config := Config{ architecture: 'aarch64', repositories: [Repository{ id: 'mixed', url: 'file://' + work + '/release', public_key: key }],
+		policy: Policy{ offline: true, reserve_bytes: 0, licenses: ['Example-EULA'] } }
+	store := work + '/store'; refresh(config, store)!
+	installed := transact(config, store, 'install', [apple.application, 'org.vinix.package-hello'], TransactionOptions{})!
+	assert installed.packages.len == 3 && installed.packages.all(it.package.architecture == 'aarch64')
+	assert installed.packages.any(it.package.kind == 'apple') && installed.packages.any(it.package.kind == 'native') && installed.packages.any(it.package.kind == 'runtime')
+	assert transact(config, store, 'remove', [apple.application], TransactionOptions{})!.packages.len == 1
+	assert !os.exists(store + '/current/share/applications/vinix-' + apple.application + '.desktop')
+	assert os.is_file(store + '/current/share/applications/vinix-org.vinix.package-hello.desktop')
+	assert rollback(config, store)!.packages.len == 3
+	println('APPLE-PROFILE: real producer locks combine Apple/native runtime closures for an explicit ARM host; x86 refuses, signed offline removal/rollback preserve independent apps PASS')
+}
+
 fn apple_no_space(_ string) !u64 { return 0 }
 fn apple_change_image(phase string, stage string) ! { if phase == 'created' { os.write_file(os.dir(stage) + '/roots/aarch64/app/Example', 'changed executable')! } }
 fn apple_change_info(phase string, stage string) ! { if phase == 'created' { os.write_file(os.dir(stage) + '/roots/aarch64/app/Info.plist', apple_fixture_info('other.app'))! } }

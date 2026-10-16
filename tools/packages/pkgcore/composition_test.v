@@ -172,3 +172,169 @@ fn test_composition_bounds_profile_count_and_nested_source_depth() {
 	}
 	composition_refused([CatalogSource{ id: 'parent', catalog: current.catalog }], work, CatalogOptions{}, 'source must match')
 }
+
+fn composition_single_target(source CatalogSource, architecture string) ! {
+	recipe := catalog_recipe(read_metadata(source.catalog)!)!
+	os.write_file(source.catalog, json2.encode(CatalogRecipe{ ...recipe, architectures: [architecture],
+		packages: recipe.packages.filter(it.recipe.manifest.architecture in [architecture, 'all']) }))!
+}
+
+fn test_selected_composition_preserves_shared_packages_pins_disclosures_and_full_input_provenance() {
+	work, sources := composition_fixture()!
+	defer { os.rmdir_all(work) or {} }
+	for architecture in ['aarch64', 'x86_64'] {
+		one := compose_catalog_for(architecture, sources, work + '/' + architecture)!
+		assert one.architectures == [architecture] && one.package_count == 4
+		assert one.sources.map(it.id) == ['alpha', 'beta']
+		mut reversed := sources.clone(); reversed.reverse_in_place()
+		two := compose_catalog_for(architecture, reversed, work + '/' + architecture + '-reversed')!
+		assert read_metadata(one.catalog)! == read_metadata(two.catalog)!
+		assert read_metadata(one.directory + '/composition.json')! == read_metadata(two.directory + '/composition.json')!
+		assert os.stat(one.directory)!.mode & 0o777 == 0o700
+		selected := catalog_recipe(read_metadata(one.catalog)!)!
+		assert selected.packages.all(it.recipe.manifest.architecture in [architecture, 'all'])
+		for source in sources {
+			input := catalog_recipe(read_metadata(source.catalog)!)!
+			assert one.sources.filter(it.id == source.id)[0].catalog_sha256 == index_digest(json2.encode(input) + '\n')
+			for item in input.packages.filter(it.recipe.manifest.architecture in [architecture, 'all']) {
+				actual := selected.packages.filter(it.source == source.id + '/' + item.source && it.recipe.manifest.id == item.recipe.manifest.id)
+				assert actual.len == 1 && actual[0].recipe == item.recipe
+			}
+		}
+		workspace := work + '/workspace-' + architecture
+		assert pack_catalog(one.catalog, work + '/roots', workspace)!.package_count == 4
+		key := keygen(work + '/seed-' + architecture)!
+		release := work + '/release-' + architecture
+		publish_release(workspace, 'selected', work + '/seed-' + architecture, 1, time.now().unix() + 3600, release)!
+		config := Config{ architecture: architecture, repositories: [Repository{ id: 'selected', url: 'file://' + release, public_key: key }],
+			policy: Policy{ offline: true, reserve_bytes: 0 } }
+		store := work + '/store-' + architecture
+		refresh(config, store)!
+		mut denied := false
+		transact(config, store, 'install', ['alpha', 'beta'], TransactionOptions{}) or { denied = true }
+		assert denied && read_state(store, architecture)!.generation == 0
+		accepted := Config{ ...config, policy: Policy{ offline: true, reserve_bytes: 0, licenses: ['Vendor-EULA'], allow_firmware: true } }
+		assert transact(accepted, store, 'install', ['alpha', 'beta'], TransactionOptions{})!.packages.len == 4
+		assert read_metadata(store + '/current/apps/alpha/bin/app')! == 'alpha ' + architecture
+		assert transact(accepted, store, 'remove', ['alpha', 'beta'], TransactionOptions{})!.packages.len == 0
+		assert rollback(accepted, store)!.packages.len == 4
+		// Input pins are still complete, but packing reads only selected roots.
+		other := if architecture == 'aarch64' { 'x86_64' } else { 'aarch64' }
+		for profile in ['alpha', 'beta'] { os.rename(work + '/roots/' + profile + '/' + other, work + '/' + profile + '-saved')! }
+		assert pack_catalog(one.catalog, work + '/roots', work + '/only-' + architecture)!.package_count == 4
+		for profile in ['alpha', 'beta'] { os.rename(work + '/' + profile + '-saved', work + '/roots/' + profile + '/' + other)! }
+	}
+	baseline := compose_catalog_for('aarch64', sources, work + '/baseline')!
+	input := catalog_recipe(read_metadata(sources[0].catalog)!)!
+	mut changed := []CatalogImport{}
+	for item in input.packages { changed << if item.recipe.manifest.architecture == 'x86_64' {
+		CatalogImport{ ...item, recipe: RootRecipe{ ...item.recipe, manifest: Package{ ...item.recipe.manifest, description: 'Reviewed omitted variant changed' } } }
+	} else { item } }
+	os.write_file(sources[0].catalog, json2.encode(CatalogRecipe{ ...input, packages: changed }))!
+	updated := compose_catalog_for('aarch64', sources, work + '/updated')!
+	assert baseline.catalog_sha256 == updated.catalog_sha256
+	assert baseline.sources[0].catalog_sha256 != updated.sources[0].catalog_sha256
+	assert read_metadata(baseline.directory + '/composition.json')! != read_metadata(updated.directory + '/composition.json')!
+	for source in sources { os.write_file(source.catalog, ' \n' + read_metadata(source.catalog)! + '\n')! }
+	formatted := compose_catalog_for('aarch64', sources, work + '/formatted')!
+	assert read_metadata(updated.directory + '/composition.json')! == read_metadata(formatted.directory + '/composition.json')!
+	println('COMPOSITION TARGET: both host selections preserve shared dependencies, manifests/pins/policy, signed offline maintenance and full-input provenance PASS')
+}
+
+fn test_selected_composition_combines_mixed_targets_without_changing_strict_composition() {
+	work, sources := composition_fixture()!
+	defer { os.rmdir_all(work) or {} }
+	composition_single_target(sources[1], 'aarch64')!
+	composition_refused(sources, work, CatalogOptions{}, 'same architectures')
+	selected := compose_catalog_for('aarch64', sources, work + '/selected')!
+	assert selected.package_count == 4 && selected.architectures == ['aarch64']
+	mut unsupported := false
+	compose_catalog_for('x86_64', sources, work + '/unsupported') or {
+		unsupported = err.msg().contains('beta does not support requested architecture x86_64')
+	}
+	assert unsupported && !os.exists(work + '/unsupported')
+	composition_single_target(sources[0], 'aarch64')!
+	strict := compose_catalog(sources, work + '/strict')!
+	projected := compose_catalog_for('aarch64', sources, work + '/projected')!
+	assert read_metadata(strict.catalog)! == read_metadata(projected.catalog)!
+	assert read_metadata(strict.directory + '/composition.json')! == read_metadata(projected.directory + '/composition.json')!
+}
+
+fn composition_target_refused(architecture string, sources []CatalogSource, work string, options CatalogOptions, diagnostic string) {
+	mut denied := false
+	compose_catalog_for_with(architecture, sources, work + '/refused', options) or { denied = err.msg().contains(diagnostic) }
+	assert denied && !os.exists(work + '/refused'), diagnostic
+	assert os.ls(work)!.all(!it.starts_with('.vinix-composition-'))
+}
+
+fn test_selected_composition_validates_full_inputs_before_omitting_other_variants() {
+	work, sources := composition_fixture()!
+	defer { os.rmdir_all(work) or {} }
+	original := read_metadata(sources[0].catalog)!
+	input := catalog_recipe(original)!
+	for fault in ['missing-variant', 'source', 'dependency', 'unknown-field'] {
+		mut imports := []CatalogImport{}
+		for item in input.packages {
+			if item.recipe.manifest.architecture != 'x86_64' { imports << item; continue }
+			if fault == 'missing-variant' { continue }
+			imports << if fault == 'source' { CatalogImport{ ...item, source: '../x86_64' } }
+			else if fault == 'dependency' { CatalogImport{ ...item, recipe: RootRecipe{ ...item.recipe,
+				manifest: Package{ ...item.recipe.manifest, dependencies: [Dependency{ id: 'absent-runtime' }] } } } }
+			else { item }
+		}
+		text := json2.encode(CatalogRecipe{ ...input, packages: imports })
+		os.write_file(sources[0].catalog, if fault == 'unknown-field' { text.replace_once('"architecture":"x86_64"', '"architecture":"x86_64","unknown":true') } else { text })!
+		composition_target_refused('aarch64', sources, work, CatalogOptions{}, '')
+	}
+	os.write_file(sources[0].catalog, original)!
+	// Shared identities must not be duplicated across selected profiles either.
+	os.write_file(sources[1].catalog, read_metadata(sources[1].catalog)!.replace('beta-notice', 'alpha-notice'))!
+	composition_target_refused('aarch64', sources, work, CatalogOptions{}, 'duplicate catalog package')
+	println('COMPOSITION TARGET: incomplete, malformed, unsafe and unresolved omitted variants plus shared identity collisions refuse before publication PASS')
+}
+
+fn test_selected_composition_refuses_invalid_targets_space_staging_corruption_and_output_races() {
+	work, sources := composition_fixture()!
+	defer { os.rmdir_all(work) or {} }
+	for architecture in ['', 'all', 'arm64', 'AARCH64', '../aarch64'] {
+		composition_target_refused(architecture, sources, work, CatalogOptions{}, 'target must be aarch64 or x86_64')
+	}
+	composition_target_refused('aarch64', []CatalogSource{}, work, CatalogOptions{}, 'between 1 and 64')
+	composition_target_refused('aarch64', []CatalogSource{len: 65, init: sources[0]}, work, CatalogOptions{}, 'between 1 and 64')
+	composition_target_refused('aarch64', [sources[0], sources[0]], work, CatalogOptions{}, 'distinct valid profile IDs')
+	composition_target_refused('aarch64', [CatalogSource{ id: '../escape', catalog: sources[0].catalog }], work, CatalogOptions{}, 'distinct valid profile IDs')
+	composition_target_refused('aarch64', sources, work, CatalogOptions{ available_space: composition_no_space }, 'insufficient disk space')
+	composition_target_refused('aarch64', sources, work, CatalogOptions{ checkpoint: composition_corrupt }, 'changed before publication')
+	mut raced := false
+	compose_catalog_for_with('aarch64', sources, work + '/refused', CatalogOptions{ checkpoint: composition_race }) or { raced = true }
+	assert raced && os.is_dir(work + '/refused') && os.ls(work + '/refused')!.len == 0
+	assert os.ls(work)!.all(!it.starts_with('.vinix-composition-'))
+	os.rmdir(work + '/refused')!
+	assert compose_catalog_for('aarch64', sources, work + '/refused')!.package_count == 4
+}
+
+fn test_selected_composition_cli_matches_api_with_literal_paths_and_refuses_invalid_requests() {
+	cli := os.getenv('VINIX_PACKAGE_COMPOSITION_CLI'); if cli == '' { return }
+	work, sources := composition_fixture()!
+	defer { os.rmdir_all(work) or {} }
+	composition_single_target(sources[1], 'aarch64')!
+	literal := work + '/catalog ; $literal.json'
+	os.rename(sources[1].catalog, literal)!
+	pairs := ['alpha', sources[0].catalog, 'beta', literal]
+	api := compose_catalog_for('aarch64', [sources[0], CatalogSource{ id: 'beta', catalog: literal }], work + '/api')!
+	destination := work + '/lock ; $literal'
+	result := os.exec([cli, 'compose-catalog-for', 'aarch64', destination, ...pairs])
+	assert result.exit_code == 0, result.output
+	actual := json2.decode[CompositionInfo](result.output)!
+	assert actual.catalog_sha256 == api.catalog_sha256 && actual.architectures == ['aarch64'] && actual.sources == api.sources
+	assert read_metadata(destination + '/composition.json')! == read_metadata(api.directory + '/composition.json')!
+	for arguments in [ []string{}, ['aarch64'], ['aarch64', work + '/bad'], ['aarch64', work + '/bad', 'alpha'],
+		['all', work + '/bad', ...pairs], ['x86_64', work + '/bad', ...pairs],
+		['aarch64', destination, ...pairs], ['aarch64', work + '/bad', ...pairs, 'extra'] ] {
+		refused := os.exec([cli, 'compose-catalog-for', ...arguments])
+		assert refused.exit_code != 0 && refused.output.trim_space() != '' && !refused.output.contains('V panic:'), refused.output
+		assert !os.exists(work + '/bad')
+	}
+	assert os.exec([cli, 'compose-catalog', work + '/bad', ...pairs]).exit_code != 0 && !os.exists(work + '/bad')
+	println('COMPOSITION TARGET: explicit CLI/API equivalence, literal paths, unsupported host, argument counts and existing-output refusals PASS')
+}

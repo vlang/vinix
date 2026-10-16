@@ -577,8 +577,12 @@ edit grants or run commands, and is unavailable during execution. See
 `compose-catalog` combines reviewed profile locks into one publisher catalog,
 with separate prepared-root directories for each profile. It retains pins,
 permissions and license declarations and rechecks targets and dependencies.
+`compose-catalog-for aarch64|x86_64` explicitly selects one supported host from
+complete profiles with different architecture sets, retaining shared packages
+and full input-lock provenance. Every input must support the selected host.
 See [catalog composition](SDK.md#compose-application-catalogs) and
-[qualification](../../tests/packages/composition-check.md).
+[qualification](../../tests/packages/composition-check.md), including
+[explicit host selection](../../tests/packages/composition-target-check.md).
 
 The [application SDK module](appsdk/context.v) supplies an owned launch context
 with installed app/runtime versions, publisher provenance, admitted generation,

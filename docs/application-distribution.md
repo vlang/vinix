@@ -290,6 +290,12 @@ combines independently prepared profiles into one publisher release while
 keeping their loaders and libraries in separate directories. It preserves every
 payload pin, permission and license disclosure, checks complete architecture and
 runtime coverage, and retains canonical source-lock provenance. The
+explicit `compose-catalog-for aarch64|x86_64` command selects a single host from
+complete profiles with different target sets, allowing an AArch64 Apple lock to
+join a dual-host native lock. Unsupported profiles refuse the operation; shared
+packages and all selected declarations retain their normal policy. Provenance
+binds complete input locks, including omitted variants. See
+[target selection checks](../tests/packages/composition-target-check.md). The
 [combined-catalog qualification](../tests/packages/composition-check.md) exercises
 SQLite, FFmpeg and FFprobe in one signed release, including a SQLite-only runtime
 update, rollback, offline cache reinstall and data-preserving uninstall.

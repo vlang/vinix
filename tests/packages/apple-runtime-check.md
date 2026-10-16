@@ -23,6 +23,13 @@ bundle executable argument satisfy that publisher profile. Separate
 [publisher receipts](apple-profile-check.md) retain this integration; earlier
 receipts below predate it.
 
+The current guest then invokes `compose-catalog-for aarch64` to combine each
+Apple lock with a dual-host shared notice catalog, refuses the x86-64 request
+and signs the selected three-package catalog. Both the application and notice
+are installed, maintained, removed and reinstalled from cache. See
+[target composition qualification](composition-target-check.md) for its receipts;
+the older runtime/profile receipts predate this added composition step.
+
 The native launcher runs as the ordinary user inside the same production
 sandbox. It validates SDK context, exact Documents/keychain/HOME/TMPDIR paths,
 zero supplementary groups, hidden host paths and an explicitly granted literal

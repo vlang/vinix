@@ -42,6 +42,21 @@ pub fn compose_catalog(sources []CatalogSource, destination string) !Composition
 }
 
 fn compose_catalog_with(sources []CatalogSource, destination string, options CatalogOptions) !CompositionInfo {
+	return compose_catalog_selected(sources, destination, '', options)
+}
+
+// Explicitly select one host from complete reviewed inputs. Validate every
+// input before selecting variants and retain its full digest in provenance.
+pub fn compose_catalog_for(architecture string, sources []CatalogSource, destination string) !CompositionInfo {
+	return compose_catalog_for_with(architecture, sources, destination, CatalogOptions{})
+}
+
+fn compose_catalog_for_with(architecture string, sources []CatalogSource, destination string, options CatalogOptions) !CompositionInfo {
+	if architecture !in ['aarch64', 'x86_64'] { return error('catalog composition target must be aarch64 or x86_64') }
+	return compose_catalog_selected(sources, destination, architecture, options)
+}
+
+fn compose_catalog_selected(sources []CatalogSource, destination string, architecture string, options CatalogOptions) !CompositionInfo {
 	if sources.len == 0 || sources.len > 64 { return error('catalog composition requires between 1 and 64 named catalogs') }
 	mut ordered := sources.clone()
 	ordered.sort(a.id < b.id)
@@ -53,16 +68,22 @@ fn compose_catalog_with(sources []CatalogSource, destination string, options Cat
 		if !identifier(source.id) || source.id == previous { return error('catalog composition requires distinct valid profile IDs') }
 		previous = source.id
 		input := catalog_recipe(read_metadata(source.catalog)!)!
-		if architectures.len == 0 { architectures = input.architectures.clone() }
-		if architectures != input.architectures { return error('composed catalogs must cover the same architectures: ${source.id}') }
-		if imports.len + input.packages.len > 4096 { return error('composed catalog exceeds the 4096 package limit') }
+		if architecture == '' {
+			if architectures.len == 0 { architectures = input.architectures.clone() }
+			if architectures != input.architectures { return error('composed catalogs must cover the same architectures: ${source.id}') }
+		} else {
+			if architecture !in input.architectures { return error('catalog profile ${source.id} does not support requested architecture ${architecture}') }
+			if architectures.len == 0 { architectures << architecture }
+		}
 		for item in input.packages {
+			if architecture != '' && item.recipe.manifest.architecture !in [architecture, 'all'] { continue }
+			if imports.len == 4096 { return error('composed catalog exceeds the 4096 package limit') }
 			imports << CatalogImport{ source: source.id + '/' + item.source, recipe: item.recipe }
 		}
 		records << CompositionSource{ id: source.id, catalog_sha256: index_digest(json2.encode(input) + '\n') }
 	}
 	// This checks duplicate package identities, complete target coverage and
-// runtime closures again, including any conflict introduced by composition.
+	// runtime closures again, including any conflict introduced by composition.
 	merged := catalog_recipe(json2.encode(CatalogRecipe{ format: 1, architectures: architectures, packages: imports }))!
 	text := json2.encode(merged) + '\n'
 	if text.len > max_metadata { return error('composed catalog exceeds metadata limit') }

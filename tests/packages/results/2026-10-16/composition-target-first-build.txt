@@ -1,0 +1,22 @@
+/Users/alex/code/vinix/build/package-release-work/v-toolchain/v -os linux -arch arm64 -gc none -d no_backtrace -d no_segfault_handler -path @vlib|@vmodules|/Users/alex/code/vinix/.|/Users/alex/code/vinix/tools/accounts|/Users/alex/code/vinix/tools/security-events|/Users/alex/code/vinix/tools/keyring -o /Users/alex/code/vinix/build/pct-1/guest/init.c /Users/alex/code/vinix/tests/accounts/guest
+v: exit status 1
+   82 |     private_directory(directory, uid)!
+   83 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+   84 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+   85 |     mut accepted := false
+   86 |     defer { if !accepted { unsafe { path.free() } } }
+tools/packages/pkgadmin/socket.c.v:103:2: notice: variable `path` shadows a function declaration
+  101 |     private_directory(directory, uid)!
+  102 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+  103 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+  104 |     defer { unsafe { path.free() } }
+  105 |     location := address(path)!
+tests/accounts/guest/package_apple.v:44:56: error: field `CatalogRecipe.format` must be initialized
+   42 |     os.mkdir_all(notice)!
+   43 |     os.write_file(notice + '/NOTICE.txt', 'Qualification catalog: only AArch64 Apple execution is supported.\n')!
+   44 |     os.write_file('/tmp/apple-notices.json', json2.encode(pkgcore.CatalogRecipe{ architectures: ['aarch64', 'x86_64'],
+      |                                                           ~~~~~~~~~~~~~~~~~~~~~~
+   45 |         packages: [pkgcore.CatalogImport{ source: 'shared', recipe: pkgcore.RootRecipe{
+   46 |             manifest: pkgcore.Package{ id: apple_notice_id, version: '1.0.0', architecture: 'all', name: 'Apple catalog notice', kind: 'data', license: 'MIT',

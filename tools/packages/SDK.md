@@ -684,6 +684,39 @@ again within the eight-component bound. Prepare ordinary directories matching
 these prefixes; links to profile/architecture directories are refused. Guest
 payload aliases inside each captured architecture root retain `pack-root` rules.
 
+`compose-catalog-for ARCH NEW_LOCK_DIRECTORY PROFILE CATALOG.json [PROFILE CATALOG.json...]`
+explicitly builds a single-host catalog from complete inputs with different
+architecture sets. `ARCH` is exactly `aarch64` or `x86_64`. Every input must
+declare that host; unsupported profiles are refused, never silently omitted.
+The composer validates each entire input before selection, including metadata,
+coverage, pins and dependency closures for the other host. It then retains the
+requested host's variants and all shared (`architecture: "all"`) packages,
+prefixes their source paths and validates the combined closure. Each selected
+manifest and selector remains unchanged. Missing payload roots for the omitted
+host do not need to be staged for `pack-catalog`.
+
+The existing strict command still requires identical input architecture sets.
+The explicit command returns the same format-1 result and provenance schema:
+`architectures` contains only the requested host, and `sources` binds the full
+canonical input locks, including omitted variants. Changing an omitted variant
+therefore changes provenance even when the output catalog digest stays the same.
+Shared package identity collisions still refuse composition. Neither command
+provides binary translation or creates missing application/runtime variants.
+
+For example, prepare native roots at `/build/roots/native/{aarch64,x86_64}` and
+Apple roots at `/build/roots/apple/aarch64`, then use:
+
+```sh
+vinix-package native-catalog 1.0.0 /build/roots/native /build/native-lock
+vinix-package apple-catalog /build/apple-recipes /build/roots/apple /build/apple-lock
+vinix-package compose-catalog-for aarch64 /build/arm-lock native /build/native-lock/catalog.json apple /build/apple-lock/catalog.json
+vinix-package pack-catalog /build/arm-lock/catalog.json /build/roots /build/arm-workspace
+```
+
+This release contains the AArch64 native apps and Apple runtime closure. The
+same composition request for `x86_64` refuses the Apple input. See
+[target selection qualification](../../tests/packages/composition-target-check.md).
+
 For the qualified SQLite and FFmpeg profiles, prepare this layout (copy the
 prepared roots into these directories while preserving their file modes):
 
@@ -1189,8 +1222,9 @@ changes cause `pack-catalog` to refuse its reviewed pins. Handled failures clean
 staging without replacing an existing or concurrently created destination; an
 abrupt kill may leave `.vinix-apple-profile-*` for inspection. Normal signing,
 trust, offline caching, policy, review, runtime upgrades, rollback and retained
-private-data/uninstall rules apply. Composition requires catalogs with the same
-architecture list; this profile cannot silently join a two-host catalog.
+private-data/uninstall rules apply. Use `compose-catalog-for aarch64` to combine
+this lock with reviewed dual-host profiles. The strict `compose-catalog` command
+still requires the same architecture list, and no x86-64 Apple variant is implied.
 
 Header admission does not bind imports/fixups, inspect every runtime resource,
 verify Apple code signatures or qualify arbitrary framework/API behavior. Use
