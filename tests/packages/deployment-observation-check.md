@@ -38,6 +38,11 @@ source establishes the actual count. Remaining allocations elsewhere in the
 public paths require separate work; functional public-path tests do not assert
 zero whole-service retention.
 
+Follow-up: [stored metadata qualification](stored-decode-check.md) addresses
+these decoder, validation-queue and filesystem-scratch allocations with a tracked
+100-cycle public-call regression. The historical measurements above remain the
+results of this construction-only increment.
+
 The signed CLI lifecycle checks withdrawn versions, exact saved bytes and
 receipts, sequence-floor matches, missing/changed drift status, ordinary readers
 and savers, existing-file refusal and reproduction from newly authenticated

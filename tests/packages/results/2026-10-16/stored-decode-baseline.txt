@@ -1,0 +1,5 @@
+Pre-change stored decoder regression: ten configuration decode/close cycles retain 2,034 bytes; ten state cycles retain 5,223 bytes. Input source, production source, executable and generated C are retained and pinned.
+
+Stored decode: ten configuration decode/close cycles retained 2034 bytes; ten persistent-state cycles retained 5223 bytes
+tools/packages/pkgcore/stored_decode_test.v:31: fn test_stored_decoders_retire_complete_owned_values
+    assert config_bytes == 0 && state_bytes == 0

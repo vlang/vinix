@@ -144,7 +144,9 @@ fn test_public_snapshot_save_and_audit_observations_preserve_owned_results_and_s
 	os.write_file(store + '/trust-history.json', '{unavailable history')!
 	service := Service{ root: work }
 	path := work + '/saved é; $literal.json'
-	for _ in 0 .. 4 {
+	mut warmup := service.snapshot_deployment([])!; warmup.close()
+	$if track_heap ? { C.vinix_heap_begin() }
+	for _ in 0 .. 100 {
 		mut document := service.snapshot_deployment([])!
 		assert document.packages.len == 4 && document.locked.len == 4
 		document.close(); document.close()
@@ -159,6 +161,7 @@ fn test_public_snapshot_save_and_audit_observations_preserve_owned_results_and_s
 		}
 		os.rm(path)!
 	}
+	$if track_heap ? { kept := C.vinix_heap_end(); println('Deployment observation: 100 public snapshot/save/audit and existing-file refusal cycles retained ${kept} bytes'); assert kept == 0 }
 	assert os.read_file(store + '/current/state.json')! == state_text && os.readlink(store + '/current')! == 'generations/7'
 	assert os.read_file(work + '/etc/vinix-packages/config.json')! == config_text
 	assert os.read_file(store + '/catalog.json')! == '{unavailable catalog' && os.read_file(store + '/trust-history.json')! == '{unavailable history'

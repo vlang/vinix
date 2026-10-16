@@ -91,6 +91,10 @@ fn check() ! {
 		run(work + '/deployment-observation-memory', [])!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
 			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/stored-decode-memory', repository + '/tools/packages/pkgcore/stored_decode_test.v'])!
+		run(work + '/stored-decode-memory', [])!
+		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/diagnostics-memory', repository + '/tools/packages/pkgcore/view_test.v'])!
 		run(work + '/diagnostics-memory', [])!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',

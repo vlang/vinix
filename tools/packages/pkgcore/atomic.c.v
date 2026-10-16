@@ -34,13 +34,13 @@ fn create_atomic_file(parent int) !(int, string) {
 fn atomic_name_matches(parent int, name string, fd int) bool {
 	mut opened := C.stat{}
 	mut named := C.stat{}
-	return C.fstat(fd, &opened) == 0 && C.fstatat(parent, name.str, &named, C.AT_SYMLINK_NOFOLLOW) == 0
+	return C.fstat(fd, unsafe { &opened }) == 0 && C.fstatat(parent, name.str, unsafe { &named }, C.AT_SYMLINK_NOFOLLOW) == 0
 		&& named.st_mode & 0o170000 == 0o100000 && opened.st_dev == named.st_dev && opened.st_ino == named.st_ino
 }
 
 fn check_atomic_temporary(parent int, name string, fd int, expected int) ! {
 	mut info := C.stat{}
-	if !atomic_name_matches(parent, name, fd) || C.fstat(fd, &info) != 0
+	if !atomic_name_matches(parent, name, fd) || C.fstat(fd, unsafe { &info }) != 0
 		|| info.st_mode & 0o170000 != 0o100000 || info.st_nlink != 1 || info.st_size != expected {
 		return error('package metadata temporary file changed; restore a stable directory and retry')
 	}
@@ -48,7 +48,7 @@ fn check_atomic_temporary(parent int, name string, fd int, expected int) ! {
 
 fn atomic_parent_matches(path string, device u64, inode u64) bool {
 	mut named := C.stat{}
-	return C.fstatat(C.AT_FDCWD, path.str, &named, C.AT_SYMLINK_NOFOLLOW) == 0
+	return C.fstatat(C.AT_FDCWD, path.str, unsafe { &named }, C.AT_SYMLINK_NOFOLLOW) == 0
 		&& named.st_mode & 0o170000 == 0o040000 && u64(named.st_dev) == device && u64(named.st_ino) == inode
 }
 
@@ -72,7 +72,7 @@ fn atomic_publish_new(parent int, source string, destination string) int {
 
 fn atomic_new_file_matches(parent int, name string, fd int, size int) bool {
 	mut info := C.stat{}
-	return atomic_name_matches(parent, name, fd) && C.fstat(fd, &info) == 0 && info.st_nlink == 1
+	return atomic_name_matches(parent, name, fd) && C.fstat(fd, unsafe { &info }) == 0 && info.st_nlink == 1
 		&& info.st_mode & 0o7777 == 0o644 && info.st_size == size
 }
 
@@ -92,14 +92,15 @@ fn atomic_write_with(path string, text string, options AtomicWriteOptions) ! {
 	if directory < 0 { return error('cannot open ordinary package metadata parent directory') }
 	defer { C.close(directory) }
 	mut info := C.stat{}
-	if C.fstat(directory, &info) != 0 || info.st_mode & 0o170000 != 0o040000 {
+	// Native stat calls consume scratch synchronously; keep it on the stack.
+	if C.fstat(directory, unsafe { &info }) != 0 || info.st_mode & 0o170000 != 0o040000 {
 		return error('cannot inspect package metadata parent directory')
 	}
 	device := u64(info.st_dev)
 	inode := u64(info.st_ino)
 	if options.exclusive {
 		mut existing := C.stat{}
-		if C.fstatat(directory, name.str, &existing, C.AT_SYMLINK_NOFOLLOW) == 0 { return error('package metadata destination already exists; choose a new file name') }
+		if C.fstatat(directory, name.str, unsafe { &existing }, C.AT_SYMLINK_NOFOLLOW) == 0 { return error('package metadata destination already exists; choose a new file name') }
 		if C.errno != C.ENOENT { return error('cannot inspect new package metadata destination') }
 	}
 	fd, leaf := create_atomic_file(directory)!

@@ -114,7 +114,8 @@ pub struct Lock {
 fn state_requires_lock(directory string) bool {
 	for name in ['lock', 'current', 'catalog.json', 'trust-history.json']! {
 		path := directory + '/' + name
-		present := os.exists(path) || os.is_link(path)
+		mut info := C.stat{}
+		present := C.lstat(path.str, unsafe { &info }) == 0 || C.errno != C.ENOENT
 		unsafe { path.free() }
 		if present { return true }
 	}

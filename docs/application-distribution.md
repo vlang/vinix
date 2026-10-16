@@ -1627,8 +1627,13 @@ Snapshot construction uses borrowed installed manifests until it builds the
 independent lock, and releases selection, encoding and hash scratch after use.
 Saved JSON and audit digests retain their exact byte contracts, with the saved
 file's LF included in its size check. See the scoped
-[construction qualification](../tests/packages/deployment-observation-check.md),
-including the remaining whole-API allocation measurements.
+[construction qualification](../tests/packages/deployment-observation-check.md).
+Stored configuration and generation metadata use bounded readers that release
+partial nested values on refusal, preserve legacy defaults and require canonical
+unsigned decimal integer spelling. Tracked public snapshot/save/audit cycles
+also cover owned filesystem paths and stack-based stat scratch; see
+[stored metadata qualification](../tests/packages/stored-decode-check.md) for
+the exact scope, malformed-input checks and allocation measurements.
 
 In **Software**, select **Deployment**, enter the absolute file path and choose
 **Review deployment**. The review shows the entire resulting set, including

@@ -1,0 +1,50 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=26
+!>+ [11] ./sbin/init sz=210912
+!>+ [12] ./usr/bin/ sz=0
+!>+ [13] ./usr/share/ sz=0
+!>+ [14] ./usr/share/package-fixtures/ sz=0
+!>+ [15] ./usr/share/package-fixtures/audit-protocol sz=586744
+!>+ [16] ./usr/share/package-fixtures/audit-probe sz=1447728
+!>+ [17] ./usr/share/package-fixtures/stored-decode sz=1001352
+!>+ [18] ./usr/share/package-fixtures/observation-core sz=1140096
+!>+ [19] ./usr/share/package-fixtures/audit-core sz=1126160
+!>+ [20] ./usr/bin/vinix-package sz=2363928
+!>+!>initramfs: no ustar sig at 0xff00000037e89400
+initramfs: Done (21 entries)
+HWTEST START packages-deployment-audit
+DEPLOYMENT AUDIT exact installed metadata, sorted runtime/all-data closure, captured digest, minimum sequence floors and offline revoked policy on both architectures PASS
+DEPLOYMENT AUDIT missing/unexpected packages, versions, architecture, digests, publisher/repository, floor and requested-root differences PASS
+DEPLOYMENT AUDIT writer exclusion, malformed/roots-only/mismatched/aliased inputs and corrupt state refusal; empty read without initialization PASS
+AUDIT PROCESS audit-core PASS
+DEPLOYMENT AUDIT PROTOCOL complete typed fields, duplicate/unknown keys, bounded sorted union rows and coherent drift result PASS
+AUDIT PROCESS audit-protocol PASS
+DEPLOYMENT SNAPSHOT ordinary UID 1000 reads exact root-owned metadata without administrator authorization PASS
+DEPLOYMENT SAVE ordinary UID 1000 saves exact root-owned installed metadata into an owned relative destination without administrator authorization PASS
+DEPLOYMENT AUDIT ordinary UID 1000 reads exact root-owned comparison without administrator authorization PASS
+DEPLOYMENT SAVE CLI new-file durable export, exact receipt and withdrawn/offline/revoked metadata, existing-file preservation and authenticated reproduction PASS
+DEPLOYMENT AUDIT CLI exact offline metadata and sequence-floor matches, missing/changed drift exit 3, no fresh-state initialization and authenticated reproduction PASS
+DEPLOYMENT SNAPSHOT CLI preserves withdrawn installed app/runtime/all-data pins offline with revoked policy, refuses missing roots and unauthenticated apply, and reproduces exact versions from newly authenticated media PASS
+AUDIT PROCESS audit-probe PASS
+Deployment observation: exact SDK JSON and optional LF; inclusive metadata bound and overflow refusal release growth buffers PASS
+Deployment observation: complete 4096-root/record snapshots and 8192-row disjoint audit union PASS
+Deployment observation: selected manifests borrow source state; exported records survive selection-buffer retirement PASS
+Deployment observation: public owned snapshots, durable saved receipts, exact offline audits and existing-file refusals preserve store PASS
+AUDIT PROCESS observation-core PASS
+Stored decode: partial nested cleanup, escaped duplicate keys, canonical integers and late semantic refusal PASS
+Stored decode: both architectures, owned Unicode/escaped keys, legacy policy/window defaults and full u64 counters PASS
+Stored decode: 4096-repository/package limits, excess refusal, nested dependency/argument declarations and growing payload arrays PASS
+Stored decode: inclusive 8-MiB metadata and 16384-payload bounds with overflow refusal PASS
+AUDIT PROCESS stored-decode PASS
+HWTEST PASS packages-deployment-audit

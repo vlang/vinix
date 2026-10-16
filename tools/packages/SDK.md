@@ -1910,9 +1910,14 @@ fields; `.close()` retires the returned document. See
 Construction borrows installed manifests only until the independent lock is
 built. Selection and JSON encoding scratch, including buffer growth, retire on
 success or refusal. Saved receipts and audit input digests retire hash scratch
-while preserving exact bytes. These scoped lifetime checks do not establish
-zero allocation retention across the full public API; see
-[construction qualification](../../tests/packages/deployment-observation-check.md).
+while preserving exact bytes. Stored configuration/state readers also retire
+partial fields on refusal, bound nested collections during parsing and preserve
+legacy defaults. Stored integer fields require canonical unsigned decimal
+spelling. Native tracking and sanitizers cover 100 repeated public snapshot,
+save, audit and existing-file-refusal cycles in an isolated store, alongside
+the construction fixtures. This does not qualify every service operation or
+system-root caller. See [construction qualification](../../tests/packages/deployment-observation-check.md)
+and [stored metadata qualification](../../tests/packages/stored-decode-check.md).
 
 `deployment-snapshot-save NEW_FILE [INSTALLED_ID...]` saves that same sorted
 format-2 snapshot plus one terminating LF. The reader lock covers generation

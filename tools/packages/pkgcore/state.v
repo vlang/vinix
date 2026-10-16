@@ -1,20 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import json2
 import os
 
 // Generations are written by the service, rather than supplied as manifest
 // templates. Every state envelope field must survive storage and decoding.
-struct PersistentStateInput {
-	format int @[required]
-	generation u64 @[required]
-	previous u64 @[required]
-	architecture string @[required]
-	requested []string @[required]
-	packages []Installed @[required]
-}
-
 fn state_document_field(parent string, key string) bool {
 	return match parent {
 		'' { key in ['format', 'generation', 'previous', 'architecture', 'requested', 'packages']! }
@@ -60,16 +50,7 @@ fn state_value_type(parent string, key string, token u8) bool {
 }
 
 fn decode_persistent_state(text string, architecture string) !State {
-	if text.len > max_metadata { return error('persistent package state exceeds metadata limit') }
-	input := json2.decode[PersistentStateInput](text, strict: true)!
-	state := State{ format: input.format, generation: input.generation, previous: input.previous,
-		architecture: input.architecture, requested: input.requested, packages: input.packages }
-	document_keys_schema(text, state_document_field, state_required_fields, state_value_type) or {
-		close_decoded_state(state)
-		return err
-	}
-	validate_state(state, architecture) or { close_decoded_state(state); return err }
-	return state
+	return read_stored_state(text, architecture)
 }
 
 // Only for independently owned JSON-decoded states. Plans and in-memory fixture
@@ -112,7 +93,8 @@ fn read_generation_state(directory string, architecture string, generation u64) 
 	name := generation.str()
 	path := directory + '/generations/' + name
 	defer { unsafe { name.free(); path.free() } }
-	if os.is_link(path) || !os.is_dir(path) {
+	mut info := C.stat{}
+	if C.lstat(path.str, unsafe { &info }) != 0 || u32(info.st_mode) & 0o170000 != 0o040000 {
 		return error('package generation must be an ordinary directory')
 	}
 	metadata := path + '/state.json'

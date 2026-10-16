@@ -31,6 +31,7 @@ fn suite() hwhost.Suite {
 			hwhost.Program{ source: 'tools/packages/pkgprotocol/deployment_audit_test.v', path: 'usr/share/package-fixtures/audit-protocol' },
 			hwhost.Program{ source: 'tests/packages/deployment-snapshot-check.v', path: 'usr/share/package-fixtures/audit-probe' },
 			hwhost.Program{ source: 'tools/packages/pkgcore/deployment_observation_test.v', path: 'usr/share/package-fixtures/observation-core' },
+			hwhost.Program{ source: 'tools/packages/pkgcore/stored_decode_test.v', path: 'usr/share/package-fixtures/stored-decode' },
 		], scenarios: [hwhost.Scenario{ name: 'packages-deployment-audit', arches: ['aarch64', 'x86_64'],
 			about: 'read-only installed deployment drift, exact pins, sequence floors, ordinary readers and strict bounded reports',
 			required: ['HWTEST START packages-deployment-audit',
@@ -44,6 +45,11 @@ fn suite() hwhost.Suite {
 				'Deployment observation: complete 4096-root/record snapshots and 8192-row disjoint audit union PASS',
 				'Deployment observation: public owned snapshots, durable saved receipts, exact offline audits and existing-file refusals preserve store PASS',
 				'AUDIT PROCESS observation-core PASS',
+				'Stored decode: partial nested cleanup, escaped duplicate keys, canonical integers and late semantic refusal PASS',
+				'Stored decode: both architectures, owned Unicode/escaped keys, legacy policy/window defaults and full u64 counters PASS',
+				'Stored decode: 4096-repository/package limits, excess refusal, nested dependency/argument declarations and growing payload arrays PASS',
+				'Stored decode: inclusive 8-MiB metadata and 16384-payload bounds with overflow refusal PASS',
+				'AUDIT PROCESS stored-decode PASS',
 				'AUDIT PROCESS audit-core PASS', 'AUDIT PROCESS audit-protocol PASS', 'AUDIT PROCESS audit-probe PASS',
 				'HWTEST PASS packages-deployment-audit'], ending: .poweroff, timeout: 600 }]
 	}
@@ -66,6 +72,7 @@ fn check() !int {
 			artifact('guest-init', base + '/guest/init')!, artifact('package-cli', base + '/guest/root/usr/bin/vinix-package')!, artifact('audit-core', root + 'audit-core')!,
 			artifact('audit-protocol', root + 'audit-protocol')!, artifact('audit-probe', root + 'audit-probe')!,
 			artifact('observation-core', root + 'observation-core')!,
+			artifact('stored-decode', root + 'stored-decode')!,
 			artifact('serial-log', base + '/packages-deployment-audit/serial.log')!] }
 		os.write_file(base + '/qualification.json', json2.encode(receipt) + '\n')!
 	}

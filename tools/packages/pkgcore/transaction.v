@@ -6,29 +6,46 @@ import strings
 import tools.packages.pkgprotocol
 
 pub fn state_directory(root string) string {
-	return root.trim_right('/') + '/var/lib/vinix-packages'
+	return rooted_package_path(root, '/var/lib/vinix-packages')
+}
+
+// Borrow the trimmed prefix only while constructing the independent path.
+fn rooted_package_path(root string, suffix string) string {
+	mut end := root.len
+	for end > 0 && root[end - 1] == `/` { end-- }
+	return unsafe { tos(root.str, end) } + suffix
 }
 
 pub fn load_config(root string) !Config {
-	path := root.trim_right('/') + '/etc/vinix-packages/config.json'
+	path := rooted_package_path(root, '/etc/vinix-packages/config.json')
+	defer { unsafe { path.free() } }
 	if root == '' || root == '/' {
-		for trusted in ['/etc/vinix-packages', path, state_directory(root)] {
-			if !os.exists(trusted) { continue }
-			info := os.lstat(trusted)!
-			if os.is_link(trusted) || info.uid != 0 || info.mode & 0o022 != 0 {
+		directory := state_directory(root)
+		defer { unsafe { directory.free() } }
+		for trusted in ['/etc/vinix-packages', path, directory]! {
+			mut info := C.stat{}
+			if C.lstat(trusted.str, unsafe { &info }) != 0 {
+				if C.errno == C.ENOENT { continue }
+				return error('cannot inspect package trust/state ownership')
+			}
+			if u32(info.st_mode) & 0o170000 == 0o120000 || info.st_uid != 0 || info.st_mode & 0o022 != 0 {
 				return error('package trust/state must be root-owned and not writable by other users: ${trusted}')
 			}
 		}
 	}
 	text := read_metadata(path)!
 	defer { unsafe { text.free() } }
-	config := decode_configuration(text) or { return error('invalid package configuration: ${err}') }
+	config := decode_configuration(text) or {
+		message := err.msg()
+		defer { unsafe { message.free(); err.free() } }
+		return error('invalid package configuration: ' + message)
+	}
 	if root == '' || root == '/' {
 		$if arm64 {
-			if config.architecture != 'aarch64' { return error('package configuration targets another architecture') }
+			if config.architecture != 'aarch64' { close_decoded_configuration(config); return error('package configuration targets another architecture') }
 		}
 		$if amd64 {
-			if config.architecture != 'x86_64' { return error('package configuration targets another architecture') }
+			if config.architecture != 'x86_64' { close_decoded_configuration(config); return error('package configuration targets another architecture') }
 		}
 	}
 	return config
@@ -36,10 +53,13 @@ pub fn load_config(root string) !Config {
 
 pub fn read_state(directory string, architecture string) !State {
 	current := directory + '/current'
-	if !os.is_link(current) {
-		if os.exists(current) { return error('package activation pointer is not a symlink') }
-		return State{ architecture: architecture }
+	defer { unsafe { current.free() } }
+	mut info := C.stat{}
+	if C.lstat(current.str, unsafe { &info }) != 0 {
+		if C.errno == C.ENOENT { return State{ architecture: architecture } }
+		return error('cannot inspect package activation pointer')
 	}
+	if u32(info.st_mode) & 0o170000 != 0o120000 { return error('package activation pointer is not a symlink') }
 	target := os.readlink(current)!
 	defer { unsafe { target.free() } }
 	if !target.starts_with('generations/') || target.len <= 12 {
@@ -69,6 +89,7 @@ fn validate_state(state State, architecture string) ! {
 		ids[installed.package.id] = index
 	}
 	mut reached := map[string]bool{}
+	// The traversal queue borrows IDs from the state; retire only its buffer.
 	mut pending := []string{cap: state.packages.len}
 	unsafe { pending.flags |= .noslices }
 	defer { unsafe { reached.free(); (&array(&pending)).free() } }
@@ -76,7 +97,8 @@ fn validate_state(state State, architecture string) ! {
 		if id !in ids { return error('persistent requested package is missing: ${id}') }
 		if id in reached { return error('duplicate persistent requested package: ${id}') }
 		reached[id] = true
-		pending << id
+		pointer := unsafe { &id }
+		unsafe { pending.push_many(pointer, 1) }
 	}
 	for installed in state.packages {
 		for dependency in installed.package.dependencies {
@@ -99,7 +121,9 @@ fn validate_state(state State, architecture string) ! {
 		for dependency in state.packages[ids[id]].package.dependencies {
 			if dependency.id in reached { continue }
 			reached[dependency.id] = true
-			pending << dependency.id
+			next_id := dependency.id
+			pointer := unsafe { &next_id }
+			unsafe { pending.push_many(pointer, 1) }
 		}
 	}
 	if reached.len != state.packages.len { return error('persistent package state contains packages outside the requested dependency closure') }

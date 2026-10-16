@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import json2
-
 fn configuration_field(parent string, key string) bool {
 	return match parent {
 		'' { key in ['format', 'architecture', 'repositories', 'policy', 'launch_user']! }
@@ -30,14 +28,7 @@ fn configuration_value_type(parent string, key string, token u8) bool {
 // Explicit values must keep their type and spelling: an ignored policy typo
 // must never silently become the default permissions or unrestricted allowlist.
 fn decode_configuration(text string) !Config {
-	if text.len > max_metadata { return error('package configuration exceeds metadata limit') }
-	config := json2.decode[Config](text, strict: true)!
-	mut accepted := false
-	defer { if !accepted { close_decoded_configuration(config) } }
-	document_keys_schema(text, configuration_field, document_optional_fields, configuration_value_type)!
-	config.validate()!
-	accepted = true
-	return config
+	return read_stored_configuration(text)
 }
 
 // Only independently JSON-decoded configurations own these allocations.
