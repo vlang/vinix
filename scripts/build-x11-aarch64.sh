@@ -525,10 +525,15 @@ install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/s
 # Vinix exposes its pointer as one small absolute-coordinate packet and its
 # keyboard through the console. Translate both into XTEST events rather than
 # importing Linux's evdev/udev input stack just to run X11 applications.
+# The V bridge generator names architectures arm64 and amd64.
+V_ARCH=arm64
+[ "$VINIX_ARCH" != x86_64 ] || V_ARCH=amd64
 echo "  Building Vinix X11 input bridge..."
 "$SCRIPT_DIR/build-support/xorg-server/compile-v-host" xinputcore \
-    "$BUILD_DIR/vinix-xinput-core.c" --arch arm64
-$CC -std=gnu11 -O2 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parameter \
+    "$BUILD_DIR/vinix-xinput-core.c" --arch "$V_ARCH"
+# $CC carries -static-libgcc for links; this step only compiles.
+$CC -std=gnu11 -O2 -Wall -Wextra -Werror -Wno-unused-command-line-argument \
+    -Wno-unused-function -Wno-unused-parameter \
     -ffreestanding -fno-builtin -fwrapv -fno-strict-aliasing \
     -I"$SCRIPT_DIR/build-support/xorg-server" -I"$SYSROOT/usr/include" \
     -c "$BUILD_DIR/vinix-xinput-core.c" -o "$BUILD_DIR/vinix-xinput-core.o"
@@ -543,7 +548,7 @@ $CC -O2 -Wall -Wextra -Werror -D__vinix__ -I"$SYSROOT/usr/include" \
 # input records into XTEST events; it never opens the physical input devices.
 echo "  Building Vinix embedded Wine host..."
 "$SCRIPT_DIR/build-support/xorg-server/compile-v-host" winehost \
-    "$BUILD_DIR/vinix-wine-host-core.c" --arch arm64
+    "$BUILD_DIR/vinix-wine-host-core.c" --arch "$V_ARCH"
 $CC -O2 -Wall -Wextra -Werror -D__vinix__ -I"$SYSROOT/usr/include" \
     -I"$SCRIPT_DIR/build-support/xorg-server" \
     "$BUILD_DIR/vinix-wine-host-core.c" \
