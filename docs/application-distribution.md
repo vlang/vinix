@@ -78,6 +78,12 @@ existing identical declarations. Check reports expose its path, action, byte
 count and digest. See [the contract](../tools/packages/SDK.md#declare-release-applications-in-an-image)
 and [qualification](../tests/packages/image-catalog-check.md).
 
+**Deployment → Check release apps** compares the installed generation with the
+image's declaration using the existing read-only deployment audit. Ordinary
+administrator and standard accounts can see missing apps, exact matches and
+version drift without approval or repository payload access. Updates preserve
+the original declaration. See [installed-release checks](../tests/packages/release-audit-check.md).
+
 Configuration, cached catalogs, trust histories, installed state and publisher
 documents share a bounded metadata reader. It captures a nonblocking descriptor,
 refuses leaf symlinks and nonregular files, and reads at most the admitted file

@@ -669,6 +669,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     exact lock into normal staging. Software discovers it for a full-set review
     with separate confirmation; matching trust and signed offline bundles remain
     mandatory, and existing declarations are preserved or refused.
+    [Installed release audits](tests/packages/release-audit-check.md) compare
+    that baseline without administrator approval. Both targets retain the exact
+    declaration through blank-disk installation and four installed-root boots,
+    reporting missing/matching apps and update drift through rollback and
+    cached reinstall. Production catalog and graphical acceptance remain open.
   - [x] [Bounded prepared-root materialization](tests/packages/import-limits-check.md)
     checks aggregate entries across selectors/aliases and output directory depth
     during import, including empty-directory trees and nested selector parents.

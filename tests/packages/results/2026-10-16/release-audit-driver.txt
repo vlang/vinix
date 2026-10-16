@@ -1,0 +1,1344 @@
+Software paragraph fonts: both native mono scales fit eight logical pixels per UTF-8 byte and eighteen-pixel rows PASS
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/metadata_fixture.v:6:8: warning: module 'ui2' is imported but never used. Use `import ui2 as _`, to silence this warning, or just remove the unused import line
+    4 | import json2
+    5 | import os
+    6 | import ui2
+      |        ~~~
+    7 | import tools.packages.pkgprotocol
+    8 |
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/metadata_fixture.v:7:8: warning: module 'pkgprotocol (tools.packages.pkgprotocol)' is imported but never used. Use `import pkgprotocol (tools.packages.pkgprotocol) as _`, to silence this warning, or just remove the unused import line
+    5 | import os
+    6 | import ui2
+    7 | import tools.packages.pkgprotocol
+      |        ~~~~~~~~~~~~~~~~~~~~~~~~~~
+    8 | 
+    9 | fn software_metadata_service_fixture(args []string) bool {
+build/package-view-reader-work/desktop/modules/ui2/ui/control_state.c.v:4:9: warning: module 'macos' is imported but never used. Use `import macos as _`, to silence this warning, or just remove the unused import line
+    2 | 
+    3 | $if macos && !ui2_custom_rendering ? {
+    4 |     import macos
+      |            ~~~~~
+    5 | }
+    6 |
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/launch_navigation_fixture.v:63:2: notice: variable `arguments` shadows a function declaration
+   61 | 
+   62 | fn check_launch_empty_paste(mut app SoftwareApp) {
+   63 |     arguments := editor_bytes_text(app.launch_arguments); file := editor_bytes_text(app.launch_file)
+      |     ~~~~~~~~~
+   64 |     argument_storage := app.launch_arguments.data; file_storage := app.launch_file.data
+   65 |     status := app.status; selected := app.launch_file_selected; scroll := app.launch_file_scroll
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/launch_navigation_fixture.v:101:2: notice: variable `arguments` shadows a function declaration
+   99 |     focus := app.launch_focus; selection := app.select_all
+  100 |     selected := app.launch_file_selected; scroll := app.launch_file_scroll
+  101 |     arguments := editor_bytes_text(app.launch_arguments); file := editor_bytes_text(app.launch_file)
+      |     ~~~~~~~~~
+  102 |     argument_storage := app.launch_arguments.data; file_storage := app.launch_file.data; files := app.launch_documents.data
+  103 |     id := app.launch_id; name := app.launch_name; cwd := app.launch_data_cwd; allowed := app.launch_files_allowed; status := app.status
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/launch_navigation_fixture.v:141:2: notice: variable `arguments` shadows a function declaration
+  139 |     padding := '文'.repeat(1359)
+  140 |     long_file := '/private/tmp/' + padding + 'é.txt'
+  141 |     arguments := 'λ'.repeat(2048)
+      |     ~~~~~~~~~
+  142 |     defer { pkgprotocol.free_command_values(mut files); unsafe { padding.free(); long_file.free(); arguments.free() } }
+  143 |     unsafe { files[255].free() }; files[255] = long_file.clone()
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/software_health.v:35:6: notice: variable `arguments` shadows a function declaration
+   33 |     a.focus = false; a.select_all = false
+   34 |     a.health_focus = false; a.health_select_all = false
+   35 |     mut arguments := ['--json', '--progress', 'health']
+      |         ~~~~~~~~~
+   36 |     a.start(arguments, true)
+   37 |     unsafe { (&array(&arguments)).free() }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/software_policy.v:63:6: notice: variable `arguments` shadows a function declaration
+   61 |     a.clear_policy_pages()
+   62 |     a.policy_ready = false; a.focus = false; a.select_all = false
+   63 |     mut arguments := ['policy']
+      |         ~~~~~~~~~
+   64 |     a.start(arguments, true)
+   65 |     unsafe { (&array(&arguments)).free() }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/software_policy.v:100:6: notice: variable `arguments` shadows a function declaration
+   98 |     a.policy_pending = path.clone()
+   99 |     a.focus = false; a.select_all = false
+  100 |     mut arguments := ['policy-review', a.policy_pending]
+      |         ~~~~~~~~~
+  101 |     a.start(arguments, false)
+  102 |     unsafe { (&array(&arguments)).free() }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/software_policy.v:163:8: notice: variable `arguments` shadows a function declaration
+  161 |                 unsafe { encoded.free() }
+  162 |             }
+  163 |             mut arguments := ['policy-apply', a.policy_snapshot.fingerprint, a.policy_pending]
+      |                 ~~~~~~~~~
+  164 |             a.start(arguments, false)
+  165 |             unsafe { (&array(&arguments)).free() }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/software_window.v:39:6: notice: variable `arguments` shadows a function declaration
+   37 |     unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+   38 |     a.clear_window()
+   39 |     mut arguments := ['run-window', request.id]
+      |         ~~~~~~~~~
+   40 |     if request.document != '' { arguments << request.document }
+   41 |     defer { unsafe { (&array(&arguments)).free() } }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/software_window.v:157:7: notice: variable `arguments` shadows a function declaration
+  155 |     if event_id == 'software.window.back' && a.worker == unsafe { nil } {
+  156 |         a.clear_window()
+  157 |         mut arguments := ['view']
+      |             ~~~~~~~~~
+  158 |         a.start(arguments, true)
+  159 |         unsafe { (&array(&arguments)).free() }
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_compiled.v:85:4: notice: unused function: `vml_dispatch_compiled`
+   83 | }
+   84 | 
+   85 | fn vml_dispatch_compiled[T](mut model T, name string, arguments []string) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+   86 |     $for method in T.methods {
+   87 |         if method.name == name {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1243:4: notice: unused function: `v_validate_action`
+ 1241 | }
+ 1242 | 
+ 1243 | fn v_validate_action[T](expr &VExpression, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~
+ 1244 |     if expr.kind != .call || !expr.value.starts_with('app.') {
+ 1245 |         return error('event handlers must call an app action at line ${expr.line}')
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1258:4: notice: unused function: `v_validate_assignment`
+ 1256 | }
+ 1257 | 
+ 1258 | fn v_validate_assignment[T](expr &VExpression, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+ 1259 |     if expr.kind != .assignment || expr.left.kind != .path || !expr.left.value.starts_with('app.')
+ 1260 |         || expr.left.value.count('.') != 1 {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1269:4: notice: unused function: `v_validate_repeater_schema`
+ 1267 | }
+ 1268 | 
+ 1269 | fn v_validate_repeater_schema[T](node &VNode, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1270 |     model_expr := node.expressions['model'] or {
+ 1271 |         return error('Repeater requires `model` at line ${node.line}')
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1294:4: notice: unused function: `v_validate_node_schema`
+ 1292 | }
+ 1293 | 
+ 1294 | fn v_validate_node_schema[T](node &VNode, incoming_scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~~
+ 1295 |     mut scope := incoming_scope.clone()
+ 1296 |     if node.id.len > 0 {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1375:4: notice: unused function: `v_validate_template`
+ 1373 | }
+ 1374 | 
+ 1375 | fn v_validate_template[T](root &VNode, model T) ! {
+      |    ~~~~~~~~~~~~~~~~~~~
+ 1376 |     v_validate_node_schema[T](root, {
+ 1377 |         'app': v_schema_from(model)
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1451:4: notice: unused function: `vml_writable_field_type`
+ 1449 | }
+ 1450 | 
+ 1451 | fn vml_writable_field_type[T](name string) !string {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+ 1452 |     return vml_writable_path_type($zero(T), name.split('.'), name)
+ 1453 | }
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1455:4: notice: unused function: `type_check_action`
+ 1453 | }
+ 1454 | 
+ 1455 | fn type_check_action[T](name string, args []VSchema, line int) ! {
+      |    ~~~~~~~~~~~~~~~~~
+ 1456 |     $for method in T.methods {
+ 1457 |         if method.name == name {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1483:4: notice: unused function: `vml_set_field`
+ 1481 | }
+ 1482 | 
+ 1483 | fn vml_set_field[T](mut model T, name string, value VValue) ! {
+      |    ~~~~~~~~~~~~~
+ 1484 |     vml_set_path(mut model, name.split('.'), name, value)!
+ 1485 | }
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1487:4: notice: unused function: `vml_dispatch`
+ 1485 | }
+ 1486 | 
+ 1487 | fn vml_dispatch[T](mut model T, invocation VmlInvocation) ! {
+      |    ~~~~~~~~~~~~
+ 1488 |     mut scope := invocation.scope.clone()
+ 1489 |     // The app object is intentionally refreshed here. Repeater-local values stay
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1513:4: notice: unused function: `vml_apply_assignment`
+ 1511 | }
+ 1512 | 
+ 1513 | fn vml_apply_assignment[T](mut model T, assignment VmlAssignment) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~
+ 1514 |     mut scope := assignment.scope.clone()
+ 1515 |     scope['app'] = v_value_from(model)
+tools/packages/pkgadmin/socket.c.v:84:2: notice: variable `path` shadows a function declaration
+   82 |     private_directory(directory, uid)!
+   83 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+   84 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+   85 |     mut accepted := false
+   86 |     defer { if !accepted { unsafe { path.free() } } }
+tools/packages/pkgadmin/socket.c.v:103:2: notice: variable `path` shadows a function declaration
+  101 |     private_directory(directory, uid)!
+  102 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+  103 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+  104 |     defer { unsafe { path.free() } }
+  105 |     location := address(path)!
+Software package plan reader: all 4096 arguments and 8192 packages, bounded per-item caches and invalid-metadata diagnostics passed
+Software package plan reader: six operations on both architectures, complete metadata and Unicode paths/descriptions, exact u64 space/generations, arguments/packages, empty plans, native lines, resize anchors and frozen confirmation passed
+Software package navigation: all five operations, partial and complete-before-exit Stop/Cancel/Escape, fresh retry, frozen catalog state, compact review/details/status/progress/failures, protected apply/refresh and reload passed
+Software configured repositories: damaged metadata does not block reviewed revocation; enrollment remains refused PASS
+Software repository paste: literal bounded UTF-8, atomic control/invalid/overflow refusal, preserved selection, empty/unfocused no-op, key-only commands and frozen trust review PASS
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software repository reader: complete trust fields, new/same/rotated keys and revocation effects, both architectures, maximum Unicode sources and counters, frozen URL gate and cache retirement passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software repository navigation: compact list/review/status/progress/failures, partial and complete-before-exit Stop/Cancel/Escape, retained inputs/list, fresh paged review, protected apply/refresh and retry passed
+Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed
+Software Verify: visible control, no administrator/catalog dependency, streamed progress, stable selection, incomplete/failure retention, review isolation and safe close PASS
+Software verification navigation: partial/live/complete-before-exit Stop/Cancel/Escape, pending completion despite human success text, kill/reap and buffer retirement, fresh retry and late failure, compact diagnostics, frozen catalog state and protected verify-phase transactions/launches passed
+Software repair: installed dependency control, exact-version closure disclosure, read-only review, duplicate/modal isolation, frozen confirmation and reviewed administrator apply PASS
+Software health navigation: partial/live/complete-before-exit Stop/Cancel/Escape, compact reload/status/progress/summary/failure, frozen search/filter/selection/paging, late failure and fresh retry PASS
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software health: read-only asynchronous report, issue-first searchable metadata/diagnostics, issues-only filtering, stable visible selection, empty results, bounded Unicode editing, reload retention, compact Back, isolated catalog state, full-set repair review and safe close PASS
+Software health progress: separate bounded stderr, live package names, both-pipe EOF, complete/exit/report/count admission, malformed/partial/late/flood refusal, Stop/Escape kill and reap, retry and compact cancellation PASS
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software cleanup reader: complete generation IDs, fingerprint and retention rules, both architectures, empty and maximum u64 identities, modal confirmation isolation and cache retirement passed
+SOFTWARE CLEANUP read-only review, complete paged disclosure, modal/compact controls, frozen administrator approval, stale refusal, diagnostics and reload PASS
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software cleanup navigation: partial and complete-before-exit Stop/Cancel/Escape, fresh review requirement, 4096-generation admission and stable resize anchor, compact diagnostics, approval cancellation, protected deletion, stopped/failed post-cleanup reload and retained result passed
+Software deployment: full closure, frozen literal path, empty removal, cancellation, bounds, stale/error diagnostics and close guard passed
+Software release catalog: optional ordinary-file discovery, explicit full-closure review, frozen literal path, separate confirmation, stale-picker retirement, missing/link refusal and retained drafts PASS
+Software release audit: visible ordinary read, frozen literal path, stale-picker retirement, reload, drift, separate review and missing/link refusal PASS
+Software distribution path paste: deployment/destination/lock fields, atomic controls/UTF-8/4096-byte refusal, preserved focus/selection, literal append/replace, empty/unfocused no-op, keyboard editing and fixed saved source PASS
+Software deployment navigation: compact form/review/details/status/progress/failures, partial and complete-before-exit Stop/Cancel/Escape, fresh literal retry, empty removal, protected apply and subflow routing passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software deployment audit: literal ordinary argv, exit 0/3 coherence, complete drift rows, details/paging, frozen reload/review, cancellation, failure diagnostics, bounds and compact navigation passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software deployment audit search: all 8192 rows, difference-first projection, IDs/status/versions/fields, stable selection/resize, bounded UTF-8 editing, reload/stop/error retention, empty results and full deployment review passed
+Software save navigation: literal paste/control refusal, focus-first Escape, full/compact status/failure, frozen receipt paging, partial/complete-before-exit writer guards and late failure PASS
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software deployment saving: literal ordinary argv, bounded complete receipt, destination binding, both architectures, empty generation, close guard, fresh audit/review, diagnostics and compact navigation passed
+Software saved deployment export: frozen source/digest, explicit new destination, no catalog selection, full path/package/license review, administrator apply, progress, changed-source refusal, retry and retirement passed
+Software offline export reader: complete 4096-byte Unicode destination/source paths, exact digests and u64 space, both architectures/filesystem layouts, frozen path gates and modal isolation passed
+Software offline export navigation: compact Back/Cancel/Stop/status/progress/failures, partial and complete-before-exit review cancellation/reaping, frozen retry and protected publication passed
+Software offline export: destination paging, dependency provenance, literal confirmation, installed scope, progress, stale diagnostics and close guard passed
+Software locked offline export: exact older runtime, source/digest paging, literal frozen confirmation, invalid responses, stale diagnostics, progress and cancellation passed
+Software launch options: quoted literal arguments, separate file grants, frozen worker input, diagnostics and terminal transfer passed
+Software launch reader: complete 4096-byte Unicode arguments, pending and allowed paths; all 256 grants; installed permissions, both working folders, empty drafts, native lines, compact/full/tiny anchors and frozen form state passed
+Software launch navigation: compact Back/status/failures, stable draft and file paging, Escape blur/back, control-paste refusal, installed permission basis, protected literal batch success/failure, retry and exact terminal transfer passed
+Software native windows: bounded frames, namespaced controls, ordinary-service launch, clicks, close acknowledgement and EOF retirement passed
+Software native text: focus, UTF-8 bounds, literal replacement, stale controls, explicit commit/discard, close guard and protocol admission passed
+Software administrator approval: frozen literal request, masked bounded UTF-8 password, hidden-action refusal, credential wiping, cancellation and progress passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software personal data reader: empty and 4096-row inventory, 128-byte IDs and complete 512-byte Unicode diagnostics, initial selection and bounded item navigation, full/compact return placement and retirement passed
+Software personal data: own-account inventory, installed/unsafe refusal, frozen explicit confirmation, cancellation, paging, live-lease diagnostics, reload and close guard passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software report reader: complete health/audit/receipt UTF-8 pages, native lines, keyboard and filtered package traversal, resize/tiny Back, read-only modal isolation and retained source/digests passed
+Software personal data navigation: partial and complete-before-exit inventory Stop/Cancel/Escape, fresh inventory requirement, compact controls and stable selection, protected purge, stopped post-delete reload, retained result and failure diagnostics passed
+Software policy reader: complete current/previous/proposed/source/impact titles and text, short UTF-8 pages, native lines, all-topic navigation, resize anchors, tiny Back and frozen modal state passed
+Software policy reader: complete current/previous/proposed/source/impact titles and text, short UTF-8 pages, native lines, all-topic navigation, resize anchors, tiny Back and frozen modal state passed
+Software policy reader: complete current/previous/proposed/source/impact titles and text, short UTF-8 pages, native lines, all-topic navigation, resize anchors, tiny Back and frozen modal state passed
+Software organization policy: current restrictions, complete settings/impact paging, literal file review, frozen confirmation, administrator approval/cancel/wipe, stale/error refusal, reload and close guard passed
+Software policy navigation: partial and complete-before-exit read/review Stop/Cancel/Escape, fresh policy requirement, literal retry, compact controls and stable pages, approval cancellation, protected save/progress, stopped post-save reload and failure diagnostics passed
+Software metadata review: missing firmware and escaped duplicate flags refuse confirmation before administrator approval
+Software paragraphs: complete minimum-size destructive/trust/restore/launch warnings, keys and permissions, explicit newlines, UTF-8 wrapping, overflow marks, borrowed lines and unobscured administrator controls PASS
+Software disclosure lines: complete catalog/review/health/audit/snapshot/policy pages, individual native-renderer labels, narrow UTF-8 columns, geometry and unchanged review state PASS
+Software compact package details: complete catalog/seven-operation review pages, twelve-byte UTF-8 fragments, section/page/keyboard navigation, resize anchors, tiny Back, frozen review and cache retirement PASS
+Software package details: complete Unicode descriptions/provenance/licenses/diagnostics, installed versus displayed permissions, paging, frozen review, hidden-action refusal, legacy fields and invalid-text refusal passed
+Software search paste: catalog/health/audit literal bounded UTF-8, controls, malformed text, exact byte limits, atomic refusal, selection/focus/page preservation, empty/unfocused input and keyboard editing passed
+Software compact catalog: both architectures, all six kinds, 4096 packages, search/filter/empty states, complete Details, native controls, resize selection, read-only actions and Back passed
+Software catalog reader: complete typed flags, installed-versus-planned launch fields, asynchronous malformed-response refusal, prior-valid-view preservation and explicit legacy details passed
+Software status reader: twelve idle contexts, complete Unicode/escaped text, 8192-byte bounds/tail notice, separate failure/report caches, native short lines, modal isolation, resize/keys/Back and worker admission passed
+Software failure navigation: complete short Unicode/escaped diagnostic pages, separate native-renderer lines, Previous/Next/arrow/Page keys, resize anchors, narrow/tiny Back, modal isolation and clear PASS
+Software failure details: complete retained Unicode output, progress filtering, paging, read-only modal, compact back, reload retention and replacement/clear passed
+Software failure details: bounded tail, truncation disclosure, valid UTF-8/control escaping, empty diagnostics and response-limit failure passed
+Software empty clipboard: policy paths, launch arguments/file grants, administrator passwords and native clean/dirty fields preserve text, focus, selection and state; explicit keyboard editing and empty native commits passed
+Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed
+Software deployment chooser: real broker requests/pending/results/cancel/disconnect, literal paths, explicit review, duplicate suppression and late edit/navigation/review/audit/snapshot retirement PASS
+build/package-view-reader-work/desktop/modules/ui2/ui/control_state.c.v:4:9: warning: module 'macos' is imported but never used. Use `import macos as _`, to silence this warning, or just remove the unused import line
+    2 | 
+    3 | $if macos && !ui2_custom_rendering ? {
+    4 |     import macos
+      |            ~~~~~
+    5 | }
+    6 |
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/cleanup_navigation_fixture.v:193:3: notice: variable `arguments` shadows a function declaration
+  191 |         text := json2.encode(review); empty_text := json2.encode(empty)
+  192 |         review.close(); empty.close()
+  193 |         arguments := ['cleanup-apply']
+      |         ~~~~~~~~~
+  194 |         defer { unsafe { text.free(); empty_text.free(); (&array(&arguments)).free() } }
+  195 |         mut app := SoftwareApp{ cleanup_mode: true, output: []u8{cap: 128 * 1024} }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/data_navigation_fixture.v:163:3: notice: variable `arguments` shadows a function declaration
+  161 |         mut status := pkgprotocol.PersonalDataStatus{ rows: rows }; status.close()
+  162 |         defer { unsafe { text.free() } }
+  163 |         arguments := ['purge-data', 'app-1']
+      |         ~~~~~~~~~
+  164 |         defer { unsafe { (&array(&arguments)).free() } }
+  165 |         mut app := SoftwareApp{ administration_required: true, data_mode: true, output: []u8{cap: 8192} }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/deployment_navigation_fixture.v:225:3: notice: variable `arguments` shadows a function declaration
+  223 |         texts := [json2.encode(normal), json2.encode(empty)]!
+  224 |         normal.close(); empty.close()
+  225 |         arguments := ['deployment-apply']
+      |         ~~~~~~~~~
+  226 |         defer { unsafe { for text in texts { text.free() }; (&array(&arguments)).free() } }
+  227 |         mut app := SoftwareApp{ output: []u8{cap: 8192} }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/failure_fixture.v:227:3: notice: variable `arguments` shadows a function declaration
+  225 |         app.set_status('Local validation: /private/é🚀/a long source path; restore trusted metadata before retrying.\n\x1b\xff')
+  226 |         for byte in 'Cause: é🚀 long path and escaped controls\x1b\xff\n'.repeat(20) { app.output << byte }
+  227 |         arguments := ['install', 'diagnostic-app']
+      |         ~~~~~~~~~
+  228 |         for warmup in 0 .. 2 {
+  229 |             if warmup == 1 { C.vinix_heap_begin() }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/health_fixture.v:364:3: notice: variable `arguments` shadows a function declaration
+  362 |         bad := pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'unknown', package: 'editor', repository: 'trusted' }) + '\n'
+  363 |         oversized := 'x'.repeat(pkgprotocol.progress_limit + 1) + '\n'
+  364 |         arguments := ['--json', '--progress', 'health']
+      |         ~~~~~~~~~
+  365 |         defer { unsafe { oversized.free(); (&array(&arguments)).free() } }
+  366 |         mut app := SoftwareApp{ query: []u8{cap: 256}, output: []u8{cap: 8192} }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/launch_navigation_fixture.v:63:2: notice: variable `arguments` shadows a function declaration
+   61 | 
+   62 | fn check_launch_empty_paste(mut app SoftwareApp) {
+   63 |     arguments := editor_bytes_text(app.launch_arguments); file := editor_bytes_text(app.launch_file)
+      |     ~~~~~~~~~
+   64 |     argument_storage := app.launch_arguments.data; file_storage := app.launch_file.data
+   65 |     status := app.status; selected := app.launch_file_selected; scroll := app.launch_file_scroll
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/launch_navigation_fixture.v:101:2: notice: variable `arguments` shadows a function declaration
+   99 |     focus := app.launch_focus; selection := app.select_all
+  100 |     selected := app.launch_file_selected; scroll := app.launch_file_scroll
+  101 |     arguments := editor_bytes_text(app.launch_arguments); file := editor_bytes_text(app.launch_file)
+      |     ~~~~~~~~~
+  102 |     argument_storage := app.launch_arguments.data; file_storage := app.launch_file.data; files := app.launch_documents.data
+  103 |     id := app.launch_id; name := app.launch_name; cwd := app.launch_data_cwd; allowed := app.launch_files_allowed; status := app.status
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/launch_navigation_fixture.v:141:2: notice: variable `arguments` shadows a function declaration
+  139 |     padding := '文'.repeat(1359)
+  140 |     long_file := '/private/tmp/' + padding + 'é.txt'
+  141 |     arguments := 'λ'.repeat(2048)
+      |     ~~~~~~~~~
+  142 |     defer { pkgprotocol.free_command_values(mut files); unsafe { padding.free(); long_file.free(); arguments.free() } }
+  143 |     unsafe { files[255].free() }; files[255] = long_file.clone()
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/launch_navigation_fixture.v:318:3: notice: variable `arguments` shadows a function declaration
+  316 |         for index in 0 .. 256 { files << '/private/tmp/document-' + index.str() + ' é; $literal.txt' }
+  317 |         defer { pkgprotocol.free_command_values(mut files) }
+  318 |         arguments := ['run-args']
+      |         ~~~~~~~~~
+  319 |         defer { unsafe { (&array(&arguments)).free() } }
+  320 |         mut app := launch_navigation_app()
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/mirror_navigation_fixture.v:312:3: notice: variable `arguments` shadows a function declaration
+  310 |     $if track_heap ? {
+  311 |         text := json2.encode(software_snapshot_export_review(software_snapshot_fixture_path, false))
+  312 |         arguments := ['mirror-deployment-apply']
+      |         ~~~~~~~~~
+  313 |         defer { unsafe { text.free(); (&array(&arguments)).free() } }
+  314 |         mut app := SoftwareApp{ output: []u8{cap: 8192} }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/package_navigation_fixture.v:400:3: notice: variable `arguments` shadows a function declaration
+  398 |             texts << json2.encode(review); review.close()
+  399 |         }
+  400 |         arguments := ['apply']
+      |         ~~~~~~~~~
+  401 |         defer { unsafe { for text in texts { text.free() }; (&array(&texts)).free(); (&array(&arguments)).free() } }
+  402 |         mut app := SoftwareApp{ output: []u8{cap: 8192}, query: 'Editor'.bytes(), filter: 1 }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/policy_navigation_fixture.v:208:3: notice: variable `arguments` shadows a function declaration
+  206 |         document_text := json2.encode(document); review_text := json2.encode(review)
+  207 |         document.close(); review.close()
+  208 |         arguments := ['policy-apply']
+      |         ~~~~~~~~~
+  209 |         defer { unsafe { document_text.free(); review_text.free(); (&array(&arguments)).free() } }
+  210 |         mut app := SoftwareApp{ policy_mode: true, output: []u8{cap: 8192} }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/repository_navigation_fixture.v:329:3: notice: variable `arguments` shadows a function declaration
+  327 |         repositories := [pkgprotocol.Repository{ id: 'fixture', url: repository_fixture_url, public_key: old_key }]
+  328 |         configuration := json2.encode(pkgprotocol.RepositoryConfiguration{ format: 1, scope: 'configuration', architecture: 'aarch64', repositories: repositories })
+  329 |         arguments := ['repo-apply']
+      |         ~~~~~~~~~
+  330 |         defer { unsafe { url.free(); key.free(); old_key.free(); fingerprint.free(); digest.free(); configuration.free(); for text in texts { text.free() }; (&array(&repositories)).free(); (&array(&arguments)).free() } }
+  331 |         mut app := SoftwareApp{ repository_mode: true, output: []u8{cap: 8192} }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/software_health.v:35:6: notice: variable `arguments` shadows a function declaration
+   33 |     a.focus = false; a.select_all = false
+   34 |     a.health_focus = false; a.health_select_all = false
+   35 |     mut arguments := ['--json', '--progress', 'health']
+      |         ~~~~~~~~~
+   36 |     a.start(arguments, true)
+   37 |     unsafe { (&array(&arguments)).free() }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/software_policy.v:63:6: notice: variable `arguments` shadows a function declaration
+   61 |     a.clear_policy_pages()
+   62 |     a.policy_ready = false; a.focus = false; a.select_all = false
+   63 |     mut arguments := ['policy']
+      |         ~~~~~~~~~
+   64 |     a.start(arguments, true)
+   65 |     unsafe { (&array(&arguments)).free() }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/software_policy.v:100:6: notice: variable `arguments` shadows a function declaration
+   98 |     a.policy_pending = path.clone()
+   99 |     a.focus = false; a.select_all = false
+  100 |     mut arguments := ['policy-review', a.policy_pending]
+      |         ~~~~~~~~~
+  101 |     a.start(arguments, false)
+  102 |     unsafe { (&array(&arguments)).free() }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/software_policy.v:163:8: notice: variable `arguments` shadows a function declaration
+  161 |                 unsafe { encoded.free() }
+  162 |             }
+  163 |             mut arguments := ['policy-apply', a.policy_snapshot.fingerprint, a.policy_pending]
+      |                 ~~~~~~~~~
+  164 |             a.start(arguments, false)
+  165 |             unsafe { (&array(&arguments)).free() }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/software_window.v:39:6: notice: variable `arguments` shadows a function declaration
+   37 |     unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+   38 |     a.clear_window()
+   39 |     mut arguments := ['run-window', request.id]
+      |         ~~~~~~~~~
+   40 |     if request.document != '' { arguments << request.document }
+   41 |     defer { unsafe { (&array(&arguments)).free() } }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/software_window.v:157:7: notice: variable `arguments` shadows a function declaration
+  155 |     if event_id == 'software.window.back' && a.worker == unsafe { nil } {
+  156 |         a.clear_window()
+  157 |         mut arguments := ['view']
+      |             ~~~~~~~~~
+  158 |         a.start(arguments, true)
+  159 |         unsafe { (&array(&arguments)).free() }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/software/verify_navigation_fixture.v:149:3: notice: variable `arguments` shadows a function declaration
+  147 |     $if track_heap ? {
+  148 |         live := verify_navigation_frame(false); complete := verify_navigation_frame(true)
+  149 |         arguments := ['--progress', 'verify']
+      |         ~~~~~~~~~
+  150 |         defer { unsafe { live.free(); complete.free(); (&array(&arguments)).free() } }
+  151 |         mut app := verify_navigation_app(true)
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_compiled.v:85:4: notice: unused function: `vml_dispatch_compiled`
+   83 | }
+   84 | 
+   85 | fn vml_dispatch_compiled[T](mut model T, name string, arguments []string) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+   86 |     $for method in T.methods {
+   87 |         if method.name == name {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1243:4: notice: unused function: `v_validate_action`
+ 1241 | }
+ 1242 | 
+ 1243 | fn v_validate_action[T](expr &VExpression, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~
+ 1244 |     if expr.kind != .call || !expr.value.starts_with('app.') {
+ 1245 |         return error('event handlers must call an app action at line ${expr.line}')
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1258:4: notice: unused function: `v_validate_assignment`
+ 1256 | }
+ 1257 | 
+ 1258 | fn v_validate_assignment[T](expr &VExpression, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+ 1259 |     if expr.kind != .assignment || expr.left.kind != .path || !expr.left.value.starts_with('app.')
+ 1260 |         || expr.left.value.count('.') != 1 {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1269:4: notice: unused function: `v_validate_repeater_schema`
+ 1267 | }
+ 1268 | 
+ 1269 | fn v_validate_repeater_schema[T](node &VNode, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1270 |     model_expr := node.expressions['model'] or {
+ 1271 |         return error('Repeater requires `model` at line ${node.line}')
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1294:4: notice: unused function: `v_validate_node_schema`
+ 1292 | }
+ 1293 | 
+ 1294 | fn v_validate_node_schema[T](node &VNode, incoming_scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~~
+ 1295 |     mut scope := incoming_scope.clone()
+ 1296 |     if node.id.len > 0 {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1375:4: notice: unused function: `v_validate_template`
+ 1373 | }
+ 1374 | 
+ 1375 | fn v_validate_template[T](root &VNode, model T) ! {
+      |    ~~~~~~~~~~~~~~~~~~~
+ 1376 |     v_validate_node_schema[T](root, {
+ 1377 |         'app': v_schema_from(model)
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1451:4: notice: unused function: `vml_writable_field_type`
+ 1449 | }
+ 1450 | 
+ 1451 | fn vml_writable_field_type[T](name string) !string {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+ 1452 |     return vml_writable_path_type($zero(T), name.split('.'), name)
+ 1453 | }
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1455:4: notice: unused function: `type_check_action`
+ 1453 | }
+ 1454 | 
+ 1455 | fn type_check_action[T](name string, args []VSchema, line int) ! {
+      |    ~~~~~~~~~~~~~~~~~
+ 1456 |     $for method in T.methods {
+ 1457 |         if method.name == name {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1483:4: notice: unused function: `vml_set_field`
+ 1481 | }
+ 1482 | 
+ 1483 | fn vml_set_field[T](mut model T, name string, value VValue) ! {
+      |    ~~~~~~~~~~~~~
+ 1484 |     vml_set_path(mut model, name.split('.'), name, value)!
+ 1485 | }
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1487:4: notice: unused function: `vml_dispatch`
+ 1485 | }
+ 1486 | 
+ 1487 | fn vml_dispatch[T](mut model T, invocation VmlInvocation) ! {
+      |    ~~~~~~~~~~~~
+ 1488 |     mut scope := invocation.scope.clone()
+ 1489 |     // The app object is intentionally refreshed here. Repeater-local values stay
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1513:4: notice: unused function: `vml_apply_assignment`
+ 1511 | }
+ 1512 | 
+ 1513 | fn vml_apply_assignment[T](mut model T, assignment VmlAssignment) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~
+ 1514 |     mut scope := assignment.scope.clone()
+ 1515 |     scope['app'] = v_value_from(model)
+tools/packages/pkgadmin/socket.c.v:84:2: notice: variable `path` shadows a function declaration
+   82 |     private_directory(directory, uid)!
+   83 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+   84 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+   85 |     mut accepted := false
+   86 |     defer { if !accepted { unsafe { path.free() } } }
+tools/packages/pkgadmin/socket.c.v:103:2: notice: variable `path` shadows a function declaration
+  101 |     private_directory(directory, uid)!
+  102 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+  103 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+  104 |     defer { unsafe { path.free() } }
+  105 |     location := address(path)!
+Native window broker: 1000 fragmented text frames, focus/edit/discard, UI builds and owned-tree retirements retain zero tracked bytes
+Software administrator approval: 1000 prompt/edit/render/wipe cycles retain zero tracked bytes
+Software empty clipboard: 1000 empty/populated credential focus/selection/render/wipe cycles retain zero tracked bytes
+Software personal data: 1000 wide/invalid/valid decode/select/render/confirm/cancel/retire cycles retain zero tracked bytes
+Software personal data reader: 1000 inventory/confirmation/read/item/page/resize/ignored-deletion/Back/cancel/retirement cycles retain zero tracked bytes
+Software organization policy: 1000 wide-document/valid-review/invalid-review/page/redraw/cancel/retire cycles retain zero tracked bytes
+Software package/trust/offline metadata: 1000 valid/partial-invalid review, page/redraw/cancel/retire cycles retain zero tracked bytes
+Software package details: 1000 catalog/review/open/growing-UTF-8-page/redraw/navigate/back/retire cycles retain zero tracked bytes
+Software paragraphs: 1000 owned/borrowed/wrapped/truncated label retirement cycles retain zero tracked bytes
+Software compact package details: 1000 prepare/section/full/compact/keys/resize/back/review/retire cycles retain zero tracked bytes
+Software catalog reader: 1000 wide/partial-invalid/legacy reload, display/details and retirement cycles retain zero tracked bytes
+Software search paste: 1000 literal/rejected/selected/empty input and catalog retirement cycles retain zero tracked bytes
+Software compact catalog: 1000 search/filter/select/details/resize/ignored-write/Back and retirement cycles retain zero tracked bytes
+Software failure details: 1000 capture/full/compact/all-short-pages/keys/resize/back/replace/clear cycles retain zero tracked bytes
+Software status reader: 1000 capture/native-page/keyboard/resize/ignored-write/Back/cache-retirement cycles retain zero tracked bytes
+Software repair: 1000 decode/disclose/render/cancel cycles retain zero tracked bytes PASS
+Software health: 1000 decode/order/page/render/select/search/filter/empty/compact/retire cycles retain zero tracked bytes PASS
+Software health progress: 1000 fragmented/report/admission/full/compact/failure/partial/complete/oversized/stop/descriptor-retirement cycles retain zero tracked bytes PASS
+SOFTWARE CLEANUP 1000 owned decode/page/render/compact/retirement cycles retain zero tracked bytes PASS
+Software cleanup reader: 1000 decode/read/page/resize/back/retirement cycles retain zero tracked bytes
+Software deployment audit: 1000 complete decode, detail, render, paging and retirement cycles retain zero tracked bytes
+Software report reader: 1000 decode/short-pages/package-steps/resize/back/cache-retirement cycles retain zero tracked bytes
+Software deployment audit search: 1000 decode/search/filter/select/empty/resize/render/retirement cycles retain zero tracked bytes
+Software deployment saving: 1000 literal paste/control refusal/blur/full/compact/receipt/paging/mismatch/retirement cycles retain zero tracked bytes
+Software saved deployment export: 1000 handoff, decode, path/package render, digest mismatch and retirement cycles retain zero tracked bytes
+Software saved export reader: 1000 frozen-source/read/page/resize/ignored-publish/Back/cache-retirement cycles retain zero tracked bytes
+Software offline export navigation: 1000 compact form/path/package/failure render, cancel and retirement cycles retain zero tracked bytes
+Software offline path paste: 1000 literal/rejected/selected/empty input cycles retain zero tracked bytes
+Software offline export reader: 1000 decode/read/page/render/resize/ignored-publish/Back/cancel/cache-retirement cycles retain zero tracked bytes
+Software deployment navigation: 1000 normal/empty form/review/details/failure render, cancel and retirement cycles retain zero tracked bytes
+Software deployment path paste: 1000 literal/rejected/selected/empty input cycles retain zero tracked bytes
+Software deployment plan reader: 1000 normal/removal-only/decode/read/item/page/render/resize/ignored-confirm/Back/cancel/cache-retirement cycles retain zero tracked bytes
+Software deployment chooser: 1000 literal/empty/invalid/4096-byte/oversize/late-result/directory/full/compact lifecycle cycles retain zero tracked bytes PASS
+Software release catalog: 1000 full/compact form, discovery, missing-file refusal, navigation and retirement cycles retain zero tracked bytes PASS
+Software repository navigation: 1000 configuration/enrollment/revocation/page/full/compact/failure/cancel/retirement cycles retain zero tracked bytes
+Software repository paste: 1000 valid/rejected/selected-input cycles retain zero tracked bytes
+Software repository reader: 1000 enrollment/revocation/read/page/resize/ignored-confirm/Back/cancel/retirement cycles retain zero tracked bytes
+Software package navigation: 1000 catalog and five-operation full/compact/review/details/failure/cancel/retirement cycles retain zero tracked bytes
+Software package plan reader: 1000 five-operation/decode/read/item/page/render/resize/ignored-confirm/Back/cancel/cache-retirement cycles retain zero tracked bytes
+Software policy navigation: 1000 document/review/section/page/full/compact/cancel/failure/retirement cycles retain zero tracked bytes
+Software policy reader: 1000 current/review/cache/compact/full/keys/back/cancel/retirement cycles retain zero tracked bytes
+Software personal data navigation: 1000 inventory/select/full/compact/confirm/cancel/failure/progress/retirement cycles retain zero tracked bytes
+Software personal data reader: 1000 read/confirm/failure/progress/resize/Back/cancel/cache-retirement cycles retain zero tracked bytes
+Software launch navigation: 1000 256-file draft/full/compact/paging/paste/blur/failure/terminal-transfer/retirement cycles retain zero tracked bytes
+Software launch reader: 1000 entry/file/page/render/resize/ignored-run/Back/cache-retirement cycles retain zero tracked bytes
+Software cleanup navigation: 1000 4096-generation/empty review/full/compact/resize/failure/progress/result/back/retirement cycles retain zero tracked bytes
+Software cleanup reader: 1000 maximum/empty review/read/resize/back/retirement cycles retain zero tracked bytes
+Software verification navigation: 1000 fragmented/live/complete/wait/full/compact/stop/failure/descriptor-retirement cycles retain zero tracked bytes
+desktop/editor_documents.v:3:8: warning: module 'os' is imported but never used. Use `import os as _`, to silence this warning, or just remove the unused import line
+    1 | // SPDX-License-Identifier: GPL-2.0-or-later
+    2 | module main
+    3 | import os
+      |        ~~
+    4 | import ui2
+    5 | import desktop.workflowcore
+desktop/activity.v:996:4: notice: unused function: `activity_header`
+  994 | // darker and has an arrow for its direction, and a rule between headings
+  995 | // shows where one target ends and the next begins.
+  996 | fn activity_header(mut children []ui2.Element, width int, sort ActivitySort, descending bool) {
+      |    ~~~~~~~~~~~~~~~
+  997 |     name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column - activity_mem_column
+  998 |     pid_x := activity_padding + name_width
+desktop/activity.v:1116:4: notice: unused function: `activity_row_cells`
+ 1114 | // activity_row_cells lays one process across the same four columns the
+ 1115 | // headings above use.
+ 1116 | fn activity_row_cells(entry ActivityRow, width int) []ui2.Element {
+      |    ~~~~~~~~~~~~~~~~~~
+ 1117 |     name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column - activity_mem_column
+ 1118 |     number := ui2.TextStyle{
+desktop/activity_preferences.v:7:7: notice: unused constant: `activity_preferences_filename`
+    5 | import ui2
+    6 | 
+    7 | const activity_preferences_filename = '.vinix-activity-settings'
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    8 | const activity_preferences_limit = 1024
+    9 |
+build/app-src/app_calculator.v:64:4: notice: unused function: `initial_calculator`
+   62 | }
+   63 | 
+   64 | fn initial_calculator() Calculator {
+      |    ~~~~~~~~~~~~~~~~~~
+   65 |     return Calculator{
+   66 |         keys: calculator_keys()
+desktop/app_process.v:398:4: notice: unused function: `wire_take_state`
+  396 | }
+  397 | 
+  398 | fn wire_take_state(mut reader WireReader) !AppWireState {
+      |    ~~~~~~~~~~~~~~~
+  399 |     return wire_take_state_flags(mut reader, 0)
+  400 | }
+desktop/battery.v:330:4: notice: unused function: `battery_settings_elements`
+  328 | // A percentage with nothing else known about it draws as one /dev/battery
+  329 | // reported.
+  330 | fn battery_settings_elements(percent int, history &BatteryHistory, x int, inner int) []ui2.Element {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~
+  331 |     return battery_reading_elements(BatteryReading{
+  332 |         percent: percent
+desktop/calculator_app.v:101:4: notice: unused function: `build_compiled_calculator`
+   99 | }
+  100 | 
+  101 | fn build_compiled_calculator(app &CalculatorApp) ui2.Element {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~
+  102 |     return $vml('calculator_vinix.vml')
+  103 | }
+desktop/calculator_programmer.v:84:4: notice: unused function: `calculator_integer_parse`
+   82 | // Prefixes are allowed for a pasted single operand, regardless of the active
+   83 | // display base. Leading signs, whitespace within a number and commands fail.
+   84 | fn calculator_integer_parse(text string, selected_base int) (u64, string) {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~
+   85 |     return calculator_integer_parse_width(text, selected_base, 64)
+   86 | }
+desktop/calculator_programmer.v:271:4: notice: unused function: `calculator_integer_result`
+  269 | }
+  270 | 
+  271 | fn calculator_integer_result(left u64, right u64, operation CalculatorIntegerOperation) (u64, string) {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~
+  272 |     return calculator_integer_result_width(left, right, operation, 64)
+  273 | }
+desktop/capture.v:213:4: notice: unused function: `capture_png_bytes`
+  211 | }
+  212 | 
+  213 | fn capture_png_bytes(canvas &Canvas) ![]u8 {
+      |    ~~~~~~~~~~~~~~~~~
+  214 |     return capture_png_bytes_with_backing(canvas, unsafe { nil })
+  215 | }
+desktop/capture.v:283:4: notice: unused function: `capture_write_png`
+  281 | }
+  282 | 
+  283 | fn capture_write_png(path string, canvas &Canvas) bool {
+      |    ~~~~~~~~~~~~~~~~~
+  284 |     return capture_write_png_with_backing(path, canvas, unsafe { nil })
+  285 | }
+desktop/clock.v:15:7: notice: unused constant: `weekday_names`
+   13 | // English abbreviations, for code that has not yet moved to the translated
+   14 | // names below. Text the user reads comes from date_weekday_short and friends.
+   15 | const weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   16 | const month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
+   17 |     'Dec']
+desktop/clock.v:16:7: notice: unused constant: `month_names`
+   14 | // names below. Text the user reads comes from date_weekday_short and friends.
+   15 | const weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+   16 | const month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   17 |     'Dec']
+   18 |
+desktop/idle_timer.v:163:2: notice: variable `sleep_ms` shadows a function declaration
+  161 | fn (t &IdleTimer) wait_ms(now_ms u64, display_off_minutes int, sleep_minutes int, limit u64) u64 {
+  162 |     display_ms := idle_timeout_ms(display_off_minutes)
+  163 |     sleep_ms := if t.refused { u64(0) } else { idle_timeout_ms(sleep_minutes) }
+      |     ~~~~~~~~
+  164 |     if t.phase == .asleep || (t.phase == .active && display_ms == 0 && sleep_ms == 0) {
+  165 |         return limit
+desktop/reminders_app.v:10:7: notice: unused constant: `reminders_filename`
+    8 | const reminders_record_header = 'VINIX-REMINDERS 2\n'
+    9 | const reminders_record_header_v1 = 'VINIX-REMINDERS 1\n'
+   10 | const reminders_filename = '.vinix-reminders'
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   11 | 
+   12 | enum ReminderPriority { none low medium high }
+desktop/software_health.v:35:6: notice: variable `arguments` shadows a function declaration
+   33 |     a.focus = false; a.select_all = false
+   34 |     a.health_focus = false; a.health_select_all = false
+   35 |     mut arguments := ['--json', '--progress', 'health']
+      |         ~~~~~~~~~
+   36 |     a.start(arguments, true)
+   37 |     unsafe { (&array(&arguments)).free() }
+desktop/software_policy.v:63:6: notice: variable `arguments` shadows a function declaration
+   61 |     a.clear_policy_pages()
+   62 |     a.policy_ready = false; a.focus = false; a.select_all = false
+   63 |     mut arguments := ['policy']
+      |         ~~~~~~~~~
+   64 |     a.start(arguments, true)
+   65 |     unsafe { (&array(&arguments)).free() }
+desktop/software_policy.v:100:6: notice: variable `arguments` shadows a function declaration
+   98 |     a.policy_pending = path.clone()
+   99 |     a.focus = false; a.select_all = false
+  100 |     mut arguments := ['policy-review', a.policy_pending]
+      |         ~~~~~~~~~
+  101 |     a.start(arguments, false)
+  102 |     unsafe { (&array(&arguments)).free() }
+desktop/software_policy.v:163:8: notice: variable `arguments` shadows a function declaration
+  161 |                 unsafe { encoded.free() }
+  162 |             }
+  163 |             mut arguments := ['policy-apply', a.policy_snapshot.fingerprint, a.policy_pending]
+      |                 ~~~~~~~~~
+  164 |             a.start(arguments, false)
+  165 |             unsafe { (&array(&arguments)).free() }
+desktop/software_window.v:39:6: notice: variable `arguments` shadows a function declaration
+   37 |     unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+   38 |     a.clear_window()
+   39 |     mut arguments := ['run-window', request.id]
+      |         ~~~~~~~~~
+   40 |     if request.document != '' { arguments << request.document }
+   41 |     defer { unsafe { (&array(&arguments)).free() } }
+desktop/software_window.v:157:7: notice: variable `arguments` shadows a function declaration
+  155 |     if event_id == 'software.window.back' && a.worker == unsafe { nil } {
+  156 |         a.clear_window()
+  157 |         mut arguments := ['view']
+      |             ~~~~~~~~~
+  158 |         a.start(arguments, true)
+  159 |         unsafe { (&array(&arguments)).free() }
+desktop/terminal.v:259:4: notice: unused function: `terminal_rebuild_message`
+  257 | }
+  258 | 
+  259 | fn terminal_rebuild_message(value string, compositor_pid int, now_ms u64) string {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~
+  260 |     record := terminal_rebuild_record(value, compositor_pid, now_ms) or { return '' }
+  261 |     return terminal_rebuild_result(record, now_ms)
+desktop/translations.v:101:4: notice: unused function: `tr_count_fill`
+   99 | // tr_count_fill is tr_count for a sentence that names something besides the
+  100 | // count, which goes in `{1}`.
+  101 | fn tr_count_fill(key string, count i64, b string) string {
+      |    ~~~~~~~~~~~~~
+  102 |     number := count.str()
+  103 |     text := tr_substitute(tr_plural_form(key, count), number, b, '')
+desktop/activity_controls.c.v:18:7: notice: unused constant: `activity_controls_height`
+   16 | const activity_action_priority_down = 'activity.control.priority.down'
+   17 | const activity_action_kill_tree = 'activity.control.kill_tree'
+   18 | const activity_controls_height = 62
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   19 | 
+   20 | // No waitpid: the monitor does not own the inspected processes. Actions only
+desktop/editor_save_as.c.v:6:4: notice: unused function: `editor_create_file`
+    4 | // Exclusive creation never truncates an existing regular file or follows an
+    5 | // existing final symlink. On failed writes remove only this new file's inode.
+    6 | fn editor_create_file(path string, data []u8) string {
+      |    ~~~~~~~~~~~~~~~~~~
+    7 |     fd := C.open(&char(path.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_NOFOLLOW | C.O_NONBLOCK | C.O_CLOEXEC, u32(0o600))
+    8 |     if fd < 0 { return if C.errno == C.EEXIST { 'editor.workflow.exists' } else { 'editor.status.cannot_save' } }
+desktop/file_context_ops.c.v:196:4: notice: unused function: `file_context_clipboard_available`
+  194 | }
+  195 | 
+  196 | fn file_context_clipboard_available() bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  197 |     clipboard := file_context_clipboard_load() or { return false }
+  198 |     unsafe { clipboard.path.free() }
+desktop/files_trash_io.c.v:362:4: notice: unused function: `files_trash_directory_empty`
+  360 | }
+  361 | 
+  362 | fn files_trash_directory_empty(directory int) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  363 |     fd := C.openat(directory, c'item', C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC, 0)
+  364 |     if fd < 0 { return false }
+desktop/files_trash_io.c.v:418:4: notice: unused function: `files_trash_empty_one`
+  416 | }
+  417 | 
+  418 | fn files_trash_empty_one(store int, entry &FilesTrashEntry) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+  419 |     mut progress := FilesTrashProgress{}
+  420 |     return files_trash_empty_one_progress(store, entry, mut progress)
+desktop/files_trash_io.c.v:434:4: notice: unused function: `files_trash_remove_tree`
+  432 | // Walk anchored descriptors, never symbolic links or nested mounted devices.
+  433 | // Failure retains the bucket/metadata so a partial removal remains visible.
+  434 | fn files_trash_remove_tree(parent int, name string, device u64, depth int, mut budget [1]int) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+  435 |     mut progress := FilesTrashProgress{remaining: budget[0]}
+  436 |     ok := files_trash_remove_tree_progress(parent, name, device, depth, mut progress)
+build/package-view-reader-work/desktop/modules/ui2/ui/animation.v:1278:4: notice: unused function: `reset_widget_animations`
+ 1276 | }
+ 1277 | 
+ 1278 | fn reset_widget_animations() {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+ 1279 |     mut runtime := g_animation_runtime
+ 1280 |     runtime.mutex.lock()
+build/package-view-reader-work/desktop/modules/ui2/ui/file_dialog.v:119:4: notice: unused function: `file_dialog_filter_spec`
+  117 | // Windows backend. It is deliberately plain text so each backend can map the
+  118 | // same public filters onto its own native control.
+  119 | fn file_dialog_filter_spec(filters []FileDialogFilter) string {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+  120 |     mut parts := []string{}
+  121 |     for filter in filters {
+build/package-view-reader-work/desktop/modules/ui2/ui/menu.v:110:4: notice: unused function: `emit_menu_event`
+  108 | // emit_menu_event sends a chosen row to the window's event handler, the same
+  109 | // channel a button tap arrives on.
+  110 | fn emit_menu_event(id string) {
+      |    ~~~~~~~~~~~~~~~
+  111 |     st := menu_state()
+  112 |     if id.len > 0 && voidptr(st.dispatch) != unsafe { nil } {
+build/package-view-reader-work/desktop/modules/ui2/ui/menu.v:117:4: notice: unused function: `menu_app_name`
+  115 | }
+  116 | 
+  117 | fn menu_app_name() string {
+      |    ~~~~~~~~~~~~~
+  118 |     return menu_state().app_name
+  119 | }
+build/package-view-reader-work/desktop/modules/ui2/ui/menu.v:121:4: notice: unused function: `menu_window`
+  119 | }
+  120 | 
+  121 | fn menu_window() voidptr {
+      |    ~~~~~~~~~~~
+  122 |     return menu_state().window
+  123 | }
+build/package-view-reader-work/desktop/modules/ui2/ui/menu.v:129:4: notice: unused function: `install_declared_menus`
+  127 | // is installed even when nothing was declared, because macOS still needs its
+  128 | // application menu.
+  129 | fn install_declared_menus() {
+      |    ~~~~~~~~~~~~~~~~~~~~~~
+  130 |     st := menu_state()
+  131 |     native_set_menu_bar(st.menus)
+build/package-view-reader-work/desktop/modules/ui2/ui/ui.v:330:4: notice: unused function: `box_draws_fill`
+  328 | // box_draws_fill is shared by native and custom renderers so every element
+  329 | // backed by BoxStyle gives transparent the same meaning.
+  330 | fn box_draws_fill(box BoxStyle) bool {
+      |    ~~~~~~~~~~~~~~
+  331 |     return !box.transparent
+  332 | }
+build/package-view-reader-work/desktop/modules/ui2/ui/ui.v:345:4: notice: unused function: `label_needs_container`
+  343 | // while the text moves within it. A label with none of those stays the control itself,
+  344 | // because a view per label costs a third of a frame in a grid of them.
+  345 | fn label_needs_container(el Element) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+  346 |     return el.kind == .label && (el.tooltip.len > 0 || el.menu.len > 0
+  347 |         || box_draws_border(el.box))
+build/package-view-reader-work/desktop/modules/ui2/ui/ui.v:463:4: notice: unused function: `reconciliation_child_key`
+  461 | // reconciliation_child_key encodes user keys so separators inside a key
+  462 | // cannot alias a nested key path.
+  463 | fn reconciliation_child_key(parent string, index int, el Element) string {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~
+  464 |     suffix := if el.key.len > 0 { 'k:' + el.key.bytes().hex() } else { 'i:' + index.str() }
+  465 |     return if parent.len == 0 { suffix } else { parent + '/' + suffix }
+build/package-view-reader-work/desktop/modules/ui2/ui/ui.v:722:4: notice: unused function: `scroll_mode_offset`
+  720 | // the mode leaves out the position is the start: anything else would keep the content
+  721 | // shifted with no way to scroll it back.
+  722 | fn scroll_mode_offset(mode ScrollMode, x f64, y f64) (f64, f64) {
+      |    ~~~~~~~~~~~~~~~~~~
+  723 |     return if mode == .vertical_only { 0.0 } else { x }, if mode == .horizontal_only {
+  724 |         0.0
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_compiled.v:85:4: notice: unused function: `vml_dispatch_compiled`
+   83 | }
+   84 | 
+   85 | fn vml_dispatch_compiled[T](mut model T, name string, arguments []string) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+   86 |     $for method in T.methods {
+   87 |         if method.name == name {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1243:4: notice: unused function: `v_validate_action`
+ 1241 | }
+ 1242 | 
+ 1243 | fn v_validate_action[T](expr &VExpression, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~
+ 1244 |     if expr.kind != .call || !expr.value.starts_with('app.') {
+ 1245 |         return error('event handlers must call an app action at line ${expr.line}')
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1258:4: notice: unused function: `v_validate_assignment`
+ 1256 | }
+ 1257 | 
+ 1258 | fn v_validate_assignment[T](expr &VExpression, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+ 1259 |     if expr.kind != .assignment || expr.left.kind != .path || !expr.left.value.starts_with('app.')
+ 1260 |         || expr.left.value.count('.') != 1 {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1269:4: notice: unused function: `v_validate_repeater_schema`
+ 1267 | }
+ 1268 | 
+ 1269 | fn v_validate_repeater_schema[T](node &VNode, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1270 |     model_expr := node.expressions['model'] or {
+ 1271 |         return error('Repeater requires `model` at line ${node.line}')
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1294:4: notice: unused function: `v_validate_node_schema`
+ 1292 | }
+ 1293 | 
+ 1294 | fn v_validate_node_schema[T](node &VNode, incoming_scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~~
+ 1295 |     mut scope := incoming_scope.clone()
+ 1296 |     if node.id.len > 0 {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1375:4: notice: unused function: `v_validate_template`
+ 1373 | }
+ 1374 | 
+ 1375 | fn v_validate_template[T](root &VNode, model T) ! {
+      |    ~~~~~~~~~~~~~~~~~~~
+ 1376 |     v_validate_node_schema[T](root, {
+ 1377 |         'app': v_schema_from(model)
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1455:4: notice: unused function: `type_check_action`
+ 1453 | }
+ 1454 | 
+ 1455 | fn type_check_action[T](name string, args []VSchema, line int) ! {
+      |    ~~~~~~~~~~~~~~~~~
+ 1456 |     $for method in T.methods {
+ 1457 |         if method.name == name {
+tools/packages/pkgadmin/socket.c.v:84:2: notice: variable `path` shadows a function declaration
+   82 |     private_directory(directory, uid)!
+   83 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+   84 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+   85 |     mut accepted := false
+   86 |     defer { if !accepted { unsafe { path.free() } } }
+tools/packages/pkgadmin/socket.c.v:103:2: notice: variable `path` shadows a function declaration
+  101 |     private_directory(directory, uid)!
+  102 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+  103 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+  104 |     defer { unsafe { path.free() } }
+  105 |     location := address(path)!
+desktop/editor_documents.v:3:8: warning: module 'os' is imported but never used. Use `import os as _`, to silence this warning, or just remove the unused import line
+    1 | // SPDX-License-Identifier: GPL-2.0-or-later
+    2 | module main
+    3 | import os
+      |        ~~
+    4 | import ui2
+    5 | import desktop.workflowcore
+desktop/activity.v:996:4: notice: unused function: `activity_header`
+  994 | // darker and has an arrow for its direction, and a rule between headings
+  995 | // shows where one target ends and the next begins.
+  996 | fn activity_header(mut children []ui2.Element, width int, sort ActivitySort, descending bool) {
+      |    ~~~~~~~~~~~~~~~
+  997 |     name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column - activity_mem_column
+  998 |     pid_x := activity_padding + name_width
+desktop/activity.v:1116:4: notice: unused function: `activity_row_cells`
+ 1114 | // activity_row_cells lays one process across the same four columns the
+ 1115 | // headings above use.
+ 1116 | fn activity_row_cells(entry ActivityRow, width int) []ui2.Element {
+      |    ~~~~~~~~~~~~~~~~~~
+ 1117 |     name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column - activity_mem_column
+ 1118 |     number := ui2.TextStyle{
+desktop/activity_preferences.v:7:7: notice: unused constant: `activity_preferences_filename`
+    5 | import ui2
+    6 | 
+    7 | const activity_preferences_filename = '.vinix-activity-settings'
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    8 | const activity_preferences_limit = 1024
+    9 |
+build/app-src/app_calculator.v:64:4: notice: unused function: `initial_calculator`
+   62 | }
+   63 | 
+   64 | fn initial_calculator() Calculator {
+      |    ~~~~~~~~~~~~~~~~~~
+   65 |     return Calculator{
+   66 |         keys: calculator_keys()
+desktop/app_process.v:398:4: notice: unused function: `wire_take_state`
+  396 | }
+  397 | 
+  398 | fn wire_take_state(mut reader WireReader) !AppWireState {
+      |    ~~~~~~~~~~~~~~~
+  399 |     return wire_take_state_flags(mut reader, 0)
+  400 | }
+desktop/battery.v:330:4: notice: unused function: `battery_settings_elements`
+  328 | // A percentage with nothing else known about it draws as one /dev/battery
+  329 | // reported.
+  330 | fn battery_settings_elements(percent int, history &BatteryHistory, x int, inner int) []ui2.Element {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~
+  331 |     return battery_reading_elements(BatteryReading{
+  332 |         percent: percent
+desktop/calculator_app.v:101:4: notice: unused function: `build_compiled_calculator`
+   99 | }
+  100 | 
+  101 | fn build_compiled_calculator(app &CalculatorApp) ui2.Element {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~
+  102 |     return $vml('calculator_vinix.vml')
+  103 | }
+desktop/calculator_programmer.v:84:4: notice: unused function: `calculator_integer_parse`
+   82 | // Prefixes are allowed for a pasted single operand, regardless of the active
+   83 | // display base. Leading signs, whitespace within a number and commands fail.
+   84 | fn calculator_integer_parse(text string, selected_base int) (u64, string) {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~
+   85 |     return calculator_integer_parse_width(text, selected_base, 64)
+   86 | }
+desktop/calculator_programmer.v:271:4: notice: unused function: `calculator_integer_result`
+  269 | }
+  270 | 
+  271 | fn calculator_integer_result(left u64, right u64, operation CalculatorIntegerOperation) (u64, string) {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~
+  272 |     return calculator_integer_result_width(left, right, operation, 64)
+  273 | }
+desktop/capture.v:213:4: notice: unused function: `capture_png_bytes`
+  211 | }
+  212 | 
+  213 | fn capture_png_bytes(canvas &Canvas) ![]u8 {
+      |    ~~~~~~~~~~~~~~~~~
+  214 |     return capture_png_bytes_with_backing(canvas, unsafe { nil })
+  215 | }
+desktop/capture.v:283:4: notice: unused function: `capture_write_png`
+  281 | }
+  282 | 
+  283 | fn capture_write_png(path string, canvas &Canvas) bool {
+      |    ~~~~~~~~~~~~~~~~~
+  284 |     return capture_write_png_with_backing(path, canvas, unsafe { nil })
+  285 | }
+desktop/clock.v:15:7: notice: unused constant: `weekday_names`
+   13 | // English abbreviations, for code that has not yet moved to the translated
+   14 | // names below. Text the user reads comes from date_weekday_short and friends.
+   15 | const weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   16 | const month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
+   17 |     'Dec']
+desktop/clock.v:16:7: notice: unused constant: `month_names`
+   14 | // names below. Text the user reads comes from date_weekday_short and friends.
+   15 | const weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+   16 | const month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   17 |     'Dec']
+   18 |
+desktop/idle_timer.v:163:2: notice: variable `sleep_ms` shadows a function declaration
+  161 | fn (t &IdleTimer) wait_ms(now_ms u64, display_off_minutes int, sleep_minutes int, limit u64) u64 {
+  162 |     display_ms := idle_timeout_ms(display_off_minutes)
+  163 |     sleep_ms := if t.refused { u64(0) } else { idle_timeout_ms(sleep_minutes) }
+      |     ~~~~~~~~
+  164 |     if t.phase == .asleep || (t.phase == .active && display_ms == 0 && sleep_ms == 0) {
+  165 |         return limit
+desktop/reminders_app.v:10:7: notice: unused constant: `reminders_filename`
+    8 | const reminders_record_header = 'VINIX-REMINDERS 2\n'
+    9 | const reminders_record_header_v1 = 'VINIX-REMINDERS 1\n'
+   10 | const reminders_filename = '.vinix-reminders'
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   11 | 
+   12 | enum ReminderPriority { none low medium high }
+desktop/software_health.v:35:6: notice: variable `arguments` shadows a function declaration
+   33 |     a.focus = false; a.select_all = false
+   34 |     a.health_focus = false; a.health_select_all = false
+   35 |     mut arguments := ['--json', '--progress', 'health']
+      |         ~~~~~~~~~
+   36 |     a.start(arguments, true)
+   37 |     unsafe { (&array(&arguments)).free() }
+desktop/software_policy.v:63:6: notice: variable `arguments` shadows a function declaration
+   61 |     a.clear_policy_pages()
+   62 |     a.policy_ready = false; a.focus = false; a.select_all = false
+   63 |     mut arguments := ['policy']
+      |         ~~~~~~~~~
+   64 |     a.start(arguments, true)
+   65 |     unsafe { (&array(&arguments)).free() }
+desktop/software_policy.v:100:6: notice: variable `arguments` shadows a function declaration
+   98 |     a.policy_pending = path.clone()
+   99 |     a.focus = false; a.select_all = false
+  100 |     mut arguments := ['policy-review', a.policy_pending]
+      |         ~~~~~~~~~
+  101 |     a.start(arguments, false)
+  102 |     unsafe { (&array(&arguments)).free() }
+desktop/software_policy.v:163:8: notice: variable `arguments` shadows a function declaration
+  161 |                 unsafe { encoded.free() }
+  162 |             }
+  163 |             mut arguments := ['policy-apply', a.policy_snapshot.fingerprint, a.policy_pending]
+      |                 ~~~~~~~~~
+  164 |             a.start(arguments, false)
+  165 |             unsafe { (&array(&arguments)).free() }
+desktop/software_window.v:39:6: notice: variable `arguments` shadows a function declaration
+   37 |     unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+   38 |     a.clear_window()
+   39 |     mut arguments := ['run-window', request.id]
+      |         ~~~~~~~~~
+   40 |     if request.document != '' { arguments << request.document }
+   41 |     defer { unsafe { (&array(&arguments)).free() } }
+desktop/software_window.v:157:7: notice: variable `arguments` shadows a function declaration
+  155 |     if event_id == 'software.window.back' && a.worker == unsafe { nil } {
+  156 |         a.clear_window()
+  157 |         mut arguments := ['view']
+      |             ~~~~~~~~~
+  158 |         a.start(arguments, true)
+  159 |         unsafe { (&array(&arguments)).free() }
+desktop/terminal.v:259:4: notice: unused function: `terminal_rebuild_message`
+  257 | }
+  258 | 
+  259 | fn terminal_rebuild_message(value string, compositor_pid int, now_ms u64) string {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~
+  260 |     record := terminal_rebuild_record(value, compositor_pid, now_ms) or { return '' }
+  261 |     return terminal_rebuild_result(record, now_ms)
+desktop/translations.v:101:4: notice: unused function: `tr_count_fill`
+   99 | // tr_count_fill is tr_count for a sentence that names something besides the
+  100 | // count, which goes in `{1}`.
+  101 | fn tr_count_fill(key string, count i64, b string) string {
+      |    ~~~~~~~~~~~~~
+  102 |     number := count.str()
+  103 |     text := tr_substitute(tr_plural_form(key, count), number, b, '')
+desktop/activity_controls.c.v:18:7: notice: unused constant: `activity_controls_height`
+   16 | const activity_action_priority_down = 'activity.control.priority.down'
+   17 | const activity_action_kill_tree = 'activity.control.kill_tree'
+   18 | const activity_controls_height = 62
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   19 | 
+   20 | // No waitpid: the monitor does not own the inspected processes. Actions only
+desktop/editor_save_as.c.v:6:4: notice: unused function: `editor_create_file`
+    4 | // Exclusive creation never truncates an existing regular file or follows an
+    5 | // existing final symlink. On failed writes remove only this new file's inode.
+    6 | fn editor_create_file(path string, data []u8) string {
+      |    ~~~~~~~~~~~~~~~~~~
+    7 |     fd := C.open(&char(path.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_NOFOLLOW | C.O_NONBLOCK | C.O_CLOEXEC, u32(0o600))
+    8 |     if fd < 0 { return if C.errno == C.EEXIST { 'editor.workflow.exists' } else { 'editor.status.cannot_save' } }
+desktop/file_context_ops.c.v:196:4: notice: unused function: `file_context_clipboard_available`
+  194 | }
+  195 | 
+  196 | fn file_context_clipboard_available() bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  197 |     clipboard := file_context_clipboard_load() or { return false }
+  198 |     unsafe { clipboard.path.free() }
+desktop/files_trash_io.c.v:362:4: notice: unused function: `files_trash_directory_empty`
+  360 | }
+  361 | 
+  362 | fn files_trash_directory_empty(directory int) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  363 |     fd := C.openat(directory, c'item', C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC, 0)
+  364 |     if fd < 0 { return false }
+desktop/files_trash_io.c.v:418:4: notice: unused function: `files_trash_empty_one`
+  416 | }
+  417 | 
+  418 | fn files_trash_empty_one(store int, entry &FilesTrashEntry) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+  419 |     mut progress := FilesTrashProgress{}
+  420 |     return files_trash_empty_one_progress(store, entry, mut progress)
+desktop/files_trash_io.c.v:434:4: notice: unused function: `files_trash_remove_tree`
+  432 | // Walk anchored descriptors, never symbolic links or nested mounted devices.
+  433 | // Failure retains the bucket/metadata so a partial removal remains visible.
+  434 | fn files_trash_remove_tree(parent int, name string, device u64, depth int, mut budget [1]int) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+  435 |     mut progress := FilesTrashProgress{remaining: budget[0]}
+  436 |     ok := files_trash_remove_tree_progress(parent, name, device, depth, mut progress)
+build/package-view-reader-work/desktop/modules/ui2/ui/animation.v:1278:4: notice: unused function: `reset_widget_animations`
+ 1276 | }
+ 1277 | 
+ 1278 | fn reset_widget_animations() {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+ 1279 |     mut runtime := g_animation_runtime
+ 1280 |     runtime.mutex.lock()
+build/package-view-reader-work/desktop/modules/ui2/ui/file_dialog.v:119:4: notice: unused function: `file_dialog_filter_spec`
+  117 | // Windows backend. It is deliberately plain text so each backend can map the
+  118 | // same public filters onto its own native control.
+  119 | fn file_dialog_filter_spec(filters []FileDialogFilter) string {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+  120 |     mut parts := []string{}
+  121 |     for filter in filters {
+build/package-view-reader-work/desktop/modules/ui2/ui/menu.v:110:4: notice: unused function: `emit_menu_event`
+  108 | // emit_menu_event sends a chosen row to the window's event handler, the same
+  109 | // channel a button tap arrives on.
+  110 | fn emit_menu_event(id string) {
+      |    ~~~~~~~~~~~~~~~
+  111 |     st := menu_state()
+  112 |     if id.len > 0 && voidptr(st.dispatch) != unsafe { nil } {
+build/package-view-reader-work/desktop/modules/ui2/ui/menu.v:117:4: notice: unused function: `menu_app_name`
+  115 | }
+  116 | 
+  117 | fn menu_app_name() string {
+      |    ~~~~~~~~~~~~~
+  118 |     return menu_state().app_name
+  119 | }
+build/package-view-reader-work/desktop/modules/ui2/ui/menu.v:121:4: notice: unused function: `menu_window`
+  119 | }
+  120 | 
+  121 | fn menu_window() voidptr {
+      |    ~~~~~~~~~~~
+  122 |     return menu_state().window
+  123 | }
+build/package-view-reader-work/desktop/modules/ui2/ui/menu.v:129:4: notice: unused function: `install_declared_menus`
+  127 | // is installed even when nothing was declared, because macOS still needs its
+  128 | // application menu.
+  129 | fn install_declared_menus() {
+      |    ~~~~~~~~~~~~~~~~~~~~~~
+  130 |     st := menu_state()
+  131 |     native_set_menu_bar(st.menus)
+build/package-view-reader-work/desktop/modules/ui2/ui/ui.v:330:4: notice: unused function: `box_draws_fill`
+  328 | // box_draws_fill is shared by native and custom renderers so every element
+  329 | // backed by BoxStyle gives transparent the same meaning.
+  330 | fn box_draws_fill(box BoxStyle) bool {
+      |    ~~~~~~~~~~~~~~
+  331 |     return !box.transparent
+  332 | }
+build/package-view-reader-work/desktop/modules/ui2/ui/ui.v:345:4: notice: unused function: `label_needs_container`
+  343 | // while the text moves within it. A label with none of those stays the control itself,
+  344 | // because a view per label costs a third of a frame in a grid of them.
+  345 | fn label_needs_container(el Element) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+  346 |     return el.kind == .label && (el.tooltip.len > 0 || el.menu.len > 0
+  347 |         || box_draws_border(el.box))
+build/package-view-reader-work/desktop/modules/ui2/ui/ui.v:463:4: notice: unused function: `reconciliation_child_key`
+  461 | // reconciliation_child_key encodes user keys so separators inside a key
+  462 | // cannot alias a nested key path.
+  463 | fn reconciliation_child_key(parent string, index int, el Element) string {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~
+  464 |     suffix := if el.key.len > 0 { 'k:' + el.key.bytes().hex() } else { 'i:' + index.str() }
+  465 |     return if parent.len == 0 { suffix } else { parent + '/' + suffix }
+build/package-view-reader-work/desktop/modules/ui2/ui/ui.v:722:4: notice: unused function: `scroll_mode_offset`
+  720 | // the mode leaves out the position is the start: anything else would keep the content
+  721 | // shifted with no way to scroll it back.
+  722 | fn scroll_mode_offset(mode ScrollMode, x f64, y f64) (f64, f64) {
+      |    ~~~~~~~~~~~~~~~~~~
+  723 |     return if mode == .vertical_only { 0.0 } else { x }, if mode == .horizontal_only {
+  724 |         0.0
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_compiled.v:85:4: notice: unused function: `vml_dispatch_compiled`
+   83 | }
+   84 | 
+   85 | fn vml_dispatch_compiled[T](mut model T, name string, arguments []string) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+   86 |     $for method in T.methods {
+   87 |         if method.name == name {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1243:4: notice: unused function: `v_validate_action`
+ 1241 | }
+ 1242 | 
+ 1243 | fn v_validate_action[T](expr &VExpression, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~
+ 1244 |     if expr.kind != .call || !expr.value.starts_with('app.') {
+ 1245 |         return error('event handlers must call an app action at line ${expr.line}')
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1258:4: notice: unused function: `v_validate_assignment`
+ 1256 | }
+ 1257 | 
+ 1258 | fn v_validate_assignment[T](expr &VExpression, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+ 1259 |     if expr.kind != .assignment || expr.left.kind != .path || !expr.left.value.starts_with('app.')
+ 1260 |         || expr.left.value.count('.') != 1 {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1269:4: notice: unused function: `v_validate_repeater_schema`
+ 1267 | }
+ 1268 | 
+ 1269 | fn v_validate_repeater_schema[T](node &VNode, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1270 |     model_expr := node.expressions['model'] or {
+ 1271 |         return error('Repeater requires `model` at line ${node.line}')
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1294:4: notice: unused function: `v_validate_node_schema`
+ 1292 | }
+ 1293 | 
+ 1294 | fn v_validate_node_schema[T](node &VNode, incoming_scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~~
+ 1295 |     mut scope := incoming_scope.clone()
+ 1296 |     if node.id.len > 0 {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1375:4: notice: unused function: `v_validate_template`
+ 1373 | }
+ 1374 | 
+ 1375 | fn v_validate_template[T](root &VNode, model T) ! {
+      |    ~~~~~~~~~~~~~~~~~~~
+ 1376 |     v_validate_node_schema[T](root, {
+ 1377 |         'app': v_schema_from(model)
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1455:4: notice: unused function: `type_check_action`
+ 1453 | }
+ 1454 | 
+ 1455 | fn type_check_action[T](name string, args []VSchema, line int) ! {
+      |    ~~~~~~~~~~~~~~~~~
+ 1456 |     $for method in T.methods {
+ 1457 |         if method.name == name {
+tools/packages/pkgadmin/socket.c.v:84:2: notice: variable `path` shadows a function declaration
+   82 |     private_directory(directory, uid)!
+   83 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+   84 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+   85 |     mut accepted := false
+   86 |     defer { if !accepted { unsafe { path.free() } } }
+tools/packages/pkgadmin/socket.c.v:103:2: notice: variable `path` shadows a function declaration
+  101 |     private_directory(directory, uid)!
+  102 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+  103 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+  104 |     defer { unsafe { path.free() } }
+  105 |     location := address(path)!
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/launcher-desktop/app_calculator.v:4:8: warning: module 'ui2' is imported but never used. Use `import ui2 as _`, to silence this warning, or just remove the unused import line
+    2 | 
+    3 | import math
+    4 | import ui2
+      |        ~~~
+    5 | 
+    6 | const window_width = 284
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/launcher-desktop/editor_documents.v:3:8: warning: module 'os' is imported but never used. Use `import os as _`, to silence this warning, or just remove the unused import line
+    1 | // SPDX-License-Identifier: GPL-2.0-or-later
+    2 | module main
+    3 | import os
+      |        ~~
+    4 | import ui2
+    5 | import desktop.workflowcore
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/launcher-desktop/package_launcher_test.v:8:8: warning: module 'json2' is imported but never used. Use `import json2 as _`, to silence this warning, or just remove the unused import line
+    6 | import ui2
+    7 | import os
+    8 | import json2
+      |        ~~~~~
+    9 | import time
+   10 | import tools.packages.pkgprotocol
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/launcher-desktop/modules/ui2/ui/control_state.c.v:4:9: warning: module 'macos' is imported but never used. Use `import macos as _`, to silence this warning, or just remove the unused import line
+    2 | 
+    3 | $if macos && !ui2_custom_rendering ? {
+    4 |     import macos
+      |            ~~~~~
+    5 | }
+    6 |
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/launcher-desktop/software_health.v:35:6: notice: variable `arguments` shadows a function declaration
+   33 |     a.focus = false; a.select_all = false
+   34 |     a.health_focus = false; a.health_select_all = false
+   35 |     mut arguments := ['--json', '--progress', 'health']
+      |         ~~~~~~~~~
+   36 |     a.start(arguments, true)
+   37 |     unsafe { (&array(&arguments)).free() }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/launcher-desktop/software_policy.v:63:6: notice: variable `arguments` shadows a function declaration
+   61 |     a.clear_policy_pages()
+   62 |     a.policy_ready = false; a.focus = false; a.select_all = false
+   63 |     mut arguments := ['policy']
+      |         ~~~~~~~~~
+   64 |     a.start(arguments, true)
+   65 |     unsafe { (&array(&arguments)).free() }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/launcher-desktop/software_policy.v:100:6: notice: variable `arguments` shadows a function declaration
+   98 |     a.policy_pending = path.clone()
+   99 |     a.focus = false; a.select_all = false
+  100 |     mut arguments := ['policy-review', a.policy_pending]
+      |         ~~~~~~~~~
+  101 |     a.start(arguments, false)
+  102 |     unsafe { (&array(&arguments)).free() }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/launcher-desktop/software_policy.v:163:8: notice: variable `arguments` shadows a function declaration
+  161 |                 unsafe { encoded.free() }
+  162 |             }
+  163 |             mut arguments := ['policy-apply', a.policy_snapshot.fingerprint, a.policy_pending]
+      |                 ~~~~~~~~~
+  164 |             a.start(arguments, false)
+  165 |             unsafe { (&array(&arguments)).free() }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/launcher-desktop/software_window.v:39:6: notice: variable `arguments` shadows a function declaration
+   37 |     unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+   38 |     a.clear_window()
+   39 |     mut arguments := ['run-window', request.id]
+      |         ~~~~~~~~~
+   40 |     if request.document != '' { arguments << request.document }
+   41 |     defer { unsafe { (&array(&arguments)).free() } }
+build/package-release-audit-work/distribution-stage/vinix-distribution-check-77446/launcher-desktop/software_window.v:157:7: notice: variable `arguments` shadows a function declaration
+  155 |     if event_id == 'software.window.back' && a.worker == unsafe { nil } {
+  156 |         a.clear_window()
+  157 |         mut arguments := ['view']
+      |             ~~~~~~~~~
+  158 |         a.start(arguments, true)
+  159 |         unsafe { (&array(&arguments)).free() }
+tools/packages/pkgadmin/socket.c.v:84:2: notice: variable `path` shadows a function declaration
+   82 |     private_directory(directory, uid)!
+   83 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+   84 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+   85 |     mut accepted := false
+   86 |     defer { if !accepted { unsafe { path.free() } } }
+tools/packages/pkgadmin/socket.c.v:103:2: notice: variable `path` shadows a function declaration
+  101 |     private_directory(directory, uid)!
+  102 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+  103 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+  104 |     defer { unsafe { path.free() } }
+  105 |     location := address(path)!
+Running package launchers
+Software offline export memory (deployment lock=false): redraw/paging=0; review retirement=0 bytes
+Software offline export memory (deployment lock=true): redraw/paging=0; review retirement=0 bytes
+Package launcher assertions passed
+Software distribution checks passed

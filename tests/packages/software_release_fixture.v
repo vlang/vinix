@@ -27,6 +27,7 @@ fn check_software_release() ! {
 	assert app.release_deployment_available
 	tree = app.build(ui2.rect(0, 0, 640, 610))!
 	assert tree.children.any(it.id == 'software.deployment.release' && it.text == 'Review release apps')
+	assert tree.children.any(it.id == 'software.deployment.release-audit' && it.text == 'Check release apps')
 	assert !tree.children.any(it.id == 'software.confirm')
 	free_window_tree(tree)
 	// The old picker cannot redirect the new read-only proposal.
@@ -49,15 +50,37 @@ fn check_software_release() ! {
 	wait_for_software(mut app)
 	assert app.deployment_pending == path
 	app.handle('software.cancel')!
+	// Checking the release baseline is an ordinary read, independent of review
+	// and administrator confirmation. A late chooser cannot replace its source.
+	app.administration_required = true
+	app.deployment_choice_pending = true; app.deployment_choice_current = true
+	app.handle('software.deployment.release-audit')!
+	assert app.audit_mode && app.worker_audit && app.prepare_close() && !app.admin_prompt
+	assert app.worker.args == ['--json', 'deployment-audit', path]
+	assert !app.deployment_choice_current && app.finish_deployment_choice('/late audit.json')
+	software_repository_text(mut app.deployment_path, '/edited audit form.json')
+	app.handle('software.confirm')!
+	wait_for_software(mut app)
+	assert app.audit_ready && app.audit_path == path && !app.audit_snapshot.matches
+	assert app.review == '' && !app.admin_prompt && app.failure_pages.len == 0
+	app.handle('software.audit.reload')!; wait_for_software(mut app)
+	assert app.audit_ready && app.audit_path == path
+	app.handle('software.audit.back')!
+	assert app.deployment_mode && !app.audit_mode
 	os.rm(path)!
 	software_repository_text(mut app.deployment_path, '/kept draft.json')
 	app.handle('software.deployment.release')!
 	assert !app.release_deployment_available && app.worker == unsafe { nil } && editor_bytes_text(app.deployment_path) == '/kept draft.json'
+	app.handle('software.deployment.release-audit')!
+	assert !app.audit_mode && app.worker == unsafe { nil } && editor_bytes_text(app.deployment_path) == '/kept draft.json'
 	os.write_file(base + '/other.json', '{}')!; os.symlink(base + '/other.json', path)!
 	app.handle('software.deployment.back')!; app.handle('software.deployment')!
 	assert !app.release_deployment_available
+	app.handle('software.deployment.release-audit')!
+	assert !app.audit_mode && app.worker == unsafe { nil } && editor_bytes_text(app.deployment_path) == '/kept draft.json'
 	assert SoftwareApp{}.release_deployment_path == pkgprotocol.image_applications_path
 	println('Software release catalog: optional ordinary-file discovery, explicit full-closure review, frozen literal path, separate confirmation, stale-picker retirement, missing/link refusal and retained drafts PASS')
+	println('Software release audit: visible ordinary read, frozen literal path, stale-picker retirement, reload, drift, separate review and missing/link refusal PASS')
 }
 
 fn check_software_release_memory() ! {
@@ -74,6 +97,7 @@ fn check_software_release_memory() ! {
 				app.handle('software.deployment.back')!
 				app.handle('software.deployment')!
 				app.handle('software.deployment.release')!
+				app.handle('software.deployment.release-audit')!
 				app.release_deployment_available = true
 			}
 		}

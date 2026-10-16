@@ -46,7 +46,7 @@ fn package_cold_files(installed bool) ![]PackageColdFile {
 		paths << '/home/' + name + '/.local/share/vinix-apps/org.vinix.counter/counter.txt'
 	}
 	paths << '/home/alex/.local/share/vinix-apps/org.vinix.memo/memo.txt'
-	if installed { paths << package_installed_tools; paths << '/usr/share/package-fixtures/installed-only.txt' }
+	if installed { paths << package_installed_files; paths << '/usr/share/package-fixtures/installed-only.txt' }
 	mut files := []PackageColdFile{}
 	for path in paths {
 		bytes := os.read_bytes(path)!
@@ -113,6 +113,7 @@ fn qualify_package_software_persistence(mut t Test) ! {
 	observation_path := if installed { package_installed_observation } else { package_disk + '/cold-observation.json' }
 	image_configuration := os.read_file('/etc/vinix-packages/config.json')!
 	fresh := if installed { package_installed_root()! } else { package_cold_mount()! }
+	if installed { t.say('PACKAGE INSTALLED RELEASE exact declaration disk identity mode digest PASS') }
 	assert os.read_file('/etc/vinix-packages/config.json')! == image_configuration
 	mut boot := 1
 	mut db := accountcore.Database{}
@@ -138,8 +139,10 @@ fn qualify_package_software_persistence(mut t Test) ! {
 	if boot == 1 {
 		install_result := run(['/usr/share/package-fixtures/software-image', 'install'], '', db, alex)
 		if install_result.status != 0 { return error('initial Software install failed: ' + install_result.output) }
+		t.say(install_result.output)
 		standard := run(['/usr/share/package-fixtures/software-image', 'standard'], '', db, sam)
 		if standard.status != 0 { return error('standard Software launch failed: ' + standard.output) }
+		t.say(standard.output)
 	} else {
 		package_cold_verify(if boot == 2 { '1.0.0' } else { '1.1.0' }, config.repositories[0].public_key, mount)!
 		if boot == 2 {
@@ -156,6 +159,7 @@ fn qualify_package_software_persistence(mut t Test) ! {
 		phase := if boot == 2 { 'cold-upgrade' } else if boot == 3 { 'cold-maintain' } else { 'cold-reopen' }
 		result := run(['/usr/share/package-fixtures/software-image', phase], '', db, alex)
 		if result.status != 0 { return error('Software ' + phase + ' failed: ' + result.output) }
+		t.say(result.output)
 	}
 	package_cold_verify(if boot == 1 { '1.0.0' } else { '1.1.0' }, config.repositories[0].public_key, mount)!
 	assert os.read_file('/etc/vinix-packages/config.json')! == image_configuration

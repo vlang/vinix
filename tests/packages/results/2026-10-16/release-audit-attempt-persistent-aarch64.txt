@@ -1,0 +1,44 @@
+FAIL aarch64 packages-software-persistence (9.7s)
+  forbidden "HWTEST FAIL" in the line: HWTEST FAIL packages-software-persistence: initial Software install failed: SOFTWARE CONTROL software.refresh
+  last 40 serial lines:
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x4002dc
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x4002dc
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x4002dc
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x4002dc
+  | HWTEST FAIL packages-software-persistence: initial Software install failed: SOFTWARE CONTROL software.refresh
+  | SOFTWARE CONTROL software.admin.cancel
+  | SOFTWARE CONTROL software.refresh
+  | SOFTWARE CONTROL software.admin.password
+  | SOFTWARE CONTROL software.admin.approve
+  | SOFTWARE CONTROL software.refresh
+  | SOFTWARE CONTROL software.admin.password
+  | SOFTWARE CONTROL software.admin.approve
+  | SOFTWARE CONTROL software.deployment
+  | SOFTWARE CONTROL software.deployment.release-audit
+  | /Users/alex/code/vinix/build/praudit-persistent-arm-1/software-source/main.v:180: FAIL: fn main.image_release_audit: assert app.audit_snapshot.matches == (version == '1.0.0') && app.failure_pages.len == 0
+  | V panic: Assertion failed...
+  | 
+  | HWTEST FAIL packages-software-persistence
+  | syspower: power off: stopping devices
+  logs: /Users/alex/code/vinix/build/praudit-persistent-arm-1/native

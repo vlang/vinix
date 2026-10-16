@@ -1,0 +1,5 @@
+An initial controller build hit the pinned V compiler constant-array spread lowering bug (const string[10] has no .data). Returning the marker array from a helper fixed the host build; no target behavior changed.
+
+The first four guest attempts failed in initial-empty audit qualification because the fixture required an empty diagnostics panel after its intentional bad-password attempt. Software correctly retains that diagnostic. The corrected fixture requires unchanged diagnostic count, exact audit match/drift results, and unchanged state bytes.
+
+Attempt 2 passed both four-boot ext2 workflows and installed AArch64. Installed x86 completed all four workflows but the host refused because the added root-proof marker used stdout (the display console on that target) rather than the harness serial writer. The marker now uses Test.say on both targets. Attempt 3 reruns all four workflows on fresh disks with unchanged final product and fixture sources.

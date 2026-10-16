@@ -94,6 +94,10 @@ path, publish/preserve decision, byte count and digest. See
 [the contract](SDK.md#declare-release-applications-in-an-image) and
 [qualification](../../tests/packages/image-catalog-check.md).
 
+**Deployment → Check release apps** reports missing apps and installed metadata
+drift from that exact image lock without administrator approval or state changes.
+See [installed-release checks](../../tests/packages/release-audit-check.md).
+
 Desktop checks need generated examples under `build/app-src` and a headless ui2
 overlay under `build/vmodules`; `VINIX_PACKAGE_TEST_UI2` selects another overlay
 parent. Package implementation, publishing, staging and qualification use V.

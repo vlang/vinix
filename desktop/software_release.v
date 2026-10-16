@@ -8,14 +8,22 @@ fn (mut a SoftwareApp) find_release_deployment() {
 		&& info.st_mode & 0o170000 == 0o100000
 }
 
-fn (mut a SoftwareApp) review_release_deployment() {
-	if a.worker != unsafe { nil } || a.review != '' || !a.deployment_mode { return }
+fn (mut a SoftwareApp) select_release_deployment() bool {
+	if a.worker != unsafe { nil } || a.review != '' || !a.deployment_mode { return false }
 	a.find_release_deployment()
 	if !a.release_deployment_available {
 		a.set_status('The release application file is unavailable. Choose a deployment file or enter its absolute path.')
-		return
+		return false
 	}
 	a.initialize_deployment_field()
 	software_repository_text(mut a.deployment_path, a.release_deployment_path)
-	a.begin_deployment_review()
+	return true
+}
+
+fn (mut a SoftwareApp) review_release_deployment() {
+	if a.select_release_deployment() { a.begin_deployment_review() }
+}
+
+fn (mut a SoftwareApp) audit_release_deployment() {
+	if a.select_release_deployment() { a.begin_deployment_audit() }
 }

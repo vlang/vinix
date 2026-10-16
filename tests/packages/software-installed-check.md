@@ -1,5 +1,9 @@
 # Software maintenance on an installed system disk
 
+The newer [installed-release audit check](release-audit-check.md) also pins the
+staged release declaration on disk, installs it through one approved Software
+review and checks baseline drift as ordinary users through all four boots.
+
 `native-catalog-check.v --installed` starts with a blank 4 GiB disk and the
 production-staged native application image. The kernel's normal `vinix.disk=auto`
 path formats that disk as Vinix's journaled primary filesystem (VJFS), installs

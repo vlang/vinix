@@ -53,6 +53,7 @@ fn (mut a SoftwareApp) handle_deployment(event_id string) {
 	match event_id {
 		'software.deployment.choose' { a.choose_deployment_file() }
 		'software.deployment.release' { a.review_release_deployment() }
+		'software.deployment.release-audit' { a.audit_release_deployment() }
 		'software.deployment.path' {
 			a.focus = true
 			a.select_all = false
@@ -140,6 +141,7 @@ fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
 		children << software_button('software.deployment.snapshot', 'Save installed…', 210, 330, 160)
 		if a.release_deployment_available {
 			children << software_button('software.deployment.release', 'Review release apps', 14, 374, 180)
+			children << software_button('software.deployment.release-audit', 'Check release apps', 210, 374, 160)
 		}
 	} else if a.deployment_review_running() {
 		children << software_button('software.deployment.stop', 'Stop review', 14, 286, 160)

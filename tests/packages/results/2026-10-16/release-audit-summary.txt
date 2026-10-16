@@ -1,0 +1,5 @@
+Fourteen focused Software compile/run checks passed, including ASan/UBSan with leak detection disabled. Maintained Software functional suite, 27 allocation modes, both full Linux desktop target typechecks and launcher checks passed.
+installed aarch64 PASS 75.014s; four boots, ten release audits, 66 artifacts
+installed x86_64 PASS 74.764s; four boots, ten release audits, 66 artifacts
+persistent aarch64 PASS 61.856s; four boots, ten release audits, 64 artifacts
+persistent x86_64 PASS 60.024s; four boots, ten release audits, 64 artifacts

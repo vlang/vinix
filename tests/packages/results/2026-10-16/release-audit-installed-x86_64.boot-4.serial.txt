@@ -1,0 +1,20 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01HHWTEST START packages-software-installed
+PACKAGE INSTALLED RELEASE exact declaration disk identity mode digest PASS
+SOFTWARE CONTROL software.deployment
+SOFTWARE CONTROL software.deployment.release-audit
+SOFTWARE CONTROL software.audit.back
+SOFTWARE CONTROL software.deployment.back
+SOFTWARE RELEASE audit cold-reopen installed=1.1.0 exact-baseline unchanged-state ordinary-read PASS
+SOFTWARE CONTROL software.catalog
+SOFTWARE CONTROL software.search
+SOFTWARE CONTROL software.row.0
+SOFTWARE CONTROL software.run
+SOFTWARE CONTROL software.window.close
+SOFTWARE CONTROL software.window.back
+SOFTWARE CONTROL software.window.close
+SOFTWARE CONTROL software.window.back
+
+PACKAGE INSTALLED BOOT 4 retained reinstall tools provenance registration private data PASS
+HWTEST PASS packages-software-installed

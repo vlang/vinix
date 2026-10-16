@@ -547,6 +547,15 @@ remain mandatory. Missing declarations leave manual/file-dialog workflows
 available. This does not enroll a production publisher or migrate the legacy
 Alpine/vendor catalog.
 
+**Deployment → Check release apps** compares recorded installed metadata with
+the same exact image lock as an ordinary user, without administrator approval
+or catalog/payload access. Missing apps, matching releases and drift after an
+update are shown in the existing deployment audit. Its digest identifies the
+captured declaration. Checking preserves trust, catalog, installed generation
+and the declaration; it does not pin subsequent updates to the image release.
+Payload health and current trust remain separate checks. See the
+[installed-release qualification](../../tests/packages/release-audit-check.md).
+
 V builders use `configuration.prepare_applications(&repositories, ids)` or
 `configuration.prepare_application_file(&repositories, source)` to own an
 `ImageApplications` plan. `plan.report()` returns independently owned JSON.

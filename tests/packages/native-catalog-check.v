@@ -34,6 +34,20 @@ fn native_artifact(role string, path string) !NativeArtifact {
 }
 
 const installed_image_id = 'vinix-packages-installed-sdk-1'
+fn release_audit_markers() []string {
+	return [
+	'SOFTWARE RELEASE audit initial-empty installed=absent exact-baseline unchanged-state ordinary-read PASS',
+	'SOFTWARE RELEASE audit initial-installed installed=1.0.0 exact-baseline unchanged-state ordinary-read PASS',
+	'SOFTWARE RELEASE audit standard-account installed=1.0.0 exact-baseline unchanged-state ordinary-read PASS',
+	'SOFTWARE RELEASE audit cold-upgrade installed=1.0.0 exact-baseline unchanged-state ordinary-read PASS',
+	'SOFTWARE RELEASE audit cold-upgraded installed=1.1.0 exact-baseline unchanged-state ordinary-read PASS',
+	'SOFTWARE RELEASE audit cold-maintain installed=1.1.0 exact-baseline unchanged-state ordinary-read PASS',
+	'SOFTWARE RELEASE audit cold-rollback installed=1.0.0 exact-baseline unchanged-state ordinary-read PASS',
+	'SOFTWARE RELEASE audit cold-removed installed=absent exact-baseline unchanged-state ordinary-read PASS',
+	'SOFTWARE RELEASE audit cold-reinstalled installed=1.1.0 exact-baseline unchanged-state ordinary-read PASS',
+	'SOFTWARE RELEASE audit cold-reopen installed=1.1.0 exact-baseline unchanged-state ordinary-read PASS',
+	]
+}
 struct NativeInstalledImage { format int = 1 image string files []NativeArtifact }
 
 fn native_suite(sandbox string, image bool, software bool) hwhost.Suite {
@@ -69,6 +83,7 @@ fn native_suite(sandbox string, image bool, software bool) hwhost.Suite {
 			'SOFTWARE IMAGE updates rollback uninstall registration cached-reinstall retained-memo PASS',
 			'SOFTWARE IMAGE unchanged-staged-trust root-owned-state separate-user-data clean-runtime PASS']
 		required << 'SOFTWARE IMAGE staged-release-catalog discovered full-set review separate administrator approval exact offline install PASS'
+		required << release_audit_markers()[..3]
 	}
 	if image { required << 'PACKAGE IMAGE BUNDLE production-staged signed repository before first refresh PASS' }
 	return hwhost.Suite{ name: 'package-native-catalog', guest: 'tests/accounts/guest',
@@ -95,7 +110,9 @@ fn persistent_software_suite(sandbox string, disk string) hwhost.Suite {
 			'PACKAGE COLD BOOT 1 fresh staged trust ordinary Software install separate user data PASS',
 			'PACKAGE COLD BOOT 2 exact retained state accounts trust native reopen reviewed upgrade PASS',
 			'PACKAGE COLD BOOT 3 exact retained upgrade rollback uninstall cached reinstall PASS',
-			'PACKAGE COLD BOOT 4 exact retained reinstall provenance registration private data PASS'],
+			'PACKAGE COLD BOOT 4 exact retained reinstall provenance registration private data PASS',
+			'SOFTWARE IMAGE staged-release-catalog discovered full-set review separate administrator approval exact offline install PASS',
+			...release_audit_markers()],
 		forbidden: ['V panic:', 'HWTEST FAIL'],
 	}] }
 }
@@ -118,7 +135,10 @@ fn installed_software_suite(sandbox string, disk string) hwhost.Suite {
 				'PACKAGE INSTALLED BOOT 1 disk root staged tools trust ordinary Software install PASS',
 				'PACKAGE INSTALLED BOOT 2 retained tools accounts state native reopen reviewed upgrade PASS',
 				'PACKAGE INSTALLED BOOT 3 retained upgrade rollback uninstall cached reinstall PASS',
-				'PACKAGE INSTALLED BOOT 4 retained reinstall tools provenance registration private data PASS'],
+				'PACKAGE INSTALLED BOOT 4 retained reinstall tools provenance registration private data PASS',
+				'PACKAGE INSTALLED RELEASE exact declaration disk identity mode digest PASS',
+				'SOFTWARE IMAGE staged-release-catalog discovered full-set review separate administrator approval exact offline install PASS',
+				...release_audit_markers()],
 			forbidden: forbidden,
 	}
 	return hwhost.Suite{ ...base, name: 'package-software-installed', files: files, scenarios: [selected] }
@@ -128,7 +148,7 @@ fn stage_installed_proof(root string, guest string) !NativeArtifact {
 	mut files := [native_artifact('/sbin/init', guest)!]
 	for path in ['/usr/bin/vinix-package', '/usr/bin/vinix-sandbox', '/usr/sbin/vinix-account', '/usr/sbin/vinix-authd',
 		'/usr/sbin/vinix-session', '/usr/share/package-fixtures/software-image',
-		'/usr/share/vinix/actions/packages-change', '/usr/share/vinix/actions/packages-launch']! {
+		'/usr/share/vinix/actions/packages-change', '/usr/share/vinix/actions/packages-launch', pkgprotocol.image_applications_path]! {
 		files << native_artifact(path, root + path)!
 	}
 	path := '/usr/share/package-fixtures/installed-image.json'

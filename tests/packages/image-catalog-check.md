@@ -1,5 +1,9 @@
 # Release application declarations in staged images
 
+The later [installed-release audit check](release-audit-check.md) carries this
+declaration through real blank-disk installation and four installed-root boots,
+and adds an ordinary **Check release apps** action for baseline drift.
+
 Selecting advertised application requirements now makes normal package staging
 publish the exact resolved format-2 lock to
 `/usr/share/vinix-packages/applications.json`. Software's **Deployment → Review

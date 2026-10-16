@@ -4,15 +4,16 @@ module main
 import crypto.sha256
 import json2
 import os
+import tools.packages.pkgprotocol
 
 struct PackageInstalledFile { role string bytes u64 sha256 string }
 struct PackageInstalledImage { format int image string files []PackageInstalledFile }
 
 const package_installed_observation = '/root/package-installed-observation.json'
-const package_installed_tools = ['/sbin/init', '/usr/bin/vinix-package', '/usr/bin/vinix-sandbox',
+const package_installed_files = ['/sbin/init', '/usr/bin/vinix-package', '/usr/bin/vinix-sandbox',
 	'/usr/sbin/vinix-account', '/usr/sbin/vinix-authd', '/usr/sbin/vinix-session',
 	'/usr/share/package-fixtures/software-image', '/usr/share/vinix/actions/packages-change',
-	'/usr/share/vinix/actions/packages-launch']
+	'/usr/share/vinix/actions/packages-launch', pkgprotocol.image_applications_path]
 
 fn package_installed_root() !bool {
 	mut root := C.stat{}
@@ -28,10 +29,10 @@ fn package_installed_root() !bool {
 	proof := json2.decode[PackageInstalledImage](os.read_file('/usr/share/package-fixtures/installed-image.json')!)!
 	assert proof.format == 1 && proof.image == 'vinix-packages-installed-sdk-1'
 	assert os.read_file('/.vinix-image-id')!.trim_space() == proof.image
-	assert proof.files.len == package_installed_tools.len
+	assert proof.files.len == package_installed_files.len
 	mut seen := []string{}
 	for file in proof.files {
-		assert file.role in package_installed_tools && file.role !in seen
+		assert file.role in package_installed_files && file.role !in seen
 		seen << file.role
 		mut info := C.stat{}
 		if C.lstat(file.role.str, unsafe { &info }) != 0 || info.st_dev != root.st_dev
@@ -42,6 +43,9 @@ fn package_installed_root() !bool {
 		defer { unsafe { bytes.free() } }
 		if u64(bytes.len) != file.bytes || sha256.sum(bytes).hex() != file.sha256 {
 			return error('installed tool differs from its production-staged input: ' + file.role)
+		}
+		if file.role == pkgprotocol.image_applications_path {
+			assert info.st_mode & 0o7777 == 0o644 && info.st_nlink == 1 && file.bytes > 0
 		}
 	}
 	fresh := !os.exists(package_installed_observation)
