@@ -17,8 +17,18 @@ Standalone staging and qualification are also available:
 ```sh
 v run tools/packages/stage.v --arch aarch64 --staging /path/to/root
 v run tools/packages/stage.v --arch x86_64 --staging /path/to/root
+v run tools/packages/stage.v --arch aarch64 --staging /path/to/fresh-root --config /release/reviewed-packages.json
 v run tests/packages/distribution-check.v --cross --desktop
 ```
+
+Release builders can supply a reviewed format-1 package configuration with
+`--config FILE` or `VINIX_PACKAGE_IMAGE_CONFIG=/absolute/FILE`. The option takes
+precedence over the environment. This seeds repository keys, organization policy
+and an optional launch account only on a fresh image; without it, new images
+remain unenrolled. Existing configuration is validated and preserved byte-for-byte,
+and missing configuration beside retained package state requires recovery.
+See [image configuration](SDK.md#release-image-configuration) and its
+[qualification](../../tests/packages/image-configuration-check.md).
 
 Desktop checks need generated examples under `build/app-src` and a headless ui2
 overlay under `build/vmodules`; `VINIX_PACKAGE_TEST_UI2` selects another overlay

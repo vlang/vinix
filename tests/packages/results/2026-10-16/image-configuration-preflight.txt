@@ -1,0 +1,5 @@
+Explicit --config input:
+package staging: invalid package metadata JSON structure
+
+VINIX_PACKAGE_IMAGE_CONFIG input:
+package staging: invalid package metadata JSON structure

@@ -4,7 +4,17 @@ Vinix has a native V application package service, `vinix-package`, and a
 **Software** desktop application. They manage signed repositories and immutable
 application generations on AArch64 and x86_64. The desktop security-tools stage
 installs the service, sandbox launcher, Software process link and XDG registration
-directory. It preserves existing configuration; a fresh image enrolls no keys.
+directory. It preserves existing configuration; a fresh image enrolls no keys
+unless its builder supplies an explicit reviewed release configuration.
+
+Release image staging accepts `--config FILE` or `VINIX_PACKAGE_IMAGE_CONFIG` to
+seed the normal repository keys, policy and launch account before first boot.
+It captures and validates the input before compiling, checks new publisher keys,
+and publishes configuration exclusively without changing existing configuration
+or package state. Missing configuration beside retained state requires recovery.
+The desktop cache tracks the selected input and its contents. See
+[the image contract](../tools/packages/SDK.md#release-image-configuration) and
+[clean-image native catalog qualification](../tests/packages/image-configuration-check.md).
 
 Configuration, cached catalogs, trust histories, installed state and publisher
 documents share a bounded metadata reader. It captures a nonblocking descriptor,

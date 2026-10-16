@@ -195,6 +195,51 @@ Software. [Administrator qualification](../../tests/packages/admin-check.md)
 covers real signed ordinary-account workflows on both target architectures and
 the actual Software prompt/progress/credential-retirement code.
 
+## Release image configuration
+
+`tools/packages/stage.v --arch ARCH --staging ROOT --config FILE` initializes a
+fresh image with the release builder's reviewed format-1 `Config`. The existing
+desktop/security staging path also reads `VINIX_PACKAGE_IMAGE_CONFIG`; an explicit
+`--config` wins. Use an absolute source path. The desktop image cache key includes
+both that selection and the source contents.
+
+The document uses the normal `architecture`, `repositories` (`id`, `url`,
+`public_key`), `policy` and `launch_user` fields. Defaults are the existing
+format-1 defaults; proprietary-license acceptance and firmware permission require
+explicit policy entries. Review the exact public keys through your release's
+trusted channel. New publisher keys must be canonical non-identity Ed25519
+prime-order points. No key, repository, license acceptance or firmware permission
+is supplied automatically. A selected launch account must be provisioned by the
+image's account setup before application launch.
+
+Staging captures one bounded regular input before compilation and holds its
+validated canonical bytes until publication. Changed/deleted input cannot alter
+that prepared configuration. The target architecture must match. Image roots and
+configuration parents must be ordinary controlled directories; links and shared
+write access refuse. Publication uses a flushed private temporary and exclusive
+atomic rename to a 0644 new file. Concurrently created configuration is preserved.
+
+Existing valid configuration is retained byte-for-byte and the release input is
+ignored, including when that input is absent. Invalid or wrong-architecture
+existing configuration refuses; it is never repaired by staging. A missing config
+beside nonempty package state also refuses, so staging cannot reset retained trust
+or policy. Restore that installation's trusted configuration instead. Package
+state is never initialized or cleared by this operation.
+
+V image builders can call `pkgcore.prepare_image_configuration(root, architecture,
+source)` before compiling tools, then `plan.publish()` after successful staging.
+It returns true only for a newly published configuration. Call `plan.close()`
+after use; close is repeatable. Keep ancestor directories controlled throughout
+the build. Staging updates other tool files individually and does not make the
+whole image build transactional; publish the completed image only after success.
+
+After boot, the normal Refresh, review/install, updates, rollback and uninstall
+flows use this configuration. Image seeding does not fetch catalogs or accept
+unsigned metadata. See [qualification](../../tests/packages/image-configuration-check.md),
+including real native applications maintained from a staged configuration without
+guest-side trust-file edits. Production publisher selection and complete graphical
+login/runtime acceptance remain release responsibilities.
+
 ## Build and publish
 
 ```sh

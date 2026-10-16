@@ -19,16 +19,21 @@ fn stage() ! {
 	mut staging := ''
 	mut compiler := ''
 	mut compiler_args := []string{}
+	mut configuration := os.getenv('VINIX_PACKAGE_IMAGE_CONFIG')
 	mut arguments := os.args[1..].clone()
 	for arguments.len > 0 {
 		if arguments.len < 2 {
-			return error('usage: stage.v --arch aarch64|x86_64 --staging DIR [--cc COMPILER]')
+			return error('usage: stage.v --arch aarch64|x86_64 --staging DIR [--cc COMPILER] [--config REVIEWED_CONFIG.json]')
 		}
 		match arguments[0] {
 			'--arch' { architecture = arguments[1] }
 			'--staging' { staging = os.abs_path(arguments[1]) }
 			'--cc' { compiler = arguments[1] }
 			'--cc-argv' { compiler_args = json2.decode[[]string](arguments[1])! }
+			'--config' {
+				if arguments[1] == '' { return error('--config requires a reviewed package configuration file') }
+				configuration = arguments[1]
+			}
 			else { return error('unknown staging option: ${arguments[0]}') }
 		}
 		arguments = arguments[2..].clone()
@@ -36,6 +41,8 @@ fn stage() ! {
 	if architecture !in ['aarch64', 'x86_64'] || staging == '' || staging == '/' || !os.is_dir(staging) {
 		return error('staging needs an existing target directory and supported architecture')
 	}
+	mut image_configuration := pkgcore.prepare_image_configuration(staging, architecture, configuration)!
+	defer { image_configuration.close() }
 	if compiler == '' { compiler = os.getenv('VINIX_MUSL_CC_' + architecture.to_upper()) }
 	if compiler == '' { compiler = architecture + '-linux-musl-gcc' }
 	// A compiler is an executable path, never shell text.
@@ -85,15 +92,8 @@ fn stage() ! {
 	software := staging + '/usr/bin/vinix-software'
 	if os.exists(software) || os.is_link(software) { os.rm(software)! }
 	os.symlink('/usr/bin/vinix-desktop', software)!
-	os.mkdir_all(staging + '/etc/vinix-packages')!
-	config_path := staging + '/etc/vinix-packages/config.json'
-	if !os.exists(config_path) {
-		// Releases must enroll their actual public key. Never ship a trusted
-		// demonstration key or fall back to unsigned repositories.
-		os.write_file(config_path, json2.encode(pkgcore.Config{ architecture: architecture }) + '\n')!
-		os.chmod(config_path, 0o644)!
-	}
-	os.chmod(staging + '/etc/vinix-packages', 0o755)!
+	created := unsafe { &image_configuration }.publish()!
+	println(if created { 'Initialized reviewed image package configuration' } else { 'Preserved existing image package configuration; release input was not applied' })
 	os.mkdir_all(staging + '/usr/share/vinix/actions')!
 	// Fixed actions separate reviewed administration from own-account launch
 	// isolation. Preserve administrator-owned overrides when upgrading an image.
@@ -103,10 +103,6 @@ fn stage() ! {
 			os.cp(repository + '/tools/accounts/actions/' + name, action)!
 			os.chmod(action, 0o644)!
 		}
-	}
-	config := pkgcore.load_config(staging)!
-	if config.architecture != architecture {
-		return error('existing package configuration targets another architecture')
 	}
 	os.mkdir_all(staging + '/var/lib/vinix-packages')!
 	os.chmod(staging + '/var/lib/vinix-packages', 0o755)!

@@ -39,6 +39,7 @@ fn desktop_fixture(root string) !(string, map[string]string) {
 		fixture_write(root + '/' + item[0], item[1])!
 	}
 	mut env := os.environ()
+	env.delete('VINIX_PACKAGE_IMAGE_CONFIG')
 	for name, value in {
 		'LLVM_BIN':                         llvm
 		'LD_LLD':                           root + '/tools/ld.lld'
@@ -88,6 +89,26 @@ fn test_source_content_change_invalidates() {
 	first := fixture_key(root, v, env)!
 	fixture_write(root + '/desktop/main.v', 'module main\nconst changed = true\n')!
 	assert first != fixture_key(root, v, env)!
+}
+
+fn test_release_package_configuration_content_and_selection_invalidate() {
+	root := desktop_temporary()!
+	defer { os.rmdir_all(root) or { panic(err) } }
+	v, mut env := desktop_fixture(root)!
+	unenrolled := fixture_key(root, v, env)!
+	configuration := root + '/release/config.json'
+	fixture_write(configuration, 'first reviewed release configuration\n')!
+	env['VINIX_PACKAGE_IMAGE_CONFIG'] = configuration
+	first := fixture_key(root, v, env)!
+	assert first != unenrolled
+	mut state := C.vinix_cache_stat{}
+	assert C.vinix_cache_lstat(&char(configuration.str), &state) == 0
+	fixture_write(configuration, 'other reviewed release configuration\n')!
+	stamps := [C.timespec{state.st_atime, state.vinix_cache_atime_nsec}, C.timespec{state.st_mtime, state.vinix_cache_mtime_nsec}]!
+	assert C.utimensat(C.AT_FDCWD, &char(configuration.str), &stamps[0], 0) == 0
+	assert first != fixture_key(root, v, env)!
+	env.delete('VINIX_PACKAGE_IMAGE_CONFIG')
+	assert fixture_key(root, v, env)! == unenrolled
 }
 
 fn test_v_launcher_change_invalidates() {

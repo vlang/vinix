@@ -39,6 +39,10 @@ fn qualify_package_native_catalog(mut t Test) ! {
 	// Stable repository identity, with successive complete signed snapshots.
 	os.symlink('/tmp/native-release-1.0.0', '/tmp/native-repository')!
 	package_success(['repo-enroll', 'native', 'file:///tmp/native-repository', key])!
+	native_catalog_consume(mut t, key, architecture, '/tmp/native-release-')!
+}
+
+fn native_catalog_consume(mut t Test, key string, architecture string, release_prefix string) ! {
 	package_success(['update'])!
 	ids := ['org.vinix.counter', 'org.vinix.memo', 'org.vinix.package-hello']
 	reviewed_package_operation('install', ids)!
@@ -75,7 +79,7 @@ fn qualify_package_native_catalog(mut t Test) ! {
 	native_catalog_reopen(memo)!
 	t.say('PACKAGE NATIVE CATALOG six-pinned-packages signed-review architecture notices document-grant protocols-1-2 ordinary-data PASS')
 	os.rm('/tmp/native-repository')!
-	os.symlink('/tmp/native-release-1.1.0', '/tmp/native-repository')!
+	os.symlink(release_prefix + '1.1.0', '/tmp/native-repository')!
 	package_success(['update'])!
 	reviewed_package_operation('upgrade', [])!
 	assert pkgcore.Service{}.verify()!.packages.all(it.package.version == '1.1.0')
@@ -88,7 +92,7 @@ fn qualify_package_native_catalog(mut t Test) ! {
 	reviewed_package_operation('remove', ids)!
 	for id in ids { assert !os.exists('/var/lib/vinix-packages/current/share/applications/vinix-' + id + '.desktop') }
 	package_success(['gc'])!
-	os.rename('/tmp/native-release-1.1.0/objects', '/tmp/native-hidden-objects')!
+	os.rename(release_prefix + '1.1.0/objects', '/tmp/native-hidden-objects')!
 	reviewed_package_operation('install', ids)!
 	assert pkgcore.Service{}.verify()!.packages.all(it.package.version == '1.1.0')
 	native_catalog_reopen(memo)!
@@ -97,3 +101,25 @@ fn qualify_package_native_catalog(mut t Test) ! {
 }
 
 fn scenario_packages_native_catalog(mut t Test) { qualify_package_native_catalog(mut t) or { t.check(false, err.msg()) } }
+
+fn qualify_package_native_image(mut t Test) ! {
+	t.make_accounts()
+	architecture := $if arm64 { 'aarch64' } $else { 'x86_64' }
+	path := '/etc/vinix-packages/config.json'
+	initial := os.read_file(path)!
+	config := pkgcore.load_config('')!
+	assert config.architecture == architecture && config.launch_user == 'alex' && config.policy.offline
+	assert config.repositories.len == 1 && config.repositories[0].id == 'native'
+	assert config.repositories[0].url == 'file:///tmp/native-repository'
+	assert os.ls('/var/lib/vinix-packages')!.len == 0
+	os.symlink('/usr/share/native-catalog/releases/1.0.0', '/tmp/native-repository')!
+	t.say('PACKAGE IMAGE CONFIG booted with staged trust policy and launch account before first refresh PASS')
+	fixture := run(['/usr/share/package-fixtures/image-configuration'], '', none, none)
+	assert fixture.status == 0, fixture.output
+	assert fixture.output.contains('PACKAGE IMAGE CONFIG signed catalog install remove rollback both architectures PASS')
+	native_catalog_consume(mut t, config.repositories[0].public_key, architecture, '/usr/share/native-catalog/releases/')!
+	assert os.read_file(path)! == initial
+	t.say('PACKAGE IMAGE CONFIG unchanged staged configuration real native apps upgrade rollback offline reinstall PASS')
+}
+
+fn scenario_packages_native_image(mut t Test) { qualify_package_native_image(mut t) or { t.check(false, err.msg()) } }
