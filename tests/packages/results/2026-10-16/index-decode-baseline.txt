@@ -1,0 +1,13 @@
+The same isolated 64-cycle probe before/after bounded signed-index decoding; all returned results retired. No compiler or standard-library changes. Sources, executables and generated C retained and pinned.
+
+Before:
+decode: 64 bytes, 64 records, first size 1
+verify: 64 bytes, 64 records, first size 1
+remember: 0 bytes, 0 records, first size 0
+{"format":1,"repository":"","sequence":0,"expires":0,"packages":[]}
+
+After:
+decode: 0 bytes, 0 records, first size 0
+verify: 0 bytes, 0 records, first size 0
+remember: 0 bytes, 0 records, first size 0
+{"format":1,"repository":"","sequence":0,"expires":0,"packages":[]}

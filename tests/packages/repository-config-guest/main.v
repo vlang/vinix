@@ -12,14 +12,24 @@ fn C.reboot(int) int
 fn C.usleep(u32) int
 
 fn check() ! {
-	for name in ['repository-config-core', 'repository-config-protocol', 'configuration-observation', 'repository-status'] {
+	for name in ['repository-config-core', 'repository-config-protocol', 'configuration-observation', 'repository-status', 'index-decode', 'index-schema'] {
+		if name == 'index-decode' {
+			for architecture in ['aarch64', 'x86_64']! {
+				for count in [0, 1, 64, 4096]! { run_fixture(name, ['--index-case', 'owned-' + architecture + '-' + count.str()])! }
+			}
+			for selection in ['refusals', 'bounds', 'signed']! { run_fixture(name, ['--index-case', selection])! }
+		} else { run_fixture(name, [])! }
+		println('CONFIGURATION PROCESS ' + name + ' PASS')
+	}
+}
+
+fn run_fixture(name string, args []string) ! {
 		mut child := os.new_process('/usr/share/package-fixtures/' + name)
+		child.set_args(args)
 		child.set_redirect_stdio_merged(); child.run()
 		output := child.stdout_slurp(); child.wait(); code := child.code; child.close()
 		print(output)
 		if code != 0 || output.contains(': fn test_') { return error('${name} failed (${code})') }
-		println('CONFIGURATION PROCESS ' + name + ' PASS')
-	}
 }
 
 fn main() {

@@ -1449,8 +1449,13 @@ reader retires unused configuration fields and paths, including complete source
 configuration on refusal. Format, wire ordering, reader locking and authenticated
 legacy-floor recovery are unchanged. Synthetic documents can borrow fields and
 must keep their caller-managed lifetime. See
-[strict repository observation qualification](../../tests/packages/repository-status-ownership-check.md),
-including the separately measured signed-index decoder residual.
+[strict repository observation qualification](../../tests/packages/repository-status-ownership-check.md)
+for the original measured scope. The subsequent
+[bounded signed-index qualification](../../tests/packages/index-decode-check.md)
+removes the decoder residual and requires zero retained bytes on authenticated
+status paths. Indexes use the stored-manifest reader's field bounds while keeping
+signature-first verification, complete declarations, exact publisher bytes and
+the full unsigned sequence/signed expiry ranges.
 
 History is keyed by ID/key, independent of mirror URL, and records exact signed
 index bytes. Reject lower sequences and changed bytes at an existing sequence;

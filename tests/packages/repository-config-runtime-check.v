@@ -30,6 +30,8 @@ fn suite() hwhost.Suite {
 			hwhost.Program{ source: 'tools/packages/pkgprotocol/repository_configuration_test.v', path: 'usr/share/package-fixtures/repository-config-protocol' },
 			hwhost.Program{ source: 'tools/packages/pkgcore/configuration_observation_test.v', path: 'usr/share/package-fixtures/configuration-observation' },
 			hwhost.Program{ source: 'tools/packages/pkgcore/repository_status_ownership_test.v', path: 'usr/share/package-fixtures/repository-status' },
+			hwhost.Program{ source: 'tools/packages/pkgcore/index_decode_test.v', path: 'usr/share/package-fixtures/index-decode' },
+			hwhost.Program{ source: 'tools/packages/pkgcore/index_schema_test.v', path: 'usr/share/package-fixtures/index-schema' },
 		], scenarios: [hwhost.Scenario{ name: 'packages-repository-config', arches: ['aarch64', 'x86_64'],
 			about: 'configuration-only repository discovery and reviewed revocation while maintenance metadata remains refused',
 			required: ['HWTEST START packages-repository-config',
@@ -44,6 +46,11 @@ fn suite() hwhost.Suite {
 				'REPOSITORY STATUS 64-cycle authenticated expired migration, newer floors, signature/equivocation refusals and exact retired-key recovery preserve configuration/cache/history PASS',
 				'REPOSITORY STATUS 1000 schema/alias/FIFO configuration/cache/history and missing/unsafe/busy lock refusals retire scratch, preserve recovery data and permit restored retry PASS',
 				'CONFIGURATION PROCESS repository-status PASS',
+				'INDEX DECODE both architectures, empty/growing owned results, full 4096 packages, retired source buffers and exact canonical declarations PASS',
+				'INDEX DECODE partial/schema/UTF8/number/validation refusals retire scratch; full unsigned sequence and signed expiry ranges PASS',
+				'INDEX DECODE exact 8 MiB and limit-minus-one accepted; limit-plus-one and 4097 packages refused PASS',
+				'INDEX DECODE authenticated original/legacy bytes, signature-before-schema refusals and 64-cycle signed retries retire scratch PASS',
+				'CONFIGURATION PROCESS index-decode PASS', 'CONFIGURATION PROCESS index-schema PASS',
 				'HWTEST PASS packages-repository-config'], ending: .poweroff, timeout: 300 }]
 	}
 }
@@ -66,6 +73,7 @@ fn check() !int {
 			artifact('repository-config-protocol', root + 'repository-config-protocol')!,
 			artifact('configuration-observation', root + 'configuration-observation')!,
 			artifact('repository-status', root + 'repository-status')!,
+			artifact('index-decode', root + 'index-decode')!, artifact('index-schema', root + 'index-schema')!,
 			artifact('serial-log', base + '/packages-repository-config/serial.log')!] }
 		os.write_file(base + '/qualification.json', json2.encode(receipt) + '\n')!
 	}

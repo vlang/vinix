@@ -1,0 +1,123 @@
+index_decode:
+INDEX DECODE both architectures, empty/growing owned results, full 4096 packages, retired source buffers and exact canonical declarations PASS
+INDEX DECODE partial/schema/UTF8/number/validation refusals retire scratch; full unsigned sequence and signed expiry ranges PASS
+INDEX DECODE exact 8 MiB and limit-minus-one accepted; limit-plus-one and 4097 packages refused PASS
+INDEX DECODE authenticated original/legacy bytes, signature-before-schema refusals and 64-cycle signed retries retire scratch PASS
+index_schema:
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading data/share/data (30 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+repository_status_ownership:
+REPOSITORY STATUS both architectures, independent owned fields, repeated close, source replacement, exact protocol bytes and full 4096 repository/history bounds PASS
+REPOSITORY STATUS 64-cycle authenticated expired migration, newer floors, signature/equivocation refusals and exact retired-key recovery preserve configuration/cache/history PASS
+REPOSITORY STATUS 1000 schema/alias/FIFO configuration/cache/history and missing/unsafe/busy lock refusals retire scratch, preserve recovery data and permit restored retry PASS
+catalog_ownership:
+CATALOG OWNERSHIP returned manifests and configured publisher identities survive scratch retirement PASS
+CATALOG OWNERSHIP growing catalog survives source wrapper/index retirement with intact nested manifests PASS
+CATALOG OWNERSHIP later signature/syntax/schema/expiry/floor/equivocation/ambiguity/missing/identity refusal and revoked snapshots preserve metadata and configured identities PASS
+enrollment_ownership:
+ENROLLMENT OWNERSHIP admitted snapshot text and decoded index have independent lifetimes; publisher identity remains borrowed PASS
+ENROLLMENT OWNERSHIP 16 repeats of six large signature/authentication/read failures release all reader and input scratch PASS
+ENROLLMENT OWNERSHIP expired, misidentified and zero-sequence signed metadata refuse; restored offline acquisition retries normally PASS
+ENROLLMENT OWNERSHIP proposed configuration growth and syntax/curve refusal retire array scratch and preserve borrowed source fields PASS
+ENROLLMENT OWNERSHIP accepted reviews own independent fields; rejected review construction releases all clones and fingerprints PASS
+ENROLLMENT OWNERSHIP public failure/review/apply/revocation preserve read-only trust state, independent review fields and retained replay history PASS
+trust_recovery:
+TRUST RECOVERY exact disabled identity/digest/sequence and complete index required PASS
+TRUST RECOVERY valid retired keys still require authenticated signatures PASS
+TRUST RECOVERY empty refresh preserves retired and independent replay floors PASS
+repository_signature:
+SIGNATURE DECODING legacy case, prefixes, odd leading-zero form, six ASCII whitespace bytes and all 256 interior bytes preserve results and diagnostics PASS
+SIGNATURE DECODING accepted forms authenticate exact bytes; tampering, expiry, identity and size/key/signature precedence remain enforced PASS
+SIGNATURE DECODING megabyte wrong-length/late-invalid inputs and long outer whitespace preserve compatibility and source bytes PASS
+administration:
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository unreachable
+Updating trusted repository fixture
+Updating trusted repository fixture
+service:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+release:
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+RELEASE ADMISSION late-index refused=true unpublished=true
+RELEASE ADMISSION changed staged metadata refuses after reservation; exact retry preserves publisher floor PASS
+RELEASE ADMISSION 34 staged/reserved refusals preserve workspace and outside data; history timing, no publication, cleanup and exact retry PASS
+stored_decode:
+Stored decode: partial nested cleanup, escaped duplicate keys, canonical integers and late semantic refusal PASS
+Stored decode: both architectures, owned Unicode/escaped keys, legacy policy/window defaults and full u64 counters PASS
+Stored decode: 4096-repository/package limits, excess refusal, nested dependency/argument declarations and growing payload arrays PASS
+Stored decode: inclusive 8-MiB metadata and 16384-payload bounds with overflow refusal PASS
+state_schema:
+Stored state probe: aarch64 missing firmware accepted=false
+Stored state probe: aarch64 missing proprietary accepted=false
+Stored state probe: aarch64 null permissions accepted=false
+Stored state probe: aarch64 missing sdk accepted=false
+Stored state probe: x86_64 missing firmware accepted=false
+Stored state probe: x86_64 missing proprietary accepted=false
+Stored state probe: x86_64 null permissions accepted=false
+Stored state probe: x86_64 missing sdk accepted=false
+Stored state: complete nested declarations, explicit types, ambiguity refusal and legacy window compatibility passed on both architectures
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Downloading app/bin/app (14 bytes)
+Activated package generation 1
+Updating trusted repository publisher
+Installing Application 2.0.0 (1/1) from publisher
+Activated package generation 2
+Activated package generation 4
+Installing Application 2.0.0 (1/1) from publisher
+Activated package generation 5
+Restored packages from generation 2 in generation 5; application data was retained
+Stored state: malformed active/previous metadata preserves activation, trust, payloads, cache and recovery; restoration permits reviewed removal, rollback and collection

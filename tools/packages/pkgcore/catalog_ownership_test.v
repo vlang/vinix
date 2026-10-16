@@ -116,7 +116,7 @@ fn test_later_publisher_failures_retire_prior_transfers_without_changing_persist
 			message := err.msg()
 			assert message.contains(match fault {
 				'signature' { 'signature verification failed' }
-				'syntax' { 'Invalid json' }
+				'syntax' { 'unterminated administration document string' }
 				'schema' { 'missing required' }
 				'expiry' { 'expired' }
 				'floor', 'equivocation' { 'rollback or sequence equivocation' }

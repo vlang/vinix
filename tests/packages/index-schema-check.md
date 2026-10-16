@@ -8,6 +8,11 @@ coerced counters are refused. The legacy omitted `window_protocol` still means
 zero. Unique escaped names, whitespace and reordered object fields remain valid.
 The publisher's existing canonical bytes and signatures are unchanged.
 
+The follow-up [bounded signed-index decoder](index-decode-check.md) replaces
+generic typed decoding with owned bounded primitives, retains this signed-schema
+contract and qualifies complete/partial decoder lifetimes. The recorded results
+below retain the original scanner-only allocation scope.
+
 The shared key scanner now checks each object's required fields and each known
 field's JSON value kind without decoding the whole document a second time.
 Explicit array checks cover a pinned-compiler strict-decoder gap that accepts

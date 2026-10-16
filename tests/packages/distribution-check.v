@@ -107,6 +107,10 @@ fn check() ! {
 		run(work + '/repository-status-memory', [])!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
 			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-o', work + '/index-decode-memory', repository + '/tools/packages/pkgcore/index_decode_test.v'])!
+		run(work + '/index-decode-memory', [])!
+		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
 			'-o', work + '/diagnostics-memory', repository + '/tools/packages/pkgcore/view_test.v'])!
 		run(work + '/diagnostics-memory', [])!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',

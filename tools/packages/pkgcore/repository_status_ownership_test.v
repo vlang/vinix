@@ -14,7 +14,6 @@ $if track_heap ? {
 	fn C.vinix_heap_begin()
 	fn C.vinix_heap_end() u64
 	fn C.vinix_heap_count() u32
-	fn C.vinix_heap_size_at(u32) u64
 }
 
 fn test_repository_status_owns_both_architectures_and_growing_retained_documents() {
@@ -77,7 +76,6 @@ fn test_repository_status_preserves_authenticated_migration_and_retired_replay_f
 		text := canonical_index(Index{ repository: repository.id, sequence: 7, expires: 1 })!
 		snapshot := Snapshot{ repository: repository, text: text, signature: signing.sign(private, text.bytes())!.hex() }
 		cache := json2.encode([snapshot]); os.write_file(directory + '/catalog.json', cache)!
-		mut warm := repository_status(root)!; warm.close() // warm the existing signed-index decoder's metadata cache
 		for phase in ['legacy', 'newer', 'signature', 'equivocation']! {
 			history := if phase == 'legacy' { '' } else { json2.encode(TrustHistory{ repositories: [RepositoryFloor{ id: repository.id, public_key: repository.public_key,
 				sequence: if phase == 'newer' { u64(10) } else { u64(7) }, index_sha256: if phase == 'signature' { index_digest(text) } else { 'a'.repeat(64) } }] }) }
@@ -94,12 +92,9 @@ fn test_repository_status_preserves_authenticated_migration_and_retired_replay_f
 			}
 			$if track_heap ? {
 				kept := C.vinix_heap_end()
-				if phase == 'signature' { assert kept == 0 } else { assert kept <= 64 }
-				// The unchanged signed-index decoder retains one byte per call.
-				// Permit only that isolated residual, never configuration/result
-				// buffers or error-interface boxes hidden inside a byte budget.
-				for i in 0 .. C.vinix_heap_count() { assert C.vinix_heap_size_at(i) == 1 }
-				println('REPOSITORY STATUS signed ' + phase + ': 64 cycles retained ' + kept.str() + ' bytes of isolated index-decoder scratch')
+				assert kept == 0
+				assert C.vinix_heap_count() == 0
+				println('REPOSITORY STATUS signed ' + phase + ': 64 cycles retained ' + kept.str() + ' bytes')
 			}
 			assert os.read_file(path)! == configuration && os.read_file(directory + '/catalog.json')! == current_cache
 			if phase == 'legacy' { assert !os.exists(directory + '/trust-history.json') }
@@ -116,9 +111,9 @@ fn test_repository_status_preserves_authenticated_migration_and_retired_replay_f
 			retire_repository_status(mut status)
 		}
 		$if track_heap ? {
-			kept := C.vinix_heap_end(); assert kept <= 64
-			for i in 0 .. C.vinix_heap_count() { assert C.vinix_heap_size_at(i) == 1 }
-			println('REPOSITORY STATUS retired key: 64 cycles retained ' + kept.str() + ' bytes of isolated index-decoder scratch')
+			kept := C.vinix_heap_end(); assert kept == 0
+			assert C.vinix_heap_count() == 0
+			println('REPOSITORY STATUS retired key: 64 cycles retained ' + kept.str() + ' bytes')
 		}
 		assert os.read_file(directory + '/catalog.json')! == legacy_cache && os.read_file(directory + '/trust-history.json')! == legacy_history
 		assert !os.exists(directory + '/current') && os.ls(directory + '/objects')!.len == 0 && os.ls(directory + '/generations')!.len == 0

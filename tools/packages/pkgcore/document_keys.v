@@ -18,9 +18,11 @@ fn close_document_keys(frame DocumentKeyFrame) {
 	}
 }
 
-// Run after typed JSON decoding. The decoder validates syntax/types but drops
-// unknown fields and overwrites duplicate keys. Keep object/array contexts so
-// sibling records and nested objects have independent key sets. Decode escaped
+// Pair with typed JSON decoding: this scan checks schema, not complete syntax.
+// Generic decoding drops unknown fields and overwrites duplicate keys; bounded
+// signed-index decoding follows this pass to preserve schema diagnostics.
+// Keep object/array contexts so sibling records and nested objects have
+// independent key sets. Decode escaped
 // key spelling before comparison; never reinterpret already validated values.
 fn document_keys(text string, allowed fn (string, string) bool) ! {
 	document_keys_required(text, allowed, document_optional_fields)!
@@ -31,7 +33,7 @@ fn document_optional_fields(_ string, _ []string) ! {}
 fn document_any_value(_ string, _ string, _ u8) bool { return true }
 
 // Required-field checks use each object's decoded key set without decoding the
-// complete document a second time. Run only after strict typed syntax checks.
+// complete document a second time. Callers also require strict typed syntax checks.
 fn document_keys_required(text string, allowed fn (string, string) bool,
 	required fn (string, []string) !) ! {
 	document_keys_schema(text, allowed, required, document_any_value)!

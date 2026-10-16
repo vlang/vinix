@@ -1,0 +1,93 @@
+Initial expanded fixture compilation required its signing helper to return !string. A compatibility run then caught a catalog test expecting the generic decoder wording Invalid json for truncated JSON; the new bounded scanner reports unterminated administration document string. That assertion was updated to the specific new diagnostic, preserving rejection and state checks. Both original outputs are retained below; the final complete set passed.
+
+Fixture compilation:
+tools/packages/pkgcore/index_decode_test.v:105:43: error: to propagate the Result call, `index_decode_signature` must return a Result
+  103 | fn index_decode_signature(private signing.PrivateKey, text string) string {
+  104 |     bytes := text.bytes(); defer { unsafe { bytes.free() } }
+  105 |     signature := signing.sign(private, bytes)!; defer { unsafe { signature.free() } }
+      |                                              ^
+  106 |     return signature.hex()
+  107 | }
+Details: tools/packages/pkgcore/index_decode_test.v:103:68: details: prepend ! before the declaration of the return type of `index_decode_signature`
+  101 | }
+  102 | 
+  103 | fn index_decode_signature(private signing.PrivateKey, text string) string {
+      |                                                                    ~~~~~~
+  104 |     bytes := text.bytes(); defer { unsafe { bytes.free() } }
+  105 |     signature := signing.sign(private, bytes)!; defer { unsafe { signature.free() } }
+tools/packages/pkgcore/index_decode_test.v:105:43: error: to propagate the call, `index_decode_signature` must return a Result type
+  103 | fn index_decode_signature(private signing.PrivateKey, text string) string {
+  104 |     bytes := text.bytes(); defer { unsafe { bytes.free() } }
+  105 |     signature := signing.sign(private, bytes)!; defer { unsafe { signature.free() } }
+      |                                              ^
+  106 |     return signature.hex()
+  107 | }
+Details: tools/packages/pkgcore/index_decode_test.v:103:68: details: prepend ! before the declaration of the return type of `index_decode_signature`
+  101 | }
+  102 | 
+  103 | fn index_decode_signature(private signing.PrivateKey, text string) string {
+      |                                                                    ~~~~~~
+  104 |     bytes := text.bytes(); defer { unsafe { bytes.free() } }
+  105 |     signature := signing.sign(private, bytes)!; defer { unsafe { signature.free() } }
+
+Catalog diagnostic assertion:
+CATALOG OWNERSHIP returned manifests and configured publisher identities survive scratch retirement PASS
+CATALOG OWNERSHIP growing catalog survives source wrapper/index retirement with intact nested manifests PASS
+tools/packages/pkgcore/catalog_ownership_test.v:117: fn test_later_publisher_failures_retire_prior_transfers_without_changing_persistent_metadata
+    assert message.contains(match fault {
+				'signature' { 'signature verification failed' }
+				'syntax' { 'Invalid json' }
+				'schema' { 'missing required' }
+				'expiry' { 'expired' }
+				'floor', 'equivocation' { 'rollback or sequence equivocation' }
+				'ambiguous' { 'ambiguous package' }
+				else { 'no authenticated cached index' }
+			}), message
+        Message: unterminated administration document string
+
+Initial AArch64 fixture allocation refusal: final large input generation streams an encoded package template, full catalogs use one live owner, and guest cases run in fresh workers without changed limits. Original source, executable, generated C and serial/controller logs are retained in the ledger.
+FAIL aarch64 packages-repository-config (123.8s)
+  forbidden "HWTEST FAIL" in the line: HWTEST FAIL packages-repository-config
+  last 40 serial lines:
+  | kmain_thread: console done
+  | devcore: 3 VirtIO devices listed
+  | kmain_thread: writeback done
+  | 
+  | *** aarch64: Kernel initialisation complete ***
+  | *** Starting /sbin/init ***
+  | syspower: power button through the event device at 0x9080000
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | HWTEST START packages-repository-config
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | REPOSITORY CONFIG fresh/locked/corrupt configuration checks; damaged cache/history listing and reviewed revocation preserve maintenance failures PASS
+  | CONFIGURATION PROCESS repository-config-core PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | REPOSITORY CONFIG protocol explicit scope, complete bounded metadata, legacy separation and owned close PASS
+  | CONFIGURATION PROCESS repository-config-protocol PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | random: reseeded from 5161 events, 4 hardware words
+  | CONFIGURATION OBSERVATION both architectures, independent repository/policy fields, canonical policy order, unchanged wire bytes and stored offline flag PASS
+  | CONFIGURATION OBSERVATION 1000 legacy/default and growing 64-record cycles retire scratch; full 4096 repository/pin observations preserve source configuration PASS
+  | CONFIGURATION OBSERVATION maintenance FIFOs remain unopened; 1000 schema/missing/alias/FIFO/lock/busy refusal cycles retire scratch and permit restored reads PASS
+  | CONFIGURATION PROCESS configuration-observation PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | REPOSITORY STATUS both architectures, independent owned fields, repeated close, source replacement, exact protocol bytes and full 4096 repository/history bounds PASS
+  | REPOSITORY STATUS 64-cycle authenticated expired migration, newer floors, signature/equivocation refusals and exact retired-key recovery preserve configuration/cache/history PASS
+  | REPOSITORY STATUS 1000 schema/alias/FIFO configuration/cache/history and missing/unsafe/busy lock refusals retire scratch, preserve recovery data and permit restored retry PASS
+  | CONFIGURATION PROCESS repository-status PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | malloc(0x49f)
+  | V panic: memory allocation failure
+  |  v hash: 826e96f
+  |     pid: 0x481a
+  |     tid: 0x481a
+  | index-decode failed (1)
+  | HWTEST FAIL packages-repository-config
+  | syspower: power off: stopping devices
+  logs: /Users/alex/code/vinix/build/pkg-index-decode-arm/packages-repository-config
+package-repository-config aarch64: 0 passed, 1 failed, 0 skipped

@@ -60,10 +60,13 @@ fn index_value_type(parent string, key string, token u8) bool {
 // Complete declarations prevent defaults, coercion or duplicate keys from
 // silently changing publisher intent. window_protocol remains optional at zero.
 fn decode_signed_index(repository string, text string, now i64) !Index {
-	index := json2.decode[Index](text, strict: true)!
+	if text.len > max_metadata { return error(repository + ': repository index too large') }
+	// Preserve signed-schema diagnostics before the bounded typed reader. Both
+	// passes inspect the authenticated bytes without rewriting them.
+	document_keys_schema(text, index_document_field, index_required_fields, index_value_type)!
+	index := read_signed_index(text)!
 	mut accepted := false
 	defer { if !accepted { close_decoded_index(index) } }
-	document_keys_schema(text, index_document_field, index_required_fields, index_value_type)!
 	if index.format != 1 || index.repository != repository || index.sequence == 0
 		|| index.expires <= now || index.packages.len > 4096 {
 		return error(repository + ': expired, incompatible or misidentified repository metadata; refresh from its publisher')

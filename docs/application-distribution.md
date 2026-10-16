@@ -47,7 +47,10 @@ complete configuration on cache/history refusal. `repo-list` closes its result
 after output. Locking, authenticated legacy-history recovery and strict metadata
 admission retain their existing behavior. See
 [repository status ownership checks](../tests/packages/repository-status-ownership-check.md)
-for measured scope and the remaining signed-index decoder allocation.
+for the original measured scope. The subsequent
+[bounded signed-index decoder](../tests/packages/index-decode-check.md) removes
+the decoder allocation and requires zero retained bytes for authenticated
+repository observations as well as direct index results and refusals.
 
 Local payload copies validate ordinary source and destination descriptors before
 writing, refuse the same file even through a hard link, and enforce the captured

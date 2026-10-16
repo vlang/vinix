@@ -1,0 +1,55 @@
+clang ASan/UBSan; -gc none -manualfree; detect_leaks=0; halt_on_error=1
+INDEX DECODE aarch64 0 packages: 1000 cycles retained 0 bytes
+INDEX DECODE aarch64 1 packages: 1000 cycles retained 0 bytes
+INDEX DECODE aarch64 64 packages: 1000 cycles retained 0 bytes
+INDEX DECODE x86_64 0 packages: 1000 cycles retained 0 bytes
+INDEX DECODE x86_64 1 packages: 1000 cycles retained 0 bytes
+INDEX DECODE x86_64 64 packages: 1000 cycles retained 0 bytes
+INDEX DECODE both architectures, empty/growing owned results, full 4096 packages, retired source buffers and exact canonical declarations PASS
+INDEX DECODE refusal 0: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 1: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 2: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 3: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 4: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 5: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 6: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 7: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 8: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 9: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 10: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 11: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 12: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 13: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 14: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 15: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 16: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 17: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 18: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 19: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 20: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 21: 1000 cycles retained 0 bytes
+INDEX DECODE refusal 22: 1000 cycles retained 0 bytes
+INDEX DECODE partial/schema/UTF8/number/validation refusals retire scratch; full unsigned sequence and signed expiry ranges PASS
+INDEX DECODE exact 8 MiB and limit-minus-one accepted; limit-plus-one and 4097 packages refused PASS
+INDEX DECODE signed original/legacy: 64 cycles retained 0 bytes
+INDEX DECODE signed original/legacy: 64 cycles retained 0 bytes
+INDEX DECODE authenticated original/legacy bytes, signature-before-schema refusals and 64-cycle signed retries retire scratch PASS
+
+Repository observations:
+REPOSITORY STATUS both architectures, independent owned fields, repeated close, source replacement, exact protocol bytes and full 4096 repository/history bounds PASS
+REPOSITORY STATUS signed legacy: 64 cycles retained 0 bytes
+REPOSITORY STATUS signed newer: 64 cycles retained 0 bytes
+REPOSITORY STATUS signed signature: 64 cycles retained 0 bytes
+REPOSITORY STATUS signed equivocation: 64 cycles retained 0 bytes
+REPOSITORY STATUS retired key: 64 cycles retained 0 bytes
+REPOSITORY STATUS signed legacy: 64 cycles retained 0 bytes
+REPOSITORY STATUS signed newer: 64 cycles retained 0 bytes
+REPOSITORY STATUS signed signature: 64 cycles retained 0 bytes
+REPOSITORY STATUS signed equivocation: 64 cycles retained 0 bytes
+REPOSITORY STATUS retired key: 64 cycles retained 0 bytes
+REPOSITORY STATUS 64-cycle authenticated expired migration, newer floors, signature/equivocation refusals and exact retired-key recovery preserve configuration/cache/history PASS
+REPOSITORY STATUS 1000 schema/alias/FIFO configuration/cache/history and missing/unsafe/busy lock refusals retire scratch, preserve recovery data and permit restored retry PASS
+REPOSITORY STATUS 1000 fresh reads/retirements retained 0 bytes
+REPOSITORY STATUS 1000 retained reads/retirements retained 0 bytes
+REPOSITORY STATUS 1000 bad-cache reads/retirements retained 0 bytes
+REPOSITORY STATUS 1000 bad-history reads/retirements retained 0 bytes

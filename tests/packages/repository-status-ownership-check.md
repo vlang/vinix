@@ -53,6 +53,11 @@ retained allocation to be exactly one byte. Signature refusals before decoding
 retain zero. This is an explicit dependency limit, not a whole-status zero-byte
 claim; raw failed output, source, probe and final measurements are retained.
 
+The subsequent [bounded signed-index decoder](index-decode-check.md) removes
+that dependency allocation. The maintained status fixture now requires zero on
+every authenticated path without warming a generic decoder cache. The results
+below retain this earlier qualification's original scope and measurements.
+
 The maintained repository guest suite adds this fixture to configuration-only
 discovery and protocol checks. Host qualification includes administration,
 coordination, history recovery, signed CLI maintenance and sanitizers. System-root
