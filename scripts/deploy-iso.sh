@@ -214,7 +214,7 @@ check_layer() {
 
 if [ "$BUILD_AMD64" -eq 1 ]; then
     step "Building the amd64 image"
-    for layer in x11 network-tools python v; do
+    for layer in x11 network-tools; do
         check_layer "$SCRIPT_DIR/build-amd64-$layer/staging" "./build-$layer-amd64.sh"
     done
     [ "$layer_missing" -eq 0 ] || die "build the missing layers in $SCRIPT_DIR first"
@@ -222,8 +222,6 @@ if [ "$BUILD_AMD64" -eq 1 ]; then
     VINIX_UI2_SOURCE="$UI2_SOURCE" \
     VINIX_AMD64_X11_STAGING="$SCRIPT_DIR/build-amd64-x11/staging" \
     VINIX_AMD64_NETWORK_TOOLS_STAGING="$SCRIPT_DIR/build-amd64-network-tools/staging" \
-    VINIX_AMD64_PYTHON_STAGING="$SCRIPT_DIR/build-amd64-python/staging" \
-    VINIX_AMD64_VLANG_STAGING="$SCRIPT_DIR/build-amd64-v/staging" \
     VINIX_AMD64_DESKTOP_BUILD_DIR="$WORK/amd64-desktop" \
     VINIX_AMD64_USERLAND_BUILD_DIR="$CACHE/amd64-userland" \
     VINIX_AMD64_BUILD_DIR="$SRC/build-amd64-kernel" \
@@ -244,8 +242,6 @@ if [ "$BUILD_ARM64" -eq 1 ]; then
     check_layer "$SCRIPT_DIR/build-aarch64-userland/staging" ./scripts/build-aarch64.sh
     check_layer "$SCRIPT_DIR/build-aarch64-x11/staging" ./scripts/build-x11-aarch64.sh
     check_layer "$SCRIPT_DIR/build-aarch64-network-tools/staging" ./scripts/build-network-tools-aarch64.sh
-    check_layer "$SCRIPT_DIR/build-aarch64-python/staging" ./scripts/build-python-aarch64.sh
-    check_layer "$SCRIPT_DIR/build-aarch64-v/staging" ./scripts/build-v-aarch64.sh
     [ "$layer_missing" -eq 0 ] || die "build the missing layers in $SCRIPT_DIR first"
 
     mkdir -p "$SRC/build-support/init-aarch64"
@@ -260,9 +256,7 @@ if [ "$BUILD_ARM64" -eq 1 ]; then
     VINIX_UI2_SOURCE="$UI2_SOURCE" \
     VINIX_AARCH64_USERLAND_BUILD_DIR="$SCRIPT_DIR/build-aarch64-userland" \
     VINIX_AARCH64_APP_CACHE="$CACHE/arm64-desktop-apps" \
-    VINIX_PYTHON_STAGING="$SCRIPT_DIR/build-aarch64-python/staging" \
     VINIX_NETWORK_TOOLS_STAGING="$SCRIPT_DIR/build-aarch64-network-tools/staging" \
-    VINIX_VLANG_STAGING="$SCRIPT_DIR/build-aarch64-v/staging" \
     VINIX_X11_STAGING="$SCRIPT_DIR/build-aarch64-x11/staging" \
     VINIX_GPU_SYSROOT="$SCRIPT_DIR/build-aarch64-x11/sysroot" \
     VINIX_DESKTOP_INITRAMFS="$WORK/arm64-initramfs-desktop.tar" \
@@ -376,7 +370,8 @@ describe_boot() {
     echo "launch offers them and \`pkg install\` downloads them, so give the VM a network"
     echo "card (the commands above do). Vinix drives VirtIO and Intel e1000 cards. Nor is"
     echo "X11: the first graphical Linux application brings it, from the"
-    echo "\`vinix-x11-*.tar.gz\` files of this release."
+    echo "\`vinix-x11-*.tar.gz\` files of this release. Python is a \`pkg install python3\`"
+    echo "away; the V compiler and Oh My Zsh are left out too."
     echo
     echo "### VirtualBox"
     echo

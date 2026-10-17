@@ -1,0 +1,14 @@
+# Zsh for Vinix images built without Oh My Zsh (the image builders'
+# --with-oh-my-zsh replaces this file with one that loads it). The prompt is
+# the robbyrussell theme's, so the shell looks the same either way.
+HISTFILE="$HOME/.zsh_history"
+HISTSIZE=10000
+SAVEHIST=10000
+setopt hist_ignore_dups share_history auto_cd interactive_comments prompt_subst
+bindkey -e
+
+autoload -Uz compinit
+compinit -i -d "$HOME/.zcompdump"
+zstyle ':completion:*' menu select
+
+PROMPT='%(?:%B%F{green}➜%f%b:%B%F{red}➜%f%b) %F{cyan}%c%f '

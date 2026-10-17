@@ -74,10 +74,11 @@ controllers VirtualBox gives an arm64 VM, so that one runs from memory.
 `./scripts/run-iso-virtualbox.sh vinix-amd64.iso` creates such a VM, disk included.
 VirtualBox only runs guests of its host's architecture.
 
-Both images carry the same software: X.org with Mesa, GTK, Python, V, GCC,
-git, curl and `pkg`. Firefox, Chromium and the other larger apps are not on the
-image; the first launch offers them and `pkg install` downloads them, which is
-why the commands above give the VM a network card. Vinix drives VirtIO and
+Both images carry the same software: the desktop, GCC, git, curl and `pkg`.
+Firefox, Chromium and the other larger apps are not on the image; the first
+launch offers them and `pkg install` downloads them, which is why the commands
+above give the VM a network card. X11 comes with the first graphical Linux
+application, and Python with `pkg install python3`. Vinix drives VirtIO and
 Intel e1000 network cards.
 
 ### Virtualization and KVM
@@ -209,7 +210,10 @@ Both Alpine userland images include Zsh and a pinned, local Oh My Zsh
 installation at `/root/.oh-my-zsh`. Vinix boots into a Zsh login shell, and
 the native desktop Terminal and Hyprland's Foot terminal also launch Zsh by
 default. The root `.zshrc` loads the bundled `robbyrussell` theme without guest
-network access. Run the following inside Vinix to verify the shell setup:
+network access. The compact and amd64 desktop images leave Oh My Zsh out unless
+built with `--with-oh-my-zsh`; their `.zshrc` is `build-support/zshrc`, which
+keeps the same prompt. Where it is installed, run the following inside Vinix to
+verify the shell setup:
 
 ```sh
 /root/zsh-smoke.sh
@@ -305,7 +309,8 @@ and QEMU screenshot test.
 
 ### Develop Vinix desktop inside Vinix
 
-The AArch64 desktop image contains the native V compiler and its matching
+The full AArch64 desktop image, and a compact or amd64 one built with
+`--with-v`, contains the native V compiler and its matching
 `vlib`, TCC, the editable staged desktop sources in `/root/desktop`, and the
 headless ui2 module in `/root/vmodules`. QEMU also shares the checkout from
 which it was launched at `/mnt/host/vinix`. The share is a read-only mirror
@@ -827,10 +832,12 @@ the browser on the physical Xorg display for command-line debugging.
 Set `VINIX_FIREFOX_STAGING` to merge a different completed staging tree, or
 `ALPINE_BRANCH`/`VINIX_FIREFOX_PACKAGE` to select another compatible build.
 The compact desktop image used by the default M1 deployment and the release
-ISOs carries Python, Git and GCC without the much larger complete userland
-image, and no X11: X11 serves only the Linux applications the desktop hosts on
-Xvfb, while native applications, and OpenGL through a GPU driver's EGL, do
-without it. `pkg` installs it with the first graphical application, from the
+ISOs carries Git and GCC without the much larger complete userland image.
+Python, the V compiler with TCC and Oh My Zsh are left out unless it is built
+with `--with-python`, `--with-v` or `--with-oh-my-zsh`, and so is X11: X11
+serves only the Linux applications the desktop hosts on Xvfb, while native
+applications, and OpenGL through a GPU driver's EGL, do without it. `pkg`
+installs it with the first graphical application, from the
 `vinix-x11-ARCH.tar.gz` bundle `scripts/deploy-iso.sh` publishes with each
 release (`pkg install x11` installs it alone). `--with-x11` keeps it in the
 image, as does any option for an application that needs it, such as

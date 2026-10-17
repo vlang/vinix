@@ -5,10 +5,12 @@
 # and GCC come from official Alpine packages.
 #
 # The image carries the same package layers as the arm64 desktop; build them
-# first with ./scripts/build-x11-amd64.sh, ./scripts/build-network-tools-amd64.sh,
-# ./scripts/build-python-amd64.sh and ./scripts/build-v-amd64.sh.
+# first with ./scripts/build-x11-amd64.sh and ./scripts/build-network-tools-amd64.sh,
+# and for the options below ./scripts/build-python-amd64.sh and
+# ./scripts/build-v-amd64.sh.
 #
 # Usage: ./scripts/build-desktop-amd64.sh [--no-iso] [--with-firefox] [--with-x11]
+#            [--with-python] [--with-v] [--with-oh-my-zsh]
 #
 #   --with-firefox  also stage Firefox and its GTK/media runtime from
 #                   ./scripts/build-firefox-amd64.sh; otherwise the first-run
@@ -16,6 +18,11 @@
 #   --with-x11      keep X11 in the image; otherwise pkg installs it with the
 #                   first graphical application. VINIX_AMD64_X11_BUNDLE=FILE.tar.gz
 #                   writes the bundle it installs.
+#   --with-python   stage Python 3; otherwise `pkg install python3` adds it
+#   --with-v        stage the V compiler with TCC, and the desktop's sources
+#                   for rebuilding it in the guest
+#   --with-oh-my-zsh  keep Oh My Zsh for root's shell; otherwise root's
+#                   .zshrc is build-support/zshrc
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -27,6 +34,9 @@ OUTPUT_ISO="${VINIX_AMD64_DESKTOP_ISO:-$SCRIPT_DIR/vinix-desktop-amd64.iso}"
 MAKE_ISO=1
 WITH_FIREFOX=0
 WITH_X11=0
+WITH_PYTHON=0
+WITH_V=0
+WITH_OH_MY_ZSH=0
 X11_BUNDLE="${VINIX_AMD64_X11_BUNDLE:-}"
 
 for arg in "$@"; do
@@ -34,6 +44,9 @@ for arg in "$@"; do
         --no-iso) MAKE_ISO=0 ;;
         --with-firefox) WITH_FIREFOX=1; WITH_X11=1 ;;
         --with-x11) WITH_X11=1 ;;
+        --with-python) WITH_PYTHON=1 ;;
+        --with-v) WITH_V=1 ;;
+        --with-oh-my-zsh) WITH_OH_MY_ZSH=1 ;;
         --help|-h)
             sed -n '2,/^set -/s/^# \{0,1\}//p' "$0"
             exit 0
@@ -58,15 +71,20 @@ else
     UI2_SOURCE="$SCRIPT_DIR/third_party/ui2"
 fi
 
-# X.org with Mesa and LLVM; pkg with apk, curl and git; Python; V with TCC.
-# Firefox, with its GTK and media runtime, only on request.
+# pkg with apk, curl and git. X.org with Mesa and LLVM, Firefox with its GTK
+# and media runtime, Python, and V with TCC only on request.
 X11_STAGING="${VINIX_AMD64_X11_STAGING:-$SCRIPT_DIR/build-amd64-x11/staging}"
 FIREFOX_STAGING="${VINIX_AMD64_FIREFOX_STAGING:-$SCRIPT_DIR/build-amd64-firefox/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_AMD64_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-amd64-network-tools/staging}"
 PYTHON_STAGING="${VINIX_AMD64_PYTHON_STAGING:-$SCRIPT_DIR/build-amd64-python/staging}"
 VLANG_STAGING="${VINIX_AMD64_VLANG_STAGING:-$SCRIPT_DIR/build-amd64-v/staging}"
-LAYERS=("$NETWORK_TOOLS_STAGING:scripts/build-network-tools-amd64.sh"
-    "$PYTHON_STAGING:scripts/build-python-amd64.sh" "$VLANG_STAGING:scripts/build-v-amd64.sh")
+LAYERS=("$NETWORK_TOOLS_STAGING:scripts/build-network-tools-amd64.sh")
+if [ "$WITH_PYTHON" -eq 1 ]; then
+    LAYERS+=("$PYTHON_STAGING:scripts/build-python-amd64.sh")
+fi
+if [ "$WITH_V" -eq 1 ]; then
+    LAYERS+=("$VLANG_STAGING:scripts/build-v-amd64.sh")
+fi
 # X11 serves only the Linux applications the desktop hosts on Xvfb; native
 # applications, and OpenGL through a GPU driver's EGL, do without it.
 if [ "$WITH_X11" -eq 1 ] || [ -n "$X11_BUNDLE" ]; then
@@ -204,7 +222,13 @@ fi
 if [ "$WITH_FIREFOX" -eq 1 ]; then
     MERGE+=("$FIREFOX_STAGING")
 fi
-MERGE+=("$NETWORK_TOOLS_STAGING" "$PYTHON_STAGING" "$VLANG_STAGING")
+MERGE+=("$NETWORK_TOOLS_STAGING")
+if [ "$WITH_PYTHON" -eq 1 ]; then
+    MERGE+=("$PYTHON_STAGING")
+fi
+if [ "$WITH_V" -eq 1 ]; then
+    MERGE+=("$VLANG_STAGING")
+fi
 for layer in "${MERGE[@]}"; do
     echo "    merging $layer"
     merge_staging_tree "$layer"
@@ -229,13 +253,20 @@ rm -f "$STAGING/usr/bin/lto-dump" "$STAGING/usr/bin/g++" "$STAGING/usr/bin/c++" 
     "$STAGING"/usr/libexec/gcc/*/*/lto-wrapper \
     "$STAGING/usr/lib/libstdc++.a" "$STAGING/usr/lib/libsupc++.a"
 rm -rf "$STAGING/usr/include/c++"
-find "$STAGING/usr/lib/vlang" -type d \( -name tests -o -name slow_tests -o -name testdata \) \
-    -prune -exec rm -rf {} +
-find "$STAGING/usr/lib/vlang" -type f \( -name '*_test.v' -o -name '*_test.*.v' \) -delete
+if [ "$WITH_V" -eq 1 ]; then
+    find "$STAGING/usr/lib/vlang" -type d \( -name tests -o -name slow_tests -o -name testdata \) \
+        -prune -exec rm -rf {} +
+    find "$STAGING/usr/lib/vlang" -type f \( -name '*_test.v' -o -name '*_test.*.v' \) -delete
+fi
 rm -f "$STAGING"/usr/lib/libOSMesa.so* "$STAGING"/usr/lib/libGLU.so* \
     "$STAGING"/usr/lib/libxatracker.so*
+# The userland installs Oh My Zsh for root (build-support/stage-oh-my-zsh.sh).
+if [ "$WITH_OH_MY_ZSH" -eq 0 ]; then
+    rm -rf "$STAGING/root/.oh-my-zsh" "$STAGING/root/zsh-smoke.sh"
+    install -m644 "$SCRIPT_DIR/build-support/zshrc" "$STAGING/root/.zshrc"
+fi
 mkdir -p "$STAGING/usr/bin" "$STAGING/usr/share/vinix/wallpapers" \
-    "$STAGING/usr/share/vinix/icons" "$STAGING/root/desktop" "$STAGING/run"
+    "$STAGING/usr/share/vinix/icons" "$STAGING/run"
 install -m755 "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
 VFLAGS="${VFLAGS:-} -nocache" "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/desktop/tools/build-services.v" \
     --install-only --output="$BUILD_DIR/services" --staging="$STAGING"
@@ -307,13 +338,19 @@ fi
 echo "==> Installing Vinix's optimized musl allocator..."
 "$SCRIPT_DIR/build-support/musl/stage" --arch x86_64 --staging "$STAGING"
 
-x11_command_paths=()
+optional_command_paths=()
 if [ "$WITH_X11" -eq 1 ]; then
-    x11_command_paths=(usr/bin/Xorg usr/bin/Xvfb usr/bin/Xvfb-glx usr/bin/startx
+    optional_command_paths=(usr/bin/Xorg usr/bin/Xvfb usr/bin/Xvfb-glx usr/bin/startx
         usr/bin/vinix-wine-host usr/bin/vinix-xinput)
 fi
-for command_path in bin/zsh usr/bin/python3 usr/bin/v usr/bin/tcc usr/bin/pkg sbin/apk \
-    usr/bin/curl usr/bin/git ${x11_command_paths[@]+"${x11_command_paths[@]}"} \
+if [ "$WITH_PYTHON" -eq 1 ]; then
+    optional_command_paths+=(usr/bin/python3)
+fi
+if [ "$WITH_V" -eq 1 ]; then
+    optional_command_paths+=(usr/bin/v usr/bin/tcc)
+fi
+for command_path in bin/zsh usr/bin/pkg sbin/apk \
+    usr/bin/curl usr/bin/git ${optional_command_paths[@]+"${optional_command_paths[@]}"} \
     usr/bin/run-firefox; do
     if [ ! -x "$STAGING/$command_path" ]; then
         echo "ERROR: desktop image has no executable /$command_path" >&2
@@ -362,13 +399,17 @@ if [ -d "$BUILD_DIR/wallpapers" ]; then
         "$BUILD_DIR/wallpapers"/SOURCES.txt \
         "$STAGING/usr/share/vinix/wallpapers/" 2>/dev/null || true
 fi
-(
-    # The V migration may leave no handwritten C sources to ship.
-    shopt -s nullglob
-    cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop"/*.c "$SCRIPT_DIR/desktop"/*.h \
-        "$APP_SRC/app_icon_data.h" "$SCRIPT_DIR/desktop/README.md" \
-        "$STAGING/root/desktop/"
-)
+# The desktop's sources, for the V compiler to rebuild it in the guest.
+if [ "$WITH_V" -eq 1 ]; then
+    mkdir -p "$STAGING/root/desktop"
+    (
+        # The V migration may leave no handwritten C sources to ship.
+        shopt -s nullglob
+        cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop"/*.c "$SCRIPT_DIR/desktop"/*.h \
+            "$APP_SRC/app_icon_data.h" "$SCRIPT_DIR/desktop/README.md" \
+            "$STAGING/root/desktop/"
+    )
+fi
 
 # The X11 that pkg installs onto an image built without it (vinix-pkg's
 # install_x11): the layer and its launcher, less every path this image already

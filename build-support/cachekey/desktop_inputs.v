@@ -35,6 +35,7 @@ const desktop_source_paths = [
 	'kernel/c',
 	'build-support/vinix-pkg',
 	'build-support/v-command',
+	'build-support/zshrc',
 	'build-support/java-cacerts',
 	'build-support/java-cacerts.v',
 	'build-support/java-cacerts-stage.v',

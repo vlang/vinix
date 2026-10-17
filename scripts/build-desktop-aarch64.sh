@@ -4,6 +4,7 @@
 #
 # Usage: ./scripts/build-desktop-aarch64.sh [--no-initramfs] [--compact-initramfs]
 #        [--with-firefox] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-dota2] [--with-asahi-gpu] [--with-x86-translation] [--with-roblox] [--wifi-bundle=DIR]
+#        [--with-python] [--with-v] [--with-oh-my-zsh]
 # Set V or VINIX_V_COMPILER to a V executable or checkout directory to select
 # a compiler explicitly (for example V=~/code/v/v).
 #
@@ -115,8 +116,11 @@ write_staging_cache_manifest() {
 
     # Change this when the immutable-layer assembly logic changes. Desktop
     # source and launcher edits are refreshed below without restaging 6+ GiB.
-    printf 'version=10\n'
+    printf 'version=11\n'
     printf 'compact=%s\n' "$COMPACT_INITRAMFS"
+    printf 'python=%s\n' "$WITH_PYTHON"
+    printf 'v=%s\n' "$WITH_V"
+    printf 'oh_my_zsh=%s\n' "$WITH_OH_MY_ZSH"
     printf 'firefox=%s\n' "$WITH_FIREFOX"
     printf 'x11=%s\n' "$WITH_X11"
     printf 'chromium=%s\n' "$WITH_CHROMIUM"
@@ -273,6 +277,11 @@ WITH_MINECRAFT=0
 WITH_OPENGOTHIC=0
 WITH_FIREFOX=0
 WITH_X11=0
+# Python, V with TCC, and Oh My Zsh: a full image keeps them, a compact one
+# only on request.
+WITH_PYTHON=
+WITH_V=
+WITH_OH_MY_ZSH=
 REFRESH_STAGING="${VINIX_REFRESH_DESKTOP_STAGING:-0}"
 # The Apple GPU userspace is only correct on Apple hardware; see the overlay
 # below for why its mere presence on disk must not select it.
@@ -294,13 +303,20 @@ for arg in "$@"; do
         --with-opengothic) WITH_OPENGOTHIC=1 ;;
         --with-firefox) WITH_FIREFOX=1 ;;
         --with-x11) WITH_X11=1 ;;
+        --with-python) WITH_PYTHON=1 ;;
+        --with-v) WITH_V=1 ;;
+        --with-oh-my-zsh) WITH_OH_MY_ZSH=1 ;;
         # The default since images stopped carrying Firefox; kept for callers.
         --without-firefox) WITH_FIREFOX=0 ;;
         --with-asahi-gpu) WITH_ASAHI_GPU=1 ;;
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
-            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-firefox] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-dota2] [--with-asahi-gpu] [--with-x86-translation] [--with-steam] [--with-qemu-system] [--with-android] [--with-roblox] [--wifi-bundle=DIR]"
-            echo "  --compact-initramfs stages the desktop, X11 and core developer tools"
+            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-firefox] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-dota2] [--with-asahi-gpu] [--with-x86-translation] [--with-steam] [--with-qemu-system] [--with-android] [--with-roblox] [--wifi-bundle=DIR] [--with-python] [--with-v] [--with-oh-my-zsh]"
+            echo "  --compact-initramfs stages the desktop, pkg and GCC"
+            echo "  --with-python adds Python 3 to a compact image; otherwise pkg install python3"
+            echo "  --with-v adds the V compiler with TCC to a compact image, with the desktop"
+            echo "      sources vinix-desktop-build rebuilds the desktop from"
+            echo "  --with-oh-my-zsh keeps Oh My Zsh for root in a compact image"
             echo "  --with-firefox adds a previously staged Firefox and its GTK/media runtime;"
             echo "      otherwise the first-run app page offers it through pkg"
             echo "  --with-x11 keeps X11 in a compact image; otherwise pkg installs it with the"
@@ -342,6 +358,14 @@ if [ "$COMPACT_INITRAMFS" -eq 0 ] || [ "$WITH_FIREFOX" -eq 1 ] ||
     WITH_X11=1
 fi
 X11_BUNDLE="${VINIX_X11_BUNDLE:-}"
+if [ "$COMPACT_INITRAMFS" -eq 0 ]; then
+    WITH_PYTHON=1
+    WITH_V=1
+    WITH_OH_MY_ZSH=1
+fi
+WITH_PYTHON="${WITH_PYTHON:-0}"
+WITH_V="${WITH_V:-0}"
+WITH_OH_MY_ZSH="${WITH_OH_MY_ZSH:-0}"
 
 case "$REFRESH_STAGING" in
     0|1) ;;
@@ -452,7 +476,8 @@ if [ "$MAKE_INITRAMFS" -eq 1 ]; then
     fi
 fi
 
-if [ "$MAKE_INITRAMFS" -eq 1 ] && [ ! -x "$VLANG_STAGING/usr/lib/vlang/v" ]; then
+if [ "$MAKE_INITRAMFS" -eq 1 ] && [ "$WITH_V" -eq 1 ] &&
+   [ ! -x "$VLANG_STAGING/usr/lib/vlang/v" ]; then
     if [ -n "${VINIX_VLANG_STAGING:-}" ]; then
         echo "ERROR: custom V staging is incomplete: $VLANG_STAGING" >&2
         exit 1
@@ -699,8 +724,8 @@ fi
 # Appending an overlay tar would leave duplicate paths that the kernel's
 # initramfs unpacker rejects, so stage before repacking it. A full userland is
 # useful for development but can exceed an M1 EFI partition. Compact mode keeps
-# the native GCC toolchain plus the packaged X11, Python and network-tool
-# closures, while leaving out unrelated large runtimes.
+# the native GCC toolchain and the network tools with pkg, plus X11, Python and
+# V on request, while leaving out unrelated large runtimes.
 if [ ! -f "$BASE_INITRAMFS" ]; then
     echo "ERROR: $BASE_INITRAMFS not found; it is the desktop's base userland."
     exit 1
@@ -726,7 +751,7 @@ if [ ! -x "$NETWORK_TOOLS_STAGING/usr/bin/pkg" ] ||
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    if [ ! -x "$PYTHON_STAGING/usr/bin/python3" ]; then
+    if [ "$WITH_PYTHON" -eq 1 ] && [ ! -x "$PYTHON_STAGING/usr/bin/python3" ]; then
         echo "ERROR: compact desktop needs $PYTHON_STAGING/usr/bin/python3" >&2
         echo "Run ./scripts/build-python-aarch64.sh first." >&2
         exit 1
@@ -946,7 +971,7 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
         merge_staging_tree "$LIBREOFFICE_STAGING"
     fi
     if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-        echo "    compact image: staging BusyBox, X11, Python, Git and GCC"
+        echo "    compact image: staging BusyBox, Git and GCC"
         if [ ! -f "$DEVTOOLS_ARCHIVE" ]; then
             echo "ERROR: compact desktop needs $DEVTOOLS_ARCHIVE" >&2
             echo "Run ./scripts/build-userland-aarch64.sh first." >&2
@@ -983,7 +1008,10 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
             merge_staging_tree "$FIREFOX_STAGING"
         fi
         merge_staging_tree "$NETWORK_TOOLS_STAGING"
-        merge_staging_tree "$PYTHON_STAGING"
+        if [ "$WITH_PYTHON" -eq 1 ]; then
+            echo "    staging Python (--with-python)"
+            merge_staging_tree "$PYTHON_STAGING"
+        fi
 
         # GCC's lto-dump is a standalone compiler-internals inspection utility,
         # not part of compiling or linking programs. Keeping its second 32 MiB
@@ -1065,11 +1093,13 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
         merge_staging_tree "$NETWORK_TOOLS_STAGING"
     fi
 
-    # Always take V from its own pinned layer. The base userland may have been
+    # Take V from its own pinned layer. The base userland may have been
     # assembled before that layer was rebuilt, while a compact image never
     # extracts the full base tree at all.
-    echo "    staging the native V compiler"
-    merge_staging_tree "$VLANG_STAGING"
+    if [ "$WITH_V" -eq 1 ]; then
+        echo "    staging the native V compiler"
+        merge_staging_tree "$VLANG_STAGING"
+    fi
 
     if [ "$COMPACT_INITRAMFS" -eq 0 ] &&
        [ -x "$BLENDER_NATIVE_STAGING/usr/libexec/vinix-blender-native" ]; then
@@ -1301,6 +1331,11 @@ if [ -d "$STAGING/usr/lib/vlang" ]; then
 fi
 rm -f "$STAGING"/usr/lib/libOSMesa.so* "$STAGING"/usr/lib/libGLU.so* \
     "$STAGING"/usr/lib/libxatracker.so*
+# The userland installs Oh My Zsh for root (build-support/stage-oh-my-zsh.sh).
+if [ "$WITH_OH_MY_ZSH" -eq 0 ]; then
+    rm -rf "$STAGING/root/.oh-my-zsh" "$STAGING/root/zsh-smoke.sh"
+    install -m644 "$SCRIPT_DIR/build-support/zshrc" "$STAGING/root/.zshrc"
+fi
 
 # These files are owned by this checkout, not by a compiled staging layer, so
 # refresh them even when the expensive tree above is reused.
@@ -1466,14 +1501,18 @@ mkdir -p "$STAGING/usr/share/vinix/firefox"
 install -m644 "$SCRIPT_DIR/build-support/firefox/vinix.js" \
     "$STAGING/usr/share/vinix/firefox/vinix.js"
 install -m755 "$SCRIPT_DIR/build-support/chromium/run-chromium" "$STAGING/usr/bin/run-chromium"
-# Keep the small launcher current even when the cached native V layer is reused.
-install -m755 "$SCRIPT_DIR/build-support/v-command" "$STAGING/usr/bin/v"
-install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-build" \
-    "$STAGING/usr/bin/vinix-desktop-build"
+# Keep the small launchers current even when the cached native V layer is
+# reused. Building the desktop in the guest, and the host source mirror it
+# builds from, need V.
+if [ "$WITH_V" -eq 1 ]; then
+    install -m755 "$SCRIPT_DIR/build-support/v-command" "$STAGING/usr/bin/v"
+    install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-build" \
+        "$STAGING/usr/bin/vinix-desktop-build"
+    install -m755 "$SCRIPT_DIR/build-support/vinix-host-sync" \
+        "$STAGING/usr/bin/vinix-host-sync"
+fi
 install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-reload" \
     "$STAGING/usr/bin/vinix-desktop-reload"
-install -m755 "$SCRIPT_DIR/build-support/vinix-host-sync" \
-    "$STAGING/usr/bin/vinix-host-sync"
 # The release this image is, for the desktop to compare with the newest one
 # vinix-os.org names (build-support/vinix-version-check). scripts/deploy-iso.sh sets
 # VINIX_RELEASE; any other build is a development image and does not ask.
@@ -1539,16 +1578,26 @@ if [ ! -x "$STAGING/usr/bin/pkg" ] || [ ! -x "$STAGING/sbin/apk" ]; then
     echo "ERROR: desktop image is missing pkg or apk" >&2
     exit 1
 fi
-for development_path in \
-    usr/bin/v usr/lib/vlang/v usr/bin/gcc usr/bin/tcc \
-    usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload \
-    usr/bin/vinix-host-sync; do
+development_paths=(usr/bin/gcc usr/bin/vinix-desktop-reload)
+development_files=()
+if [ "$WITH_V" -eq 1 ]; then
+    development_paths+=(usr/bin/v usr/lib/vlang/v usr/bin/tcc usr/bin/vinix-desktop-build
+        usr/bin/vinix-host-sync)
+    development_files+=(usr/lib/vlang/cmd/v/v.v usr/lib/libtcc.so)
+elif [ -e "$STAGING/usr/bin/v" ] || [ -e "$STAGING/usr/lib/vlang" ]; then
+    echo "ERROR: desktop image has V without --with-v" >&2
+    exit 1
+fi
+if [ "$WITH_PYTHON" -eq 1 ]; then
+    development_paths+=(usr/bin/python3)
+fi
+for development_path in "${development_paths[@]}"; do
     if [ ! -x "$STAGING/$development_path" ]; then
         echo "ERROR: desktop development environment is missing /$development_path" >&2
         exit 1
     fi
 done
-for development_file in usr/lib/vlang/cmd/v/v.v usr/lib/libtcc.so; do
+for development_file in ${development_files[@]+"${development_files[@]}"}; do
     if [ ! -f "$STAGING/$development_file" ]; then
         echo "ERROR: desktop development environment is missing /$development_file" >&2
         exit 1
@@ -1583,7 +1632,7 @@ elif ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git ${x11_runtime_paths[@]+"${x11_runtime_paths[@]}"} usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-obs usr/bin/run-chromium usr/bin/run-libreoffice usr/libexec/vinix-minecraft/fetch-minecraft usr/bin/gcc usr/bin/tcc usr/bin/ldd usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload usr/bin/vinix-host-sync; do
+    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/git ${x11_runtime_paths[@]+"${x11_runtime_paths[@]}"} usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-obs usr/bin/run-chromium usr/bin/run-libreoffice usr/libexec/vinix-minecraft/fetch-minecraft usr/bin/gcc usr/bin/ldd usr/bin/vinix-desktop-reload; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1
@@ -1736,25 +1785,28 @@ fi
 # upgraded machine build even when its carried home predates /root/vmodules.
 # It is the only copy an image carries: vinix-desktop-build uses it whenever
 # /root/desktop is missing, so a second one in /root would only double 37 MiB.
+# Only an image with V can build from it.
 DESKTOP_DEV_ROOT="$STAGING/usr/share/vinix/desktop-dev"
 rm -rf "$DESKTOP_DEV_ROOT"
-mkdir -p "$DESKTOP_DEV_ROOT/desktop"
-cp -L "$APP_SRC"/*.v "$APP_SRC"/*.vml "$APP_SRC"/*.h \
-    "$BUILD_DIR/execinfo.c" "$BUILD_DIR/gpu-present-soft.c" \
-    "$SCRIPT_DIR/desktop/README.md" "$DESKTOP_DEV_ROOT/desktop/"
-cp -a "$SCRIPT_DIR/desktop/execinfocore" "$SCRIPT_DIR/desktop/gpucore" "$DESKTOP_DEV_ROOT/desktop/"
-mkdir -p "$DESKTOP_DEV_ROOT/vmodules/ui2"
-cp -aL "$UI2_MODULES/ui2/." "$DESKTOP_DEV_ROOT/vmodules/ui2/"
-VFLAGS="${VFLAGS:-} -nocache" "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/desktop/tools/build-services.v" \
-    --client-modules-only --staging="$STAGING"
-if [ ! -f "$DESKTOP_DEV_ROOT/desktop/main.v" ] || \
-   [ ! -f "$DESKTOP_DEV_ROOT/vmodules/ui2/v.mod" ]; then
-    echo "ERROR: system desktop development tree is incomplete" >&2
-    exit 1
+if [ "$WITH_V" -eq 1 ]; then
+    mkdir -p "$DESKTOP_DEV_ROOT/desktop"
+    cp -L "$APP_SRC"/*.v "$APP_SRC"/*.vml "$APP_SRC"/*.h \
+        "$BUILD_DIR/execinfo.c" "$BUILD_DIR/gpu-present-soft.c" \
+        "$SCRIPT_DIR/desktop/README.md" "$DESKTOP_DEV_ROOT/desktop/"
+    cp -a "$SCRIPT_DIR/desktop/execinfocore" "$SCRIPT_DIR/desktop/gpucore" "$DESKTOP_DEV_ROOT/desktop/"
+    mkdir -p "$DESKTOP_DEV_ROOT/vmodules/ui2"
+    cp -aL "$UI2_MODULES/ui2/." "$DESKTOP_DEV_ROOT/vmodules/ui2/"
+    VFLAGS="${VFLAGS:-} -nocache" "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/desktop/tools/build-services.v" \
+        --client-modules-only --staging="$STAGING"
+    if [ ! -f "$DESKTOP_DEV_ROOT/desktop/main.v" ] || \
+       [ ! -f "$DESKTOP_DEV_ROOT/vmodules/ui2/v.mod" ]; then
+        echo "ERROR: system desktop development tree is incomplete" >&2
+        exit 1
+    fi
+    "$SCRIPT_DIR/build-support/content-key" \
+        "$DESKTOP_DEV_ROOT/desktop" "$DESKTOP_DEV_ROOT/vmodules" \
+        > "$DESKTOP_DEV_ROOT/.source-version"
 fi
-"$SCRIPT_DIR/build-support/content-key" \
-    "$DESKTOP_DEV_ROOT/desktop" "$DESKTOP_DEV_ROOT/vmodules" \
-    > "$DESKTOP_DEV_ROOT/.source-version"
 rm -rf "$STAGING/root/desktop" "$STAGING/root/vmodules" \
     "$STAGING/root/.vinix-desktop-dev-version"
 
@@ -1843,6 +1895,7 @@ CONTENT_KEY_INPUTS=(
     "$STAGING/usr/share/vinix/n64"
     "$SCRIPT_DIR/build-support/vinix-pkg"
     "$SCRIPT_DIR/build-support/v-command"
+    "$SCRIPT_DIR/build-support/zshrc"
     "$SCRIPT_DIR/build-support/vinix-desktop-build"
     "$SCRIPT_DIR/build-support/vinix-desktop-reload"
     "$SCRIPT_DIR/build-support/vinix-host-sync"
