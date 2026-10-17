@@ -33,6 +33,7 @@ fn main() {
 		stencil_buffer_store: 0xbbbb_bbbb_bbbb_bbbb
 		stencil_meta_load: 0xcccc_cccc_cccc_cccc
 		stencil_meta_store: 0xdddd_dddd_dddd_dddd
+		visibility_result_buffer: 0xeeee_eeee_eeee_eee0
 	}
 
 	assert fw.initialize_g17_3d_descriptor(descriptor.data, u64(descriptor.len))
@@ -50,6 +51,18 @@ fn main() {
 	assert read_le_u64(descriptor, fw.g17_render_stencil_buffer_store_member) == fields.stencil_buffer_store
 	assert read_le_u64(descriptor, fw.g17_render_stencil_meta_buffer_load_member) == fields.stencil_meta_load
 	assert read_le_u64(descriptor, fw.g17_render_stencil_meta_buffer_store_member) == fields.stencil_meta_store
+	// An independent raw Apple payload must reach the same native member as
+	// the Mesa bridge. Do not use the bridge's member constant as this oracle.
+	assert read_le_u64(descriptor, 0x4c0) == fields.visibility_result_buffer
+	mut payload := []u8{len: int(fw.g17_render_payload_size)}
+	for index in 0 .. 8 {
+		payload[0x6c0 + index] = u8(fields.visibility_result_buffer >> (index * 8))
+	}
+	mut apple_descriptor := []u8{len: int(fw.g17_3d_descriptor_size)}
+	assert fw.initialize_g17_3d_descriptor(apple_descriptor.data, u64(apple_descriptor.len))
+	assert fw.populate_g17_ta_render_passthrough(apple_descriptor.data,
+		u64(apple_descriptor.len), payload.data, u64(payload.len))
+	assert read_le_u64(apple_descriptor, 0x4c0) == read_le_u64(descriptor, 0x4c0)
 	assert !fw.populate_g17_render_resource_fields(descriptor.data, fw.g17_3d_descriptor_size - 1, fields)
 
 	println('G17 render descriptor bridge tests passed')

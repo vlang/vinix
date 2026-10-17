@@ -93,18 +93,31 @@ while their native G17 descriptor members remain `PENDING`. Sampler-array
 ranges cover all eight bytes of every AGX sampler descriptor rather than only
 one byte per sampler.
 
-Eleven resource identities now cross the final descriptor boundary as a
+Twelve resource identities now cross the final descriptor boundary as a
 deliberately scoped bridge. The TA encoder pointer is written at `0xfe0`; the
 fragment load/store pipeline addresses are written at `0x610`/`0x768` with
 their bind values at `0x608`/`0x760`; and depth load/store planes are written
 at `0x668`/`0x670` with their metadata planes at `0x6e8`/`0x6f0`. Stencil
 load/store planes use `0x680`/`0x688`, with metadata at `0x710`/`0x718`. Each
 resource value is checked both against its live FakeG17VM binding and against
-the exact descriptor member. These mappings agree across the recovered G17
-selector/value graph, the color/depth/stencil resource traces, and m1n1
+the exact descriptor member. The original eleven mappings agree across the
+recovered G17 selector/value graph, the color/depth/stencil resource traces, and m1n1
 `940439`'s independent Asahi register-list producer. This does not identify the
 global selector address space, and no partial-pipeline, partial-depth, or
 partial-stencil member is promoted by analogy.
+
+The visibility-result buffer now crosses at descriptor `0x4c0`. Apple's
+`processRenderSetup` copies it from raw payload `0x6c0`; the recovered 3D
+producer emits `(address & ~15)` through `0x15310` in every register pass.
+m1n1's independent register producer identifies that selector as
+`ISP_OCLQRY_BASE`. `v run tools/agx-re/check_g17_visibility.v
+tools/agx-re/build/kext/g17c/AGXG17X.macho` checks the UUID, instruction-checked
+copy map, and independently traced consumer against the local Apple binary,
+and reports its SHA-256 digest.
+The fake path now verifies the exact descriptor address as well as the writable
+VM binding. Its encoder fixture covers zero, wide addresses, and low-bit
+masking in all four passes. This establishes command bytes and ownership
+validation; fake execution does not execute an occlusion query on the GPU.
 
 The expected-write list is deliberately path-specific. The recovered virtual,
 inline and direct-append sites cover 3D, TA, FastBlit, and CL; they are not

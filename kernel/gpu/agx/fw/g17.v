@@ -1926,7 +1926,7 @@ pub fn initialize_g17_3d_descriptor(descriptor voidptr, descriptor_bytes u64) bo
 	return true
 }
 
-// The scoped Mesa-to-G17 descriptor bridge. These thirteen members are
+// The scoped Mesa-to-G17 descriptor bridge. The original thirteen members are
 // triangulated rather than inferred from selector numbers alone:
 //
 // - the recovered G17 graph loads them for selectors 0x1c880, 0x15368,
@@ -1955,22 +1955,28 @@ pub const g17_render_stencil_buffer_load_member = u32(0x680)
 pub const g17_render_stencil_buffer_store_member = u32(0x688)
 pub const g17_render_stencil_meta_buffer_load_member = u32(0x710)
 pub const g17_render_stencil_meta_buffer_store_member = u32(0x718)
+// ISP_OCLQRY_BASE: processRenderSetup copies payload +0x6c0 here;
+// generateRegisterListFor3D emits it through selector 0x15310 after clearing
+// the low four bits. See tools/agx-re/check_g17_visibility.v for the pinned
+// producer/consumer proof. Preserve the original address in the descriptor.
+pub const g17_render_visibility_result_buffer_member = u32(0x4c0)
 
 pub struct G17RenderDescriptorFields {
 pub:
-	encoder              u64
-	load_pipeline_bind   u64
-	load_pipeline        u64
-	store_pipeline_bind  u64
-	store_pipeline       u64
-	depth_buffer_load    u64
-	depth_buffer_store   u64
-	depth_meta_load      u64
-	depth_meta_store     u64
-	stencil_buffer_load  u64
-	stencil_buffer_store u64
-	stencil_meta_load    u64
-	stencil_meta_store   u64
+	encoder                  u64
+	load_pipeline_bind       u64
+	load_pipeline            u64
+	store_pipeline_bind      u64
+	store_pipeline           u64
+	depth_buffer_load        u64
+	depth_buffer_store       u64
+	depth_meta_load          u64
+	depth_meta_store         u64
+	stencil_buffer_load      u64
+	stencil_buffer_store     u64
+	stencil_meta_load        u64
+	stencil_meta_store       u64
+	visibility_result_buffer u64
 }
 
 // Populate normalized values only after initialize_g17_3d_descriptor has
@@ -2009,6 +2015,8 @@ pub fn populate_g17_render_resource_fields(descriptor voidptr,
 			g17_render_stencil_meta_buffer_load_member, 8, fields.stencil_meta_load)
 		write_g17_descriptor_value(destination,
 			g17_render_stencil_meta_buffer_store_member, 8, fields.stencil_meta_store)
+		write_g17_descriptor_value(destination,
+			g17_render_visibility_result_buffer_member, 8, fields.visibility_result_buffer)
 	}
 	return true
 }

@@ -94,6 +94,7 @@ pub fn initialize_render_descriptor(descriptor voidptr, descriptor_bytes u64,
 			stencil_buffer_store: command.stencil_buffer_store
 			stencil_meta_load: command.stencil_meta_buffer_load
 			stencil_meta_store: command.stencil_meta_buffer_store
+			visibility_result_buffer: command.visibility_result_buffer
 		})
 }
 
@@ -205,7 +206,9 @@ pub fn stage_render_resource_references(command &agxrender.Command) []FakeG17Res
 	append_render_resource(mut resources, .stencil_meta_buffer_partial, .gpu_va, command.stencil_meta_buffer_partial, 8, fake_g17_vm_write)
 	append_render_resource(mut resources, .scissor_array, .gpu_va, command.scissor_array, 8, fake_g17_vm_read)
 	append_render_resource(mut resources, .depth_bias_array, .gpu_va, command.depth_bias_array, 8, fake_g17_vm_read)
-	append_render_resource(mut resources, .visibility_result_buffer, .gpu_va, command.visibility_result_buffer, 8, fake_g17_vm_write)
+	append_render_resource_at(mut resources, .visibility_result_buffer, .gpu_va,
+		command.visibility_result_buffer, 8, fake_g17_vm_write,
+		fw.g17_render_visibility_result_buffer_member)
 	append_render_resource(mut resources, .vertex_sampler_array, .gpu_va,
 		command.vertex_sampler_array, sampler_array_bytes(command.vertex_sampler_count),
 		fake_g17_vm_read)

@@ -213,6 +213,34 @@ fn run_append_reference() i32 {
 	return 0
 }
 
+// Independent ISP_OCLQRY_BASE oracle: all four register streams must use the
+// descriptor's visibility buffer and apply Apple's 16-byte address mask.
+fn run_visibility_reference() i32 {
+	unsafe {
+		for address in [u64(0), u64(0x123456789ab0), u64(0xfedcba987654321f)]! {
+			mut fixture := C.vg17_encoder_fixture{}
+			mut report := C.vinix_fake_g17_report{}
+			mut count := u32(0)
+			mut observed := u32(0)
+			initialize_fixture(fixture_address(usize(&fixture)))
+			fixture.inputs.column_count = 4
+			for index in 0 .. 8 {
+				fixture.descriptor[0x4c0 + index] = u8(address >> (index * 8))
+			}
+			if !check(encoded(fixture_address(usize(&fixture)), 404, &count) == C.VINIX_FAKE_G17_ENCODE_OK, 291, c'visibility encode succeeds') { return 1 }
+			if !check(verified(fixture_address(usize(&fixture)), count, &report) == C.VINIX_FAKE_G17_OK, 292, c'visibility command bytes match the write trace') { return 1 }
+			for index in u32(0) .. count {
+				write := &fixture.writes[index]
+				if write.selector != 0x15310 { continue }
+				if !check(write.value == (address & u64(0xfffffffffffffff0)), 295, c'ISP_OCLQRY_BASE equals the aligned visibility buffer') { return 1 }
+				observed++
+			}
+			if !check(observed == 4, 298, c'each pass emits ISP_OCLQRY_BASE') { return 1 }
+		}
+	}
+	return 0
+}
+
 @[export: 'main']
 pub fn run() i32 {
 	if !check(C.vinix_fake_g17_encoder_inputs_size() == sizeof(C.vinix_fake_g17_encoder_inputs), 278, c'vinix_fake_g17_encoder_inputs_size() == sizeof(struct vinix_fake_g17_encoder_inputs)') { return 1 }
@@ -223,6 +251,7 @@ pub fn run() i32 {
 	if !check(run_dense_reference() == 0, 284, c'run_dense_reference() == 0') { return 1 }
 	if !check(run_append_reference() == 0, 285, c'run_append_reference() == 0') { return 1 }
 	if !check(run_failure_checks() == 0, 286, c'run_failure_checks() == 0') { return 1 }
+	if !check(run_visibility_reference() == 0, 287, c'run_visibility_reference() == 0') { return 1 }
 	C.puts(c'fake G17 recovered 3D encoder tests passed')
 	return 0
 }

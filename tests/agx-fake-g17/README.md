@@ -3,8 +3,14 @@
 `run.sh` checks the production V verifier/encoder and the native descriptor
 bridge. The independent V encoder fixture retains all sixteen recovered-ABI
 golden hashes, dense and appended-address goldens, capacity failures and command
-mutations. Its 32 checks retain the original diagnostic lines and expressions.
+mutations. Its original 32 checks retain their diagnostic lines and expressions.
 Host ASan/UBSan builds reject hidden allocation imports.
+
+The visibility-buffer extension independently checks `ISP_OCLQRY_BASE` in all
+four register streams for zero, a wide GPU address and low-bit masking. The
+descriptor test compares the Mesa field writer with the raw Apple payload
+copy at `+0x6c0 -> +0x4c0`. The source-bound binary check is
+`v run tools/agx-re/check_g17_visibility.v /path/to/AGXG17X.macho`.
 
 The independent V verifier retains all 41 original trace, size, resource and
 provenance checks. Its 314-record scale case retains the single explicit
