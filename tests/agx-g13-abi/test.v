@@ -21,6 +21,11 @@ module main
 import gpu.agx.hw
 import gpu.agx.fw
 
+// The native fixture uses libc for the kernel's diagnostic-only printf ABI.
+#include <stdio.h>
+#define kprintf printf
+fn C.kprintf(format &char, ...) i32
+
 // The fused ladder off a MacBookAir10,1; see tests/agx-t8103-opp.
 const ladder_hz = [u64(0), 396_000_000, 528_000_000, 720_000_000, 924_000_000, 1_128_000_000,
 	1_278_000_000]
