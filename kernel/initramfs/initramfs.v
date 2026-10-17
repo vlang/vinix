@@ -121,8 +121,10 @@ fn check_ustar(hdr &USTARHeader) bool {
 	}
 }
 
+// True when tmpfs files were left reading straight from the archive, which must
+// then stay where it is for good.
 @[manualfree]
-fn unpack(initramfs_begin voidptr, initramfs_size u64, module_index u64) {
+fn unpack(initramfs_begin voidptr, initramfs_size u64, module_index u64) bool {
 	C.kprintf(c'initramfs: Module:  %llu\n', u64(module_index + 1))
 	C.kprintf(c'initramfs: Address: 0x%llx\n', u64(initramfs_begin))
 	C.kprintf(c'initramfs: Size:    %llu\n', u64(u32(initramfs_size)))
@@ -130,6 +132,7 @@ fn unpack(initramfs_begin voidptr, initramfs_size u64, module_index u64) {
 	uart_puts('initramfs: Unpacking...\n')
 
 	mut entry_count := u64(0)
+	mut borrowed := false
 	mut name_override := ''
 	mut current_header := &USTARHeader(unsafe { nil })
 	unsafe {
@@ -245,11 +248,14 @@ fn unpack(initramfs_begin voidptr, initramfs_size u64, module_index u64) {
 				// directory the earlier tree put there — is left alone.
 				if stat.isreg(new_resource.stat.mode) {
 					buf := voidptr(u64(current_header) + 512)
-					// Limine module memory remains reserved and mapped after
-					// boot.  Let tmpfs read straight from it until a process
+					// The archive, Limine module memory or the pages a
+					// compressed module was inflated into, stays reserved and
+					// mapped.  Let tmpfs read straight from it until a process
 					// modifies the file, instead of duplicating the entire root
 					// filesystem while the archive is still resident.
-					if !fs.tmpfs_borrow_storage(mut new_resource, buf, size) {
+					if fs.tmpfs_borrow_storage(mut new_resource, buf, size) {
+						borrowed = true
+					} else {
 						// Keep the generic path for a regular file supplied by some
 						// other root filesystem implementation.
 						new_resource.grow(unsafe { nil }, size) or {}
@@ -282,6 +288,7 @@ fn unpack(initramfs_begin voidptr, initramfs_size u64, module_index u64) {
 	uart_puts('initramfs: Done (')
 	uart_put_dec(entry_count)
 	uart_puts(' entries)\n')
+	return borrowed
 }
 
 @[manualfree]
@@ -441,14 +448,17 @@ fn unpack_modules(first u64) {
 
 	for module_index := first; module_index < module_req.response.module_count; module_index++ {
 		archive := module_archive(module_index)
-		unpack(archive.address, archive.size, module_index)
-		archive.release()
+		// An inflated archive that tmpfs reads from is kept; one copied onto
+		// a disk is given back.
+		if !unpack(archive.address, archive.size, module_index) {
+			archive.release()
+		}
 	}
 }
 
 // A module's tar archive: the bootloader's bytes, or, for a gzip-compressed
 // module (a release ISO's image), the archive inflated into pages of its own,
-// which release() gives back once the archive has been unpacked.
+// which release() gives back unless tmpfs files still read from it.
 struct Archive {
 	address  voidptr
 	size     u64
