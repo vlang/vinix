@@ -8056,21 +8056,41 @@ The native V driver adds `ios_video`, the matching target headers and the static
 decoder libraries. The decode fixture requires the SDK. Runners built without
 the optional backend report decoder-not-found from session creation.
 
-The six imports now resolve. The actual IPA still exits with status 1 before
-application entry, at `_$s8StoreKit10StorefrontV11countryCodeSSvg`.
-Fortnite remains unplayable and full iOS regression remains unpassed.
+After the six VideoToolbox imports resolved, the probe stopped at
+`_$s8StoreKit10StorefrontV11countryCodeSSvg`. StoreKit now implements that
+Swift getter. It borrows the resilient `Storefront` through x20, reads its
+country field at offset zero and returns an owned String pair in x0/x1.
+It retains the existing String owner, preserves Swift context/error registers
+and uses a sealed adapter that is unmapped after callers drain. The getter
+requires no per-call heap allocation.
+
+The installed StoreKit library and SDK confirm the field layout and bridge
+retention. Native comparisons cover small, immortal, native heap and Cocoa
+Strings, read-only fields beside guard pages, result survival after source
+release and concurrent ARC. Eight host ASan/UBSan runs and four ARM64 Vinix
+suites cover the getter and existing String, NSString bridge and shared UTF-8
+behavior, including concurrent publication and two drained runtime lifetimes.
+Native measurements, actual IPA call sites, pinned inputs and eleven generated
+C/executable pairs are retained under `build/ios/fortnite/storefront-checks`.
+The fixture is available through `tests/ios/native-checks.v build-storefront`
+and the native check inventories.
+
+The country getter import now resolves. The actual IPA still exits with status 1
+before application entry at `_$s8StoreKit10StorefrontV7currentACSgvgZ`, the
+separate asynchronous storefront query. Fortnite remains unplayable and full iOS
+regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,674 | 486 | 79 |
+| Fortnite executable | 1,675 | 485 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,509 | 489 | 120 |
+| All images | 2,510 | 488 | 120 |
 
-The C++/GLES/Text variant reports 2,523 resolved imports, 475 unresolved strong
+The C++/GLES/Text variant reports 2,524 resolved imports, 474 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
