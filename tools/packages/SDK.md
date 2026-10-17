@@ -919,6 +919,15 @@ returned descriptors remain independent of that scratch. Guest-root, parent and
 40-link rules stay unchanged. See [lookup ownership qualification](../../tests/packages/import-lookup-check.md).
 This measures resolver/recheck storage, not complete import or packer retention.
 
+Materialization also retires its directory ancestry, parent-construction and
+file-opening scratch. Directory cycles compare captured device/inode values;
+new parents retain the original umask behavior, and files still receive only
+ordinary executable/data modes after source checks. Multiblock copying and
+materialized digest comparison retain their checks on complete and refused
+calls. See [materialization ownership qualification](../../tests/packages/import-materialization-ownership-check.md).
+Complete private import workspace creation/retirement and complete publisher
+profile construction remain separate ownership boundaries.
+
 `pack-root`, `pack-catalog` and the Native, SQLite and FFmpeg profile builders
 share input-root admission. Empty and NUL-containing paths refuse. Redundant
 trailing separators are stripped while preserving `/`, so a symlink at the

@@ -1,5 +1,10 @@
 # Prepared-root lookup ownership
 
+This records the lookup/recheck increment. Subsequent
+[materialization ownership checks](import-materialization-ownership-check.md)
+also cover recursion, directory construction and file-opening scratch. Complete
+private import workspace/profile construction remains a separate boundary.
+
 Prepared-root source lookup and consistency rechecks now retire their temporary
 path storage on success, link/parent restart and refusal. The returned file
 descriptor and stat fields remain usable after that storage and the caller's

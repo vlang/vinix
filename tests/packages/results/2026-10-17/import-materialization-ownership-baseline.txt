@@ -1,0 +1,21 @@
+IMPORT MATERIALIZATION case=file retained=183 allocations=2
+IMPORT MATERIALIZATION case=empty retained=183 allocations=2
+IMPORT MATERIALIZATION case=nested retained=13980 allocations=28
+IMPORT MATERIALIZATION case=tree retained=26351 allocations=139
+IMPORT MATERIALIZATION case=alias retained=26351 allocations=139
+IMPORT MATERIALIZATION case=parent-alias retained=20171 allocations=108
+IMPORT MATERIALIZATION case=pinned retained=183 allocations=2
+IMPORT MATERIALIZATION case=pin-size retained=0 allocations=0
+IMPORT MATERIALIZATION case=pin-mode retained=0 allocations=0
+IMPORT MATERIALIZATION case=pin-digest retained=183 allocations=2
+IMPORT MATERIALIZATION case=cycle retained=5526 allocations=24
+IMPORT MATERIALIZATION case=special retained=0 allocations=0
+IMPORT MATERIALIZATION case=opened retained=0 allocations=0
+IMPORT MATERIALIZATION case=directory retained=61 allocations=3
+IMPORT MATERIALIZATION case=sized retained=0 allocations=0
+IMPORT MATERIALIZATION case=block retained=0 allocations=0
+IMPORT MATERIALIZATION case=read retained=0 allocations=0
+IMPORT MATERIALIZATION case=hashed retained=0 allocations=0
+IMPORT MATERIALIZATION case=copy-block retained=183 allocations=2
+IMPORT MATERIALIZATION case=copied retained=20151 allocations=108
+IMPORT MATERIALIZATION files, recursive guest aliases, pinned inventories and late refusals retire owned scratch PASS

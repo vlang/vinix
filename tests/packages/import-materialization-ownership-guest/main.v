@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module main
+
+import os
+
+#include <fcntl.h>
+#include <sys/reboot.h>
+#include <unistd.h>
+fn C.dup2(int, int) int
+fn C.sync()
+fn C.reboot(int) int
+fn C.usleep(u32) int
+
+fn C.sleep(u32) u32
+
+fn materialization_grace(name string) ! {
+	// Removed filesystem nodes remain charged during the kernel lookup grace.
+	// Record that boundary before starting the next independently owned burst.
+	before := os.read_file('/proc/kernel-resources')!
+	println('IMPORT MATERIALIZATION resources before grace ' + name + ':\n' + before)
+	C.sleep(6)
+	after := os.read_file('/proc/kernel-resources')!
+	println('IMPORT MATERIALIZATION resources after grace ' + name + ':\n' + after)
+	unsafe { before.free(); after.free() }
+}
+
+fn check() ! {
+	os.unsetenv('VINIX_IMPORT_LIMITS_BEFORE')
+	for name in ['import-lookup', 'import-capture', 'import-limits', 'import', 'pack-source', 'catalog', 'release']! {
+		mut child := os.new_process('/usr/share/package-fixtures/' + name)
+		child.set_redirect_stdio_merged(); child.run()
+		output := child.stdout_slurp(); child.wait(); code := child.code; child.close()
+		print(output)
+		if code != 0 || output.contains(': fn test_') { return error(name + ' failed (' + code.str() + ')') }
+		println('IMPORT LOOKUP PROCESS ' + name + ' PASS')
+	}
+	for name in ['file', 'empty', 'nested', 'tree', 'alias', 'parent-alias', 'pinned', 'pin-size', 'pin-mode', 'pin-digest', 'cycle', 'special', 'opened', 'directory', 'sized', 'block', 'read', 'hashed', 'copy-block', 'copied', 'create-failure', 'parent-file', 'functional']! {
+		materialization_grace(name)!
+		mut child := os.new_process('/usr/share/package-fixtures/materialization')
+		child.set_args(['case', name]); child.set_redirect_stdio_merged(); child.run()
+		output := child.stdout_slurp(); child.wait(); code := child.code; child.close(); print(output)
+		if code != 0 || output.contains(': fn test_') { return error('materialization ' + name + ' failed (' + code.str() + ')') }
+		println('IMPORT MATERIALIZATION CASE ' + name + ' PASS')
+	}
+	println('IMPORT MATERIALIZATION PROCESS materialization PASS')
+}
+
+fn main() {
+	console := $if arm64 { '/dev/console' } $else { '/dev/com1' }
+	fd := C.open(console.str, C.O_WRONLY)
+	if fd >= 0 { C.dup2(fd, 1); C.dup2(fd, 2); if fd > 2 { C.close(fd) } }
+	println('HWTEST START packages-import-materialization-ownership')
+	mut passed := true
+	check() or { eprintln(err); passed = false }
+	println(if passed { 'HWTEST PASS packages-import-materialization-ownership' } else { 'HWTEST FAIL packages-import-materialization-ownership' })
+	C.sync(); C.reboot(0x4321fedc)
+	for { C.usleep(1_000_000) }
+}

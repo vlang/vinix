@@ -712,6 +712,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     inventory checks reject changed payloads before packing, with cleanup/retry.
     [Owned lookups and rechecks](tests/packages/import-lookup-check.md) retire
     temporary path storage on success, parent/link restart and late refusal.
+    [Owned materialization](tests/packages/import-materialization-ownership-check.md)
+    retires ancestry, parent creation and file-opening scratch across complete
+    copies, recursive aliases and late/native refusals, preserving modes and
+    exact retry. Complete private import workspace/profile construction remains
+    a separate ownership boundary.
 - [ ] Add transactional install/remove/upgrade, rollback, disk-space checks,
   interrupted-download recovery and coherent persistent package state.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,

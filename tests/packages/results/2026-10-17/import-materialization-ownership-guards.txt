@@ -1,0 +1,1 @@
+IMPORT MATERIALIZATION qualification guards: missing archive, correct-length wrong-digest archive, and existing work directory refuse before output/compilation PASS

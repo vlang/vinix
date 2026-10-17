@@ -1,0 +1,2 @@
+IMPORT MATERIALIZATION files, recursive guest aliases, pinned inventories and late refusals retire owned scratch PASS
+IMPORT MATERIALIZATION multiblock/empty bytes, stripped modes, umask, unchanged parents, empty directories and native creation refusal/retry PASS

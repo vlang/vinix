@@ -300,6 +300,13 @@ descriptors, guest-root resolution and late refusal diagnostics. See
 [lookup ownership checks](../tests/packages/import-lookup-check.md); this does not
 measure complete import/packer retention.
 
+The [materialization ownership checks](../tests/packages/import-materialization-ownership-check.md)
+also retire recursion, parent-construction and file-opening scratch. Directory
+cycles use captured device/inode values, and native writes retain partial-write
+and interruption handling. Source rechecks, pinned digests, ordinary final modes
+and corrected retry remain covered. Complete private import workspace retirement
+and full publisher-profile construction remain separate boundaries.
+
 The lower-level `pack` command also captures its source root and walks children
 through descriptors relative to their captured parents. Hashing and copying
 share each regular file's descriptor, with identity, length and executable-mode

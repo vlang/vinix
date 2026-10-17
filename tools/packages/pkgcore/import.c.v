@@ -198,6 +198,11 @@ fn import_names_limit(fd int, limit int) ![]string {
 	return names
 }
 
+struct ImportDirectoryIdentity {
+	device u64
+	inode u64
+}
+
 struct RootImport {
 	root   int
 	output string
@@ -207,7 +212,7 @@ mut:
 	entries   int // includes selected roots and every materialized alias visit
 	files     int
 	bytes     u64
-	ancestors []string
+	ancestors []ImportDirectoryIdentity
 }
 
 // The returned descriptor is owned by the caller. Resolve through the captured
@@ -249,12 +254,13 @@ fn (mut importer RootImport) copy_at(source string, target string, depth int) ! 
 	C.close(recheck_import_node(importer.root, source, node)!)
 	if node.mode & 0o170000 == 0o040000 {
 		if depth >= max_pack_depth { return error('prepared import exceeds directory depth limit: ${target}') }
-		identity := '${node.device}:${node.inode}'
-		defer { unsafe { identity.free() } }
+		identity := ImportDirectoryIdentity{ device: node.device, inode: node.inode }
 		if identity in importer.ancestors {
 			return error('guest directory symlink cycle: ${source}')
 		}
-		importer.ancestors << identity
+		// Keep only values in this ancestry stack: string interpolation and
+		// variable string append retain scratch in manual-free builds.
+		unsafe { importer.ancestors.flags |= .noslices; importer.ancestors.push_many(&identity, 1) }
 		defer { importer.ancestors.pop() }
 		remaining := max_pack_entries - importer.entries
 		names := import_names_limit(node.fd, if remaining < max_files { remaining } else { max_files })!
@@ -263,7 +269,7 @@ fn (mut importer RootImport) copy_at(source string, target string, depth int) ! 
 		C.close(recheck_import_node(importer.root, source, node)!)
 		path := importer.output + '/' + target
 		defer { unsafe { path.free() } }
-		os.mkdir_all(path)!
+		make_package_directories(path, 0o777)!
 		for name in names {
 			child_source := source + '/' + name
 			child_target := target + '/' + name
@@ -306,10 +312,12 @@ fn (mut importer RootImport) copy_at(source string, target string, depth int) ! 
 	path := importer.output + '/' + target
 	parent := os.dir(path)
 	defer { unsafe { path.free(); parent.free() } }
-	os.mkdir_all(parent)!
-	mut output := os.open_file(path, 'w', 0o600)!
-	defer { output.close() }
-	output.set_unbuffered()
+	make_package_directories(parent, 0o777)!
+	// The variadic V File helper retains its permission-options array with
+	// no collector. Own one native descriptor and write the captured blocks.
+	output := C.open(path.str, C.O_WRONLY | C.O_CREAT | C.O_TRUNC | C.O_CLOEXEC, 0o600)
+	if output < 0 { return error('cannot create prepared payload; check permissions and disk space: ' + target) }
+	defer { C.close(output) }
 	mut buffer := []u8{len: 64 * 1024}
 	defer { unsafe { buffer.free() } }
 	mut copied := u64(0)
@@ -324,9 +332,10 @@ fn (mut importer RootImport) copy_at(source string, target string, depth int) ! 
 		if copied > node.bytes { return error('prepared payload grew during import: ${source}') }
 		mut sent := 0
 		for sent < count {
-			written := output.write(buffer[sent..int(count)])!
-			if written == 0 { return error('short import write; check disk space') }
-			sent += written
+			written := C.write(output, unsafe { &u8(buffer.data) + sent }, usize(int(count) - sent))
+			if written < 0 && C.errno == C.EINTR { continue }
+			if written <= 0 { return error('cannot write prepared payload; check disk space: ' + target) }
+			sent += int(written)
 		}
 		importer.options.checkpoint('copy-block', source)!
 	}
@@ -404,7 +413,7 @@ fn pack_root_descriptor_with(recipe RootRecipe, root int, repository string, pin
 	payload := work + '/payload'
 	manifest_path := work + '/manifest.json'
 	defer { unsafe { payload.free(); manifest_path.free() } }
-	mut importer := RootImport{ root: root, output: payload, pins: pins, options: options, ancestors: []string{cap: max_pack_depth} }
+	mut importer := RootImport{ root: root, output: payload, pins: pins, options: options, ancestors: []ImportDirectoryIdentity{cap: max_pack_depth} }
 	defer { unsafe { (&array(&importer.ancestors)).free() } }
 	for entry in recipe.entries { importer.copy(entry.source, entry.path)! }
 	manifest := publisher_json(recipe.manifest)

@@ -1,0 +1,24 @@
+IMPORT MATERIALIZATION case=file retained=0 allocations=0
+IMPORT MATERIALIZATION case=empty retained=0 allocations=0
+IMPORT MATERIALIZATION case=nested retained=0 allocations=0
+IMPORT MATERIALIZATION case=tree retained=0 allocations=0
+IMPORT MATERIALIZATION case=alias retained=0 allocations=0
+IMPORT MATERIALIZATION case=parent-alias retained=0 allocations=0
+IMPORT MATERIALIZATION case=pinned retained=0 allocations=0
+IMPORT MATERIALIZATION case=pin-size retained=0 allocations=0
+IMPORT MATERIALIZATION case=pin-mode retained=0 allocations=0
+IMPORT MATERIALIZATION case=pin-digest retained=0 allocations=0
+IMPORT MATERIALIZATION case=cycle retained=0 allocations=0
+IMPORT MATERIALIZATION case=special retained=0 allocations=0
+IMPORT MATERIALIZATION case=opened retained=0 allocations=0
+IMPORT MATERIALIZATION case=directory retained=0 allocations=0
+IMPORT MATERIALIZATION case=sized retained=0 allocations=0
+IMPORT MATERIALIZATION case=block retained=0 allocations=0
+IMPORT MATERIALIZATION case=read retained=0 allocations=0
+IMPORT MATERIALIZATION case=hashed retained=0 allocations=0
+IMPORT MATERIALIZATION case=copy-block retained=0 allocations=0
+IMPORT MATERIALIZATION case=copied retained=0 allocations=0
+IMPORT MATERIALIZATION case=create-failure retained=0 allocations=0
+IMPORT MATERIALIZATION case=parent-file retained=0 allocations=0
+IMPORT MATERIALIZATION files, recursive guest aliases, pinned inventories and late refusals retire owned scratch PASS
+IMPORT MATERIALIZATION multiblock/empty bytes, stripped modes, umask, unchanged parents, empty directories and native creation refusal/retry PASS
