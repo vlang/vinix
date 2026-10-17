@@ -8123,22 +8123,49 @@ under `build/ios/fortnite/storefront-metadata-checks`. The fixture is available
 through `tests/ios/native-checks.v build-storefront-metadata` and the native
 check inventories.
 
+The subsequent `Transaction.beginRefundRequest(for:in:)` entry and async
+descriptor now support the unavailable-platform profile. Vinix has no refund
+service, so each call throws an owned CFError with `SKErrorDomain`, SDK
+`SKErrorUnsupportedPlatform` (19), and a localized explanation. The entry
+does not submit a request or report a status. It leaves the indirect result
+and borrowed transaction/scene arguments untouched, returns the Error in x21,
+and tail-resumes the same child x22, which the caller may immediately free.
+
+`RefundRequestStatus` has canonical metadata and all eleven enum value
+witnesses: a one-byte POD value, two cases, and 254 extra inhabitants.
+Single-payload witnesses preserve native tag-width transitions and UInt32
+wrapping. Its private nested nominal descriptor supports symbolic lookup;
+Transaction's broader metadata, reflection, conformances and refund UI remain
+unavailable. These entries share the existing sealed StoreKit pages and drain
+with their callers.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites cover this path,
+Storefront.current, task creation, and NSError/Error bridging. The enum was
+compared with native witnesses; generic async throwing/catching was compared
+with native Swift tasks and synthetic CFErrors. Native refund service entries
+were inspected without invocation. The installed Mac entry has a 112-byte
+context, also used by this profile; its UIKit counterpart is unavailable on
+this Mac. Pinned measurements, joined IPA evidence and eleven generated
+C/executable pairs are retained under `build/ios/fortnite/refund-checks`.
+The fixture is available through `tests/ios/native-checks.v build-refund` and
+the native check inventories.
+
 The actual IPA now exits with status 1 before application entry at
-`_$s8StoreKit11TransactionV18beginRefundRequest3for2inAC0eF6StatusOs6UInt64V_So13UIWindowSceneCtYaKFZ`,
-the asynchronous refund-request entry. Fortnite remains unplayable and full
-iOS regression remains unpassed.
+`_SKAdNetworkCoarseConversionValueHigh`, a required StoreKit advertising
+conversion constant. Fortnite remains unplayable and full iOS regression
+remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,679 | 481 | 79 |
+| Fortnite executable | 1,682 | 478 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,514 | 484 | 120 |
+| All images | 2,517 | 481 | 120 |
 
-The C++/GLES/Text variant reports 2,528 resolved imports, 470 unresolved strong
+The C++/GLES/Text variant reports 2,531 resolved imports, 467 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

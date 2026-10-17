@@ -55,7 +55,8 @@ fn storefront_arena_locked() ?u64 {
 	swift_protocol_relative(descriptor, base + 32)
 	write32(descriptor + 4, 64) // Native async function descriptor context size.
 	storefront_metadata_emit(base, descriptor)
-	C.__builtin___clear_cache(code, voidptr(base + 120))
+	refund_emit(base, descriptor)
+	C.__builtin___clear_cache(code, voidptr(base + 216))
 	if C.mprotect(code, page, C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(voidptr(descriptor), page, C.PROT_READ) != 0 {
 		if C.munmap(code, page * 2) != 0 { panic('iOS: cannot retire unsealed Storefront entries') }
