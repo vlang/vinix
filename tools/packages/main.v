@@ -124,12 +124,14 @@ fn checked(arguments []string) !int {
 			if names.len != 3 {
 				return error('pack requires a manifest, payload directory and repository directory')
 			}
-			println(json2.encode(pkgcore.pack(names[0], names[1], names[2])!))
+			mut info := pkgcore.pack(names[0], names[1], names[2])!
+			publisher_reply(mut info)
 			return 0
 		}
 		'pack-root' {
 			if names.len != 3 { return error('pack-root requires a recipe, prepared guest root and repository directory') }
-			println(json2.encode(pkgcore.pack_root(names[0], names[1], names[2])!))
+			mut info := pkgcore.pack_root(names[0], names[1], names[2])!
+			publisher_reply(mut info)
 			return 0
 		}
 		'pack-catalog' {

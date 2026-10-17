@@ -29,9 +29,11 @@ struct CopyOutput {
 fn check_copy_output(output CopyOutput, path string, bytes u64) ! {
 	mut opened := C.stat{}
 	mut named := C.stat{}
-	if C.fstat(output.fd, &opened) != 0 || opened.st_mode & 0o170000 != 0o100000
+	// These stat calls consume their output pointers synchronously. Keep the
+	// records on the stack when each copied block rechecks its destination.
+	if C.fstat(output.fd, unsafe { &opened }) != 0 || opened.st_mode & 0o170000 != 0o100000
 		|| opened.st_size < 0 || u64(opened.st_size) != bytes || opened.st_nlink != 1
-		|| C.fstatat(C.AT_FDCWD, path.str, &named, C.AT_SYMLINK_NOFOLLOW) != 0
+		|| C.fstatat(C.AT_FDCWD, path.str, unsafe { &named }, C.AT_SYMLINK_NOFOLLOW) != 0
 		|| named.st_mode & 0o170000 != 0o100000
 		|| u64(named.st_dev) != output.device || u64(named.st_ino) != output.inode {
 		return error('copy destination changed while writing; require a stable ordinary file without hard links: ${path}')
@@ -43,7 +45,7 @@ fn copy_source(source string, maximum u64) !CopySource {
 	fd := C.open(source.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
 	if fd < 0 { return error('cannot open ordinary copy source: ${source}') }
 	mut info := C.stat{}
-	if C.fstat(fd, &info) != 0 || info.st_mode & 0o170000 != 0o100000 || info.st_size < 0 {
+	if C.fstat(fd, unsafe { &info }) != 0 || info.st_mode & 0o170000 != 0o100000 || info.st_size < 0 {
 		C.close(fd)
 		return error('copy source must be an ordinary regular file: ${source}')
 	}
@@ -85,7 +87,7 @@ fn copy_opened_with(input CopySource, source string, target string, offset u64, 
 	if output < 0 { return error('cannot open ordinary copy destination: ${target}') }
 	defer { C.close(output) }
 	mut info := C.stat{}
-	if C.fstat(output, &info) != 0 || info.st_mode & 0o170000 != 0o100000 || info.st_size < 0 {
+	if C.fstat(output, unsafe { &info }) != 0 || info.st_mode & 0o170000 != 0o100000 || info.st_size < 0 {
 		return error('copy destination must be an ordinary regular file: ${target}')
 	}
 	if u64(info.st_dev) == input.device && u64(info.st_ino) == input.inode {
@@ -135,7 +137,7 @@ fn copy_opened_with(input CopySource, source string, target string, offset u64, 
 		count := C.read(input.fd, buffer.data, 1)
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count < 0 { return error('cannot read copy source: ${source}') }
-		if count != 0 || C.fstat(input.fd, &info) != 0 || info.st_size < 0 || u64(info.st_size) != input.bytes {
+		if count != 0 || C.fstat(input.fd, unsafe { &info }) != 0 || info.st_size < 0 || u64(info.st_size) != input.bytes {
 			return error('copy source changed size while reading: ${source}')
 		}
 		break

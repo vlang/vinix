@@ -391,6 +391,13 @@ independently closeable `CatalogInfo`. It finishes metadata admission and budget
 before touching prepared roots or destination parents, retaining the existing
 deduplication, scratch-space and reserve estimates. See
 [workspace planning checks](../tests/packages/catalog-plan-check.md).
+Direct and prepared-root packing return independently closeable package metadata.
+Packing retires discarded template inventories and partial payload lists, moves
+owned file records without implicit clones, and releases encoding/copy scratch.
+A directory occupying an object digest slot now refuses publication while
+retaining its contents. [Packing ownership checks](../tests/packages/pack-ownership-check.md)
+cover cold/cache walks, late refusals, literal CLI replies and exact retry;
+complete workspace/lock/durability helper ownership remains a separate boundary.
 
 ## Trust and configuration
 

@@ -1,0 +1,5 @@
+PACK OWNERSHIP cold/cache walks, growing inventories and late hash/copy/cache refusals retain zero owned scratch PASS
+PACK OWNERSHIP complete replies and locked/late-walk refusals stay within separate filesystem scratch budget PASS
+PACK OWNERSHIP pack/root replies survive retired inputs and sibling close; ignored template inventory, literal declarations, legacy manifest bytes and saved objects remain intact PASS
+PACK OWNERSHIP late validation/publication/cache-directory refusals preserve saved metadata and recovery bytes; exact retry PASS
+PACK OWNERSHIP production pack/pack-root CLI retain exact JSON replies and declarations PASS

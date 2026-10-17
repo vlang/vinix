@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import os
 import tools.packages.pkgprotocol
 
 // Bound directory work as well as the manifest's regular-file count. The root
@@ -22,12 +21,24 @@ mut:
 	files []Payload
 }
 
+fn close_pack_files(files []Payload) {
+	unsafe {
+		for file in files { file.path.free(); file.sha256.free() }
+		(&array(&files)).free()
+	}
+}
+
+fn (mut source PackSource) close() {
+	close_pack_files(source.files)
+	source = PackSource{}
+}
+
 fn check_pack_node(parent int, name string, node ImportNode, relative string) ! {
 	mut opened := C.stat{}
 	mut named := C.stat{}
-	if C.fstat(node.fd, &opened) != 0 || u64(opened.st_dev) != node.device
+	if C.fstat(node.fd, unsafe { &opened }) != 0 || u64(opened.st_dev) != node.device
 		|| u64(opened.st_ino) != node.inode || u32(opened.st_mode) & 0o170111 != node.mode & 0o170111
-		|| C.fstatat(parent, name.str, &named, C.AT_SYMLINK_NOFOLLOW) != 0
+		|| C.fstatat(parent, name.str, unsafe { &named }, C.AT_SYMLINK_NOFOLLOW) != 0
 		|| u64(named.st_dev) != node.device || u64(named.st_ino) != node.inode
 		|| u32(named.st_mode) & 0o170111 != node.mode & 0o170111 {
 		return error('package source identity or executable mode changed while packing: ${relative}')
@@ -68,7 +79,7 @@ fn (mut source PackSource) entry(parent int, name string, relative string, depth
 	if fd < 0 { return error('cannot open ordinary package source entry without following symlinks: ${relative}') }
 	defer { C.close(fd) }
 	mut info := C.stat{}
-	if C.fstat(fd, &info) != 0 || info.st_mode & 0o170000 !in [0o040000, 0o100000] || info.st_size < 0 {
+	if C.fstat(fd, unsafe { &info }) != 0 || info.st_mode & 0o170000 !in [0o040000, 0o100000] || info.st_size < 0 {
 		return error('package source contains an invalid or special file: ${relative}')
 	}
 	node := ImportNode{ fd: fd, mode: u32(info.st_mode), bytes: u64(info.st_size),
@@ -85,22 +96,29 @@ fn (mut source PackSource) entry(parent int, name string, relative string, depth
 	source.admit(node.bytes)!
 	source.options.checkpoint('sized', relative)!
 	digest := hash_opened(fd, node.bytes, relative, HashReadOptions{ checkpoint: source.options.checkpoint })!
+	payload := Payload{ path: relative.clone(), bytes: node.bytes, sha256: digest, executable: node.mode & 0o111 != 0 }
+	mut transferred := false
+	defer { if !transferred { unsafe { payload.path.free(); payload.sha256.free() } } }
 	source.options.checkpoint('hashed', relative)!
 	check_pack_node(parent, name, node, relative)!
-	payload := Payload{ path: relative.clone(), bytes: node.bytes, sha256: digest, executable: node.mode & 0o111 != 0 }
 	target := source.repository + '/objects/' + digest
+	partial := target + '.new'
+	defer { unsafe { target.free(); partial.free() } }
 	if !verified_file(target, payload) {
 		input := CopySource{ fd: fd, bytes: node.bytes, device: node.device, inode: node.inode }
-		copy_opened(input, relative, target + '.new', 0, pkgprotocol.Progress{}, no_progress)!
-		if !verified_file(target + '.new', payload) {
+		copy_opened(input, relative, partial, 0, pkgprotocol.Progress{}, no_progress)!
+		if !verified_file(partial, payload) {
 			return error('package source changed contents while packing: ${relative}')
 		}
 		source.options.checkpoint('copied', relative)!
 		check_pack_node(parent, name, node, relative)!
-		os.rename(target + '.new', target)!
+		replace_path(partial, target)!
 	} else {
 		source.options.checkpoint('cached', relative)!
 		check_pack_node(parent, name, node, relative)!
 	}
-	source.files << payload
+	// Move owned fields once. Variable append implicitly deep-clones them in V;
+	// noslices allows capacity growth to retire the old collection buffer.
+	unsafe { source.files.flags |= .noslices; source.files.push_many(&payload, 1) }
+	transferred = true
 }

@@ -807,6 +807,21 @@ and MIME types are sorted, and JSON field order is fixed. Identical payload byte
 sequence, expiry and seed produce identical index bytes and Ed25519 signature.
 Binary build reproducibility remains the compiler/upstream build's responsibility.
 
+V callers own the `Package` returned by `pkgcore.pack` and `pkgcore.pack_root`.
+Call `package.close()` after use; repeated close is safe and leaves published
+manifests and objects available. These replies survive retirement of caller
+arguments, decoded templates, sibling replies and private materialization roots.
+Package records borrowed from states, catalogs or plans must be retired through
+their owning object instead. Both CLI commands encode and release their reply.
+
+Packing retires replaced template inventories, partial walked inventories and
+encoding/path scratch on success and failure. Copied objects use literal path
+replacement, so a directory occupying a digest slot refuses publication instead
+of receiving a nested object. Existing verified objects and retained partials
+keep their existing recovery behavior. See
+[packing ownership qualification](../../tests/packages/pack-ownership-check.md)
+for measured cold/cache walks, failure/retry and remaining whole-call scratch.
+
 ### Import a prepared guest root
 
 `pack-root recipe.json /build/guest-root /build/new-repository` imports an explicit

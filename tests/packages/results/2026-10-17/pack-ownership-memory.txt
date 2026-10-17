@@ -1,0 +1,22 @@
+PACK OWNERSHIP walk files=16 cold=false mode=complete retained=0 allocations=0
+PACK OWNERSHIP walk files=16 cold=false mode=hashed retained=0 allocations=0
+PACK OWNERSHIP walk files=16 cold=false mode=copied-or-cached retained=0 allocations=0
+PACK OWNERSHIP walk files=16 cold=true mode=complete retained=0 allocations=0
+PACK OWNERSHIP walk files=16 cold=true mode=hashed retained=0 allocations=0
+PACK OWNERSHIP walk files=16 cold=true mode=copied-or-cached retained=0 allocations=0
+PACK OWNERSHIP walk files=64 cold=false mode=complete retained=0 allocations=0
+PACK OWNERSHIP walk files=64 cold=false mode=hashed retained=0 allocations=0
+PACK OWNERSHIP walk files=64 cold=false mode=copied-or-cached retained=0 allocations=0
+PACK OWNERSHIP walk files=64 cold=true mode=complete retained=0 allocations=0
+PACK OWNERSHIP walk files=64 cold=true mode=hashed retained=0 allocations=0
+PACK OWNERSHIP walk files=64 cold=true mode=copied-or-cached retained=0 allocations=0
+PACK OWNERSHIP cold/cache walks, growing inventories and late hash/copy/cache refusals retain zero owned scratch PASS
+PACK OWNERSHIP full files=1 mode=complete retained=12896 allocations=37
+PACK OWNERSHIP full files=1 mode=locked retained=12152 allocations=31
+PACK OWNERSHIP full files=32 mode=complete retained=12896 allocations=37
+PACK OWNERSHIP full files=32 mode=locked retained=12152 allocations=31
+PACK OWNERSHIP full files=32 mode=hashed retained=12152 allocations=31
+PACK OWNERSHIP complete replies and locked/late-walk refusals stay within separate filesystem scratch budget PASS
+PACK OWNERSHIP pack/root replies survive retired inputs and sibling close; ignored template inventory, literal declarations, legacy manifest bytes and saved objects remain intact PASS
+PACK OWNERSHIP late validation/publication/cache-directory refusals preserve saved metadata and recovery bytes; exact retry PASS
+PACK OWNERSHIP production pack/pack-root CLI retain exact JSON replies and declarations PASS

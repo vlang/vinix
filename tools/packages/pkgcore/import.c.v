@@ -189,7 +189,9 @@ fn import_names_limit(fd int, limit int) ![]string {
 			unsafe { name.free() }
 			return error('prepared directory exceeds entry limit')
 		}
-		names << name
+		// name is already an independent copy of the directory entry. Move it
+		// into the owner rather than cloning again on variable append.
+		unsafe { names.push_many(&name, 1) }
 	}
 	names.sort()
 	accepted = true

@@ -663,6 +663,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     retires templates, partial packed inventories and canonicalization scratch,
     returns an independently closeable reply and preserves canonical locks.
     Complete import/packing/filesystem allocation freedom remains open.
+  - [x] [Owned packing inventories and replies](tests/packages/pack-ownership-check.md)
+    retire discarded template inventories, partial walked files and copy scratch
+    across cold/cache success and late refusal. Independently closeable pack/root
+    replies preserve manifest bytes; digest-slot directories refuse publication
+    without losing recovery data. Whole-call filesystem scratch remains open.
   - [x] [Explicit catalog host selection](tests/packages/composition-target-check.md)
     combines complete single-host and dual-host profiles for a declared target,
     preserving shared packages, pinned declarations and full-input provenance.

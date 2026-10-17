@@ -2,9 +2,16 @@
 module pkgcore
 
 import tools.packages.signing as ed25519
-import json2
 import os
 import time
+
+// Only independently owned pack/pack_root replies. Package records inside a
+// state, catalog or plan borrow their owner's storage and must not close it.
+// Published manifests and payload objects are independent of reply metadata.
+pub fn (mut p Package) close() {
+	close_decoded_package(p)
+	p = Package{}
+}
 
 pub fn pack(manifest string, source string, repository string) !Package {
 	return pack_with(manifest, source, repository, PackSourceOptions{})
@@ -17,20 +24,35 @@ fn pack_with(manifest string, source string, repository string, options PackSour
 	text := read_metadata(manifest)!
 	defer { unsafe { text.free() } }
 	template := decode_manifest(text, false)!
+	mut input := PackSource{ options: options }
+	mut transferred := false
+	defer {
+		if !transferred { close_decoded_package(template); input.close() }
+	}
 	publisher_outside_source(root, repository)!
 	workspace := publisher_workspace(repository, true)!
 	defer { unsafe { workspace.free() } }
 	guard := publisher_lock(workspace)!
 	defer { guard.release() }
 	options.checkpoint('locked', workspace)!
-	owned_directory(workspace + '/objects', 0o755)!
-	mut input := PackSource{ repository: workspace, options: options }
+	objects := workspace + '/objects'
+	manifests := workspace + '/manifests'
+	defer { unsafe { objects.free(); manifests.free() } }
+	owned_directory(objects, 0o755)!
+	input = PackSource{ repository: workspace, options: options }
 	input.walk(root, '', 0)!
 	p := Package{ ...template, files: input.files }
 	p.validate()!
-	owned_directory(workspace + '/manifests', 0o755)!
-	atomic_write(workspace + '/manifests/${p.id}-${p.architecture}-${p.version}.json', json2.encode(p) + '\n')!
-	sync_directory(workspace + '/objects')!
+	owned_directory(manifests, 0o755)!
+	path := manifests + '/${p.id}-${p.architecture}-${p.version}.json'
+	encoded := publisher_json(p)
+	defer { unsafe { path.free(); encoded.free() } }
+	atomic_write(path, encoded)!
+	sync_directory(objects)!
+	// Supplied template inventories are replaced by the captured walk. Retire
+	// them separately before moving declarations and the new inventory to p.
+	close_pack_files(template.files)
+	transferred = true
 	return p
 }
 
