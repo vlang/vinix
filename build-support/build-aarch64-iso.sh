@@ -77,7 +77,13 @@ fetch_limine_file limine-uefi-cd.bin "$UEFI_CD_SHA256"
 mkdir -p "$ISO_ROOT/boot" "$ISO_ROOT/EFI/BOOT"
 install -m644 "$KERNEL" "$ISO_ROOT/boot/vinix"
 install -m644 "$INITRAMFS" "$ISO_ROOT/boot/initramfs.tar"
-install -m644 "$SCRIPT_DIR/build-support/limine.conf" "$ISO_ROOT/boot/limine.conf"
+# The image goes in compressed (below); Limine loads it as it is.
+sed 's#^\(    module_path: boot():/boot/initramfs\.tar\)$#\1.gz#' \
+    "$SCRIPT_DIR/build-support/limine.conf" > "$ISO_ROOT/boot/limine.conf"
+grep -q 'module_path: boot():/boot/initramfs\.tar\.gz$' "$ISO_ROOT/boot/limine.conf" || {
+    echo "ERROR: limine.conf has no module_path for boot/initramfs.tar" >&2
+    exit 1
+}
 # A machine booted from the ISO keeps its system on a blank disk if it has
 # one, installing it there on the first boot (kernel/sysdisk). The entry is the
 # file's last, so the option goes at the end.
@@ -89,6 +95,24 @@ mkdir -p "$IMAGE_ID_DIR"
 sha256_file "$INITRAMFS" | cut -c1-16 > "$IMAGE_ID_DIR/.vinix-image-id"
 COPYFILE_DISABLE=1 tar --format=ustar -rf "$ISO_ROOT/boot/initramfs.tar" \
     -C "$IMAGE_ID_DIR" ./.vinix-image-id
+# Ship the image gzip-compressed, as Ubuntu, Debian and Arch ship their
+# initramfs compressed: the bootloader reads about a third of the bytes and the
+# kernel inflates them (kernel/initramfs/gzip.v). The header's comment field
+# carries the image id, so a machine booting the system installed on its disk
+# can compare ids without inflating the image.
+echo "==> Compressing the image..."
+gzip -9 -n -c "$ISO_ROOT/boot/initramfs.tar" > "$ISO_ROOT/boot/initramfs.plain.gz"
+if [ "$(od -An -tx1 -j3 -N1 "$ISO_ROOT/boot/initramfs.plain.gz" | tr -d ' \n')" != 00 ]; then
+    echo "ERROR: gzip -n wrote optional header fields; cannot add the image id" >&2
+    exit 1
+fi
+{
+    # ID1 ID2, deflate, FCOMMENT, no mtime, maximum compression, Unix.
+    printf '\037\213\010\020\000\000\000\000\002\003'
+    printf 'vinix-image-id=%s\000' "$(cat "$IMAGE_ID_DIR/.vinix-image-id")"
+    tail -c +11 "$ISO_ROOT/boot/initramfs.plain.gz"
+} > "$ISO_ROOT/boot/initramfs.tar.gz"
+rm -f "$ISO_ROOT/boot/initramfs.tar" "$ISO_ROOT/boot/initramfs.plain.gz"
 install -m644 "$BUILD_DIR/limine/limine-uefi-cd.bin" \
     "$ISO_ROOT/boot/limine-uefi-cd.bin"
 install -m644 "$BUILD_DIR/limine/BOOTAA64.EFI" "$ISO_ROOT/EFI/BOOT/BOOTAA64.EFI"

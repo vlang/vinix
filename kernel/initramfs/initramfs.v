@@ -5,7 +5,7 @@ import lib
 import limine
 import fs
 import stat
-import memory as _
+import memory
 
 struct USTARHeader {
 	name       [100]u8
@@ -375,12 +375,29 @@ pub fn image_id() string {
 	if module_req.response == unsafe { nil } || module_req.response.module_count < 1 {
 		return ''
 	}
-	archive := unsafe { module_req.response.modules[0] }
-	if archive == unsafe { nil } || archive.size < 512 {
+	image := unsafe { module_req.response.modules[0] }
+	if image == unsafe { nil } || image.size < 512 {
 		return ''
 	}
-	end := u64(archive.address) + archive.size
-	mut header := unsafe { &USTARHeader(archive.address) }
+	if !is_gzip(&u8(image.address), image.size) {
+		return archive_image_id(image.address, image.size)
+	}
+	id := gzip_image_id(&u8(image.address), image.size)
+	if id.len > 0 {
+		return id
+	}
+	// A compressed image without the header comment: inflate it to look.
+	archive := module_archive(0)
+	defer {
+		archive.release()
+	}
+	return archive_image_id(archive.address, archive.size)
+}
+
+// The id in the archive's own /.vinix-image-id entry, or empty.
+fn archive_image_id(address voidptr, archive_size u64) string {
+	end := u64(address) + archive_size
+	mut header := unsafe { &USTARHeader(address) }
 	for u64(header) + 512 <= end && check_ustar(header) {
 		size := octal_to_int(ustar_field_string(&header.size[0], header.size.len))
 		name := ustar_field_string(&header.name[0], header.name.len)
@@ -422,12 +439,87 @@ fn unpack_modules(first u64) {
 		panic('No initramfs')
 	}
 
-	modules := module_req.response.modules
 	for module_index := first; module_index < module_req.response.module_count; module_index++ {
-		archive_module := unsafe { modules[module_index] }
-		if archive_module == unsafe { nil } || archive_module.size < 512 {
-			panic('Invalid initramfs module')
-		}
-		unpack(archive_module.address, archive_module.size, module_index)
+		archive := module_archive(module_index)
+		unpack(archive.address, archive.size, module_index)
+		archive.release()
 	}
+}
+
+// A module's tar archive: the bootloader's bytes, or, for a gzip-compressed
+// module (a release ISO's image), the archive inflated into pages of its own,
+// which release() gives back once the archive has been unpacked.
+struct Archive {
+	address  voidptr
+	size     u64
+	physical voidptr
+	pages    u64
+}
+
+fn (archive Archive) release() {
+	if archive.pages != 0 {
+		memory.pmm_free(archive.physical, archive.pages)
+	}
+}
+
+@[manualfree]
+fn module_archive(module_index u64) Archive {
+	archive_module := unsafe { module_req.response.modules[module_index] }
+	if archive_module == unsafe { nil } || archive_module.size < 512 {
+		panic('Invalid initramfs module')
+	}
+	data := &u8(archive_module.address)
+	size := archive_module.size
+	if !is_gzip(data, size) {
+		return Archive{
+			address: archive_module.address
+			size:    size
+		}
+	}
+	member := gzip_member(data, size) or { panic('initramfs: malformed gzip module') }
+	if member.size < 512 {
+		panic('initramfs: the compressed module holds no archive')
+	}
+	uart_puts('initramfs: inflating ')
+	uart_put_dec(size)
+	uart_puts(' bytes into ')
+	uart_put_dec(member.size)
+	uart_putc(`\n`)
+	pages := lib.div_roundup(member.size, page_size)
+	physical := memory.pmm_alloc_nozero_fallible(pages)
+	if physical == unsafe { nil } {
+		panic('initramfs: not enough memory to inflate the image')
+	}
+	output := unsafe { &u8(u64(physical) + higher_half) }
+	mut inflater := &Inflater{}
+	ok := inflater.gunzip(data, size, member, output)
+	unsafe { free(inflater) }
+	if !ok {
+		memory.pmm_free(physical, pages)
+		panic('initramfs: the compressed image is corrupt')
+	}
+	return Archive{
+		address:  voidptr(output)
+		size:     member.size
+		physical: physical
+		pages:    pages
+	}
+}
+
+// The image id a release ISO's scripts put in its gzip header's comment, as
+// `vinix-image-id=<id>`, so that a machine booting its installed system does
+// not inflate the whole image to learn it. Empty when there is none.
+fn gzip_image_id(data &u8, size u64) string {
+	member := gzip_member(data, size) or { return '' }
+	prefix := 'vinix-image-id='
+	if member.comment_length <= u64(prefix.len) || member.comment_length > 256 {
+		return ''
+	}
+	comment := unsafe { tos(&u8(u64(data) + member.comment_offset), int(member.comment_length)) }
+	if !comment.starts_with(prefix) {
+		return ''
+	}
+	return unsafe {
+		tos(&u8(u64(data) + member.comment_offset + u64(prefix.len)), int(member.comment_length) - prefix.len)
+	}.clone()
 }
