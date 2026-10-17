@@ -4,6 +4,7 @@ module main
 $if ios_video ? {
 	#include <libavcodec/avcodec.h>
 	#include <libavutil/mem.h>
+	#include <libavutil/opt.h>
 	#include <libswscale/swscale.h>
 	@[typedef]
 	struct C.AVCodec {}
@@ -47,7 +48,9 @@ $if ios_video ? {
 	fn C.av_frame_unref(&C.AVFrame)
 	fn C.av_frame_free(&&C.AVFrame)
 	fn C.av_mallocz(usize) voidptr
-	fn C.sws_getCachedContext(&C.SwsContext, i32, i32, i32, i32, i32, i32, i32, voidptr, voidptr, voidptr) &C.SwsContext
+	fn C.sws_alloc_context() &C.SwsContext
+	fn C.av_opt_set_int(voidptr, &char, i64, i32) i32
+	fn C.sws_init_context(&C.SwsContext, voidptr, voidptr) i32
 	fn C.sws_getCoefficients(i32) &i32
 	fn C.sws_setColorspaceDetails(&C.SwsContext, &i32, i32, &i32, i32, i32, i32, i32) i32
 	fn C.sws_scale(&C.SwsContext, &&u8, &i32, i32, i32, &&u8, &i32) i32
@@ -62,6 +65,7 @@ mut:
 	packet voidptr
 	frame voidptr
 	convert voidptr
+	conversion [7]i32
 }
 fn vt_backend_close(mut backend VTBackend) {
 	$if ios_video ? {
@@ -116,12 +120,27 @@ fn vt_backend_decode(mut backend VTBackend, bytes u64, count u64, output u64) i3
 		pixel := cv_pixel_state(output)
 		if frame.width != i32(pixel.width) || frame.height != i32(pixel.height) { return -12910 }
 		format := if pixel.format == 0x42475241 { i32(C.AV_PIX_FMT_BGRA) } else { i32(C.AV_PIX_FMT_NV12) }
-		backend.convert = C.sws_getCachedContext(backend.convert, frame.width, frame.height, frame.format,
-			frame.width, frame.height, format, C.SWS_BILINEAR, unsafe { nil }, unsafe { nil }, unsafe { nil })
-		if backend.convert == unsafe { nil } { return -12904 }
-		matrix := C.sws_getCoefficients(if frame.colorspace == 1 { 1 } else { 5 })
-		if C.sws_setColorspaceDetails(backend.convert, matrix, i32(frame.color_range == 2), matrix,
-			i32(pixel.format != 0x34323076), 0, 1 << 16, 1 << 16) < 0 { return -12910 }
+		key := [frame.width, frame.height, frame.format, format, i32(frame.color_range == 2),
+			i32(pixel.format != 0x34323076), if frame.colorspace == 1 { i32(1) } else { i32(5) }]!
+		if backend.convert == unsafe { nil } || backend.conversion != key {
+			if backend.convert != unsafe { nil } { C.sws_freeContext(backend.convert) }
+			backend.convert = C.sws_alloc_context()
+			if backend.convert == unsafe { nil } { return -12904 }
+			// Set ranges before initialization. Changing them on a context
+			// created by sws_getCachedContext can leave its unscaled NV12 copy
+			// path active, producing limited-range pixels labelled full-range.
+			names := [c'srcw', c'srch', c'src_format', c'dstw', c'dsth', c'dst_format', c'sws_flags', c'src_range', c'dst_range']!
+			values := [i64(frame.width), i64(frame.height), i64(frame.format), i64(frame.width),
+				i64(frame.height), i64(format), i64(C.SWS_BILINEAR), i64(key[4]), i64(key[5])]!
+			mut result := i32(0)
+			for i, name in names { if C.av_opt_set_int(backend.convert, name, values[i], 0) < 0 { result = -12910; break } }
+			if result == 0 && C.sws_init_context(backend.convert, unsafe { nil }, unsafe { nil }) < 0 { result = -12910 }
+			matrix := C.sws_getCoefficients(key[6])
+			if result == 0 && C.sws_setColorspaceDetails(backend.convert, matrix, key[4], matrix,
+				key[5], 0, 1 << 16, 1 << 16) < 0 { result = -12910 }
+			if result != 0 { C.sws_freeContext(backend.convert); backend.convert = unsafe { nil }; return result }
+			backend.conversion = key
+		}
 		mut planes := [unsafe { &u8(nil) }, unsafe { &u8(nil) }, unsafe { &u8(nil) }, unsafe { &u8(nil) }]!
 		mut strides := [4]i32{}
 		if pixel.planes == 0 { planes[0] = unsafe { &u8(pixel.base) }; strides[0] = i32(pixel.stride) }

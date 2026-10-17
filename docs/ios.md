@@ -8006,22 +8006,71 @@ streams and executables, native measurements and joined guest evidence are
 retained under `build/ios/fortnite/media-time-checks`. The actual IPA calls
 `CACurrentMediaTime` at `0x10a64d53c`.
 
-One further required import resolves. The actual IPA exits with status 1 before
-application entry at `_VTDecompressionSessionCanAcceptFormatDescription`. Image sample construction, codec
-execution and the system Metal device/renderer remain unavailable. Fortnite
-remains unplayable and full iOS regression remains unpassed.
+That probe stopped before application entry at
+`_VTDecompressionSessionCanAcceptFormatDescription`. VideoToolbox now provides
+all six VideoToolbox functions imported by this IPA, backed by the optional
+FFmpeg software H.264/HEVC decoder. Sessions own their codec, immutable format
+and output attributes. Successful decodes deliver independently allocated BGRA,
+limited-range NV12 or full-range NV12 buffers, with the sample timestamp, duration
+and caller reference delivered through the native callback ABI. Each callback
+borrows its image; clients retain it to outlive that callback. Full-range
+conversion is configured before scaler initialization to preserve the advertised
+pixel levels.
+
+The current profile processes one ready sample per call, with fixed dimensions
+and configuration and no frame reordering. Async and temporal permission flags
+allow synchronous completion; the actual IPA supplies flag value 9 at
+`0x1078cb7a0`. The realtime hint is accepted and DoNotOutputFrame decodes with a
+null callback image. Wait joins active decoding. Invalidation joins callbacks
+from other threads; callback-local invalidation retires the runner codec after
+the active operation returns. Retained pixel buffers survive codec destruction.
+Format changes require a fresh session. Hardware decoding, reorder queues,
+protected video, image-backed sample construction and the system Metal renderer
+remain unavailable.
+
+The installed Mac VideoToolbox library and V runner pass the same H.264/HEVC
+red/blue frame checks for all three pixel formats, timestamp/duration ABI,
+parameter-error output preservation, decode hints, suppressed images and joined
+callbacks. Runner checks additionally exercise corrupt-packet rejection and
+recovery, callback-local invalidation/release and two fully drained runtimes.
+Eight host ASan/UBSan runs and four ARM64 Vinix suites cover decoding, H.264/HEVC
+format metadata and pixel allocation. Eleven generated C/executable pairs,
+pinned inputs, native measurements and actual IPA evidence are retained under
+`build/ios/fortnite/video-decode-checks`. Earlier failed trials remain identified
+there. The measured Mac deadlocks when invalidation is called inside its own
+callback; that retirement case is tested only on the runner.
+
+`tests/ios/build-video.v` builds the optional ARM64 SDK from the reviewed
+FFmpeg archive in `tests/packages/ffmpeg-source.json`; it verifies its digest,
+disables hardware/GPL/nonfree components and reserves x18. Use a fresh output
+directory:
+
+```sh
+v -gc none -cc clang -o build/ios/build-video tests/ios/build-video.v
+build/ios/build-video build/package-ffmpeg-work/ffmpeg-8.0.1.tar.xz build/ios/video
+v -gc none -cc clang run tests/ios/native-checks.v build-video-decode
+```
+
+`VINIX_IOS_VIDEO_SDK` selects that SDK directory (default `build/ios/video`).
+The native V driver adds `ios_video`, the matching target headers and the static
+decoder libraries. The decode fixture requires the SDK. Runners built without
+the optional backend report decoder-not-found from session creation.
+
+The six imports now resolve. The actual IPA still exits with status 1 before
+application entry, at `_$s8StoreKit10StorefrontV11countryCodeSSvg`.
+Fortnite remains unplayable and full iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,668 | 492 | 79 |
+| Fortnite executable | 1,674 | 486 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,503 | 495 | 120 |
+| All images | 2,509 | 489 | 120 |
 
-The C++/GLES/Text variant reports 2,517 resolved imports, 481 unresolved strong
+The C++/GLES/Text variant reports 2,523 resolved imports, 475 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

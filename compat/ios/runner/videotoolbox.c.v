@@ -104,7 +104,6 @@ fn vt_attributes(attributes u64, dimensions CMVideoDimensions) (u32, u64, i32) {
 }
 fn vt_create(allocator u64, format u64, specification u64, attributes u64, record u64, output &u64) i32 {
 	if output == unsafe { nil } { return -12902 }
-	unsafe { *output = 0 }
 	if !vt_format_valid(format) { return -12902 }
 	cf_allocator_check(allocator)
 	description := cm_format_state(format)
@@ -159,6 +158,7 @@ fn vt_can_accept(session u64, format u64) u8 {
 	return u8(cm_format_equal(obj_header(session).fields[0], format))
 }
 fn vt_wait(session u64) i32 {
+	if session == 0 { return -12902 }
 	mut state := vt_acquire(session) or { return -12903 }
 	defer { objc_release(session) }
 	C.pthread_mutex_lock(state.mutex)
@@ -170,7 +170,9 @@ fn vt_wait(session u64) i32 {
 fn vt_decode(session u64, sample u64, flags u32, source u64, info &u32) i32 {
 	mut state := vt_acquire(session) or { return -12903 }
 	defer { objc_release(session) }
-	if flags & ~u32(3) != 0 { return -12902 }
+	// Async/temporal permission and realtime hints permit synchronous output.
+	// Bit 1 requests decoding without returning an image.
+	if flags & ~u32(15) != 0 { return -12902 }
 	C.pthread_mutex_lock(state.mutex)
 	if state.busy && state.owner == u64(C.pthread_self()) { C.pthread_mutex_unlock(state.mutex); return -12902 }
 	for state.busy && state.valid { C.pthread_cond_wait(state.condition, state.mutex) }
@@ -209,8 +211,9 @@ fn vt_decode(session u64, sample u64, flags u32, source u64, info &u32) i32 {
 	valid := state.valid
 	C.pthread_mutex_unlock(state.mutex)
 	if !valid { return -12903 }
-	if info != unsafe { nil } { zero := u32(0); C.memcpy(info, unsafe { &zero }, 4) }
-	unsafe { VTOutput(voidptr(state.callback))(state.context, source, 0, 0, image, cm_sample_pts(sample), cm_sample_duration(sample)) }
+	decoded_info := u32(0)
+	if info != unsafe { nil } { C.memcpy(info, unsafe { &decoded_info }, 4) }
+	unsafe { VTOutput(voidptr(state.callback))(state.context, source, 0, decoded_info, if flags & 2 != 0 { u64(0) } else { image }, cm_sample_pts(sample), cm_sample_duration(sample)) }
 	return 0
 }
 fn videotoolbox_symbol(symbol string) ?u64 {

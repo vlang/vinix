@@ -25,6 +25,7 @@ type VDReplace = fn (u64, u64, u64, u64) i32
 type VDSample = fn (u64, u64, u8, u64, u64, u64, i64, i64, &CMSampleTiming, i64, &u64, &u64) i32
 type VDLock = fn (u64, u64) i32
 type VDPlane = fn (u64, u64) u64
+type VDHardware = fn (u32) u8
 struct VDContext {
 	api VDAPI
 mut:
@@ -37,6 +38,7 @@ mut:
 	joining u64
 	joined u64
 	gate bool
+	omit bool
 }
 fn vd_symbol(api VDAPI, group int, name string) u64 {
 	if api.native { p := u64(C.dlsym(unsafe { voidptr(api.handles[group]) }, unsafe { &char(name.str + 1) })); assert p != 0, name; return p }
@@ -52,10 +54,12 @@ fn vd_put(api VDAPI, object u64, name string, number i64) {
 }
 fn vd_output(context u64, source u64, status i32, info u32, image u64, pts CMTime, duration CMTime) {
 	mut c := unsafe { &VDContext(context) }
-	assert source == 0x1234 && status == 0 && info == 0 && image != 0, 'callback native=${c.api.native} source=${source.hex()} status=${status} info=${info} image=${image.hex()}'
+	assert source == 0x1234 && status == 0 && info & ~u32(7) == 0, 'callback native=${c.api.native} source=${source.hex()} status=${status} info=${info} image=${image.hex()}'
 	assert pts == CMTime{17, 5, 1, 0} && duration == CMTime{1, 5, 1, 0}
 	c.calls++
 	assert c.image == 0
+	if c.omit { assert image == 0, 'suppressed frame native=${c.api.native} info=${info} image=${image.hex()}'; return }
+	assert image != 0 && info & 2 == 0
 	c.image = vd_query(c.api, 0, '_CFRetain', image)
 	if c.gate {
 		C.__atomic_store_n(unsafe { &c.entered }, 1, 5)
@@ -100,7 +104,7 @@ fn vd_pixels(api VDAPI, image u64, pixel u32, blue bool) {
 		plane := unsafe { VDPlane(voidptr(vd_symbol(api, 2, '_CVPixelBufferGetBaseAddressOfPlane'))) }; stride := unsafe { VDPlane(voidptr(vd_symbol(api, 2, '_CVPixelBufferGetBytesPerRowOfPlane'))) }
 		assert vd_query(api, 2, '_CVPixelBufferGetPlaneCount', image) == 2
 		expected_y := if pixel == 0x34323066 { if blue { 29 } else { 76 } } else { if blue { 41 } else { 81 } }
-		for y in 0 .. 64 { for x in 0 .. 64 { value := int(unsafe { *(&u8(plane(image, 0) + u64(y) * stride(image, 0) + u64(x))) }); assert value >= expected_y - 2 && value <= expected_y + 2 } }
+		for y in 0 .. 64 { for x in 0 .. 64 { value := int(unsafe { *(&u8(plane(image, 0) + u64(y) * stride(image, 0) + u64(x))) }); assert value >= expected_y - 2 && value <= expected_y + 2, 'native=${api.native} pixel=${pixel.hex()} blue=${blue} y=${value} expected=${expected_y}' } }
 		for y in 0 .. 32 { for x in 0 .. 32 { unsafe { p := &u8(plane(image, 1) + u64(y) * stride(image, 1) + u64(x) * 2); assert p[if blue { 0 } else { 1 }] >= 238; assert p[if blue { 1 } else { 0 }] < 115 } } }
 	}
 }
@@ -112,6 +116,9 @@ fn vd_cases(api VDAPI) {
 	invalidate := unsafe { VDDrop(voidptr(vd_symbol(api, 3, '_VTDecompressionSessionInvalidate'))) }
 	assert accept(0, 0) == 0
 	for hevc in [false, true]! { for pixel in [u32(0x42475241), 0x34323076, 0x34323066]! { for reentrant in [false, true]! {
+		// Native Invalidate joins its own output callback and deadlocks when
+		// invoked there. Exercise the runner's reentrant retirement separately.
+		if api.native && reentrant { continue }
 		format := vd_format(api, hevc); attrs := vd_dict(api); vd_put(api, attrs, 'PixelFormatType', i64(pixel)); spec := vd_dict(api); vd_put(api, spec, 'EnableHardwareAcceleratedVideoDecoder', 0)
 		mut context := VDContext{api: api, reentrant: reentrant}; wire := [u64(unsafe { voidptr(vd_output) }), u64(&context)]!
 		mut session := u64(0xfeed); result := create(0, format, spec, attrs, u64(unsafe { &wire[0] }), &session)
@@ -119,25 +126,52 @@ fn vd_cases(api VDAPI) {
 		context.session = session; vd_drop(api, attrs); vd_drop(api, spec)
 		assert accept(session, format) == 1 && accept(session, 0) == 0
 		assert wait(session) == 0
+		if !hevc && pixel == 0x42475241 && !reentrant {
+			mut invalid_info := u32(0xfeed)
+			invalid_status := decode(session, 0, 0, 0, &invalid_info)
+			assert invalid_status == -12902 && invalid_info == 0xfeed
+			if !api.native {
+				bad := vd_sample(api, format, false, false)
+				block := cm_sample_data(bad)
+				assert cm_block_fill(0, block, 0, cm_block_length(block)) == 0
+				assert decode(session, bad, 0, 0x1234, &invalid_info) == -12909
+				assert context.calls == 0 && context.image == 0 && invalid_info == 0xfeed
+				vd_drop(api, bad)
+			}
+		}
+		for flags in [u32(0), 4, 9, 2]! {
+		if reentrant && flags != 0 { continue }
+		context.omit = flags & 2 != 0
 		for blue in [false, true]! {
 			sample := vd_sample(api, format, hevc, blue); mut info := u32(0xfeed)
-			status := decode(session, sample, 0, 0x1234, &info)
-			assert status == 0 && info == 0 && context.image != 0, 'decode native=${api.native} hevc=${hevc} status=${status} info=${info}'
+			status := decode(session, sample, flags, 0x1234, &info)
+			assert status == 0 && info & ~u32(7) == 0, 'decode native=${api.native} hevc=${hevc} flags=${flags} status=${status} info=${info}'
+			if !reentrant { assert wait(session) == 0 }
+			assert (context.image == 0) == context.omit
 			vd_drop(api, sample)
-			vd_pixels(api, context.image, pixel, blue); vd_drop(api, context.image); context.image = 0
+			if !context.omit { vd_pixels(api, context.image, pixel, blue); vd_drop(api, context.image); context.image = 0 }
 			if reentrant { break }
 		}
-		assert context.calls == if reentrant { 1 } else { 2 }
+		}
+		assert context.calls == if reentrant { 1 } else { 8 }
 		if !reentrant { assert wait(session) == 0; invalidate(session); assert accept(session, format) == 0; vd_drop(api, session) }
 		vd_drop(api, format)
 	} } }
 }
+fn vd_errors(api VDAPI) {
+	mut output := u64(0xfeed)
+	result := unsafe { VDCreate(voidptr(vd_symbol(api, 3, '_VTDecompressionSessionCreate')))(0, 0, 0, 0, 0, &output) }
+	assert result == -12902 && output == 0xfeed
+	assert unsafe { VDStatus(voidptr(vd_symbol(api, 3, '_VTDecompressionSessionWaitForAsynchronousFrames')))(0) } == -12902
+	assert unsafe { VDHardware(voidptr(vd_symbol(api, 3, '_VTIsHardwareDecodeSupported')))(0) } == 0
+}
 fn vd_decode_worker(api VDAPI, session u64, sample u64) {
 	mut info := u32(0xfeed)
 	assert unsafe { VDDecode(voidptr(vd_symbol(api, 3, '_VTDecompressionSessionDecodeFrame')))(session, sample, 0, 0x1234, &info) } == 0
-	assert info == 0
+	assert info & ~u32(4) == 0
 }
-fn vd_invalidate_worker(mut context VDContext) {
+fn vd_invalidate_worker(address u64) {
+	mut context := unsafe { &VDContext(address) }
 	C.__atomic_store_n(unsafe { &context.joining }, 1, 5)
 	unsafe { VDDrop(voidptr(vd_symbol(context.api, 3, '_VTDecompressionSessionInvalidate')))(context.session) }
 	C.__atomic_store_n(unsafe { &context.joined }, 1, 5)
@@ -146,12 +180,12 @@ fn vd_join(api VDAPI) {
 	format := vd_format(api, false); sample := vd_sample(api, format, false, false)
 	mut context := VDContext{api: api, gate: true}; wire := [u64(unsafe { voidptr(vd_output) }), u64(&context)]!
 	mut session := u64(0)
-	assert unsafe { VDCreate(voidptr(vd_symbol(api, 3, '_VTDecompressionSessionCreate')))(0, format, 0, 0, u64(unsafe { &wire[0] }), &session) } == 0
+	assert unsafe { VDCreate(voidptr(vd_symbol(api, 3, '_VTDecompressionSessionCreate')))(0, format, 0, 0, u64(&wire[0]), &session) } == 0
 	context.session = session
 	worker := spawn vd_decode_worker(api, session, sample)
 	for _ in 0 .. 5000 { if C.__atomic_load_n(unsafe { &context.entered }, 5) != 0 { break }; C.usleep(1000) }
 	assert context.entered == 1
-	joining := spawn vd_invalidate_worker(mut context)
+	joining := spawn vd_invalidate_worker(u64(&context))
 	for _ in 0 .. 5000 { if C.__atomic_load_n(unsafe { &context.joining }, 5) != 0 { break }; C.usleep(1000) }
 	assert context.joining == 1
 	C.usleep(20000)
@@ -166,13 +200,11 @@ fn test_video_decode() {
 	$if macos {
 		mut api := VDAPI{native: true}
 		for i, name in ['CoreFoundation', 'CoreMedia', 'CoreVideo', 'VideoToolbox']! { unsafe { api.handles[i] = u64(C.dlopen(&char(('/System/Library/Frameworks/' + name + '.framework/' + name).str), 2)) }; assert api.handles[i] != 0 }
-		mut output := u64(0xfeed)
-		result := unsafe { VDCreate(voidptr(vd_symbol(api, 3, '_VTDecompressionSessionCreate')))(0, 0, 0, 0, 0, &output) }
-		println('IOS-VIDEO-DECODE-NATIVE-ERRORS: null format create=${result} output=${output.hex()} wait-null=' + unsafe { VDStatus(voidptr(vd_symbol(api, 3, '_VTDecompressionSessionWaitForAsynchronousFrames')))(0) }.str())
-		vd_cases(api); vd_join(api); println('IOS-VIDEO-DECODE-NATIVE: software H264/HEVC red/blue frames, BGRA/420v/420f, packed callback CMTime ABI, retained images, reentrant invalidation and joined callbacks')
+		vd_errors(api); vd_cases(api); vd_join(api); println('IOS-VIDEO-DECODE-NATIVE: software H264/HEVC red/blue frames, BGRA/420v/420f, packed callback CMTime ABI, parameter errors, retained images and joined callbacks')
 	}
 	for _ in 0 .. 2 {
-		objc_start(); vd_cases(VDAPI{}); vd_join(VDAPI{})
+		objc_start(); vd_errors(VDAPI{}); vd_cases(VDAPI{}); vd_join(VDAPI{})
+		for library in ['/System/Library/Frameworks/CoreMedia.framework/CoreMedia', '/usr/lib/libSystem.B.dylib']! { if _ := runtime_symbol(library, '_VTDecompressionSessionCreate') { assert false } }
 		assert ios_runtime.live == ios_runtime.framework_objects.len && ios_runtime.objects.len == ios_runtime.framework_objects.len
 		objc_stop(); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
 	}
