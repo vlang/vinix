@@ -814,10 +814,12 @@ fn first_run_install_command(request string) string {
 			not_installed.free()
 		}
 	}
-	// Each app's result also goes to the console, the serial port in QEMU,
-	// for a test of the whole setup or for whoever looks into a failure.
+	// Each app's result also goes to the console and, on amd64, whose console
+	// does not reach it, the first serial port: the serial port in QEMU, for a
+	// test of the whole setup or for whoever looks into a failure.
 	return "echo '${started}'; echo; " +
-		'echo "vinix-setup: installing ${names}" 2>/dev/null >/dev/console; ' +
+		'report() { for port in /dev/console /dev/com1; do [ -c "\$port" ] && echo "vinix-setup: \$1" 2>/dev/null >"\$port"; done; }; ' +
+		'report "installing ${names}"; ' +
 		'present() { for path; do [ -x "\$path" ] && return 0; done; return 1; }; ' +
 		'failed=; for app in ${names}; do ' +
 		'case "\$app" in ios-runtime) /usr/bin/vinix-desktop --install-ios-runtime && ' +
@@ -831,8 +833,8 @@ fn first_run_install_command(request string) string {
 		'elif case "\$app" in ${presence}esac; then result=installed; ' +
 		'else result="failed (nothing to run was installed)"; fi; ' +
 		'[ "\$result" = installed ] || failed="\$failed \$app"; ' +
-		'echo "vinix-setup: \$app \$result" 2>/dev/null >/dev/console; done; echo; ' +
-		'echo "vinix-setup: done\${failed:+, failed:\$failed}" 2>/dev/null >/dev/console; ' +
+		'report "\$app \$result"; done; echo; ' +
+		'report "done\${failed:+, failed:\$failed}"; ' +
 		'if [ -n "\$failed" ]; then echo "${not_installed}"; ' +
 		"else echo '${done}'; fi; " + 'exec /bin/zsh -i'
 }
