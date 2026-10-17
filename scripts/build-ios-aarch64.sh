@@ -5,13 +5,17 @@ WITH_2048=0
 WITH_CXX=0
 WITH_GLES=0
 WITH_PPSSPP=0
+RUNNER_ONLY=0
 for option in "$@"; do
     case "$option" in
         --with-2048) WITH_2048=1 ;;
         --with-cxx) WITH_CXX=1 ;;
         --with-gles) WITH_GLES=1 ;;
         --with-ppsspp) WITH_PPSSPP=1; WITH_CXX=1; WITH_GLES=1 ;;
-        --help|-h) echo 'Usage: scripts/build-ios-aarch64.sh [--with-2048] [--with-cxx] [--with-gles] [--with-ppsspp]'; exit 0 ;;
+        # Only the static run-ios, as each release publishes it for the first-run
+        # app page to download (scripts/deploy-iso.sh).
+        --runner-only) RUNNER_ONLY=1 ;;
+        --help|-h) echo 'Usage: scripts/build-ios-aarch64.sh [--with-2048] [--with-cxx] [--with-gles] [--with-ppsspp] [--runner-only]'; exit 0 ;;
         *) echo "ERROR: unknown option: $option" >&2; exit 2 ;;
     esac
 done
@@ -41,25 +45,31 @@ if [ "$WITH_CXX" = 1 ]; then
     CXXLIBS+=("$OUTPUT/cxx/libcxx-ios.a" "$OUTPUT/cxx/sysroot/usr/lib/libc++abi.a" "$OUTPUT/cxx/sysroot/usr/lib/libunwind.a")
 fi
 "$V" -os linux -arch arm64 -enable-globals -gc none -prod -d glibc -d no_backtrace \
-    "${VFLAGS[@]}" \
+    ${VFLAGS[@]+"${VFLAGS[@]}"} \
     -path "@vlib|$SCRIPT_DIR/compat/ios|@vmodules" \
     -o "$OUTPUT/run-ios.c" "$SCRIPT_DIR/compat/ios/runner"
+# The C of V's runtime that a cross link has to compile itself.
+"$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/stage-v-runtime.v" "$OUTPUT/v-runtime"
+V_RUNTIME=("$OUTPUT/v-runtime/segfault_handler_nix.c" "$OUTPUT/v-runtime/execute_capture_nix.c")
 "$LLVM_BIN/clang" --target=aarch64-linux-musl -static -nostdinc -nostdlib \
     -isystem "$SCRIPT_DIR/build-support/aarch64-cc-shim" \
     -isystem "$GCCLIB/include" -isystem "$SYSROOT/usr/include" \
     -O2 -D_GNU_SOURCE -fno-stack-protector -w \
     "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
-    "$OUTPUT/run-ios.c" "$SCRIPT_DIR/compat/ios/runner/abi/dispatch.S" -ffixed-x18 -L"$SYSROOT/usr/lib" -L"$GCCLIB" \
-    "${CXXLIBS[@]}" -lgcc_eh -lc -lgcc -lm "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
+    "$OUTPUT/run-ios.c" "${V_RUNTIME[@]}" "$SCRIPT_DIR/compat/ios/runner/abi/dispatch.S" -ffixed-x18 -L"$SYSROOT/usr/lib" -L"$GCCLIB" \
+    ${CXXLIBS[@]+"${CXXLIBS[@]}"} -lgcc_eh -lc -lgcc -lm "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
     -fuse-ld=lld -B"$LLVM_BIN" -o "$OUTPUT/staging/usr/bin/run-ios"
 echo "Built $OUTPUT/staging/usr/bin/run-ios"
+if [ "$RUNNER_ONLY" = 1 ]; then
+    exit 0
+fi
 
 if [ "$WITH_GLES" = 1 ]; then
     MESA_SYSROOT="${VINIX_IOS_MESA_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
     "$SCRIPT_DIR/build-support/ios/stage-gles" --output "$OUTPUT/staging" \
         --sysroot "$SYSROOT" --mesa-sysroot "$MESA_SYSROOT" --readelf "$LLVM_BIN/llvm-readelf"
     "$V" -os linux -arch arm64 -enable-globals -gc none -prod -d glibc -d no_backtrace \
-        -d ios_gles -d ios_text "${VFLAGS[@]}" -path "@vlib|$SCRIPT_DIR/compat/ios|@vmodules" \
+        -d ios_gles -d ios_text ${VFLAGS[@]+"${VFLAGS[@]}"} -path "@vlib|$SCRIPT_DIR/compat/ios|@vmodules" \
         -o "$OUTPUT/run-ios-gles.c" "$SCRIPT_DIR/compat/ios/runner"
     # Mesa uses dynamically loaded DRI drivers. Keep the ordinary runner static,
     # and link this optional executable against musl and the private Mesa closure.
@@ -69,9 +79,9 @@ if [ "$WITH_GLES" = 1 ]; then
         -isystem "$MESA_SYSROOT/usr/include/freetype2" \
         -O2 -D_GNU_SOURCE -fno-stack-protector -w -no-pie \
         "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbegin.o" \
-        "$OUTPUT/run-ios-gles.c" "$SCRIPT_DIR/compat/ios/runner/abi/dispatch.S" -ffixed-x18 \
+        "$OUTPUT/run-ios-gles.c" "${V_RUNTIME[@]}" "$SCRIPT_DIR/compat/ios/runner/abi/dispatch.S" -ffixed-x18 \
         -L"$OUTPUT/staging/usr/lib/vinix/ios-gles" -L"$SYSROOT/usr/lib" -L"$GCCLIB" \
-        "${CXXLIBS[@]}" -lEGL -lGLESv2 -lfreetype -lgcc_eh -lc -lgcc -lm \
+        ${CXXLIBS[@]+"${CXXLIBS[@]}"} -lEGL -lGLESv2 -lfreetype -lgcc_eh -lc -lgcc -lm \
         -Wl,--dynamic-linker=/usr/lib/vinix/ios-gles/ld-musl-aarch64.so.1 \
         -Wl,-rpath,/usr/lib/vinix/ios-gles -Wl,-rpath-link,"$OUTPUT/staging/usr/lib/vinix/ios-gles" \
         "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \

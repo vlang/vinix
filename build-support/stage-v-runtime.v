@@ -21,4 +21,14 @@ fn main() {
 		// Older compilers emitted this runtime inline in the generated program.
 		os.write_file(output + '/segfault_handler_nix.c', '// Runtime emitted inline by the selected V compiler.\n') or { panic(err) }
 	}
+	// os.execute's capture, a separate object V links with #flag, not the C
+	// it generates.
+	vlib_os := os.join_path(@VEXEROOT, 'vlib', 'os')
+	if os.is_file(vlib_os + '/execute_capture_nix.c') {
+		for name in ['execute_capture_nix.c', 'execute_capture_nix.h'] {
+			os.cp(vlib_os + '/' + name, output + '/' + name) or { panic(err) }
+		}
+	} else {
+		os.write_file(output + '/execute_capture_nix.c', '// Runtime emitted inline by the selected V compiler.\n') or { panic(err) }
+	}
 }
