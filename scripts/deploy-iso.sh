@@ -27,6 +27,8 @@
 #   SHA256SUMS
 #   vinix-x11-ARCH.tar.gz(.sha256)  the X11 that pkg installs with the first
 #                     graphical application; the images leave it out
+#   vinix-ios-runtime-arm64(.sha256)  the static iOS runtime the first-run app
+#                     page installs on arm64 (desktop/app_selection_runtime.v)
 #   RELEASE_NOTES.md  what the release page says
 #   test/             serial logs and screenshots from scripts/test-iso.sh
 #
@@ -265,6 +267,22 @@ if [ "$BUILD_ARM64" -eq 1 ]; then
     [ -s "$OUT/vinix-x11-arm64.tar.gz.sha256" ] || die "the arm64 build made no X11 bundle"
     BUNDLES+=("$OUT/vinix-x11-arm64.tar.gz" "$OUT/vinix-x11-arm64.tar.gz.sha256")
 
+    # The iOS runtime the first-run app page offers, which machines download
+    # from their release rather than build: the images carry no V compiler.
+    VINIX_IOS_BUILD_DIR="$WORK/ios" \
+    VINIX_AARCH64_SYSROOT="$SCRIPT_DIR/build-aarch64-userland/staging" \
+        "$SRC/scripts/build-ios-aarch64.sh" --runner-only
+    IOS_RUNTIME="$OUT/vinix-ios-runtime-arm64"
+    install -m755 "$WORK/ios/staging/usr/bin/run-ios" "$IOS_RUNTIME"
+    file "$IOS_RUNTIME" | grep -q 'ARM aarch64.*statically linked' ||
+        die "the iOS runtime is not a static arm64 executable"
+    if command -v sha256sum >/dev/null 2>&1; then
+        (cd "$OUT" && sha256sum vinix-ios-runtime-arm64)
+    else
+        (cd "$OUT" && shasum -a 256 vinix-ios-runtime-arm64)
+    fi > "$IOS_RUNTIME.sha256"
+    BUNDLES+=("$IOS_RUNTIME" "$IOS_RUNTIME.sha256")
+
     rm -f "$OUT/vinix-arm64.iso"
     VINIX_AARCH64_KERNEL="$SRC/build-arm64-kernel/bin/vinix" \
     VINIX_AARCH64_INITRAMFS="$WORK/arm64-initramfs-desktop.tar" \
@@ -371,7 +389,8 @@ describe_boot() {
     echo "card (the commands above do). Vinix drives VirtIO and Intel e1000 cards. Nor is"
     echo "X11: the first graphical Linux application brings it, from the"
     echo "\`vinix-x11-*.tar.gz\` files of this release. Python is a \`pkg install python3\`"
-    echo "away; the V compiler and Oh My Zsh are left out too."
+    echo "away; the V compiler and Oh My Zsh are left out too. The iOS runtime the first"
+    echo "launch offers on arm64 is \`vinix-ios-runtime-arm64\`, prebuilt."
     echo
     echo "### VirtualBox"
     echo

@@ -382,15 +382,18 @@ LibreOffice installs the full Alpine suite together with its GTK plugin,
 English resources, document fonts and icon theme for Vinix's existing launcher.
 
 The **iOS runtime** option installs Vinix's own static ARM64 compatibility
-runner from an optional image payload. To supply that choice, include the
-already built runner before packing the image root:
+runner. It downloads the prebuilt runner that `scripts/deploy-iso.sh`
+publishes with each release, `vinix-ios-runtime-arm64` with its `.sha256`,
+from the release the image is (`/etc/vinix-release`), or from the newest
+release for an image that names none, and checks its checksum and that it is a
+static ARM64 executable. `scripts/build-ios-aarch64.sh --runner-only` builds
+it. An image can carry the runner instead, so that nothing is downloaded:
 
 ```sh
 v run build-support/ios/stage-setup-runtime.v build/ios/staging/usr/bin/run-ios /path/to/image/root
 ```
 
-Images that already include `/usr/bin/run-ios` show it as installed. Images
-without the optional payload build it from official Vinix sources on demand.
+Images that already include `/usr/bin/run-ios` show it as installed.
 The runtime executes compatible, unencrypted ARM64 iOS Mach-O apps directly, without CPU emulation;
 its supported API subset and limitations are documented in [iOS compatibility](../docs/ios.md).
 It is not a general App Store runtime. The optional payload is a Vinix binary,

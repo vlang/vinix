@@ -4,32 +4,34 @@ module main
 import os
 import encoding.binary
 
-// Image publishers can include the static native runner here. Older images
-// build it on demand from the official Vinix source using the bundled V toolchain.
+// Image publishers can include the static native runner here. Otherwise it is
+// downloaded prebuilt from the image's GitHub release, where
+// scripts/deploy-iso.sh publishes it beside the images.
 const first_run_ios_payload = '/usr/share/vinix/optional/ios-runtime/run-ios'
+const first_run_ios_asset = 'vinix-ios-runtime-arm64'
+const first_run_ios_releases = 'https://github.com/vlang/vinix/releases'
 
-fn first_run_prepare_ios_payload() ! {
+// The runner of the release the image is (/etc/vinix-release, as for pkg's
+// X11 bundle), or of the newest release for an image that names none.
+fn first_run_ios_runtime_url(root string) string {
+	text := os.read_file('${root}/etc/vinix-release') or { '' }
+	release := text.all_before('\n').trim_space()
+	if release != '' && release.bytes().all(it.is_alnum() || it in [`-`, `.`, `_`]) {
+		return '${first_run_ios_releases}/download/${release}/${first_run_ios_asset}'
+	}
+	return '${first_run_ios_releases}/latest/download/${first_run_ios_asset}'
+}
+
+// Download the runner and the checksum published with it into `work`.
+fn first_run_download_ios_runtime(work string) !string {
 	$if !arm64 { return error('the native iOS runtime requires ARM64 hardware') }
-	first_run_tool(['pkg', 'install', 'libarchive-tools', 'gcc', 'musl-dev', 'binutils'])!
-	if !os.is_executable('/usr/bin/v') { return error('the image is missing its native V compiler') }
-	work := '/var/cache/vinix-ios-setup-${os.getpid()}'
-	os.mkdir(work)!
-	defer { os.rmdir_all(work) or {} }
-	archive := work + '/vinix.tar.gz'
-	first_run_download('https://codeload.github.com/vlang/vinix/tar.gz/refs/heads/master', archive)!
-	first_run_unpack(archive, work, false)!
-	source := work + '/vinix-master/compat/ios/runner'
+	url := first_run_ios_runtime_url('')
 	output := work + '/run-ios'
-	first_run_tool(['/usr/bin/v', '-os', 'linux', '-arch', 'arm64', '-cc', 'gcc',
-		'-enable-globals', '-gc', 'none', '-prod', '-d', 'glibc', '-d', 'no_backtrace',
-		'-cflags', '-ffixed-x18', '-ldflags', '-static ${source}/abi/dispatch.S',
-		'-path', '@vlib|${work}/vinix-master/compat/ios|@vmodules', '-o', output, source])!
-	data := os.read_bytes(output)!
-	defer { unsafe { data.free() } }
-	if !first_run_ios_elf(data) { return error('the iOS build did not produce a static ARM64 runtime') }
-	os.mkdir_all(os.dir(first_run_ios_payload))!
-	os.cp(output, first_run_ios_payload)!
-	os.chmod(first_run_ios_payload, 0o755)!
+	first_run_download(url + '.sha256', output + '.sha256')!
+	first_run_download(url, output)!
+	sums := os.read_file(output + '.sha256')!
+	first_run_verify_hash(output, sums.fields()[0] or { '' })!
+	return output
 }
 
 fn first_run_ios_elf(data []u8) bool {
@@ -71,12 +73,17 @@ fn first_run_install_ios_runtime(root string) ! {
 	$if !arm64 {
 		return error('the native iOS runtime requires ARM64 hardware')
 	}
-	source := '${root}${first_run_ios_payload}'
-	if root == '' && !os.is_file(source) { first_run_prepare_ios_payload()! }
+	mut source := '${root}${first_run_ios_payload}'
+	work := '/var/cache/vinix-ios-setup-${os.getpid()}'
+	defer { os.rmdir_all(work) or {} }
+	if root == '' && !os.is_file(source) {
+		os.mkdir_all(work)!
+		source = first_run_download_ios_runtime(work)!
+	}
 	data := os.read_bytes(source)!
 	defer { unsafe { data.free() } }
 	if !first_run_ios_elf(data) {
-		return error('the image contains an invalid static ARM64 iOS runtime')
+		return error('${source} is not a static ARM64 iOS runtime')
 	}
 	directory := '${root}/usr/bin'
 	os.mkdir_all(directory)!

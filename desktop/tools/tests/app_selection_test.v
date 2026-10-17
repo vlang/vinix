@@ -668,6 +668,18 @@ fn test_first_run_ios_runtime_installs_only_a_valid_payload() {
 	}
 }
 
+fn test_first_run_ios_runtime_comes_from_the_image_release() {
+	root := os.join_path(os.temp_dir(), 'vinix-setup-release-${os.getpid()}')
+	os.mkdir_all(root + '/etc')!
+	defer { os.rmdir_all(root) or {} }
+	latest := 'https://github.com/vlang/vinix/releases/latest/download/vinix-ios-runtime-arm64'
+	assert first_run_ios_runtime_url(root) == latest
+	os.write_file(root + '/etc/vinix-release', 'iso-2026-10-17-2\n')!
+	assert first_run_ios_runtime_url(root) == 'https://github.com/vlang/vinix/releases/download/iso-2026-10-17-2/vinix-ios-runtime-arm64'
+	os.write_file(root + '/etc/vinix-release', '../../evil?x=1\n')!
+	assert first_run_ios_runtime_url(root) == latest
+}
+
 fn test_first_run_install_command_reports_failures_and_continues() {
 	work := os.join_path(os.temp_dir(), 'vinix-first-run-install-${os.getpid()}')
 	os.mkdir_all(os.join_path(work, 'bin')) or { panic(err) }
