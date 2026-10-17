@@ -1,7 +1,9 @@
 #!/bin/bash
 # Assemble an aarch64 UEFI ISO around an already-built kernel and initramfs.
-# The pinned Limine binaries are downloaded directly; no target toolchain or
-# Limine source build is part of the normal image path.
+# Limine's EFI boot image comes from its pinned release; the loader inside it
+# is that release built with Vinix's base revision patch
+# (scripts/build-limine-aarch64.sh), since upstream Limine refuses the
+# kernel's base revision 2 on arm64.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -9,9 +11,7 @@ BUILD_DIR="${VINIX_AARCH64_ISO_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-iso}"
 KERNEL="${VINIX_AARCH64_KERNEL:-$SCRIPT_DIR/build-aarch64-kernel/bin/vinix}"
 INITRAMFS="${VINIX_AARCH64_INITRAMFS:-$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar}"
 OUTPUT_ISO="${VINIX_AARCH64_ISO:-$SCRIPT_DIR/vinix-aarch64.iso}"
-LIMINE_COMMIT=ee5d29cd0a8034612dcd1df3f00052480db785c5
-BOOTAA64_SHA256=bc79bb7237ac7d57081f06bb714c5bedd0b1635645ec6c58d597e1a493999b81
-UEFI_CD_SHA256=7751a48fde8ec040f3ac079a9893dbbe0687af3e3c0a96619d69ae2eba9b1478
+. "$SCRIPT_DIR/build-support/limine-binary.sh"
 
 case "$BUILD_DIR" in
     ''|/|"$SCRIPT_DIR")
@@ -32,7 +32,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-for command_name in curl xorriso; do
+for command_name in curl xorriso mcopy; do
     command -v "$command_name" >/dev/null 2>&1 || {
         echo "ERROR: required command not found: $command_name" >&2
         exit 1
@@ -53,26 +53,19 @@ sha256_file() {
     fi
 }
 
-fetch_limine_file() {
-    local filename="$1" expected="$2" destination="$BUILD_DIR/limine/$1"
-    mkdir -p "$BUILD_DIR/limine"
-    if [ ! -s "$destination" ]; then
-        echo "==> Fetching pinned Limine $filename..."
-        curl -fL --retry 3 \
-            "https://raw.githubusercontent.com/limine-bootloader/limine/$LIMINE_COMMIT/$filename" \
-            -o "$destination"
-    fi
-    actual="$(sha256_file "$destination")"
-    if [ "$actual" != "$expected" ]; then
-        echo "ERROR: Limine $filename checksum mismatch." >&2
-        echo "Expected: $expected" >&2
-        echo "Actual:   $actual" >&2
-        exit 1
-    fi
-}
-
-fetch_limine_file BOOTAA64.EFI "$BOOTAA64_SHA256"
-fetch_limine_file limine-uefi-cd.bin "$UEFI_CD_SHA256"
+LIMINE_DIR="$(limine_binary_dir "$BUILD_DIR/limine")"
+"$SCRIPT_DIR/scripts/build-limine-aarch64.sh" >&2
+BOOTAA64="$SCRIPT_DIR/boot-image/limine-bin/BOOTAA64.EFI"
+if ! LC_ALL=C grep -aqF "Limine $LIMINE_BINARY_VERSION (aarch64, UEFI)" "$BOOTAA64"; then
+    echo "ERROR: $BOOTAA64 is not Limine $LIMINE_BINARY_VERSION" >&2
+    exit 1
+fi
+# The release's EFI boot image, with its arm64 loader replaced by the patched one.
+mkdir -p "$BUILD_DIR/limine"
+UEFI_CD="$BUILD_DIR/limine/limine-uefi-cd.bin"
+cp "$LIMINE_DIR/limine-uefi-cd.bin" "$UEFI_CD"
+chmod u+w "$UEFI_CD"
+MTOOLS_SKIP_CHECK=1 mcopy -o -i "$UEFI_CD" "$BOOTAA64" ::/EFI/BOOT/BOOTAA64.EFI
 
 mkdir -p "$ISO_ROOT/boot" "$ISO_ROOT/EFI/BOOT"
 install -m644 "$KERNEL" "$ISO_ROOT/boot/vinix"
@@ -113,9 +106,8 @@ fi
     tail -c +11 "$ISO_ROOT/boot/initramfs.plain.gz"
 } > "$ISO_ROOT/boot/initramfs.tar.gz"
 rm -f "$ISO_ROOT/boot/initramfs.tar" "$ISO_ROOT/boot/initramfs.plain.gz"
-install -m644 "$BUILD_DIR/limine/limine-uefi-cd.bin" \
-    "$ISO_ROOT/boot/limine-uefi-cd.bin"
-install -m644 "$BUILD_DIR/limine/BOOTAA64.EFI" "$ISO_ROOT/EFI/BOOT/BOOTAA64.EFI"
+install -m644 "$UEFI_CD" "$ISO_ROOT/boot/limine-uefi-cd.bin"
+install -m644 "$BOOTAA64" "$ISO_ROOT/EFI/BOOT/BOOTAA64.EFI"
 
 mkdir -p "$(dirname "$OUTPUT_ISO")"
 OUTPUT_ISO_TMP="$(mktemp "$(dirname "$OUTPUT_ISO")/.vinix-aarch64.iso.XXXXXX")"

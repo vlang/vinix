@@ -70,7 +70,7 @@ BOOT_DISK="${VINIX_BOOT_DISK:-$BOOT_DIR/boot.img}"
 BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-2048}"
 OVMF_VARS="${VINIX_EFIVARS:-/tmp/vinix-efivars.fd}"
 INIT_DIR="$SCRIPT_DIR/build-support/init-aarch64"
-LIMINE_VERSION="12.8.0"
+LIMINE_VERSION="12.9.3"
 LIMINE_CONF_SRC="$SCRIPT_DIR/build-support/limine.conf"
 # Keep command-line mutations private to this VM; concurrent runs may select
 # different backends and must not overwrite each other's generated config.

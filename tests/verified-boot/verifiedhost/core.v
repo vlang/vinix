@@ -107,7 +107,7 @@ pub fn pe(arch string) ![]u8 {
 	put32(mut data, 412, 512)
 	for i, b in bootpolicy.config_marker.bytes() { data[512 + i] = b }
 	for i in 0 .. 128 { data[512 + bootpolicy.config_marker.len + i] = `0` }
-	label := 'Limine 12.8.0 (' + if arch == 'x86_64' { 'x86-64' } else { arch } + ', UEFI)'
+	label := 'Limine 12.9.3 (' + if arch == 'x86_64' { 'x86-64' } else { arch } + ', UEFI)'
 	for i, b in label.bytes() { data[800 + i] = b }
 	return data
 }

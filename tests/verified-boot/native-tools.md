@@ -31,10 +31,10 @@ Publication follows verification in a private directory on the destination
 filesystem. Negative cases never publish a completed bundle. Private keys and
 certificates are not bundled.
 
-The loader builder authenticates the pinned 12.8.0 source archive before
+The loader builder authenticates the pinned 12.9.3 source archive before
 extraction, rejects unsafe tar members, applies the existing ARM base-revision
 patch and builds the requested UEFI architecture. The source SHA-256 is
-`6fe2209457cb342ccf102d270ba953153138a191546c7801ed8ee9a6b2dcee4b`.
+`b28b9c9f614f4252cae79580d6cbbc09f4d764a541ec01d586b5c385e3776c99`.
 
 The host verifier test copies the unchanged production V verifier and SHA
 implementations into a private directory, emits isolated C, and invokes their

@@ -9,8 +9,7 @@ KERNEL="${VINIX_AMD64_KERNEL:-$SCRIPT_DIR/build-amd64-kernel/bin/vinix}"
 INITRAMFS="${VINIX_AMD64_INITRAMFS:-$SCRIPT_DIR/build-amd64-userland/initramfs.tar}"
 OUTPUT_DISK="${VINIX_AMD64_DISK:-$SCRIPT_DIR/vinix-amd64.img}"
 DISK_SIZE_MB="${VINIX_AMD64_DISK_SIZE_MB:-64}"
-LIMINE_COMMIT=ee5d29cd0a8034612dcd1df3f00052480db785c5
-BOOTX64_SHA256=c1d6c34cf827e0c5cb0f3546d2db8568dd29aae26833a6332db5532b823503c3
+. "$SCRIPT_DIR/build-support/limine-binary.sh"
 
 case "$BUILD_DIR" in
     ''|/|"$SCRIPT_DIR")
@@ -37,29 +36,7 @@ for input in "$KERNEL" "$INITRAMFS" "$SCRIPT_DIR/build-support/limine.conf"; do
     fi
 done
 
-sha256_file() {
-    if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$1" | awk '{print $1}'
-    else
-        shasum -a 256 "$1" | awk '{print $1}'
-    fi
-}
-
-mkdir -p "$BUILD_DIR/limine"
-BOOTX64="$BUILD_DIR/limine/BOOTX64.EFI"
-if [ ! -s "$BOOTX64" ]; then
-    echo "==> Fetching pinned Limine BOOTX64.EFI..."
-    curl -fL --retry 3 \
-        "https://raw.githubusercontent.com/limine-bootloader/limine/$LIMINE_COMMIT/BOOTX64.EFI" \
-        -o "$BOOTX64"
-fi
-actual="$(sha256_file "$BOOTX64")"
-if [ "$actual" != "$BOOTX64_SHA256" ]; then
-    echo "ERROR: Limine BOOTX64.EFI checksum mismatch." >&2
-    echo "Expected: $BOOTX64_SHA256" >&2
-    echo "Actual:   $actual" >&2
-    exit 1
-fi
+BOOTX64="$(limine_binary_dir "$BUILD_DIR/limine")/BOOTX64.EFI"
 
 payload_bytes=$(($(wc -c < "$KERNEL") + $(wc -c < "$INITRAMFS") + $(wc -c < "$BOOTX64")))
 disk_bytes=$((DISK_SIZE_MB * 1024 * 1024))

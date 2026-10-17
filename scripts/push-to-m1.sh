@@ -9,7 +9,7 @@ set -eu
 REMOTE="${1:-sergey@192.168.0.3}"
 DEST="${2:-/Users/sergey/code/vinix}"
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-LIMINE_VERSION="12.8.0"
+LIMINE_VERSION="12.9.3"
 
 cd "$SCRIPT_DIR"
 

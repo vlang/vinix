@@ -4,9 +4,9 @@ module main
 import hosttest
 import os
 
-const label = 'Limine 12.8.0 (aarch64, UEFI)'
+const label = 'Limine 12.9.3 (aarch64, UEFI)'
 const guard = 'Base revision %u is no longer supported for aarch64'
-const patch = '12.8.0-vinix-base-revision-2.patch'
+const patch = '12.9.3-vinix-base-revision-2.patch'
 const upstream = 'void limine_load(char *config, char *cmdline) {
     if (base_rev_p2_ptr != NULL) {
         *base_rev_p2_ptr = 0;
@@ -39,7 +39,7 @@ fn setup(root string, delegate string) !Fixture {
 	hosttest.module_copy_file(os.join_path(hosttest.root(), 'scripts/build-limine-aarch64.sh'), os.join_path(root, 'scripts/build-limine-aarch64.sh'))!
 	os.mkdir_all(os.join_path(root, 'build-support/limine'))!
 	hosttest.module_copy_file(os.join_path(hosttest.root(), 'build-support/limine', patch), os.join_path(root, 'build-support/limine', patch))!
-	source := os.join_path(root, 'boot-image/limine-src-12.8.0')
+	source := os.join_path(root, 'boot-image/limine-src-12.9.3')
 	driver := os.join_path(source, 'common/protos/limine.c')
 	os.mkdir_all(os.dir(driver))!
 	os.write_file(driver, upstream)!

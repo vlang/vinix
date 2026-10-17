@@ -21,7 +21,7 @@ fn main() {
 				exit(91)
 			}
 			os.mkdir_all('bin')!
-			os.write_file('bin/BOOTAA64.EFI', 'Limine 12.8.0 (aarch64, UEFI)\n')!
+			os.write_file('bin/BOOTAA64.EFI', 'Limine 12.9.3 (aarch64, UEFI)\n')!
 		}
 		'curl' {
 			eprintln('unexpected download in the isolated Limine fixture')

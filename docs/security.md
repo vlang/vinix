@@ -76,7 +76,7 @@ clipboard token revocation through the real broker socket.
 
 ## Authenticated UEFI images
 
-[`tools/verified-boot`](../tools/verified-boot/README.md) builds a Limine 12.8
+[`tools/verified-boot`](../tools/verified-boot/README.md) builds a Limine 12.9
 UEFI boot tree using an administrator-supplied signing key and certificate.
 The configuration hash is embedded in the loader before its PE signature is
 made. That configuration pins the command line, kernel, initramfs overlays and

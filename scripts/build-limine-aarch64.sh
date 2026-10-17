@@ -12,8 +12,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-LIMINE_VERSION="12.8.0"
-LIMINE_SHA256="6fe2209457cb342ccf102d270ba953153138a191546c7801ed8ee9a6b2dcee4b"
+LIMINE_VERSION="12.9.3"
+LIMINE_SHA256="b28b9c9f614f4252cae79580d6cbbc09f4d764a541ec01d586b5c385e3776c99"
 BOOT_DIR="$SCRIPT_DIR/boot-image"
 SRC_DIR="$BOOT_DIR/limine-src-${LIMINE_VERSION}"
 PATCH_DIR="$SCRIPT_DIR/build-support/limine"

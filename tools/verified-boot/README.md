@@ -33,7 +33,7 @@ signature against a certificate supplied separately from the output tree.
 
 V, Clang, LLVM (`ld.lld`, `llvm-ar`, `llvm-objcopy`), make and patch
 are needed to obtain a loader. `get-loader` downloads the same repository
-pinned Limine 12.8.0 source archive as `scripts/build-limine-aarch64.sh`, checks its
+pinned Limine 12.9.3 source archive as `scripts/build-limine-aarch64.sh`, checks its
 SHA-256 before extraction, and builds the UEFI port for either architecture.
 For aarch64 it applies the existing Vinix protocol base revision 2 patch.
 An offline archive may be supplied with `--source-archive`.
@@ -157,11 +157,11 @@ BIOS boots and the Apple Silicon m1n1/U-Boot deployment do not gain firmware
 authentication from this UEFI signing path. Application launchers must still
 apply their sandbox and operational policy.
 
-Limine's [12.8.0 Secure Boot documentation](https://github.com/Limine-Bootloader/Limine/blob/v12.8.0/USAGE.md)
+Limine's [12.9.3 Secure Boot documentation](https://github.com/Limine-Bootloader/Limine/blob/v12.9.3/USAGE.md)
 describes enrolled configuration hashes, required file hashes, forced failure
 on mismatches, and disabled configuration editing under Secure Boot.
 The enrolled configuration hash is checked even when Secure Boot is disabled
-in [its configuration loader](https://github.com/Limine-Bootloader/Limine/blob/v12.8.0/common/lib/config.c).
+in [its configuration loader](https://github.com/Limine-Bootloader/Limine/blob/v12.9.3/common/lib/config.c).
 
 The public builders and all five test commands run directly in V. `bundlehost`
 handles bundle inventory, signing, enrollment, atomic publication and command

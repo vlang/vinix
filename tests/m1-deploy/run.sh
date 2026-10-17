@@ -16,7 +16,7 @@ cp "$repo/scripts/deploy-m1-efi.sh" "$fixture/scripts/"
 # guard and keeps this test independent of generated kernel artifacts.
 "$repo/build-support/source-tools/run" m1-kernel "$fixture/kernel/bin/vinix"
 
-printf '%s\n' 'Limine 12.8.0 (aarch64, UEFI)' \
+printf '%s\n' 'Limine 12.9.3 (aarch64, UEFI)' \
     > "$fixture/boot-image/limine-bin/BOOTAA64.EFI"
 cat > "$fixture/build-support/limine.conf" <<'EOF'
 timeout: 0

@@ -193,8 +193,8 @@ pub fn pe_info(data []u8, arch string) !PE {
 		return invalid('Limine config hash field must be in a signed, mapped PE section')
 	}
 	loader_arch := if arch == 'x86_64' { 'x86-64' } else { arch }
-	label := 'Limine 12.8.0 (${loader_arch}, UEFI)'
-	find_bytes(data, label.bytes(), 0) or { return invalid('a trusted Limine 12.8.0 loader is required') }
+	label := 'Limine 12.9.3 (${loader_arch}, UEFI)'
+	find_bytes(data, label.bytes(), 0) or { return invalid('a trusted Limine 12.9.3 loader is required') }
 	return PE{start, certificate_size}
 }
 

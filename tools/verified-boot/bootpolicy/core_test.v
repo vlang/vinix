@@ -33,7 +33,7 @@ fn fixture_pe(arch string) []u8 {
 	put32(mut data, 412, 512)
 	for index, value in config_marker.bytes() { data[512 + index] = value }
 	for index in 0 .. 128 { data[512 + config_marker.len + index] = `0` }
-	label := 'Limine 12.8.0 (${if arch == 'x86_64' { 'x86-64' } else { arch }}, UEFI)'
+	label := 'Limine 12.9.3 (${if arch == 'x86_64' { 'x86-64' } else { arch }}, UEFI)'
 	for index, value in label.bytes() { data[800 + index] = value }
 	return data
 }
