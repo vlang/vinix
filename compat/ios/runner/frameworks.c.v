@@ -7,6 +7,7 @@ import os
 // Their API methods are implemented individually; absent methods still fail.
 fn framework_symbol(library string, symbol string) ?u64 {
 	if library == '/System/Library/Frameworks/StoreKit.framework/StoreKit' {
+		if address := storekit_constant_symbol(symbol) { return address }
 		if address := storefront_symbol(symbol) { return address }
 		if address := refund_symbol(symbol) { return address }
 	}

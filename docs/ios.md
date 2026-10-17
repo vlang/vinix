@@ -8150,22 +8150,39 @@ C/executable pairs are retained under `build/ios/fortnite/refund-checks`.
 The fixture is available through `tests/ios/native-checks.v build-refund` and
 the native check inventories.
 
-The actual IPA now exits with status 1 before application entry at
-`_SKAdNetworkCoarseConversionValueHigh`, a required StoreKit advertising
-conversion constant. Fortnite remains unplayable and full iOS regression
-remains unpassed.
+StoreKit's three `SKAdNetworkCoarseConversionValue` globals now expose stable
+NSString pointer cells containing `high`, `medium` and `low`. The values and
+CFSTR representation were measured directly from the installed iOSSupport
+StoreKit shared-cache image. The IPA's actual consumer selects a pointer cell,
+then loads its NSString value. These globals occupy a sealed read-only page
+and remain available until pools, collections and Swift contexts drain.
+They do not provide an attribution service or submit postbacks.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites cover the constants,
+Storefront.current, NSString-to-Swift bridging and Objective-C associations.
+Checks include native string/ownership comparisons, contended publication,
+equal-key dictionary lookup, read-only/non-executable mappings, pool destructor
+availability and two unmapped runtime lifetimes. Pinned native/IPA evidence
+and eleven generated C/executable pairs are retained under
+`build/ios/fortnite/storekit-constants-checks`. The fixture is available through
+`tests/ios/native-checks.v build-storekit-constants` and the native inventories.
+
+The actual IPA now exits with status 1 before application entry at `_adler32`
+from `libz.1.dylib` in the static runner. The optional GLES/Text profile
+implements a separate limited set of zlib exports. Fortnite remains unplayable
+and full iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,682 | 478 | 79 |
+| Fortnite executable | 1,685 | 475 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,517 | 481 | 120 |
+| All images | 2,520 | 478 | 120 |
 
-The C++/GLES/Text variant reports 2,531 resolved imports, 467 unresolved strong
+The C++/GLES/Text variant reports 2,534 resolved imports, 464 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
