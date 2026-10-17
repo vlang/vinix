@@ -799,7 +799,10 @@ fn first_run_install_command(request string) string {
 			not_installed.free()
 		}
 	}
+	// Each app's result also goes to the console, the serial port in QEMU,
+	// for a test of the whole setup or for whoever looks into a failure.
 	return "echo '${started}'; echo; " +
+		'echo "vinix-setup: installing ${names}" 2>/dev/null >/dev/console; ' +
 		'failed=; for app in ${names}; do ' +
 		'case "\$app" in ios-runtime) /usr/bin/vinix-desktop --install-ios-runtime && ' +
 		'{ if [ -x /usr/libexec/vinix-persist-packages ]; then /usr/libexec/vinix-persist-packages save; fi; } ;; ' +
@@ -807,7 +810,10 @@ fn first_run_install_command(request string) string {
 		'libreoffice) pkg install "\$app" libreoffice-gtk libreoffice-lang-en_us ttf-liberation font-dejavu adwaita-icon-theme ;; ' +
 		'vlc-qt|keepassxc) pkg install "\$app" qt5-qtbase-x11 font-dejavu ;; ' +
 		'telegram-desktop) pkg install "\$app" qt6-qtbase-x11 font-dejavu ;; ' +
-		'*) pkg install "\$app" ;; esac || failed="\$failed \$app"; done; echo; ' +
+		'*) pkg install "\$app" ;; esac; status=\$?; ' +
+		'if [ \$status -eq 0 ]; then result=installed; else failed="\$failed \$app"; result="failed (\$status)"; fi; ' +
+		'echo "vinix-setup: \$app \$result" 2>/dev/null >/dev/console; done; echo; ' +
+		'echo "vinix-setup: done\${failed:+, failed:\$failed}" 2>/dev/null >/dev/console; ' +
 		'if [ -n "\$failed" ]; then echo "${not_installed}"; ' +
 		"else echo '${done}'; fi; " + 'exec /bin/zsh -i'
 }
