@@ -171,7 +171,9 @@ materialize_runtime_library_links() {
 	for path in $(LC_ALL=C awk '/^(lib|usr\/lib)\/.*\.so(\..*)?$/' "$owned_files"); do
 		link=$(root_path "/$path")
 		if [ -L "$link" ]; then
-			real=$(bb readlink -f "$link")
+			# A link whose target is missing stays as it is; resolving it must not
+			# end the transaction under set -e.
+			real=$(bb readlink -f "$link" 2>/dev/null) || continue
 			[ -f "$real" ] || continue
 			# A hard link is a regular directory entry from the loader's point of
 			# view and avoids duplicating Blender's large library dependencies.
