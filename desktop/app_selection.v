@@ -781,10 +781,25 @@ fn first_run_install_command(request string) string {
 		return ''
 	}
 	names := packages.join(' ')
+	// An install only counts when it leaves something to run: one of the paths
+	// by which the picker itself tells that an app is installed.
+	mut checks := []string{cap: packages.len}
+	for name in packages {
+		for app in first_run_apps {
+			if app.package_name == name {
+				paths := app.installed_paths.join(' ')
+				checks << '${name}) present ${paths} ;; '
+				unsafe { paths.free() }
+			}
+		}
+	}
+	presence := checks.join('')
 	defer {
 		unsafe {
 			names.free()
 			packages.free()
+			checks.free()
+			presence.free()
 		}
 	}
 	// The messages sit inside the shell's quotes: `$failed` is the shell's list
@@ -803,6 +818,7 @@ fn first_run_install_command(request string) string {
 	// for a test of the whole setup or for whoever looks into a failure.
 	return "echo '${started}'; echo; " +
 		'echo "vinix-setup: installing ${names}" 2>/dev/null >/dev/console; ' +
+		'present() { for path; do [ -x "\$path" ] && return 0; done; return 1; }; ' +
 		'failed=; for app in ${names}; do ' +
 		'case "\$app" in ios-runtime) /usr/bin/vinix-desktop --install-ios-runtime && ' +
 		'{ if [ -x /usr/libexec/vinix-persist-packages ]; then /usr/libexec/vinix-persist-packages save; fi; } ;; ' +
@@ -811,7 +827,10 @@ fn first_run_install_command(request string) string {
 		'vlc-qt|keepassxc) pkg install "\$app" qt5-qtbase-x11 font-dejavu ;; ' +
 		'telegram-desktop) pkg install "\$app" qt6-qtbase-x11 font-dejavu ;; ' +
 		'*) pkg install "\$app" ;; esac; status=\$?; ' +
-		'if [ \$status -eq 0 ]; then result=installed; else failed="\$failed \$app"; result="failed (\$status)"; fi; ' +
+		'if [ \$status -ne 0 ]; then result="failed (\$status)"; ' +
+		'elif case "\$app" in ${presence}esac; then result=installed; ' +
+		'else result="failed (nothing to run was installed)"; fi; ' +
+		'[ "\$result" = installed ] || failed="\$failed \$app"; ' +
 		'echo "vinix-setup: \$app \$result" 2>/dev/null >/dev/console; done; echo; ' +
 		'echo "vinix-setup: done\${failed:+, failed:\$failed}" 2>/dev/null >/dev/console; ' +
 		'if [ -n "\$failed" ]; then echo "${not_installed}"; ' +

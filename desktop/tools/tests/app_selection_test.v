@@ -691,17 +691,26 @@ fn test_first_run_install_command_reports_failures_and_continues() {
 	}
 	os.chmod(fake_pkg, 0o755) or { panic(err) }
 
+	// Stop where the Terminal would hand over to the interactive shell, and
+	// take what the fake pkg installs as present: none of it is on this host.
+	installed := 'present() { return 0; }; host_present() {'
 	command := first_run_install_command('firefox chromium libreoffice')
-	// Stop where the Terminal would hand over to the interactive shell.
-	script := command.replace('exec /bin/zsh -i', 'exit 0')
+	script := command.replace('exec /bin/zsh -i', 'exit 0').replace('present() {', installed)
 	result := os.execute('PATH="${work}/bin:\$PATH" sh -c ${os.quoted_path(script)}')
 	assert result.exit_code == 0
 	assert os.read_file(log) or { '' } == 'install firefox\ninstall chromium\ninstall libreoffice libreoffice-gtk libreoffice-lang-en_us ttf-liberation font-dejavu adwaita-icon-theme\n'
 	assert result.output.contains('Installing the apps chosen during setup: firefox chromium libreoffice')
 	assert result.output.contains('Not installed: chromium. Run vinix-desktop --install-setup-app chromium to try again.')
 
-	success := first_run_install_command('firefox').replace('exec /bin/zsh -i', 'exit 0')
+	single := first_run_install_command('firefox').replace('exec /bin/zsh -i', 'exit 0')
+	success := single.replace('present() {', installed)
 	ok := os.execute('PATH="${work}/bin:\$PATH" sh -c ${os.quoted_path(success)}')
 	assert ok.exit_code == 0
 	assert ok.output.contains('The selected apps are installed.')
+
+	// A package manager that succeeds without leaving the app's executable
+	// behind has not installed it.
+	empty := os.execute('PATH="${work}/bin:\$PATH" sh -c ${os.quoted_path(single)}')
+	assert empty.exit_code == 0
+	assert empty.output.contains('Not installed: firefox.')
 }
