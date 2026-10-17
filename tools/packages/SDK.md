@@ -826,6 +826,12 @@ also measures admission, containment, locking and durability. Repeated cached
 packing into an initialized workspace releases all measured storage after reply
 close, including locked and late-walk refusals. This does not establish ownership
 for first-time workspace creation or complete prepared-root/profile construction.
+The subsequent [first workspace creation qualification](../../tests/packages/workspace-creation-ownership-check.md)
+also covers new parents, publisher roots and private directories, plus cold first
+packing and late refusals. Measurements initialize immutable JSON field metadata
+before creating any output. Parent aliases and `alias/..` preserve filesystem
+semantics; umask applies to new parents and explicit directory modes remain
+enforced. Complete prepared-root/profile construction remains separate.
 
 ### Import a prepared guest root
 

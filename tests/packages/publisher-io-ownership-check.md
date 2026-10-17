@@ -1,5 +1,10 @@
 # Publisher filesystem scratch ownership
 
+The results below record the existing-workspace increment. Subsequent
+[first workspace creation checks](workspace-creation-ownership-check.md) also
+cover new parents/private directories and cold first packing. Complete
+prepared-root/profile construction remains a separate ownership boundary.
+
 Publisher workspace admission, source/output containment, locking and durability
 now retire their temporary storage in manual-free builds. Native stat records
 remain on the stack for synchronous calls. Physical paths use independently

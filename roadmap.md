@@ -671,8 +671,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
   - [x] [Owned publisher filesystem checks](tests/packages/publisher-io-ownership-check.md)
     retire workspace admission, containment, lock and durability scratch across
     success and refusal. Cached packing in an initialized workspace releases all
-    measured call storage after reply close; first-time creation and complete
-    prepared-root/profile construction remain separate ownership boundaries.
+    measured call storage after reply close; complete prepared-root/profile
+    construction remains a separate ownership boundary.
+  - [x] [Owned first workspace creation](tests/packages/workspace-creation-ownership-check.md)
+    retires export-parent, recursive directory and fresh workspace construction
+    scratch, including cold first packing and late refusal. Parent aliases,
+    filesystem dotdot, umask, existing modes and partial-parent retry are checked;
+    complete prepared-root/profile construction remains a separate boundary.
   - [x] [Explicit catalog host selection](tests/packages/composition-target-check.md)
     combines complete single-host and dual-host profiles for a declared target,
     preserving shared packages, pinned declarations and full-input provenance.

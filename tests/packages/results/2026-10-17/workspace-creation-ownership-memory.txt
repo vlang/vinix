@@ -1,0 +1,26 @@
+WORKSPACE CREATION mode=export deep=false retained=0 allocations=0
+WORKSPACE CREATION mode=workspace deep=false retained=0 allocations=0
+WORKSPACE CREATION mode=owned deep=false retained=0 allocations=0
+WORKSPACE CREATION mode=export deep=true retained=0 allocations=0
+WORKSPACE CREATION mode=workspace deep=true retained=0 allocations=0
+WORKSPACE CREATION mode=owned deep=true retained=0 allocations=0
+WORKSPACE CREATION refusal=existing retained=0 allocations=0
+WORKSPACE CREATION refusal=alias retained=0 allocations=0
+WORKSPACE CREATION refusal=unsafe retained=0 allocations=0
+WORKSPACE CREATION refusal=file-parent retained=0 allocations=0
+WORKSPACE CREATION refusal=create-failure retained=0 allocations=0
+WORKSPACE CREATION fresh parent/workspace/private directories and existing/alias/unsafe/file-parent/creation refusals retire owned scratch PASS
+WORKSPACE CREATION parent aliases and dotdot, trailing separators, umask, existing modes, invalid paths and retained partial-parent retry PASS
+WORKSPACE CREATION pack files=1 deep=false mode=complete retained=0 allocations=0
+WORKSPACE CREATION pack files=1 deep=false mode=locked retained=0 allocations=0
+WORKSPACE CREATION pack files=1 deep=true mode=complete retained=0 allocations=0
+WORKSPACE CREATION pack files=1 deep=true mode=locked retained=0 allocations=0
+WORKSPACE CREATION pack files=32 deep=false mode=complete retained=0 allocations=0
+WORKSPACE CREATION pack files=32 deep=false mode=locked retained=0 allocations=0
+WORKSPACE CREATION pack files=32 deep=false mode=hashed retained=0 allocations=0
+WORKSPACE CREATION pack files=32 deep=false mode=copied retained=0 allocations=0
+WORKSPACE CREATION pack files=32 deep=true mode=complete retained=0 allocations=0
+WORKSPACE CREATION pack files=32 deep=true mode=locked retained=0 allocations=0
+WORKSPACE CREATION pack files=32 deep=true mode=hashed retained=0 allocations=0
+WORKSPACE CREATION pack files=32 deep=true mode=copied retained=0 allocations=0
+WORKSPACE CREATION first packing, cold copies and locked/hash/copy refusals retire owned scratch; exact retry PASS

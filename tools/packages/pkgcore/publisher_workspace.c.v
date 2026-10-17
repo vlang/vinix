@@ -34,7 +34,7 @@ fn publisher_workspace(repository string, create bool) !string {
 	if create && !publisher_entry_exists(path) {
 		target := export_target(path, 'publisher workspace')!
 		defer { unsafe { target.free() } }
-		os.mkdir(target, mode: 0o755)!
+		if C.mkdir(target.str, 0o755) != 0 { return error('cannot create publisher workspace; check directory permissions and disk space') }
 	}
 	fd := capture_prepared_root(path, 'publisher workspace')!
 	defer { C.close(fd) }

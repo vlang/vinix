@@ -1,0 +1,44 @@
+FAIL x86_64 packages-workspace-creation-ownership (99.8s)
+  forbidden "HWTEST FAIL" in the line: HWTEST FAIL packages-workspace-creation-ownership
+  last 40 serial lines:
+  | WORKSPACE CREATION fresh parent/workspace/private directories and existing/alias/unsafe/file-parent/creation refusals retire owned scratch PASS
+  | WORKSPACE CREATION CASE component-export-false PASS
+  | WORKSPACE CREATION mode=workspace deep=false retained=0 allocations=0
+  | WORKSPACE CREATION fresh parent/workspace/private directories and existing/alias/unsafe/file-parent/creation refusals retire owned scratch PASS
+  | WORKSPACE CREATION CASE component-workspace-false PASS
+  | WORKSPACE CREATION mode=owned deep=false retained=0 allocations=0
+  | WORKSPACE CREATION fresh parent/workspace/private directories and existing/alias/unsafe/file-parent/creation refusals retire owned scratch PASS
+  | WORKSPACE CREATION CASE component-owned-false PASS
+  | WORKSPACE CREATION pack files=1 deep=false mode=complete retained=0 allocations=0
+  | WORKSPACE CREATION first packing, cold copies and locked/hash/copy refusals retire owned scratch; exact retry PASS
+  | WORKSPACE CREATION CASE pack-1-false-complete PASS
+  | WORKSPACE CREATION pack files=1 deep=false mode=locked retained=0 allocations=0
+  | WORKSPACE CREATION first packing, cold copies and locked/hash/copy refusals retire owned scratch; exact retry PASS
+  | WORKSPACE CREATION CASE pack-1-false-locked PASS
+  | WORKSPACE CREATION pack files=32 deep=false mode=complete retained=0 allocations=0
+  | WORKSPACE CREATION first packing, cold copies and locked/hash/copy refusals retire owned scratch; exact retry PASS
+  | WORKSPACE CREATION CASE pack-32-false-complete PASS
+  | WORKSPACE CREATION pack files=32 deep=false mode=locked retained=0 allocations=0
+  | WORKSPACE CREATION first packing, cold copies and locked/hash/copy refusals retire owned scratch; exact retry PASS
+  | WORKSPACE CREATION CASE pack-32-false-locked PASS
+  | WORKSPACE CREATION pack files=32 deep=false mode=hashed retained=0 allocations=0
+  | WORKSPACE CREATION first packing, cold copies and locked/hash/copy refusals retire owned scratch; exact retry PASS
+  | WORKSPACE CREATION CASE pack-32-false-hashed PASS
+  | WORKSPACE CREATION pack files=32 deep=false mode=copied retained=0 allocations=0
+  | WORKSPACE CREATION first packing, cold copies and locked/hash/copy refusals retire owned scratch; exact retry PASS
+  | WORKSPACE CREATION CASE pack-32-false-copied PASS
+  | WORKSPACE CREATION mode=export deep=true retained=0 allocations=0
+  | WORKSPACE CREATION fresh parent/workspace/private directories and existing/alias/unsafe/file-parent/creation refusals retire owned scratch PASS
+  | WORKSPACE CREATION CASE component-export-true PASS
+  | WORKSPACE CREATION mode=workspace deep=true retained=0 allocations=0
+  | WORKSPACE CREATION fresh parent/workspace/private directories and existing/alias/unsafe/file-parent/creation refusals retire owned scratch PASS
+  | WORKSPACE CREATION CASE component-workspace-true PASS
+  | WORKSPACE CREATION mode=owned deep=true retained=0 allocations=0
+  | WORKSPACE CREATION fresh parent/workspace/private directories and existing/alias/unsafe/file-parent/creation refusals retire owned scratch PASS
+  | WORKSPACE CREATION CASE component-owned-true PASS
+  | WORKSPACE CREATION pack files=1 deep=true mode=complete retained=0 allocations=0
+  | WORKSPACE CREATION first packing, cold copies and locked/hash/copy refusals retire owned scratch; exact retry PASS
+  | WORKSPACE CREATION CASE pack-1-true-complete PASS
+  | creation pack-1-true-locked failed (1)
+  | HWTEST FAIL packages-workspace-creation-ownership
+  logs: /Users/alex/code/vinix/build/wco-x86-3/packages-workspace-creation-ownership

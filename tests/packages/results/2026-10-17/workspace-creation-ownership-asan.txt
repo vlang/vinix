@@ -1,0 +1,3 @@
+WORKSPACE CREATION fresh parent/workspace/private directories and existing/alias/unsafe/file-parent/creation refusals retire owned scratch PASS
+WORKSPACE CREATION parent aliases and dotdot, trailing separators, umask, existing modes, invalid paths and retained partial-parent retry PASS
+WORKSPACE CREATION first packing, cold copies and locked/hash/copy refusals retire owned scratch; exact retry PASS

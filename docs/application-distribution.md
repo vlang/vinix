@@ -400,8 +400,14 @@ cover cold/cache walks, late refusals, literal CLI replies and exact retry;
 [publisher filesystem ownership checks](../tests/packages/publisher-io-ownership-check.md)
 also retire admission, containment, lock and durability scratch. Complete cached
 packing into an initialized workspace retains zero measured bytes after reply close,
-including lock-checkpoint and late-walk refusals. First-time workspace creation
-and complete prepared-root/profile construction remain separate boundaries.
+including lock-checkpoint and late-walk refusals. Those measurements cover an
+initialized workspace; complete prepared-root/profile construction remains separate.
+[First workspace construction checks](../tests/packages/workspace-creation-ownership-check.md)
+also cover new export parents, publisher roots and private child directories.
+Cold first packing and late lock/hash/copy refusals release their measured call
+storage after result retirement. Tests initialize immutable JSON field metadata
+before measuring filesystem creation; full prepared-root/profile construction
+and broader installed-system acceptance remain separate boundaries.
 
 ## Trust and configuration
 

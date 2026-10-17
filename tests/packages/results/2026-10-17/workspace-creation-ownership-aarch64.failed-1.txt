@@ -1,0 +1,44 @@
+FAIL aarch64 packages-workspace-creation-ownership (123.2s)
+  forbidden "V panic:" in the line: V panic: folder: /tmp/vinix-create-owned-34957-1792197939484963/, error: Out of memory
+  last 40 serial lines:
+  | WORKSPACE CREATION PROCESS release PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | PUBLISHER IO OWNERSHIP mode=capture retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP mode=capture-alias retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP mode=workspace retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP mode=workspace-alias retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP mode=workspace-unsafe retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP mode=outside retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP mode=relative-outside retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP mode=contained retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP mode=relative-contained retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP mode=lock retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP mode=busy retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP mode=hard-linked retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP mode=file retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP mode=directory retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP mode=file-alias retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP mode=directory-alias retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP mode=flush-failure retained=0 allocations=0
+  | PUBLISHER IO OWNERSHIP admission, containment, exclusion and durability scratch PASS
+  | WORKSPACE CREATION PROCESS publisher-io PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | WORKSPACE CREATION PROCESS durability PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | WORKSPACE CREATION mode=export deep=false retained=0 allocations=0
+  | WORKSPACE CREATION mode=workspace deep=false retained=0 allocations=0
+  | WORKSPACE CREATION mode=owned deep=false retained=0 allocations=0
+  | WORKSPACE CREATION mode=export deep=true retained=0 allocations=0
+  | WORKSPACE CREATION mode=workspace deep=true retained=0 allocations=0
+  | /Users/alex/code/vinix/tools/packages/pkgcore/workspace_creation_ownership_test.v:64: fn test_creation_component_paths_retire_new_parents_and_refusal_scratch failed propagation with error: Out of memory
+  | V panic: folder: /tmp/vinix-create-owned-34957-1792197939484963/, error: Out of memory
+  |  v hash: 826e96f
+  |     pid: 0x888d
+  |     tid: 0x888d
+  | creation failed (1)
+  | HWTEST FAIL packages-workspace-creation-ownership
+  | syspower: power off: stopping devices
+  logs: /Users/alex/code/vinix/build/wco-arm-1/packages-workspace-creation-ownership

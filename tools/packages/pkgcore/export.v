@@ -29,18 +29,29 @@ fn export_target(destination string, kind string) !string {
 	}
 	trimmed := destination.trim_right('/')
 	name := os.file_name(trimmed)
-	if name in ['', '.', '..'] { return error('${kind} destination must be a new directory') }
-	if os.exists(destination) || os.is_link(destination) { return error('${kind} destination must be new') }
+	defer { unsafe { trimmed.free(); name.free() } }
+	if name in ['', '.', '..']! { return error('${kind} destination must be a new directory') }
+	if publisher_entry_exists(destination) { return error('${kind} destination must be new') }
 	path := os.dir(trimmed)
-	mut existing := os.abs_path(path)
-	for !os.exists(existing) && !os.is_link(existing) { existing = os.dir(existing) }
-	if !os.is_dir(existing) { return error('${kind} parent must be a directory') }
-	check_export_parent(os.real_path(existing), kind)!
-	os.mkdir_all(path, mode: 0o755)!
-	parent := os.real_path(path)
+	defer { unsafe { path.free() } }
+	mut existing := mirror_absolute_path(path)!
+	defer { unsafe { existing.free() } }
+	for !publisher_entry_exists(existing) {
+		next := os.dir(existing)
+		unsafe { existing.free() }
+		existing = next
+	}
+	mut info := C.stat{}
+	if C.fstatat(C.AT_FDCWD, existing.str, unsafe { &info }, 0) != 0 || info.st_mode & 0o170000 != 0o040000 { return error('${kind} parent must be a directory') }
+	ancestor := publisher_real_path(existing)!
+	defer { unsafe { ancestor.free() } }
+	check_export_parent(ancestor, kind)!
+	make_package_directories(path, 0o755)!
+	parent := publisher_real_path(path)!
+	defer { unsafe { parent.free() } }
 	check_export_parent(parent, kind)!
-	target := parent.trim_right('/') + '/' + name
-	if os.exists(target) || os.is_link(target) { return error('${kind} destination must be new') }
+	target := if parent == '/' { parent + name } else { parent + '/' + name }
+	if publisher_entry_exists(target) { unsafe { target.free() }; return error('${kind} destination must be new') }
 	return target
 }
 

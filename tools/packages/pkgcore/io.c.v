@@ -163,7 +163,7 @@ pub fn owned_directory(path string, mode int) ! {
 	mut info := C.stat{}
 	if C.lstat(path.str, unsafe { &info }) != 0 {
 		if C.errno != C.ENOENT { return error('cannot inspect package state directory: ' + path) }
-		os.mkdir_all(path, mode: mode)!
+		make_package_directories(path, u32(mode))!
 		if C.lstat(path.str, unsafe { &info }) != 0 { return error('cannot inspect created package state directory: ' + path) }
 	}
 	if info.st_mode & 0o170000 != 0o040000 {

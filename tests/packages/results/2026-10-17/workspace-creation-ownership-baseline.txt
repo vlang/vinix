@@ -1,0 +1,24 @@
+WORKSPACE CREATION mode=export deep=false retained=9750 allocations=26
+WORKSPACE CREATION mode=workspace deep=false retained=13911 allocations=28
+WORKSPACE CREATION mode=owned deep=false retained=5358 allocations=19
+WORKSPACE CREATION mode=export deep=true retained=47075 allocations=104
+WORKSPACE CREATION mode=workspace deep=true retained=51252 allocations=106
+WORKSPACE CREATION mode=owned deep=true retained=39486 allocations=51
+WORKSPACE CREATION refusal=existing retained=72 allocations=2
+WORKSPACE CREATION refusal=alias retained=210 allocations=3
+WORKSPACE CREATION refusal=unsafe retained=5236 allocations=20
+WORKSPACE CREATION refusal=file-parent retained=1065 allocations=18
+WORKSPACE CREATION fresh parent/workspace/private directories and existing/alias/unsafe/file-parent refusals retire owned scratch PASS
+WORKSPACE CREATION pack files=1 deep=false mode=complete retained=31335 allocations=101
+WORKSPACE CREATION pack files=1 deep=false mode=locked retained=19570 allocations=50
+WORKSPACE CREATION pack files=1 deep=true mode=complete retained=74137 allocations=244
+WORKSPACE CREATION pack files=1 deep=true mode=locked retained=58895 allocations=152
+WORKSPACE CREATION pack files=32 deep=false mode=complete retained=30844 allocations=94
+WORKSPACE CREATION pack files=32 deep=false mode=locked retained=19570 allocations=50
+WORKSPACE CREATION pack files=32 deep=false mode=hashed retained=25202 allocations=72
+WORKSPACE CREATION pack files=32 deep=false mode=copied retained=25202 allocations=72
+WORKSPACE CREATION pack files=32 deep=true mode=complete retained=74137 allocations=244
+WORKSPACE CREATION pack files=32 deep=true mode=locked retained=58895 allocations=152
+WORKSPACE CREATION pack files=32 deep=true mode=hashed retained=66511 allocations=198
+WORKSPACE CREATION pack files=32 deep=true mode=copied retained=66511 allocations=198
+WORKSPACE CREATION first packing, cold copies and locked/hash/copy refusals retire owned scratch; exact retry PASS

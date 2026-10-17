@@ -1,0 +1,1 @@
+INTERRUPTED: controller stopped before reporting an outcome or receipt. Raw serial ends at first creation process after thirteen prior programs passed. This is not a qualified run.

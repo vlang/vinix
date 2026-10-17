@@ -1,0 +1,44 @@
+FAIL aarch64 packages-workspace-creation-ownership (183.2s)
+  forbidden "HWTEST FAIL" in the line: HWTEST FAIL packages-workspace-creation-ownership
+  last 40 serial lines:
+  | Denied.accounts: 0
+  | Denied.objects: 0
+  | Denied.global: 0
+  | Denied.owner: 0
+  | Denied.cgroup: 0
+  | 
+  | EXPORT RETIREMENT kernel resources after grace:
+  | Limit: 117934080
+  | OwnerLimit: 58967040
+  | Charged: 3087820
+  | Accounts: 5
+  | Denied: 0
+  | Kind Objects Bytes
+  | file 10 26694
+  | descriptor 10 33792
+  | socket 2 16384
+  | ipc 2 139264
+  | mapping 85 2271232
+  | process 4 55016
+  | thread 5 528800
+  | scratch 2 16638
+  | Denied.invalid: 0
+  | Denied.accounts: 0
+  | Denied.objects: 0
+  | Denied.global: 0
+  | Denied.owner: 0
+  | Denied.cgroup: 0
+  | 
+  | EXPORT RETIREMENT 128 deep-tree retirements use at most 32 descriptors and leave no staging names PASS
+  | EXPORT RETIREMENT alias/dangling/FIFO/hard-link leaves retire without outside traversal, content or mode changes PASS
+  | EXPORT RETIREMENT post-publication flush failure retains complete output; existing ordinary/alias/special destinations refuse without replacement PASS
+  | EXPORT RETIREMENT unsafe roots and foreign directory inventory refuse before unlinking; restored ownership/modes permit retry PASS
+  | WORKSPACE CREATION PROCESS export-stage PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | /Users/alex/code/vinix/tools/packages/pkgcore/workspace_creation_ownership_test.v:149: fn test_creation_preserves_parent_alias_dotdot_umask_existing_modes_and_partial_parents
+  |     assert refused && os.is_dir('partial') && os.ls('partial')!.len == 0
+  | creation paths failed (1)
+  | HWTEST FAIL packages-workspace-creation-ownership
+  | syspower: power off: stopping devices
+  logs: /Users/alex/code/vinix/build/wco-arm-2/packages-workspace-creation-ownership
