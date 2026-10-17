@@ -115,9 +115,10 @@ write_staging_cache_manifest() {
 
     # Change this when the immutable-layer assembly logic changes. Desktop
     # source and launcher edits are refreshed below without restaging 6+ GiB.
-    printf 'version=9\n'
+    printf 'version=10\n'
     printf 'compact=%s\n' "$COMPACT_INITRAMFS"
     printf 'firefox=%s\n' "$WITH_FIREFOX"
+    printf 'x11=%s\n' "$WITH_X11"
     printf 'chromium=%s\n' "$WITH_CHROMIUM"
     printf 'libreoffice=%s\n' "$WITH_LIBREOFFICE"
     printf 'minecraft=%s\n' "$WITH_MINECRAFT"
@@ -172,6 +173,92 @@ remove_firefox_browser() {
         "$STAGING"/usr/share/metainfo/*firefox*
 }
 
+# The generic Mesa DRI drivers for a machine without a GPU: only the software
+# entries of the X11 layer's directory, which is 49 names for one 27 MiB object.
+stage_x11_dri() {
+    local root="$1" software_driver
+    mkdir -p "$root/usr/lib/dri"
+    cp -a "$X11_STAGING/usr/lib/xorg/modules/dri/libgallium_dri.so" "$root/usr/lib/dri/"
+    for software_driver in swrast_dri.so kms_swrast_dri.so; do
+        cp -a "$X11_STAGING/usr/lib/xorg/modules/dri/$software_driver" \
+            "$root/usr/lib/dri/" 2>/dev/null || true
+    done
+}
+
+# What the desktop's X11 hosting needs beyond the layer: the launcher, the two
+# Vinix bridges, and the X11 clients' software GL stack.
+install_x11_runtime() {
+    local root="$1"
+    local x11_gl_runtime="$root/usr/lib/vinix-x11-software"
+    mkdir -p "$root/usr/bin"
+    install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$root/usr/bin/startx"
+    install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$root/usr/bin/vinix-xinput"
+    install -m755 "$X11_STAGING/usr/bin/vinix-wine-host" "$root/usr/bin/vinix-wine-host"
+    # Xvfb-glx needs the X11 layer's legacy GLX Mesa, while OBS creates its video
+    # context through that layer's EGL Mesa on the same display. The full desktop
+    # also carries native Mesa. Keep the X11 clients on the tested software stack.
+    # install follows staging symlinks for Vinix's O_NOFOLLOW loader.
+    rm -rf "$x11_gl_runtime"
+    if [ "$WITH_ASAHI_GPU" -eq 0 ] &&
+       [ -f "$X11_STAGING/usr/lib/libGL.so.1" ] &&
+       [ -f "$X11_STAGING/usr/lib/libglapi.so.0" ] &&
+       [ -f "$X11_STAGING/usr/lib/libEGL.so.1" ] &&
+       [ -f "$X11_STAGING/usr/lib/libgbm.so.1" ]; then
+        mkdir -p "$x11_gl_runtime/egl"
+        install -m755 "$X11_STAGING/usr/lib/libGL.so.1" "$x11_gl_runtime/libGL.so.1"
+        install -m755 "$X11_STAGING/usr/lib/libglapi.so.0" "$x11_gl_runtime/libglapi.so.0"
+        install -m755 "$X11_STAGING/usr/lib/libEGL.so.1" "$x11_gl_runtime/egl/libEGL.so.1"
+        install -m755 "$X11_STAGING/usr/lib/libgbm.so.1" "$x11_gl_runtime/egl/libgbm.so.1"
+    fi
+}
+
+# The X11 that pkg installs onto an image built without it (vinix-pkg's
+# install_x11): the layer and its runtime as an image with X11 would carry
+# them, less every path the finished image already has, so that installing it
+# never replaces a system file. Shared drivers stay hard links, not copies.
+build_x11_bundle() {
+    local root="$BUILD_DIR/x11-bundle-root" tmp path link target
+    echo "==> Building the X11 bundle $X11_BUNDLE"
+    rm -rf "$root"
+    mkdir -p "$root"
+    cp -a "$X11_STAGING/." "$root/"
+    rm -f "$root"/usr/lib/libOSMesa.so* "$root"/usr/lib/libGLU.so* \
+        "$root"/usr/lib/libxatracker.so*
+    if [ "$WITH_ASAHI_GPU" -eq 0 ] && [ -d "$X11_STAGING/usr/lib/xorg/modules/dri" ]; then
+        stage_x11_dri "$root"
+        find "$root/usr/lib/dri" -type l -name '*.so*' | while IFS= read -r link; do
+            target=$(readlink "$link")
+            case "$target" in
+                /*) target="$root$target" ;;
+                *) target="$(dirname "$link")/$target" ;;
+            esac
+            [ -f "$target" ] && ln -f "$target" "$link"
+        done
+    fi
+    install_x11_runtime "$root"
+    (cd "$root" && find . ! -type d) | while IFS= read -r path; do
+        if [ -e "$STAGING/$path" ] || [ -L "$STAGING/$path" ]; then
+            rm -f "$root/$path"
+        fi
+    done
+    find "$root" -depth -type d -empty -delete
+    if [ ! -x "$root/usr/bin/Xvfb" ] || [ ! -x "$root/usr/bin/vinix-wine-host" ]; then
+        echo "ERROR: the X11 bundle has no Xvfb or vinix-wine-host" >&2
+        exit 1
+    fi
+    mkdir -p "$(dirname "$X11_BUNDLE")"
+    tmp="$(mktemp "$(dirname "$X11_BUNDLE")/.x11-bundle.XXXXXX")"
+    COPYFILE_DISABLE=1 tar --format=ustar --uid 0 --gid 0 --uname root --gname root \
+        -czf "$tmp" -C "$root" .
+    mv -f "$tmp" "$X11_BUNDLE"
+    if command -v sha256sum >/dev/null 2>&1; then
+        (cd "$(dirname "$X11_BUNDLE")" && sha256sum "$(basename "$X11_BUNDLE")")
+    else
+        (cd "$(dirname "$X11_BUNDLE")" && shasum -a 256 "$(basename "$X11_BUNDLE")")
+    fi > "$X11_BUNDLE.sha256"
+    echo "    $(du -h "$X11_BUNDLE" | cut -f1) $X11_BUNDLE"
+}
+
 MAKE_INITRAMFS=1
 COMPACT_INITRAMFS=0
 WITH_X86_TRANSLATION=0
@@ -185,6 +272,7 @@ WITH_LIBREOFFICE=0
 WITH_MINECRAFT=0
 WITH_OPENGOTHIC=0
 WITH_FIREFOX=0
+WITH_X11=0
 REFRESH_STAGING="${VINIX_REFRESH_DESKTOP_STAGING:-0}"
 # The Apple GPU userspace is only correct on Apple hardware; see the overlay
 # below for why its mere presence on disk must not select it.
@@ -205,6 +293,7 @@ for arg in "$@"; do
         --with-minecraft) WITH_MINECRAFT=1 ;;
         --with-opengothic) WITH_OPENGOTHIC=1 ;;
         --with-firefox) WITH_FIREFOX=1 ;;
+        --with-x11) WITH_X11=1 ;;
         # The default since images stopped carrying Firefox; kept for callers.
         --without-firefox) WITH_FIREFOX=0 ;;
         --with-asahi-gpu) WITH_ASAHI_GPU=1 ;;
@@ -214,6 +303,9 @@ for arg in "$@"; do
             echo "  --compact-initramfs stages the desktop, X11 and core developer tools"
             echo "  --with-firefox adds a previously staged Firefox and its GTK/media runtime;"
             echo "      otherwise the first-run app page offers it through pkg"
+            echo "  --with-x11 keeps X11 in a compact image; otherwise pkg installs it with the"
+            echo "      first graphical application, and VINIX_X11_BUNDLE=FILE.tar.gz writes that"
+            echo "      bundle (the options for applications that need X11 imply it)"
             echo "  --with-chromium adds a previously staged Chromium; otherwise it is a pkg install"
             echo "  --with-libreoffice adds a previously staged LibreOffice; otherwise it is a pkg install"
             echo "  --with-minecraft adds a previously staged Minecraft; otherwise it is a pkg install"
@@ -236,6 +328,20 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+# X11 serves only the Linux applications the desktop hosts on Xvfb; native
+# applications, and OpenGL through a GPU driver's EGL, do without it. A compact
+# image leaves it to pkg unless it carries such an application already. A full
+# image keeps the X11 its base userland was assembled with.
+if [ "$COMPACT_INITRAMFS" -eq 0 ] || [ "$WITH_FIREFOX" -eq 1 ] ||
+   [ "$WITH_CHROMIUM" -eq 1 ] || [ "$WITH_LIBREOFFICE" -eq 1 ] ||
+   [ "$WITH_MINECRAFT" -eq 1 ] || [ "$WITH_OPENGOTHIC" -eq 1 ] ||
+   [ "$WITH_STEAM" -eq 1 ] || [ "$WITH_DOTA2" -eq 1 ] ||
+   [ "$WITH_X86_TRANSLATION" -eq 1 ] || [ "$WITH_QEMU_SYSTEM" -eq 1 ] ||
+   [ "$WITH_ANDROID" -eq 1 ] || [ "$WITH_ROBLOX" -eq 1 ]; then
+    WITH_X11=1
+fi
+X11_BUNDLE="${VINIX_X11_BUNDLE:-}"
 
 case "$REFRESH_STAGING" in
     0|1) ;;
@@ -599,15 +705,19 @@ if [ ! -f "$BASE_INITRAMFS" ]; then
     echo "ERROR: $BASE_INITRAMFS not found; it is the desktop's base userland."
     exit 1
 fi
-if [ ! -x "$X11_STAGING/usr/bin/vinix-xinput" ] ||
-   [ ! -x "$X11_STAGING/usr/bin/vinix-wine-host" ] ||
-   [ ! -x "$X11_STAGING/usr/bin/Xvfb" ]; then
-    echo "ERROR: desktop needs Xvfb and the Vinix X11 input bridges in $X11_STAGING" >&2
-    echo "Run ./scripts/build-x11-aarch64.sh first." >&2
-    exit 1
+if [ "$WITH_X11" -eq 1 ] || [ -n "$X11_BUNDLE" ]; then
+    if [ ! -x "$X11_STAGING/usr/bin/Xorg" ] ||
+       [ ! -x "$X11_STAGING/usr/bin/Xvfb" ] ||
+       [ ! -x "$X11_STAGING/usr/bin/startx" ] ||
+       [ ! -x "$X11_STAGING/usr/bin/vinix-xinput" ] ||
+       [ ! -x "$X11_STAGING/usr/bin/vinix-wine-host" ]; then
+        echo "ERROR: X11 needs Xorg, Xvfb, startx and the Vinix input bridges in $X11_STAGING" >&2
+        echo "Run ./scripts/build-x11-aarch64.sh first." >&2
+        exit 1
+    fi
+    sh "$SCRIPT_DIR/build-support/xorg-server/build-wine-host.sh" aarch64 \
+        "$X11_STAGING" "$SYSROOT"
 fi
-sh "$SCRIPT_DIR/build-support/xorg-server/build-wine-host.sh" aarch64 \
-    "$X11_STAGING" "$SYSROOT"
 if [ ! -x "$NETWORK_TOOLS_STAGING/usr/bin/pkg" ] ||
    [ ! -x "$NETWORK_TOOLS_STAGING/sbin/apk" ] ||
    [ ! -s "$NETWORK_TOOLS_STAGING/etc/vinix-pkg/base-world" ]; then
@@ -624,15 +734,6 @@ if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
     if [ ! -x "$NETWORK_TOOLS_STAGING/usr/bin/git" ]; then
         echo "ERROR: compact desktop needs $NETWORK_TOOLS_STAGING/usr/bin/git" >&2
         echo "Run ./scripts/build-network-tools-aarch64.sh first." >&2
-        exit 1
-    fi
-    if [ ! -x "$X11_STAGING/usr/bin/Xorg" ] ||
-        [ ! -x "$X11_STAGING/usr/bin/Xvfb" ] ||
-        [ ! -x "$X11_STAGING/usr/bin/startx" ] ||
-        [ ! -x "$X11_STAGING/usr/bin/vinix-xinput" ] ||
-        [ ! -x "$X11_STAGING/usr/bin/vinix-wine-host" ]; then
-        echo "ERROR: compact desktop needs Xorg, Xvfb, startx and the input bridges in $X11_STAGING" >&2
-        echo "Run ./scripts/build-x11-aarch64.sh first." >&2
         exit 1
     fi
 fi
@@ -874,7 +975,9 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
                 cp -a "$zsh_source" "$STAGING/$zsh_relative"
             done
         done
-        merge_staging_tree "$X11_STAGING"
+        if [ "$WITH_X11" -eq 1 ]; then
+            merge_staging_tree "$X11_STAGING"
+        fi
         if [ "$WITH_FIREFOX" -eq 1 ]; then
             echo "    staging Firefox (--with-firefox)"
             merge_staging_tree "$FIREFOX_STAGING"
@@ -1118,23 +1221,15 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
             "$STAGING"/usr/lib/libOSMesa.so* \
             "$STAGING"/usr/lib/libxatracker.so* \
             "$STAGING"/usr/lib/libGLU.so*
-    elif [ -d "$X11_STAGING/usr/lib/xorg/modules/dri" ]; then
+    elif [ "$WITH_X11" -eq 1 ] && [ -d "$X11_STAGING/usr/lib/xorg/modules/dri" ]; then
         # Nothing else fills /usr/lib/dri: the Apple overlay was the only thing
         # putting drivers there, so skipping it leaves Mesa with none at all. The
         # X11 layer already stages the generic Alpine set, and that one does carry
         # llvmpipe, so software OpenGL reaches 4.5 rather than softpipe's 3.3.
         echo "==> Staging the generic Mesa DRI drivers"
-        mkdir -p "$STAGING/usr/lib/dri"
-        # Only the software entries. That directory is 49 names for one 27 MiB
-        # object, 48 of them links, and the pass below turns every link into a real
-        # file -- copying all of them would add 1.3 GiB of the same driver. A
-        # machine with no GPU needs exactly these.
-        cp -a "$X11_STAGING/usr/lib/xorg/modules/dri/libgallium_dri.so" \
-            "$STAGING/usr/lib/dri/"
-        for software_driver in swrast_dri.so kms_swrast_dri.so; do
-            cp -a "$X11_STAGING/usr/lib/xorg/modules/dri/$software_driver" \
-                "$STAGING/usr/lib/dri/" 2>/dev/null || true
-        done
+        # Only the software entries: the pass below turns every link into a real
+        # file, and copying all 49 would add 1.3 GiB of the same driver.
+        stage_x11_dri "$STAGING"
         # libEGL names its Gallium by version in DT_NEEDED, and the Apple overlay
         # was the only thing supplying one. Take the X11 sysroot's, which is the
         # build these drivers belong to.
@@ -1332,25 +1427,12 @@ for minecraft_support in \
 done
 "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/java-cacerts-stage.v" \
     --arch aarch64 --staging "$STAGING"
-install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
-install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput"
-install -m755 "$X11_STAGING/usr/bin/vinix-wine-host" "$STAGING/usr/bin/vinix-wine-host"
-# Xvfb-glx needs the X11 layer's legacy GLX Mesa, while OBS creates its video
-# context through that layer's EGL Mesa on the same display. The full desktop
-# also carries native Mesa. Keep the X11 clients on the tested software stack.
-# install follows staging symlinks for Vinix's O_NOFOLLOW loader.
-x11_gl_runtime="$STAGING/usr/lib/vinix-x11-software"
-rm -rf "$x11_gl_runtime"
-if [ "$WITH_ASAHI_GPU" -eq 0 ] &&
-   [ -f "$X11_STAGING/usr/lib/libGL.so.1" ] &&
-   [ -f "$X11_STAGING/usr/lib/libglapi.so.0" ] &&
-   [ -f "$X11_STAGING/usr/lib/libEGL.so.1" ] &&
-   [ -f "$X11_STAGING/usr/lib/libgbm.so.1" ]; then
-    mkdir -p "$x11_gl_runtime/egl"
-    install -m755 "$X11_STAGING/usr/lib/libGL.so.1" "$x11_gl_runtime/libGL.so.1"
-    install -m755 "$X11_STAGING/usr/lib/libglapi.so.0" "$x11_gl_runtime/libglapi.so.0"
-    install -m755 "$X11_STAGING/usr/lib/libEGL.so.1" "$x11_gl_runtime/egl/libEGL.so.1"
-    install -m755 "$X11_STAGING/usr/lib/libgbm.so.1" "$x11_gl_runtime/egl/libgbm.so.1"
+if [ "$WITH_X11" -eq 1 ]; then
+    install_x11_runtime "$STAGING"
+else
+    rm -rf "$STAGING/usr/lib/vinix-x11-software"
+    rm -f "$STAGING/usr/bin/startx" "$STAGING/usr/bin/vinix-xinput" \
+        "$STAGING/usr/bin/vinix-wine-host"
 fi
 install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" "$STAGING/usr/bin/run-firefox"
 install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" "$STAGING/usr/bin/run-gimp"
@@ -1472,7 +1554,11 @@ for development_file in usr/lib/vlang/cmd/v/v.v usr/lib/libtcc.so; do
         exit 1
     fi
 done
-for runtime_path in usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-obs usr/bin/run-chromium usr/bin/run-libreoffice; do
+x11_runtime_paths=()
+if [ "$WITH_X11" -eq 1 ]; then
+    x11_runtime_paths=(usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host)
+fi
+for runtime_path in ${x11_runtime_paths[@]+"${x11_runtime_paths[@]}"} usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-obs usr/bin/run-chromium usr/bin/run-libreoffice; do
     if [ ! -x "$STAGING/$runtime_path" ]; then
         echo "ERROR: desktop hosted-X11 runtime is missing /$runtime_path" >&2
         echo "Run ./scripts/build-x11-aarch64.sh, then rebuild the desktop." >&2
@@ -1497,7 +1583,7 @@ elif ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-obs usr/bin/run-chromium usr/bin/run-libreoffice usr/libexec/vinix-minecraft/fetch-minecraft usr/bin/gcc usr/bin/tcc usr/bin/ldd usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload usr/bin/vinix-host-sync; do
+    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git ${x11_runtime_paths[@]+"${x11_runtime_paths[@]}"} usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-obs usr/bin/run-chromium usr/bin/run-libreoffice usr/libexec/vinix-minecraft/fetch-minecraft usr/bin/gcc usr/bin/tcc usr/bin/ldd usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload usr/bin/vinix-host-sync; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1
@@ -1827,6 +1913,11 @@ if [ "$WITH_DOTA2" -eq 1 ]; then
         >> "$CONTENT_KEY_EXPECTED"
 fi
 printf 'release=%s\n' "${VINIX_RELEASE:-}" >> "$CONTENT_KEY_EXPECTED"
+
+# Against the finished tree, so the bundle leaves out everything it has.
+if [ -n "$X11_BUNDLE" ]; then
+    build_x11_bundle
+fi
 
 if [ "$REUSE_STAGING" -eq 1 ] &&
    [ -f "$CONTENT_KEY" ] && cmp -s "$CONTENT_KEY_EXPECTED" "$CONTENT_KEY" &&

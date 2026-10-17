@@ -826,9 +826,15 @@ backend or accessibility overrides. Running `run-firefox` directly still starts
 the browser on the physical Xorg display for command-line debugging.
 Set `VINIX_FIREFOX_STAGING` to merge a different completed staging tree, or
 `ALPINE_BRANCH`/`VINIX_FIREFOX_PACKAGE` to select another compatible build.
-The compact desktop image used by the default M1 deployment merges the X11
-staging tree directly, alongside Python, Git and GCC, without shipping the much
-larger complete userland image; `--with-firefox` adds the Firefox tree too.
+The compact desktop image used by the default M1 deployment and the release
+ISOs carries Python, Git and GCC without the much larger complete userland
+image, and no X11: X11 serves only the Linux applications the desktop hosts on
+Xvfb, while native applications, and OpenGL through a GPU driver's EGL, do
+without it. `pkg` installs it with the first graphical application, from the
+`vinix-x11-ARCH.tar.gz` bundle `scripts/deploy-iso.sh` publishes with each
+release (`pkg install x11` installs it alone). `--with-x11` keeps it in the
+image, as does any option for an application that needs it, such as
+`--with-firefox`, which adds the Firefox tree too.
 
 On M1 and in a VirGL VM, Firefox automatically enables WebRender over X11 EGL
 when a render node and the matching Mesa runtime are present. Xorg imports the

@@ -1835,7 +1835,7 @@ wine.word.starting
 Microsoft Word 2013を起動中…
 -----
 wine.xvfb_missing
-Xvfbが未インストールです。VinixのX11レイヤーを再ビルドしてください。
+X11 がインストールされていません。pkg install x11 でインストールしてください。
 -----
 wm.app_failed
 このアプリの描画に失敗しました:

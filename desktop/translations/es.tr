@@ -1835,7 +1835,7 @@ wine.word.starting
 Iniciando Microsoft Word 2013…
 -----
 wine.xvfb_missing
-Xvfb no está instalado. Recompila la capa X11.
+X11 no está instalado. Instálalo con: pkg install x11
 -----
 wm.app_failed
 Esta aplicación no pudo dibujarse:

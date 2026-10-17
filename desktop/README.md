@@ -442,11 +442,12 @@ Firefox is an upstream GTK/X11 application rather than a native ui2 client. It
 runs on a private Xvfb display whose live XWD framebuffer is composited into a
 normal movable Vinix window. Pointer and keyboard events cross the same compact
 input bridge used by the other hosted X11 applications, so the native desktop
-and taskbar remain active while Firefox runs. The desktop image builder includes
-Xvfb, the input bridge, the direct `startx` launcher, and Firefox's Vinix policy
-files, but not the browser itself: the first-run app page and `pkg install
-firefox` install it (`--with-firefox` builds it into an image). A native error
-window remains as a runtime fallback when the browser or X11 layer is missing.
+and taskbar remain active while Firefox runs. Images carry Firefox's Vinix
+policy files but neither the browser nor X11: the first-run app page and `pkg
+install firefox` install the browser, and pkg brings Xvfb, the input bridge and
+the direct `startx` launcher with it (`--with-firefox` builds both into an
+image). A native error window remains as a runtime fallback when the browser or
+X11 is missing.
 The direct launcher writes Firefox's upstream graphics and GTK diagnostics to
 `/var/log/firefox.log`. On an M1 image with the Asahi runtime, direct Xorg can
 enable glamor/DRI3 and Firefox WebRender over X11 EGL. The embedded window uses

@@ -25,6 +25,8 @@
 #   vinix-amd64.iso   boots through BIOS or UEFI, from a CD or a disk
 #   vinix-arm64.iso   boots through UEFI
 #   SHA256SUMS
+#   vinix-x11-ARCH.tar.gz(.sha256)  the X11 that pkg installs with the first
+#                     graphical application; the images leave it out
 #   RELEASE_NOTES.md  what the release page says
 #   test/             serial logs and screenshots from scripts/test-iso.sh
 #
@@ -194,6 +196,8 @@ export V
 export VINIX_RELEASE="$TAG"
 
 IMAGES=()
+# The X11 bundles and their checksum files, uploaded beside the images.
+BUNDLES=()
 
 # ── amd64 ──────────────────────────────────────────────────────────────────
 
@@ -224,9 +228,12 @@ if [ "$BUILD_AMD64" -eq 1 ]; then
     VINIX_AMD64_USERLAND_BUILD_DIR="$CACHE/amd64-userland" \
     VINIX_AMD64_BUILD_DIR="$SRC/build-amd64-kernel" \
     VINIX_AMD64_DESKTOP_ISO="$OUT/vinix-amd64.iso" \
+    VINIX_AMD64_X11_BUNDLE="$OUT/vinix-x11-amd64.tar.gz" \
         "$SRC/scripts/build-desktop-amd64.sh"
     [ -f "$OUT/vinix-amd64.iso" ] || die "the amd64 build made no ISO"
+    [ -s "$OUT/vinix-x11-amd64.tar.gz.sha256" ] || die "the amd64 build made no X11 bundle"
     IMAGES+=("$OUT/vinix-amd64.iso")
+    BUNDLES+=("$OUT/vinix-x11-amd64.tar.gz" "$OUT/vinix-x11-amd64.tar.gz.sha256")
 fi
 
 # ── arm64 ──────────────────────────────────────────────────────────────────
@@ -259,7 +266,10 @@ if [ "$BUILD_ARM64" -eq 1 ]; then
     VINIX_X11_STAGING="$SCRIPT_DIR/build-aarch64-x11/staging" \
     VINIX_GPU_SYSROOT="$SCRIPT_DIR/build-aarch64-x11/sysroot" \
     VINIX_DESKTOP_INITRAMFS="$WORK/arm64-initramfs-desktop.tar" \
+    VINIX_X11_BUNDLE="$OUT/vinix-x11-arm64.tar.gz" \
         "$SRC/scripts/build-desktop-aarch64.sh" --compact-initramfs
+    [ -s "$OUT/vinix-x11-arm64.tar.gz.sha256" ] || die "the arm64 build made no X11 bundle"
+    BUNDLES+=("$OUT/vinix-x11-arm64.tar.gz" "$OUT/vinix-x11-arm64.tar.gz.sha256")
 
     rm -f "$OUT/vinix-arm64.iso"
     VINIX_AARCH64_KERNEL="$SRC/build-arm64-kernel/bin/vinix" \
@@ -364,7 +374,9 @@ describe_boot() {
     echo
     echo "Firefox, Chromium and the other optional apps are not on the image: the first"
     echo "launch offers them and \`pkg install\` downloads them, so give the VM a network"
-    echo "card (the commands above do). Vinix drives VirtIO and Intel e1000 cards."
+    echo "card (the commands above do). Vinix drives VirtIO and Intel e1000 cards. Nor is"
+    echo "X11: the first graphical Linux application brings it, from the"
+    echo "\`vinix-x11-*.tar.gz\` files of this release."
     echo
     echo "### VirtualBox"
     echo
@@ -411,6 +423,9 @@ for image in "${IMAGES[@]}"; do
     echo "    $(basename "$image") ($(human_size "$(file_size "$image")"))"
 done
 echo "    SHA256SUMS"
+for bundle in ${BUNDLES[@]+"${BUNDLES[@]}"}; do
+    echo "    $(basename "$bundle") ($(human_size "$(file_size "$bundle")"))"
+done
 if [ "$ASSUME_YES" -ne 1 ]; then
     if [ ! -t 0 ]; then
         die "not a terminal; pass --yes to publish without asking"
@@ -426,7 +441,7 @@ create_args=(release create "$TAG" --repo "$REPO" --target "$COMMIT"
     --title "Vinix $TAG" --notes-file "$OUT/RELEASE_NOTES.md")
 [ "$DRAFT" -eq 1 ] && create_args+=(--draft)
 [ "$PRERELEASE" -eq 1 ] && create_args+=(--prerelease)
-gh "${create_args[@]}" "${IMAGES[@]}" "$OUT/SHA256SUMS"
+gh "${create_args[@]}" "${IMAGES[@]}" "$OUT/SHA256SUMS" ${BUNDLES[@]+"${BUNDLES[@]}"}
 
 step "Published"
 gh release view "$TAG" --repo "$REPO" --json url --jq .url

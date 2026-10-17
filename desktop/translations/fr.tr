@@ -1835,7 +1835,7 @@ wine.word.starting
 Démarrage de Microsoft Word 2013…
 -----
 wine.xvfb_missing
-Xvfb n'est pas installé. Reconstruisez la couche X11 de Vinix.
+X11 n'est pas installé. Installez-le avec : pkg install x11
 -----
 wm.app_failed
 Cette application n'a pas pu s'afficher :

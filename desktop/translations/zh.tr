@@ -1835,7 +1835,7 @@ wine.word.starting
 正在启动 Microsoft Word 2013…
 -----
 wine.xvfb_missing
-未安装 Xvfb。请重新构建 Vinix X11 层。
+未安装 X11。请运行 pkg install x11 安装。
 -----
 wm.app_failed
 此应用绘制失败：

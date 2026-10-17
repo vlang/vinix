@@ -316,7 +316,9 @@ fn first_run_install_vendor(name string) ! {
 		first_run_tool(['pkg', 'install', name])!
 		return
 	}
-	first_run_tool(['pkg', 'install', 'libarchive-tools', 'font-dejavu', 'bash'])!
+	// Vendor Linux applications are X11 clients the desktop hosts on Xvfb, and
+	// unlike Alpine's they do not bring X11 through apk.
+	first_run_tool(['pkg', 'install', 'libarchive-tools', 'font-dejavu', 'bash', 'x11'])!
 	os.mkdir_all('/var/cache/vinix-setup')!
 	work := '/var/cache/vinix-setup/${name}-${os.getpid()}'
 	os.mkdir(work)!

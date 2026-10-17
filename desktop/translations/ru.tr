@@ -1835,7 +1835,7 @@ wine.word.starting
 Запуск Microsoft Word 2013…
 -----
 wine.xvfb_missing
-Xvfb не установлен. Пересоберите слой X11.
+X11 не установлен. Установите его командой: pkg install x11
 -----
 wm.app_failed
 Приложению не удалось отрисовать окно:

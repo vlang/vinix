@@ -8,11 +8,14 @@
 # first with ./scripts/build-x11-amd64.sh, ./scripts/build-network-tools-amd64.sh,
 # ./scripts/build-python-amd64.sh and ./scripts/build-v-amd64.sh.
 #
-# Usage: ./scripts/build-desktop-amd64.sh [--no-iso] [--with-firefox]
+# Usage: ./scripts/build-desktop-amd64.sh [--no-iso] [--with-firefox] [--with-x11]
 #
 #   --with-firefox  also stage Firefox and its GTK/media runtime from
 #                   ./scripts/build-firefox-amd64.sh; otherwise the first-run
-#                   app page offers the browser through pkg
+#                   app page offers the browser through pkg (implies --with-x11)
+#   --with-x11      keep X11 in the image; otherwise pkg installs it with the
+#                   first graphical application. VINIX_AMD64_X11_BUNDLE=FILE.tar.gz
+#                   writes the bundle it installs.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -23,11 +26,14 @@ KERNEL_BUILD_DIR="${VINIX_AMD64_BUILD_DIR:-$SCRIPT_DIR/build-amd64-kernel}"
 OUTPUT_ISO="${VINIX_AMD64_DESKTOP_ISO:-$SCRIPT_DIR/vinix-desktop-amd64.iso}"
 MAKE_ISO=1
 WITH_FIREFOX=0
+WITH_X11=0
+X11_BUNDLE="${VINIX_AMD64_X11_BUNDLE:-}"
 
 for arg in "$@"; do
     case "$arg" in
         --no-iso) MAKE_ISO=0 ;;
-        --with-firefox) WITH_FIREFOX=1 ;;
+        --with-firefox) WITH_FIREFOX=1; WITH_X11=1 ;;
+        --with-x11) WITH_X11=1 ;;
         --help|-h)
             sed -n '2,/^set -/s/^# \{0,1\}//p' "$0"
             exit 0
@@ -59,9 +65,13 @@ FIREFOX_STAGING="${VINIX_AMD64_FIREFOX_STAGING:-$SCRIPT_DIR/build-amd64-firefox/
 NETWORK_TOOLS_STAGING="${VINIX_AMD64_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-amd64-network-tools/staging}"
 PYTHON_STAGING="${VINIX_AMD64_PYTHON_STAGING:-$SCRIPT_DIR/build-amd64-python/staging}"
 VLANG_STAGING="${VINIX_AMD64_VLANG_STAGING:-$SCRIPT_DIR/build-amd64-v/staging}"
-LAYERS=("$X11_STAGING:scripts/build-x11-amd64.sh"
-    "$NETWORK_TOOLS_STAGING:scripts/build-network-tools-amd64.sh"
+LAYERS=("$NETWORK_TOOLS_STAGING:scripts/build-network-tools-amd64.sh"
     "$PYTHON_STAGING:scripts/build-python-amd64.sh" "$VLANG_STAGING:scripts/build-v-amd64.sh")
+# X11 serves only the Linux applications the desktop hosts on Xvfb; native
+# applications, and OpenGL through a GPU driver's EGL, do without it.
+if [ "$WITH_X11" -eq 1 ] || [ -n "$X11_BUNDLE" ]; then
+    LAYERS+=("$X11_STAGING:scripts/build-x11-amd64.sh")
+fi
 if [ "$WITH_FIREFOX" -eq 1 ]; then
     LAYERS+=("$FIREFOX_STAGING:scripts/build-firefox-amd64.sh")
 fi
@@ -187,7 +197,10 @@ merge_staging_tree() {
     cp -a "$overlay/." "$STAGING/"
 }
 # Firefox goes between X11 and the package tools, as on arm64.
-MERGE=("$X11_STAGING")
+MERGE=()
+if [ "$WITH_X11" -eq 1 ]; then
+    MERGE+=("$X11_STAGING")
+fi
 if [ "$WITH_FIREFOX" -eq 1 ]; then
     MERGE+=("$FIREFOX_STAGING")
 fi
@@ -248,7 +261,9 @@ install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-reload" \
 "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/ath10k/stage.v" "$SYSROOT" "$STAGING"
 "$SCRIPT_DIR/build-support/stage-uname.sh" "$STAGING"
 install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" "$STAGING/usr/bin/pkg"
-install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
+if [ "$WITH_X11" -eq 1 ]; then
+    install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
+fi
 install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" "$STAGING/usr/bin/run-firefox"
 install -m755 "$SCRIPT_DIR/build-support/chromium/run-chromium" "$STAGING/usr/bin/run-chromium"
 install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" "$STAGING/usr/bin/run-gimp"
@@ -292,19 +307,27 @@ fi
 echo "==> Installing Vinix's optimized musl allocator..."
 "$SCRIPT_DIR/build-support/musl/stage" --arch x86_64 --staging "$STAGING"
 
+x11_command_paths=()
+if [ "$WITH_X11" -eq 1 ]; then
+    x11_command_paths=(usr/bin/Xorg usr/bin/Xvfb usr/bin/Xvfb-glx usr/bin/startx
+        usr/bin/vinix-wine-host usr/bin/vinix-xinput)
+fi
 for command_path in bin/zsh usr/bin/python3 usr/bin/v usr/bin/tcc usr/bin/pkg sbin/apk \
-    usr/bin/curl usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/Xvfb-glx \
-    usr/bin/vinix-wine-host usr/bin/vinix-xinput usr/bin/run-firefox; do
+    usr/bin/curl usr/bin/git ${x11_command_paths[@]+"${x11_command_paths[@]}"} \
+    usr/bin/run-firefox; do
     if [ ! -x "$STAGING/$command_path" ]; then
         echo "ERROR: desktop image has no executable /$command_path" >&2
         exit 1
     fi
 done
-runtime_paths=(usr/lib/xorg/modules/dri/swrast_dri.so usr/share/fonts)
+runtime_paths=()
+if [ "$WITH_X11" -eq 1 ]; then
+    runtime_paths+=(usr/lib/xorg/modules/dri/swrast_dri.so usr/share/fonts)
+fi
 if [ "$WITH_FIREFOX" -eq 1 ]; then
     runtime_paths+=(usr/lib/libgtk-3.so.0 usr/lib/libavcodec.so.60)
 fi
-for runtime_path in "${runtime_paths[@]}"; do
+for runtime_path in ${runtime_paths[@]+"${runtime_paths[@]}"}; do
     if [ ! -e "$STAGING/$runtime_path" ]; then
         echo "ERROR: desktop image is missing /$runtime_path" >&2
         exit 1
@@ -346,6 +369,41 @@ fi
         "$APP_SRC/app_icon_data.h" "$SCRIPT_DIR/desktop/README.md" \
         "$STAGING/root/desktop/"
 )
+
+# The X11 that pkg installs onto an image built without it (vinix-pkg's
+# install_x11): the layer and its launcher, less every path this image already
+# has, so that installing it never replaces a system file.
+if [ -n "$X11_BUNDLE" ]; then
+    echo "==> Building the X11 bundle $X11_BUNDLE"
+    X11_ROOT="$BUILD_DIR/x11-bundle-root"
+    rm -rf "$X11_ROOT"
+    mkdir -p "$X11_ROOT/usr/bin"
+    cp -a "$X11_STAGING/." "$X11_ROOT/"
+    install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$X11_ROOT/usr/bin/startx"
+    rm -f "$X11_ROOT"/usr/lib/libOSMesa.so* "$X11_ROOT"/usr/lib/libGLU.so* \
+        "$X11_ROOT"/usr/lib/libxatracker.so*
+    (cd "$X11_ROOT" && find . ! -type d) | while IFS= read -r x11_path; do
+        if [ -e "$STAGING/$x11_path" ] || [ -L "$STAGING/$x11_path" ]; then
+            rm -f "$X11_ROOT/$x11_path"
+        fi
+    done
+    find "$X11_ROOT" -depth -type d -empty -delete
+    if [ ! -x "$X11_ROOT/usr/bin/Xvfb" ] || [ ! -x "$X11_ROOT/usr/bin/vinix-wine-host" ]; then
+        echo "ERROR: the X11 bundle has no Xvfb or vinix-wine-host" >&2
+        exit 1
+    fi
+    mkdir -p "$(dirname "$X11_BUNDLE")"
+    X11_BUNDLE_TMP="$(mktemp "$(dirname "$X11_BUNDLE")/.x11-bundle.XXXXXX")"
+    COPYFILE_DISABLE=1 tar --format=ustar --uid 0 --gid 0 --uname root --gname root \
+        -czf "$X11_BUNDLE_TMP" -C "$X11_ROOT" .
+    mv -f "$X11_BUNDLE_TMP" "$X11_BUNDLE"
+    if command -v sha256sum >/dev/null 2>&1; then
+        (cd "$(dirname "$X11_BUNDLE")" && sha256sum "$(basename "$X11_BUNDLE")")
+    else
+        (cd "$(dirname "$X11_BUNDLE")" && shasum -a 256 "$(basename "$X11_BUNDLE")")
+    fi > "$X11_BUNDLE.sha256"
+    echo "    $(du -h "$X11_BUNDLE" | cut -f1) $X11_BUNDLE"
+fi
 
 INITRAMFS="$BUILD_DIR/initramfs-desktop.tar"
 INITRAMFS_TMP="$(mktemp "$BUILD_DIR/.initramfs-desktop.tar.XXXXXX")"

@@ -25,13 +25,18 @@ MINECRAFT_DOWNLOAD_JOBS=${VINIX_MINECRAFT_DOWNLOAD_JOBS:-8}
 # scripts/build-voffice-aarch64.sh produces this asset for the vlang/office releases.
 VOFFICE_URL=${VINIX_VOFFICE_URL:-https://github.com/vlang/office/releases/latest/download/VOffice-vinix-aarch64.tar.gz}
 VOFFICE_SHA256_URL=${VINIX_VOFFICE_SHA256_URL:-$VOFFICE_URL.sha256}
+# Release images leave X11 out. scripts/deploy-iso.sh publishes one bundle per
+# architecture beside the ISOs; an image takes its own release's bundle, and an
+# image built outside a release the latest one.
+X11_URL=${VINIX_X11_URL:-}
+X11_RELEASES=${VINIX_X11_RELEASES:-https://github.com/vlang/vinix/releases}
 
 usage() {
 	cat <<'EOF'
 usage: pkg <command> [package ...]
 
 commands:
-  install PACKAGE...  install packages (includes Firefox, Chromium, OBS Studio, VOffice, Minecraft, Java, FFmpeg, GTK, GIMP, Blender, and Sublime Text)
+  install PACKAGE...  install packages (includes Firefox, Chromium, OBS Studio, VOffice, Minecraft, Java, FFmpeg, GTK, GIMP, Blender, Sublime Text, and X11)
   remove PACKAGE...   remove packages
   update              refresh Alpine repository indexes
   upgrade             upgrade installed packages
@@ -40,7 +45,8 @@ commands:
   list                list installed packages
 
 Alpine package names can be used directly. Vinix currently tracks Alpine 3.21
-for aarch64; package changes affect the running root filesystem.
+for aarch64; package changes affect the running root filesystem. Installing a
+graphical application also installs X11, which the desktop runs it on.
 EOF
 }
 
@@ -308,12 +314,13 @@ resolve_packages() {
 			java)
 				resolved="$resolved openjdk21-jdk ca-certificates-bundle"
 				;;
-			minecraft|voffice)
+			minecraft|voffice|x11)
 				# Remove Mojang's client through its own manifest below, but retain
 				# the shared Alpine JVM/X11/Mesa packages. The immutable Vinix base
 				# carries several of those outside apk's database; deleting them here
 				# would remove files Firefox and the desktop still use. VOffice is
-				# compiled from source and owns no apk package at all.
+				# compiled from source and owns no apk package at all. Nor does the X11
+				# bundle, which remove_x11 takes out by its own manifest.
 				;;
 			firefox)
 				resolved="$resolved firefox-esr"
@@ -363,6 +370,9 @@ install_packages() {
 				;;
 			voffice)
 				install_voffice
+				;;
+			x11)
+				install_x11
 				;;
 			firefox)
 				# The image's own browser is Alpine's ESR build; keep a reinstall on
@@ -451,6 +461,11 @@ install_packages() {
 				;;
 		esac
 	done
+	# A graphical Linux application links libX11, and the desktop hosts it on
+	# Xvfb. Install X11 with the first one, whichever package brought it.
+	if ! x11_installed && apk info -e libx11 >/dev/null 2>&1; then
+		install_x11
+	fi
 }
 
 materialize_link() {
@@ -1127,6 +1142,137 @@ install_voffice() {
 	echo "pkg: VOffice ${version:+$version }Writer and Calc installed"
 }
 
+x11_installed() {
+	[ -x "$(root_path /usr/bin/Xvfb)" ] && [ -x "$(root_path /usr/bin/vinix-wine-host)" ]
+}
+
+x11_bundle_url() {
+	if [ -n "$X11_URL" ]; then
+		printf '%s\n' "$X11_URL"
+		return 0
+	fi
+	case "$(uname -m)" in
+		aarch64|arm64) x11_arch=arm64 ;;
+		x86_64|amd64) x11_arch=amd64 ;;
+		*)
+			echo "pkg: no X11 bundle is published for $(uname -m)" >&2
+			return 1
+			;;
+	esac
+	release=
+	release_file=$(root_path /etc/vinix-release)
+	[ ! -f "$release_file" ] || release=$(sed -n '1p' "$release_file")
+	if [ -n "$release" ]; then
+		printf '%s/download/%s/vinix-x11-%s.tar.gz\n' "$X11_RELEASES" "$release" "$x11_arch"
+	else
+		printf '%s/latest/download/vinix-x11-%s.tar.gz\n' "$X11_RELEASES" "$x11_arch"
+	fi
+}
+
+# X11 is not part of release images; graphical Linux applications bring it.
+# The bundle holds the Xvfb and Xorg servers, the bridges that carry their
+# input and windows to the desktop, and the Mesa that serves their OpenGL. It
+# was built without any file the image already has, and installing it never
+# replaces a file: the system's and apk's own copies win.
+install_x11() {
+	if x11_installed; then
+		return 0
+	fi
+	url=$(x11_bundle_url) || exit 1
+	wait_for_network
+	cache_parent=$(root_path /var/cache)
+	mkdir -p "$cache_parent"
+	temp=$(bb mktemp -d "$cache_parent/vinix-x11.XXXXXX")
+	trap 'rm -rf "$temp"' EXIT INT TERM
+	archive="$temp/x11.tar.gz"
+	download_file "$url" "$archive" X11
+	download_file "$url.sha256" "$archive.sha256" "X11 checksum"
+	expected=$(awk 'NR == 1 { print $1 }' "$archive.sha256")
+	case "$expected" in
+		''|*[!0-9a-f]*)
+			echo "pkg: X11 checksum file is malformed" >&2
+			exit 1
+			;;
+	esac
+	# shellcheck disable=SC2086
+	actual=$($SHA256SUM "$archive" | awk '{ print $1 }')
+	if [ "$actual" != "$expected" ]; then
+		echo "pkg: X11 bundle checksum mismatch" >&2
+		exit 1
+	fi
+
+	payload="$temp/extract"
+	mkdir -p "$payload"
+	bb tar -xzf "$archive" -C "$payload"
+	rm -f "$archive"
+	for required in usr/bin/Xvfb usr/bin/vinix-wine-host usr/bin/vinix-xinput; do
+		if [ ! -x "$payload/$required" ]; then
+			echo "pkg: X11 bundle is missing $required" >&2
+			exit 1
+		fi
+	done
+
+	installed="$temp/installed"
+	: >"$installed"
+	# A redirected `read` can block on Vinix regular files; iterate a command
+	# substitution split on newlines instead, without pathname expansion.
+	old_ifs=$IFS
+	IFS='
+'
+	case $- in
+		*f*) restore_glob=false ;;
+		*) restore_glob=true; set -f ;;
+	esac
+	for path in $(cd "$payload" && bb find . ! -type d | LC_ALL=C sort); do
+		relative=${path#./}
+		destination=$(root_path "/$relative")
+		if [ -e "$destination" ] || [ -L "$destination" ]; then
+			continue
+		fi
+		mkdir -p "$(dirname "$destination")"
+		# Linking keeps the bundle's shared driver files shared, and costs no
+		# copy when the cache and the destination share a filesystem.
+		if [ -L "$payload/$relative" ] ||
+			! bb ln "$payload/$relative" "$destination" 2>/dev/null; then
+			bb cp -a "$payload/$relative" "$destination"
+		fi
+		printf '%s\n' "$relative" >>"$installed"
+	done
+	[ "$restore_glob" = false ] || set +f
+	IFS=$old_ifs
+
+	manifest_dir=$(root_path /var/lib/vinix-pkg)
+	mkdir -p "$manifest_dir"
+	sed 's#^#./#' "$installed" >"$manifest_dir/x11.files"
+	record_custom_files "$manifest_dir/x11.files"
+	materialize_runtime_library_links "$installed"
+	rm -rf "$temp"
+	trap - EXIT INT TERM
+	if ! x11_installed; then
+		echo "pkg: X11 bundle did not install Xvfb" >&2
+		exit 1
+	fi
+	echo "pkg: X11 installed"
+}
+
+remove_x11() {
+	manifest=$(root_path /var/lib/vinix-pkg/x11.files)
+	[ -s "$manifest" ] || return 0
+	old_ifs=$IFS
+	IFS='
+'
+	case $- in
+		*f*) restore_glob=false ;;
+		*) restore_glob=true; set -f ;;
+	esac
+	for path in $(cat "$manifest"); do
+		bb rm -f "$(root_path "/${path#./}")"
+	done
+	[ "$restore_glob" = false ] || set +f
+	IFS=$old_ifs
+	bb rm -f "$manifest"
+}
+
 remove_voffice() {
 	bb rm -f "$(root_path /usr/bin/voffice-writer)" \
 		"$(root_path /usr/bin/voffice-calc)" \
@@ -1202,11 +1348,14 @@ case "$command_name" in
 	install|add)
 		[ "$#" -gt 0 ] || { echo "pkg: install needs a package name" >&2; exit 1; }
 		require_root
-		# VOffice is a release download that never touches apk, so installing it
-		# alone must not wait on the Alpine mirror or register the base packages.
+		# VOffice and X11 are release downloads that never touch apk, so installing
+		# them alone must not wait on the Alpine mirror or register the base packages.
 		needs_apk=false
 		for requested in "$@"; do
-			[ "$requested" = voffice ] || needs_apk=true
+			case "$requested" in
+				voffice|x11) ;;
+				*) needs_apk=true ;;
+			esac
 		done
 		if [ "$needs_apk" = true ]; then
 			ensure_repository_indexes
@@ -1223,6 +1372,7 @@ case "$command_name" in
 			case "$requested" in
 				minecraft) remove_minecraft ;;
 				voffice) remove_voffice ;;
+				x11) remove_x11 ;;
 				firefox) bb rm -f "$(root_path /var/lib/vinix-pkg/firefox.files)" ;;
 				gtk|gtk+3.0-demo) remove_gtk_demo ;;
 				blender) remove_blender ;;
@@ -1288,6 +1438,8 @@ case "$command_name" in
 			|| echo minecraft
 		[ ! -s "$(root_path /var/lib/vinix-pkg/voffice.files)" ] \
 			|| echo voffice
+		[ ! -s "$(root_path /var/lib/vinix-pkg/x11.files)" ] \
+			|| echo x11
 		;;
 	*)
 		echo "pkg: unknown command: $command_name" >&2
