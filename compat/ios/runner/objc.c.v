@@ -265,7 +265,7 @@ mut:
 	swift_task_main_jobs u64 // Queued main-executor callbacks, under the same mutex.
 	swift_hash_code u64 // Sealed generic Hashable forwarding entries, retired after callbacks drain.
 	swift_fatal_code u64 // Assertion argument capture and BRK, retired at quiescent teardown.
-	storefront_code u64 // Sealed resilient Storefront getter, retired after Swift callers drain.
+	storefront_code u64 // Sealed Storefront getters/async descriptor, retired after Swift callers drain.
 	storefront_retired bool
 	names        map[string]u64
 	protocol_names map[string]u64

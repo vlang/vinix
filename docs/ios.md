@@ -8075,22 +8075,45 @@ C/executable pairs are retained under `build/ios/fortnite/storefront-checks`.
 The fixture is available through `tests/ios/native-checks.v build-storefront`
 and the native check inventories.
 
-The country getter import now resolves. The actual IPA still exits with status 1
-before application entry at `_$s8StoreKit10StorefrontV7currentACSgvgZ`, the
-separate asynchronous storefront query. Fortnite remains unplayable and full iOS
-regression remains unpassed.
+That probe next stopped at `_$s8StoreKit10StorefrontV7currentACSgvgZ`.
+The asynchronous [Storefront.current](https://developer.apple.com/documentation/storekit/storefront/current)
+query now supports the accountless profile. Vinix has no App Store account
+service, so it completes with `Optional<Storefront>.none`. The native value
+witnesses encode that result in the country String's bridge word at offset 8;
+the other payload bytes remain uninitialized. Account integration and queries
+that return a populated storefront remain unavailable.
+
+The async entry receives its indirect result in x0 and child context in x22.
+It tail-resumes the caller with that same child context, allowing the caller to
+free the frame during completion. Its separate read-only async descriptor
+advertises the measured 64-byte context and relative entry point. Code and
+descriptor pages are retired after task callers drain.
+
+Native measurements on this Mac returned no storefront. Native and runner
+tests exercise real nested task calls, guarded optional results, child-frame
+release and single continuation resumption. Eight host ASan/UBSan runs and four
+ARM64 Vinix suites cover this path, the country getter, task creation and
+100,000-switch continuation regressions. Eleven generated C/executable pairs,
+pinned inputs and joined IPA evidence are retained under
+`build/ios/fortnite/storefront-current-checks`; the new fixture is available
+through `tests/ios/native-checks.v build-storefront-current`.
+
+Both current-query imports now resolve. The actual IPA still exits with status 1
+before application entry at `_$s8StoreKit10StorefrontVMa`, the Storefront type
+metadata accessor. Fortnite remains unplayable and full iOS regression remains
+unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,675 | 485 | 79 |
+| Fortnite executable | 1,677 | 483 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,510 | 488 | 120 |
+| All images | 2,512 | 486 | 120 |
 
-The C++/GLES/Text variant reports 2,524 resolved imports, 474 unresolved strong
+The C++/GLES/Text variant reports 2,526 resolved imports, 472 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
