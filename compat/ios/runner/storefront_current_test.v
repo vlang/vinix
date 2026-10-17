@@ -103,6 +103,12 @@ fn sc_api(native bool) SCApi {
 		tag = unsafe { SCTag(voidptr(read64(witness + 48) & u64(0x0000ffffffffffff))) }
 		destroy = unsafe { SCDestroy(voidptr(read64(witness + 8) & u64(0x0000ffffffffffff))) }
 	} }
+	if !native {
+		metadata = unsafe { SCAccess(voidptr(runtime_symbol('/System/Library/Frameworks/StoreKit.framework/StoreKit', '_$s8StoreKit10StorefrontVMa') or { panic(err) }))(0) }.metadata
+		witness := read64(metadata - 8)
+		tag = unsafe { SCTag(voidptr(read64(witness + 48))) }
+		destroy = unsafe { SCDestroy(voidptr(read64(witness + 8))) }
+	}
 	descriptor := entries[7]
 	assert read32(descriptor + 4) == 64
 	entry := u64(i64(descriptor) + i64(i32(read32(descriptor))))

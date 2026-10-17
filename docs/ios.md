@@ -8098,22 +8098,47 @@ pinned inputs and joined IPA evidence are retained under
 `build/ios/fortnite/storefront-current-checks`; the new fixture is available
 through `tests/ios/native-checks.v build-storefront-current`.
 
-Both current-query imports now resolve. The actual IPA still exits with status 1
-before application entry at `_$s8StoreKit10StorefrontVMa`, the Storefront type
-metadata accessor. Fortnite remains unplayable and full iOS regression remains
-unpassed.
+The subsequent Storefront metadata accessor and nominal descriptor imports,
+`_$s8StoreKit10StorefrontVMa` and `_$s8StoreKit10StorefrontVMn`, now have a
+canonical StoreKit implementation. Native metadata describes a 48-byte value:
+country and identifier Strings at offsets 0 and 16, followed by Locale's
+implementation object and table at 32 and 40. All eight value witnesses are
+implemented, including field ownership during reentrant assignment, whole-value
+take assignment, and single-payload enum encoding through UInt32 case limits.
+
+Storefront exceeds Swift's three-word inline value buffer. Its buffer witness
+shares a retained, registered 64-byte box and returns the payload at offset 16;
+the box destructor releases all three owned fields before freeing storage.
+The existing Any implementation recognizes those boxes. Code and metadata use
+the existing sealed RX/R pages and retire after callers drain. The private
+nominal descriptor supports symbolic type lookup; field reflection, broader
+Storefront APIs and account services remain unavailable.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites validate metadata,
+the async current query, Any and Locale. Native comparisons include actual
+String/Locale values, reentrant field destruction, shared buffers, guarded and
+unaligned enum storage, concurrent callers, and two sealed/unmapped runtimes.
+Eleven generated C/executable pairs and pinned native/IPA evidence are retained
+under `build/ios/fortnite/storefront-metadata-checks`. The fixture is available
+through `tests/ios/native-checks.v build-storefront-metadata` and the native
+check inventories.
+
+The actual IPA now exits with status 1 before application entry at
+`_$s8StoreKit11TransactionV18beginRefundRequest3for2inAC0eF6StatusOs6UInt64V_So13UIWindowSceneCtYaKFZ`,
+the asynchronous refund-request entry. Fortnite remains unplayable and full
+iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,677 | 483 | 79 |
+| Fortnite executable | 1,679 | 481 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,512 | 486 | 120 |
+| All images | 2,514 | 484 | 120 |
 
-The C++/GLES/Text variant reports 2,526 resolved imports, 472 unresolved strong
+The C++/GLES/Text variant reports 2,528 resolved imports, 470 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

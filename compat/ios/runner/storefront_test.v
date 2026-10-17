@@ -209,8 +209,7 @@ fn test_storefront_country_code() {
 			'/System/Library/Frameworks/UIKit.framework/UIKit', '/usr/lib/swift/libswiftCore.dylib', '/usr/lib/libSystem.B.dylib']! {
 			if _ := runtime_symbol(library, '_$s8StoreKit10StorefrontV11countryCodeSSvg') { assert false }
 		}
-		for unsupported in ['_$s8StoreKit10StorefrontVMa', '_$s8StoreKit10StorefrontVMn',
-			'_$s8StoreKit10StorefrontV2idSSvg', '$s8StoreKit10StorefrontV11countryCodeSSvg']! {
+		for unsupported in ['_$s8StoreKit10StorefrontV2idSSvg', '$s8StoreKit10StorefrontV11countryCodeSSvg']! {
 			if _ := storefront_symbol(unsupported) { assert false }
 		}
 		assert ios_runtime.live == baseline && ios_runtime.swift_strings.len == 0 && ios_runtime.swift_buffers.len == 0

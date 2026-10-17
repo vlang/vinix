@@ -12,6 +12,8 @@ type SwiftAnyDestroyCall = fn (u64,u64)
 
 fn swift_any_full_metadata() u64 { return swift_error_metadata_arena() + u64(C.getpagesize()) + 448 }
 fn swift_any_box_metadata_checked(metadata u64) !u64 {
+	if ios_runtime != unsafe { nil } && !ios_runtime.storefront_retired && ios_runtime.storefront_code != 0
+		&& metadata == ios_runtime.storefront_code + u64(C.getpagesize()) + 32 { return metadata + 288 }
 	full := swift_any_full_metadata()
 	if metadata == full + 8 { return full + 176 }
 	if (swift_collection_kind_checked(metadata,false) or { -1 }) == 1 { return metadata - 8 + 896 }
