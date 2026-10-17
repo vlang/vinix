@@ -667,7 +667,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     retire discarded template inventories, partial walked files and copy scratch
     across cold/cache success and late refusal. Independently closeable pack/root
     replies preserve manifest bytes; digest-slot directories refuse publication
-    without losing recovery data. Whole-call filesystem scratch remains open.
+    without losing recovery data.
+  - [x] [Owned publisher filesystem checks](tests/packages/publisher-io-ownership-check.md)
+    retire workspace admission, containment, lock and durability scratch across
+    success and refusal. Cached packing in an initialized workspace releases all
+    measured call storage after reply close; first-time creation and complete
+    prepared-root/profile construction remain separate ownership boundaries.
   - [x] [Explicit catalog host selection](tests/packages/composition-target-check.md)
     combines complete single-host and dual-host profiles for a declared target,
     preserving shared packages, pinned declarations and full-input provenance.

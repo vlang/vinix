@@ -29,23 +29,28 @@ struct ReleaseOptions {
 fn check_publisher_lock(fd int, path string) ! {
 	mut opened := C.stat{}
 	mut named := C.stat{}
-	if C.fstat(fd, &opened) != 0 || opened.st_mode & 0o170000 != 0o100000
+	if C.fstat(fd, unsafe { &opened }) != 0 || opened.st_mode & 0o170000 != 0o100000
 		|| opened.st_uid != u32(os.geteuid()) || opened.st_mode & 0o077 != 0 || opened.st_nlink != 1
-		|| C.fstatat(C.AT_FDCWD, path.str, &named, C.AT_SYMLINK_NOFOLLOW) != 0
+		|| C.fstatat(C.AT_FDCWD, path.str, unsafe { &named }, C.AT_SYMLINK_NOFOLLOW) != 0
 		|| named.st_mode & 0o170000 != 0o100000 || named.st_dev != opened.st_dev || named.st_ino != opened.st_ino {
 		return error('publisher lock must be a stable private ordinary file owned by this administrator without hard links')
 	}
 }
 
 fn publisher_lock(repository string) !Lock {
-	info := os.lstat(repository)!
-	if os.is_link(repository) || !os.is_dir(repository) || info.uid != u32(os.geteuid()) || info.mode & 0o022 != 0 {
+	mut info := C.stat{}
+	if C.lstat(repository.str, unsafe { &info }) != 0 { return error('cannot inspect publisher workspace') }
+	if info.st_mode & 0o170000 != 0o040000 || info.st_uid != u32(os.geteuid()) || info.st_mode & 0o022 != 0 {
 		return error('publisher workspace must be an ordinary directory owned by this administrator and not writable by other users')
 	}
-	check_export_parent(os.real_path(repository), 'publisher workspace')!
-	owned_directory(repository + '/.publisher', 0o700)!
+	physical := publisher_real_path(repository)!
+	directory := repository + '/.publisher'
+	defer { unsafe { physical.free(); directory.free() } }
+	check_export_parent(physical, 'publisher workspace')!
+	owned_directory(directory, 0o700)!
 	sync_directory(repository)!
 	path := repository + '/.publisher/lock'
+	defer { unsafe { path.free() } }
 	fd := C.open(path.str, C.O_RDWR | C.O_CREAT | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK, 0o600)
 	if fd < 0 { return error('cannot open publisher release lock') }
 	check_publisher_lock(fd, path) or { C.close(fd); return err }

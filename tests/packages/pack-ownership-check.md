@@ -1,5 +1,11 @@
 # Packing inventory and reply ownership
 
+The results below record the original inventory/reply change. The subsequent
+[publisher filesystem qualification](publisher-io-ownership-check.md) closes the
+measured existing-workspace helper boundary and tightens the maintained complete
+packing assertions to zero retained bytes. First-time workspace creation and
+complete prepared-root/profile construction remain separate boundaries.
+
 Direct packing now owns its decoded template and growing payload inventory until
 it transfers the successful reply. Any failure retires both owners, including
 partly walked files and a payload whose hash/copy/cache checkpoint refused.

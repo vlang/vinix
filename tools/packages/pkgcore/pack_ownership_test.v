@@ -101,7 +101,7 @@ fn test_pack_owned_cold_cached_walks_and_late_refusals_retire_every_inventory() 
 	println('PACK OWNERSHIP cold/cache walks, growing inventories and late hash/copy/cache refusals retain zero owned scratch PASS')
 }
 
-fn test_pack_owned_full_api_retention_is_bounded_separately_from_walk_ownership() {
+fn test_pack_owned_existing_workspace_calls_retire_inventory_and_filesystem_scratch() {
 	for count in [1, 32]! {
 		work, root, manifest, repository := pack_owned_fixture(count)!
 		defer { os.rmdir_all(work) or {}; unsafe { work.free(); root.free(); manifest.free(); repository.free() } }
@@ -120,13 +120,13 @@ fn test_pack_owned_full_api_retention_is_bounded_separately_from_walk_ownership(
 			}
 			$if track_heap ? {
 				println('PACK OWNERSHIP full files=' + count.str() + ' mode=' + mode + ' retained=' + maximum.str() + ' allocations=' + records.str())
-				// Workspace/lock/durability helpers retain additional scratch. Their
-				// ownership is not established by the zero-retention walk above.
-				assert maximum < 18000 && records < 64
+				// Existing-workspace admission, locks, durability, metadata and
+				// payload owners all retire here; first-time construction is separate.
+				assert maximum == 0 && records == 0
 			}
 		}
 	}
-	println('PACK OWNERSHIP complete replies and locked/late-walk refusals stay within separate filesystem scratch budget PASS')
+	println('PACK OWNERSHIP existing-workspace replies and locked/late-walk refusals retain zero owned scratch PASS')
 }
 
 fn test_pack_owned_replies_survive_arguments_templates_siblings_and_private_root_retirement() {

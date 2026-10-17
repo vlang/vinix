@@ -820,7 +820,12 @@ replacement, so a directory occupying a digest slot refuses publication instead
 of receiving a nested object. Existing verified objects and retained partials
 keep their existing recovery behavior. See
 [packing ownership qualification](../../tests/packages/pack-ownership-check.md)
-for measured cold/cache walks, failure/retry and remaining whole-call scratch.
+for cold/cache walks and failure/retry. The subsequent
+[publisher filesystem qualification](../../tests/packages/publisher-io-ownership-check.md)
+also measures admission, containment, locking and durability. Repeated cached
+packing into an initialized workspace releases all measured storage after reply
+close, including locked and late-walk refusals. This does not establish ownership
+for first-time workspace creation or complete prepared-root/profile construction.
 
 ### Import a prepared guest root
 

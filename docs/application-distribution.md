@@ -397,7 +397,11 @@ owned file records without implicit clones, and releases encoding/copy scratch.
 A directory occupying an object digest slot now refuses publication while
 retaining its contents. [Packing ownership checks](../tests/packages/pack-ownership-check.md)
 cover cold/cache walks, late refusals, literal CLI replies and exact retry;
-complete workspace/lock/durability helper ownership remains a separate boundary.
+[publisher filesystem ownership checks](../tests/packages/publisher-io-ownership-check.md)
+also retire admission, containment, lock and durability scratch. Complete cached
+packing into an initialized workspace retains zero measured bytes after reply close,
+including lock-checkpoint and late-walk refusals. First-time workspace creation
+and complete prepared-root/profile construction remain separate boundaries.
 
 ## Trust and configuration
 

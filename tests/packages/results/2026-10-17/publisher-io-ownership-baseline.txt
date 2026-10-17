@@ -1,0 +1,10 @@
+PUBLISHER IO OWNERSHIP mode=capture retained=144 allocations=1
+PUBLISHER IO OWNERSHIP mode=workspace retained=4384 allocations=3
+PUBLISHER IO OWNERSHIP mode=outside retained=1824 allocations=15
+PUBLISHER IO OWNERSHIP mode=contained retained=816 allocations=8
+PUBLISHER IO OWNERSHIP mode=lock retained=6064 allocations=16
+PUBLISHER IO OWNERSHIP mode=busy retained=5776 allocations=14
+PUBLISHER IO OWNERSHIP mode=file retained=720 allocations=5
+PUBLISHER IO OWNERSHIP mode=directory retained=720 allocations=5
+PUBLISHER IO OWNERSHIP mode=flush-failure retained=432 allocations=3
+PUBLISHER IO OWNERSHIP admission, containment, exclusion and durability scratch PASS

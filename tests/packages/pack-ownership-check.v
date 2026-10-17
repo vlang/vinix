@@ -52,7 +52,7 @@ fn check() ! {
 	checks << task('native-tracked-run', [work + '/native-tracked'], work)!
 	assert checks.len == 45
 	os.write_file(work + '/qualification.json', json2.encode(Receipt{ compiler: v, compiler_sha256: sha256.sum(os.read_bytes(v)!).hex(),
-		scope: 'owned direct packing templates and growing payload inventories; 816 tracked cold/cache walks with late hash/copy/cache refusals, independently closeable pack/root replies and literal CLI JSON, object-directory refusal, all five profiles and signed catalog/composition/release regressions; complete workspace/lock/durability scratch remains qualified separately', checks: checks }) + '\n')!
+		scope: 'owned direct packing templates and growing payload inventories; 816 tracked cold/cache walks with late hash/copy/cache refusals, zero-retention existing-workspace packing after reply close, independently closeable pack/root replies and literal CLI JSON, object-directory refusal, all five profiles and signed catalog/composition/release regressions; first-time workspace creation and full prepared-root/profile construction remain separate boundaries', checks: checks }) + '\n')!
 	println('Packing ownership: forty-five host build/test checks PASS')
 }
 

@@ -44,7 +44,7 @@ fn pack_with(manifest string, source string, repository string, options PackSour
 	p := Package{ ...template, files: input.files }
 	p.validate()!
 	owned_directory(manifests, 0o755)!
-	path := manifests + '/${p.id}-${p.architecture}-${p.version}.json'
+	path := '${manifests}/${p.id}-${p.architecture}-${p.version}.json'
 	encoded := publisher_json(p)
 	defer { unsafe { path.free(); encoded.free() } }
 	atomic_write(path, encoded)!

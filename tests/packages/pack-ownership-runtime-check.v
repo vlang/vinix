@@ -18,7 +18,7 @@ fn packing_artifact(role string, path string) !PackingArtifact {
 fn packing_suite() hwhost.Suite {
 	mut required := ["HWTEST START packages-pack-ownership", "HWTEST PASS packages-pack-ownership",
 		"PACK OWNERSHIP cold/cache walks, growing inventories and late hash/copy/cache refusals retain zero owned scratch PASS",
-		"PACK OWNERSHIP complete replies and locked/late-walk refusals stay within separate filesystem scratch budget PASS",
+		"PACK OWNERSHIP existing-workspace replies and locked/late-walk refusals retain zero owned scratch PASS",
 		"PACK OWNERSHIP pack/root replies survive retired inputs and sibling close; ignored template inventory, literal declarations, legacy manifest bytes and saved objects remain intact PASS",
 		"PACK OWNERSHIP late validation/publication/cache-directory refusals preserve saved metadata and recovery bytes; exact retry PASS"]
 	for count in [16, 64]! { for cold in [false, true]! { for mode in ["complete", "hashed", "copied-or-cached"]! {

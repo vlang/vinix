@@ -12,10 +12,10 @@ fn durability_matches(fd int, path string, initial C.stat, directory bool) bool 
 	mut opened := C.stat{}
 	mut named := C.stat{}
 	kind := if directory { u32(0o040000) } else { u32(0o100000) }
-	return C.fstat(fd, &opened) == 0 && opened.st_mode & 0o170000 == kind
+	return C.fstat(fd, unsafe { &opened }) == 0 && opened.st_mode & 0o170000 == kind
 		&& opened.st_dev == initial.st_dev && opened.st_ino == initial.st_ino
 		&& (directory || opened.st_size == initial.st_size)
-		&& C.fstatat(C.AT_FDCWD, path.str, &named, C.AT_SYMLINK_NOFOLLOW) == 0
+		&& C.fstatat(C.AT_FDCWD, path.str, unsafe { &named }, C.AT_SYMLINK_NOFOLLOW) == 0
 		&& named.st_mode & 0o170000 == kind && named.st_dev == initial.st_dev && named.st_ino == initial.st_ino
 		&& (directory || named.st_size == initial.st_size)
 }
@@ -40,7 +40,7 @@ fn sync_path_with(path string, directory bool, options DurabilityOptions) ! {
 	defer { C.close(fd) }
 	mut initial := C.stat{}
 	kind := if directory { u32(0o040000) } else { u32(0o100000) }
-	if C.fstat(fd, &initial) != 0 || initial.st_mode & 0o170000 != kind || (!directory && initial.st_size < 0) {
+	if C.fstat(fd, unsafe { &initial }) != 0 || initial.st_mode & 0o170000 != kind || (!directory && initial.st_size < 0) {
 		return error('package durability requires an ordinary ${label}: ${path}')
 	}
 	options.checkpoint('captured', name)!

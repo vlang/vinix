@@ -1,0 +1,18 @@
+PUBLISHER IO OWNERSHIP mode=capture retained=0 allocations=0
+PUBLISHER IO OWNERSHIP mode=capture-alias retained=0 allocations=0
+PUBLISHER IO OWNERSHIP mode=workspace retained=0 allocations=0
+PUBLISHER IO OWNERSHIP mode=workspace-alias retained=0 allocations=0
+PUBLISHER IO OWNERSHIP mode=workspace-unsafe retained=0 allocations=0
+PUBLISHER IO OWNERSHIP mode=outside retained=0 allocations=0
+PUBLISHER IO OWNERSHIP mode=relative-outside retained=0 allocations=0
+PUBLISHER IO OWNERSHIP mode=contained retained=0 allocations=0
+PUBLISHER IO OWNERSHIP mode=relative-contained retained=0 allocations=0
+PUBLISHER IO OWNERSHIP mode=lock retained=0 allocations=0
+PUBLISHER IO OWNERSHIP mode=busy retained=0 allocations=0
+PUBLISHER IO OWNERSHIP mode=hard-linked retained=0 allocations=0
+PUBLISHER IO OWNERSHIP mode=file retained=0 allocations=0
+PUBLISHER IO OWNERSHIP mode=directory retained=0 allocations=0
+PUBLISHER IO OWNERSHIP mode=file-alias retained=0 allocations=0
+PUBLISHER IO OWNERSHIP mode=directory-alias retained=0 allocations=0
+PUBLISHER IO OWNERSHIP mode=flush-failure retained=0 allocations=0
+PUBLISHER IO OWNERSHIP admission, containment, exclusion and durability scratch PASS
