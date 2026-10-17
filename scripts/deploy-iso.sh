@@ -194,8 +194,11 @@ unset PROD
 export V
 # Each image records the release it is as /etc/vinix-release. At boot it asks
 # vinix-os.org/version for the newest one and, when that is newer, the desktop
-# tells the user to download it (build-support/vinix-version-check).
-export VINIX_RELEASE="$TAG"
+# tells the user to download it (build-support/vinix-version-check). A test
+# build that is not to be published can set VINIX_RELEASE= (empty) to make
+# development images instead, which take X11 and the iOS runtime from the newest
+# release rather than from a tag that will never have them.
+export VINIX_RELEASE="${VINIX_RELEASE-$TAG}"
 
 IMAGES=()
 # The X11 bundles and their checksum files, uploaded beside the images.
