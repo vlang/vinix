@@ -177,6 +177,30 @@ fn first_run_materialize_libraries(root string, directory string) ! {
 	}
 }
 
+// Each private runtime is set up by a process of its own. Debian's index and
+// what is staged from it stay allocated until that process ends (the desktop
+// frees nothing implicitly), and Steam's two runtimes in one process ran out
+// of memory where one never did. Its output goes straight to the Terminal.
+fn first_run_install_runtime_process(arch string) ! {
+	mut process := os.new_process('/usr/bin/vinix-desktop')
+	defer { process.close() }
+	process.set_args(['--install-linux-runtime', arch])
+	process.run()
+	process.wait()
+	if process.code != 0 {
+		return error('the private ${arch} Linux runtime was not installed')
+	}
+}
+
+// `vinix-desktop --install-linux-runtime ARCH`, which the process above runs.
+fn first_run_install_linux_runtime_alone(arch string) ! {
+	os.mkdir_all('/var/cache/vinix-setup')!
+	work := '/var/cache/vinix-setup/runtime-${arch}-${os.getpid()}'
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	first_run_install_linux_runtime(arch, work)!
+}
+
 fn first_run_install_linux_runtime(arch string, work string) ! {
 	if arch !in ['aarch64', 'x86_64', 'i386'] {
 		return error('unsupported Linux runtime architecture')

@@ -335,8 +335,8 @@ fn first_run_install_vendor(name string) ! {
 	first_run_download(download.url, archive)!
 	payload := work + '/payload'
 	first_run_stage_vendor(download, archive, payload, name == 'steam')!
-	first_run_install_linux_runtime(download.arch, work)!
-	if name == 'steam' { first_run_install_linux_runtime('x86_64', work)! }
+	first_run_install_runtime_process(download.arch)!
+	if name == 'steam' { first_run_install_runtime_process('x86_64')! }
 	first_run_publish_vendor(name, download, payload, '')!
 	if os.is_executable('/usr/libexec/vinix-persist-packages') {
 		first_run_tool(['/usr/libexec/vinix-persist-packages', 'save'])!

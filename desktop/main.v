@@ -144,6 +144,10 @@ fn main() {
 			if failed { exit(1) }
 			return
 		}
+		if arg == '--install-linux-runtime' && i + 1 < all_args.len {
+			first_run_install_linux_runtime_alone(all_args[i + 1]) or { eprintln(err); exit(1) }
+			return
+		}
 		if arg == '--run-setup-app' && i + 1 < all_args.len {
 			first_run_launch_vendor(all_args[i + 1], all_args[i + 2..]) or { eprintln(err); exit(1) }
 			return
