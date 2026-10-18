@@ -18,6 +18,7 @@ import gpu.agx.fw
 import gpu.agx.event
 import memory
 import klock
+import katomic
 import sched
 import aarch64.timer
 
@@ -1122,6 +1123,9 @@ pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bo
 	message := fw.make_g13_fwctl_invalidate(addr, slot)
 	token := mgr.channels.fw_ctrl.enqueue_with_token(voidptr(&message)) or {
 		uat_mgr.abort_unpublished_flush(slot)
+		if mgr.channels.fw_ctrl.has_fault() {
+			mgr.state = .error
+		}
 		return false
 	}
 	if !mgr.send_role_message(0, u8(ep_doorbell), msg_fwctl) {
@@ -1131,6 +1135,12 @@ pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bo
 
 	started := timer.get_ns()
 	for mgr.channels.fw_ctrl.read_pointer() != token {
+		// Some callers hold mgr.lock, while ioctl mapping flushes do not.
+		// Only the worker reads the graph's halt word under that lock. Observe
+		// its failure here without borrowing a graph that shutdown can release.
+		if mgr.state != .running {
+			return false
+		}
 		if timer.get_ns() - started >= u64(1_000_000_000) {
 			println('agx: firmware-control UAT flush timed out')
 			mgr.state = .error
@@ -1181,10 +1191,17 @@ pub fn (mut mgr GpuManager) handle_event() {
 					println('agx: fault event without a valid G13 fault register')
 				}
 				mgr.state = .error
+				return
 			}
 			fw.fw_event_timeout {
 				println('agx: GPU firmware timeout event')
 				mgr.state = .error
+				return
+			}
+			fw.fw_event_channel_error {
+				println('agx: GPU firmware channel error event')
+				mgr.state = .error
+				return
 			}
 			fw.fw_event_grow_tvb {
 				grow := unsafe { &fw.FwGrowTVBEvent(&buf[0]) }
@@ -1247,8 +1264,47 @@ fn (mut mgr GpuManager) drain_auxiliary_channels() {
 	}
 }
 
+// Caller holds mgr.lock (or owns the unpublished manager). A halted firmware
+// CPU need not deliver an event before it stops consuming commands. Do not
+// acknowledge resume: the queues and faulting mappings have not been repaired.
+// The worker's existing shutdown path stops ASC before failing retained jobs.
+fn (mut mgr GpuManager) check_g13_firmware_health() bool {
+	if mgr.hw_config.gpu_gen != .g13 {
+		return true
+	}
+	if mgr.channels.device_ctrl.has_fault() || mgr.channels.fw_ctrl.has_fault()
+		|| mgr.channels.event.has_fault() || mgr.channels.fw_log.has_fault()
+		|| mgr.channels.ktrace.has_fault() || mgr.channels.stats.has_fault() {
+		println('agx: invalid GPU firmware ring pointer')
+		mgr.state = .error
+		return false
+	}
+	for index in 0 .. 12 {
+		if mgr.channels.pipes[index].has_fault() {
+			println('agx: invalid GPU work-pipe ring pointer')
+			mgr.state = .error
+			return false
+		}
+	}
+	if mgr.g13_channels != unsafe { nil } && mgr.g13_channels.fw_status.phys != 0 {
+		status := unsafe { &fw.G13FwStatus(mgr.g13_channels.fw_status.cpu_address()) }
+		if katomic.load(&status.halted) != 0 {
+			C.kprintf(c'agx: GPU firmware halted (count=%llu)\n', u64(katomic.load(&status.halt_count)))
+			mgr.state = .error
+			return false
+		}
+	}
+	return true
+}
+
 fn event_worker(mut mgr GpuManager) {
 	for mgr.state == .running {
+		mgr.lock.acquire()
+		healthy := mgr.check_g13_firmware_health()
+		mgr.lock.release()
+		if !healthy {
+			break
+		}
 		if !mgr.poll_rtkit_messages() {
 			println('agx: RTKit system endpoint failed')
 			mgr.state = .error
@@ -1258,10 +1314,16 @@ fn event_worker(mut mgr GpuManager) {
 		if mgr.state != .running {
 			break
 		}
+		mgr.drain_auxiliary_channels()
+		mgr.lock.acquire()
+		still_healthy := mgr.check_g13_firmware_health()
+		mgr.lock.release()
+		if !still_healthy {
+			break
+		}
 		event.scan_all_completions()
 		mgr.reap_g13_render_jobs()
 		mgr.reap_g13_compute_jobs()
-		mgr.drain_auxiliary_channels()
 		sched.yield(false)
 	}
 	if mgr.state == .error {

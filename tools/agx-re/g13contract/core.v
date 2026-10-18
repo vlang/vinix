@@ -90,6 +90,13 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 	require_order(fwctl_state, ['_SIZE = 0x20', 'READ_PTR = 0x00', 'WRITE_PTR = 0x10'], 'm1n1 firmware-control channel state')!
 	require(fw_channels.contains('[(FWCtlMsg, 0x14, 0x100)]'), 'm1n1 FwCtl ring ABI changed')!
 	results << 'channel state offsets and FwCtl ring geometry'
+	status_source := read(os.join_path(m1n1, 'proxyclient/m1n1/fw/agx/initdata.py'))!
+	status := section(status_source, 'class InitData_FWStatus', 'class AGXHWDataShared1', 'm1n1 firmware status')!
+	require_order(status, ['"fwctl_channel" / ChannelInfo', '"halt_count" / Int32ul', 'ZPadding(0xc)',
+		'"halted" / Int32ul', 'ZPadding(0xc)', '"resume" / Int32ul', 'ZPadding(0xc)'], 'm1n1 firmware halt fields')!
+	require(!status.contains('Ver('), 'm1n1 firmware halt layout is now version-dependent')!
+	require(fw_channels.contains('"msg_type" / Hex(Const(8, Int32ul))'), 'm1n1 channel-error event tag changed')!
+	results << 'G13 12.3/13.5 firmware halt fields and channel-error tag'
 	runtime_channels := read(os.join_path(m1n1, 'proxyclient/m1n1/agx/channels.py'))!
 	send_inval := section(runtime_channels, '    def send_inval(self, ctx, addr=0):', 'class GPUEventChannel', 'm1n1 FwCtl')!
 	require_order(send_inval, ['msg.addr = addr', 'msg.unk_8 = 0', 'msg.context_id = ctx',
@@ -128,6 +135,15 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 	enqueue := section(vinix_channel, 'pub fn (mut ch TxChannel) enqueue_with_token', 'pub fn (ch &TxChannel) read_pointer', 'Vinix TX channel')!
 	require_order(enqueue, ['C.memcpy', 'katomic.sync()', 'katomic.store(mut write_ptr'], 'Vinix TX channel publication')!
 	results << 'TX ring entry barrier before write-pointer publication'
+	vinix_jobs := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!
+	batch := section(vinix_jobs, 'fn (mut mgr GpuManager) submit_g13_queue_commands(', 'fn (mut mgr GpuManager) submit_g13_queue_command(', 'Vinix batched G13 publisher')!
+	require_order(batch, ['*entry = command_va', 'katomic.sync()', 'katomic.store(mut &state.cpu_wptr',
+		'C.memcpy(destination', 'katomic.sync()', 'katomic.store(mut outer_write'], 'Vinix batched G13 publication')!
+	render := section(vinix_jobs, 'fn (mut mgr GpuManager) publish_g13_render_job_locked(', '// Transfer a prepared render pass', 'Vinix paired G13 publisher')!
+	require_order(render, ['*vertex_entry_1 = job.vertex.va', 'katomic.sync()',
+		'katomic.store(mut &fragment_state.cpu_wptr', 'C.memcpy(vertex_destination',
+		'katomic.sync()', 'katomic.store(mut fragment_outer_write'], 'Vinix paired G13 publication')!
+	results << 'batched compute/render entry barriers before inner and outer pointer publication'
 	return results
 }
 

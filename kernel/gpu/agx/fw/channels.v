@@ -6,11 +6,12 @@ import gpu.agx.hw
 // Defines the shared memory layout for ring buffer channels
 // Translates fw channel structures from the Asahi Linux GPU driver
 
-// G13 v12.3 EventMsg discriminants.
+// G13 v12.3 and v13.5 EventMsg discriminants.
 pub const fw_event_fault = u32(0)
 pub const fw_event_flag = u32(1)
 pub const fw_event_timeout = u32(4)
 pub const fw_event_grow_tvb = u32(7)
+pub const fw_event_channel_error = u32(8)
 
 // Channel sizes (number of entries)
 pub const device_control_size = u32(256)

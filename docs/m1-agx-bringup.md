@@ -2,7 +2,7 @@
 
 This pins the one boot handoff the native AGX driver supports on a base M1, so
 that a failed bring-up is a driver bug rather than an unpinned input. Everything
-below is what `kernel/modules/gpu/agx/driver/driver.v` actually reads; it is not
+below is what `kernel/gpu/agx/driver/driver.v` actually reads; it is not
 a wish list.
 
 Scope is base M1 only. `hw.get_config()` recognises exactly two chip IDs,
@@ -14,8 +14,8 @@ Scope is base M1 only. `hw.get_config()` recognises exactly two chip IDs,
 | --- | --- |
 | Bootloader | m1n1 in its Linux/FDT hand-off mode. Vinix consumes a flattened device tree, not the Apple DeviceTree. |
 | GPU node `compatible` | `apple,agx-g13g` (preferred) or the older `apple,agx-t8103`. |
-| Firmware ABI | 12.3.0, published as `apple,firmware-abi = <12 3 0>`. |
-| Firmware image | The macOS 12.3-era G13 firmware. The ABI tuple is checked, the image is not: a newer image behind a 12.3 tuple will be accepted and will then disagree with every structure in `gpu/agx/fw`. |
+| Firmware ABI | 12.3.0 or 13.5.0, published as `apple,firmware-abi` or `apple,firmware-compat`. |
+| Firmware image | The image matching the declared ABI. Vinix checks the tuple, not the image. InitData, work commands, microsequences and queue objects select their layouts from this ABI. |
 
 `gpu,t8103` selects the native Apple DeviceTree path instead. That path is not
 supported yet, but the gap is now a short named list rather than an open
@@ -186,13 +186,15 @@ Everything before the last two lines is bring-up working on hardware:
 * **All thirteen G13 ABI self-checks pass.** They print only on failure, and the
   fragment command layout that failed the previous boot was the last one wrong.
 
-### The firmware ABI is the live blocker
+### Firmware ABI evidence and current implementation
 
-`apple,firmware-compat 13.5.0`. This machine's installed GPU firmware speaks the
-**13.5** ABI; `gpu/agx/fw` implements **12.3** and nothing else — its HwDataB is
-explicitly the pre-13.0b4 layout. The probe refuses and touches no power domain
-or ASC register, which is correct: the structures it would publish describe a
-different firmware.
+The boot log above records an earlier implementation that refused 13.5. The
+current driver accepts both 12.3 and 13.5 and constructs versioned InitData,
+HwData, work commands, queue objects and microsequences. The enum spelling
+`v13_5_partial` is retained in code; it no longer means that probe rejects this
+ABI. `tests/agx-g13-abi` and `tests/agx-g13-layouts` check the two layouts on
+the host. Successful firmware execution still needs the acceptance sequence
+below.
 
 Note the spelling. An M1 Air carries `apple,firmware-compat` and no
 `apple,firmware-abi` at all, so the fallback name is the one that turns up on
@@ -207,33 +209,60 @@ $ cat "/Volumes/EFI - FEDOR/asahi/SystemVersion.plist"
         ProductBuildVersion     22G74
 ```
 
-So the GPU firmware is macOS 13.5's, which is also the ABI Asahi's own driver
-targets for G13. Reaching a first accepted command on this machine means meeting
-13.5 somewhere.
+The installed m1n1 firmware bundle and the currently running macOS driver are
+separate inputs. macOS 26.3.1 on this Air does not make its m1n1 firmware bundle
+speak the macOS 26 ABI. Preserve that distinction when recovering layouts.
 
-There are two honest ways past this, and only two:
+### Live M1 failure protocol recovery (2026-10-18)
 
-1. **Boot firmware that speaks 12.3.** The tuple is not a setting — it reports
-   what m1n1 found installed — so this means installing a 12.3-era AGX firmware
-   bundle on the machine. It matches what this tree already implements and is
-   the shortest route to a first accepted command.
-2. **Implement the 13.5 ABI.** The 12.3 structures here are complete and
-   byte-validated; 13.0b4 moved HwDataB and the InitData graph, so this is a
-   real port, not a version bump.
+Connected to the MacBookAir10,1 through the host named in `deploy-to-m1.sh` and
+read its SGX/accelerator properties and active Preboot kernel cache. The
+`/System/Library/KernelCollections/BootKernelExtensions.kc` file on this machine
+is an x86 image; the running ARM collection is selected by `boot/active` under
+Preboot and lives at `System/Library/Caches/com.apple.kernelcaches/kernelcache`.
 
-Editing the accepted tuple is not a third option. It would publish 12.3
-structures to firmware expecting 13.5 — the exact failure the check exists to
-prevent, moved from a refusal at boot to undefined behaviour after power-up.
+The extracted `AGXG13G` has UUID `AE55928C-9E24-3571-B472-8ECEEB2E5EA1` and
+SHA-256 `7a7044d6ce4c9599683b94453e2ea5af0d85a64cce9eebb53e724d3eaca36428`.
+`tools/agx-re/check_g13_failure.v` pins these observations to its instructions:
 
-One more thing worth knowing before trying to finish it:
+* `AGXFirmware::drainFirmwareEventRing` checks both read and write indices
+  against capacity with unsigned comparisons before testing for an empty ring
+  or fetching entries. Equal out-of-range pointers are still invalid.
+* Event tag 8 has a separate channel-error dispatch; it is not an unknown event
+  that the host can just ignore.
+* `AGXArmFirmware::isFirmwareStoppedForHostRecovery` tests a shared halt word.
+  Its current native runtime offset is `0x4a20`. This is **not** a 13.5 wire
+  offset: m1n1's version-independent `InitData_FWStatus` places `halt_count`,
+  `halted` and `resume` at `0x10`, `0x20` and `0x30`. The reference-contract
+  checker validates this older layout separately.
 
-* `AGXAccelerator::applyLeakageEquation` is a double-precision, `pow()`-based
-  *thermal* model. It is not the per-pstate table, and it could not be used in
-  this kernel anyway — the AArch64 build is `-mgeneral-regs-only`, which is why
-  every coefficient here is carried as a raw IEEE-754 word.
+Vinix now rejects corrupt TX/RX indices before accessing ring memory, retains
+a sticky channel error, handles tag 8 as fatal, and polls the G13 halt word even
+without an event. Fatal events stop the drain immediately. The worker stops
+firmware CPUs before failure callbacks release job resources; it does not
+resume queues that have not been repaired. Firmware-control waits also stop
+when the worker reports a failure.
 
-So the remaining work is reproducing a fuse read and finding a source for a
-maximum power, not reconstructing a power model.
+Compute batches and paired render submissions write their rings directly,
+bypassing `TxChannel.enqueue`. Those paths now check outer channel indices and
+inner workqueue write/done indices before publishing anything. They also issue
+the full-system publication barrier before advancing each inner and outer
+write pointer. Without these barriers firmware could observe a new pointer
+before the commands it names were visible. The reference-contract checker
+checks the ordering in both publishers as well as the ordinary TX helper.
+
+```sh
+v run tests/agx-g13-failure/run.v --sanitize
+v run tools/agx-re/check_g13_failure.v path/to/AGXG13G.macho
+```
+
+The host fixture executes the production publishers, channel, event,
+health-check, worker and shutdown functions with hardware services replaced.
+It covers both G13 ABIs, ring wrap/full/empty, malformed indices including equal invalid indices,
+all six log subchannels, fatal-event ordering, and shutdown before failure
+callbacks. The native fixture also passes on the M1 Air over SSH. These are
+protocol checks, not a Vinix boot or a GPU-rendering result. Apple binaries and
+live captures remain untracked under `tools/agx-re/build`.
 
 ## Acceptance sequence
 
@@ -258,7 +287,7 @@ executed anything. In order:
 * No step of the sequence above has been run on hardware from this tree.
 * The native Apple DeviceTree path is still gated; see above for the four
   inputs it is short of.
-* The 12.3.0 gate checks the device tree's claim, not the firmware image.
+* The ABI check validates the device tree's claim, not the firmware image.
 * Userspace is a separate acceptance criterion. The submission interface is
   pinned to a particular Mesa-era UAPI (`drm_ioctl.validate_asahi_25_layouts()`),
   and whether userspace selects the native driver and emits commands and shaders

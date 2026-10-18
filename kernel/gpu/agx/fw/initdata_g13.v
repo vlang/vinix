@@ -84,8 +84,21 @@ pub mut:
 @[packed]
 pub struct G13FwStatus {
 pub mut:
-	fwctl ChannelRingPointers
-	flags [0x70]u8
+	fwctl      ChannelRingPointers
+	halt_count u32
+	pad_14     [0xc]u8
+	halted     u32
+	pad_24     [0xc]u8
+	resume     u32
+	pad_34     [0xc]u8
+	unk_40     u32
+	pad_44     [0xc]u8
+	unk_ctr    u32
+	pad_54     [0xc]u8
+	unk_60     u32
+	pad_64     [0xc]u8
+	unk_70     u32
+	pad_74     [0xc]u8
 }
 
 @[packed]
@@ -263,6 +276,8 @@ pub fn validate_g13_initdata_layouts() bool {
 	return sizeof(G13PipeChannels) == 0x30
 		&& sizeof(G13RuntimePointers) == g13_runtime_pointers_size
 		&& sizeof(G13Globals) == g13_v13_5_globals_size && sizeof(G13FwStatus) == 0x80
+		&& __offsetof(G13FwStatus, halt_count) == 0x10
+		&& __offsetof(G13FwStatus, halted) == 0x20 && __offsetof(G13FwStatus, resume) == 0x30
 		&& sizeof(G13UatLevelInfo) == 0x20 && sizeof(G13InitData) == g13_initdata_size
 		&& sizeof(G13InitDataBlob) == g13_initdata_v13_5_size
 		&& sizeof(G13GlobalStatsVertex) == 0x3004

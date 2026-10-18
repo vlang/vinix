@@ -52,6 +52,7 @@ pub mut:
 	ring_size  u32 // number of entries
 	entry_size u32 // size of each entry in bytes
 	write_off  u32 // write_ptr offset in the state object
+	faulted    u32 // sticky protocol error, observed by the firmware worker
 	lock       klock.Lock
 }
 
@@ -66,6 +67,7 @@ pub mut:
 	ring_size   u32
 	entry_size  u32
 	subchannels u32
+	faulted     u32
 	lock        klock.Lock
 }
 
@@ -127,11 +129,20 @@ pub fn (mut ch TxChannel) enqueue_with_token(data voidptr) ?u32 {
 	defer {
 		ch.lock.release()
 	}
+	if ch.has_fault() {
+		return none
+	}
 
 	read_ptr := unsafe { &u32(ch.state_phys + higher_half) }
 	mut write_ptr := unsafe { &u32(ch.state_phys + higher_half + ch.write_off) }
 	wp := katomic.load(write_ptr)
 	rp := katomic.load(read_ptr)
+	// G13 pointers are indices, not monotonically increasing counters. Apple
+	// checks both against the ring capacity before fetching an event. Masking
+	// an invalid pointer would conceal corruption and can publish stale work.
+	if !ch.validate_pointers(rp, wp) {
+		return none
+	}
 	next_wp := (wp + 1) % ch.ring_size
 
 	// One entry stays empty so equal pointers unambiguously mean empty.
@@ -168,12 +179,16 @@ pub fn (mut ch RxChannel) dequeue(data voidptr) bool {
 
 // Read one firmware-log subchannel. Other RX channel types use index zero.
 pub fn (mut ch RxChannel) dequeue_subchannel(data voidptr, index u32) bool {
-	if index >= ch.subchannels {
+	if data == unsafe { nil } || ch.state_phys == 0 || ch.ring_phys == 0
+		|| ch.ring_size < 2 || ch.entry_size == 0 || index >= ch.subchannels {
 		return false
 	}
 	ch.lock.acquire()
 	defer {
 		ch.lock.release()
+	}
+	if ch.has_fault() {
+		return false
 	}
 
 	state_offset := u64(index) * u64(sizeof(RingHeader))
@@ -181,6 +196,10 @@ pub fn (mut ch RxChannel) dequeue_subchannel(data voidptr, index u32) bool {
 	write_ptr := unsafe { &u32(ch.state_phys + higher_half + state_offset + 0x20) }
 	rp := katomic.load(read_ptr)
 	wp := katomic.load(write_ptr)
+	if rp >= ch.ring_size || wp >= ch.ring_size {
+		katomic.store(mut &ch.faulted, u32(1))
+		return false
+	}
 
 	if rp == wp {
 		return false
@@ -193,6 +212,8 @@ pub fn (mut ch RxChannel) dequeue_subchannel(data voidptr, index u32) bool {
 	}
 
 	new_rp := (rp + 1) % ch.ring_size
+	// Do not let firmware reuse the slot before the entire entry is read.
+	katomic.sync()
 	katomic.store(mut read_ptr, new_rp)
 	return true
 }
@@ -203,7 +224,8 @@ pub fn (ch &RxChannel) peek(data voidptr) bool {
 }
 
 pub fn (ch &RxChannel) peek_subchannel(data voidptr, index u32) bool {
-	if index >= ch.subchannels {
+	if data == unsafe { nil } || ch.state_phys == 0 || ch.ring_phys == 0
+		|| ch.ring_size < 2 || ch.entry_size == 0 || index >= ch.subchannels || ch.has_fault() {
 		return false
 	}
 	state_offset := u64(index) * u64(sizeof(RingHeader))
@@ -212,7 +234,7 @@ pub fn (ch &RxChannel) peek_subchannel(data voidptr, index u32) bool {
 	rp := katomic.load(read_ptr)
 	wp := katomic.load(write_ptr)
 
-	if rp == wp {
+	if rp >= ch.ring_size || wp >= ch.ring_size || rp == wp {
 		return false
 	}
 
@@ -226,18 +248,47 @@ pub fn (ch &RxChannel) peek_subchannel(data voidptr, index u32) bool {
 
 // Check if the transmit channel is full
 pub fn (ch &TxChannel) is_full() bool {
+	if ch.state_phys == 0 || ch.ring_phys == 0 || ch.ring_size < 2
+		|| ch.entry_size == 0 || ch.has_fault() {
+		return true
+	}
 	read_ptr := unsafe { &u32(ch.state_phys + higher_half) }
 	write_ptr := unsafe { &u32(ch.state_phys + higher_half + ch.write_off) }
 	wp := katomic.load(write_ptr)
 	rp := katomic.load(read_ptr)
-	return (wp + 1) % ch.ring_size == rp
+	return wp >= ch.ring_size || rp >= ch.ring_size || (wp + 1) % ch.ring_size == rp
 }
 
 // Check if the receive channel is empty
 pub fn (ch &RxChannel) is_empty() bool {
+	if ch.state_phys == 0 || ch.ring_phys == 0 || ch.ring_size < 2
+		|| ch.entry_size == 0 || ch.subchannels == 0 || ch.has_fault() {
+		return true
+	}
 	read_ptr := unsafe { &u32(ch.state_phys + higher_half) }
 	write_ptr := unsafe { &u32(ch.state_phys + higher_half + 0x20) }
 	rp := katomic.load(read_ptr)
 	wp := katomic.load(write_ptr)
-	return rp == wp
+	return rp >= ch.ring_size || wp >= ch.ring_size || rp == wp
+}
+
+pub fn (ch &TxChannel) has_fault() bool {
+	return katomic.load(&ch.faulted) != 0
+}
+
+// Caller holds ch.lock. Batched G13 publishers reserve several rings before
+// writing any of them, so they must validate the same snapshots they publish.
+pub fn (mut ch TxChannel) validate_pointers(read_ptr u32, write_ptr u32) bool {
+	if ch.has_fault() {
+		return false
+	}
+	if ch.ring_size < 2 || read_ptr >= ch.ring_size || write_ptr >= ch.ring_size {
+		katomic.store(mut &ch.faulted, u32(1))
+		return false
+	}
+	return true
+}
+
+pub fn (ch &RxChannel) has_fault() bool {
+	return katomic.load(&ch.faulted) != 0
 }

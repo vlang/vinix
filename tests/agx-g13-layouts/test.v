@@ -26,6 +26,11 @@ module main
 
 import gpu.agx.fw
 
+// The native fixture supplies libc for the kernel's diagnostic-only ABI.
+#include <stdio.h>
+#define kprintf printf
+fn C.kprintf(format &char, ...) i32
+
 fn object_u32(value voidptr, offset u32) u32 {
 	unsafe {
 		bytes := &u8(value)

@@ -786,7 +786,7 @@ fn (mut mgr GpuManager) submit_g13_queue_commands(resources &G13QueueResources,
 	outer_index := pipe_index(resources.priority, pipe_type)
 	mut outer := &mgr.channels.pipes[outer_index]
 	outer.lock.acquire()
-	if outer.ring_size == 0 || outer.entry_size != sizeof(fw.FwRunWorkQueueMsg)
+	if outer.ring_size < 2 || outer.entry_size != sizeof(fw.FwRunWorkQueueMsg)
 		|| outer.state_phys == 0 || outer.ring_phys == 0 {
 		outer.lock.release()
 		return false
@@ -795,6 +795,11 @@ fn (mut mgr GpuManager) submit_g13_queue_commands(resources &G13QueueResources,
 	mut outer_write := unsafe { &u32(outer.state_phys + higher_half + outer.write_off) }
 	outer_wp := katomic.load(outer_write)
 	outer_rp := katomic.load(outer_read)
+	if !outer.validate_pointers(outer_rp, outer_wp) {
+		mgr.state = .error
+		outer.lock.release()
+		return false
+	}
 	outer_next := (outer_wp + 1) % outer.ring_size
 	if outer_next == outer_rp {
 		outer.lock.release()
@@ -812,6 +817,12 @@ fn (mut mgr GpuManager) submit_g13_queue_commands(resources &G13QueueResources,
 	mut state := unsafe { &fw.G13WorkQueueRingState(queue.state.cpu_address()) }
 	inner_wp := katomic.load(&state.cpu_wptr)
 	inner_done := katomic.load(&state.gpu_doneptr)
+	if inner_wp >= fw.g13_workqueue_entries || inner_done >= fw.g13_workqueue_entries {
+		mgr.state = .error
+		queue.lock.release()
+		outer.lock.release()
+		return false
+	}
 	inner_used := (inner_wp + fw.g13_workqueue_entries - inner_done) % fw.g13_workqueue_entries
 	inner_free := fw.g13_workqueue_entries - inner_used - 1
 	if u32(command_vas.len) > inner_free {
@@ -827,6 +838,7 @@ fn (mut mgr GpuManager) submit_g13_queue_commands(resources &G13QueueResources,
 		}
 		inner_next = (inner_next + 1) % fw.g13_workqueue_entries
 	}
+	katomic.sync()
 	katomic.store(mut &state.cpu_wptr, inner_next)
 
 	message := fw.FwRunWorkQueueMsg{
@@ -840,6 +852,7 @@ fn (mut mgr GpuManager) submit_g13_queue_commands(resources &G13QueueResources,
 		destination := voidptr(outer.ring_phys + higher_half + u64(outer_wp) * outer.entry_size)
 		C.memcpy(destination, &message, sizeof(fw.FwRunWorkQueueMsg))
 	}
+	katomic.sync()
 	katomic.store(mut outer_write, outer_next)
 	queue.is_new = false
 	queue.lock.release()
@@ -1676,10 +1689,17 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 		}
 		vertex_outer_wp = katomic.load(vertex_outer_write)
 		fragment_outer_wp = katomic.load(fragment_outer_write)
-		vertex_outer_next = (vertex_outer_wp + 1) % vertex_outer.ring_size
-		fragment_outer_next = (fragment_outer_wp + 1) % fragment_outer.ring_size
-		valid = vertex_outer_next != katomic.load(vertex_outer_read)
-			&& fragment_outer_next != katomic.load(fragment_outer_read)
+		vertex_outer_rp := katomic.load(vertex_outer_read)
+		fragment_outer_rp := katomic.load(fragment_outer_read)
+		valid = vertex_outer.validate_pointers(vertex_outer_rp, vertex_outer_wp)
+			&& fragment_outer.validate_pointers(fragment_outer_rp, fragment_outer_wp)
+		if !valid {
+			mgr.state = .error
+		} else {
+			vertex_outer_next = (vertex_outer_wp + 1) % vertex_outer.ring_size
+			fragment_outer_next = (fragment_outer_wp + 1) % fragment_outer.ring_size
+			valid = vertex_outer_next != vertex_outer_rp && fragment_outer_next != fragment_outer_rp
+		}
 	}
 	if valid {
 		vertex_state := unsafe {
@@ -1692,12 +1712,18 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 		fragment_inner_wp = katomic.load(&fragment_state.cpu_wptr)
 		vertex_done := katomic.load(&vertex_state.gpu_doneptr)
 		fragment_done := katomic.load(&fragment_state.gpu_doneptr)
-		vertex_used := (vertex_inner_wp + fw.g13_workqueue_entries - vertex_done) % fw.g13_workqueue_entries
-		fragment_used := (fragment_inner_wp + fw.g13_workqueue_entries - fragment_done) % fw.g13_workqueue_entries
-		valid = fw.g13_workqueue_entries - vertex_used - 1 >= 2
-			&& fw.g13_workqueue_entries - fragment_used - 1 >= 2
-		vertex_inner_next = (vertex_inner_wp + 2) % fw.g13_workqueue_entries
-		fragment_inner_next = (fragment_inner_wp + 2) % fw.g13_workqueue_entries
+		valid = vertex_inner_wp < fw.g13_workqueue_entries && vertex_done < fw.g13_workqueue_entries
+			&& fragment_inner_wp < fw.g13_workqueue_entries && fragment_done < fw.g13_workqueue_entries
+		if !valid {
+			mgr.state = .error
+		} else {
+			vertex_used := (vertex_inner_wp + fw.g13_workqueue_entries - vertex_done) % fw.g13_workqueue_entries
+			fragment_used := (fragment_inner_wp + fw.g13_workqueue_entries - fragment_done) % fw.g13_workqueue_entries
+			valid = fw.g13_workqueue_entries - vertex_used - 1 >= 2
+				&& fw.g13_workqueue_entries - fragment_used - 1 >= 2
+			vertex_inner_next = (vertex_inner_wp + 2) % fw.g13_workqueue_entries
+			fragment_inner_next = (fragment_inner_wp + 2) % fw.g13_workqueue_entries
+		}
 	}
 	if !valid {
 		fragment_queue.lock.release()
@@ -1721,6 +1747,7 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 		&fw.G13WorkQueueRingState(fragment_queue.state.cpu_address())
 	}
 	mut vertex_state := unsafe { &fw.G13WorkQueueRingState(vertex_queue.state.cpu_address()) }
+	katomic.sync()
 	katomic.store(mut &fragment_state.cpu_wptr, fragment_inner_next)
 	katomic.store(mut &vertex_state.cpu_wptr, vertex_inner_next)
 
@@ -1750,6 +1777,7 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 	mut vertex_outer_write := unsafe {
 		&u32(vertex_outer.state_phys + higher_half + vertex_outer.write_off)
 	}
+	katomic.sync()
 	katomic.store(mut fragment_outer_write, fragment_outer_next)
 	katomic.store(mut vertex_outer_write, vertex_outer_next)
 	fragment_queue.is_new = false
