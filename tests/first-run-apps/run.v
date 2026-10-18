@@ -10,7 +10,7 @@ import os
 import qmpclient
 import time
 
-const usage = 'Usage: tests/first-run-apps/run [--out=DIR] [--timeout=MINUTES] [--disk=GIB] [--apps=A,B] [--keep] ISO
+const usage = 'Usage: tests/first-run-apps/run [--out=DIR] [--timeout=MINUTES] [--disk=GIB] [--apps=A,B] [--min-free=GIB] [--keep] ISO
        tests/first-run-apps/run DIR key QCODE... | type TEXT | click X Y [double] | shot FILE
 
 Boots ISO (vinix-arm64.iso under HVF, vinix-amd64.iso under TCG) with a blank
@@ -29,6 +29,8 @@ mut:
 	out      string
 	timeout  int = 300
 	disk_gib int = 16
+	// What the host must have free before a run starts.
+	min_free int = 10
 	keep     bool
 	apps     ?[]string
 }
@@ -57,6 +59,8 @@ fn parse_options() !Options {
 			options.disk_gib = argument.all_after('=').int()
 		} else if argument.starts_with('--apps=') {
 			options.apps = argument.all_after('=').split(',').filter(it != '')
+		} else if argument.starts_with('--min-free=') {
+			options.min_free = argument.all_after('=').int()
 		} else if argument == '--keep' {
 			options.keep = true
 		} else if argument.starts_with('-') {
@@ -134,8 +138,8 @@ fn start(options Options) !Vm {
 	// disk request timed out and the run hung halfway, which looks like a
 	// Vinix failure.
 	usage := os.disk_usage(options.out)!
-	if usage.available < u64(10) << 30 {
-		return error('${options.out} has ${usage.available >> 20} MiB free; a full run needs 10 GiB')
+	if usage.available < u64(options.min_free) << 30 {
+		return error('${options.out} has ${usage.available >> 20} MiB free; the run wants ${options.min_free} GiB (--min-free)')
 	}
 	disk := os.join_path(options.out, 'disk.img')
 	mut file := os.create(disk)!
