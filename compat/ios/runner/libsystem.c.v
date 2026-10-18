@@ -113,6 +113,7 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 	if address := terminal_symbol(symbol) { return address }
 	if address := thread_policy_symbol(symbol) { return address }
 	if address := mach_memory_symbol(symbol) { return address }
+	if address := mach_host_symbol(symbol) { return address }
 	if address := mach_exception_symbol(symbol) { return address }
 	if address := common_crypto_symbol(symbol) { return address }
 	address := match symbol {

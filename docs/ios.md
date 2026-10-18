@@ -9021,17 +9021,54 @@ statistics count negotiation, port/flavor errors and output extents are retained
 for the next adapter. Fortnite remains unplayable and the full iOS regression
 is unpassed.
 
+V now resolves `_mach_host_self`, `_host_statistics` and `_host_statistics64`.
+The Vinix host send right has reference counts, shared namespace locking,
+atomic name publication and names that survive neither last-reference removal
+nor image retirement. Port type/ref queries, reference modification, deallocation,
+exception arguments and wrong-type semaphore operations recognize it. Forked
+children acquire a fresh host right. The Mac backend uses native host rights
+and statistics calls.
+
+The Vinix statistics subset supports `HOST_VM_INFO` through both functions and
+`HOST_VM_INFO64` through the 64-bit function. Native count negotiation selects
+12/14/15-word legacy revisions and 24/38/40/62-word 64-bit revisions. Short
+buffers and invalid destinations/flavors return the measured errors without
+changing output. A bounded `/proc/meminfo` parser rejects malformed, duplicate
+and overflowing mapped fields. Output copies use the negotiated word count;
+64-bit counters retain their upper words and legacy counters saturate.
+
+Vinix lacks Darwin's active/inactive page queues. This adapter reports resident
+file cache as inactive, kernel slab as wired, and remaining resident pages as
+active, with bounded totals and separate compressed-storage counts. Available
+Vinix page-in/page-out counters are mapped; unsupported lifetime and tagging
+counters remain zero. These are approximate classifications of Vinix memory.
+Other host-statistics flavors remain unsupported on Vinix.
+
+`tests/ios/native-checks.v build-host-statistics` builds the fixture. Two host
+ASan/UBSan runs and the ARM64 Vinix suite pass for guarded revision layouts,
+parser failures, counter saturation, dirty upper arguments, errno/floating-point
+state, eight concurrent callers, host references, fork isolation and two
+lifecycles. Existing Mach thread, semaphore and exception host suites also pass
+twice under ASan/UBSan. The initial host exception fixture mixed native and
+synthetic task names; its failed attempt and the corrected fixture are retained.
+Generated C review verifies stack buffers and no added allocation lifetime.
+
+Native measurements, joined logs, pinned inputs and eight generated C/executable
+pairs are under `build/ios/fortnite/host-statistics-checks`. The fresh IPA probe
+passes all three imports and stops before entry at `_logbf`. Fortnite remains
+unplayable and the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,740 | 420 | 79 |
+| Fortnite executable | 1,743 | 417 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,575 | 423 | 120 |
+| All images | 2,578 | 420 | 120 |
 
-The C++/GLES/Text variant reports 2,589 resolved imports, 409 unresolved strong
+The C++/GLES/Text variant reports 2,592 resolved imports, 406 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

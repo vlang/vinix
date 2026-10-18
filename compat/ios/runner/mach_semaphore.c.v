@@ -100,6 +100,7 @@ fn mach_semaphore_bad_name(name u32, destroying bool) i32 {
 			}
 		} $else {
 			mach_threads_refresh()
+			if mach_host_live(name) { return if destroying { i32(4) } else { i32(20) } }
 			if mach_thread_find(name) != unsafe { nil } {
 				return if destroying { i32(4) } else { i32(20) }
 			}

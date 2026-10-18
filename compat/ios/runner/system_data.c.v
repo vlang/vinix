@@ -26,6 +26,8 @@ mut:
 	guard u64
 	page_size u64
 	task_self u32
+	host_name u32
+	host_refs u32
 	thread_ports &MachThreadPort = unsafe { nil }
 	semaphores &MachSemaphore = unsafe { nil }
 	main_queue [8]u64

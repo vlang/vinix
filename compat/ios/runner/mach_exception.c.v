@@ -20,6 +20,7 @@ enum MachExceptionRight {
 fn mach_exception_right(name u32) MachExceptionRight {
 	if name == 0 || name == 0xffffffff { return .dead }
 	if name == system_data.task_self { return .send }
+	if mach_host_known(name) { return if mach_host_live(name) { MachExceptionRight.send } else { MachExceptionRight.missing } }
 	if mach_semaphore_known(name) {
 		semaphore := mach_semaphore_find(name)
 		if semaphore == unsafe { nil } { return .missing }

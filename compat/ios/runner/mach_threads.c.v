@@ -199,6 +199,7 @@ fn mach_threads_fork_parent() {
 fn mach_threads_fork_child() {
 	mach_threads_clear(true)
 	mach_semaphores_clear(true)
+	if system_data != unsafe { nil } { system_data.host_name = 0; system_data.host_refs = 0 }
 	signals_fork_child()
 }
 
@@ -289,6 +290,7 @@ fn darwin_mach_port_type(task u32, name u32, output &u32) i32 {
 	previous := unsafe { *C.ios_errno_address() }
 	defer { darwin_set_errno(previous) }
 	if task != system_data.task_self || output == unsafe { nil } { return 4 }
+	if result := mach_host_port_type(name, output) { return result }
 	if result := mach_semaphore_port_type(name, output) { return result }
 	$if macos { return C.ios_native_port_type(name, output) }
 	if name == 0xffffffff { unsafe { *output = 0x100000 }; return 0 }
@@ -305,6 +307,7 @@ fn darwin_mach_port_get_refs(task u32, name u32, right i32, output &u32) i32 {
 	previous := unsafe { *C.ios_errno_address() }
 	defer { darwin_set_errno(previous) }
 	if task != system_data.task_self || output == unsafe { nil } { return 4 }
+	if result := mach_host_port_refs(name, right, output) { return result }
 	if result := mach_semaphore_port_refs(name, right, output) { return result }
 	$if macos { return C.ios_native_port_refs(name, right, output) }
 	if right < 0 || right > 5 { return 18 }
@@ -325,6 +328,7 @@ fn darwin_mach_port_mod_refs(task u32, name u32, right i32, delta i32) i32 {
 	previous := unsafe { *C.ios_errno_address() }
 	defer { darwin_set_errno(previous) }
 	if task != system_data.task_self { return 4 }
+	if result := mach_host_port_mod_refs(name, right, delta) { return result }
 	if result := mach_semaphore_port_mod_refs(name, right, delta) { return result }
 	$if macos { return C.ios_native_port_mod_refs(name, right, delta) }
 	if right < 0 || right > 4 { return 18 }
@@ -357,6 +361,7 @@ fn darwin_mach_port_deallocate(task u32, name u32) i32 {
 	previous := unsafe { *C.ios_errno_address() }
 	defer { darwin_set_errno(previous) }
 	if task != system_data.task_self { return 4 }
+	if result := mach_host_port_mod_refs(name, 0, -1) { return result }
 	if result := mach_semaphore_port_deallocate(name) { return result }
 	$if macos { return C.ios_native_port_deallocate(name) }
 	if name == 0 || name == 0xffffffff { return 0 }
