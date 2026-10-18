@@ -753,6 +753,12 @@ exports have no installed version; updates identify one, and keep/remove rows
 retain it. Contradictions refuse before approval, including nested exports;
 missing history stays unknown for existing-package actions. See
 [action checks](../tests/packages/review-actions-check.md).
+The review builder also completes generation/disk observations before allocating
+rows and releases refused presentation metadata. Returned fingerprints are
+independent of preparation, while ordinary/deployment identity encoding and
+comparison scratch retire explicitly with unchanged identity bytes. See
+[construction ownership](../tests/packages/review-construction-check.md) for the
+measured helper boundary; complete public-service allocation freedom stays open.
 
 Software keeps a proposal readable when its space estimate does not fit. Its
 status and plan/review readers identify the filesystem and exact additional

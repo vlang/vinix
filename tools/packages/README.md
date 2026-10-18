@@ -380,6 +380,10 @@ Both review formats also reject actions that contradict installed versions,
 including nested exports, before presenting confirmation. Missing prior facts
 remain unknown for an existing-package action. See
 [action validation checks](../../tests/packages/review-actions-check.md).
+Review construction releases failed presentation metadata, generation-scan
+scratch and ordinary/deployment fingerprint storage. Returned fingerprints are
+independently owned; their encoded identity stays compatible with prior reviews.
+See [construction checks](../../tests/packages/review-construction-check.md).
 
 Software releases rejected progress-frame errors under manual memory management.
 Malformed frames keep the last valid progress, and oversized lines recover at

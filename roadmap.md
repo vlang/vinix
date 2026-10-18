@@ -804,6 +804,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     proposals and blocks known insufficient or overflowing budgets. Shared and
     separate offline export caches retain service accounting and no-op
     exemptions; the service repeats its final disk check before changes.
+  - [x] [Owned review construction](tests/packages/review-construction-check.md)
+    retires counter scans, failed presentation rows and ordinary/deployment
+    fingerprint encoding/comparison storage. Returned fingerprints are
+    independent, with unchanged approval identities; measured construction and
+    refusal loops leave complete public-service preparation as a separate boundary.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,
   permissions, progress, uninstall, updates and useful failure diagnostics.
   - [x] [Reviewed permission changes](tests/packages/review-permissions-check.md)

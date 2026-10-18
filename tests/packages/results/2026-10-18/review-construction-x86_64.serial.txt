@@ -1,0 +1,150 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=29
+!>+ [11] ./sbin/init sz=210976
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/deployment sz=1807368
+!>+ [15] ./usr/share/package-fixtures/review sz=1604008
+!>+ [16] ./usr/share/package-fixtures/construction sz=875360
+!>initramfs: no ustar sig at 0xff00000037102800
+initramfs: Done (16 entries)
+HWTEST START packages-review-construction
+REVIEW CONSTRUCTION aarch64 changed/no-op/space/validation cycles retained 0 tracked bytes
+REVIEW CONSTRUCTION aarch64 generation 01 retained 0 tracked bytes
+REVIEW CONSTRUCTION aarch64 generation 18446744073709551615 retained 0 tracked bytes
+REVIEW CONSTRUCTION aarch64 generation 18446744073709551616 retained 0 tracked bytes
+REVIEW CONSTRUCTION x86_64 changed/no-op/space/validation cycles retained 0 tracked bytes
+REVIEW CONSTRUCTION x86_64 generation 01 retained 0 tracked bytes
+REVIEW CONSTRUCTION x86_64 generation 18446744073709551615 retained 0 tracked bytes
+REVIEW CONSTRUCTION x86_64 generation 18446744073709551616 retained 0 tracked bytes
+REVIEW CONSTRUCTION both hosts preserve changed/no-op proposals, reject space/validation/generation failures and retire 128 repeated calls per case PASS
+REVIEW CONSTRUCTION ordinary/deployment fingerprint cycles retained 0 tracked bytes
+REVIEW CONSTRUCTION ordinary/deployment identities retain exact prior JSON digests, repair domains and 1000 repeated hash retirements PASS
+REVIEW CONSTRUCTION independently owned fingerprints, rows and prior declarations survive input retirement on both hosts PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/3) from fixture
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/3) from fixture
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+REVIEW PERMISSIONS both hosts retain installed declarations across new installs, updates, unchanged dependencies, empty sets, repair, rollback and revoked removal PASS
+REVIEW PERMISSIONS 1000 independently owned before/target row creation and retirement cycles retain zero tracked bytes PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 2.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Activated package generation 4
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /tmp/vinix-deployment-mirror-pins-57208-1792309117558479/locked export; $literal; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /tmp/vinix-deployment-mirror-capture-57208-1792309119116582/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /tmp/vinix-deployment-mirror-final-lock-57208-1792309119609710/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION locked export binds exact captured deployment bytes through publication; changed staged lock refuses and retry preserves pins PASS
+Updating trusted repository fixture
+Updating trusted repository deployment.json
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /tmp/vinix-deployment-mirror-namespace-57208-1792309120101687/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/2) from fixture
+Installing Runtime 2.0.0 (2/2) from fixture
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Offline mirror ready: /tmp/vinix-deployment-reproducible-57208-1792309120958193/mirror; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading unused/bin/runner (14 bytes)
+Activated package generation 1
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+HWTEST PASS packages-review-construction

@@ -18,7 +18,10 @@ struct ReviewIdentity {
 }
 
 fn review_fingerprint(config Config, operation string, names []string, current State, plan Plan, target u64, repairs []string) string {
-	text := json2.encode(ReviewIdentity{
+	mut bytes := []u8{cap: 2048}
+	unsafe { bytes.flags |= .noslices }
+	defer { unsafe { bytes.free() } }
+	json2.encode_append(ReviewIdentity{
 		config:            config
 		operation:         operation
 		names:             names
@@ -26,14 +29,17 @@ fn review_fingerprint(config Config, operation string, names []string, current S
 		plan:              plan
 		target_generation: target
 		repairs:           repairs
-	})
-	bytes := text.bytes()
-	result := sha256.sum(bytes).hex()
-	unsafe {
-		bytes.free()
-		text.free()
-	}
-	return result
+	}, mut bytes)
+	return review_identity_digest(bytes)
+}
+
+fn review_identity_digest(bytes []u8) string {
+	mut hash := sha256.new()
+	mut sum := []u8{len: sha256.size}
+	defer { unsafe { sum.free(); hash.free(); free(hash) } }
+	hash.write(bytes) or { panic(err) }
+	hash.checksum_into(mut sum)
+	return sum.hex()
 }
 
 fn check_review(expected string, actual string) ! {
@@ -170,10 +176,13 @@ fn review_operation_locked(config Config, directory string, operation string, na
 	}
 	repairs := transaction_repairs(directory, current, plan, operation)
 	defer { close_transaction_repairs(repairs) }
-	return review_plan(config, directory, current, operation, names, plan, target, repairs,
-		review_fingerprint(config, operation, names, current, plan, target, repairs))
+	fingerprint := review_fingerprint(config, operation, names, current, plan, target, repairs)
+	defer { unsafe { fingerprint.free() } }
+	return review_plan(config, directory, current, operation, names, plan, target, repairs, fingerprint)
 }
 
+// Inputs, including the fingerprint, are borrowed. Finish fallible observations
+// before allocating presentation fields; the returned review owns every field.
 fn review_plan(config Config, directory string, current State, operation string, names []string, plan Plan, target u64, repairs []string, fingerprint string) !pkgprotocol.Review {
 	changed := operation == 'rollback' || current.requested != plan.requested || current.packages != plan.packages || repairs.len > 0
 	if changed {
@@ -186,6 +195,8 @@ fn review_plan(config Config, directory string, current State, operation string,
 		})!
 		unsafe { encoded.free() }
 	}
+	needed := if !changed { u64(0) } else { estimate_transaction_space(plan, directory, current, operation)! }
+	available := free_bytes(directory)!
 	mut rows := []pkgprotocol.ReviewPackage{cap: plan.packages.len + current.packages.len}
 	for installed in plan.packages {
 		previous := current.packages.filter(it.package.id == installed.package.id)
@@ -209,25 +220,20 @@ fn review_plan(config Config, directory string, current State, operation string,
 		}
 	}
 	rows.sort(a.id < b.id)
-	needed := if !changed {
-		u64(0)
-	} else {
-		estimate_transaction_space(plan, directory, current, operation)!
-	}
-	review := pkgprotocol.Review{
+	mut review := pkgprotocol.Review{
 		format:            2
 		operation:         operation.clone()
 		names:             review_strings(names)
 		architecture:      config.architecture.clone()
 		generation:        current.generation
 		target_generation: target
-		fingerprint:       fingerprint
+		fingerprint:       fingerprint.clone()
 		requested:         review_strings(plan.requested)
 		rows:              rows
 		disk_needed:       needed
-		disk_available:    free_bytes(directory)!
+		disk_available:    available
 		disk_reserve:      config.policy.reserve_bytes
 	}
-	review.validate()!
+	review.validate() or { review.close(); return err }
 	return review
 }

@@ -1,0 +1,9 @@
+REVIEW CONSTRUCTION aarch64 changed/no-op/space/validation cycles retained 683272 tracked bytes
+REVIEW CONSTRUCTION aarch64 generation 01 retained 10392 tracked bytes
+REVIEW CONSTRUCTION aarch64 generation 18446744073709551615 retained 10536 tracked bytes
+REVIEW CONSTRUCTION aarch64 generation 18446744073709551616 retained 10536 tracked bytes
+REVIEW CONSTRUCTION x86_64 changed/no-op/space/validation cycles retained 683000 tracked bytes
+REVIEW CONSTRUCTION x86_64 generation 01 retained 10392 tracked bytes
+REVIEW CONSTRUCTION x86_64 generation 18446744073709551615 retained 10536 tracked bytes
+REVIEW CONSTRUCTION x86_64 generation 18446744073709551616 retained 10536 tracked bytes
+REVIEW CONSTRUCTION ordinary/deployment fingerprint cycles retained 8291264 tracked bytes

@@ -3721,6 +3721,14 @@ refuse before confirmation, including inside either offline-export envelope.
 Missing permission history never makes an existing-package action a new install.
 See [action validation checks](../../tests/packages/review-actions-check.md).
 
+Review construction borrows its internal inputs and returns independent owned
+presentation fields, including the fingerprint. Generation/disk observations
+finish before row allocation; rejected final validation closes the partial
+result. Ordinary/deployment identity encoding and comparison fingerprints have
+explicit retirement without changing their bytes or stale-review semantics.
+See [construction ownership checks](../../tests/packages/review-construction-check.md)
+for the measured boundary; complete service preparation remains separate.
+
 Review format 2 adds the optional paired row fields
 `installed_permissions_known`/`installed_permissions`. They describe the active
 generation's declarations before the reviewed transaction, independently of

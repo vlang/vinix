@@ -133,11 +133,11 @@ fn resolve_locked_deployment(config Config, catalog Catalog, current State, docu
 }
 
 fn deployment_fingerprint(config Config, current State, document DeploymentLock, plan Plan, repairs []string) string {
-	text := json2.encode(DeploymentIdentity{ config: config, current: current, document: document, plan: plan, repairs: repairs })
-	bytes := text.bytes()
-	fingerprint := sha256.sum(bytes).hex()
-	unsafe { bytes.free(); text.free() }
-	return fingerprint
+	mut bytes := []u8{cap: 2048}
+	unsafe { bytes.flags |= .noslices }
+	defer { unsafe { bytes.free() } }
+	json2.encode_append(DeploymentIdentity{ config: config, current: current, document: document, plan: plan, repairs: repairs }, mut bytes)
+	return review_identity_digest(bytes)
 }
 
 // Without IDs, export the currently requested set, preferring authenticated
@@ -169,8 +169,9 @@ pub fn (service Service) review_deployment(path string) !pkgprotocol.Review {
 	plan := deployment_plan(config, directory, current, document)!
 	repairs := transaction_repairs(directory, current, plan, 'deploy')
 	defer { close_transaction_repairs(repairs) }
-	return review_plan(config, directory, current, 'deploy', document.packages, plan, 0, repairs,
-		deployment_fingerprint(config, current, document, plan, repairs))
+	fingerprint := deployment_fingerprint(config, current, document, plan, repairs)
+	defer { unsafe { fingerprint.free() } }
+	return review_plan(config, directory, current, 'deploy', document.packages, plan, 0, repairs, fingerprint)
 }
 
 fn (service Service) deploy_document(path string, expected string) !State {
@@ -183,7 +184,9 @@ fn (service Service) deploy_document(path string, expected string) !State {
 	plan := deployment_plan(config, directory, current, document)!
 	repairs := transaction_repairs(directory, current, plan, 'deploy')
 	defer { close_transaction_repairs(repairs) }
-	check_review(expected, deployment_fingerprint(config, current, document, plan, repairs))!
+	fingerprint := deployment_fingerprint(config, current, document, plan, repairs)
+	defer { unsafe { fingerprint.free() } }
+	check_review(expected, fingerprint)!
 	service.progress(pkgprotocol.Progress{ phase: 'resolve' })
 	return activate_repair_plan_locked(config, directory, current, plan, 'deploy', repairs, TransactionOptions{ progress: service.progress })
 }

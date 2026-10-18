@@ -130,8 +130,12 @@ fn validate_state(state State, architecture string) ! {
 }
 
 fn next_generation(directory string) !u64 {
+	path := directory + '/generations'
+	defer { unsafe { path.free() } }
+	names := os.ls(path)!
+	defer { unsafe { for name in names { name.free() }; (&array(&names)).free() } }
 	mut maximum := u64(0)
-	for name in os.ls(directory + '/generations')! {
+	for name in names {
 		if numeric_generation_name(name) {
 			generation := generation_number(name)!
 			if generation > maximum { maximum = generation }
@@ -307,7 +311,9 @@ fn transact_locked(config Config, directory string, operation string, names []st
 	repairs := transaction_repairs(directory, current, plan, operation)
 	defer { close_transaction_repairs(repairs) }
 	if options.expected_review != '' {
-		check_review(options.expected_review, review_fingerprint(config, operation, names, current, plan, 0, repairs))!
+		fingerprint := review_fingerprint(config, operation, names, current, plan, 0, repairs)
+		defer { unsafe { fingerprint.free() } }
+		check_review(options.expected_review, fingerprint)!
 	}
 	options.progress(pkgprotocol.Progress{ phase: 'resolve' })
 	return activate_repair_plan_locked(config, directory, current, plan, operation, repairs, options)
@@ -507,7 +513,9 @@ fn rollback_transaction_locked(config Config, directory string, options Transact
 	old := rollback_target(config, directory, current)!
 	plan := Plan{ requested: old.requested, packages: old.packages }
 	if options.expected_review != '' {
-		check_review(options.expected_review, review_fingerprint(config, 'rollback', [], current, plan, old.generation, []))!
+		fingerprint := review_fingerprint(config, 'rollback', [], current, plan, old.generation, [])
+		defer { unsafe { fingerprint.free() } }
+		check_review(options.expected_review, fingerprint)!
 	}
 	number := old.generation.str()
 	root := directory + '/generations/' + number

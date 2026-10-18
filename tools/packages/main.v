@@ -245,8 +245,12 @@ fn checked(arguments []string) !int {
 				document.close()
 				encoded
 			} else {
-				json2.encode(service.review_deployment(names[0])!)
+				mut review := service.review_deployment(names[0])!
+				encoded := json2.encode(review)
+				review.close()
+				encoded
 			}
+			defer { unsafe { text.free() } }
 			if text.len > pkgcore.max_metadata { return error('deployment document/review exceeds metadata limit') }
 			println(text)
 		}
@@ -407,7 +411,10 @@ fn checked(arguments []string) !int {
 		}
 		'review' {
 			if names.len < 1 { return error('review requires an operation') }
-			text := json2.encode(service.review(names[0], names[1..])!)
+			mut review := service.review(names[0], names[1..])!
+			defer { review.close() }
+			text := json2.encode(review)
+			defer { unsafe { text.free() } }
 			if text.len > pkgcore.max_metadata { return error('package review exceeds metadata limit') }
 			println(text)
 		}
