@@ -8209,8 +8209,37 @@ call and its level selection were inspected with V/Mach-O/LLVM. Pinned inputs,
 native measurements, joined probe/audit logs and eleven generated C/executable
 pairs are retained under `build/ios/fortnite/zlib-compress-checks`.
 
+`deflateBound` now has an allocation-free V implementation with Darwin's
+64-bit unsigned-long arithmetic. It validates the stream, accounts for raw,
+zlib and gzip wrappers, preset dictionaries and custom gzip headers, and
+selects tight or conservative bounds from the stream settings. Initialized
+streams use the private LP64 deflate-state prefix shared by the inspected Mac
+zlib 1.2.12 and the supplied musl backend; changing that backend requires
+rerunning the native interoperability fixture. The function neither creates
+stream state nor adds streaming compression to the static runner.
+
+The inspected Darwin library underestimates some raw and zlib streams with a
+preset dictionary (64 KiB random input, level 1, fixed Huffman strategy). V uses a
+larger conservative bound for that case so the compressor can finish without
+exhausting the output buffer. Other measured Darwin results, including wrapping
+arithmetic, are preserved.
+
+`tests/ios/native-checks.v build-zlib-bound` builds the fixture. It compares
+Darwin bounds, including unsigned overflow, checks guarded read-only ABI
+objects and exercises real native streams, reset, dictionaries and custom gzip
+headers. Compression must finish within the returned capacity, and the backend
+inflater verifies the resulting raw/zlib/gzip data. The actual IPA consumer
+initializes a gzip stream, obtains its bound and then ends the stream; its
+instructions were inspected with V/Mach-O/LLVM.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites pass, covering stream
+bounds, compression, NSString bridging and Storefront.current. Native streams
+from the Mac's zlib 1.2.12 and Vinix's packaged zlib 1.3.2 both finish within
+the V bounds. Pinned inputs, native/IPA inspection and eleven generated
+C/executable pairs are retained under `build/ios/fortnite/zlib-bound-checks`.
+
 The actual IPA now exits with status 1 before application entry at
-`_deflateBound` from `libz.1.dylib`. Fortnite remains unplayable and full iOS
+`_res_9_query` from `libresolv.9.dylib`. Fortnite remains unplayable and full iOS
 regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -8218,12 +8247,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,688 | 472 | 79 |
+| Fortnite executable | 1,689 | 471 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,523 | 475 | 120 |
+| All images | 2,524 | 474 | 120 |
 
-The C++/GLES/Text variant reports 2,537 resolved imports, 461 unresolved strong
+The C++/GLES/Text variant reports 2,538 resolved imports, 460 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
