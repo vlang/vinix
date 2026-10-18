@@ -31,6 +31,7 @@ mut:
 	host_refs u32
 	thread_ports &MachThreadPort = unsafe { nil }
 	semaphores &MachSemaphore = unsafe { nil }
+	receive_ports &MachReceivePort = unsafe { nil }
 	main_queue [8]u64
 	vm_mappings []MachMapping
 	memory_entries &MachMemoryEntry = unsafe { nil }
@@ -116,6 +117,7 @@ fn system_data_stop() {
 	mach_memory_stop()
 	mach_threads_stop()
 	mach_semaphores_stop()
+	mach_receive_stop()
 	pthread_rwlocks_stop()
 	for _, pointer in system_data.mutexes {
 		if C.pthread_mutex_destroy(pointer) != 0 { panic('iOS: active mutex at image shutdown') }

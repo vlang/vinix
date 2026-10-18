@@ -75,6 +75,8 @@ fn mach_host_destination(name u32) i32 {
 	if system_data == unsafe { nil } { return i32(0x10000003) }
 	C.ios_mach_threads_lock(); defer { C.ios_mach_threads_unlock() }
 	if mach_host_live(name) { return 0 }
+	port_right := mach_receive_find(name)
+	if port_right != unsafe { nil } { return if port_right.receive && port_right.refs != 0 { i32(46) } else { i32(0x10000003) } }
 	if name == system_data.task_self || mach_semaphore_find(name) != unsafe { nil } || mach_memory_find(name) != unsafe { nil } { return 22 }
 	$if linux {
 		mach_threads_refresh()
@@ -88,7 +90,7 @@ fn mach_host_statistics(host u32, flavor i32, output voidptr, count &u32, wide b
 	previous := unsafe { *C.ios_errno_address() }
 	defer { darwin_set_errno(previous) }
 	$if macos {
-		if system_data != unsafe { nil } && (host == system_data.task_self || mach_semaphore_known(host) || mach_host_known(host) || mach_memory_known(host)) {
+		if system_data != unsafe { nil } && (host == system_data.task_self || mach_semaphore_known(host) || mach_host_known(host) || mach_memory_known(host) || mach_receive_known(host)) {
 			return mach_host_destination(host)
 		}
 		return if wide { C.host_statistics64(host, flavor, output, count) } else { C.host_statistics(host, flavor, output, count) }

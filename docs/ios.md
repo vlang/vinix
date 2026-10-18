@@ -9119,17 +9119,59 @@ over an allocated destination and immediate send-right removal. The fresh probe
 passes these three imports and stops before entry at `_mach_msg`. Fortnite remains
 unplayable and the full iOS regression is unpassed.
 
+V now provides `_mach_msg`, receive-port allocation, same-name `MAKE_SEND` right
+insertion and port destruction. The process-local transport accepts inline
+`COPY_SEND`, `MOVE_SEND` and `MAKE_SEND` messages without transferred reply or
+voucher rights. It has a five-message FIFO queue, a 64-KiB message limit, blocking
+send/receive and millisecond timeouts. The caller's buffer is copied before a
+send waits for space. Receives return the Darwin header and minimum eight-byte
+trailer, including exact partial output for undersized buffers.
+
+`MACH_RCV_LARGE` retains the message for retry and reports only fields that fit.
+Ordinary oversized receives discard the message and return a header-only result.
+Timed-out sends return their in-transit right: copy/make sends gain a reference,
+move sends restore theirs, and the returned header permits a move-send retry.
+Native measurements also show that removing a receive right wakes receivers
+with `MACH_RCV_PORT_CHANGED`, while an already blocked send succeeds and discards
+its message when the destination is destroyed. The adapter follows these rules.
+
+Port type/ref queries, send/dead references, receive-right removal and last-right
+cleanup share the existing namespace. Call pins keep objects alive across waits;
+destruction wakes callers and frees queued packets. Pending sender copies are
+tracked from allocation through enqueue or failure. Fork freezes the queues and
+retires the child's inherited namespace. Image teardown checks for active calls
+before freeing packets and native synchronization objects. Host-statistics and
+exception RPCs to these user ports reject unsupported delivery explicitly.
+Port sets, cross-process transport, complex descriptors, transferred reply/voucher
+rights, send-once rights, alternate trailers and kernel exception delivery remain
+unsupported. Only the measured message options are accepted.
+
+`tests/ios/native-checks.v build-mach-message` builds the fixture. Ten host
+ASan/UBSan runs include native Mach comparison and the existing memory-entry,
+thread, semaphore and exception suites. The ARM64 Vinix fixture covers guarded
+output extents, queue pressure, retry ownership, FIFO payloads, blocking sends,
+eight receivers, retirement, errno, fork with blocked send/receive and queued data,
+import scope and two image lifecycles. Generated C review checks packet and port
+ownership, reference credits, lock order, stack copies and teardown order.
+
+Native probes, retained failed assumptions, joined logs, pinned inputs and
+compressed generated C/executables are under `build/ios/fortnite/mach-message-checks`.
+LLVM inspection confirms Fortnite's receive loop at `0x1000b416c`, stop send at
+`0x1000b46fc` and reply forwarding call at `0x1000b4894`. The fresh import probe
+passes `_mach_msg` and stops before entry at `_mach_port_move_member`. Fortnite
+remains unplayable and the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,747 | 413 | 79 |
+| Fortnite executable | 1,750 | 410 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,582 | 416 | 120 |
+| All images | 2,585 | 413 | 120 |
 
-The C++/GLES/Text variant reports 2,596 resolved imports, 402 unresolved strong
+The C++/GLES/Text variant reports 2,599 resolved imports, 399 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

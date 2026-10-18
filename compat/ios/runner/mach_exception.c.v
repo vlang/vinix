@@ -20,6 +20,12 @@ enum MachExceptionRight {
 fn mach_exception_right(name u32) MachExceptionRight {
 	if name == 0 || name == 0xffffffff { return .dead }
 	if name == system_data.task_self { return .send }
+	if mach_receive_known(name) {
+		port := mach_receive_find(name)
+		if port == unsafe { nil } { return .missing }
+		if !port.receive { return .dead }
+		return if port.refs != 0 { MachExceptionRight.send } else { MachExceptionRight.missing }
+	}
 	if mach_host_known(name) { return if mach_host_live(name) { MachExceptionRight.send } else { MachExceptionRight.missing } }
 	if mach_memory_known(name) { return if mach_memory_find(name) != unsafe { nil } { MachExceptionRight.send } else { MachExceptionRight.missing } }
 	if mach_semaphore_known(name) {
@@ -40,12 +46,12 @@ fn mach_exception_right(name u32) MachExceptionRight {
 	return if port.dead { MachExceptionRight.dead } else { MachExceptionRight.send }
 }
 
-// Vinix currently has kernel task/thread/semaphore ports, with no public user
-// receive ports. These kernel objects reject exception RPCs, as measured on
+// Kernel task/thread/semaphore ports reject exception RPCs, as measured on
 // Darwin: KERN_FAILURE for raise, KERN_INVALID_ARGUMENT for the state forms.
 // This never reports successful delivery or intercepts a kernel fault. On the
 // Mac, native ports use the native transport; compatibility semaphores and the
-// compatibility task name stay in this namespace.
+// compatibility task name stay in this namespace. The inline-message transport
+// rejects typed exception RPCs to user receive ports until it can transfer rights.
 fn mach_exception_kernel_result(destination u32, worker u32, task u32, descriptors bool, state bool) ?i32 {
 	if system_data == unsafe { nil } {
 		$if macos { return none }
@@ -54,13 +60,16 @@ fn mach_exception_kernel_result(destination u32, worker u32, task u32, descripto
 	C.ios_mach_threads_lock()
 	defer { C.ios_mach_threads_unlock() }
 	$if macos {
-		if destination != system_data.task_self && !mach_semaphore_known(destination) && !mach_memory_known(destination) { return none }
+		if destination != system_data.task_self && !mach_semaphore_known(destination) && !mach_memory_known(destination) && !mach_receive_known(destination) { return none }
 	}
 	mach_threads_refresh()
 	if mach_exception_right(destination) != .send { return i32(0x10000003) }
 	if descriptors && (mach_exception_right(worker) == .missing || mach_exception_right(task) == .missing) {
 		return i32(0x1000000a)
 	}
+	// Public receive ports can exchange inline messages, but typed exception
+	// RPCs carry rights/descriptors this transport does not implement yet.
+	if mach_receive_known(destination) { return i32(46) }
 	return if state { i32(4) } else { i32(5) }
 }
 
