@@ -1,0 +1,7 @@
+NATIVE BUILDER attempt=0 retained=6649 allocations=71
+{55: 6, 9: 4, 10: 2, 255: 4, 11: 6, 7: 1, 38: 12, 48: 6, 50: 1, 143: 6, 18: 1, 15: 2, 13: 4, 12: 4, 17: 3, 16: 3, 20: 1, 8: 1, 1823: 1, 14: 1, 927: 1, 479: 1}
+NATIVE BUILDER attempt=1 retained=506 allocations=13
+{38: 12, 50: 1}
+NATIVE BUILDER attempt=2 retained=506 allocations=13
+{38: 12, 50: 1}
+ELF PROBE retained=38 allocations=1

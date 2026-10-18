@@ -38,8 +38,8 @@ fn test_native_owned_complete_build_preserves_catalog_and_reports_remaining_file
 	$if track_heap ? {
 		kept := C.vinix_heap_end(); count := C.vinix_heap_count()
 		println('NATIVE OWNERSHIP whole-build retained=' + kept.str() + ' allocations=' + count.str())
-		// The metadata owner is measured separately. Import/packing/filesystem
-		// helpers still retain scratch and have no allocation-free claim here.
+		// The first build includes lazy JSON field metadata. The complete-call
+		// owner is measured after initialization in native_builder_ownership_test.
 		assert kept < 400000 && count < 1600
 	}
 	text := os.read_file(target + '/catalog.json')!

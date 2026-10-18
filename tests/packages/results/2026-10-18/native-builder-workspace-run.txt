@@ -1,0 +1,9 @@
+IMPORT WORKSPACE case=complete retained=0 allocations=0
+IMPORT WORKSPACE case=pinned retained=0 allocations=0
+IMPORT WORKSPACE case=opened retained=0 allocations=0
+IMPORT WORKSPACE case=directory retained=0 allocations=0
+IMPORT WORKSPACE case=copied retained=0 allocations=0
+IMPORT WORKSPACE case=publisher-file retained=0 allocations=0
+IMPORT WORKSPACE case=object-directory retained=0 allocations=0
+IMPORT WORKSPACE case=manifest-directory retained=0 allocations=0
+IMPORT WORKSPACE complete cold/pinned imports and early/late/publisher refusals retire storage and descriptors; exact canonical retry PASS

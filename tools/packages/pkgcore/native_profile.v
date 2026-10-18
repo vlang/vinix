@@ -147,7 +147,7 @@ fn native_catalog_with(version string, source_roots string, destination string, 
 		if size > scratch { scratch = size }
 	}
 	parent := os.dir(target)
-	temporary := os.temp_dir()
+	temporary := import_temporary_directory()
 	defer { unsafe { parent.free(); temporary.free() } }
 	scratch = mirror_cost(scratch, scratch)!
 	disk_check(options.available_space(parent)!, mirror_cost(needed, scratch)!, 64 * 1024 * 1024)!
@@ -181,7 +181,10 @@ fn write_native_profile(version string, roots map[string]int, target string, opt
 			if !file.executable { C.close(objects); return error('native SDK profile payload is not executable: ${file.path}') }
 			profile_elf(objects, file.sha256, architecture, 'static', false) or {
 				C.close(objects)
-				return error('native SDK profile imported ${p.id}: ${err}')
+				cause := err.msg()
+				message := 'native SDK profile imported ' + p.id + ': ' + cause
+				unsafe { cause.free(); err.free() }
+				return error(message)
 			}
 		}
 		C.close(objects)

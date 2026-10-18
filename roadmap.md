@@ -662,7 +662,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
   - [x] [Owned native profile metadata](tests/packages/native-profile-ownership-check.md)
     retires templates, partial packed inventories and canonicalization scratch,
     returns an independently closeable reply and preserves canonical locks.
-    Complete import/packing/filesystem allocation freedom remains open.
+    [Complete native builder ownership](tests/packages/native-builder-check.md)
+    also covers source/ELF preflight, disk budgeting, all six partial imports,
+    publication, retirement and reply/error disposal after JSON metadata
+    initialization, with zero retained tracked V allocations across 256 calls.
+    Other complete profile/catalog/release builders remain separate boundaries.
   - [x] [Owned packing inventories and replies](tests/packages/pack-ownership-check.md)
     retire discarded template inventories, partial walked files and copy scratch
     across cold/cache success and late refusal. Independently closeable pack/root
@@ -721,7 +725,8 @@ architectures; broader release/catalog/runtime acceptance remains open.
     preserving canonical retries under a 32-descriptor limit. Captured roots,
     payloads and manifests reject substitutions and retain unadmitted recovery
     data with explicit diagnostics, including failure after package publication.
-    Complete profile construction and broader release/runtime acceptance remain open.
+    Complete profile construction is qualified separately for the native SDK
+    builder above; other profiles and broader release/runtime acceptance remain open.
 - [ ] Add transactional install/remove/upgrade, rollback, disk-space checks,
   interrupted-download recovery and coherent persistent package state.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,

@@ -36,7 +36,12 @@ fn profile_elf(root int, path string, architecture string, kind string, require_
 	profile_read_at(node.fd, 0, mut header)!
 	machine := if architecture == 'aarch64' { u64(183) } else { u64(62) }
 	image_type := profile_le(header[16..18])
-	if header[..7] != [u8(127), `E`, `L`, `F`, 2, 1, 1] || profile_le(header[18..20]) != machine
+	// The anonymous dynamic comparison array retained one allocation per check
+	// under manual-free builds. Compare the fixed signature on the stack.
+	signature := [u8(127), `E`, `L`, `F`, 2, 1, 1]!
+	mut identified := true
+	for index, byte in signature { if header[index] != byte { identified = false; break } }
+	if !identified || profile_le(header[18..20]) != machine
 		|| profile_le(header[20..24]) != 1 || image_type != if kind == 'static' { u64(2) } else { u64(3) } {
 		return error('ELF profile has the wrong ELF target/type: ${architecture}/${path}')
 	}

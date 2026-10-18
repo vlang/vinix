@@ -1,0 +1,64 @@
+NATIVE BUILDER case=complete retained=0 allocations=0
+NATIVE BUILDER complete canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=nested retained=0 allocations=0
+NATIVE BUILDER nested canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=version retained=0 allocations=0
+NATIVE BUILDER version canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=missing-root retained=0 allocations=0
+NATIVE BUILDER missing-root canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=missing-architecture retained=0 allocations=0
+NATIVE BUILDER missing-architecture canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=wrong-target retained=0 allocations=0
+NATIVE BUILDER wrong-target canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=wrong-mode retained=0 allocations=0
+NATIVE BUILDER wrong-mode canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=missing-notice retained=0 allocations=0
+NATIVE BUILDER missing-notice canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=empty-notice retained=0 allocations=0
+NATIVE BUILDER empty-notice canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=notice-directory retained=0 allocations=0
+NATIVE BUILDER notice-directory canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=no-output-space retained=0 allocations=0
+NATIVE BUILDER no-output-space canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=no-temp-space retained=0 allocations=0
+NATIVE BUILDER no-temp-space canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=space-error retained=0 allocations=0
+NATIVE BUILDER space-error canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=created retained=0 allocations=0
+NATIVE BUILDER created canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=packed-1 retained=0 allocations=0
+NATIVE BUILDER packed-1 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=packed-2 retained=0 allocations=0
+NATIVE BUILDER packed-2 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=packed-3 retained=0 allocations=0
+NATIVE BUILDER packed-3 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=packed-4 retained=0 allocations=0
+NATIVE BUILDER packed-4 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=packed-5 retained=0 allocations=0
+NATIVE BUILDER packed-5 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=packed-6 retained=0 allocations=0
+NATIVE BUILDER packed-6 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=ready retained=0 allocations=0
+NATIVE BUILDER ready canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=import-elf retained=0 allocations=0
+NATIVE BUILDER import-elf canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=import-notice retained=0 allocations=0
+NATIVE BUILDER import-notice canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=import-directory retained=0 allocations=0
+NATIVE BUILDER import-directory canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=changed-lock retained=0 allocations=0
+NATIVE BUILDER changed-lock canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=occupied retained=0 allocations=0
+NATIVE BUILDER occupied canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=raced-target retained=0 allocations=0
+NATIVE BUILDER raced-target canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=flush retained=0 allocations=0
+NATIVE BUILDER flush canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=cleanup retained=0 allocations=0
+NATIVE BUILDER cleanup canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=root-replaced retained=0 allocations=0
+NATIVE BUILDER root-replaced canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=inventory-replaced retained=0 allocations=0
+NATIVE BUILDER inventory-replaced canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER case=lock-replaced retained=0 allocations=0
+NATIVE BUILDER lock-replaced canonical retry, saved output, source and descriptor preservation PASS

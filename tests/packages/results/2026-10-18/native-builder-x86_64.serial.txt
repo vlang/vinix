@@ -1,0 +1,1764 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./Users/ sz=0
+!>+ [8] ./root/ sz=0
+!>+ [9] ./dev/ sz=0
+!>+ [10] ./tmp/ sz=0
+!>+ [11] ./Users/alex/ sz=0
+!>+ [12] ./Users/alex/code/ sz=0
+!>+ [13] ./Users/alex/code/vinix/ sz=0
+!>+ [14] ./Users/alex/code/vinix/examples/ sz=0
+!>+ [15] ./Users/alex/code/vinix/examples/package-hello/ sz=0
+!>+ [16] ./Users/alex/code/vinix/examples/package-counter/ sz=0
+!>+ [17] ./Users/alex/code/vinix/examples/package-memo/ sz=0
+!>+ [18] ./Users/alex/code/vinix/examples/package-memo/manifest-x86_64.json sz=287
+!>+ [19] ./Users/alex/code/vinix/examples/package-memo/manifest-aarch64.json sz=288
+!>+ [20] ./Users/alex/code/vinix/examples/package-counter/manifest-x86_64.json sz=293
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>initramfs: no ustar sig at 0xff00000037102600
+initramfs: Done (32 entries)
+HWTEST START packages-native-builder
+ELF OWNERSHIP 150 static/PIE/shared target, signature, range, interpreter and file cases; 1200 checks retain zero tracked bytes/allocations and stable descriptors PASS
+NATIVE BUILDER PROCESS elf-owned  PASS
+NATIVE OWNERSHIP whole-build retained=6143 allocations=58
+NATIVE OWNERSHIP complete build preserves baseline canonical bytes and retires reply without removing published lock PASS
+NATIVE OWNERSHIP imports=0 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=1 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=2 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=3 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=4 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=5 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=6 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=6 fault=duplicate retained=0 allocations=0
+NATIVE OWNERSHIP imports=0 fault=empty retained=0 allocations=0
+NATIVE OWNERSHIP templates, partial inventories, canonicalization and late refusals retire all owned metadata PASS
+NATIVE OWNERSHIP independent replies survive caller retirement and close idempotently PASS
+NATIVE BUILDER PROCESS native-ownership  PASS
+Updating trusted repository native
+Installing Native counter 1.0.0 (1/3) from native
+Downloading org.vinix.counter/bin/counter (512 bytes)
+Downloading org.vinix.counter/licenses/application-sdk-MIT.txt (23 bytes)
+Downloading org.vinix.counter/licenses/musl-MIT.txt (12 bytes)
+Downloading org.vinix.counter/licenses/v-MIT.txt (9 bytes)
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 1
+Activated package generation 2
+Installing Native counter 1.0.0 (1/3) from native
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository native
+Installing Native counter 1.0.0 (1/3) from native
+Downloading org.vinix.counter/bin/counter (512 bytes)
+Downloading org.vinix.counter/licenses/application-sdk-MIT.txt (23 bytes)
+Downloading org.vinix.counter/licenses/musl-MIT.txt (12 bytes)
+Downloading org.vinix.counter/licenses/v-MIT.txt (9 bytes)
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 1
+Activated package generation 2
+Installing Native counter 1.0.0 (1/3) from native
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+NATIVE BUILDER PROCESS native-profile  PASS
+NATIVE BUILDER resources before grace complete:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 11164422
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1626 10019244
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 501248
+process 4 54604
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace complete:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1144590
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 6 26746
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 501248
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=complete retained=0 allocations=0
+NATIVE BUILDER complete canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case complete PASS
+NATIVE BUILDER resources before grace nested:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 10423830
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1502 9256366
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 45 523520
+process 4 54618
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace nested:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 2635328
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 244 1495212
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 45 523520
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=nested retained=0 allocations=0
+NATIVE BUILDER nested canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case nested PASS
+NATIVE BUILDER resources before grace version:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 11253956
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1538 9477712
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 49 568064
+process 4 54614
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace version:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1186708
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 49 568064
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=version retained=0 allocations=0
+NATIVE BUILDER version canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case version PASS
+NATIVE BUILDER resources before grace missing-root:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 3826116
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 334 2049870
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 49 568064
+process 4 54616
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace missing-root:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1186708
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 49 568064
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=missing-root retained=0 allocations=0
+NATIVE BUILDER missing-root canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case missing-root PASS
+NATIVE BUILDER resources before grace missing-architecture:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 3328702
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 334 2049870
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 55 634880
+process 4 54626
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace missing-architecture:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1253524
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 55 634880
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=missing-architecture retained=0 allocations=0
+NATIVE BUILDER missing-architecture canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case missing-architecture PASS
+NATIVE BUILDER resources before grace wrong-target:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 3328692
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 334 2049844
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 55 634880
+process 4 54642
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace wrong-target:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1759648
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 84 508172
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 55 634880
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=wrong-target retained=0 allocations=0
+NATIVE BUILDER wrong-target canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case wrong-target PASS
+NATIVE BUILDER resources before grace wrong-mode:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 3915214
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 334 2049870
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 57 657152
+process 4 54626
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace wrong-mode:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1275796
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 57 657152
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=wrong-mode retained=0 allocations=0
+NATIVE BUILDER wrong-mode canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case wrong-mode PASS
+NATIVE BUILDER resources before grace missing-notice:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 3418298
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 334 2049870
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 63 724480
+process 4 54622
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace missing-notice:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1343124
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 63 724480
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=missing-notice retained=0 allocations=0
+NATIVE BUILDER missing-notice canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case missing-notice PASS
+NATIVE BUILDER resources before grace empty-notice:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 3994858
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 336 2062182
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 63 724480
+process 4 54630
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace empty-notice:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1343124
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 63 724480
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=empty-notice retained=0 allocations=0
+NATIVE BUILDER empty-notice canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case empty-notice PASS
+NATIVE BUILDER resources before grace notice-directory:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 3462846
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 334 2049870
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 67 769024
+process 4 54626
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace notice-directory:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1387668
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 67 769024
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=notice-directory retained=0 allocations=0
+NATIVE BUILDER notice-directory canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case notice-directory PASS
+NATIVE BUILDER resources before grace no-output-space:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 3509750
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 338 2074494
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 69 791296
+process 4 54634
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace no-output-space:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1409940
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 69 791296
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=no-output-space retained=0 allocations=0
+NATIVE BUILDER no-output-space canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case no-output-space PASS
+NATIVE BUILDER resources before grace no-temp-space:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 3485124
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 334 2049870
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 69 791296
+process 4 54632
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace no-temp-space:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1409940
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 69 791296
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=no-temp-space retained=0 allocations=0
+NATIVE BUILDER no-temp-space canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case no-temp-space PASS
+NATIVE BUILDER resources before grace space-error:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 4071632
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 334 2049870
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 71 813568
+process 4 54628
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace space-error:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 2024564
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 98 594400
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 71 813568
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=space-error retained=0 allocations=0
+NATIVE BUILDER space-error canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case space-error PASS
+NATIVE BUILDER resources before grace created:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 4093900
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 334 2049870
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 73 835840
+process 4 54624
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace created:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1454484
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 73 835840
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=created retained=0 allocations=0
+NATIVE BUILDER created canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case created PASS
+NATIVE BUILDER resources before grace packed-1:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 3825610
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 382 2345828
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 73 835840
+process 4 54616
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace packed-1:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1454484
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 73 835840
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=packed-1 retained=0 allocations=0
+NATIVE BUILDER packed-1 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case packed-1 PASS
+NATIVE BUILDER resources before grace packed-2:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 6212230
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 670 4123662
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 77 880384
+process 4 54618
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace packed-2:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1499028
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 77 880384
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=packed-2 retained=0 allocations=0
+NATIVE BUILDER packed-2 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case packed-2 PASS
+NATIVE BUILDER resources before grace packed-3:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 7198678
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 830 5110110
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 77 880384
+process 4 54618
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace packed-3:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 2054428
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 92 557448
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 77 880384
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=packed-3 retained=0 allocations=0
+NATIVE BUILDER packed-3 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case packed-3 PASS
+NATIVE BUILDER resources before grace packed-4:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 7643110
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 990 6096510
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 79 902656
+process 4 54618
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace packed-4:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1521300
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 79 902656
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=packed-4 retained=0 allocations=0
+NATIVE BUILDER packed-4 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case packed-4 PASS
+NATIVE BUILDER resources before grace packed-5:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 9341926
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1166 7182446
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 83 951296
+process 4 54618
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace packed-5:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 3025732
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 238 1457840
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 83 951296
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=packed-5 retained=0 allocations=0
+NATIVE BUILDER packed-5 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case packed-5 PASS
+NATIVE BUILDER resources before grace packed-6:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 9764134
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1326 8168894
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 83 951296
+process 4 54618
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace packed-6:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 2051370
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 80 483478
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 83 951296
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=packed-6 retained=0 allocations=0
+NATIVE BUILDER packed-6 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case packed-6 PASS
+NATIVE BUILDER resources before grace ready:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 10795078
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1486 9155294
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 87 995840
+process 4 54618
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace ready:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 3588102
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 322 1975666
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 87 995840
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=ready retained=0 allocations=0
+NATIVE BUILDER ready canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case ready PASS
+NATIVE BUILDER resources before grace import-elf:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 10896022
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1502 9256244
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 87 995840
+process 4 54612
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace import-elf:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 2650542
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 170 1038106
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 87 995840
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=import-elf retained=0 allocations=0
+NATIVE BUILDER import-elf canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case import-elf PASS
+NATIVE BUILDER resources before grace import-notice:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 10916746
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1502 9254686
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 89 1018112
+process 4 54622
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace import-notice:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1636756
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 89 1018112
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=import-notice retained=0 allocations=0
+NATIVE BUILDER import-notice canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case import-notice PASS
+NATIVE BUILDER resources before grace import-directory:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 8943814
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1182 7281748
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 89 1018112
+process 4 54628
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace import-directory:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 3758944
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 346 2124236
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 89 1018112
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=import-directory retained=0 allocations=0
+NATIVE BUILDER import-directory canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case import-directory PASS
+NATIVE BUILDER resources before grace changed-lock:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 9150054
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 1212 7465710
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 91 1040384
+process 4 54634
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace changed-lock:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 2140156
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 80 483176
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 91 1040384
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=changed-lock retained=0 allocations=0
+NATIVE BUILDER changed-lock canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case changed-lock PASS
+NATIVE BUILDER resources before grace occupied:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 10962974
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1502 9256366
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 93 1062656
+process 4 54626
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace occupied:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 2865308
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 194 1186056
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 93 1062656
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=occupied retained=0 allocations=0
+NATIVE BUILDER occupied canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case occupied PASS
+NATIVE BUILDER resources before grace raced-target:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 3854838
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 350 2148238
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 93 1062656
+process 4 54618
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace raced-target:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1681300
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 93 1062656
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=raced-target retained=0 allocations=0
+NATIVE BUILDER raced-target canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case raced-target PASS
+NATIVE BUILDER resources before grace flush:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 11746222
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1534 9453102
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 95 1084928
+process 4 54626
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace flush:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 2456222
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 124 754698
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 95 1084928
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=flush retained=0 allocations=0
+NATIVE BUILDER flush canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case flush PASS
+NATIVE BUILDER resources before grace cleanup:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 11571744
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1502 9256366
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 97 1107200
+process 4 54612
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace cleanup:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1725844
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 97 1107200
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=cleanup retained=0 allocations=0
+NATIVE BUILDER cleanup canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case cleanup PASS
+NATIVE BUILDER resources before grace root-replaced:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 11204202
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1534 9453060
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 97 1107200
+process 4 54616
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace root-replaced:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 3354520
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 266 1630724
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 97 1107200
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=root-replaced retained=0 allocations=0
+NATIVE BUILDER root-replaced canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case root-replaced PASS
+NATIVE BUILDER resources before grace inventory-replaced:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 4928024
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 418 2568086
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 101 1151744
+process 4 54628
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace inventory-replaced:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1795084
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 6 26744
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 101 1151744
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=inventory-replaced retained=0 allocations=0
+NATIVE BUILDER inventory-replaced canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case inventory-replaced PASS
+NATIVE BUILDER resources before grace lock-replaced:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 4363074
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 418 2567366
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 101 1151744
+process 4 54638
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace lock-replaced:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1770388
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 101 1151744
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER case=lock-replaced retained=0 allocations=0
+NATIVE BUILDER lock-replaced canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case lock-replaced PASS
+NATIVE BUILDER resources before grace profile-export-0:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 4924800
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 414 2542590
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 103 1174016
+process 4 54628
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace profile-export-0:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 2274090
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 80 483478
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 103 1174016
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+PROFILE EXPORT baseline native refused=true replacement-preserved=true
+PROFILE EXPORT native cohort 0 16 substitutions recovery source pins exact retry 32 descriptors PASS
+PROFILE EXPORT selected profiles retain canonical saved locks after flush, moved-parent and replaced-inventory cleanup failures PASS
+NATIVE BUILDER PROCESS profile-export native 0 PASS
+NATIVE BUILDER resources before grace profile-export-1:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 9170060
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1102 6787856
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 103 1174016
+process 4 54622
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace profile-export-1:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 2632898
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 138 842286
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 103 1174016
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+PROFILE EXPORT native cohort 1 16 substitutions recovery source pins exact retry 32 descriptors PASS
+NATIVE BUILDER PROCESS profile-export native 1 PASS
+NATIVE BUILDER resources before grace profile-export-2:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 21064576
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 3028 18674180
+descriptor 4 16768
+socket 0 0
+ipc 2 8192
+mapping 103 1174016
+process 4 54622
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace profile-export-2:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 1817356
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 6 26744
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 103 1174016
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+PROFILE EXPORT native cohort 2 16 substitutions recovery source pins exact retry 32 descriptors PASS
+NATIVE BUILDER PROCESS profile-export native 2 PASS
+NATIVE BUILDER resources before grace profile-export-3:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 12602286
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1746 10762050
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 105 1196288
+process 4 54622
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace profile-export-3:
+Limit: 120994816
+OwnerLimit: 60497408
+Charged: 2049472
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 40 236588
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 105 1196288
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+PROFILE EXPORT native cohort 3 16 substitutions recovery source pins exact retry 32 descriptors PASS
+NATIVE BUILDER PROCESS profile-export native 3 PASS
+HWTEST PASS packages-native-builder

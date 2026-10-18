@@ -1,0 +1,1959 @@
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FC86000 start failed: Unsupported
+Error: Image at 0007FC0B000 start failed: Not Found
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+BdsDxe: starting Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x760a0000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x760a0000 to 0xffffffff80000000, length: 0x2f0000
+vmm: Kernel: Mapping 0x76390000 to 0xffffffff802f0000, length: 0x2c000
+vmm: Kernel: Mapping 0x763bc000 to 0xffffffff8031c000, length: 0x15e6000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x760a0000 +0x31c000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 29
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 30
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 1000000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+init smp...
+smp: BSP MPIDR:       0
+smp: Discovered CPUs: 4
+smp: Starting CPUs:   4
+security: PAN enabled
+smp: CPU 0 online!
+smp: CPU 1 online!
+smp: CPU 2 online!
+smp: CPU 3 online!
+smp: 4 CPUs online
+smp done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+initramfs: Module:  1
+initramfs: Address: 0xffff000075aa4000
+initramfs: Size:    6273024
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./Users/ sz=0
+!>+ [8] ./root/ sz=0
+!>+ [9] ./dev/ sz=0
+!>+ [10] ./tmp/ sz=0
+!>+ [11] ./Users/alex/ sz=0
+!>+ [12] ./Users/alex/code/ sz=0
+!>+ [13] ./Users/alex/code/vinix/ sz=0
+!>+ [14] ./Users/alex/code/vinix/examples/ sz=0
+!>+ [15] ./Users/alex/code/vinix/examples/package-hello/ sz=0
+!>+ [16] ./Users/alex/code/vinix/examples/package-counter/ sz=0
+!>+ [17] ./Users/alex/code/vinix/examples/package-memo/ sz=0
+!>+ [18] ./Users/alex/code/vinix/examples/package-memo/manifest-x86_64.json sz=287
+!>+ [19] ./Users/alex/code/vinix/examples/package-memo/manifest-aarch64.json sz=288
+!>+ [20] ./Users/alex/code/vinix/examples/package-counter/manifest-x86_64.json sz=293
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>initramfs: no ustar sig at 0xffff00007609f400
+initramfs: Done (32 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 1000000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+pci: Found [0:2:0:-1]
+devcore: 3 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 3 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+HWTEST START packages-native-builder
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+ELF OWNERSHIP 150 static/PIE/shared target, signature, range, interpreter and file cases; 1200 checks retain zero tracked bytes/allocations and stable descriptors PASS
+NATIVE BUILDER PROCESS elf-owned  PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE OWNERSHIP whole-build retained=6143 allocations=58
+NATIVE OWNERSHIP complete build preserves baseline canonical bytes and retires reply without removing published lock PASS
+NATIVE OWNERSHIP imports=0 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=1 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=2 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=3 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=4 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=5 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=6 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=6 fault=duplicate retained=0 allocations=0
+NATIVE OWNERSHIP imports=0 fault=empty retained=0 allocations=0
+NATIVE OWNERSHIP templates, partial inventories, canonicalization and late refusals retire all owned metadata PASS
+NATIVE OWNERSHIP independent replies survive caller retirement and close idempotently PASS
+NATIVE BUILDER PROCESS native-ownership  PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+random: reseeded from 58139 events, 4 hardware words
+Updating trusted repository native
+Installing Native counter 1.0.0 (1/3) from native
+Downloading org.vinix.counter/bin/counter (512 bytes)
+Downloading org.vinix.counter/licenses/application-sdk-MIT.txt (23 bytes)
+Downloading org.vinix.counter/licenses/musl-MIT.txt (12 bytes)
+Downloading org.vinix.counter/licenses/v-MIT.txt (9 bytes)
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 1
+Activated package generation 2
+Installing Native counter 1.0.0 (1/3) from native
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository native
+Installing Native counter 1.0.0 (1/3) from native
+Downloading org.vinix.counter/bin/counter (512 bytes)
+Downloading org.vinix.counter/licenses/application-sdk-MIT.txt (23 bytes)
+Downloading org.vinix.counter/licenses/musl-MIT.txt (12 bytes)
+Downloading org.vinix.counter/licenses/v-MIT.txt (9 bytes)
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 1
+Activated package generation 2
+Installing Native counter 1.0.0 (1/3) from native
+Installing Native memo 1.0.0 (2/3) from native
+Installing Package Hello 1.0.0 (3/3) from native
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+NATIVE BUILDER PROCESS native-profile  PASS
+NATIVE BUILDER resources before grace complete:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 7895116
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 1052 6477794
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 914176
+process 4 55020
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace complete:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1391828
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 914176
+process 2 27478
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=complete retained=0 allocations=0
+NATIVE BUILDER complete canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case complete PASS
+NATIVE BUILDER resources before grace nested:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 6749920
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 866 5332584
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 914176
+process 4 55034
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace nested:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1404220
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 4 14440
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 914176
+process 2 27478
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=nested retained=0 allocations=0
+NATIVE BUILDER nested canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case nested PASS
+NATIVE BUILDER resources before grace version:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 6318896
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 788 4850620
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 35 965120
+process 4 55030
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace version:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1442772
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 35 965120
+process 2 27478
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=version retained=0 allocations=0
+NATIVE BUILDER version canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case version PASS
+NATIVE BUILDER resources before grace missing-root:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 3518148
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 334 2049870
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 35 965120
+process 4 55032
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace missing-root:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1442772
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 35 965120
+process 2 27478
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=missing-root retained=0 allocations=0
+NATIVE BUILDER missing-root canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case missing-root PASS
+NATIVE BUILDER resources before grace missing-architecture:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 3569102
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 334 2049870
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 1016064
+process 4 55042
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace missing-architecture:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1493716
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 1016064
+process 2 27478
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=missing-architecture retained=0 allocations=0
+NATIVE BUILDER missing-architecture canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case missing-architecture PASS
+NATIVE BUILDER resources before grace wrong-target:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 3620062
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 334 2049870
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 39 1067008
+process 4 55058
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace wrong-target:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1544660
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 39 1067008
+process 2 27478
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=wrong-target retained=0 allocations=0
+NATIVE BUILDER wrong-target canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case wrong-target PASS
+NATIVE BUILDER resources before grace wrong-mode:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 3620046
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 334 2049870
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 39 1067008
+process 4 55042
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace wrong-mode:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1544660
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 39 1067008
+process 2 27478
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=wrong-mode retained=0 allocations=0
+NATIVE BUILDER wrong-mode canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case wrong-mode PASS
+NATIVE BUILDER resources before grace missing-notice:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 3776746
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 334 2049870
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 41 1117952
+process 4 55038
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace missing-notice:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1701364
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 41 1117952
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=missing-notice retained=0 allocations=0
+NATIVE BUILDER missing-notice canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case missing-notice PASS
+NATIVE BUILDER resources before grace empty-notice:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 3840010
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 336 2062182
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 1168896
+process 4 55046
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace empty-notice:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1752308
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 1168896
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=empty-notice retained=0 allocations=0
+NATIVE BUILDER empty-notice canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case empty-notice PASS
+NATIVE BUILDER resources before grace notice-directory:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 3827694
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 334 2049870
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 1168896
+process 4 55042
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace notice-directory:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1752308
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 1168896
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=notice-directory retained=0 allocations=0
+NATIVE BUILDER notice-directory canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case notice-directory PASS
+NATIVE BUILDER resources before grace no-output-space:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 3903270
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 338 2074494
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 45 1219840
+process 4 55050
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace no-output-space:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1803252
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 45 1219840
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=no-output-space retained=0 allocations=0
+NATIVE BUILDER no-output-space canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case no-output-space PASS
+NATIVE BUILDER resources before grace no-temp-space:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 3929588
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 334 2049870
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 47 1270784
+process 4 55048
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace no-temp-space:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1854196
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 47 1270784
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=no-temp-space retained=0 allocations=0
+NATIVE BUILDER no-temp-space canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case no-temp-space PASS
+NATIVE BUILDER resources before grace space-error:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 3929558
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 334 2049844
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 47 1270784
+process 4 55044
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace space-error:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1854196
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 47 1270784
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=space-error retained=0 allocations=0
+NATIVE BUILDER space-error canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case space-error PASS
+NATIVE BUILDER resources before grace created:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 3929580
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 334 2049870
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 47 1270784
+process 4 55040
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace created:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1854196
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 47 1270784
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=created retained=0 allocations=0
+NATIVE BUILDER created canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case created PASS
+NATIVE BUILDER resources before grace packed-1:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 4225556
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 382 2345854
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 47 1270784
+process 4 55032
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace packed-1:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1854196
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 47 1270784
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=packed-1 retained=0 allocations=0
+NATIVE BUILDER packed-1 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case packed-1 PASS
+NATIVE BUILDER resources before grace packed-2:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 6003366
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 670 4123662
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 47 1270784
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace packed-2:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1854196
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 47 1270784
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=packed-2 retained=0 allocations=0
+NATIVE BUILDER packed-2 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case packed-2 PASS
+NATIVE BUILDER resources before grace packed-3:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 6929818
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 812 4999170
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 49 1321728
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace packed-3:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1905140
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 49 1321728
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=packed-3 retained=0 allocations=0
+NATIVE BUILDER packed-3 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case packed-3 PASS
+NATIVE BUILDER resources before grace packed-4:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 6955422
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 808 4973830
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 51 1372672
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace packed-4:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 1956084
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 51 1372672
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=packed-4 retained=0 allocations=0
+NATIVE BUILDER packed-4 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case packed-4 PASS
+NATIVE BUILDER resources before grace packed-5:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 7561658
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 898 5529122
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 53 1423616
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace packed-5:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2007028
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 53 1423616
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=packed-5 retained=0 allocations=0
+NATIVE BUILDER packed-5 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case packed-5 PASS
+NATIVE BUILDER resources before grace packed-6:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 6821120
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 778 4788584
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 53 1423616
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace packed-6:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2056406
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 10 51426
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 53 1423616
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=packed-6 retained=0 allocations=0
+NATIVE BUILDER packed-6 canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case packed-6 PASS
+NATIVE BUILDER resources before grace ready:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 7710344
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 914 5626864
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 55 1474560
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace ready:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2094962
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 8 39038
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 55 1474560
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=ready retained=0 allocations=0
+NATIVE BUILDER ready canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case ready PASS
+NATIVE BUILDER resources before grace import-elf:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 7748988
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 920 5665514
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 55 1474560
+process 4 55028
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace import-elf:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2070368
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 4 14444
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 55 1474560
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=import-elf retained=0 allocations=0
+NATIVE BUILDER import-elf canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case import-elf PASS
+NATIVE BUILDER resources before grace import-notice:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 8118488
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 980 6035004
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 55 1474560
+process 4 55038
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace import-notice:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2094964
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 8 39040
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 55 1474560
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=import-notice retained=0 allocations=0
+NATIVE BUILDER import-notice canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case import-notice PASS
+NATIVE BUILDER resources before grace import-directory:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 7502296
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 880 5418806
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 55 1474560
+process 4 55044
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace import-directory:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2082666
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 6 26742
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 55 1474560
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=import-directory retained=0 allocations=0
+NATIVE BUILDER import-directory canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case import-directory PASS
+NATIVE BUILDER resources before grace changed-lock:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 8848810
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 1090 6713858
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 57 1526016
+process 4 55050
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace changed-lock:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2109428
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 57 1526016
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=changed-lock retained=0 allocations=0
+NATIVE BUILDER changed-lock canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case changed-lock PASS
+NATIVE BUILDER resources before grace occupied:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 8739818
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 1064 6553930
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 59 1576960
+process 4 55042
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace occupied:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2160372
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 59 1576960
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=occupied retained=0 allocations=0
+NATIVE BUILDER occupied canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case occupied PASS
+NATIVE BUILDER resources before grace raced-target:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 4334118
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 350 2148238
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 59 1576960
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace raced-target:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2160372
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 59 1576960
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=raced-target retained=0 allocations=0
+NATIVE BUILDER raced-target canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case raced-target PASS
+NATIVE BUILDER resources before grace flush:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 8221790
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 980 6035902
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 59 1576960
+process 4 55042
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace flush:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2160372
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 59 1576960
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=flush retained=0 allocations=0
+NATIVE BUILDER flush canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case flush PASS
+NATIVE BUILDER resources before grace cleanup:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 7518598
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 866 5332724
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 59 1576960
+process 4 55028
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace cleanup:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2160372
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 59 1576960
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=cleanup retained=0 allocations=0
+NATIVE BUILDER cleanup canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case cleanup PASS
+NATIVE BUILDER resources before grace root-replaced:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 8591632
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 1040 6405754
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 59 1576960
+process 4 55032
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace root-replaced:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2197374
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 8 39050
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 59 1576960
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=root-replaced retained=0 allocations=0
+NATIVE BUILDER root-replaced canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case root-replaced PASS
+NATIVE BUILDER resources before grace inventory-replaced:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 4868170
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 420 2580392
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 63 1678848
+process 4 55044
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace inventory-replaced:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2262260
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 63 1678848
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=inventory-replaced retained=0 allocations=0
+NATIVE BUILDER inventory-replaced canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case inventory-replaced PASS
+NATIVE BUILDER resources before grace lock-replaced:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 4830458
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 414 2542670
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 63 1678848
+process 4 55054
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace lock-replaced:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2262260
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 63 1678848
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+NATIVE BUILDER case=lock-replaced retained=0 allocations=0
+NATIVE BUILDER lock-replaced canonical retry, saved output, source and descriptor preservation PASS
+NATIVE BUILDER PROCESS builder case lock-replaced PASS
+NATIVE BUILDER resources before grace profile-export-0:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 4830368
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 414 2542590
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 63 1678848
+process 4 55044
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace profile-export-0:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2262260
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 63 1678848
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+PROFILE EXPORT baseline native refused=true replacement-preserved=true
+PROFILE EXPORT native cohort 0 16 substitutions recovery source pins exact retry 32 descriptors PASS
+PROFILE EXPORT selected profiles retain canonical saved locks after flush, moved-parent and replaced-inventory cleanup failures PASS
+NATIVE BUILDER PROCESS profile-export native 0 PASS
+NATIVE BUILDER resources before grace profile-export-1:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 7622028
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 858 5283312
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 65 1729792
+process 4 55038
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace profile-export-1:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2313204
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 65 1729792
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+PROFILE EXPORT native cohort 1 16 substitutions recovery source pins exact retry 32 descriptors PASS
+NATIVE BUILDER PROCESS profile-export native 1 PASS
+NATIVE BUILDER resources before grace profile-export-2:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 7806724
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 888 5468008
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 65 1729792
+process 4 55038
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace profile-export-2:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2325600
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 4 14444
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 65 1729792
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+PROFILE EXPORT native cohort 2 16 substitutions recovery source pins exact retry 32 descriptors PASS
+NATIVE BUILDER PROCESS profile-export native 2 PASS
+NATIVE BUILDER resources before grace profile-export-3:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 7326548
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 810 4987832
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 65 1729792
+process 4 55038
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+NATIVE BUILDER resources after grace profile-export-3:
+Limit: 119359488
+OwnerLimit: 59679744
+Charged: 2350180
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 8 39024
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 65 1729792
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+PROFILE EXPORT native cohort 3 16 substitutions recovery source pins exact retry 32 descriptors PASS
+NATIVE BUILDER PROCESS profile-export native 3 PASS
+HWTEST PASS packages-native-builder
+syspower: power off: stopping devices

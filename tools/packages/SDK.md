@@ -1213,7 +1213,14 @@ does not delete the published lock. The CLI releases its reply after encoding.
 One internal owner retires fixed templates, partial packed inventories and
 canonicalization metadata on success and refusal. See
 [native profile ownership qualification](../../tests/packages/native-profile-ownership-check.md)
-for the measured metadata boundary and remaining complete-build scratch.
+for the measured metadata boundary. The subsequent
+[complete native builder qualification](../../tests/packages/native-builder-check.md)
+covers all call storage after one-time JSON metadata initialization: source/ELF
+admission, disk budgeting, all six partial inventories, publication, retirement
+and reply/error disposal. Repeated successes and refusals retain zero tracked V
+allocations under a 32-descriptor limit, with exact canonical retries and saved
+locks after publication errors. First-call JSON metadata, other complete profile
+builders and broader release/runtime qualification remain separate.
 
 Each of `PREPARED_ROOTS/aarch64` and `PREPARED_ROOTS/x86_64` must contain:
 

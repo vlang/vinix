@@ -112,7 +112,12 @@ fn (mut profile ProfileStage) publish(canonical string, target string, options C
 }
 
 fn (mut profile ProfileStage) finish(target string) ! {
-	profile.retire() or { return error(profile.stage.kind + ' published at ' + target + ', but private inventory cleanup refused: ' + err.msg() + '; retain recovery data for inspection') }
+	profile.retire() or {
+		cause := err.msg()
+		message := profile.stage.kind + ' published at ' + target + ', but private inventory cleanup refused: ' + cause + '; retain recovery data for inspection'
+		unsafe { cause.free(); err.free() }
+		return error(message)
+	}
 	if C.fsync(profile.stage.parent) != 0 { return error(profile.stage.kind + ' published at ' + target + ', but its cleanup directory flush failed; verify storage') }
 }
 

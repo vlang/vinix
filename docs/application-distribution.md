@@ -401,7 +401,13 @@ The native SDK profile also owns its templates, partial inventories and
 canonicalization metadata. Its public reply survives caller argument retirement
 and provides an idempotent close operation; the CLI releases that reply after
 encoding. [Native profile ownership checks](../tests/packages/native-profile-ownership-check.md)
-measure that metadata boundary separately from remaining import/filesystem scratch.
+measure that metadata boundary. The subsequent
+[complete native builder checks](../tests/packages/native-builder-check.md)
+cover 256 complete successful/refused calls after JSON metadata initialization,
+including disk-space failures, all six partial imports and retained recovery or
+published output. All measured calls retain zero tracked V allocations and stable
+descriptors. Shared ELF checks also retire signature scratch on both targets;
+other complete publisher builders and broader release/runtime acceptance remain open.
 The workspace builder also owns its metadata/disk-budget plan and returns an
 independently closeable `CatalogInfo`. It finishes metadata admission and budgeting
 before touching prepared roots or destination parents, retaining the existing

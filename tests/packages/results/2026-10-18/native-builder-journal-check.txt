@@ -1,0 +1,4 @@
+NATIVE BUILDER journal guard=sources refuses before compilation PASS
+NATIVE BUILDER journal guard=artifact refuses before compilation PASS
+NATIVE BUILDER journal guard=existing refuses before compilation PASS
+NATIVE BUILDER intact completed journal resumes with all original timings and artifact pins PASS
