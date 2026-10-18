@@ -174,6 +174,13 @@ fn (mut app SystemInformationApp) field(tab int, key string, data string, field 
 	unsafe { value.free() }
 }
 
+fn (mut app SystemInformationApp) memory_field(key string, data string, field string) {
+	kib := activity_resource_field(data, field) or { app.value(0, key, ''); return }
+	if kib > u64(-1) / 1024 { app.value(0, key, ''); return }
+	// procfs reports KiB; use the same decimal MB as Activity Monitor.
+	app.sections[0].add(key, memory_mb_text(kib * 1024), false)
+}
+
 fn (mut app SystemInformationApp) raw_report(tab int, key string, path string) {
 	app.sections[tab].add(key, path.clone(), true)
 	data := app.read(path) or {
@@ -206,9 +213,9 @@ fn (mut app SystemInformationApp) refresh_sources(sources SystemInformationSourc
 	app.field(0, 'system_information.architecture', cpu, 'CPU architecture:')
 	app.value(0, 'system_information.cpu_online', app.read(sources.cpu_online) or { '' })
 	memory := app.read(sources.memory) or { '' }
-	app.field(0, 'system_information.memory_total', memory, 'MemTotal:')
-	app.field(0, 'system_information.memory_available', memory, 'MemAvailable:')
-	app.field(0, 'system_information.memory_cached', memory, 'Cached:')
+	app.memory_field('system_information.memory_total', memory, 'MemTotal')
+	app.memory_field('system_information.memory_available', memory, 'MemAvailable')
+	app.memory_field('system_information.memory_cached', memory, 'Cached')
 	uptime := app.read(sources.uptime) or { '' }
 	mut end := 0
 	for end < uptime.len && uptime[end] != ` ` && uptime[end] != `\t` && uptime[end] != `\n` { end++ }

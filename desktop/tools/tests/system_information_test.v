@@ -288,7 +288,7 @@ fn test_system_information_refresh_collects_actual_sources_and_replaces_snapshot
 	app.refresh_sources(sources)
 	assert system_information_test_has(app.sections[0], 'system_information.kernel', 'Vinix version test-vinix')
 	assert system_information_test_has(app.sections[0], 'system_information.cpu', 'Test CPU')
-	assert system_information_test_has(app.sections[0], 'system_information.memory_total', '16384 kB')
+	assert system_information_test_has(app.sections[0], 'system_information.memory_total', '16 MB')
 	assert system_information_test_has(app.sections[0], 'system_information.uptime', '123.45')
 	assert system_information_test_has(app.sections[1], '', 'drivers: virtio_gpu')
 	assert system_information_test_has(app.sections[3], '', 'alpha 1.2-r3')
