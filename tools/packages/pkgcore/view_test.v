@@ -112,7 +112,7 @@ fn test_software_provenance_retains_installation_identity_through_preview_revoca
 		replacement := Repository{ ...base.repositories[0], public_key: '3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c' }
 		config := Config{ ...base, architecture: architecture, repositories: [replacement] }
 		assets := view_installed(view_package('assets', '1.0.0', 'data'))
-		old := view_installed(Package{ ...view_package('app', '1.0.0', 'native'), architecture: architecture, dependencies: [Dependency{ id: 'assets' }] })
+		old := view_installed(Package{ ...view_package('app', '1.0.0', 'native'), architecture: architecture, dependencies: [Dependency{ id: 'assets', minimum: '1.0.0', before: '2.0.0' }] })
 		incoming := Installed{ ...old, package: Package{ ...old.package, version: '2.0.0', dependencies: [] }, repository: replacement.id, public_key: replacement.public_key }
 		fresh := Installed{ ...incoming, package: Package{ ...incoming.package, id: 'fresh' } }
 		current := State{ architecture: architecture, generation: 1, requested: ['app'], packages: [old, assets] }
@@ -120,27 +120,35 @@ fn test_software_provenance_retains_installation_identity_through_preview_revoca
 		view := catalog_view(config, catalog, current, '')!
 		row := view_row(view, 'app')
 		assert row.version == '2.0.0' && row.installed_version == '1.0.0' && row.update_action == 'update'
+		assert row.installed_dependencies_known && row.installed_dependencies == old.package.dependencies
 		assert row.repository == replacement.id && row.public_key == replacement.public_key
 		assert row.installed_repository == old.repository && row.installed_public_key == old.public_key
 		mut wire := pkgprotocol.decode_software_view(json2.encode(view))!
 		assert wire.rows.filter(it.id == 'app')[0].installed_public_key == old.public_key
 		assert wire.rows.filter(it.id == 'app')[0].public_key == replacement.public_key
+		assert wire.rows.filter(it.id == 'app')[0].installed_dependencies[0].minimum == '1.0.0'
+		assert wire.rows.filter(it.id == 'app')[0].installed_dependencies[0].before == '2.0.0'
 		wire.close()
 		assert row.diagnostic.contains('revoked')
 		removed := view_row(view, 'assets')
 		assert removed.update_action == 'remove' && removed.installed_repository == assets.repository && removed.installed_public_key == assets.public_key
 		assert view_row(view, 'fresh').installed_repository == '' && view_row(view, 'fresh').installed_public_key == ''
+		assert !view_row(view, 'fresh').installed_dependencies_known && view_row(view, 'fresh').installed_dependencies.len == 0
 		revoked := catalog_view(Config{ ...config, repositories: [] }, Catalog{}, current, 'publisher revoked')!
 		assert view_row(revoked, 'app').installed_repository == old.repository && view_row(revoked, 'app').installed_public_key == old.public_key
 		assert view_row(revoked, 'app').diagnostic.contains('revoked') && !view_row(revoked, 'app').updatable
+		assert view_row(revoked, 'app').installed_dependencies == old.package.dependencies
 		activated := catalog_view(config, catalog, State{ ...current, generation: 2, packages: [incoming] }, '')!
 		assert view_row(activated, 'app').installed_repository == incoming.repository && view_row(activated, 'app').installed_public_key == incoming.public_key
+		assert view_row(activated, 'app').installed_dependencies_known && view_row(activated, 'app').installed_dependencies.len == 0
 		restored := catalog_view(config, catalog, State{ ...current, generation: 3 }, '')!
 		assert view_row(restored, 'app').installed_repository == old.repository && view_row(restored, 'app').installed_public_key == old.public_key
+		assert view_row(restored, 'app').installed_dependencies == old.package.dependencies
 		unavailable := catalog_view(config, Catalog{}, current, 'catalog unavailable')!
 		assert view_row(unavailable, 'app').installed_repository == old.repository && view_row(unavailable, 'app').installed_public_key == old.public_key
 	}
 	println('SOFTWARE PROVENANCE both hosts retain installed publisher across previews, removal, revocation, activation, restored generations and unavailable catalogs PASS')
+	println('SOFTWARE DEPENDENCIES both hosts retain installed requirements across update previews, removals, revocation, activation and rollback PASS')
 }
 
 fn test_updates_disclose_dependency_removals_and_retain_explicit_roots() {
@@ -266,6 +274,10 @@ fn test_disk_view_is_read_only_and_uses_package_reader_lock() {
 	assert view_row(view, 'runtime').version == '2.0.0'
 	assert view_row(view, 'runtime').installed_repository == 'fixture' && view_row(view, 'runtime').installed_public_key == key
 	assert view_row(view, 'app').installed_repository == 'fixture' && view_row(view, 'app').installed_public_key == key
+	assert view_row(view, 'app').installed_dependencies_known && view_row(view, 'app').installed_dependencies == app.dependencies
+	mut wire := pkgprotocol.decode_software_view(json2.encode(view))!
+	assert wire.rows.filter(it.id == 'app')[0].installed_dependencies[0].id == 'runtime'
+	wire.close()
 	assert os.ls(directory + '/objects')! == objects && os.ls(directory + '/generations')! == generations
 	assert read_state(directory, 'aarch64')! == state
 	guard := acquire(directory)!

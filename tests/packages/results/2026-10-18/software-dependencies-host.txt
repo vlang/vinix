@@ -1,0 +1,16 @@
+core-compile PASS
+core-run PASS
+core-sanitize-compile PASS
+core-sanitize-run PASS
+protocol-compile PASS
+protocol-run PASS
+protocol-sanitize-compile PASS
+protocol-sanitize-run PASS
+ui-compile PASS
+ui-functional PASS
+ui-view-memory PASS
+ui-details-memory PASS
+ui-sanitize-compile PASS
+ui-sanitize-functional PASS
+ui-sanitize-view-memory PASS
+ui-sanitize-details-memory PASS

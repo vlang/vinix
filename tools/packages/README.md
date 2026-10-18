@@ -177,6 +177,13 @@ This applies to catalog facts and frozen install, remove, update, repair,
 deployment, rollback and offline-export reviews. See
 [compact detail checks](../../tests/packages/software-details-navigation-check.md).
 
+For installed packages, **Details → Diagnostics** also shows the installed
+dependency IDs, inclusive/exclusive version bounds and actual installed versions.
+It names one requested app that requires a shared package, including indirectly,
+and reports incomplete information from older services. Update previews keep the
+installed graph until activation. See
+[dependency inspection checks](../../tests/packages/software-dependencies-check.md).
+
 Compact catalog windows offer **Browse catalog**. Search, a cycling
 Catalog/Installed/Updates filter, Previous/Next package and complete **Details**
 work from 180×220. Back/Escape keeps the query, filter and selected package;

@@ -34,6 +34,49 @@ fn test_view_reader_preserves_complete_installed_and_planned_fields_and_unicode(
 	fresh.close()
 }
 
+fn test_view_reader_admits_only_complete_bounded_installed_dependency_facts() {
+	dependency := SoftwareDependency{id: 'old-runtime', minimum: '1.0.0', before: '2.0.0'}
+	row := SoftwareRow{ ...fixture_software_row(), installed_dependencies_known: true, installed_dependencies: [dependency] }
+	text := json2.encode(SoftwareView{ ...fixture_software_view(), rows: [row] })
+	mut view := decode_software_view(text)!
+	assert view.rows[0].installed_dependencies_known && view.rows[0].installed_dependencies == [dependency]
+	assert view.rows[0].runtime == 'runtime' // displayed candidate remains independent
+	view.close(); view.close()
+	group := '"installed_dependencies":' + json2.encode([dependency]) + ','
+	assert text.contains(group)
+	for field in ['"installed_dependencies_known":true,', group] { assert refuses_software_view(text.replace(field, '')) }
+	legacy := text.replace('"installed_dependencies_known":true,', '').replace(group, '')
+	mut old := decode_software_view(legacy)!
+	assert !old.rows[0].installed_dependencies_known && old.rows[0].installed_dependencies.len == 0
+	old.close()
+	for bad in [text.replace('"installed_dependencies_known":true', '"installed_dependencies_known":false'),
+		text.replace('"installed_dependencies_known":true', '"installed_dependencies_known":1'),
+		text.replace('"installed_dependencies_known":true', '"installed_dependencies_known":true,"installed_dependencies_kn\\u006fwn":true'),
+		text.replace(group, group + group), text.replace(group, '"installed_dependencies":null,'),
+		text.replace('old-runtime', '../runtime'), text.replace('old-runtime', 'x'.repeat(129)),
+		text.replace('"minimum":"1.0.0",', ''), text.replace('"before":"2.0.0"', '"before":null'),
+		text.replace('"minimum":"1.0.0"', '"minimum":"01.0.0"'),
+		text.replace('"before":"2.0.0"', '"before":"1.0.0"'),
+		text.replace('"before":"2.0.0"', '"before":"0.9.0"'),
+		text.replace('"minimum":"1.0.0"', '"minimum":"1.0.0","min\\u0069mum":"1.0.0"'),
+		text.replace(group, '"installed_dependencies":' + json2.encode([dependency, dependency]) + ',')] {
+		assert refuses_software_view(bad)
+	}
+	mut many := []SoftwareDependency{cap: 129}
+	for i in 0 .. 129 { many << SoftwareDependency{id: 'dependency-' + i.str()} }
+	mut bounded := decode_software_view(text.replace(group, '"installed_dependencies":' + json2.encode(many[..128]) + ','))!
+	assert bounded.rows[0].installed_dependencies.len == 128
+	bounded.close()
+	assert refuses_software_view(text.replace(group, '"installed_dependencies":' + json2.encode(many) + ','))
+	assert refuses_software_view(json2.encode(SoftwareView{ ...fixture_software_view(), rows: [SoftwareRow{ ...row,
+		installed_version: '', installed_name: '', installed_kind: '', installed_permissions: [], installed_window_protocol: 0,
+		requested: false, updatable: false, update_action: '' }] }))
+	mut empty := decode_software_view(text.replace(group, '"installed_dependencies":[],'))!
+	assert empty.rows[0].installed_dependencies_known && empty.rows[0].installed_dependencies.len == 0
+	empty.close()
+	println('SOFTWARE DEPENDENCIES protocol preserves installed bounds, explicit empty/legacy facts and refuses partial/duplicate/coerced/oversized requirements PASS')
+}
+
 fn test_view_reader_requires_every_header_and_base_package_field() {
 	text := json2.encode(fixture_software_view())
 	for field in ['"format":1,', '"generation":7,', '"architecture":"aarch64",', '"offline":false,',

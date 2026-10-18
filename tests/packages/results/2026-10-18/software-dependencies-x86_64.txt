@@ -1,0 +1,2 @@
+PASS x86_64 packages-software-provenance (29.8s)
+package-software-provenance x86_64: 1 passed, 0 failed, 0 skipped

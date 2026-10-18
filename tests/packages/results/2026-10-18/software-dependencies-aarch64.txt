@@ -1,0 +1,2 @@
+PASS aarch64 packages-software-provenance (21.0s)
+package-software-provenance aarch64: 1 passed, 0 failed, 0 skipped

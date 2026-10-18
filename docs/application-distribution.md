@@ -1439,6 +1439,14 @@ provenance is shown as unavailable; it is never inferred from a candidate.
 Viewing these facts changes no trust or package state. See
 [installed provenance qualification](../tests/packages/software-provenance-check.md).
 
+**Details → Diagnostics** now explains installed dependencies: complete IDs,
+inclusive minimum/exclusive upper bounds and installed versions, separately from
+the displayed update. It names one requested application requiring the selection
+through the installed graph, including shared runtimes and cycles. Older service
+responses explicitly report unavailable or incomplete facts. Inspection starts
+no transaction; reviewed removal still decides which unused dependencies leave
+the generation. See [dependency inspection checks](../tests/packages/software-dependencies-check.md).
+
 In compact catalog windows, **Browse catalog** provides search, a button cycling
 Catalog/Installed/Updates, Previous/Next package and complete **Details** at
 180×220 or larger. Tab focuses search; Enter leaves search and then opens

@@ -2700,6 +2700,24 @@ trust. Both strings belong to the owned view and are freed by `.close()`.
 Existing SDK-1 readers ignore the additive fields. See
 [installed provenance checks](../../tests/packages/software-provenance-check.md).
 
+The additive `installed_dependencies_known`/`installed_dependencies` pair
+describes requirements from the installed generation, independently of the
+displayed update. A known list requires an installed version; an empty known
+list means no declared requirements. Omitted pairs, or `false` with an empty
+list, mean unavailable information. Partial pairs and unknown nonempty lists
+refuse the view. Each of at most 128 requirements has explicit `id`, `minimum`
+and `before` strings. IDs are unique; optional bounds use canonical package
+versions, with inclusive minimum and exclusive before. Two supplied bounds
+must form a nonempty range. Duplicate/escaped keys, coerced values and malformed
+records refuse the complete response and retire partial storage.
+
+These facts grant no installation or removal authority. Software's Diagnostics
+inspector shows complete requirements and installed dependency versions, plus
+one deterministic requested package that needs the selection, including through
+shared dependencies and cycles. It warns when legacy rows leave the usage graph
+incomplete. Review inspectors retain their reviewed-target scope. See
+[installed dependency checks](../../tests/packages/software-dependencies-check.md).
+
 `pkgprotocol.decode_registration(text)` reads the desktop presentation projection
 of a format-1 installed generation. Its owned `RegistrationSnapshot` contains
 `format`, positive `generation`, `architecture` and `packages`; each

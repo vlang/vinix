@@ -801,6 +801,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
   interrupted-download recovery and coherent persistent package state.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,
   permissions, progress, uninstall, updates and useful failure diagnostics.
+  - [x] [Installed dependency inspection](tests/packages/software-dependencies-check.md)
+    shows installed requirements, version bounds and actual versions separately
+    from update previews. A bounded graph walk names a requiring requested app
+    through shared dependencies/cycles; older services report incomplete facts.
+    Inspection preserves review/approval state. Full graphical-session and
+    production catalog/runtime acceptance remain open.
   - [x] [Installed publisher provenance](tests/packages/software-provenance-check.md)
     keeps the installed generation's repository/key separate from a displayed
     update, including key rotation, revocation and unavailable catalogs. Complete

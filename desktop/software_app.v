@@ -298,6 +298,8 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 
 fn software_free_row(row SoftwareRow) {
 	unsafe {
+		for dependency in row.installed_dependencies { dependency.id.free(); dependency.minimum.free(); dependency.before.free() }
+		(&array(&row.installed_dependencies)).free()
 		row.id.free()
 		row.name.free()
 		row.description.free()

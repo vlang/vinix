@@ -12,6 +12,8 @@ pub:
 	installed_version string
 	installed_repository string
 	installed_public_key string
+	installed_dependencies_known bool
+	installed_dependencies []Dependency
 	installed_name    string
 	installed_kind    string
 	installed_permissions []string
@@ -126,6 +128,8 @@ fn catalog_view(config Config, catalog Catalog, current State, catalog_error str
 			installed_version: old.package.version
 			installed_repository: old.repository
 			installed_public_key: old.public_key
+			installed_dependencies_known: old.package.id != ''
+			installed_dependencies: old.package.dependencies
 			installed_name:    old.package.name
 			installed_kind:    old.package.kind
 			installed_permissions: old.package.permissions

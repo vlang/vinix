@@ -37,7 +37,7 @@ fn software_details_text_valid(value string, limit int) bool {
 }
 
 fn software_details_row_valid(row SoftwareRow) bool {
-	if row.id == '' || row.name == '' || row.permissions.len > 5 || row.installed_permissions.len > 5
+	if row.id == '' || row.name == '' || row.permissions.len > 5 || row.installed_permissions.len > 5 || row.installed_dependencies.len > 128
 		|| row.installed_window_protocol < 0 || row.installed_window_protocol > 2 { return false }
 	for value in [row.id, row.runtime, row.repository, row.installed_repository]! { if !software_details_text_valid(value, 128) { return false } }
 	for value in [row.name, row.installed_name, row.license]! { if !software_details_text_valid(value, 256) { return false } }
@@ -47,6 +47,10 @@ fn software_details_row_valid(row SoftwareRow) bool {
 	if !software_details_text_valid(row.public_key, 64) || !software_details_text_valid(row.installed_public_key, 64) { return false }
 	for value in row.permissions { if !software_details_text_valid(value, 16) { return false } }
 	for value in row.installed_permissions { if !software_details_text_valid(value, 16) { return false } }
+	for dependency in row.installed_dependencies {
+		if !software_details_text_valid(dependency.id, 128) || !software_details_text_valid(dependency.minimum, 29)
+			|| !software_details_text_valid(dependency.before, 29) { return false }
+	}
 	return true
 }
 
@@ -143,6 +147,7 @@ fn (mut a SoftwareApp) prepare_details_context(row SoftwareRow, action string, r
 		general << 'Installed role: ' + if row.installed_version == '' { 'Not installed' } else if row.requested { 'Requested application' } else { 'Dependency/runtime' }
 		general << 'Update status: ' + if a.update_error != '' { 'Updates unavailable; see Diagnostics' } else if row.updatable { row.update_action } else { 'No resolved change' }
 		if row.installed_version != '' {
+			general << 'Installed requirements and usage: See Diagnostics'.clone()
 			if row.installed_kind == '' { general << 'Installed launch metadata is unavailable from this service.'.clone() }
 			else {
 				general << 'Installed name: ' + row.installed_name
@@ -180,6 +185,7 @@ fn (mut a SoftwareApp) prepare_details_context(row SoftwareRow, action string, r
 		'Firmware payload: ' + if row.firmware { 'Yes' } else { 'No' }]
 	a.details_values(4, licensing); software_policy_free_lines(mut licensing)
 	mut diagnostics := []string{cap: 8}
+	unsafe { diagnostics.flags |= .noslices }
 	if reviewing {
 		software_details_count(mut diagnostics, 'Required disk space (bytes): ', a.review_snapshot.disk_needed)
 		software_details_count(mut diagnostics, 'Available disk space (bytes): ', a.review_snapshot.disk_available)
@@ -193,6 +199,7 @@ fn (mut a SoftwareApp) prepare_details_context(row SoftwareRow, action string, r
 		if a.update_error != '' { diagnostics << 'Update diagnostic: ' + a.update_error }
 	}
 	if diagnostics.len == 0 { diagnostics << 'No package, catalog or update diagnostics.'.clone() }
+	if !reviewing && row.installed_version != '' { a.installed_dependency_values(row, mut diagnostics) }
 	a.details_values(5, diagnostics); software_policy_free_lines(mut diagnostics)
 	a.finish_details(plan)
 }

@@ -2,7 +2,48 @@
 module pkgprotocol
 
 const software_view_keys = ['format', 'generation', 'architecture', 'offline', 'catalog_error', 'update_error', 'rows', 'launch_user']
-const software_row_keys = ['id', 'name', 'description', 'version', 'installed_version', 'architecture', 'kind', 'runtime', 'repository', 'public_key', 'license', 'proprietary', 'firmware', 'permissions', 'requested', 'updatable', 'update_action', 'diagnostic', 'installed_name', 'installed_kind', 'installed_permissions', 'installed_window_protocol', 'installed_repository', 'installed_public_key']
+const software_row_keys = ['id', 'name', 'description', 'version', 'installed_version', 'architecture', 'kind', 'runtime', 'repository', 'public_key', 'license', 'proprietary', 'firmware', 'permissions', 'requested', 'updatable', 'update_action', 'diagnostic', 'installed_name', 'installed_kind', 'installed_permissions', 'installed_window_protocol', 'installed_repository', 'installed_public_key', 'installed_dependencies_known', 'installed_dependencies']
+
+fn (mut r MetadataReader) software_dependency() !SoftwareDependency {
+	r.expect(`{`)!
+	mut value := SoftwareDependency{}
+	mut accepted := false
+	defer { if !accepted { unsafe { value.id.free(); value.minimum.free(); value.before.free() } } }
+	mut seen := u32(0)
+	mut first := true
+	for r.next(first, `}`)! {
+		first = false
+		field := r.view_member(policy_pin_keys, seen)!
+		if field >= 0 { seen |= u32(1) << field }
+		match field {
+			0 { value = SoftwareDependency{ ...value, id: r.quoted(128)! } }
+			1 { value = SoftwareDependency{ ...value, minimum: r.quoted(29)! } }
+			2 { value = SoftwareDependency{ ...value, before: r.quoted(29)! } }
+			else { r.skip_view_extension(0)! }
+		}
+	}
+	if seen != 7 { return error('missing installed dependency requirement field') }
+	accepted = true
+	return value
+}
+
+fn (mut r MetadataReader) software_dependencies() ![]SoftwareDependency {
+	r.expect(`[` )!
+	mut values := []SoftwareDependency{cap: 4}
+	unsafe { values.flags |= .noslices }
+	mut accepted := false
+	defer { if !accepted { close_software_dependencies(values) } }
+	mut first := true
+	for r.next(first, `]`)! {
+		first = false
+		if values.len == 128 { return error('Software installed dependencies exceed their entry limit') }
+		value := r.software_dependency()!
+		pointer := unsafe { &value }
+		unsafe { values.push_many(pointer, 1) }
+	}
+	accepted = true
+	return values
+}
 
 // Both presentation projections ignore additive/service-owned fields. Known
 // fields remain typed, mandatory and unique, including escaped key spellings.
@@ -97,6 +138,8 @@ fn (mut r MetadataReader) parse_software_row() !SoftwareRow {
 			21 { row = SoftwareRow{ ...row, installed_window_protocol: int(r.unsigned(2)!) } }
 			22 { row = SoftwareRow{ ...row, installed_repository: r.quoted(128)! } }
 			23 { row = SoftwareRow{ ...row, installed_public_key: r.quoted(64)! } }
+			24 { row = SoftwareRow{ ...row, installed_dependencies_known: r.boolean()! } }
+			25 { row = SoftwareRow{ ...row, installed_dependencies: r.software_dependencies()! } }
 			else { r.skip_view_extension(0)! }
 		}
 	}
@@ -111,6 +154,7 @@ fn (mut r MetadataReader) parse_software_row() !SoftwareRow {
 	// Provenance is additive to every SDK-1 launch shape. An omitted or empty
 	// pair means unavailable; a partial pair must never borrow catalog identity.
 	if (seen >> 22) & 3 !in [u32(0), 3]! { return error('partial installed publisher provenance in Software view') }
+	if (seen >> 24) & 3 !in [u32(0), 3]! { return error('partial installed dependency metadata in Software view') }
 	accepted = true
 	return row
 }

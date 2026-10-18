@@ -1,0 +1,2 @@
+SOFTWARE DEPENDENCIES protocol preserves installed bounds, explicit empty/legacy facts and refuses partial/duplicate/coerced/oversized requirements PASS
+SOFTWARE PROVENANCE protocol keeps installed and displayed publishers distinct; legacy groups, duplicate/partial/invalid identity and uninstalled rows PASS

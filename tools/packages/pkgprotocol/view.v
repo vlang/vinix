@@ -4,6 +4,13 @@ module pkgprotocol
 
 import tools.packages.appsdk
 
+pub struct SoftwareDependency {
+pub:
+	id string
+	minimum string
+	before string
+}
+
 pub struct SoftwareRow {
 pub:
 	id string
@@ -13,6 +20,8 @@ pub:
 	installed_version string
 	installed_repository string
 	installed_public_key string
+	installed_dependencies_known bool
+	installed_dependencies []SoftwareDependency
 	installed_name string
 	installed_kind string
 	installed_permissions []string
@@ -99,10 +108,32 @@ pub fn (view &SoftwareView) validate() ! {
 				|| !identifier(row.installed_repository) || !digest(row.installed_public_key))) {
 			return error('invalid installed publisher provenance in Software view')
 		}
+		if row.installed_dependencies.len > 128
+			|| (row.installed_dependencies_known && row.installed_version == '')
+			|| (!row.installed_dependencies_known && row.installed_dependencies.len != 0) {
+			return error('invalid installed dependency metadata in Software view')
+		}
+		mut dependencies := map[string]bool{}
+		defer { unsafe { dependencies.free() } }
+		for dependency in row.installed_dependencies {
+			if !identifier(dependency.id) || dependency.id in dependencies
+				|| !policy_range_valid(dependency.minimum, dependency.before) {
+				return error('invalid installed dependency requirement in Software view')
+			}
+			dependencies[dependency.id] = true
+		}
+	}
+}
+
+fn close_software_dependencies(values []SoftwareDependency) {
+	unsafe {
+		for value in values { value.id.free(); value.minimum.free(); value.before.free() }
+		(&array(&values)).free()
 	}
 }
 
 fn close_software_row(row SoftwareRow) {
+	close_software_dependencies(row.installed_dependencies)
 	unsafe {
 		row.id.free(); row.name.free(); row.description.free(); row.version.free(); row.installed_version.free()
 		row.installed_repository.free(); row.installed_public_key.free()
