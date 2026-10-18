@@ -8944,17 +8944,45 @@ client imports and stops before entry at `_flock`. Native RE verifies its
 locking flags and Fortnite's nonblocking unlock at `0x1005a752c`. Fortnite
 remains unplayable and the full iOS regression is unpassed.
 
+V now resolves `_flock` for regular files and directories using native kernel
+locks. The adapter reproduces Darwin's unlock-before-exclusive-before-shared
+flag precedence, ignores unknown bits, preserves the nonblocking bit and maps
+contention to Darwin `EWOULDBLOCK` (35). Invalid operations on valid files report
+`EBADF`; pipes and sockets report `ENOTSUP` before operation validation. Kernel
+open descriptions retain ownership through dup and fork, wake blocking waiters,
+and release locks on last close. The adapter adds no allocation or lifetime state.
+
+This remains a Linux lock backend: a failed shared-to-exclusive conversion can
+drop the shared lock, and flock/POSIX record locks have separate conflict domains.
+Native Darwin retains the shared lock and makes those lock domains interact.
+Device locks remain unsupported on Vinix and return `ENOTSUP`.
+
+`tests/ios/native-checks.v build-flock` builds the fixture. Two host ASan/UBSan
+runs and the ARM64 Vinix suite pass for 80 flag combinations, real contention
+and blocking wakeup, directories, read/write access, descriptor errors, dup/fork
+ownership, dirty upper ARM64 arguments, ordinary status flags, contents, offsets,
+errno, floating-point state and eight concurrent callers. The tests account for
+the Mac's additional `F_GETFL` bit after flock. Worker fixtures are opened before
+the concurrent calls; the initial guest fixture-open failure is retained.
+
+Native reference measurements, the failed attempts, joined logs, pinned inputs
+and five final generated C/executable pairs are under
+`build/ios/fortnite/flock-checks`. V/Mach-O/LLVM inspection confirms Fortnite's
+nonblocking unlock at `0x1005a752c`. The fresh IPA probe passes `_flock` and stops
+before entry at `_getprogname`. Native RE verifies its stable borrowed basename
+pointer. Fortnite remains unplayable and the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,737 | 423 | 79 |
+| Fortnite executable | 1,738 | 422 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,572 | 426 | 120 |
+| All images | 2,573 | 425 | 120 |
 
-The C++/GLES/Text variant reports 2,586 resolved imports, 412 unresolved strong
+The C++/GLES/Text variant reports 2,587 resolved imports, 411 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
