@@ -396,28 +396,41 @@ fn pack_root_descriptor(recipe RootRecipe, root int, repository string, pinned b
 
 fn pack_root_descriptor_with(recipe RootRecipe, root int, repository string, pinned bool, options PackSourceOptions) !Package {
 	validate_root_recipe(recipe)!
-	temporary := os.temp_dir()
-	process := os.getpid().str()
-	template_path := temporary + '/vinix-pack-root-' + process + '-XXXXXX'
-	defer { unsafe { temporary.free(); process.free(); template_path.free() } }
-	mut template := template_path.bytes()
-	template << u8(0)
-	defer { unsafe { template.free() } }
-	created := C.mkdtemp(&char(template.data))
-	if created == unsafe { nil } { return error('cannot create private import workspace') }
-	work := unsafe { cstring_to_vstring(created).clone() }
-	defer { os.rmdir_all(work) or {}; unsafe { work.free() } }
+	mut work := create_import_workspace()!
+	defer { work.close() }
+	mut p := materialize_root_recipe(recipe, root, repository, pinned, options, mut work) or { return work.failure(err) }
+	work.checkpoint('workspace-packed', options) or {
+		p.close()
+		cause := err.msg()
+		message := 'package packed at ' + repository + ', but private import check failed: ' + cause
+		unsafe { cause.free(); err.free() }
+		return work.failure(error(message))
+	}
+	work.retire() or {
+		p.close()
+		cause := err.msg()
+		message := 'package packed at ' + repository + ', but private import cleanup refused at ' + work.stage.path + ': ' + cause + '; retain recovery data for inspection'
+		unsafe { cause.free(); err.free() }
+		return error(message)
+	}
+	return p
+}
+
+fn materialize_root_recipe(recipe RootRecipe, root int, repository string, pinned bool, options PackSourceOptions, mut work ImportWorkspace) !Package {
+	work.checkpoint('workspace-created', options)!
 	mut pins := map[string]Payload{}
 	defer { unsafe { pins.free() } }
 	if pinned { for file in recipe.manifest.files { pins[file.path] = file } }
-	payload := work + '/payload'
-	manifest_path := work + '/manifest.json'
+	payload := work.stage.path + '/payload'
+	manifest_path := work.stage.path + '/manifest.json'
 	defer { unsafe { payload.free(); manifest_path.free() } }
 	mut importer := RootImport{ root: root, output: payload, pins: pins, options: options, ancestors: []ImportDirectoryIdentity{cap: max_pack_depth} }
 	defer { unsafe { (&array(&importer.ancestors)).free() } }
 	for entry in recipe.entries { importer.copy(entry.source, entry.path)! }
+	work.checkpoint('workspace-copied', options)!
 	manifest := publisher_json(recipe.manifest)
 	defer { unsafe { manifest.free() } }
-	os.write_file(manifest_path, manifest)!
+	work.write_manifest(manifest)!
+	work.checkpoint('workspace-manifest', options)!
 	return pack(manifest_path, payload, repository)!
 }

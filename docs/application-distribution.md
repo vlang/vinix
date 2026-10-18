@@ -304,8 +304,17 @@ The [materialization ownership checks](../tests/packages/import-materialization-
 also retire recursion, parent-construction and file-opening scratch. Directory
 cycles use captured device/inode values, and native writes retain partial-write
 and interruption handling. Source rechecks, pinned digests, ordinary final modes
-and corrected retry remain covered. Complete private import workspace retirement
-and full publisher-profile construction remain separate boundaries.
+and corrected retry remain covered.
+
+[Private import workspace ownership](../tests/packages/import-workspace-check.md)
+now covers complete cold, pinned and refused imports after one-time JSON metadata
+initialization. The importer captures its temporary parent, private root, payload
+directory and manifest, and checks them before publication and retirement.
+Replacements, rewritten manifests and unexpected root entries retain recovery
+data with its path in the diagnostic. Cleanup uses the held parent after a
+rename and preserves any package already published. Repeated checks reopen the
+directory to avoid sharing an exhausted enumeration cursor. Full publisher-profile
+construction remains a separate ownership boundary.
 
 The lower-level `pack` command also captures its source root and walks children
 through descriptors relative to their captured parents. Hashing and copying

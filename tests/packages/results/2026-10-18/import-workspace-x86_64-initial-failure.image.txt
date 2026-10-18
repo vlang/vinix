@@ -1,0 +1,35 @@
+==> Fetching Limine 12.9.3 binaries...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  4 2022k    4 96825    0     0  91797      0  0:00:22  0:00:01  0:00:21 91797100 2022k  100 2022k    0     0  1212k      0  0:00:01  0:00:01 --:--:-- 3145k
+==> Building the Limine host installer...
+==> Compressing the image...
+==> Assembling /Users/alex/code/vinix/build/iwo-x86-1/packages-import-workspace/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/code/vinix/build/iwo-x86-1/packages-import-workspace/.vinix-amd64.iso.sa6mde'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 11.2g free
+Added to ISO image: directory '/'='/Users/alex/code/vinix/build/iwo-x86-1/packages-import-workspace/iso/.iso-staging.J6QYim/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 18484 sectors
+Written to medium : 18484 sectors at LBA 0
+Writing to 'stdio:/Users/alex/code/vinix/build/iwo-x86-1/packages-import-workspace/.vinix-amd64.iso.sa6mde' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at byte offset 0x1000.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully.
+    /Users/alex/code/vinix/build/iwo-x86-1/packages-import-workspace/test.iso (37855232 bytes)

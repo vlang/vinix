@@ -715,8 +715,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Owned materialization](tests/packages/import-materialization-ownership-check.md)
     retires ancestry, parent creation and file-opening scratch across complete
     copies, recursive aliases and late/native refusals, preserving modes and
-    exact retry. Complete private import workspace/profile construction remains
-    a separate ownership boundary.
+    exact retry.
+  - [x] [Captured, owned private import workspaces](tests/packages/import-workspace-check.md)
+    retire complete cold/pinned/refused imports after JSON metadata initialization,
+    preserving canonical retries under a 32-descriptor limit. Captured roots,
+    payloads and manifests reject substitutions and retain unadmitted recovery
+    data with explicit diagnostics, including failure after package publication.
+    Complete profile construction and broader release/runtime acceptance remain open.
 - [ ] Add transactional install/remove/upgrade, rollback, disk-space checks,
   interrupted-download recovery and coherent persistent package state.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,

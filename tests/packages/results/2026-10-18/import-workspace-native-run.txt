@@ -1,0 +1,13 @@
+NATIVE OWNERSHIP whole-build retained=6649 allocations=71
+NATIVE OWNERSHIP complete build preserves baseline canonical bytes and retires reply without removing published lock PASS
+NATIVE OWNERSHIP imports=0 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=1 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=2 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=3 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=4 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=5 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=6 fault=none retained=0 allocations=0
+NATIVE OWNERSHIP imports=6 fault=duplicate retained=0 allocations=0
+NATIVE OWNERSHIP imports=0 fault=empty retained=0 allocations=0
+NATIVE OWNERSHIP templates, partial inventories, canonicalization and late refusals retire all owned metadata PASS
+NATIVE OWNERSHIP independent replies survive caller retirement and close idempotently PASS

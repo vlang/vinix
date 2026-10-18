@@ -1,0 +1,4 @@
+IMPORT WORKSPACE journal guard=sources refuses before compilation PASS
+IMPORT WORKSPACE journal guard=artifact refuses before compilation PASS
+IMPORT WORKSPACE journal guard=existing refuses before compilation PASS
+IMPORT WORKSPACE intact completed journal resumes with all original timings and artifact pins PASS

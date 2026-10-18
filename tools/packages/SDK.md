@@ -905,9 +905,10 @@ refuse. Guest-absolute aliases keep their guest meaning during these checks.
 Unpinned `pack-root` imports hash each admitted regular file before copying and
 compare the materialized bytes with that digest. Catalog imports use their
 locked inventory digest instead. Same-size rewrites between hashing and
-copying therefore refuse, as do changed pinned contents. A refusal removes the
-private workspace before any package repository is published; retry after
-stabilizing the source. These checks detect changes during traversal; they do
+copying therefore refuse, as do changed pinned contents. A source refusal retires
+the admitted private workspace before packing; retry after stabilizing the source.
+If staging identities change or cleanup fails, the diagnostic identifies recovery
+data to retain for inspection. These checks detect changes during traversal; they do
 not take an atomic filesystem snapshot. Keep prepared contents stable throughout
 publishing. See [source consistency qualification](../../tests/packages/import-capture-check.md).
 
@@ -925,8 +926,21 @@ new parents retain the original umask behavior, and files still receive only
 ordinary executable/data modes after source checks. Multiblock copying and
 materialized digest comparison retain their checks on complete and refused
 calls. See [materialization ownership qualification](../../tests/packages/import-materialization-ownership-check.md).
-Complete private import workspace creation/retirement and complete publisher
-profile construction remain separate ownership boundaries.
+
+Private workspace creation and retirement now share a captured owner for the
+temporary parent, private root, payload directory and manifest descriptor.
+Checks refuse root/payload/manifest substitutions, manifest content changes and
+unexpected root entries, retaining the tree for inspection. Each enumeration
+opens a fresh directory description, so repeated checks cannot miss entries
+through an exhausted cursor. Retirement uses the held parent even after a parent
+rename, closes all descriptors and releases owned storage. If packing succeeded
+before a later check or cleanup refusal, the diagnostic explicitly reports the
+published package and its repository; published objects and manifests remain.
+See [private import workspace qualification](../../tests/packages/import-workspace-check.md)
+for 128 complete cold/pinned/refused imports with zero tracked retained V
+allocations after JSON field metadata initialization, captured recovery cases
+and both guest architectures. Complete publisher-profile construction remains
+a separate ownership boundary.
 
 `pack-root`, `pack-catalog` and the Native, SQLite and FFmpeg profile builders
 share input-root admission. Empty and NUL-containing paths refuse. Redundant

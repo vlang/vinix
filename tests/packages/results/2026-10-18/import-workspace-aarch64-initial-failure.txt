@@ -1,0 +1,44 @@
+FAIL aarch64 packages-import-workspace (136.4s)
+  forbidden "V panic:" in the line: V panic: metadata must be a bounded regular file: /Users/alex/code/vinix/examples/package-counter/manifest-aarch64.json
+  last 40 serial lines:
+  | apple-spi-kbd: no device tree; not probing
+  | kmain_thread: console done
+  | devcore: 3 VirtIO devices listed
+  | kmain_thread: writeback done
+  | 
+  | *** aarch64: Kernel initialisation complete ***
+  | *** Starting /sbin/init ***
+  | syspower: power button through the event device at 0x9080000
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | HWTEST START packages-import-workspace
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | IMPORT CAPTURE retained root and guest-absolute aliases survive host namespace replacement with identical retry metadata PASS
+  | IMPORT CAPTURE 49 file identity/size/execute mutations refuse before publication; 32-descriptor cleanup and exact retry PASS
+  | IMPORT CAPTURE multi-block same-size rewrites during hashing and copying fail content comparison before publication PASS
+  | IMPORT CAPTURE directory replacement and added/removed/renamed entries refuse; guest targets survive and retries succeed PASS
+  | IMPORT CAPTURE pinned digest/execute admission, empty files, stripped special modes and canonical declarations survive exact retry PASS
+  | IMPORT CAPTURE nine injected checkpoint failures retire descriptors and private scratch before successful public retry PASS
+  | IMPORT WORKSPACE PROCESS import-capture  PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | random: reseeded from 56031 events, 4 hardware words
+  | IMPORT LIMITS 129th directory refuses before materialization; source and ancestor state preserved PASS
+  | IMPORT LIMITS exact 128-level directory/file boundary and nested selector parents match final pack rules PASS
+  | IMPORT LIMITS shared 32768-entry budget counts selected roots, empty directories and repeated aliases; refusal precedes output and retry resets budget PASS
+  | IMPORT LIMITS remaining-budget enumeration refuses partial lists and preserves sorted exact-boundary names PASS
+  | IMPORT LIMITS 32 failed/successful public imports retire descriptors and private scratch, preserve source bytes and permit exact retry PASS
+  | IMPORT WORKSPACE PROCESS import-limits  PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | IMPORT WORKSPACE PROCESS pack-source  PASS
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+  | V panic: metadata must be a bounded regular file: /Users/alex/code/vinix/examples/package-counter/manifest-aarch64.json
+  |  v hash: 826e96f
+  |     pid: 0x7bad
+  |     tid: 0x7bad
+  | native-profile failed (1)
+  | HWTEST FAIL packages-import-workspace
+  | syspower: power off: stopping devices
+  logs: /Users/alex/code/vinix/build/iwo-arm-1/packages-import-workspace

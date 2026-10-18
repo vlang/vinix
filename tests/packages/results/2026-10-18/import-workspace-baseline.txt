@@ -1,0 +1,9 @@
+IMPORT WORKSPACE case=complete retained=12207 allocations=96
+IMPORT WORKSPACE case=pinned retained=12207 allocations=96
+IMPORT WORKSPACE case=opened retained=1379 allocations=4
+IMPORT WORKSPACE case=directory retained=1379 allocations=4
+IMPORT WORKSPACE case=copied retained=10325 allocations=86
+IMPORT WORKSPACE case=publisher-file retained=12207 allocations=96
+IMPORT WORKSPACE case=object-directory retained=12207 allocations=96
+IMPORT WORKSPACE case=manifest-directory retained=12207 allocations=96
+IMPORT WORKSPACE complete cold/pinned imports and early/late/publisher refusals retire storage and descriptors; exact canonical retry PASS

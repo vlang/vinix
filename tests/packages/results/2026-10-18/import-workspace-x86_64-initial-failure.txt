@@ -1,0 +1,19 @@
+FAIL x86_64 packages-import-workspace (13.2s)
+  forbidden "KERNEL PANIC" in the line:   *** Vinix KERNEL PANIC on CPU 0 ***
+  last 15 serial lines:
+  | BdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+  | BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+  | initramfs: Unpacking...
+  | >initramfs: no ustar sig at 0xff00000036e50000
+  | initramfs: Done (0 entries)
+  | Backtrace (return addresses):
+  |   #0  0xffffffff802c1579
+  |   #1  0xffffffff80132ea6
+  |   #2  0xffffffff80174f3d
+  |   #3  0xffffffff8014d6e9
+  |   #4  0xffffffff80116ec7
+  | 
+  |   *** Vinix KERNEL PANIC on CPU 0 ***
+  | 
+  | Panic info: Kernel has called exit()
+  logs: /Users/alex/code/vinix/build/iwo-x86-1/packages-import-workspace
