@@ -1,0 +1,4 @@
+PUBLISHER FLUSH case=complete retained=0 allocations=0
+PUBLISHER FLUSH case=ordinary-file retained=0 allocations=0
+PUBLISHER FLUSH case=nested-alias retained=0 allocations=0
+PUBLISHER FLUSH 192 recursive success and ordinary/nested durability refusal cycles retire names, paths and errors PASS

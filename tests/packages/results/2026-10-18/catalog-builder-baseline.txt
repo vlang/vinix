@@ -1,0 +1,3 @@
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=complete retained=6671 allocations=48
+CATALOG BUILDER complete canonical retry, deduplication, saved output, sources and descriptors PASS

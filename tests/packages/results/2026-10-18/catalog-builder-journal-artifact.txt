@@ -1,0 +1,10 @@
+tests/packages/catalog-builder-check.v:86: FAIL: fn main.qualify: assert workspace_pin(pin.path)! == pin
+   left value: workspace_pin(pin.path)! = WorkspacePin{
+    path: '/Users/alex/code/vinix/build/package-catalog-owner-work/host-1/cli-compile.txt'
+    sha256: 'b422ad8d80fcd9cf52cf4ca59346e17ded978d4e9de790ad92dfc7fed955bd17'
+}
+  right value: pin = WorkspacePin{
+    path: '/Users/alex/code/vinix/build/package-catalog-owner-work/host-1/cli-compile.txt'
+    sha256: 'invalid'
+}
+V panic: Assertion failed...

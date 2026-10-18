@@ -236,11 +236,12 @@ fn catalog_build(recipe_file string, source_roots string, destination string, op
 	defer { C.close(root) }
 	target := export_target(destination, 'catalog workspace')!
 	parent := os.dir(target)
-	defer { unsafe { target.free(); parent.free() } }
+	temporary := import_temporary_directory()
+	defer { unsafe { target.free(); parent.free(); temporary.free() } }
 	// Conservatively budget workspace plus the largest materialized package;
 	// also check the actual temporary filesystem, which may be another volume.
 	disk_check(options.available_space(parent)!, mirror_cost(plan.needed, plan.scratch)!, 64 * 1024 * 1024)!
-	disk_check(options.available_space(os.temp_dir())!, plan.scratch, 64 * 1024 * 1024)!
+	disk_check(options.available_space(temporary)!, plan.scratch, 64 * 1024 * 1024)!
 	mut roots := map[string]int{}
 	defer { for _, fd in roots { C.close(fd) }; unsafe { roots.free() } }
 	for item in plan.recipe.packages {
@@ -261,13 +262,16 @@ fn write_catalog_stage(plan CatalogPlan, roots map[string]int, target string, op
 	for item in plan.recipe.packages {
 		expected := item.recipe.manifest
 		packed := pack_root_descriptor(item.recipe, roots[item.source], stage, true) or {
-			return error('catalog import ${expected.id}/${expected.architecture}/${expected.version}: ${err}')
+			cause := err.msg()
+			message := 'catalog import ' + expected.id + '/' + expected.architecture + '/' + expected.version + ': ' + cause
+			unsafe { cause.free(); err.free() }
+			return error(message)
 		}
 		defer { close_decoded_package(packed) }
 		if !catalog_packed_matches(packed, expected)! {
 			return error('catalog payload inventory differs from its lock: ${expected.id}/${expected.architecture}/${expected.version}; verify prepared sources and regenerate/review the lock')
 		}
-		manifest_path := stage + '/manifests/${expected.id}-${expected.architecture}-${expected.version}.json'
+		manifest_path := '${stage}/manifests/${expected.id}-${expected.architecture}-${expected.version}.json'
 		manifest := publisher_json(expected)
 		defer { unsafe { manifest_path.free(); manifest.free() } }
 		atomic_write(manifest_path, manifest)!
@@ -284,12 +288,12 @@ fn write_catalog_stage(plan CatalogPlan, roots map[string]int, target string, op
 	sync_directory(stage)!
 	options.checkpoint('ready', stage)!
 	exporting.check()!
-	names := os.ls(manifests_path)!
+	names := publisher_flush_names(manifests_path)!
 	defer { unsafe { names.free() } }
 	if names.len != plan.recipe.packages.len { return error('catalog manifest set changed during import') }
 	for item in plan.recipe.packages {
 		p := item.recipe.manifest
-		path := manifests_path + '/${p.id}-${p.architecture}-${p.version}.json'
+		path := '${manifests_path}/${p.id}-${p.architecture}-${p.version}.json'
 		defer { unsafe { path.free() } }
 		actual := read_metadata(path)!
 		expected := publisher_json(p)
@@ -299,8 +303,10 @@ fn write_catalog_stage(plan CatalogPlan, roots map[string]int, target string, op
 		}
 	}
 	for hash, file in plan.objects {
+		// V copies string keys when iterating a map; the verification path owns
+		// this key copy as well as its joined object path.
 		path := objects_path + '/' + hash
-		defer { unsafe { path.free() } }
+		defer { unsafe { hash.free(); path.free() } }
 		if !verified_file(path, file) { return error('catalog object changed during import: ${hash}') }
 	}
 	staged := read_metadata(catalog_path)!

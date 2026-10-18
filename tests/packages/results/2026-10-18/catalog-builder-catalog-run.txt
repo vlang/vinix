@@ -1,0 +1,19 @@
+Updating trusted repository fixture
+Installing app 1.0.0 (1/3) from fixture
+Downloading app/bin/application (19 bytes)
+Installing License 1.0.0 (2/3) from fixture
+Downloading license/COPYING (23 bytes)
+Installing runtime 1.0.0 (3/3) from fixture
+Downloading runtime/bin/runner (23 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing app 1.0.0 (1/3) from fixture
+Downloading app/bin/application (18 bytes)
+Installing License 1.0.0 (2/3) from fixture
+Downloading license/COPYING (23 bytes)
+Installing runtime 1.0.0 (3/3) from fixture
+Downloading runtime/bin/runner (22 bytes)
+Activated package generation 1
+Activated package generation 2
+CATALOG WORKSPACE owned replies close independently without removing published manifests, objects or catalog PASS

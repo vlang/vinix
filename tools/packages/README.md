@@ -515,6 +515,13 @@ independent `CatalogInfo` reply with an idempotent `close()`. The original
 canonical bytes, object accounting and disk headroom are preserved. See
 [workspace planning qualification](../../tests/packages/catalog-plan-check.md).
 
+[Complete catalog builder qualification](../../tests/packages/catalog-builder-check.md)
+also covers imports, staged verification, publication and reply/error disposal:
+280 calls across 35 cases retain zero tracked allocations after JSON
+initialization. Recursive flushing retires enumeration and path scratch across
+192 success/refusal cycles. Both guests check ten selected complete-call cases;
+canonical locks, deduplicated objects and saved recovery data are preserved.
+
 Catalog normalization retains one owned decoded result, sorts its buffers in
 place and retires validation scratch on success or refusal. Structural release
 checks also retire their borrowed candidate/license lists and each fixed-root

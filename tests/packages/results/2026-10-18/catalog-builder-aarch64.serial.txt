@@ -1,0 +1,689 @@
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FC86000 start failed: Unsupported
+Error: Image at 0007FC0B000 start failed: Not Found
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+BdsDxe: starting Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x760a0000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x760a0000 to 0xffffffff80000000, length: 0x2f0000
+vmm: Kernel: Mapping 0x76390000 to 0xffffffff802f0000, length: 0x2c000
+vmm: Kernel: Mapping 0x763bc000 to 0xffffffff8031c000, length: 0x15e6000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x760a0000 +0x31c000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 29
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 30
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 1000000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+init smp...
+smp: BSP MPIDR:       0
+smp: Discovered CPUs: 4
+smp: Starting CPUs:   4
+security: PAN enabled
+smp: CPU 0 online!
+smp: CPU 1 online!
+smp: CPU 2 online!
+smp: CPU 3 online!
+smp: 4 CPUs online
+smp done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+spawn done, calling await...
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+initramfs: Module:  1
+initramfs: Address: 0xffff000075c11000
+initramfs: Size:    4780032
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=25
+!>+ [11] ./sbin/init sz=310864
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/flush sz=823320
+!>+ [15] ./usr/share/package-fixtures/plan sz=967336
+!>+ [16] ./usr/share/package-fixtures/catalog sz=1546912
+!>+ [17] ./usr/share/package-fixtures/builder sz=1119344
+!>initramfs: no ustar sig at 0xffff00007609fc00
+initramfs: Done (17 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 1000000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+pci: Found [0:2:0:-1]
+devcore: 3 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 3 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+HWTEST START packages-catalog-builder
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+CATALOG PLAN imports=1 fault=none functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=unique functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=length functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=schema functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=architecture functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=depth functional-cycles=4 PASS
+CATALOG PLAN imports=1 fault=closure functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=none functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=unique functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=length functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=schema functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=architecture functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=depth functional-cycles=4 PASS
+CATALOG PLAN imports=64 fault=closure functional-cycles=4 PASS
+CATALOG PLAN owned metadata/budget planning and schema/architecture/depth/closure/object-length refusals PASS
+CATALOG PLAN legacy bytes, deduplicated workspace/largest-package budgets, disclosures and independent idempotently closeable results PASS
+CATALOG BUILDER PROCESS plan  PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+PUBLISHER FLUSH case=complete retained=0 allocations=0
+PUBLISHER FLUSH case=ordinary-file retained=0 allocations=0
+PUBLISHER FLUSH case=nested-alias retained=0 allocations=0
+PUBLISHER FLUSH 192 recursive success and ordinary/nested durability refusal cycles retire names, paths and errors PASS
+CATALOG BUILDER PROCESS flush  PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+random: reseeded from 60672 events, 4 hardware words
+Updating trusted repository fixture
+Installing app 1.0.0 (1/3) from fixture
+Downloading app/bin/application (19 bytes)
+Installing License 1.0.0 (2/3) from fixture
+Downloading license/COPYING (23 bytes)
+Installing runtime 1.0.0 (3/3) from fixture
+Downloading runtime/bin/runner (23 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing app 1.0.0 (1/3) from fixture
+Downloading app/bin/application (18 bytes)
+Installing License 1.0.0 (2/3) from fixture
+Downloading license/COPYING (23 bytes)
+Installing runtime 1.0.0 (3/3) from fixture
+Downloading runtime/bin/runner (22 bytes)
+Activated package generation 1
+Activated package generation 2
+CATALOG WORKSPACE owned replies close independently without removing published manifests, objects or catalog PASS
+CATALOG BUILDER PROCESS catalog  PASS
+CATALOG BUILDER resources before grace complete:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 5492894
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 670 4126530
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 31 863232
+process 4 55006
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+CATALOG BUILDER resources after grace complete:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 1340884
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 31 863232
+process 2 27478
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=complete retained=0 allocations=0
+CATALOG BUILDER complete canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER PROCESS builder case complete PASS
+CATALOG BUILDER resources before grace unresolved:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 4515276
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 486 2992180
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 914176
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+CATALOG BUILDER resources after grace unresolved:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 1546944
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 10 51404
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 914176
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=unresolved retained=0 allocations=0
+CATALOG BUILDER unresolved canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER PROCESS builder case unresolved PASS
+CATALOG BUILDER resources before grace alias-source:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 3146102
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 248 1521114
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 1016064
+process 4 55038
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+CATALOG BUILDER resources after grace alias-source:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 1599476
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 1016064
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=alias-source retained=0 allocations=0
+CATALOG BUILDER alias-source canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER PROCESS builder case alias-source PASS
+CATALOG BUILDER resources before grace packed-3:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 3233078
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 262 1608086
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 1016064
+process 4 55042
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+CATALOG BUILDER resources after grace packed-3:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 1599476
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 1016064
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=packed-3 retained=0 allocations=0
+CATALOG BUILDER packed-3 canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER PROCESS builder case packed-3 PASS
+CATALOG BUILDER resources before grace packed-5:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 5345534
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 596 3669606
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 39 1067008
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+CATALOG BUILDER resources after grace packed-5:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 1675116
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 6 26744
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 39 1067008
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=packed-5 retained=0 allocations=0
+CATALOG BUILDER packed-5 canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER PROCESS builder case packed-5 PASS
+CATALOG BUILDER resources before grace import-missing:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 4717892
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 486 2991020
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 41 1117952
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+CATALOG BUILDER resources after grace import-missing:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 1701364
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 41 1117952
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=import-missing retained=0 allocations=0
+CATALOG BUILDER import-missing canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER PROCESS builder case import-missing PASS
+CATALOG BUILDER resources before grace manifest-mutated:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 3630746
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 310 1903862
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 41 1117952
+process 4 55046
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+CATALOG BUILDER resources after grace manifest-mutated:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 1701364
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 41 1117952
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=manifest-mutated retained=0 allocations=0
+CATALOG BUILDER manifest-mutated canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER PROCESS builder case manifest-mutated PASS
+CATALOG BUILDER resources before grace object-mutated:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 5177990
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 552 3400158
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 1168896
+process 4 55050
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+CATALOG BUILDER resources after grace object-mutated:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 1752308
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 1168896
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=object-mutated retained=0 allocations=0
+CATALOG BUILDER object-mutated canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER PROCESS builder case object-mutated PASS
+CATALOG BUILDER resources before grace flush:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 4845724
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 490 3016952
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 45 1219840
+process 4 55046
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+CATALOG BUILDER resources after grace flush:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 1803252
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 45 1219840
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=flush retained=0 allocations=0
+CATALOG BUILDER flush canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER PROCESS builder case flush PASS
+CATALOG BUILDER resources before grace root-replaced-refused:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 3832206
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 326 2003452
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 45 1219840
+process 4 55028
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+CATALOG BUILDER resources after grace root-replaced-refused:
+Limit: 119545856
+OwnerLimit: 59772928
+Charged: 1803252
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 45 1219840
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=root-replaced-refused retained=0 allocations=0
+CATALOG BUILDER root-replaced-refused canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER PROCESS builder case root-replaced-refused PASS
+HWTEST PASS packages-catalog-builder
+syspower: power off: stopping devices

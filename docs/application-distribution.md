@@ -435,6 +435,14 @@ independently closeable `CatalogInfo`. It finishes metadata admission and budget
 before touching prepared roots or destination parents, retaining the existing
 deduplication, scratch-space and reserve estimates. See
 [workspace planning checks](../tests/packages/catalog-plan-check.md).
+The [complete catalog builder checks](../tests/packages/catalog-builder-check.md)
+extend ownership through imports, staged manifest/object verification and
+publication. After JSON initialization, 280 calls across 35 cases retire all
+tracked V storage; recursive publisher flushing also retires names, paths and
+inspection scratch on success and refusal. Both guests exercise ten selected
+complete-call cases, preserving exact canonical retries, deduplication and
+saved/recovery data. Complete release builder ownership and broader catalog,
+graphical and application/runtime acceptance remain separate.
 Direct and prepared-root packing return independently closeable package metadata.
 Packing retires discarded template inventories and partial payload lists, moves
 owned file records without implicit clones, and releases encoding/copy scratch.

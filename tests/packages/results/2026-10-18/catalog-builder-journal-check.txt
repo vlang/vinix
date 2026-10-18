@@ -1,0 +1,4 @@
+CATALOG BUILDER journal guard=sources refuses before compilation PASS
+CATALOG BUILDER journal guard=artifact refuses before compilation PASS
+CATALOG BUILDER journal guard=existing refuses before compilation PASS
+CATALOG BUILDER intact completed journal resumes with all original timings and artifact pins PASS

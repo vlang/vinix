@@ -699,6 +699,14 @@ architectures; broader release/catalog/runtime acceptance remains open.
     canonical retries, explicit runtime/license bounds and recovery data.
     Broader catalog/release ownership, graphical acceptance and real application
     compatibility remain separate; section 14 stays open.
+  - [x] [Owned complete catalog construction](tests/packages/catalog-builder-check.md)
+    retires temporary paths, partial imports, manifest verification names,
+    object-map key copies and wrapped errors. After JSON initialization,
+    280 host calls across 35 cases, 192 recursive flush cycles and 1,792 planning
+    attempts retain zero tracked allocations. Both guests check ten selected
+    complete-call cases, preserving canonical locks, deduplicated objects and
+    saved/recovery data. Complete release builder ownership, production catalog
+    migration and broader graphical/application acceptance remain open.
   - [x] [Owned packing inventories and replies](tests/packages/pack-ownership-check.md)
     retire discarded template inventories, partial walked files and copy scratch
     across cold/cache success and late refusal. Independently closeable pack/root

@@ -1,0 +1,105 @@
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=complete retained=0 allocations=0
+CATALOG BUILDER complete canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=nested retained=0 allocations=0
+CATALOG BUILDER nested canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=missing-recipe retained=0 allocations=0
+CATALOG BUILDER missing-recipe canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=invalid-json retained=0 allocations=0
+CATALOG BUILDER invalid-json canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=unknown-schema retained=0 allocations=0
+CATALOG BUILDER unknown-schema canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=wrong-host retained=0 allocations=0
+CATALOG BUILDER wrong-host canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=unresolved retained=0 allocations=0
+CATALOG BUILDER unresolved canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=missing-root retained=0 allocations=0
+CATALOG BUILDER missing-root canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=missing-architecture retained=0 allocations=0
+CATALOG BUILDER missing-architecture canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=alias-source retained=0 allocations=0
+CATALOG BUILDER alias-source canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=no-output-space retained=0 allocations=0
+CATALOG BUILDER no-output-space canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=no-temp-space retained=0 allocations=0
+CATALOG BUILDER no-temp-space canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=space-error retained=0 allocations=0
+CATALOG BUILDER space-error canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=created retained=0 allocations=0
+CATALOG BUILDER created canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=packed-1 retained=0 allocations=0
+CATALOG BUILDER packed-1 canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=packed-2 retained=0 allocations=0
+CATALOG BUILDER packed-2 canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=packed-3 retained=0 allocations=0
+CATALOG BUILDER packed-3 canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=packed-4 retained=0 allocations=0
+CATALOG BUILDER packed-4 canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=packed-5 retained=0 allocations=0
+CATALOG BUILDER packed-5 canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=ready retained=0 allocations=0
+CATALOG BUILDER ready canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=import-missing retained=0 allocations=0
+CATALOG BUILDER import-missing canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=import-bytes retained=0 allocations=0
+CATALOG BUILDER import-bytes canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=import-mode retained=0 allocations=0
+CATALOG BUILDER import-mode canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=import-directory retained=0 allocations=0
+CATALOG BUILDER import-directory canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=manifest-mutated retained=0 allocations=0
+CATALOG BUILDER manifest-mutated canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=manifest-extra retained=0 allocations=0
+CATALOG BUILDER manifest-extra canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=object-mutated retained=0 allocations=0
+CATALOG BUILDER object-mutated canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=object-missing retained=0 allocations=0
+CATALOG BUILDER object-missing canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=catalog-mutated retained=0 allocations=0
+CATALOG BUILDER catalog-mutated canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=changed-recipe retained=0 allocations=0
+CATALOG BUILDER changed-recipe canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=occupied retained=0 allocations=0
+CATALOG BUILDER occupied canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=raced-target retained=0 allocations=0
+CATALOG BUILDER raced-target canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=flush retained=0 allocations=0
+CATALOG BUILDER flush canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=root-replaced retained=0 allocations=0
+CATALOG BUILDER root-replaced canonical retry, deduplication, saved output, sources and descriptors PASS
+CATALOG BUILDER golden=a5fac25e7915d6a796c04f427d79e0a7eab7ebbcff09a5ea79bb1ddcd4ea9158
+CATALOG BUILDER case=root-replaced-refused retained=0 allocations=0
+CATALOG BUILDER root-replaced-refused canonical retry, deduplication, saved output, sources and descriptors PASS

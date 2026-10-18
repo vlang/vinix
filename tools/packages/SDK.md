@@ -1070,6 +1070,16 @@ retires each independently packed manifest after checking it against the lock.
 See [workspace ownership qualification](../../tests/packages/catalog-plan-check.md)
 for measured planning lifetimes and publication/result checks.
 
+Complete catalog construction also retires temporary-filesystem paths, manifest
+verification names, object-map key copies and wrapped importer errors. Recursive
+publisher flushing owns its names, child paths and stack inspection records on
+success and refusal. After JSON initialization, the
+[complete builder checks](../../tests/packages/catalog-builder-check.md) measure
+280 calls across 35 cases, exact canonical retries and preserved recovery data;
+both guests cover ten selected cases. These checks preserve the package format,
+deduplication and existing directory traversal/durability rules. Complete release
+builder ownership and broader application acceptance remain separate.
+
 ```sh
 vinix-package pack-catalog catalog.json /build/prepared-roots /build/new-workspace
 vinix-package publish-release /build/new-workspace company /secure/publisher-seed 1 EXPIRES_UNIX /build/new-release

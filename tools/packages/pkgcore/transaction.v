@@ -246,11 +246,27 @@ fn desktop_entry(p Package) string {
 	return text.str()
 }
 
+// Reuse the owned descriptor enumerator without the prepared-root payload
+// limit. os.ls allocates a result buffer before opening, leaking it on refusal
+// in manual-free programs. The caller owns every returned name and the buffer.
+fn publisher_flush_names(path string) ![]string {
+	fd := C.open(path.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC)
+	if fd < 0 { return error('cannot enumerate package directory: ' + path) }
+	defer { C.close(fd) }
+	return import_names_limit(fd, 0x7fffffff)
+}
+
 fn flush_tree(path string) ! {
 	os.chmod(path, 0o755)!
-	for name in os.ls(path)! {
+	names := publisher_flush_names(path)!
+	defer { unsafe { names.free() } }
+	for name in names {
 		child := path + '/' + name
-		if os.is_dir(child) { flush_tree(child)! }
+		defer { unsafe { child.free() } }
+		mut info := C.stat{}
+		// Preserve stat's directory-following behavior without an allocated
+		// os.Stat output record or an unretired error for a missing child.
+		if C.fstatat(C.AT_FDCWD, child.str, unsafe { &info }, 0) == 0 && info.st_mode & 0o170000 == 0o040000 { flush_tree(child)! }
 	}
 	sync_directory(path)!
 }
