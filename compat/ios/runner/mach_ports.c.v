@@ -6,6 +6,8 @@ mut:
 	next &MachInlineMessage = unsafe { nil }
 	size u32
 	bytes voidptr
+	send_right bool
+	receive_bits u32 = 0x1100
 }
 
 struct MachReceivePort {
@@ -16,6 +18,12 @@ mut:
 	receive bool
 	is_set bool
 	group &MachReceivePort = unsafe { nil } // Membership is protected by the namespace lock.
+	notification &MachSendOnce = unsafe { nil }
+	notice_refs u64
+	make_send_count u32
+	had_senders bool
+	transit i64 // Atomic: queued and pending ordinary destination rights.
+	completed i64 // Atomic: dequeued rights awaiting release under the namespace.
 	calls u64
 	guard voidptr
 	changed voidptr
@@ -53,11 +61,12 @@ fn mach_receive_find(name u32) &MachReceivePort {
 fn mach_receive_packets_free(mut port MachReceivePort) {
 	mut packet := port.head
 	port.head = unsafe { nil }; port.tail = unsafe { nil }; port.count = 0
-	for packet != unsafe { nil } { next := packet.next; C.free(packet); packet = next }
+	for packet != unsafe { nil } { next := packet.next; if packet.send_right { mach_send_transit_drop(mut port) }; C.free(packet); packet = next }
 }
 
 fn mach_receive_free(mut port MachReceivePort, forked bool) {
 	if !forked && port.calls != 0 { panic('iOS: active receive port at retirement') }
+	if !forked && port.notice_refs != 0 { panic('iOS: retained notification target at retirement') }
 	if !forked && port.pending != unsafe { nil } { panic('iOS: unowned pending message at retirement') }
 	mach_receive_packets_free(mut port)
 	// In the fork child, senders vanished with their private copied packets.
@@ -74,7 +83,7 @@ fn mach_receive_refresh() {
 	mut previous := unsafe { &MachReceivePort(nil) }; mut port := system_data.receive_ports
 	for port != unsafe { nil } {
 		next := port.next
-		if !port.receive && port.refs == 0 && port.calls == 0 {
+		if !port.receive && port.refs == 0 && port.calls == 0 && port.notice_refs == 0 {
 			if previous == unsafe { nil } { system_data.receive_ports = next } else { previous.next = next }
 			mach_receive_free(mut port, false)
 		} else { previous = port }
@@ -94,6 +103,7 @@ fn mach_receive_pin(name u32) ?&MachReceivePort {
 // and MAKE_SEND therefore add a user reference; MOVE_SEND restores its one.
 fn mach_receive_restore_send(mut port MachReceivePort) u32 {
 	C.ios_mach_threads_lock(); defer { C.ios_mach_threads_unlock() }
+	mach_send_transit_drop(mut port)
 	if !port.receive { return 0xffffffff }
 	if port.refs != 65535 { port.refs++ }
 	return port.name
@@ -102,12 +112,18 @@ fn mach_receive_restore_send(mut port MachReceivePort) u32 {
 fn mach_receive_unpin(mut port MachReceivePort) {
 	C.ios_mach_threads_lock(); defer { C.ios_mach_threads_unlock() }
 	if port.calls == 0 { panic('iOS: receive port call reference underflow') }
+	mach_send_complete(mut port)
+	mach_no_senders_check(mut port)
 	port.calls--; mach_receive_refresh()
 }
 
 // Namespace lock is held. Borrowers release this guard before unpinning, so
 // termination can wake them without racing a free or inverting the locks.
 fn mach_receive_terminate(mut port MachReceivePort) {
+	if port.notification != unsafe { nil } {
+		mut right := port.notification; port.notification = unsafe { nil }
+		mach_send_once_emit(mut right, 71, 0)
+	}
 	// Membership carries no extra allocation or borrowed pointer after removal.
 	// Set destruction removes only the set right, leaving each member alive.
 	if port.is_set {
@@ -147,6 +163,7 @@ fn darwin_mach_port_insert_right(task u32, name u32, source u32, disposition u32
 	if port == unsafe { nil } { return 15 }
 	if !port.receive || port.is_set { return 17 }
 	if port.refs != 65535 { port.refs++ }
+	port.make_send_count++; port.had_senders = true
 	return 0
 }
 
@@ -155,6 +172,7 @@ fn darwin_mach_port_destroy(task u32, name u32) i32 {
 	if system_data == unsafe { nil } || task != system_data.task_self { return 4 }
 	if name == 0 || name == 0xffffffff { return 0 }
 	C.ios_mach_threads_lock(); defer { C.ios_mach_threads_unlock() }
+	if mach_send_once_known(name) { return mach_send_once_remove(name, true) }
 	mut port := mach_receive_find(name)
 	if port == unsafe { nil } { return if mach_exception_right(name) == .send { i32(46) } else { i32(15) } }
 	port.receive = false; port.refs = 0; mach_receive_terminate(mut port); mach_receive_refresh(); return 0
@@ -192,7 +210,7 @@ fn mach_receive_port_mod_refs(name u32, right i32, delta i32) ?i32 {
 	if delta < -65535 || delta > 65535 { return i32(18) }
 	if port.refs == 65535 && (port.receive || delta != -65535) { return if delta == -65535 { i32(20) } else { i32(0) } }
 	refs := i64(port.refs) + i64(delta); if refs < 0 { return i32(18) }
-	port.refs = u32(if refs > 65535 { i64(65535) } else { refs }); mach_receive_refresh(); return i32(0)
+	port.refs = u32(if refs > 65535 { i64(65535) } else { refs }); mach_no_senders_check(mut port); mach_receive_refresh(); return i32(0)
 }
 
 fn mach_receive_port_deallocate(name u32) ?i32 {
@@ -202,6 +220,7 @@ fn mach_receive_port_deallocate(name u32) ?i32 {
 	if port.is_set { port.receive = false; mach_receive_terminate(mut port); mach_receive_refresh(); return i32(0) }
 	if port.refs == 0 { return i32(17) }
 	if port.refs != 65535 { port.refs-- }
+	mach_no_senders_check(mut port)
 	mach_receive_refresh(); return i32(0)
 }
 
@@ -219,6 +238,7 @@ fn mach_receive_fork_parent() {
 }
 fn mach_receive_clear(forked bool) {
 	if system_data == unsafe { nil } { return }
+	mach_send_once_clear()
 	mut port := system_data.receive_ports; system_data.receive_ports = unsafe { nil }
 	for port != unsafe { nil } { next := port.next; mach_receive_free(mut port, forked); port = next }
 }
@@ -230,6 +250,7 @@ fn mach_ports_symbol(symbol string) ?u64 {
 		'_mach_port_insert_right' { u64(unsafe { voidptr(darwin_mach_port_insert_right) }) }
 		'_mach_port_destroy' { u64(unsafe { voidptr(darwin_mach_port_destroy) }) }
 		'_mach_port_move_member' { u64(unsafe { voidptr(darwin_mach_port_move_member) }) }
+		'_mach_port_request_notification' { u64(unsafe { voidptr(darwin_mach_port_request_notification) }) }
 		else { return none }
 	}
 }

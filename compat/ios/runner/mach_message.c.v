@@ -23,6 +23,11 @@ struct MachPreparedSend {
 fn mach_message_prepare(message voidptr, size u32, name u32, disposition u32) MachPreparedSend {
 	C.ios_mach_threads_lock(); defer { C.ios_mach_threads_unlock() }
 	mut port := mach_receive_find(name)
+	mut once := unsafe { &MachSendOnce(nil) }
+	if disposition == 18 {
+		once = mach_send_once_find(name)
+		if once != unsafe { nil } && once.target.receive { port = once.target } else { return MachPreparedSend{code: i32(0x10000003)} }
+	}
 	if port == unsafe { nil } || !port.receive || port.is_set || ((disposition == 17 || disposition == 19) && port.refs == 0) {
 		code := if system_data != unsafe { nil } && mach_exception_right(name) == .send { i32(0x10000013) } else { i32(0x10000003) }
 		return MachPreparedSend{code: code}
@@ -31,9 +36,12 @@ fn mach_message_prepare(message voidptr, size u32, name u32, disposition u32) Ma
 	defer { C.pthread_mutex_unlock(port.guard) }
 	mut packet := unsafe { &MachInlineMessage(C.malloc(usize(sizeof(MachInlineMessage)) + usize(size))) }
 	if packet == unsafe { nil } { return MachPreparedSend{code: i32(0x1000000d)} }
-	unsafe { *packet = MachInlineMessage{next: port.pending, size: size, bytes: voidptr(u64(packet) + u64(sizeof(MachInlineMessage)))} }
+	unsafe { *packet = MachInlineMessage{next: port.pending, size: size, bytes: voidptr(u64(packet) + u64(sizeof(MachInlineMessage))), send_right: disposition != 18, receive_bits: if disposition == 18 { u32(0x1200) } else { u32(0x1100) }} }
 	C.memcpy(packet.bytes, message, usize(size)); port.pending = packet; port.calls++
+	if disposition != 18 { C.ios_ref_change(unsafe { &port.transit }, 1); port.had_senders = true }
+	if disposition == 20 { port.make_send_count++ }
 	if disposition == 17 && port.refs != 65535 { port.refs-- }
+	if once != unsafe { nil } { mach_send_once_free(mut once) }
 	return MachPreparedSend{port: port, packet: packet}
 }
 
@@ -65,8 +73,7 @@ fn mach_message_send(message voidptr, size u32, options u32, timeout u32) i32 {
 	if bits & 0x1f == 0 { return i32(0x10000010) }
 	// This transport accepts inline send rights with no transferred
 	// reply/voucher rights. Descriptors and kernel RPCs need separate support.
-	if bits == 18 { return i32(0x10000003) }
-	if bits !in [u32(17), 19, 20] || mach_message_read32(message, 12) != 0 || mach_message_read32(message, 16) != 0 { return i32(0x10000013) }
+	if bits !in [u32(17), 18, 19, 20] || mach_message_read32(message, 12) != 0 || mach_message_read32(message, 16) != 0 { return i32(0x10000013) }
 	name := mach_message_read32(message, 8)
 	prepared := mach_message_prepare(message, size, name, bits)
 	if prepared.code != 0 { return prepared.code }
@@ -87,7 +94,7 @@ fn mach_message_enqueue(mut port MachReceivePort, mut packet MachInlineMessage, 
 	deadline := mach_message_deadline(timeout)
 	if C.pthread_mutex_lock(port.guard) != 0 { panic('iOS: cannot guard message send') }
 	defer { C.pthread_mutex_unlock(port.guard) }
-	for !port.dead && port.count >= 5 {
+	for packet.send_right && !port.dead && port.count >= 5 {
 		if !mach_message_wait(port, options & 0x10 != 0, deadline) {
 			mach_message_pending_remove(mut port, packet); C.free(packet); return i32(0x10000004)
 		}
@@ -95,7 +102,7 @@ fn mach_message_enqueue(mut port MachReceivePort, mut packet MachInlineMessage, 
 	mach_message_pending_remove(mut port, packet)
 	// Darwin accepts an in-flight send when its destination is destroyed;
 	// the message is discarded rather than pseudo-received by the sender.
-	if port.dead { C.free(packet); return 0 }
+	if port.dead { if packet.send_right { C.ios_ref_change(unsafe { &port.completed }, 1) }; C.free(packet); return 0 }
 	packet.next = unsafe { nil }
 	if port.tail == unsafe { nil } { port.head = packet; port.ready_order = mach_receive_next_order() } else { port.tail.next = packet }
 	port.tail = packet; port.count++
@@ -133,6 +140,7 @@ fn mach_message_copy_locked(mut port MachReceivePort, message voidptr, limit u32
 		return i32(0x10004004)
 	}
 	port.head = packet.next; if port.head == unsafe { nil } { port.tail = unsafe { nil } }; port.count--
+	if packet.send_right { C.ios_ref_change(unsafe { &port.completed }, 1) }
 	port.ready_order = if port.head == unsafe { nil } { u64(0) } else { mach_receive_next_order() }
 	defer { C.free(packet) }
 	if C.pthread_cond_broadcast(port.changed) != 0 { panic('iOS: cannot wake message sender') }
@@ -141,7 +149,7 @@ fn mach_message_copy_locked(mut port MachReceivePort, message voidptr, limit u32
 	// size is 24, followed by as much of the minimum trailer as fits.
 	length := if large { u32(24) } else { packet.size }
 	C.memcpy(message, packet.bytes, usize(length))
-	mach_message_write32(message, 0, 0x1100)
+	mach_message_write32(message, 0, packet.receive_bits)
 	mach_message_write32(message, 4, length)
 	mach_message_write32(message, 8, 0)
 	mach_message_write32(message, 12, name)

@@ -32,6 +32,7 @@ mut:
 	thread_ports &MachThreadPort = unsafe { nil }
 	semaphores &MachSemaphore = unsafe { nil }
 	receive_ports &MachReceivePort = unsafe { nil }
+	send_once &MachSendOnce = unsafe { nil }
 	main_queue [8]u64
 	vm_mappings []MachMapping
 	memory_entries &MachMemoryEntry = unsafe { nil }

@@ -294,6 +294,7 @@ fn darwin_mach_port_type(task u32, name u32, output &u32) i32 {
 	if task != system_data.task_self || output == unsafe { nil } { return 4 }
 	if result := mach_host_port_type(name, output) { return result }
 	if result := mach_receive_port_type(name, output) { return result }
+	if result := mach_send_once_type(name, output) { return result }
 	if result := mach_memory_port_type(name, output) { return result }
 	if result := mach_semaphore_port_type(name, output) { return result }
 	$if macos { return C.ios_native_port_type(name, output) }
@@ -313,6 +314,7 @@ fn darwin_mach_port_get_refs(task u32, name u32, right i32, output &u32) i32 {
 	if task != system_data.task_self || output == unsafe { nil } { return 4 }
 	if result := mach_host_port_refs(name, right, output) { return result }
 	if result := mach_receive_port_refs(name, right, output) { return result }
+	if result := mach_send_once_refs(name, right, output) { return result }
 	if result := mach_memory_port_refs(name, right, output) { return result }
 	if result := mach_semaphore_port_refs(name, right, output) { return result }
 	$if macos { return C.ios_native_port_refs(name, right, output) }
@@ -336,6 +338,7 @@ fn darwin_mach_port_mod_refs(task u32, name u32, right i32, delta i32) i32 {
 	if task != system_data.task_self { return 4 }
 	if result := mach_host_port_mod_refs(name, right, delta) { return result }
 	if result := mach_receive_port_mod_refs(name, right, delta) { return result }
+	if result := mach_send_once_mod_refs(name, right, delta) { return result }
 	if result := mach_memory_port_mod_refs(name, right, delta) { return result }
 	if result := mach_semaphore_port_mod_refs(name, right, delta) { return result }
 	$if macos { return C.ios_native_port_mod_refs(name, right, delta) }
@@ -371,6 +374,7 @@ fn darwin_mach_port_deallocate(task u32, name u32) i32 {
 	if task != system_data.task_self { return 4 }
 	if result := mach_host_port_mod_refs(name, 0, -1) { return result }
 	if result := mach_receive_port_deallocate(name) { return result }
+	if result := mach_send_once_deallocate(name) { return result }
 	if result := mach_memory_port_mod_refs(name, 0, -1) { return result }
 	if result := mach_semaphore_port_deallocate(name) { return result }
 	$if macos { return C.ios_native_port_deallocate(name) }

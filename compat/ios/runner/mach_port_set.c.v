@@ -6,11 +6,11 @@ fn darwin_mach_port_move_member(task u32, name u32, group_name u32) i32 {
 	if system_data == unsafe { nil } || task != system_data.task_self { return 4 }
 	C.ios_mach_threads_lock(); defer { C.ios_mach_threads_unlock() }
 	mut port := mach_receive_find(name)
-	if port == unsafe { nil } { return if name == 0 || name == 0xffffffff || mach_exception_right(name) != .missing { i32(17) } else { i32(15) } }
+	if port == unsafe { nil } { return if name == 0 || name == 0xffffffff || mach_send_once_find(name) != unsafe { nil } || mach_exception_right(name) != .missing { i32(17) } else { i32(15) } }
 	mut group := unsafe { &MachReceivePort(nil) }
 	if group_name != 0 {
 		group = mach_receive_find(group_name)
-		if group == unsafe { nil } { return if group_name == 0xffffffff || mach_exception_right(group_name) != .missing { i32(17) } else { i32(15) } }
+		if group == unsafe { nil } { return if group_name == 0xffffffff || mach_send_once_find(group_name) != unsafe { nil } || mach_exception_right(group_name) != .missing { i32(17) } else { i32(15) } }
 		if !group.receive || !group.is_set { return 17 }
 	}
 	// Darwin resolves the destination before checking the member's right kind.
@@ -36,6 +36,10 @@ fn darwin_mach_port_move_member(task u32, name u32, group_name u32) i32 {
 // leaving a stale set pointer and closes the empty-scan/wait notification gap.
 fn mach_port_set_notify(port &MachReceivePort) {
 	C.ios_mach_threads_lock(); defer { C.ios_mach_threads_unlock() }
+	mach_port_set_notify_locked(port)
+}
+
+fn mach_port_set_notify_locked(port &MachReceivePort) {
 	group := port.group
 	if group == unsafe { nil } { return }
 	if C.pthread_mutex_lock(group.guard) != 0 { panic('iOS: cannot notify port set') }

@@ -9143,7 +9143,7 @@ retires the child's inherited namespace. Image teardown checks for active calls
 before freeing packets and native synchronization objects. Host-statistics and
 exception RPCs to these user ports reject unsupported delivery explicitly.
 Cross-process transport, complex descriptors, transferred reply/voucher
-rights, send-once rights, alternate trailers and kernel exception delivery remain
+rights, alternate trailers and kernel exception delivery remain
 unsupported. Only the measured message options are accepted.
 
 `tests/ios/native-checks.v build-mach-message` builds the fixture. Ten host
@@ -9192,17 +9192,51 @@ fork and image retirement. Evidence is retained under
 `_mach_port_request_notification`. Fortnite remains unplayable; the full iOS
 regression is unpassed.
 
+The V adapter now implements `mach_port_request_notification` for
+`MACH_NOTIFY_NO_SENDERS` (70), the request made by Fortnite at `0x1000b3f88`.
+Native measurements establish the `sync` gate, make-send count, one-shot delivery,
+replacement/cancellation and the 36-byte notification ABI. Ordinary messages
+retain their destination send rights while queued, so the notification fires
+after the last such message is received or discarded. A retained oversized
+receive keeps that right. Timed-out sends restore their user reference and
+retain the measured make-send count.
+
+Each request reserves its send-once right and notification packet. Delivery
+allocates nothing and bypasses the ordinary queue limit, as Darwin does.
+Replacement and cancellation return owned send-once names; deallocation or
+source destruction sends `MACH_NOTIFY_SEND_ONCE` (71). Returned rights support
+type/ref queries, removal, reuse with `MOVE_SEND_ONCE`, dead-name conversion
+and inline send-once messages. Dead targets are retained only while a right
+still needs their state. Namespace locking, target references and atomic
+in-transit counts preserve ownership through concurrent receives and ref drops.
+Fork and image teardown retire internal/exported rights before their targets.
+Other notification families and send-right notification descriptors explicitly
+return `KERN_NOT_SUPPORTED`; transferred reply rights and complex descriptors
+remain unsupported.
+
+`tests/ios/native-checks.v build-mach-notification` builds the fixture.
+The public driver now routes registered individual build commands through the
+fixture table and rejects unknown fixture names.
+Fourteen host ASan/UBSan runs and the ARM64 Vinix fixture cover native ABI
+comparisons, guarded output, queue ownership, retry/discard, saturation, full
+queues, dead targets, eight set receivers, concurrent ref drops, errno, fork
+and two image lifecycles. Generated C review checks the reserved packet and
+target ownership, atomic counts, lock order and cleanup. Evidence is under
+`build/ios/fortnite/mach-notification-checks`. The fresh Fortnite probe passes
+`_mach_port_request_notification` and stops before entry at `_madvise`.
+Fortnite remains unplayable and the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,751 | 409 | 79 |
+| Fortnite executable | 1,752 | 408 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,586 | 412 | 120 |
+| All images | 2,587 | 411 | 120 |
 
-The C++/GLES/Text variant reports 2,600 resolved imports, 398 unresolved strong
+The C++/GLES/Text variant reports 2,601 resolved imports, 397 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
