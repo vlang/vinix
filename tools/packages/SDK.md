@@ -689,6 +689,22 @@ Do not modify the workspace or seed while publishing.
 An object whose digest matches the signing seed file is refused, catching an
 accidentally packed seed; keep all credentials out of payload sources as well.
 
+The V API returns independently owned reply strings:
+
+```v
+mut info := pkgcore.publish_release(workspace, id, seed, sequence, expires, destination)!
+defer { info.close() }
+```
+
+`ReleaseInfo.close()` is idempotent and preserves the signed release, private
+seed and sequence floor. Caller ID/path storage may be retired before reading
+the reply. Publication owns decoded manifests, canonicalization buffers, signing
+scratch and verified indexes; legacy `publish` also retires its tuple. The
+[ownership qualification](../../tests/packages/release-owner-check.md) measures
+304 calls across 38 cases and 448 canonicalization cycles after JSON metadata
+initialization, preserving exact signed retries and reservation/recovery behavior.
+Both guests qualify twelve selected complete-call cases and all canonical cycles.
+
 Both `publish` and `publish-release` capture the seed through one nonblocking,
 no-follow descriptor. The captured file must belong to the invoking publisher,
 have no group/other permissions or additional hard links, and contain exactly
@@ -1077,8 +1093,9 @@ success and refusal. After JSON initialization, the
 [complete builder checks](../../tests/packages/catalog-builder-check.md) measure
 280 calls across 35 cases, exact canonical retries and preserved recovery data;
 both guests cover ten selected cases. These checks preserve the package format,
-deduplication and existing directory traversal/durability rules. Complete release
-builder ownership and broader application acceptance remain separate.
+deduplication and existing directory traversal/durability rules. Release builder
+ownership has its [separate check](../../tests/packages/release-owner-check.md);
+broader application acceptance remains open.
 
 ```sh
 vinix-package pack-catalog catalog.json /build/prepared-roots /build/new-workspace

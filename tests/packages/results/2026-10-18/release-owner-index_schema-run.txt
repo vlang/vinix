@@ -1,0 +1,9 @@
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading data/share/data (30 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture

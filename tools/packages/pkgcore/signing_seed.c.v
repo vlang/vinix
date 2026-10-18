@@ -46,7 +46,7 @@ fn read_signing_seed(path string, options SigningSeedOptions) !SigningSeed {
 	defer { C.close(fd) }
 	options.checkpoint('opened', path)!
 	mut info := C.stat{}
-	if C.fstat(fd, &info) != 0 || !private_signing_file(info) {
+	if C.fstat(fd, unsafe { &info }) != 0 || !private_signing_file(info) {
 		return error('publisher signing seed must be a private ordinary file owned by this administrator, without hard links')
 	}
 	if info.st_size < 64 || info.st_size > max_signing_seed_text {
@@ -68,8 +68,8 @@ fn read_signing_seed(path string, options SigningSeedOptions) !SigningSeed {
 	}
 	options.checkpoint('read', path)!
 	mut named := C.stat{}
-	if done != expected || C.fstat(fd, &info) != 0 || !private_signing_file(info) || info.st_size != expected
-		|| C.fstatat(C.AT_FDCWD, path.str, &named, C.AT_SYMLINK_NOFOLLOW) != 0
+	if done != expected || C.fstat(fd, unsafe { &info }) != 0 || !private_signing_file(info) || info.st_size != expected
+		|| C.fstatat(C.AT_FDCWD, path.str, unsafe { &named }, C.AT_SYMLINK_NOFOLLOW) != 0
 		|| !private_signing_file(named) || named.st_dev != device || named.st_ino != inode || named.st_size != expected {
 		return error('publisher signing seed changed while reading; restore a stable private file and retry')
 	}

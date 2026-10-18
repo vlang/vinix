@@ -311,6 +311,13 @@ to emit a complete signed consumer repository with atomic publication, dependenc
 closure validation on each declared architecture and retained publisher sequence
 history. The legacy `publish` command remains available for workspace metadata.
 
+The V reply owns its strings independently and supports idempotent
+`ReleaseInfo.close()`, preserving signed output, seed and sequence history.
+The CLI closes its reply after JSON encoding. Complete publication and
+canonical-index scratch now have measured owners across 304 calls and 448
+canonicalization cycles. See [release ownership checks](../../tests/packages/release-owner-check.md)
+for refusals, exact signed retry, both-guest coverage and retained evidence.
+
 Read [administration/recovery](../../docs/application-distribution.md) and
 [SDK 1](SDK.md) for enrollment, policy, packaging and limits. Release publisher
 enrollment and catalog/runtime guest qualification remain required.

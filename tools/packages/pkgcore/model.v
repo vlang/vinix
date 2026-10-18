@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import json2
 import tools.packages.appsdk
 
 pub const format_version = 1
@@ -370,12 +369,28 @@ fn package_order(a &Package, b &Package) int {
 
 pub fn canonical_index(index Index) !string {
 	mut packages := index.packages.clone()
+	defer { unsafe { (&array(&packages)).free() } }
 	packages.sort_with_compare(package_order)
-	mut canonical := []Package{}
-	for p in packages {
-		canonical << canonical_package(p)!
+	mut canonical := []Package{cap: packages.len}
+	defer {
+		for p in canonical { close_canonical_package(p) }
+		unsafe { (&array(&canonical)).free() }
 	}
-	return json2.encode(Index{ ...index, packages: canonical }) + '\n'
+	for p in packages {
+		owned := canonical_package(p)!
+		pointer := unsafe { &owned }
+		unsafe { canonical.push_many(pointer, 1) }
+	}
+	return publisher_json(Index{ ...index, packages: canonical })
+}
+
+// Canonicalization borrows scalar strings and nested record fields; only its
+// four independently sorted collection buffers belong to the temporary copy.
+fn close_canonical_package(p Package) {
+	unsafe {
+		(&array(&p.files)).free(); (&array(&p.dependencies)).free()
+		(&array(&p.permissions)).free(); (&array(&p.associations)).free()
+	}
 }
 
 fn canonical_package(p Package) !Package {

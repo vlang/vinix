@@ -1,0 +1,628 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=23
+!>+ [11] ./sbin/init sz=216384
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/seed sz=1177928
+!>+ [15] ./usr/share/package-fixtures/canonical sz=756936
+!>+ [16] ./usr/share/package-fixtures/release sz=1603288
+!>+ [17] ./usr/share/package-fixtures/builder sz=1204264
+!>initramfs: no ustar sig at 0xff000000370f5400
+initramfs: Done (17 entries)
+HWTEST START packages-release-owner
+CANONICAL INDEX count=0 case=complete retained=0 allocations=0
+CANONICAL INDEX count=1 case=complete retained=0 allocations=0
+CANONICAL INDEX count=1 case=first-invalid retained=0 allocations=0
+CANONICAL INDEX count=1 case=last-invalid retained=0 allocations=0
+CANONICAL INDEX count=64 case=complete retained=0 allocations=0
+CANONICAL INDEX count=64 case=first-invalid retained=0 allocations=0
+CANONICAL INDEX count=64 case=last-invalid retained=0 allocations=0
+CANONICAL INDEX 448 complete/partial-refusal cycles preserve input order and borrowed fields PASS
+RELEASE OWNER PROCESS canonical  PASS
+EXPORT RETIREMENT 64 release root/parent substitutions preserve replacement and recovery trees, signing inputs and reservation timing; exact retry PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+RELEASE ADMISSION late-index refused=true unpublished=true
+RELEASE ADMISSION changed staged metadata refuses after reservation; exact retry preserves publisher floor PASS
+RELEASE ADMISSION 34 staged/reserved refusals preserve workspace and outside data; history timing, no publication, cleanup and exact retry PASS
+RELEASE OWNER PROCESS release  PASS
+RELEASE OWNER PROCESS seed  PASS
+RELEASE OWNER resources before grace complete:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 2943412
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 214 1314910
+descriptor 4 16768
+socket 0 0
+ipc 2 8192
+mapping 35 412160
+process 4 54584
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace complete:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 1065436
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 4 14408
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 434432
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=complete retained=0 allocations=0
+RELEASE OWNER complete exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER independent idempotently closeable replies preserve signed output, seed and reservation PASS
+RELEASE OWNER PROCESS builder case complete PASS
+RELEASE OWNER resources before grace in-place:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 2888442
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 196 1201282
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 41 478976
+process 4 54618
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace in-place:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 1097620
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 41 478976
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=in-place retained=0 allocations=0
+RELEASE OWNER in-place exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case in-place PASS
+RELEASE OWNER resources before grace invalid-seed:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 2329130
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 102 619698
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 501248
+process 4 54618
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace invalid-seed:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 1119892
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 501248
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=invalid-seed retained=0 allocations=0
+RELEASE OWNER invalid-seed exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case invalid-seed PASS
+RELEASE OWNER resources before grace unresolved:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 1722758
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 88 533014
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 47 545792
+process 4 54626
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace unresolved:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 1164436
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 47 545792
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=unresolved retained=0 allocations=0
+RELEASE OWNER unresolved exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case unresolved PASS
+RELEASE OWNER resources before grace seed-payload:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 1745028
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 88 533016
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 49 568064
+process 4 54622
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace seed-payload:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 1186708
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 49 568064
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=seed-payload retained=0 allocations=0
+RELEASE OWNER seed-payload exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case seed-payload PASS
+RELEASE OWNER resources before grace copied:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 1666026
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 68 409466
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 53 612608
+process 4 54626
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace copied:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 1231252
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 53 612608
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=copied retained=0 allocations=0
+RELEASE OWNER copied exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case copied PASS
+RELEASE OWNER resources before grace reserved:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 2512110
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 110 669050
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 55 634880
+process 4 54614
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace reserved:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 1253524
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 55 634880
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=reserved retained=0 allocations=0
+RELEASE OWNER reserved exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case reserved PASS
+RELEASE OWNER resources before grace late-index:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 2408002
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 180 1102810
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 57 661248
+process 4 54618
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace late-index:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 1279892
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 57 661248
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=late-index retained=0 allocations=0
+RELEASE OWNER late-index exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case late-index PASS
+RELEASE OWNER resources before grace reserved-index:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 2168442
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 134 818190
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 61 706304
+process 4 54622
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace reserved-index:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 1324948
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 61 706304
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=reserved-index retained=0 allocations=0
+RELEASE OWNER reserved-index exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case reserved-index PASS
+RELEASE OWNER resources before grace history-write:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 2608982
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 198 1214178
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 65 750848
+process 4 54630
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace history-write:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 1369492
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 65 750848
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=history-write retained=0 allocations=0
+RELEASE OWNER history-write exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case history-write PASS
+RELEASE OWNER resources before grace root-replaced-refused:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 2939482
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 248 1522408
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 67 773120
+process 4 54628
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace root-replaced-refused:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 1391764
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 67 773120
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=root-replaced-refused retained=0 allocations=0
+RELEASE OWNER root-replaced-refused exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case root-replaced-refused PASS
+RELEASE OWNER resources before grace captured-seed:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 2855370
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 136 829496
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 71 817664
+process 4 54644
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace captured-seed:
+Limit: 121158144
+OwnerLimit: 60579072
+Charged: 1436308
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 71 817664
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=captured-seed retained=0 allocations=0
+RELEASE OWNER captured-seed exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case captured-seed PASS
+HWTEST PASS packages-release-owner

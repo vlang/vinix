@@ -1,0 +1,775 @@
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FC86000 start failed: Unsupported
+Error: Image at 0007FC0B000 start failed: Not Found
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+BdsDxe: starting Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x760a0000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x760a0000 to 0xffffffff80000000, length: 0x2f0000
+vmm: Kernel: Mapping 0x76390000 to 0xffffffff802f0000, length: 0x2c000
+vmm: Kernel: Mapping 0x763bc000 to 0xffffffff8031c000, length: 0x15e6000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x760a0000 +0x31c000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 29
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 30
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 1000000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+init smp...
+smp: BSP MPIDR:       0
+smp: Discovered CPUs: 4
+smp: Starting CPUs:   4
+security: PAN enabled
+smp: CPU 0 online!
+smp: CPU 1 online!
+smp: CPU 2 online!
+smp: CPU 3 online!
+smp: 4 CPUs online
+smp done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+initramfs: Module:  1
+initramfs: Address: 0xffff000075bca000
+initramfs: Size:    5068800
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=23
+!>+ [11] ./sbin/init sz=310960
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/seed sz=1186472
+!>+ [15] ./usr/share/package-fixtures/canonical sz=892776
+!>+ [16] ./usr/share/package-fixtures/release sz=1477760
+!>+ [17] ./usr/share/package-fixtures/builder sz=1189208
+!>initramfs: no ustar sig at 0xffff00007609f400
+initramfs: Done (17 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 1000000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+pci: Found [0:2:0:-1]
+devcore: 3 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 3 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+HWTEST START packages-release-owner
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+CANONICAL INDEX count=0 case=complete retained=0 allocations=0
+CANONICAL INDEX count=1 case=complete retained=0 allocations=0
+CANONICAL INDEX count=1 case=first-invalid retained=0 allocations=0
+CANONICAL INDEX count=1 case=last-invalid retained=0 allocations=0
+CANONICAL INDEX count=64 case=complete retained=0 allocations=0
+CANONICAL INDEX count=64 case=first-invalid retained=0 allocations=0
+CANONICAL INDEX count=64 case=last-invalid retained=0 allocations=0
+CANONICAL INDEX 448 complete/partial-refusal cycles preserve input order and borrowed fields PASS
+RELEASE OWNER PROCESS canonical  PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+random: reseeded from 53957 events, 4 hardware words
+EXPORT RETIREMENT 64 release root/parent substitutions preserve replacement and recovery trees, signing inputs and reservation timing; exact retry PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+RELEASE ADMISSION late-index refused=true unpublished=true
+RELEASE ADMISSION changed staged metadata refuses after reservation; exact retry preserves publisher floor PASS
+RELEASE ADMISSION 34 staged/reserved refusals preserve workspace and outside data; history timing, no publication, cleanup and exact retry PASS
+RELEASE OWNER PROCESS release  PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+RELEASE OWNER PROCESS seed  PASS
+RELEASE OWNER resources before grace complete:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 2914848
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 248 1525282
+descriptor 4 16768
+socket 0 0
+ipc 2 8192
+mapping 27 744960
+process 6 82528
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace complete:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 1328372
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 27 744960
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=complete retained=0 allocations=0
+RELEASE OWNER complete exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER independent idempotently closeable replies preserve signed output, seed and reservation PASS
+RELEASE OWNER PROCESS builder case complete PASS
+RELEASE OWNER resources before grace in-place:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 2940204
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 250 1535380
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 29 795904
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace in-place:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 1379316
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 29 795904
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=in-place retained=0 allocations=0
+RELEASE OWNER in-place exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case in-place PASS
+RELEASE OWNER resources before grace invalid-seed:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 2135888
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 120 731064
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 29 795904
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace invalid-seed:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 1379316
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 29 795904
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=invalid-seed retained=0 allocations=0
+RELEASE OWNER invalid-seed exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case invalid-seed PASS
+RELEASE OWNER resources before grace unresolved:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 2039736
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 88 533016
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 897792
+process 4 55042
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace unresolved:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 1481204
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 897792
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=unresolved retained=0 allocations=0
+RELEASE OWNER unresolved exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case unresolved PASS
+RELEASE OWNER resources before grace seed-payload:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 2039732
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 88 533016
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 897792
+process 4 55038
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace seed-payload:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 1481204
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 897792
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=seed-payload retained=0 allocations=0
+RELEASE OWNER seed-payload exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case seed-payload PASS
+RELEASE OWNER resources before grace copied:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 2103096
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 90 545432
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 35 948736
+process 4 55042
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace copied:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 1532148
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 35 948736
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=copied retained=0 allocations=0
+RELEASE OWNER copied exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case copied PASS
+RELEASE OWNER resources before grace reserved:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 2277644
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 110 669048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 999680
+process 4 55030
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace reserved:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 1583092
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 999680
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=reserved retained=0 allocations=0
+RELEASE OWNER reserved exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case reserved PASS
+RELEASE OWNER resources before grace late-index:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 2822778
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 198 1214178
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 999680
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace late-index:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 1583092
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 999680
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=late-index retained=0 allocations=0
+RELEASE OWNER late-index exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case late-index PASS
+RELEASE OWNER resources before grace reserved-index:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 2937012
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 200 1226520
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 41 1101568
+process 4 55038
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace reserved-index:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 1684980
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 41 1101568
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=reserved-index retained=0 allocations=0
+RELEASE OWNER reserved-index exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case reserved-index PASS
+RELEASE OWNER resources before grace history-write:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 3036044
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 216 1325544
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 41 1101568
+process 4 55046
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace history-write:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 1684980
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 41 1101568
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=history-write retained=0 allocations=0
+RELEASE OWNER history-write exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case history-write PASS
+RELEASE OWNER resources before grace root-replaced-refused:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 3283850
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 248 1522408
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 1152512
+process 4 55044
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace root-replaced-refused:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 1735924
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 1152512
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=root-replaced-refused retained=0 allocations=0
+RELEASE OWNER root-replaced-refused exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case root-replaced-refused PASS
+RELEASE OWNER resources before grace captured-seed:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 2481172
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 110 668770
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 45 1203456
+process 4 55060
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+RELEASE OWNER resources after grace captured-seed:
+Limit: 119508992
+OwnerLimit: 59754496
+Charged: 1786868
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 45 1203456
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=captured-seed retained=0 allocations=0
+RELEASE OWNER captured-seed exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER PROCESS builder case captured-seed PASS
+HWTEST PASS packages-release-owner
+syspower: power off: stopping devices

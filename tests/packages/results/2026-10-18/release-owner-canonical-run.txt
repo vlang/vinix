@@ -1,0 +1,8 @@
+CANONICAL INDEX count=0 case=complete retained=0 allocations=0
+CANONICAL INDEX count=1 case=complete retained=0 allocations=0
+CANONICAL INDEX count=1 case=first-invalid retained=0 allocations=0
+CANONICAL INDEX count=1 case=last-invalid retained=0 allocations=0
+CANONICAL INDEX count=64 case=complete retained=0 allocations=0
+CANONICAL INDEX count=64 case=first-invalid retained=0 allocations=0
+CANONICAL INDEX count=64 case=last-invalid retained=0 allocations=0
+CANONICAL INDEX 448 complete/partial-refusal cycles preserve input order and borrowed fields PASS

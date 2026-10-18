@@ -1,0 +1,1 @@
+CANONICAL INDEX 448 complete/partial-refusal cycles preserve input order and borrowed fields PASS

@@ -2109,6 +2109,14 @@ existing/raced destinations and interrupted publication with retained sequence
 history. CLI and both Linux guests install complete signed release output into
 clean offline stores. `publish-release` is the supported complete-release command;
 the legacy `publish` command still writes workspace metadata separately.
+The [release ownership checks](../tests/packages/release-owner-check.md) measure
+304 calls across 38 success/refusal cases and 448 canonical-index cycles after
+JSON initialization. Publication retires decoded manifests, signing and index
+scratch, stage paths and handled errors. Independently closeable `ReleaseInfo`
+replies preserve signed output and reserved sequence floors. Both guests check
+twelve selected complete-call cases and canonicalization, retaining exact signed
+retries, captured seed semantics and recovery data. Production publisher/catalog
+migration and broader graphical/runtime acceptance remain separate.
 The [accounts guest suite](../tests/accounts/README.md) adds a `packages` scenario
 for signed installation, the root-to-account handoff, literal documents,
 user-owned data, publisher revocation and uninstall. Its sandbox substitute

@@ -705,8 +705,17 @@ architectures; broader release/catalog/runtime acceptance remains open.
     280 host calls across 35 cases, 192 recursive flush cycles and 1,792 planning
     attempts retain zero tracked allocations. Both guests check ten selected
     complete-call cases, preserving canonical locks, deduplicated objects and
-    saved/recovery data. Complete release builder ownership, production catalog
-    migration and broader graphical/application acceptance remain open.
+    saved/recovery data. Release builder ownership is qualified separately below;
+    production catalog migration and broader graphical/application acceptance
+    remain open.
+  - [x] [Owned signed release publication](tests/packages/release-owner-check.md)
+    retires decoded manifests, canonicalization buffers, signing/index scratch,
+    stage paths and wrapped errors; replies own independently closeable metadata.
+    After JSON initialization, 304 host calls across 38 cases and 448 canonical
+    index cycles retain zero tracked allocations. Both guests check twelve
+    selected complete-call cases and canonicalization, preserving exact signed
+    retries, captured seeds, reserved sequence floors and recovery data. Production
+    publisher/catalog migration and graphical/runtime acceptance remain open.
   - [x] [Owned packing inventories and replies](tests/packages/pack-ownership-check.md)
     retire discarded template inventories, partial walked files and copy scratch
     across cold/cache success and late refusal. Independently closeable pack/root

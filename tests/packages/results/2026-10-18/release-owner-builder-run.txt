@@ -1,0 +1,115 @@
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=complete retained=0 allocations=0
+RELEASE OWNER complete exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=nested retained=0 allocations=0
+RELEASE OWNER nested exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=in-place retained=0 allocations=0
+RELEASE OWNER in-place exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=invalid-seed retained=0 allocations=0
+RELEASE OWNER invalid-seed exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=unsafe-seed retained=0 allocations=0
+RELEASE OWNER unsafe-seed exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=missing-seed retained=0 allocations=0
+RELEASE OWNER missing-seed exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=nul-seed retained=0 allocations=0
+RELEASE OWNER nul-seed exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=alias-seed retained=0 allocations=0
+RELEASE OWNER alias-seed exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=invalid-id retained=0 allocations=0
+RELEASE OWNER invalid-id exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=zero-sequence retained=0 allocations=0
+RELEASE OWNER zero-sequence exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=expired retained=0 allocations=0
+RELEASE OWNER expired exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=invalid-manifest retained=0 allocations=0
+RELEASE OWNER invalid-manifest exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=duplicate-manifest retained=0 allocations=0
+RELEASE OWNER duplicate-manifest exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=missing-object retained=0 allocations=0
+RELEASE OWNER missing-object exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=changed-object retained=0 allocations=0
+RELEASE OWNER changed-object exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=bad-history retained=0 allocations=0
+RELEASE OWNER bad-history exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=equivocation retained=0 allocations=0
+RELEASE OWNER equivocation exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=rollback retained=0 allocations=0
+RELEASE OWNER rollback exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=unresolved retained=0 allocations=0
+RELEASE OWNER unresolved exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=seed-payload retained=0 allocations=0
+RELEASE OWNER seed-payload exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=no-space retained=0 allocations=0
+RELEASE OWNER no-space exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=space-error retained=0 allocations=0
+RELEASE OWNER space-error exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=seed retained=0 allocations=0
+RELEASE OWNER seed exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=created retained=0 allocations=0
+RELEASE OWNER created exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=copied retained=0 allocations=0
+RELEASE OWNER copied exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=staged retained=0 allocations=0
+RELEASE OWNER staged exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=reserved retained=0 allocations=0
+RELEASE OWNER reserved exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=late-index retained=0 allocations=0
+RELEASE OWNER late-index exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=late-signature retained=0 allocations=0
+RELEASE OWNER late-signature exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=late-object retained=0 allocations=0
+RELEASE OWNER late-object exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=extra-entry retained=0 allocations=0
+RELEASE OWNER extra-entry exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=reserved-index retained=0 allocations=0
+RELEASE OWNER reserved-index exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=history-write retained=0 allocations=0
+RELEASE OWNER history-write exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=raced-target retained=0 allocations=0
+RELEASE OWNER raced-target exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=occupied retained=0 allocations=0
+RELEASE OWNER occupied exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=root-replaced retained=0 allocations=0
+RELEASE OWNER root-replaced exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=root-replaced-refused retained=0 allocations=0
+RELEASE OWNER root-replaced-refused exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER golden=1cfdd899be97f03a74ec4d2176acf68e2b4e2d8ef541a440bcc82a38272dc112
+RELEASE OWNER case=captured-seed retained=0 allocations=0
+RELEASE OWNER captured-seed exact signed retry, sequence reservation, recovery, seed and descriptors PASS
+RELEASE OWNER independent idempotently closeable replies preserve signed output, seed and reservation PASS

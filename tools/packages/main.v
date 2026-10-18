@@ -203,7 +203,8 @@ fn checked(arguments []string) !int {
 			if command == 'publish' {
 				pkgcore.publish(names[0], names[1], names[2], sequence, expires)!
 			} else {
-				println(json2.encode(pkgcore.publish_release(names[0], names[1], names[2], sequence, expires, names[5])!))
+				mut info := pkgcore.publish_release(names[0], names[1], names[2], sequence, expires, names[5])!
+				publisher_reply(mut info)
 			}
 			return 0
 		}
