@@ -51,9 +51,12 @@ pub fn (service Service) plan(operation string, names []string) !Plan {
 
 pub fn (service Service) review(operation string, names []string) !pkgprotocol.Review {
 	directory := service.directory()!
+	defer { unsafe { directory.free() } }
 	guard := acquire_reader(directory)!
 	defer { guard.release() }
-	return review_operation_locked(service.configuration()!, directory, operation, names)
+	config := service.configuration()!
+	defer { close_decoded_configuration(config) }
+	return review_operation_locked(config, directory, operation, names)
 }
 
 pub fn (service Service) rollback(expected string) !State {

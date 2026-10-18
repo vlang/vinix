@@ -475,6 +475,11 @@ pub fn rollback(config Config, directory string) !State {
 fn rollback_target(config Config, directory string, current State) !State {
 	if current.previous == 0 { return error('no previous package generation is available') }
 	old := read_generation_state(directory, config.architecture, current.previous)!
+	mut accepted := false
+	defer { if !accepted { close_decoded_state(old) } }
+	number := old.generation.str()
+	root := directory + '/generations/' + number
+	defer { unsafe { number.free(); root.free() } }
 	require_publisher_keys(old.packages)!
 	for installed in old.packages {
 		check_policy(installed.package, config.policy)!
@@ -482,14 +487,18 @@ fn rollback_target(config Config, directory string, current State) !State {
 			return error('${installed.package.id}: rollback repository key is no longer trusted')
 		}
 		for file in installed.package.files {
-			if !verified_installed_file(directory + '/generations/' + old.generation.str() + '/apps/' + installed.package.id + '/' + file.path, file) {
+			path := '${root}/apps/${installed.package.id}/${file.path}'
+			valid := verified_installed_file(path, file)
+			unsafe { path.free() }
+			if !valid {
 				return error('${installed.package.id}: rollback payload verification failed')
 			}
 		}
-		if !verified_registration(directory + '/generations/' + old.generation.str(), installed.package) {
+		if !verified_registration(root, installed.package) {
 			return error('${installed.package.id}: rollback application registration verification failed')
 		}
 	}
+	accepted = true
 	return old
 }
 

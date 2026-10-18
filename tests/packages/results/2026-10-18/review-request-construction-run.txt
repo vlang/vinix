@@ -1,0 +1,12 @@
+REVIEW CONSTRUCTION aarch64 changed/no-op/space/validation cycles retained 0 tracked bytes
+REVIEW CONSTRUCTION aarch64 generation 01 retained 0 tracked bytes
+REVIEW CONSTRUCTION aarch64 generation 18446744073709551615 retained 0 tracked bytes
+REVIEW CONSTRUCTION aarch64 generation 18446744073709551616 retained 0 tracked bytes
+REVIEW CONSTRUCTION x86_64 changed/no-op/space/validation cycles retained 0 tracked bytes
+REVIEW CONSTRUCTION x86_64 generation 01 retained 0 tracked bytes
+REVIEW CONSTRUCTION x86_64 generation 18446744073709551615 retained 0 tracked bytes
+REVIEW CONSTRUCTION x86_64 generation 18446744073709551616 retained 0 tracked bytes
+REVIEW CONSTRUCTION both hosts preserve changed/no-op proposals, reject space/validation/generation failures and retire 128 repeated calls per case PASS
+REVIEW CONSTRUCTION ordinary/deployment fingerprint cycles retained 0 tracked bytes
+REVIEW CONSTRUCTION ordinary/deployment identities retain exact prior JSON digests, repair domains and 1000 repeated hash retirements PASS
+REVIEW CONSTRUCTION independently owned fingerprints, rows and prior declarations survive input retirement on both hosts PASS

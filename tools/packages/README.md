@@ -384,6 +384,10 @@ Review construction releases failed presentation metadata, generation-scan
 scratch and ordinary/deployment fingerprint storage. Returned fingerprints are
 independently owned; their encoded identity stays compatible with prior reviews.
 See [construction checks](../../tests/packages/review-construction-check.md).
+Complete ordinary/deployment review requests also retire configuration, installed
+and rollback states, deployment documents, authenticated catalogs and solver
+buffers after building their independent reply, including refusal paths. See
+[request ownership checks](../../tests/packages/review-request-check.md).
 
 Software releases rejected progress-frame errors under manual memory management.
 Malformed frames keep the last valid progress, and oversized lines recover at

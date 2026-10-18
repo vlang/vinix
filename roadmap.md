@@ -808,7 +808,14 @@ architectures; broader release/catalog/runtime acceptance remains open.
     retires counter scans, failed presentation rows and ordinary/deployment
     fingerprint encoding/comparison storage. Returned fingerprints are
     independent, with unchanged approval identities; measured construction and
-    refusal loops leave complete public-service preparation as a separate boundary.
+    refusal loops are qualified independently of request preparation below.
+  - [x] [Owned complete review requests](tests/packages/review-request-check.md)
+    retire configuration, active/rollback states, deployment documents,
+    authenticated catalogs and solver buffers on success/refusal. Both public
+    review entry points preserve independent replies, lock ordering, signed
+    state and approval identities across 64 calls in each of 43 cases per
+    architecture declaration. Other complete service operations and broader
+    production/catalog, graphical and runtime release gates remain open.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,
   permissions, progress, uninstall, updates and useful failure diagnostics.
   - [x] [Reviewed permission changes](tests/packages/review-permissions-check.md)

@@ -1,0 +1,88 @@
+Updating trusted repository fixture
+REVIEW REQUEST aarch64 fresh install retained 37580 tracked bytes
+REVIEW REQUEST aarch64 fresh repair retained 7710 tracked bytes
+REVIEW REQUEST aarch64 fresh rollback refusal retained 7710 tracked bytes
+Installing Application é🚀 1.0.0 (1/3) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+REVIEW REQUEST aarch64 upgrade retained 86648 tracked bytes
+Installing Application é🚀 2.0.0 (1/3) from fixture
+Installing Assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 2
+REVIEW REQUEST aarch64 installed install retained 86664 tracked bytes
+REVIEW REQUEST aarch64 installed upgrade retained 86664 tracked bytes
+REVIEW REQUEST aarch64 installed repair retained 48748 tracked bytes
+REVIEW REQUEST aarch64 installed rollback retained 91122 tracked bytes
+REVIEW REQUEST aarch64 installed remove retained 48858 tracked bytes
+REVIEW REQUEST aarch64 installed deploy retained 85944 tracked bytes
+REVIEW REQUEST aarch64 offline cached review retained 86664 tracked bytes
+REVIEW REQUEST aarch64 blocked removal retained 48748 tracked bytes
+REVIEW REQUEST aarch64 missing package retained 82412 tracked bytes
+REVIEW REQUEST aarch64 invalid repair arguments retained 48748 tracked bytes
+REVIEW REQUEST aarch64 invalid rollback arguments retained 48748 tracked bytes
+REVIEW REQUEST aarch64 deployment legacy.json retained 87518 tracked bytes
+REVIEW REQUEST aarch64 deployment exact.json retained 89434 tracked bytes
+REVIEW REQUEST aarch64 deployment old.json retained 89434 tracked bytes
+REVIEW REQUEST aarch64 deployment empty.json retained 49594 tracked bytes
+REVIEW REQUEST aarch64 refused exact pins retained 51518 tracked bytes
+REVIEW REQUEST aarch64 malformed deployment retained 48748 tracked bytes
+REVIEW REQUEST aarch64 policy refusal retained 82340 tracked bytes
+REVIEW REQUEST aarch64 rollback policy refusal retained 89698 tracked bytes
+REVIEW REQUEST aarch64 deployment policy refusal retained 51446 tracked bytes
+REVIEW REQUEST aarch64 revoked rollback retained 89508 tracked bytes
+REVIEW REQUEST aarch64 revoked removal retained 48596 tracked bytes
+REVIEW REQUEST aarch64 revoked empty deployment retained 49332 tracked bytes
+REVIEW REQUEST aarch64 damaged rollback retained 90010 tracked bytes
+REVIEW REQUEST aarch64 damaged repair retained 48748 tracked bytes
+REVIEW REQUEST aarch64 busy ordinary retained 136 tracked bytes
+REVIEW REQUEST aarch64 busy deployment retained 136 tracked bytes
+REVIEW REQUEST aarch64 malformed configuration retained 136 tracked bytes
+REVIEW REQUEST aarch64 deployment malformed configuration retained 136 tracked bytes
+Updating trusted repository fixture
+REVIEW REQUEST x86_64 fresh install retained 37570 tracked bytes
+REVIEW REQUEST x86_64 fresh repair retained 7704 tracked bytes
+REVIEW REQUEST x86_64 fresh rollback refusal retained 7704 tracked bytes
+Installing Application é🚀 1.0.0 (1/3) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+REVIEW REQUEST x86_64 upgrade retained 86630 tracked bytes
+Installing Application é🚀 2.0.0 (1/3) from fixture
+Installing Assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 2
+REVIEW REQUEST x86_64 installed install retained 86646 tracked bytes
+REVIEW REQUEST x86_64 installed upgrade retained 86646 tracked bytes
+REVIEW REQUEST x86_64 installed repair retained 48736 tracked bytes
+REVIEW REQUEST x86_64 installed rollback retained 91092 tracked bytes
+REVIEW REQUEST x86_64 installed remove retained 48846 tracked bytes
+REVIEW REQUEST x86_64 installed deploy retained 85926 tracked bytes
+REVIEW REQUEST x86_64 offline cached review retained 86646 tracked bytes
+REVIEW REQUEST x86_64 blocked removal retained 48736 tracked bytes
+REVIEW REQUEST x86_64 missing package retained 82394 tracked bytes
+REVIEW REQUEST x86_64 invalid repair arguments retained 48736 tracked bytes
+REVIEW REQUEST x86_64 invalid rollback arguments retained 48736 tracked bytes
+REVIEW REQUEST x86_64 deployment legacy.json retained 87498 tracked bytes
+REVIEW REQUEST x86_64 deployment exact.json retained 89410 tracked bytes
+REVIEW REQUEST x86_64 deployment old.json retained 89410 tracked bytes
+REVIEW REQUEST x86_64 deployment empty.json retained 49580 tracked bytes
+REVIEW REQUEST x86_64 refused exact pins retained 51500 tracked bytes
+REVIEW REQUEST x86_64 malformed deployment retained 48736 tracked bytes
+REVIEW REQUEST x86_64 policy refusal retained 82322 tracked bytes
+REVIEW REQUEST x86_64 rollback policy refusal retained 89680 tracked bytes
+REVIEW REQUEST x86_64 deployment policy refusal retained 51428 tracked bytes
+REVIEW REQUEST x86_64 revoked rollback retained 89492 tracked bytes
+REVIEW REQUEST x86_64 revoked removal retained 48586 tracked bytes
+REVIEW REQUEST x86_64 revoked empty deployment retained 49320 tracked bytes
+REVIEW REQUEST x86_64 damaged rollback retained 89990 tracked bytes
+REVIEW REQUEST x86_64 damaged repair retained 48736 tracked bytes
+REVIEW REQUEST x86_64 busy ordinary retained 134 tracked bytes
+REVIEW REQUEST x86_64 busy deployment retained 134 tracked bytes
+REVIEW REQUEST x86_64 malformed configuration retained 134 tracked bytes
+REVIEW REQUEST x86_64 deployment malformed configuration retained 134 tracked bytes

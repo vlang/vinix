@@ -1,0 +1,260 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=24
+!>+ [11] ./sbin/init sz=211040
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/deployment sz=1815736
+!>+ [15] ./usr/share/package-fixtures/review sz=1612320
+!>+ [16] ./usr/share/package-fixtures/construction sz=875360
+!>+ [17] ./usr/share/package-fixtures/request sz=1625328
+!>initramfs: no ustar sig at 0xff00000037102a00
+initramfs: Done (17 entries)
+HWTEST START packages-review-request
+Updating trusted repository fixture
+REVIEW REQUEST aarch64 fresh install retained 0 tracked bytes
+REVIEW REQUEST aarch64 fresh repair retained 0 tracked bytes
+REVIEW REQUEST aarch64 fresh rollback refusal retained 0 tracked bytes
+Installing Application é🚀 1.0.0 (1/3) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+REVIEW REQUEST aarch64 upgrade retained 0 tracked bytes
+Installing Application é🚀 2.0.0 (1/3) from fixture
+Installing Assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 2
+REVIEW REQUEST aarch64 installed install retained 0 tracked bytes
+REVIEW REQUEST aarch64 installed upgrade retained 0 tracked bytes
+REVIEW REQUEST aarch64 installed repair retained 0 tracked bytes
+REVIEW REQUEST aarch64 installed rollback retained 0 tracked bytes
+REVIEW REQUEST aarch64 installed remove retained 0 tracked bytes
+REVIEW REQUEST aarch64 installed deploy retained 0 tracked bytes
+REVIEW REQUEST aarch64 offline cached review retained 0 tracked bytes
+REVIEW REQUEST aarch64 blocked removal retained 0 tracked bytes
+REVIEW REQUEST aarch64 missing package retained 0 tracked bytes
+REVIEW REQUEST aarch64 invalid repair arguments retained 0 tracked bytes
+REVIEW REQUEST aarch64 invalid rollback arguments retained 0 tracked bytes
+REVIEW REQUEST aarch64 deployment legacy.json retained 0 tracked bytes
+REVIEW REQUEST aarch64 deployment exact.json retained 0 tracked bytes
+REVIEW REQUEST aarch64 deployment old.json retained 0 tracked bytes
+REVIEW REQUEST aarch64 deployment empty.json retained 0 tracked bytes
+REVIEW REQUEST aarch64 refused exact pins retained 0 tracked bytes
+REVIEW REQUEST aarch64 malformed deployment retained 0 tracked bytes
+REVIEW REQUEST aarch64 surplus deployment closure retained 0 tracked bytes
+REVIEW REQUEST aarch64 policy refusal retained 0 tracked bytes
+REVIEW REQUEST aarch64 rollback policy refusal retained 0 tracked bytes
+REVIEW REQUEST aarch64 deployment policy refusal retained 0 tracked bytes
+REVIEW REQUEST aarch64 revoked rollback retained 0 tracked bytes
+REVIEW REQUEST aarch64 revoked removal retained 0 tracked bytes
+REVIEW REQUEST aarch64 revoked empty deployment retained 0 tracked bytes
+REVIEW REQUEST aarch64 damaged rollback retained 0 tracked bytes
+REVIEW REQUEST aarch64 damaged rollback registration retained 0 tracked bytes
+REVIEW REQUEST aarch64 damaged repair retained 0 tracked bytes
+REVIEW REQUEST aarch64 corrupt catalog.json retained 0 tracked bytes
+REVIEW REQUEST aarch64 deployment corrupt catalog.json retained 0 tracked bytes
+REVIEW REQUEST aarch64 corrupt trust-history.json retained 0 tracked bytes
+REVIEW REQUEST aarch64 deployment corrupt trust-history.json retained 0 tracked bytes
+REVIEW REQUEST aarch64 corrupt generations/2/state.json retained 0 tracked bytes
+REVIEW REQUEST aarch64 deployment corrupt generations/2/state.json retained 0 tracked bytes
+REVIEW REQUEST aarch64 late generation refusal retained 0 tracked bytes
+REVIEW REQUEST aarch64 deployment late generation refusal retained 0 tracked bytes
+REVIEW REQUEST aarch64 busy ordinary retained 0 tracked bytes
+REVIEW REQUEST aarch64 busy deployment retained 0 tracked bytes
+REVIEW REQUEST aarch64 malformed configuration retained 0 tracked bytes
+REVIEW REQUEST aarch64 deployment malformed configuration retained 0 tracked bytes
+Updating trusted repository fixture
+REVIEW REQUEST x86_64 fresh install retained 0 tracked bytes
+REVIEW REQUEST x86_64 fresh repair retained 0 tracked bytes
+REVIEW REQUEST x86_64 fresh rollback refusal retained 0 tracked bytes
+Installing Application é🚀 1.0.0 (1/3) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+REVIEW REQUEST x86_64 upgrade retained 0 tracked bytes
+Installing Application é🚀 2.0.0 (1/3) from fixture
+Installing Assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 2
+REVIEW REQUEST x86_64 installed install retained 0 tracked bytes
+REVIEW REQUEST x86_64 installed upgrade retained 0 tracked bytes
+REVIEW REQUEST x86_64 installed repair retained 0 tracked bytes
+REVIEW REQUEST x86_64 installed rollback retained 0 tracked bytes
+REVIEW REQUEST x86_64 installed remove retained 0 tracked bytes
+REVIEW REQUEST x86_64 installed deploy retained 0 tracked bytes
+REVIEW REQUEST x86_64 offline cached review retained 0 tracked bytes
+REVIEW REQUEST x86_64 blocked removal retained 0 tracked bytes
+REVIEW REQUEST x86_64 missing package retained 0 tracked bytes
+REVIEW REQUEST x86_64 invalid repair arguments retained 0 tracked bytes
+REVIEW REQUEST x86_64 invalid rollback arguments retained 0 tracked bytes
+REVIEW REQUEST x86_64 deployment legacy.json retained 0 tracked bytes
+REVIEW REQUEST x86_64 deployment exact.json retained 0 tracked bytes
+REVIEW REQUEST x86_64 deployment old.json retained 0 tracked bytes
+REVIEW REQUEST x86_64 deployment empty.json retained 0 tracked bytes
+REVIEW REQUEST x86_64 refused exact pins retained 0 tracked bytes
+REVIEW REQUEST x86_64 malformed deployment retained 0 tracked bytes
+REVIEW REQUEST x86_64 surplus deployment closure retained 0 tracked bytes
+REVIEW REQUEST x86_64 policy refusal retained 0 tracked bytes
+REVIEW REQUEST x86_64 rollback policy refusal retained 0 tracked bytes
+REVIEW REQUEST x86_64 deployment policy refusal retained 0 tracked bytes
+REVIEW REQUEST x86_64 revoked rollback retained 0 tracked bytes
+REVIEW REQUEST x86_64 revoked removal retained 0 tracked bytes
+REVIEW REQUEST x86_64 revoked empty deployment retained 0 tracked bytes
+REVIEW REQUEST x86_64 damaged rollback retained 0 tracked bytes
+REVIEW REQUEST x86_64 damaged rollback registration retained 0 tracked bytes
+REVIEW REQUEST x86_64 damaged repair retained 0 tracked bytes
+REVIEW REQUEST x86_64 corrupt catalog.json retained 0 tracked bytes
+REVIEW REQUEST x86_64 deployment corrupt catalog.json retained 0 tracked bytes
+REVIEW REQUEST x86_64 corrupt trust-history.json retained 0 tracked bytes
+REVIEW REQUEST x86_64 deployment corrupt trust-history.json retained 0 tracked bytes
+REVIEW REQUEST x86_64 corrupt generations/2/state.json retained 0 tracked bytes
+REVIEW REQUEST x86_64 deployment corrupt generations/2/state.json retained 0 tracked bytes
+REVIEW REQUEST x86_64 late generation refusal retained 0 tracked bytes
+REVIEW REQUEST x86_64 deployment late generation refusal retained 0 tracked bytes
+REVIEW REQUEST x86_64 busy ordinary retained 0 tracked bytes
+REVIEW REQUEST x86_64 busy deployment retained 0 tracked bytes
+REVIEW REQUEST x86_64 malformed configuration retained 0 tracked bytes
+REVIEW REQUEST x86_64 deployment malformed configuration retained 0 tracked bytes
+REVIEW REQUEST complete public ordinary/deployment calls retire preparation and preserve signed state across 64 calls per case on both declarations PASS
+REVIEW CONSTRUCTION aarch64 changed/no-op/space/validation cycles retained 0 tracked bytes
+REVIEW CONSTRUCTION aarch64 generation 01 retained 0 tracked bytes
+REVIEW CONSTRUCTION aarch64 generation 18446744073709551615 retained 0 tracked bytes
+REVIEW CONSTRUCTION aarch64 generation 18446744073709551616 retained 0 tracked bytes
+REVIEW CONSTRUCTION x86_64 changed/no-op/space/validation cycles retained 0 tracked bytes
+REVIEW CONSTRUCTION x86_64 generation 01 retained 0 tracked bytes
+REVIEW CONSTRUCTION x86_64 generation 18446744073709551615 retained 0 tracked bytes
+REVIEW CONSTRUCTION x86_64 generation 18446744073709551616 retained 0 tracked bytes
+REVIEW CONSTRUCTION both hosts preserve changed/no-op proposals, reject space/validation/generation failures and retire 128 repeated calls per case PASS
+REVIEW CONSTRUCTION ordinary/deployment fingerprint cycles retained 0 tracked bytes
+REVIEW CONSTRUCTION ordinary/deployment identities retain exact prior JSON digests, repair domains and 1000 repeated hash retirements PASS
+REVIEW CONSTRUCTION independently owned fingerprints, rows and prior declarations survive input retirement on both hosts PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/3) from fixture
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/3) from fixture
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+REVIEW PERMISSIONS both hosts retain installed declarations across new installs, updates, unchanged dependencies, empty sets, repair, rollback and revoked removal PASS
+REVIEW PERMISSIONS 1000 independently owned before/target row creation and retirement cycles retain zero tracked bytes PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 2.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Activated package generation 4
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /tmp/vinix-deployment-mirror-pins-11420-1792310665775652/locked export; $literal; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /tmp/vinix-deployment-mirror-capture-11420-1792310667039080/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /tmp/vinix-deployment-mirror-final-lock-11420-1792310667424958/export; enroll its file:// repository paths with the same public keys
+MIRROR ADMISSION locked export binds exact captured deployment bytes through publication; changed staged lock refuses and retry preserves pins PASS
+Updating trusted repository fixture
+Updating trusted repository deployment.json
+Downloading app/bin/runner (14 bytes)
+Offline mirror ready: /tmp/vinix-deployment-mirror-namespace-11420-1792310667788225/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/2) from fixture
+Installing Runtime 2.0.0 (2/2) from fixture
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Offline mirror ready: /tmp/vinix-deployment-reproducible-11420-1792310668358321/mirror; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading unused/bin/runner (14 bytes)
+Activated package generation 1
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+HWTEST PASS packages-review-request

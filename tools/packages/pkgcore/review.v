@@ -48,16 +48,41 @@ fn check_review(expected string, actual string) ! {
 	}
 }
 
+// Request-local storage. Solver buffers borrow manifests from the authenticated
+// catalog (or current state for removal); repair borrows the state's buffers too.
+// Retire this owner before its configuration and installed state.
+struct PreparedOperationPlan {
+mut:
+	plan Plan
+	catalog Catalog
+	owns_catalog bool
+	owns_buffers bool
+}
+
+fn (mut prepared PreparedOperationPlan) close() {
+	if prepared.owns_buffers {
+		unsafe { (&array(&prepared.plan.requested)).free(); (&array(&prepared.plan.packages)).free() }
+	}
+	if prepared.owns_catalog { close_authenticated_catalog(prepared.catalog) }
+	prepared = PreparedOperationPlan{}
+}
+
+// Legacy plan/activation APIs return manifests borrowing the preparation's
+// storage. Keep that lifetime until those APIs have an independently owned reply.
 fn operation_plan(config Config, directory string, current State, operation string, names []string) !Plan {
+	return prepare_operation_plan(config, directory, current, operation, names)!.plan
+}
+
+fn prepare_operation_plan(config Config, directory string, current State, operation string, names []string) !PreparedOperationPlan {
 	if operation == 'deploy' && names.len == 0 {
 		// An explicit empty target only removes packages. Like uninstall, it
 		// must remain available without an authenticated catalog or publisher.
 		config.validate()!
-		return Plan{}
+		return PreparedOperationPlan{}
 	}
 	if operation == 'repair' {
 		if names.len != 0 { return error('repair takes no package IDs; it preserves the complete installed closure') }
-		if current.packages.len == 0 { return Plan{ requested: current.requested, packages: current.packages } }
+		if current.packages.len == 0 { return PreparedOperationPlan{plan: Plan{ requested: current.requested, packages: current.packages }} }
 		// Repair cannot turn a missing/withdrawn installed version into an update.
 		// Authenticate the exact manifests and provenance against today's cached
 		// catalog, then retain the already validated persistent dependency closure.
@@ -70,16 +95,19 @@ fn operation_plan(config Config, directory string, current State, operation stri
 			}
 			check_policy(installed.package, config.policy)!
 		}
-		return Plan{ requested: current.requested, packages: current.packages }
+		return PreparedOperationPlan{plan: Plan{ requested: current.requested, packages: current.packages }}
 	}
 	roots := desired_roots(current, operation, names)!
 	defer { unsafe { (&array(&roots)).free() } }
 	// Uninstall remains available with expired/revoked publishers or tightened policy.
-	catalog := if operation == 'remove' {
-		Catalog{ packages: current.packages }
-	} else {
-		load_catalog(config, directory)!
+	mut prepared := PreparedOperationPlan{}
+	mut accepted := false
+	defer { if !accepted { prepared.close() } }
+	if operation != 'remove' {
+		prepared.catalog = load_catalog(config, directory)!
+		prepared.owns_catalog = true
 	}
+	catalog := if operation == 'remove' { Catalog{packages: current.packages} } else { prepared.catalog }
 	mut licenses := []string{}
 	unsafe { licenses.flags |= .noslices }
 	defer { unsafe { (&array(&licenses)).free() } }
@@ -98,14 +126,16 @@ fn operation_plan(config Config, directory string, current State, operation stri
 	}
 	defer { if operation == 'remove' { unsafe { (&array(&resolution_config.policy.permissions)).free() } } }
 	plan := resolve(catalog, resolution_config, current, roots, operation in ['upgrade', 'deploy'])!
+	prepared.plan = plan
+	prepared.owns_buffers = true
 	if operation == 'remove' && plan.packages.any(it.package.id in names) {
-		unsafe { (&array(&plan.requested)).free(); (&array(&plan.packages)).free() }
 		if blocker := removal_blocker(current, names, '') {
 			return error('cannot remove ${blocker.id}: still required by requested package ${blocker.root}; review removal of dependent applications first')
 		}
 		return error('cannot remove a package still required by another installed application')
 	}
-	return plan
+	accepted = true
+	return prepared
 }
 
 pub fn preview_plan(config Config, directory string, operation string, names []string) !Plan {
@@ -165,15 +195,21 @@ pub fn review_operation(config Config, directory string, operation string, names
 
 fn review_operation_locked(config Config, directory string, operation string, names []string) !pkgprotocol.Review {
 	current := read_state(directory, config.architecture)!
+	defer { if current.generation != 0 { close_decoded_state(current) } }
 	mut target := u64(0)
-	plan := if operation == 'rollback' {
+	mut old := State{}
+	defer { if old.generation != 0 { close_decoded_state(old) } }
+	mut prepared := PreparedOperationPlan{}
+	defer { prepared.close() }
+	if operation == 'rollback' {
 		if names.len != 0 { return error('rollback takes no package IDs') }
-		old := rollback_target(config, directory, current)!
+		old = rollback_target(config, directory, current)!
 		target = old.generation
-		Plan{ requested: old.requested, packages: old.packages }
+		prepared.plan = Plan{ requested: old.requested, packages: old.packages }
 	} else {
-		operation_plan(config, directory, current, operation, names)!
+		prepared = prepare_operation_plan(config, directory, current, operation, names)!
 	}
+	plan := prepared.plan
 	repairs := transaction_repairs(directory, current, plan, operation)
 	defer { close_transaction_repairs(repairs) }
 	fingerprint := review_fingerprint(config, operation, names, current, plan, target, repairs)

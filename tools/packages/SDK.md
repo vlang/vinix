@@ -3726,8 +3726,13 @@ presentation fields, including the fingerprint. Generation/disk observations
 finish before row allocation; rejected final validation closes the partial
 result. Ordinary/deployment identity encoding and comparison fingerprints have
 explicit retirement without changing their bytes or stale-review semantics.
-See [construction ownership checks](../../tests/packages/review-construction-check.md)
-for the measured boundary; complete service preparation remains separate.
+See [construction ownership checks](../../tests/packages/review-construction-check.md).
+Complete `Service.review()`/`review_deployment()` requests also retire loaded
+configuration, decoded active/rollback states, deployment documents, authenticated
+catalogs and solver buffers on success/refusal. `review_operation()` borrows its
+configuration and retires its own preparation. Replies remain independently
+closeable; legacy Plan/activation replies retain their existing borrowed lifetime.
+See [complete request checks](../../tests/packages/review-request-check.md).
 
 Review format 2 adds the optional paired row fields
 `installed_permissions_known`/`installed_permissions`. They describe the active

@@ -757,8 +757,11 @@ The review builder also completes generation/disk observations before allocating
 rows and releases refused presentation metadata. Returned fingerprints are
 independent of preparation, while ordinary/deployment identity encoding and
 comparison scratch retire explicitly with unchanged identity bytes. See
-[construction ownership](../tests/packages/review-construction-check.md) for the
-measured helper boundary; complete public-service allocation freedom stays open.
+[construction ownership](../tests/packages/review-construction-check.md).
+[Complete review requests](../tests/packages/review-request-check.md) also retire
+configuration, decoded active/rollback states, deployment documents, authenticated
+catalogs and solver buffers on success/refusal, with independently owned replies.
+Other complete service operations and broader release acceptance remain open.
 
 Software keeps a proposal readable when its space estimate does not fit. Its
 status and plan/review readers identify the filesystem and exact additional

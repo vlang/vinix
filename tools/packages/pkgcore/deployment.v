@@ -102,19 +102,27 @@ fn decode_deployment(text string, architecture string) !DeploymentLock {
 }
 
 fn deployment_plan(config Config, directory string, current State, document DeploymentLock) !Plan {
-	if document.format == 1 { return operation_plan(config, directory, current, 'deploy', document.packages) }
+	// Activation still returns borrowed manifests. Review requests instead close
+	// this preparation after constructing their independent protocol reply.
+	return prepare_deployment_plan(config, directory, current, document)!.plan
+}
+
+fn prepare_deployment_plan(config Config, directory string, current State, document DeploymentLock) !PreparedOperationPlan {
+	if document.format == 1 { return prepare_operation_plan(config, directory, current, 'deploy', document.packages) }
 	if document.packages.len == 0 {
 		if document.locked.len != 0 {
 			return error('deployment lock includes packages outside the requested dependency closure')
 		}
-		return operation_plan(config, directory, current, 'deploy', document.packages)
+		return prepare_operation_plan(config, directory, current, 'deploy', document.packages)
 	}
 	catalog := load_catalog(config, directory)!
+	mut prepared := PreparedOperationPlan{catalog: catalog, owns_catalog: true}
 	mut accepted := false
-	defer { if !accepted { close_authenticated_catalog(catalog) } }
-	plan := resolve_locked_deployment(config, catalog, current, document)!
-	accepted = true // returned plan manifests borrow the authenticated catalog
-	return plan
+	defer { if !accepted { prepared.close() } }
+	prepared.plan = resolve_locked_deployment(config, catalog, current, document)!
+	prepared.owns_buffers = true
+	accepted = true
+	return prepared
 }
 
 // Returned plan storage owns only its buffers; manifests borrow this catalog.
@@ -161,12 +169,18 @@ pub fn (service Service) lock_deployment(names []string) !DeploymentLock {
 
 pub fn (service Service) review_deployment(path string) !pkgprotocol.Review {
 	directory := service.directory()!
+	defer { unsafe { directory.free() } }
 	guard := acquire_reader(directory)!
 	defer { guard.release() }
 	config := service.configuration()!
+	defer { close_decoded_configuration(config) }
 	current := read_state(directory, config.architecture)!
-	document := read_deployment(path, config.architecture)!
-	plan := deployment_plan(config, directory, current, document)!
+	defer { if current.generation != 0 { close_decoded_state(current) } }
+	mut document := read_deployment(path, config.architecture)!
+	defer { document.close() }
+	mut prepared := prepare_deployment_plan(config, directory, current, document)!
+	defer { prepared.close() }
+	plan := prepared.plan
 	repairs := transaction_repairs(directory, current, plan, 'deploy')
 	defer { close_transaction_repairs(repairs) }
 	fingerprint := deployment_fingerprint(config, current, document, plan, repairs)
