@@ -8738,17 +8738,66 @@ native group measurements cover membership, empty/immediate waits, asynchronous
 work and completion notification for the next adapter. Fortnite remains
 unplayable and the full iOS regression is unpassed.
 
+V now implements `_dispatch_group_create`, `_dispatch_group_enter`,
+`_dispatch_group_leave`, `_dispatch_group_wait`, `_dispatch_group_async` and
+`_dispatch_group_notify`, plus the two function-pointer submission variants.
+Native Mac measurements and the supplied IPA's six required imports establish
+the function and Apple Blocks ABIs. The async import cell is `0x10dc9a660`,
+with a stack-block caller at `0x10000bfb4`; other callers submit global blocks.
+Creation is also visible at `0x103ccaae4`.
+
+A nonempty group owns an internal membership reference. Submissions enter
+before publishing queue work, promote stack blocks, and leave after both the
+callback and copied-block disposal return. Explicit enter/leave pairs preserve
+the group after its external owner releases it. Waits support immediate,
+monotonic, wall-clock and infinite deadlines, with generation tracking so a
+completed wait cannot become attached to a later reuse. Pending notifications
+retain their destination queue and copied block, then submit ordinary queue
+work when the group becomes empty. Empty-group notifications still enqueue
+asynchronously. Capture helpers and notification callbacks run outside the
+scheduler mutex.
+
+The native `OS_dispatch_group` → `OS_dispatch_object` → `OS_object` →
+`NSObject` hierarchy has an eight-byte public instance size. Vinix publishes
+that facade while keeping ownership, membership and callbacks in its private
+registry. ObjC and Swift unknown-object ARC use the registry, and generic
+construction or isa replacement remains rejected. Context and finalizer APIs
+also recognize groups. Shutdown joins workers, cancels queued members, and
+disposes pending notification captures before block/class metadata is retired;
+unbalanced explicit membership is discarded with remaining image storage.
+The separately bounded Swift `DispatchQueue.async` overlay still requires a
+nil group.
+
+`tests/ios/native-checks.v build-dispatch-group` builds the fixture. Eight final
+host ASan/UBSan runs and four ARM64 Vinix suites pass for groups, queue-specific
+contexts, dispatch data and queue ObjC ownership. The new native/V comparisons
+cover 1,024 concurrent submissions, nested work, stack/global blocks, copied
+capture disposal before completion, early external release, queued notification
+ownership, reused generations, deadline clocks and floating-point state.
+Vinix checks additionally cover main-queue delivery, ObjC/Swift ownership and
+two complete cancellation/shutdown lifetimes. Native measurements, IPA consumer
+inspection, preliminary runs, pinned inputs, joined logs and eleven generated
+C/executable pairs are retained under
+`build/ios/fortnite/dispatch-group-checks`.
+
+The fresh IPA probe passes all six group imports and stops before application
+entry at `_dispatch_resume`. Its inspected callers configure timer sources
+and event-handler blocks before resuming them. A native scout verifies that
+timer sources begin suspended, resume activates their deadline, event data
+counts expirations, and cancellation runs its handler after the event callback.
+Fortnite remains unplayable and the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,716 | 444 | 79 |
+| Fortnite executable | 1,722 | 438 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,551 | 447 | 120 |
+| All images | 2,557 | 441 | 120 |
 
-The C++/GLES/Text variant reports 2,565 resolved imports, 433 unresolved strong
+The C++/GLES/Text variant reports 2,571 resolved imports, 427 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

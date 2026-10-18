@@ -53,6 +53,8 @@ mut:
 	empty_data &DispatchData = unsafe { nil }
 	data_retired &DispatchData = unsafe { nil }
 	data_stopping bool
+	group_class u64
+	groups map[u64]&DispatchGroup
 }
 
 __global dispatch_runtime = unsafe { &DispatchRuntime(nil) }
@@ -194,7 +196,7 @@ fn dispatch_objc_is_object(identity u64) bool {
 	if dispatch_runtime == unsafe { nil } { return false }
 	C.pthread_mutex_lock(dispatch_runtime.mutex)
 	defer { C.pthread_mutex_unlock(dispatch_runtime.mutex) }
-	return identity in dispatch_runtime.queues || identity in dispatch_runtime.data
+	return identity in dispatch_runtime.queues || identity in dispatch_runtime.data || identity in dispatch_runtime.groups
 }
 
 fn dispatch_objc_retain(identity u64) bool {
@@ -202,6 +204,7 @@ fn dispatch_objc_retain(identity u64) bool {
 	C.pthread_mutex_lock(dispatch_runtime.mutex)
 	defer { C.pthread_mutex_unlock(dispatch_runtime.mutex) }
 	if mut data := dispatch_runtime.data[identity] { dispatch_data_retain_locked(mut data); return true }
+	if mut group := dispatch_runtime.groups[identity] { group.refs++; return true }
 	mut queue := dispatch_runtime.queues[identity] or { return false }
 	if !queue.immortal { queue.refs++ }
 	return true
@@ -210,6 +213,12 @@ fn dispatch_objc_retain(identity u64) bool {
 fn dispatch_objc_release(identity u64) bool {
 	if dispatch_runtime == unsafe { nil } { return false }
 	C.pthread_mutex_lock(dispatch_runtime.mutex)
+	if mut group := dispatch_runtime.groups[identity] {
+		removed := dispatch_group_drop_locked(mut group)
+		C.pthread_mutex_unlock(dispatch_runtime.mutex)
+		if removed { C.free(group) }
+		return true
+	}
 	if mut data := dispatch_runtime.data[identity] {
 		dispatch_data_drop_locked(mut data)
 		C.pthread_mutex_unlock(dispatch_runtime.mutex)
@@ -258,6 +267,11 @@ fn darwin_dispatch_release(identity u64) {
 
 fn darwin_dispatch_set_context(identity u64, context voidptr) {
 	C.pthread_mutex_lock(dispatch_runtime.mutex)
+	if mut group := dispatch_runtime.groups[identity] {
+		group.context = context
+		C.pthread_mutex_unlock(dispatch_runtime.mutex)
+		return
+	}
 	mut queue := dispatch_queue_locked(identity)
 	if !queue.immortal { queue.context = context }
 	C.pthread_mutex_unlock(dispatch_runtime.mutex)
@@ -266,11 +280,17 @@ fn darwin_dispatch_set_context(identity u64, context voidptr) {
 fn darwin_dispatch_get_context(identity u64) voidptr {
 	C.pthread_mutex_lock(dispatch_runtime.mutex)
 	defer { C.pthread_mutex_unlock(dispatch_runtime.mutex) }
+	if group := dispatch_runtime.groups[identity] { return group.context }
 	return dispatch_queue_locked(identity).context
 }
 
 fn darwin_dispatch_set_finalizer_f(identity u64, function DispatchFunction) {
 	C.pthread_mutex_lock(dispatch_runtime.mutex)
+	if mut group := dispatch_runtime.groups[identity] {
+		group.finalizer = function
+		C.pthread_mutex_unlock(dispatch_runtime.mutex)
+		return
+	}
 	mut queue := dispatch_queue_locked(identity)
 	if !queue.immortal { queue.finalizer = function }
 	C.pthread_mutex_unlock(dispatch_runtime.mutex)
@@ -527,10 +547,13 @@ fn dispatch_free() {
 	if dispatch_runtime == unsafe { nil } { return }
 	dispatch_stop()
 	dispatch_specific_stop()
+	dispatch_group_stop()
 	dispatch_data_stop()
 	dispatch_data_free()
 	C.free(dispatch_runtime.empty_data)
 	unsafe { dispatch_runtime.data.free() }
+	for _, group in dispatch_runtime.groups { C.free(group) }
+	unsafe { dispatch_runtime.groups.free() }
 	for _, queue in dispatch_runtime.queues {
 		if queue.busy != 0 { panic('iOS: dispatch callback still running when its image unmaps') }
 		C.free(queue.label)

@@ -362,7 +362,7 @@ fn objc_start() {
 	ios_runtime.observers.flags |= .noslices
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
-	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
+	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
@@ -382,6 +382,7 @@ fn objc_start() {
 		parent := match name {
 			'NSObject' { u64(0) }
 			'OS_dispatch_object' { ios_runtime.names['OS_object'] }
+			'OS_dispatch_group' { ios_runtime.names['OS_dispatch_object'] }
 			'OS_dispatch_queue' { ios_runtime.names['OS_dispatch_object'] }
 			'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_global' { ios_runtime.names['OS_dispatch_queue'] }
 			'OS_dispatch_queue_serial' { ios_runtime.names['OS_dispatch_queue_serial_executor'] }
@@ -424,7 +425,7 @@ fn objc_start() {
 		metaclass.isa = if parent == 0 { meta } else { read64(parent) }
 		metaclass.parent = if parent == 0 { u64(cls) } else { read64(parent) }
 		size := match name {
-			'OS_object', 'OS_dispatch_object', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global' { u32(8) }
+			'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global' { u32(8) }
 			'_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty' { u32(8) }
 			'NSConstantDictionary' { u32(40) }
 			'_NSZeroData' { u32(8) }
@@ -644,6 +645,7 @@ fn objc_stop() {
 	reachability_stop()
 	dispatch_stop()
 	dispatch_specific_stop()
+	dispatch_group_stop()
 	reachability_free()
 	nw_free()
 	connection_stop()
