@@ -12,6 +12,74 @@ fn C.link(&char, &char) int
 fn C.mkfifo(&char, u32) int
 struct OutputLimit { current u64 maximum u64 }
 
+$if track_heap ? {
+	#include "@VMODROOT/../../../desktop/tools/tests/heap_tracker.h"
+}
+fn C.vinix_heap_begin()
+fn C.vinix_heap_end() u64
+
+fn test_https_failure_explanations_retire_owned_errors() {
+	$if track_heap ? {
+		for warmup in 0 .. 2 {
+			if warmup == 1 { C.vinix_heap_begin() }
+			for _ in 0 .. 1000 {
+				for code in [1, 2, 3, 4, 5, 6, 7, 16, 18, 22, 23, 27, 28, 33, 35, 36, 47, 48, 52, 55, 56, 58, 59, 60, 63, 67, 77, 80, 82, 83, 90, 91, 92, 94, 95, 96, 97, 98, 126, 127, 143, 199, 42]! {
+					err := https_transport_failure(code, 'https://fixture/repository', '/usr/bin/curl')
+					message := err.msg()
+					assert message.starts_with('download failed (') && message.ends_with('https://fixture/repository')
+					unsafe { message.free(); err.free() }
+				}
+			}
+		}
+		assert C.vinix_heap_end() == 0
+		println('HTTPS DIAGNOSTICS 1000 cycles across 43 statuses retire owned messages and errors with zero tracked bytes PASS')
+	}
+}
+
+fn test_https_transport_diagnostics_preserve_prefixes_and_bounded_retry() {
+	work := output_work()!; defer { os.rmdir_all(work) or {} }
+	fixture := output_fixture(work)!
+	os.write_file(work + '/calls', '')!; os.setenv('VINIX_OUTPUT_CALLS', work + '/calls', true)
+	defer { os.unsetenv('VINIX_OUTPUT_CALLS') }
+	path := work + '/payload'; prefix := 'retained authenticated prefix'
+	for code, expected in {1: 'redirect protocol', 2: 'initialize', 3: 'URL is malformed', 4: 'required feature',
+		5: 'proxy hostname', 6: 'repository hostname', 7: 'cannot connect', 16: 'protocol connection',
+		18: 'before all bytes arrived', 22: 'HTTP error', 23: 'disk space', 27: 'out of memory', 28: 'timed out',
+		33: 'byte range', 35: 'TLS handshake', 36: 'byte range', 47: 'redirected too many', 48: 'required feature',
+		52: 'no response', 55: 'interrupted', 56: 'interrupted', 58: 'client certificate', 59: 'cipher',
+		60: 'certificate or hostname', 63: 'allowed download size', 67: 'authentication failed', 77: 'CA certificates could not be read',
+		80: 'did not close', 82: 'TLS identity', 83: 'TLS identity', 90: 'TLS identity', 91: 'TLS identity',
+		92: 'protocol connection', 94: 'authentication failed', 95: 'protocol connection', 96: 'protocol connection',
+		97: 'proxy handshake', 98: 'client certificate', 126: 'cannot start HTTPS transport', 127: 'cannot start HTTPS transport',
+		42: 'inspect the transport diagnostic'} {
+		for resume in [false, true]! {
+			os.write_file(path, prefix)!
+			before := os.read_file(work + '/calls')!.split_into_lines().len
+			number := code.str(); url := 'https://fixture/exit-' + number
+			mut refused := false
+			fetch_https_with(url, path, 4096, resume, false, pkgprotocol.Progress{}, no_progress, HttpsOutputOptions{program: fixture}) or {
+				message := err.msg()
+				assert message.starts_with('download failed (' + number + '): ') && message.contains(expected), message
+				assert message.contains('retained partial data for retry') && message.ends_with(url), message
+				unsafe { message.free(); err.free() }; refused = true
+			}
+			assert refused && os.read_file(path)! == prefix
+			calls := os.read_file(work + '/calls')!.split_into_lines()
+			assert calls.len - before == if code == 33 && resume { 2 } else { 1 }
+			output_no_children()
+		}
+	}
+	os.write_file(path, prefix)!
+	mut terminated := false
+	fetch_https_with('https://fixture/terminated', path, 4096, true, false, pkgprotocol.Progress{}, no_progress, HttpsOutputOptions{program: fixture}) or {
+		message := err.msg(); terminated = message.contains('terminated unexpectedly')
+		unsafe { message.free(); err.free() }
+	}
+	assert terminated && os.read_file(path)! == prefix
+	output_no_children()
+	println('HTTPS DIAGNOSTICS 41 exit statuses and terminated transport give actionable errors, preserve fresh/resumed prefixes, retry only range refusal and reap children PASS')
+}
+
 fn output_work() !string {
 	work := os.real_path(os.temp_dir()) + '/vinix-output-' + os.getpid().str() + '-' + time.now().unix_micro().str()
 	os.mkdir(work)!

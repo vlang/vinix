@@ -1,0 +1,12 @@
+producer-compile PASS
+core-compile PASS
+core-run PASS
+core-sanitize-compile PASS
+core-sanitize-run PASS
+recovery-compile PASS
+recovery-run PASS
+tls-fixture-compile PASS
+tls-compile PASS
+destination-compile PASS
+tls-run PASS
+destination-run PASS

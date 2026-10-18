@@ -133,6 +133,13 @@ retain no tracked temporary storage under the manual-free toolchain.
 OpenSSL to check range recovery, certificate/redirect refusal and signed
 transaction state. The fixture binds only to loopback and uses a temporary CA.
 
+HTTPS failures now explain the transport status and offer a relevant next step
+for DNS, connection, proxy, timeout, interruption, HTTP access, TLS trust, response
+size and missing-tool failures. Service clients receive this guidance even when
+curl's stderr belongs to an administrator daemon. Retained prefixes and bounded
+retries follow the existing recovery rules. See
+[diagnostic checks](../../tests/packages/https-diagnostics-check.md).
+
 Software's **Failure details** pages through the latest bounded service failure,
 including long paths and exit status. It survives catalog reloads until another
 failure, explicit clearing or window close. The view is read-only and marks

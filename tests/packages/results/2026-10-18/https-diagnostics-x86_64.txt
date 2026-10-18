@@ -1,0 +1,2 @@
+PASS x86_64 packages-https-diagnostics (90.0s)
+package-https-diagnostics x86_64: 1 passed, 0 failed, 0 skipped

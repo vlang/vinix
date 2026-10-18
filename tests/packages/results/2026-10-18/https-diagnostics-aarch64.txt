@@ -1,0 +1,2 @@
+PASS aarch64 packages-https-diagnostics (83.3s)
+package-https-diagnostics aarch64: 1 passed, 0 failed, 0 skipped

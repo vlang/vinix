@@ -6,6 +6,8 @@ import os
 import time
 
 #include <unistd.h>
+#include <signal.h>
+fn C.raise(int) int
 fn C.write(int, voidptr, usize) isize
 fn C.fstat(int, &C.stat) int
 
@@ -38,6 +40,8 @@ fn run() !int {
 		}
 	}
 	if mode == 'failure' { return 60 }
+	if mode.starts_with('exit-') { return mode[5..].int() }
+	if mode == 'terminated' { C.raise(C.SIGTERM); return 1 }
 	if mode == 'no-range' && offset > 0 { return 33 }
 	if mode == 'empty' { return 0 }
 	data := os.read_bytes(os.getenv('VINIX_OUTPUT_SOURCE'))!

@@ -2780,9 +2780,9 @@ directory-relative atomic rename. Interrupted flushes retry. A post-publication
 storage failure reports **cached payload saved**; it does not report transaction
 completion. See [cache-promotion checks](../../tests/packages/cache-promotion-check.md).
 
-An HTTPS server's explicit byte-range refusal (curl exit 33) also discards the
-prefix and permits one fresh transfer. A completed fresh fallback is classified
-as fresh, so an integrity failure cannot trigger another transfer. Certificate,
+An HTTPS server's explicit byte-range refusal (curl exit 33) permits one fresh
+transfer, replacing the prefix only when fresh bytes arrive. A completed fresh
+fallback is classified as fresh, so an integrity failure cannot trigger another transfer. Certificate,
 hostname, access-denial and redirect failures preserve the prefix. The existing
 HTTPS-only, TLS, size and retry/time bounds apply to both attempts. See
 [real TLS transport qualification](../../tests/packages/https-check.md).
@@ -2795,6 +2795,17 @@ progress cannot change it and still produce transport success. Flushes retry
 These checks require controlled package directories and the writer lock; they
 do not freeze concurrent administrator changes between system calls. See
 [callback/recovery qualification](../../tests/packages/https-output-guard-check.md).
+
+HTTPS failures retain the `download failed (N)` status prefix and repository URL,
+and now include a local explanation and next step. DNS/proxy/connection errors,
+timeouts, interrupted responses, HTTP refusal, TLS handshake/identity/CA-bundle
+failures, size limits and missing transport tools have distinct guidance. The
+explanation uses curl's exit status, so it also reaches administrator-service
+clients without access to the transport's stderr. HTTP exit 22 identifies an HTTP
+error without guessing an exact response status. Unknown codes retain their
+number and generic diagnostic guidance. These messages do not alter certificate
+verification, authenticated bounds, automatic retry rules or transaction state.
+See [diagnostic qualification](../../tests/packages/https-diagnostics-check.md).
 
 Frames are bounded to 8192 bytes. Identifiers/paths, phase-specific counter
 limits, JSON field types and formats are validated by

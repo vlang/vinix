@@ -197,7 +197,6 @@ fn fetch_https_with(url string, destination string, maximum u64, resume bool, of
 		println('Restarting ${label}: repository does not support byte ranges')
 		resumed = false
 	}
-	if code == 126 || code == 127 { return error('download failed (${code}): cannot start HTTPS transport ${options.program}; retained partial data for retry: ${url}') }
-	if code != 0 { return error('download failed (${code}); retained partial data for retry: ${url}') }
+	if code != 0 { return https_transport_failure(code, url, options.program) }
 	return resumed
 }

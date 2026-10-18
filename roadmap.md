@@ -801,6 +801,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
   interrupted-download recovery and coherent persistent package state.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,
   permissions, progress, uninstall, updates and useful failure diagnostics.
+  - [x] [Actionable HTTPS failures](tests/packages/https-diagnostics-check.md)
+    preserve transport status and add recovery guidance for connection, DNS,
+    proxy, timeout, interruption, HTTP/TLS, size-limit and missing-tool errors.
+    Service replies retain the explanation without depending on daemon stderr;
+    existing partial recovery and retry rules remain enforced. Host TLS and
+    native output checks qualify the change; broader release gates stay open.
   - [x] [Installed dependency inspection](tests/packages/software-dependencies-check.md)
     shows installed requirements, version bounds and actual versions separately
     from update previews. A bounded graph walk names a requiring requested app

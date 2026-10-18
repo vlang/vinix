@@ -695,6 +695,14 @@ rewind bytes already delivered; each service attempt has its own captured offset
 cover certificate/hostname trust, HTTPS-only redirects, authenticated size bounds,
 range recovery, progress and preserved activation/rollback.
 
+HTTPS failure replies now include a local explanation and relevant recovery
+steps for connection/DNS/proxy errors, timeouts, interrupted responses, HTTP
+refusal, TLS trust, response limits and unavailable transport tools. The status
+number and repository URL remain visible to CLI and administrator-service
+clients. Classification uses the local transport exit status; it does not
+guess an exact HTTP status or weaken verification and retry rules. See
+[diagnostic checks](../tests/packages/https-diagnostics-check.md).
+
 Dependency resolution uses an iterative worklist with bounded backtracking.
 Shared dependencies and cycles expand each selected identity once, and constraints
 discovered later can change an earlier choice. Runtime kind and executable

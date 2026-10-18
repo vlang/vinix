@@ -107,11 +107,12 @@ fn qualify_transaction(work string, base string, mode string, text string, key s
 			assert !os.exists(part), 'a fresh fallback must not trigger a third integrity transfer'
 		} else {
 			assert object_requests.len == 1 && os.exists(part), failure
-			if mode == 'forbidden' { assert failure.contains('download failed (22)'), failure }
-			if mode == 'insecure-redirect' { assert failure.contains('download failed (1)'), failure }
+			if mode == 'forbidden' { assert failure.contains('download failed (22)') && failure.contains('repository returned an HTTP error'), failure }
+			if mode == 'insecure-redirect' { assert failure.contains('download failed (1)') && failure.contains('redirect protocol is unsupported'), failure }
 			assert os.read_file(part)!.starts_with(prefix)
 			if mode == 'truncated' {
 				assert failure.contains('download failed (18)') && os.file_size(part) == 5120
+				assert failure.contains('before all bytes arrived') && failure.contains('retry to resume'), failure
 				os.write_file(configuration, json2.encode(initial))!
 				plain.refresh()!
 				service.transact('install', ['https-app'], pkgcore.TransactionOptions{})!
@@ -177,8 +178,11 @@ fn check() ! {
 		os.setenv('CURL_CA_BUNDLE', work + '/ca.pem', true)
 		assert message != '', mode
 		assert os.read_file(path)! == text[..4096], mode
-		if mode in ['untrusted-ca', 'wrong-host'] { assert message.contains('download failed (60)'), message }
-		if mode == 'oversized' { assert message.contains('download failed (63)'), message }
+		if mode in ['untrusted-ca', 'wrong-host'] {
+			assert message.contains('download failed (60)') && message.contains('certificate or hostname could not be verified')
+				&& message.contains('system clock') && message.contains('trusted CA certificates'), message
+		}
+		if mode == 'oversized' { assert message.contains('download failed (63)') && message.contains('allowed download size'), message }
 		println('PASS HTTPS ' + mode + ' refusal preserves the prefix')
 	}
 	os.mkdir_all(work + '/source/share')!
@@ -192,6 +196,7 @@ fn check() ! {
 		qualify_transaction(work, base, mode, text, key, p.files[0])!
 	}
 	println('Package HTTPS: real curl, certificate and redirect enforcement, Range fallback, interrupted recovery, bounded integrity retry and rollback passed')
+	println('HTTPS DIAGNOSTICS real TLS certificate/hostname, HTTP refusal, insecure redirect, size limit and interrupted-transfer explanations preserve signed state and recovery PASS')
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }
