@@ -252,6 +252,28 @@ and after every compiler invocation. Write `vinix-package`, `vinix-session` and
 are repeatable. On compilation/publication refusal, return `build.failure(err)`
 to combine the primary error with cleanup diagnostics and release the plan.
 
+The stager also captures both required license notices and the package action
+definitions before invoking compilers. These inputs must be ordinary controlled
+single-link files of 1 byte to 64 KiB, reached without repository directory aliases.
+Later source edits or removal do not change the captured bytes. Image integration
+opens every destination directory component without following aliases, requires
+controlled ownership and permissions on the image filesystem, and prepares every
+notice/action file and launcher/registration link before publishing any of them.
+Files use flushed mode-0644 temporaries; links use exclusive random temporary
+names and atomic renames. Replacing a leaf alias never changes its target.
+Existing action and application-registration overrides are retained, including
+dangling aliases; an override appearing during publication refuses the build.
+The Software launcher is atomically replaced. Existing controlled state-directory
+permissions are retained, and no consumer package state is initialized.
+
+Custom V builders can call `configuration.prepare_integration(repository)!`
+before compilation, `integration.publish()!` after tool publication, and
+`integration.close()` on every path. Close is repeatable. Publication failures
+report an incomplete image build; previously saved entries remain saved, while
+only matching owned temporaries are removed. Keep image ancestors controlled
+throughout staging and distribute the image only after the entire build succeeds.
+See [image integration qualification](../../tests/packages/image-integration-check.md).
+
 After boot, the normal Refresh, review/install, updates, rollback and uninstall
 flows use this configuration. Image seeding does not fetch catalogs or accept
 unsigned metadata. See [qualification](../../tests/packages/image-configuration-check.md),

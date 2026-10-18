@@ -1,0 +1,17 @@
+Updating trusted repository release
+Installing Application 2.0.0 (1/1) from release
+Downloading app/bin/app (25 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 2.0.0 (1/1) from release
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository release
+Installing Application 2.0.0 (1/1) from release
+Downloading app/bin/app (24 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 2.0.0 (1/1) from release
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+PACKAGE IMAGE CONFIG signed catalog install remove rollback both architectures PASS

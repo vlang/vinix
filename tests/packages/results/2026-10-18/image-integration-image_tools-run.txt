@@ -1,0 +1,1 @@
+IMAGE TOOLS 58 target/capture/publication/refusal cases preserve prior tools, replacements, unrelated temporaries and recovery; stable descriptors PASS

@@ -730,6 +730,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     aliases and report replacement/flush recovery. Host and native guest checks
     cover both architectures; complete image publication remains per-file, and
     production catalog/graphical/runtime acceptance remains open.
+  - [x] [Captured image integration](tests/packages/image-integration-check.md)
+    binds license/action bytes before compilation and publishes notices,
+    Software/registration links and default actions through controlled image
+    directories. Atomic leaf replacement preserves outside targets, existing
+    administrator overrides and private state-directory permissions. Host and
+    native checks cover both architectures; complete image distribution and
+    production catalog/graphical/runtime acceptance remain open.
   - [x] [Owned packing inventories and replies](tests/packages/pack-ownership-check.md)
     retire discarded template inventories, partial walked files and copy scratch
     across cold/cache success and late refusal. Independently closeable pack/root

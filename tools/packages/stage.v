@@ -125,42 +125,18 @@ fn stage() ! {
 	compiler_v := if configured_v == '' { 'v' } else { configured_v }
 	v := os.find_abs_path_of_executable(compiler_v)!
 	repository := os.dir(os.dir(os.dir(@FILE)))
+	mut integration := unsafe { &image_configuration }.prepare_integration(repository)!
+	defer { integration.close() }
 	mut tool_build := unsafe { &image_configuration }.prepare_tool_build()!
 	defer { tool_build.close() }
 	compile_image_tools(unsafe { &tool_build }, architecture, repository, v, cc, compiler_args) or { return tool_build.failure(err) }
 	tool_build.retire()!
-	// Retain the pinned signing implementation's license in binary releases.
-	notices := staging + '/usr/share/licenses/vinix-packages'
-	os.mkdir_all(notices)!
-	os.cp(repository + '/tools/packages/signing/LICENSE', notices + '/ed25519-MIT.txt')!
-	os.chmod(notices + '/ed25519-MIT.txt', 0o644)!
-	os.cp(repository + '/tools/packages/appsdk/LICENSE', notices + '/application-sdk-MIT.txt')!
-	os.chmod(notices + '/application-sdk-MIT.txt', 0o644)!
-	software := staging + '/usr/bin/vinix-software'
-	if os.exists(software) || os.is_link(software) { os.rm(software)! }
-	os.symlink('/usr/bin/vinix-desktop', software)!
+	unsafe { &integration }.publish()!
 	if unsafe { &image_repositories }.publish()! { println('Published authenticated offline image repositories') }
 	created := unsafe { &image_configuration }.publish()!
 	println(if created { 'Initialized reviewed image package configuration' } else { 'Preserved existing image package configuration; release input was not applied' })
 	if unsafe { &image_applications }.publish(unsafe { &image_repositories })! {
 		println('Declared reviewed release applications for Software deployment review')
-	}
-	os.mkdir_all(staging + '/usr/share/vinix/actions')!
-	// Fixed actions separate reviewed administration from own-account launch
-	// isolation. Preserve administrator-owned overrides when upgrading an image.
-	for name in ['packages-change', 'packages-launch'] {
-		action := staging + '/usr/share/vinix/actions/' + name
-		if !os.exists(action) && !os.is_link(action) {
-			os.cp(repository + '/tools/accounts/actions/' + name, action)!
-			os.chmod(action, 0o644)!
-		}
-	}
-	os.mkdir_all(staging + '/var/lib/vinix-packages')!
-	os.chmod(staging + '/var/lib/vinix-packages', 0o755)!
-	os.mkdir_all(staging + '/usr/share/applications')!
-	registration := staging + '/usr/share/applications/vinix-packages'
-	if !os.exists(registration) && !os.is_link(registration) {
-		os.symlink('/var/lib/vinix-packages/current/share/applications', registration)!
 	}
 	image_repositories.retire()!
 	println('Staged signed package service and Software launcher (${architecture})')

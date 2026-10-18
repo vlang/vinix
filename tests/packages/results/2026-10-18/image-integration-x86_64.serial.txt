@@ -1,0 +1,111 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./var/ sz=0
+!>+ [7] ./sys/ sz=0
+!>+ [8] ./root/ sz=0
+!>+ [9] ./dev/ sz=0
+!>+ [10] ./tmp/ sz=0
+!>+ [11] ./var/lib/ sz=0
+!>+ [12] ./var/lib/vinix-packages/ sz=0
+!>+ [13] ./etc/vinix-packages/ sz=0
+!>+ [14] ./etc/hwtest-scenario sz=27
+!>+ [15] ./etc/vinix-packages/config.json sz=246
+!>+ [16] ./sbin/init sz=239160
+!>+ [17] ./usr/bin/ sz=0
+!>+ [18] ./usr/libexec/ sz=0
+!>+ [19] ./usr/sbin/ sz=0
+!>+ [20] ./usr/share/ sz=0
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>initramfs: no ustar sig at 0xff000000370f5400
+initramfs: Done (37 entries)
+HWTEST START packages-image-integration
+IMAGE INTEGRATION 82 source/capture/publication/refusal cases preserve overrides and outside data; stable descriptors PASS
+IMAGE INTEGRATION native staged licenses/actions/launcher/registration and empty consumer state PASS
+usage: vinix-package [--root DIR] [--offline] [--json] [--progress] COMMAND [ARGS]
+  update | search [QUERY] | info ID | list | status | updates | view
+  admin [--progress] [--offline] update|apply|cleanup-apply|repo-apply|deployment-apply|policy-apply|mirror-apply|mirror-deployment-apply ...
+  install ID... | remove ID... | upgrade | repair | rollback | gc | verify | health
+  cleanup-review | cleanup-apply REVIEW_FINGERPRINT (obsolete generations only)
+  plan install|remove|upgrade|repair|deploy [ID...] | deploy MANIFEST.json
+  review install|remove|upgrade|repair|deploy|rollback [ID...]
+  repo-list | repo-config | repo-enroll ID URL PUBLIC_KEY_HEX | repo-revoke ID
+  repo-review enroll ID URL KEY | repo-review revoke ID
+  repo-apply REVIEW_FINGERPRINT enroll ID URL KEY | repo-apply REVIEW_FINGERPRINT revoke ID
+  apply REVIEW_FINGERPRINT OPERATION [ID...]
+  policy | policy-review POLICY.json | policy-apply REVIEW_FINGERPRINT POLICY.json
+  deployment-lock [ID...] | deployment-snapshot [INSTALLED_ID...]
+  deployment-snapshot-save NEW_FILE [INSTALLED_ID...]
+  deployment-audit FILE (read-only metadata drift; exit 0 match, 3 drift)
+  deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE
+  run ID [ABSOLUTE_FILE...] | data-list | purge-data ID | mirror NEW_DIRECTORY ID...
+  mirror-review NEW_DIRECTORY ID... | mirror-apply REVIEW_FINGERPRINT NEW_DIRECTORY ID...
+  mirror-deployment-review NEW_DIRECTORY LOCK.json | mirror-deployment-apply REVIEW_FINGERPRINT NEW_DIRECTORY LOCK.json
+  run-terminal ID [ABSOLUTE_FILE...] (terminal standard input/output required)
+  run-window ID [ABSOLUTE_FILE...] (declared native window broker protocol)
+  run-args|run-terminal-args ID [--data-cwd] [--file ABSOLUTE_FILE]... -- [LITERAL_ARGUMENT...]
+  keygen NEW_SEED_FILE | key-public SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR
+  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR
+  pack-catalog CATALOG.json PREPARED_ROOTS NEW_WORKSPACE
+  compose-catalog NEW_LOCK_DIRECTORY PROFILE CATALOG.json [PROFILE CATALOG.json...]
+  compose-catalog-for ARCH NEW_LOCK_DIRECTORY PROFILE CATALOG.json [PROFILE CATALOG.json...]
+  native-catalog VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY
+  sqlite-catalog SQLITE_VERSION RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY
+  ffmpeg-catalog RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY
+  wine-catalog RECIPE_DIRECTORY PREPARED_ROOTS NEW_LOCK_DIRECTORY
+  apple-catalog RECIPE_DIRECTORY PREPARED_ROOTS NEW_LOCK_DIRECTORY
+  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX
+  publish-release REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY
+{"format":1,"generation":0,"previous":0,"architecture":"x86_64","requested":[],"packages":[]}
+usage: vinix-session run [--seat|--isolated] USER COMMAND [ARGUMENT...] | console | manager [--greeter COMMAND...] [--desktop COMMAND...]
+usage: vinix-linux-runner ABSOLUTE_PACKAGED_LOADER ABSOLUTE_APPLICATION [ARGS...]
+IMAGE INTEGRATION native production-staged package/session/Linux-runner execution PASS
+IMAGE INTEGRATION resources before grace:
+Limit: 121211392
+OwnerLimit: 60605696
+Charged: 40757902
+Accounts: 6
+Denied: 0
+Kind Objects Bytes
+file 6430 39584364
+descriptor 4 16768
+socket 0 0
+ipc 2 8192
+mapping 35 412160
+process 12 163860
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+IMAGE INTEGRATION resources after grace:
+Limit: 121211392
+OwnerLimit: 60605696
+Charged: 19519522
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 3004 18486670
+descriptor 4 16768
+socket 0 0
+ipc 1 4096
+mapping 35 412160
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+HWTEST PASS packages-image-integration
