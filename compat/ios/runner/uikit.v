@@ -73,7 +73,7 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 		return 0
 	}
 	selector := ctext(frame.x[1])
-	if dispatch_objc_is_queue(object) && ios_runtime.swift_concurrency_retired {
+	if dispatch_objc_is_object(object) && ios_runtime.swift_concurrency_retired {
 		panic('iOS: dispatch queue messages outside Objective-C runtime lifetime')
 	}
 	if is_block(object) {

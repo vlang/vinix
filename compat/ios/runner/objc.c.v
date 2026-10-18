@@ -368,7 +368,7 @@ fn objc_start() {
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
-        'NSData', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
+        'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
@@ -405,7 +405,9 @@ fn objc_start() {
 			'NSMutableSet' { ios_runtime.names['NSSet'] }
 			'NSMutableDictionary', 'NSConstantDictionary' { ios_runtime.names['NSDictionary'] }
 			'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { ios_runtime.names['NSLayoutAnchor'] }
-			'NSMutableData' { ios_runtime.names['NSData'] }
+			'NSMutableData', '_NSDispatchData' { ios_runtime.names['NSData'] }
+			'OS_dispatch_data' { ios_runtime.names['_NSDispatchData'] }
+			'OS_dispatch_data_empty' { ios_runtime.names['OS_dispatch_data'] }
 			'_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData' { ios_runtime.names['NSData'] }
 			'NSMutableURLRequest' { ios_runtime.names['NSURLRequest'] }
 			'NSHTTPURLResponse' { ios_runtime.names['NSURLResponse'] }
@@ -423,6 +425,7 @@ fn objc_start() {
 		metaclass.parent = if parent == 0 { u64(cls) } else { read64(parent) }
 		size := match name {
 			'OS_object', 'OS_dispatch_object', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global' { u32(8) }
+			'_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty' { u32(8) }
 			'NSConstantDictionary' { u32(40) }
 			'_NSZeroData' { u32(8) }
 			'_NSInlineData' { u32(16) }
@@ -686,6 +689,8 @@ fn objc_stop() {
 		objc_pool_drain_all()
 		if ios_runtime.associations.len == 0 && ios_runtime.distant_dates[0] == 0 && ios_runtime.distant_dates[1] == 0 { break }
 	}
+	dispatch_data_stop()
+	objc_pool_drain_all()
 	objc_pool_free(C.pthread_getspecific(ios_runtime.pool_key))
 	$if ios_text ? { text_stop() }
 	C.pthread_setspecific(ios_runtime.pool_key, unsafe { nil })
@@ -716,6 +721,7 @@ fn objc_stop() {
 	if ios_runtime.objects.len == 0 { unsafe { ios_runtime.objects.free() } }
 	unsafe { ios_runtime.associations.free() }
 	objc_monitors_stop()
+	dispatch_data_free()
 	if ios_runtime.block_refs.len != 0 { eprintln('iOS: heap blocks still owned at shutdown') }
 	for _, text in ios_runtime.constant_utf8 { unsafe { text.free() } }
 	for address, info in ios_runtime.classes {

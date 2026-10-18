@@ -55,6 +55,7 @@ fn darwin_dispatch_sync(queue u64, block u64) { dispatch_sync(queue, block, unsa
 fn darwin_dispatch_sync_f(queue u64, context voidptr, function DispatchFunction) { dispatch_sync(queue, 0, context, function) }
 
 fn dispatch_symbol(symbol string) ?u64 {
+	if address := dispatch_data_symbol(symbol) { return address }
 	return match symbol {
 		'__dispatch_source_type_timer' { dispatch_timer_type_address() }
 		'_dispatch_once_f' { u64(unsafe { voidptr(darwin_dispatch_once_f) }) }

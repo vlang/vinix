@@ -254,7 +254,7 @@ fn objc_dispose_class(cls u64) {
 fn objc_set_class(object u64, cls u64) u64 {
 	if object == 0 { return 0 }
 	dispatch_objc_allocation_checked(cls) or { panic(err) }
-	if dispatch_objc_is_queue(object) { panic('iOS: dispatch queue isa replacement is unsupported') }
+	if dispatch_objc_is_object(object) { panic('iOS: dispatch object isa replacement is unsupported') }
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if object in ios_runtime.classes || object in ios_runtime.constants { panic('iOS: changing a class or constant string isa is not implemented') }

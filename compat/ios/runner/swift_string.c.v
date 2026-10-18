@@ -204,7 +204,7 @@ fn swift_unknown_is_native(object u64) bool {
 	if os_log_is_handle(object) { return false }
 	// Queues have private storage registered with the scheduler, not ObjHeader
 	// or Swift heap headers. Release the scheduler lock before taking ObjC's.
-	if dispatch_objc_is_queue(object) { return false }
+	if dispatch_objc_is_object(object) { return false }
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if swift_task_find_locked(object) != 0 { return true }

@@ -8645,17 +8645,67 @@ native measurements establish default-buffer copying, the empty singleton,
 retained concatenation inputs and mapped subrange bytes for the next adapter.
 Fortnite remains unplayable and the full iOS regression is unpassed.
 
+V now implements `_dispatch_data_create` and `_dispatch_data_create_concat`,
+with `_dispatch_data_get_size`, `_dispatch_data_create_map` and the empty-data
+global sharing the same owned representation. Default creation copies the
+input bytes. Custom block destructors borrow them, promote the block captures
+and retain the supplied queue (or use the default global queue). Concatenation
+retains both immutable inputs without copying their bytes. Mapping a leaf
+retains that leaf; mapping a composite creates a contiguous owned copy.
+
+Normal final release schedules a custom destructor on its queue exactly once.
+Zero-length creation returns the immortal empty singleton and still schedules
+its custom destructor. Block calls and dispose helpers run outside the
+scheduler mutex and can release other data or query the runtime. Shutdown
+joins workers, invokes pending cancellation destructors, then disposes any
+remaining application captures while their data buffers are still valid.
+Remaining shutdown callbacks run synchronously before Objective-C storage and
+application mappings retire. Graph traversal and destruction use iterative
+walks rather than recursive calls through concatenation nodes.
+
+Data uses the measured eight-byte Objective-C facade:
+`OS_dispatch_data_empty` → `OS_dispatch_data` → `_NSDispatchData` → `NSData`.
+Dispatch, Objective-C and Swift unknown-object ownership share the data
+registry; generic allocation and isa replacement are rejected. The supported
+Objective-C messages cover identity, class queries and ownership. NSData byte
+methods, weak references, subranges, region iteration and named FREE/MUNMAP
+destructor globals remain unsupported; no native dispatch library supplies
+the guest data implementation.
+
+Native libSystem calls establish copy/borrow behavior, capture promotion,
+queued destruction, empty-data identity and the class hierarchy. V/Mach-O/LLVM
+inspection confirms creation with a stack-block destructor at `0x1078a9f8c`
+and concatenation followed by releases of both inputs at `0x101fbeaac`.
+`tests/ios/native-checks.v build-dispatch-data` builds the new fixture.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites pass, covering dispatch
+data, dispatch queue Objective-C ownership, TLV destruction and native zlib
+bounds. The data fixture compares the native APIs, checks promoted captures,
+queued/empty/shutdown destructor paths, guarded zero buffers, all four rounding
+modes, sticky exception flags, errno, 1,024 concurrent lifetimes, 4,096-node
+ropes, mapped byte order and three drained runtime lifetimes. Native references,
+IPA inspection, the initial invalid native-queue test and corrected runs,
+pinned inputs, joined logs and eleven generated C/executable pairs are retained
+under `build/ios/fortnite/dispatch-data-checks`.
+
+The fresh IPA probe passes both dispatch-data imports and stops before entry
+at `_dispatch_get_specific` from `libSystem.B.dylib`. Preliminary native
+measurements confirm pointer keys, local direct lookup, target-chain
+inheritance during current-queue lookup, child overrides and nil removal for
+the next adapter. Fortnite remains unplayable and the full iOS regression is
+unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,712 | 448 | 79 |
+| Fortnite executable | 1,714 | 446 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,547 | 451 | 120 |
+| All images | 2,549 | 449 | 120 |
 
-The C++/GLES/Text variant reports 2,561 resolved imports, 437 unresolved strong
+The C++/GLES/Text variant reports 2,563 resolved imports, 435 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

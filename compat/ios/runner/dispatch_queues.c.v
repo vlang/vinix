@@ -46,6 +46,11 @@ mut:
 	sequence u64
 	stopping bool
 	objc_classes [3]u64 // Main, serial and global, published before guest use.
+	data_classes [2]u64
+	data map[u64]&DispatchData
+	empty_data &DispatchData = unsafe { nil }
+	data_retired &DispatchData = unsafe { nil }
+	data_stopping bool
 }
 
 __global dispatch_runtime = unsafe { &DispatchRuntime(nil) }
@@ -62,6 +67,7 @@ fn dispatch_start() {
 		|| C.ios_key_create(unsafe { &dispatch_runtime.key }, unsafe { nil }) != 0 {
 		panic('iOS: cannot initialize dispatch scheduler')
 	}
+	dispatch_data_start()
 	dispatch_objc_publish_classes()
 	mut queue := dispatch_queue_allocate(c'com.apple.main-thread')
 	queue.identity = darwin_dispatch_get_main_queue()
@@ -156,10 +162,7 @@ fn darwin_dispatch_queue_get_label(identity u64) &char {
 }
 
 fn darwin_dispatch_retain(identity u64) {
-	C.pthread_mutex_lock(dispatch_runtime.mutex)
-	mut queue := dispatch_queue_locked(identity)
-	if !queue.immortal { queue.refs++ }
-	C.pthread_mutex_unlock(dispatch_runtime.mutex)
+	if !dispatch_objc_retain(identity) { panic('iOS: invalid dispatch object') }
 }
 
 // Apple blocks may capture a dispatch queue as an Objective-C object. These
@@ -172,10 +175,18 @@ fn dispatch_objc_is_queue(identity u64) bool {
 	return identity in dispatch_runtime.queues
 }
 
+fn dispatch_objc_is_object(identity u64) bool {
+	if dispatch_runtime == unsafe { nil } { return false }
+	C.pthread_mutex_lock(dispatch_runtime.mutex)
+	defer { C.pthread_mutex_unlock(dispatch_runtime.mutex) }
+	return identity in dispatch_runtime.queues || identity in dispatch_runtime.data
+}
+
 fn dispatch_objc_retain(identity u64) bool {
 	if dispatch_runtime == unsafe { nil } { return false }
 	C.pthread_mutex_lock(dispatch_runtime.mutex)
 	defer { C.pthread_mutex_unlock(dispatch_runtime.mutex) }
+	if mut data := dispatch_runtime.data[identity] { dispatch_data_retain_locked(mut data); return true }
 	mut queue := dispatch_runtime.queues[identity] or { return false }
 	if !queue.immortal { queue.refs++ }
 	return true
@@ -184,6 +195,12 @@ fn dispatch_objc_retain(identity u64) bool {
 fn dispatch_objc_release(identity u64) bool {
 	if dispatch_runtime == unsafe { nil } { return false }
 	C.pthread_mutex_lock(dispatch_runtime.mutex)
+	if mut data := dispatch_runtime.data[identity] {
+		dispatch_data_drop_locked(mut data)
+		C.pthread_mutex_unlock(dispatch_runtime.mutex)
+		dispatch_data_retire()
+		return true
+	}
 	mut queue := dispatch_runtime.queues[identity] or { C.pthread_mutex_unlock(dispatch_runtime.mutex); return false }
 	dispatch_queue_drop_locked(mut queue)
 	C.pthread_mutex_unlock(dispatch_runtime.mutex)
@@ -218,11 +235,7 @@ fn dispatch_retire() {
 }
 
 fn darwin_dispatch_release(identity u64) {
-	C.pthread_mutex_lock(dispatch_runtime.mutex)
-	mut queue := dispatch_queue_locked(identity)
-	dispatch_queue_drop_locked(mut queue)
-	C.pthread_mutex_unlock(dispatch_runtime.mutex)
-	dispatch_retire()
+	if !dispatch_objc_release(identity) { panic('iOS: invalid dispatch object') }
 }
 
 fn darwin_dispatch_set_context(identity u64, context voidptr) {
@@ -494,6 +507,11 @@ fn dispatch_stop() {
 
 fn dispatch_free() {
 	if dispatch_runtime == unsafe { nil } { return }
+	dispatch_stop()
+	dispatch_data_stop()
+	dispatch_data_free()
+	C.free(dispatch_runtime.empty_data)
+	unsafe { dispatch_runtime.data.free() }
 	for _, queue in dispatch_runtime.queues {
 		if queue.busy != 0 { panic('iOS: dispatch callback still running when its image unmaps') }
 		C.free(queue.label)
