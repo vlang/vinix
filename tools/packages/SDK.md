@@ -2676,6 +2676,18 @@ unchanged. The observation grants no lease or maintenance authority. Caller-buil
 values may borrow data and keep their caller-managed lifetime. See
 [catalog observation ownership](../../tests/packages/software-view-owner-check.md).
 
+Presentation clients can use `pkgprotocol.disk_budget(available, needed, reserve)`
+to compute an allocation-free `DiskBudget`: `required`, exact `shortfall` and an
+`overflow` flag. `.fits()` is false on overflow; wrapped totals are never used.
+`Review.space_sufficient()` applies the ordinary zero-cost no-op exemption;
+mirror destination checks always enforce the reserve. A complete
+`MirrorReview.cache_space_sufficient()` checks a separate cache only when it
+needs acquisition. On a shared filesystem, destination `disk_needed` already
+includes cache acquisition. These helpers interpret existing SDK-1 counters;
+they add no wire fields or installation authority. The service repeats its
+disk check under the transaction lock before making changes. See
+[space review qualification](../../tests/packages/software-space-check.md).
+
 [`pkgprotocol.decode_software_view`](pkgprotocol/view_reader.v) returns an owned
 `SoftwareView`; call `.close()` on cancellation, replacement or retirement.
 All eight header fields and eighteen base row fields are required, including

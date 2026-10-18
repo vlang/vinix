@@ -362,6 +362,14 @@ configuration, catalog, state and planning scratch; the CLI closes catalog
 responses after presentation. See
 [catalog observation checks](../../tests/packages/software-view-owner-check.md).
 
+Software explains exact byte shortfalls before confirmation. A review with
+insufficient reported space remains readable and cancellable, with Confirm
+unavailable. Free space, cancel and review again to get a fresh estimate.
+Offline exports account for destination and separate cache filesystems without
+charging acquisition twice on a shared filesystem. No-op package plans and
+fully cached separate exports keep their service reserve exemptions. See
+[space review checks](../../tests/packages/software-space-check.md).
+
 Software's **Clean up versions → Read review** presents the complete admitted
 generation list, fingerprint, retained current/rollback identities and deletion
 rules through the shared reader, including compact windows. Back/Escape keeps

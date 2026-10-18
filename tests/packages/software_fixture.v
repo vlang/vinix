@@ -401,6 +401,8 @@ fn main() {
 	if os.args.len == 2 && os.args[1] == 'metadata-memory' { check_software_metadata_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'details-memory' { check_software_details_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'view-memory' { check_software_view_memory() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'space' { check_software_space() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'space-memory' { check_software_space_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'failure-memory' { check_software_failure_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'repair-memory' { check_software_repair_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'health-memory' { check_software_health_memory() or { panic(err) }; return }
@@ -609,6 +611,7 @@ fn main() {
 	mut child_status := 0
 	assert C.waitpid(pid, &child_status, 0) == pid
 	check_package_review()
+	check_software_space() or { panic(err) }
 	check_software_package_navigation() or { panic(err) }
 	check_resolved_updates() or { panic(err) }
 	check_repository_management() or { panic(err) }

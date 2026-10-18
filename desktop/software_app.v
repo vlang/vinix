@@ -521,6 +521,12 @@ fn (mut a SoftwareApp) load_review() {
 		available.free()
 		reserve.free()
 	}
+	problem := a.review_space_problem()
+	if problem != '' {
+		a.set_status(problem)
+		unsafe { problem.free() }
+		return
+	}
 	if a.mirror_pending != '' {
 		a.set_status(if a.mirror_lock_pending != '' {
 			'Review the destination, deployment source and digest, then every application and dependency. Export preserves the exact locked versions and bundles _deployment.json.'
@@ -1061,6 +1067,11 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		}
 		'software.confirm' {
 			if a.review_ready {
+				if !a.review_space_sufficient() {
+					problem := a.review_space_problem(); a.set_status(problem)
+					unsafe { problem.free() }
+					return
+				}
 				mirroring := a.mirror_pending != ''
 				a.start(if a.mirror_lock_pending != '' {
 					['mirror-deployment-apply', a.review_snapshot.fingerprint, a.mirror_pending, a.mirror_lock_pending]
@@ -1400,7 +1411,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		}
 	}
 	if a.review.len > 0 {
-		if a.review_ready {
+		if a.review_ready && a.review_space_sufficient() {
 			children << software_button('software.confirm', 'Confirm', 274, height - 138, 130)
 		}
 		children << software_button(if a.package_review_running() { 'software.review.stop' } else { 'software.cancel' },

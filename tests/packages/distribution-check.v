@@ -341,6 +341,10 @@ fn check() ! {
 	os.cp(repository + '/desktop/software_package_navigation.v', work + '/software/software_package_navigation.v')!
 	os.cp(repository + '/tests/packages/software_package_navigation_fixture.v', work + '/software/package_navigation_fixture.v')!
 	os.cp(repository + '/desktop/software_details.v', work + '/software/software_details.v')!
+	os.cp(repository + '/desktop/software_space.v', work + '/software/software_space.v')!
+	os.cp(repository + '/desktop/software_dependencies.v', work + '/software/software_dependencies.v')!
+	os.cp(repository + '/tests/packages/software_space_fixture.v', work + '/software/space_fixture.v')!
+	os.cp(repository + '/tests/packages/software_dependencies_fixture.v', work + '/software/dependencies_fixture.v')!
 	os.cp(repository + '/desktop/software_report_reader.v', work + '/software/software_report_reader.v')!
 	os.cp(repository + '/desktop/software_health.v', work + '/software/software_health.v')!
 	os.cp(repository + '/desktop/software_cleanup.v', work + '/software/software_cleanup.v')!

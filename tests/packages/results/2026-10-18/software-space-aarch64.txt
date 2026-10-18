@@ -1,0 +1,2 @@
+PASS aarch64 packages-software-space (22.5s)
+package-software-space aarch64: 1 passed, 0 failed, 0 skipped

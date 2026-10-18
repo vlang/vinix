@@ -1,0 +1,2 @@
+SOFTWARE SPACE all maintenance operations, overflow, exact shortfall, no-op, full/compact plan inspection, blocked approval and fresh review recovery PASS
+SOFTWARE SPACE shared/separate destination/cache budgets, zero acquisition, complete export diagnostics and blocked approval PASS

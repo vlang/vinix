@@ -100,7 +100,7 @@ pub fn free_bytes(path string) !u64 {
 }
 
 pub fn disk_check(available u64, needed u64, reserve u64) ! {
-	if needed > ~u64(0) - reserve || available < needed + reserve {
+	if !pkgprotocol.disk_budget(available, needed, reserve).fits() {
 		free_text := available.str(); needed_text := needed.str(); reserve_text := reserve.str()
 		defer { unsafe { free_text.free(); needed_text.free(); reserve_text.free() } }
 		return error('insufficient disk space: ' + free_text + ' bytes free, ' + needed_text + ' needed plus ' + reserve_text + ' reserved; remove unused generations or use a larger disk')

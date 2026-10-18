@@ -52,6 +52,7 @@ fn (mut a SoftwareApp) prepare_mirror_details() {
 	software_details_count(mut values, 'Reserved space per filesystem (bytes): ', a.review_snapshot.disk_reserve)
 	software_details_count(mut values, 'Cache acquisition space (bytes): ', a.mirror_snapshot.cache_needed)
 	software_details_count(mut values, 'Cache available space (bytes): ', a.mirror_snapshot.cache_available)
+	a.review_space_values(mut values)
 	values << if a.mirror_snapshot.shared_disk { 'Cache and destination share a filesystem. Destination required space already includes cache acquisition.'.clone() }
 		else { 'Cache uses a separate filesystem. Its acquisition requirement and the same reserved-space policy apply independently.'.clone() }
 	values << 'Installed applications and personal data stay unchanged. Signed catalogs retain their original expiry; consumers enroll each repository with its original publisher key.'.clone()

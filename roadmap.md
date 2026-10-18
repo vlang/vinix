@@ -799,6 +799,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     builder above; other profiles and broader release/runtime acceptance remain open.
 - [ ] Add transactional install/remove/upgrade, rollback, disk-space checks,
   interrupted-download recovery and coherent persistent package state.
+  - [x] [Space-aware Software confirmation](tests/packages/software-space-check.md)
+    reports exact shortfalls before approval, preserves readable/cancellable
+    proposals and blocks known insufficient or overflowing budgets. Shared and
+    separate offline export caches retain service accounting and no-op
+    exemptions; the service repeats its final disk check before changes.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,
   permissions, progress, uninstall, updates and useful failure diagnostics.
   - [x] [Owned catalog observations](tests/packages/software-view-owner-check.md)

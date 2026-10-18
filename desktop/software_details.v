@@ -205,6 +205,7 @@ fn (mut a SoftwareApp) prepare_details_context(row SoftwareRow, action string, r
 		software_details_count(mut diagnostics, 'Required disk space (bytes): ', a.review_snapshot.disk_needed)
 		software_details_count(mut diagnostics, 'Available disk space (bytes): ', a.review_snapshot.disk_available)
 		software_details_count(mut diagnostics, 'Reserved disk space (bytes): ', a.review_snapshot.disk_reserve)
+		a.review_space_values(mut diagnostics)
 		if !plan && a.deployment_pending != '' { diagnostics << 'Deployment file: ' + a.deployment_pending }
 		if a.mirror_pending != '' { diagnostics << 'Export destination: ' + a.mirror_snapshot.destination }
 		if a.mirror_lock_pending != '' { diagnostics << 'Deployment lock: ' + a.mirror_lock_pending }

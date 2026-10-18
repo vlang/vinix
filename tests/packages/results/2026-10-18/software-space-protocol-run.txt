@@ -1,0 +1,2 @@
+SOFTWARE SPACE 125 counter combinations and exact/one-byte-short boundaries preserve reserve without overflow PASS
+SOFTWARE SPACE ordinary no-op reserve exemptions, mirror destination enforcement, shared-disk accounting and separate warm/cold caches PASS

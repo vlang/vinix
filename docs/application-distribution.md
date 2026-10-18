@@ -740,6 +740,19 @@ explicit upgrades retain newest-first selection. See
 
 ## Install, maintenance and recovery
 
+Software keeps a proposal readable when its space estimate does not fit. Its
+status and plan/review readers identify the filesystem and exact additional
+bytes needed, including reserved space, and Confirm is unavailable. Free space,
+cancel the proposal and review again to read current availability. Overflowing
+requirements show a diagnostic instead of wrapping to a small total. The
+service still checks actual availability before making changes.
+
+Offline exports check the destination and a separate acquisition cache
+independently. A shared filesystem's destination requirement already includes
+acquisition; a fully cached separate export does not require additional cache
+space. Ordinary no-op package plans retain their reserve exemption. See
+[space review qualification](../tests/packages/software-space-check.md).
+
 In Software, **Details → License** shows separate displayed and installed
 licenses, proprietary/firmware declarations and runtime IDs, with each version
 identified. Installed facts come from persistent generation metadata, so a
