@@ -1,0 +1,2 @@
+PASS x86_64 packages-plan-observation (175.2s)
+package-plan-observation x86_64: 1 passed, 0 failed, 0 skipped

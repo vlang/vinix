@@ -816,6 +816,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     state and approval identities across 64 calls in each of 43 cases per
     architecture declaration. Other complete service operations and broader
     production/catalog, graphical and runtime release gates remain open.
+  - [x] [Owned public plan observations](tests/packages/plan-observation-check.md)
+    return independently closeable roots, publisher identities and complete
+    nested manifests, retiring request configuration/state/catalog/solver storage
+    on success/refusal. Both public APIs preserve exact plan JSON, installed
+    preference and signed state across 64 calls in each of 48 cases per
+    architecture declaration; 1,000 nested-copy cycles retain independent
+    fields. Resolver/transaction plans and broader release gates remain separate.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,
   permissions, progress, uninstall, updates and useful failure diagnostics.
   - [x] [Reviewed permission changes](tests/packages/review-permissions-check.md)

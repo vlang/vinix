@@ -138,6 +138,8 @@ fn prepare_operation_plan(config Config, directory string, current State, operat
 	return prepared
 }
 
+// Independent observation; retire the returned fields with Plan.close().
+// Configuration, directory and input IDs remain borrowed from the caller.
 pub fn preview_plan(config Config, directory string, operation string, names []string) !Plan {
 	guard := acquire_reader(directory)!
 	defer { guard.release() }
@@ -146,7 +148,10 @@ pub fn preview_plan(config Config, directory string, operation string, names []s
 
 fn preview_plan_locked(config Config, directory string, operation string, names []string) !Plan {
 	current := read_state(directory, config.architecture)!
-	return operation_plan(config, directory, current, operation, names)
+	defer { if current.generation != 0 { close_decoded_state(current) } }
+	mut prepared := prepare_operation_plan(config, directory, current, operation, names)!
+	defer { prepared.close() }
+	return owned_plan(prepared.plan)
 }
 
 fn review_strings(values []string) []string {

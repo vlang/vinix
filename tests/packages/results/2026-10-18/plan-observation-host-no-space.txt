@@ -1,0 +1,4 @@
+C compilation error (from cc):
+error: unable to open output file '/var/folders/5s/gdmd5zq90y52hchygpfzp2m00000gn/T/src-fccc13.o': 'No space left on device'
+1 error generated.
+

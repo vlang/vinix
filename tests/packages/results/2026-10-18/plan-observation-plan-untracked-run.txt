@@ -1,0 +1,3 @@
+PLAN OBSERVATION aarch64 1000 complete nested copies retained 0 tracked bytes
+PLAN OBSERVATION x86_64 1000 complete nested copies retained 0 tracked bytes
+PLAN OBSERVATION 33-package nested copies preserve every field, full-width numbers and independent retirement across 1000 cycles per architecture PASS

@@ -388,6 +388,11 @@ Complete ordinary/deployment review requests also retire configuration, installe
 and rollback states, deployment documents, authenticated catalogs and solver
 buffers after building their independent reply, including refusal paths. See
 [request ownership checks](../../tests/packages/review-request-check.md).
+Public `Service.plan()`/`preview_plan()` results also own every root, publisher
+identity and nested manifest field independently of configuration and request
+preparation. V callers retire them with `Plan.close()`; the CLI closes its plan
+after presentation. Resolver/transaction plans keep their borrowed lifetime.
+See [plan observation checks](../../tests/packages/plan-observation-check.md).
 
 Software releases rejected progress-frame errors under manual memory management.
 Malformed frames keep the last valid progress, and oversized lines recover at

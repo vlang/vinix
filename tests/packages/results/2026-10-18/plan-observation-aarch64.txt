@@ -1,0 +1,2 @@
+PASS aarch64 packages-plan-observation (145.1s)
+package-plan-observation aarch64: 1 passed, 0 failed, 0 skipped

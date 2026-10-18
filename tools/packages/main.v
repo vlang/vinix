@@ -407,7 +407,11 @@ fn checked(arguments []string) !int {
 		}
 		'plan' {
 			if names.len < 1 { return error('plan requires an operation') }
-			println(json2.encode(service.plan(names[0], names[1..])!))
+			mut plan := service.plan(names[0], names[1..])!
+			defer { plan.close() }
+			text := json2.encode(plan)
+			defer { unsafe { text.free() } }
+			println(text)
 		}
 		'review' {
 			if names.len < 1 { return error('review requires an operation') }

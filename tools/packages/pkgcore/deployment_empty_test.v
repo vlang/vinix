@@ -148,7 +148,9 @@ fn test_empty_deployment_preserves_review_lock_state_and_transaction_recovery_ch
 	mut generic := service.review('deploy', [])!
 	defer { generic.close() }
 	assert generic.rows == review.rows && generic.fingerprint != review.fingerprint
-	assert service.plan('deploy', [])!.packages.len == 0
+	mut empty_plan := service.plan('deploy', [])!
+	assert empty_plan.packages.len == 0
+	empty_plan.close()
 	sentinel := store + '/generations/.stage-empty-sentinel'
 	os.mkdir(sentinel)!
 	os.write_file(sentinel + '/keep', 'preserve abandoned recovery evidence')!

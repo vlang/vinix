@@ -42,11 +42,15 @@ pub fn (service Service) transact(operation string, names []string, options Tran
 		TransactionOptions{ ...options, progress: service.progress })
 }
 
+// The observation owns every field independently. Retire it with Plan.close().
 pub fn (service Service) plan(operation string, names []string) !Plan {
 	directory := service.directory()!
+	defer { unsafe { directory.free() } }
 	guard := acquire_reader(directory)!
 	defer { guard.release() }
-	return preview_plan_locked(service.configuration()!, directory, operation, names)
+	config := service.configuration()!
+	defer { close_decoded_configuration(config) }
+	return preview_plan_locked(config, directory, operation, names)
 }
 
 pub fn (service Service) review(operation string, names []string) !pkgprotocol.Review {

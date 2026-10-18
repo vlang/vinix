@@ -1,0 +1,54 @@
+Updating trusted repository trusted
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing assets 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing runtime 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Activated package generation 3
+PACKAGE REPAIR install: same-version rewrite review, stale health refusal, trust/policy/source checks, offline activation, healthy no-op and damaged rollback refusal PASS
+Updating trusted repository trusted
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing assets 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing runtime 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Activated package generation 3
+PACKAGE REPAIR upgrade: same-version rewrite review, stale health refusal, trust/policy/source checks, offline activation, healthy no-op and damaged rollback refusal PASS
+Updating trusted repository trusted
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing assets 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing runtime 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Activated package generation 3
+PACKAGE REPAIR deploy-roots: same-version rewrite review, stale health refusal, trust/policy/source checks, offline activation, healthy no-op and damaged rollback refusal PASS
+Updating trusted repository trusted
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing assets 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing runtime 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Activated package generation 3
+PACKAGE REPAIR deploy-lock: same-version rewrite review, stale health refusal, trust/policy/source checks, offline activation, healthy no-op and damaged rollback refusal PASS
+Updating trusted repository trusted
+Installing app 1.0.0 (1/3) from trusted
+Downloading app/bin/app (22 bytes)
+Installing assets 1.0.0 (2/3) from trusted
+Downloading assets/bin/app (25 bytes)
+Installing runtime 1.0.0 (3/3) from trusted
+Downloading runtime/bin/app (26 bytes)
+Activated package generation 1
+Updating trusted repository trusted
+Updating trusted repository trusted
+Updating trusted repository trusted
+Activated package generation 3
+PACKAGE REPAIR repair: same-version rewrite review, stale health refusal, trust/policy/source checks, offline activation, healthy no-op and damaged rollback refusal PASS
+PACKAGE REPAIR signed install/upgrade/deployment/explicit repair, reviewed corruption recovery, exact installed versions despite available updates, publisher withdrawal refusal, preserved state/data and protocol compatibility PASS

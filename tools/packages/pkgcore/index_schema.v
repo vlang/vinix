@@ -118,7 +118,8 @@ fn decode_manifest(text string, inventory bool) !Package {
 	return p
 }
 
-// Independently decoded records only: in-memory plans borrow these fields.
+// Independently decoded or copied records only. Resolver and transaction plans
+// borrow their manifests; public preview observations own independent copies.
 fn close_decoded_package(p Package) {
 	unsafe {
 		p.id.free(); p.version.free(); p.architecture.free(); p.name.free()

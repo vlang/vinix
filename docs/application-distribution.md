@@ -762,6 +762,11 @@ comparison scratch retire explicitly with unchanged identity bytes. See
 configuration, decoded active/rollback states, deployment documents, authenticated
 catalogs and solver buffers on success/refusal, with independently owned replies.
 Other complete service operations and broader release acceptance remain open.
+Public plan observations now own their complete roots, publisher identities and
+nested manifests, with `Plan.close()` retirement after V/CLI use. Request
+configuration, state, catalogs and solver buffers retire on success/refusal;
+resolver/transaction plans retain their borrowed lifetime and JSON stays
+compatible. See [plan observation ownership](../tests/packages/plan-observation-check.md).
 
 Software keeps a proposal readable when its space estimate does not fit. Its
 status and plan/review readers identify the filesystem and exact additional

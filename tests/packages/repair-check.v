@@ -89,8 +89,12 @@ fn check_case(work string, mode string, binary string, before bool) ! {
 		}
 		pkgcore.publish(work + '/repository', 'trusted', work + '/seed', 2, time.now().unix() + 3600)!
 		setup.refresh()!
-		assert setup.plan('upgrade', [])!.packages.all(it.package.version == '2.0.0')
-		assert setup.plan('repair', [])!.packages == initial.packages
+		mut upgrade := setup.plan('upgrade', [])!
+		assert upgrade.packages.all(it.package.version == '2.0.0')
+		upgrade.close()
+		mut repair := setup.plan('repair', [])!
+		assert repair.packages == initial.packages
+		repair.close()
 	}
 	deployment := if mode.starts_with('deploy') { work + '/deployment.json' } else { '' }
 	if deployment != '' {

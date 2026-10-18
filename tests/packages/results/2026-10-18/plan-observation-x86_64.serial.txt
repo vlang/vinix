@@ -1,0 +1,236 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=26
+!>+ [11] ./sbin/init sz=211008
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/empty sz=1672136
+!>+ [15] ./usr/share/package-fixtures/plan sz=1511824
+!>+ [16] ./usr/share/package-fixtures/preference sz=817864
+!>+ [17] ./usr/share/package-fixtures/service sz=1773392
+!>initramfs: no ustar sig at 0xff00000037102000
+initramfs: Done (17 entries)
+HWTEST START packages-plan-observation
+Updating trusted repository fixture
+PLAN OBSERVATION aarch64 service fresh install retained 0 tracked bytes
+PLAN OBSERVATION aarch64 service fresh repair retained 0 tracked bytes
+PLAN OBSERVATION aarch64 service empty deploy retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit fresh install retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit fresh repair retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit empty deploy retained 0 tracked bytes
+Installing Application é🚀 1.0.0 (1/3) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Licensed firmware 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+PLAN OBSERVATION aarch64 service available upgrade retained 0 tracked bytes
+PLAN OBSERVATION aarch64 service preserved installed retained 0 tracked bytes
+PLAN OBSERVATION aarch64 service exact repair retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit available upgrade retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit preserved installed retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit exact repair retained 0 tracked bytes
+Installing Application é🚀 2.0.0 (1/3) from fixture
+Installing Licensed firmware 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 2
+PLAN OBSERVATION aarch64 service installed install retained 0 tracked bytes
+PLAN OBSERVATION aarch64 service installed upgrade retained 0 tracked bytes
+PLAN OBSERVATION aarch64 service installed repair retained 0 tracked bytes
+PLAN OBSERVATION aarch64 service installed deploy retained 0 tracked bytes
+PLAN OBSERVATION aarch64 service remove retained 0 tracked bytes
+PLAN OBSERVATION aarch64 service blocked removal retained 0 tracked bytes
+PLAN OBSERVATION aarch64 service missing retained 0 tracked bytes
+PLAN OBSERVATION aarch64 service invalid repair retained 0 tracked bytes
+PLAN OBSERVATION aarch64 service invalid upgrade retained 0 tracked bytes
+PLAN OBSERVATION aarch64 service unknown operation retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit installed install retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit installed upgrade retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit installed repair retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit installed deploy retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit remove retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit blocked removal retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit missing retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit invalid repair retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit invalid upgrade retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit unknown operation retained 0 tracked bytes
+PLAN OBSERVATION aarch64 offline cached retained 0 tracked bytes
+PLAN OBSERVATION aarch64 service policy refusal retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit policy refusal retained 0 tracked bytes
+PLAN OBSERVATION aarch64 service revoked remove retained 0 tracked bytes
+PLAN OBSERVATION aarch64 service revoked empty deploy retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit revoked remove retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit revoked empty deploy retained 0 tracked bytes
+PLAN OBSERVATION aarch64catalog.json service retained 0 tracked bytes
+PLAN OBSERVATION aarch64catalog.json explicit retained 0 tracked bytes
+PLAN OBSERVATION aarch64trust-history.json service retained 0 tracked bytes
+PLAN OBSERVATION aarch64trust-history.json explicit retained 0 tracked bytes
+PLAN OBSERVATION aarch64generations/2/state.json service retained 0 tracked bytes
+PLAN OBSERVATION aarch64generations/2/state.json explicit retained 0 tracked bytes
+PLAN OBSERVATION aarch64 busy service retained 0 tracked bytes
+PLAN OBSERVATION aarch64 busy explicit retained 0 tracked bytes
+PLAN OBSERVATION aarch64 malformed configuration retained 0 tracked bytes
+Updating trusted repository fixture
+PLAN OBSERVATION x86_64 service fresh install retained 0 tracked bytes
+PLAN OBSERVATION x86_64 service fresh repair retained 0 tracked bytes
+PLAN OBSERVATION x86_64 service empty deploy retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit fresh install retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit fresh repair retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit empty deploy retained 0 tracked bytes
+Installing Application é🚀 1.0.0 (1/3) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Licensed firmware 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+PLAN OBSERVATION x86_64 service available upgrade retained 0 tracked bytes
+PLAN OBSERVATION x86_64 service preserved installed retained 0 tracked bytes
+PLAN OBSERVATION x86_64 service exact repair retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit available upgrade retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit preserved installed retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit exact repair retained 0 tracked bytes
+Installing Application é🚀 2.0.0 (1/3) from fixture
+Installing Licensed firmware 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 2
+PLAN OBSERVATION x86_64 service installed install retained 0 tracked bytes
+PLAN OBSERVATION x86_64 service installed upgrade retained 0 tracked bytes
+PLAN OBSERVATION x86_64 service installed repair retained 0 tracked bytes
+PLAN OBSERVATION x86_64 service installed deploy retained 0 tracked bytes
+PLAN OBSERVATION x86_64 service remove retained 0 tracked bytes
+PLAN OBSERVATION x86_64 service blocked removal retained 0 tracked bytes
+PLAN OBSERVATION x86_64 service missing retained 0 tracked bytes
+PLAN OBSERVATION x86_64 service invalid repair retained 0 tracked bytes
+PLAN OBSERVATION x86_64 service invalid upgrade retained 0 tracked bytes
+PLAN OBSERVATION x86_64 service unknown operation retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit installed install retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit installed upgrade retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit installed repair retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit installed deploy retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit remove retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit blocked removal retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit missing retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit invalid repair retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit invalid upgrade retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit unknown operation retained 0 tracked bytes
+PLAN OBSERVATION x86_64 offline cached retained 0 tracked bytes
+PLAN OBSERVATION x86_64 service policy refusal retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit policy refusal retained 0 tracked bytes
+PLAN OBSERVATION x86_64 service revoked remove retained 0 tracked bytes
+PLAN OBSERVATION x86_64 service revoked empty deploy retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit revoked remove retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit revoked empty deploy retained 0 tracked bytes
+PLAN OBSERVATION x86_64catalog.json service retained 0 tracked bytes
+PLAN OBSERVATION x86_64catalog.json explicit retained 0 tracked bytes
+PLAN OBSERVATION x86_64trust-history.json service retained 0 tracked bytes
+PLAN OBSERVATION x86_64trust-history.json explicit retained 0 tracked bytes
+PLAN OBSERVATION x86_64generations/2/state.json service retained 0 tracked bytes
+PLAN OBSERVATION x86_64generations/2/state.json explicit retained 0 tracked bytes
+PLAN OBSERVATION x86_64 busy service retained 0 tracked bytes
+PLAN OBSERVATION x86_64 busy explicit retained 0 tracked bytes
+PLAN OBSERVATION x86_64 malformed configuration retained 0 tracked bytes
+PLAN OBSERVATION complete service and explicit previews preserve independent manifests, exact JSON and signed state across 64 calls per case on both declarations PASS
+PLAN OBSERVATION aarch64 1000 complete nested copies retained 0 tracked bytes
+PLAN OBSERVATION x86_64 1000 complete nested copies retained 0 tracked bytes
+PLAN OBSERVATION 33-package nested copies preserve every field, full-width numbers and independent retirement across 1000 cycles per architecture PASS
+Resolver preference: 32768 catalog variants and 4096 installed identities retain one choice each and stable fallback order PASS
+Resolver preference: 1000 public successful multi-version installs and missing-requirement refusals retain zero tracked bytes PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/3) from fixture
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Empty deployment: formats 1/2 both architectures offline/revoked/damaged/absent catalog remove complete closure, disclose policy, retain data and enforce rollback admission PASS
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Firmware fixture 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Empty deployment: nonempty/surplus lock refusal, generic/file review domains, stale config, invalid state, busy lock and interrupted-stage recovery PASS
+Empty deployment: initialized fresh store no activation or acquisition; invalid configuration and empty remove still refuse PASS
+HWTEST PASS packages-plan-observation

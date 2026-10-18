@@ -372,7 +372,9 @@ fn test_deployment_documents_are_strict_bounded_and_lock_before_reading() {
 fn test_package_metadata_digest_is_canonical_and_binds_payloads_permissions_and_runtime() {
 	work, service, _ := deployment_fixture('digest')!
 	defer { os.rmdir_all(work) or {} }
-	p := service.plan('deploy', ['app'])!.packages[0].package
+	mut plan := service.plan('deploy', ['app'])!
+	defer { plan.close() }
+	p := plan.packages[0].package
 	base := Package{ ...p, permissions: ['files', 'network'], associations: ['text/plain', 'image/png'],
 		dependencies: [Dependency{ id: 'runtime' }, Dependency{ id: 'unused' }] }
 	assert package_metadata_digest(base)! == package_metadata_digest(Package{ ...base,

@@ -3731,8 +3731,17 @@ Complete `Service.review()`/`review_deployment()` requests also retire loaded
 configuration, decoded active/rollback states, deployment documents, authenticated
 catalogs and solver buffers on success/refusal. `review_operation()` borrows its
 configuration and retires its own preparation. Replies remain independently
-closeable; legacy Plan/activation replies retain their existing borrowed lifetime.
+closeable; internal resolver/activation plans retain their borrowed lifetime.
 See [complete request checks](../../tests/packages/review-request-check.md).
+
+Public `Service.plan()` and `preview_plan()` observations own their complete
+roots and manifests independently of request preparation, configuration and
+caller IDs. Retire these replies with `Plan.close()`; repeated close is harmless.
+The explicit-configuration API borrows its configuration and directory. The CLI
+closes public plan replies after presentation, with unchanged JSON fields and
+values. Low-level `resolve()` and transaction plans still borrow manifests and
+must not be closed through this method. See
+[plan observation checks](../../tests/packages/plan-observation-check.md).
 
 Review format 2 adds the optional paired row fields
 `installed_permissions_known`/`installed_permissions`. They describe the active

@@ -1,0 +1,2 @@
+Resolver preference: 32768 catalog variants and 4096 installed identities retain one choice each and stable fallback order PASS
+Resolver preference: 1000 public successful multi-version installs and missing-requirement refusals retain zero tracked bytes PASS

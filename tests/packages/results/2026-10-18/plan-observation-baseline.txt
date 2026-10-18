@@ -1,0 +1,118 @@
+Updating trusted repository fixture
+PLAN OBSERVATION aarch64 service fresh install retained 37888 tracked bytes
+PLAN OBSERVATION aarch64 service fresh repair retained 7742 tracked bytes
+PLAN OBSERVATION aarch64 service empty deploy retained 7742 tracked bytes
+PLAN OBSERVATION aarch64 explicit fresh install retained 30146 tracked bytes
+PLAN OBSERVATION aarch64 explicit fresh repair retained 0 tracked bytes
+PLAN OBSERVATION aarch64 explicit empty deploy retained 0 tracked bytes
+Installing Application é🚀 1.0.0 (1/3) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Licensed firmware 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+PLAN OBSERVATION aarch64 service available upgrade retained 87470 tracked bytes
+PLAN OBSERVATION aarch64 service preserved installed retained 87470 tracked bytes
+PLAN OBSERVATION aarch64 service exact repair retained 49040 tracked bytes
+PLAN OBSERVATION aarch64 explicit available upgrade retained 79728 tracked bytes
+PLAN OBSERVATION aarch64 explicit preserved installed retained 79728 tracked bytes
+PLAN OBSERVATION aarch64 explicit exact repair retained 41298 tracked bytes
+Installing Application é🚀 2.0.0 (1/3) from fixture
+Installing Licensed firmware 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 2
+PLAN OBSERVATION aarch64 service installed install retained 87486 tracked bytes
+PLAN OBSERVATION aarch64 service installed upgrade retained 87486 tracked bytes
+PLAN OBSERVATION aarch64 service installed repair retained 49056 tracked bytes
+PLAN OBSERVATION aarch64 service installed deploy retained 86766 tracked bytes
+PLAN OBSERVATION aarch64 service remove retained 49166 tracked bytes
+PLAN OBSERVATION aarch64 service blocked removal retained 49056 tracked bytes
+PLAN OBSERVATION aarch64 service missing retained 49056 tracked bytes
+PLAN OBSERVATION aarch64 service invalid repair retained 49056 tracked bytes
+PLAN OBSERVATION aarch64 service invalid upgrade retained 49056 tracked bytes
+PLAN OBSERVATION aarch64 service unknown operation retained 49056 tracked bytes
+PLAN OBSERVATION aarch64 explicit installed install retained 79744 tracked bytes
+PLAN OBSERVATION aarch64 explicit installed upgrade retained 79744 tracked bytes
+PLAN OBSERVATION aarch64 explicit installed repair retained 41314 tracked bytes
+PLAN OBSERVATION aarch64 explicit installed deploy retained 79024 tracked bytes
+PLAN OBSERVATION aarch64 explicit remove retained 41424 tracked bytes
+PLAN OBSERVATION aarch64 explicit blocked removal retained 41314 tracked bytes
+PLAN OBSERVATION aarch64 explicit missing retained 41314 tracked bytes
+PLAN OBSERVATION aarch64 explicit invalid repair retained 41314 tracked bytes
+PLAN OBSERVATION aarch64 explicit invalid upgrade retained 41314 tracked bytes
+PLAN OBSERVATION aarch64 explicit unknown operation retained 41314 tracked bytes
+PLAN OBSERVATION aarch64 offline cached retained 87486 tracked bytes
+PLAN OBSERVATION aarch64 service policy refusal retained 48960 tracked bytes
+PLAN OBSERVATION aarch64 explicit policy refusal retained 41314 tracked bytes
+PLAN OBSERVATION aarch64 service revoked remove retained 48900 tracked bytes
+PLAN OBSERVATION aarch64 service revoked empty deploy retained 48790 tracked bytes
+PLAN OBSERVATION aarch64 explicit revoked remove retained 41424 tracked bytes
+PLAN OBSERVATION aarch64 explicit revoked empty deploy retained 41314 tracked bytes
+PLAN OBSERVATION aarch64catalog.json service retained 49056 tracked bytes
+PLAN OBSERVATION aarch64catalog.json explicit retained 41314 tracked bytes
+PLAN OBSERVATION aarch64trust-history.json service retained 49056 tracked bytes
+PLAN OBSERVATION aarch64trust-history.json explicit retained 41314 tracked bytes
+PLAN OBSERVATION aarch64generations/2/state.json service retained 7742 tracked bytes
+PLAN OBSERVATION aarch64generations/2/state.json explicit retained 0 tracked bytes
+PLAN OBSERVATION aarch64 busy service retained 140 tracked bytes
+PLAN OBSERVATION aarch64 busy explicit retained 0 tracked bytes
+PLAN OBSERVATION aarch64 malformed configuration retained 140 tracked bytes
+Updating trusted repository fixture
+PLAN OBSERVATION x86_64 service fresh install retained 37878 tracked bytes
+PLAN OBSERVATION x86_64 service fresh repair retained 7736 tracked bytes
+PLAN OBSERVATION x86_64 service empty deploy retained 7736 tracked bytes
+PLAN OBSERVATION x86_64 explicit fresh install retained 30142 tracked bytes
+PLAN OBSERVATION x86_64 explicit fresh repair retained 0 tracked bytes
+PLAN OBSERVATION x86_64 explicit empty deploy retained 0 tracked bytes
+Installing Application é🚀 1.0.0 (1/3) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Licensed firmware 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+PLAN OBSERVATION x86_64 service available upgrade retained 87452 tracked bytes
+PLAN OBSERVATION x86_64 service preserved installed retained 87452 tracked bytes
+PLAN OBSERVATION x86_64 service exact repair retained 49028 tracked bytes
+PLAN OBSERVATION x86_64 explicit available upgrade retained 79716 tracked bytes
+PLAN OBSERVATION x86_64 explicit preserved installed retained 79716 tracked bytes
+PLAN OBSERVATION x86_64 explicit exact repair retained 41292 tracked bytes
+Installing Application é🚀 2.0.0 (1/3) from fixture
+Installing Licensed firmware 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 2
+PLAN OBSERVATION x86_64 service installed install retained 87468 tracked bytes
+PLAN OBSERVATION x86_64 service installed upgrade retained 87468 tracked bytes
+PLAN OBSERVATION x86_64 service installed repair retained 49044 tracked bytes
+PLAN OBSERVATION x86_64 service installed deploy retained 86748 tracked bytes
+PLAN OBSERVATION x86_64 service remove retained 49154 tracked bytes
+PLAN OBSERVATION x86_64 service blocked removal retained 49044 tracked bytes
+PLAN OBSERVATION x86_64 service missing retained 49044 tracked bytes
+PLAN OBSERVATION x86_64 service invalid repair retained 49044 tracked bytes
+PLAN OBSERVATION x86_64 service invalid upgrade retained 49044 tracked bytes
+PLAN OBSERVATION x86_64 service unknown operation retained 49044 tracked bytes
+PLAN OBSERVATION x86_64 explicit installed install retained 79732 tracked bytes
+PLAN OBSERVATION x86_64 explicit installed upgrade retained 79732 tracked bytes
+PLAN OBSERVATION x86_64 explicit installed repair retained 41308 tracked bytes
+PLAN OBSERVATION x86_64 explicit installed deploy retained 79012 tracked bytes
+PLAN OBSERVATION x86_64 explicit remove retained 41418 tracked bytes
+PLAN OBSERVATION x86_64 explicit blocked removal retained 41308 tracked bytes
+PLAN OBSERVATION x86_64 explicit missing retained 41308 tracked bytes
+PLAN OBSERVATION x86_64 explicit invalid repair retained 41308 tracked bytes
+PLAN OBSERVATION x86_64 explicit invalid upgrade retained 41308 tracked bytes
+PLAN OBSERVATION x86_64 explicit unknown operation retained 41308 tracked bytes
+PLAN OBSERVATION x86_64 offline cached retained 87468 tracked bytes
+PLAN OBSERVATION x86_64 service policy refusal retained 48948 tracked bytes
+PLAN OBSERVATION x86_64 explicit policy refusal retained 41308 tracked bytes
+PLAN OBSERVATION x86_64 service revoked remove retained 48890 tracked bytes
+PLAN OBSERVATION x86_64 service revoked empty deploy retained 48780 tracked bytes
+PLAN OBSERVATION x86_64 explicit revoked remove retained 41418 tracked bytes
+PLAN OBSERVATION x86_64 explicit revoked empty deploy retained 41308 tracked bytes
+PLAN OBSERVATION x86_64catalog.json service retained 49044 tracked bytes
+PLAN OBSERVATION x86_64catalog.json explicit retained 41308 tracked bytes
+PLAN OBSERVATION x86_64trust-history.json service retained 49044 tracked bytes
+PLAN OBSERVATION x86_64trust-history.json explicit retained 41308 tracked bytes
+PLAN OBSERVATION x86_64generations/2/state.json service retained 7736 tracked bytes
+PLAN OBSERVATION x86_64generations/2/state.json explicit retained 0 tracked bytes
+PLAN OBSERVATION x86_64 busy service retained 138 tracked bytes
+PLAN OBSERVATION x86_64 busy explicit retained 0 tracked bytes
+PLAN OBSERVATION x86_64 malformed configuration retained 138 tracked bytes
