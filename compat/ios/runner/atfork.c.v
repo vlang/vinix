@@ -60,9 +60,11 @@ fn image_atfork_prepare() {
 	// mutex can be released by the surviving caller in either process.
 	C.ios_mach_threads_lock()
 	mach_threads_fork_prepare()
+	image_tls_fork_prepare()
 }
 
 fn image_atfork_complete(child bool) {
+	image_tls_fork_complete(child)
 	if child { mach_threads_fork_child() } else { mach_threads_fork_parent() }
 	C.ios_mach_threads_unlock()
 	mut handler := image_fork_state.head

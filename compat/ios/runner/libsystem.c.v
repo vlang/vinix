@@ -146,6 +146,7 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 		'_pthread_create' { unsafe { voidptr(darwin_pthread_create) } }
 		'_pthread_join' { unsafe { voidptr(darwin_pthread_join) } }
 		'__tlv_bootstrap' { unsafe { voidptr(C.ios_tlv_get_addr) } }
+		'__tlv_atexit' { unsafe { voidptr(image_tlv_atexit) } }
 		'___cxa_atexit' { unsafe { voidptr(image_cxa_atexit) } }
 		'___cxa_finalize' { unsafe { voidptr(image_cxa_finalize) } }
 		'_atexit' { unsafe { voidptr(image_atexit) } }

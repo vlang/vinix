@@ -252,8 +252,6 @@ fn dcb_execute_init(_ int, _ &&char, _ &&char, _ &&char) {
 	dcb_phase = 1
 	dcb_init_count++
 	mut tls := &ImageTls{ template: [u8(0x78), 0x56, 0x34, 0x12] }
-	assert C.pthread_key_create(unsafe { voidptr(&tls.key) }, unsafe { voidptr(C.free) }) == 0
-	tls.active = true
 	image_runtime.tls_modules << tls
 	image_runtime.tls_descriptors[0xdcb] = TlsDescriptor{tls, 0}
 	dcb_services = true

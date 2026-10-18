@@ -860,8 +860,9 @@ values, guarded outputs and three rearmed key-destructor passes. It also forks
 from a worker and checks the child's main-thread identity. ASAN/UBSAN checks
 two image loads/unloads on the process thread and another on a native worker,
 with all app workers joined and keys/conditions destroyed before unmapping.
-TLS reads from key destructors and C++ thread-local destructor ordering remain
-unverified. The full ARM64 C++/GLES/PPSSPP regression passes; an earlier attempt
+TLS reads from arbitrary native pthread-key destructors remain unverified;
+C++ thread-local destructor ordering is checked by the TLV fixture below.
+The full ARM64 C++/GLES/PPSSPP regression passes; an earlier attempt
 failed the existing concurrent permission fixture with `ENOENT` and its log is
 preserved. This resolves five more strong imports across Fortnite and EOSSDK.
 
@@ -8458,21 +8459,59 @@ Native/IPA inspection, pinned inputs, joined logs and eleven generated
 C/executable pairs are retained under
 `build/ios/fortnite/dyld-callbacks-checks`.
 
-The fresh IPA probe exits with status 1 before application entry at
-`__tlv_atexit` from `libSystem.B.dylib`. Fortnite remains unplayable and full
-iOS regression remains unpassed.
+That IPA probe exited with status 1 before application entry at
+`__tlv_atexit` from `libSystem.B.dylib`.
+
+The V `__tlv_atexit` adapter implements Darwin's void callback/object-pointer
+ABI, preserving errno. Each execution has one native pthread key; each thread
+owns a stack of destructors and independent storage for every TLS image.
+Callbacks run in reverse registration order, including callbacks registered
+reentrantly, before any of that thread's image TLS is freed. Native key cleanup
+handles both normal thread return and `pthread_exit`, without the pthread
+destructor-iteration limit. `fork` keeps the surviving thread's TLS and drops
+copies belonging to vanished threads without invoking their callbacks.
+
+Process `exit` drains current-thread TLS before process/C++ exit handlers;
+immediate exit skips both, matching native Mac measurements. When an embedded
+execution returns, framework workers are joined and the main thread's TLS is
+drained before global destructors. Additional drains handle registrations from
+global destructors and dyld removal callbacks while Objective-C and image TLS
+remain available. Live foreign TLS owners are rejected before framework
+teardown; pending callbacks are rejected before deleting the native key or
+unmapping code. TLS storage survives all these finalizers and is then freed.
+
+`tests/ios/native-checks.v build-tlv-atexit` builds the fixture. It checks 32
+joined workers across two executions, two TLS images per thread, normal and
+explicit exit, nil callback arguments, 96 reentrant callbacks, fork ownership,
+process/immediate exit and active/pending shutdown rejection. A V-generated
+ARM64 Mach-O uses real TLV descriptors through constructor, main, TLS/global
+destructors and removal callbacks, checking live Objective-C and TLS twice.
+SDK declarations and typed native calls establish the ABI and ordering;
+V/Mach-O/LLVM inspection finds 86 IPA consumers/forwarders for this import.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites pass, covering TLV exit,
+dyld callbacks, zlib bounds and executable paths. Native measurements, IPA
+inspection, pinned inputs, joined logs and eleven generated C/executable pairs
+are retained under `build/ios/fortnite/tlv-atexit-checks`. Preliminary build
+and source-review attempts are retained separately within that cohort.
+
+The fresh IPA probe now stops at `_acosh` from `libSystem.B.dylib`, before
+application entry. Its scalar-double call at `0x101b9beac` and branch-island
+forwarder are confirmed by LLVM disassembly. Native Mac boundary, NaN,
+infinity, errno and floating-exception measurements are retained for the next
+adapter. Fortnite remains unplayable and the full iOS regression is unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,701 | 459 | 79 |
+| Fortnite executable | 1,702 | 458 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,536 | 462 | 120 |
+| All images | 2,537 | 461 | 120 |
 
-The C++/GLES/Text variant reports 2,550 resolved imports, 448 unresolved strong
+The C++/GLES/Text variant reports 2,551 resolved imports, 447 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

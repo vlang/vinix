@@ -38,12 +38,16 @@ mut:
 	destructor_lock &sync.Mutex = unsafe { nil }
 	tls_modules []&ImageTls
 	tls_descriptors map[u64]TlsDescriptor
+	tls_key u64
+	tls_active bool
+	tls_closing bool
+	tls_threads u64
+	tls_owners &ImageTlsThread = unsafe { nil }
 }
 
+@[heap]
 struct ImageTls {
 mut:
-	key u64
-	active bool
 	template []u8
 }
 
@@ -55,10 +59,13 @@ struct TlsDescriptor {
 __global image_runtime = unsafe { &ImageRuntime(nil) }
 
 fn image_runtime_start(image macho.Image, layout macho.Layout, base u64) {
+	image_tls_lock.lock()
+	defer { image_tls_lock.unlock() }
 	image_runtime = &ImageRuntime{base: base, image: image, layout: layout,
 		destructor_lock: sync.new_mutex()}
 	image_runtime.destructors.flags |= .noslices
 	image_runtime.tls_modules.flags |= .noslices
+	image_tls_start()
 }
 
 fn (loaded LoadedModule) code_address(address u64) bool {
@@ -153,27 +160,13 @@ fn image_tls_prepare(loaded &LoadedModule) ! {
 			}
 		}
 	}
-	if C.pthread_key_create(unsafe { voidptr(&storage.key) }, unsafe { voidptr(C.free) }) != 0 {
-		return error('iOS: cannot allocate TLS key')
-	}
-	storage.active = true
 }
 
 @[export: 'ios_tlv_address']
 fn image_tls_address(descriptor u64) u64 {
-	entry := image_runtime.tls_descriptors[descriptor] or { panic('iOS: unknown TLV descriptor') }
-	tls := entry.storage
-	mut storage := C.pthread_getspecific(tls.key)
-	if storage == unsafe { nil } {
-		storage = C.malloc(usize(tls.template.len))
-		if storage == unsafe { nil } { panic('iOS: cannot allocate thread-local storage') }
-		unsafe { C.memcpy(storage, tls.template.data, usize(tls.template.len)) }
-		if C.pthread_setspecific(tls.key, storage) != 0 {
-			C.free(storage)
-			panic('iOS: cannot install thread-local storage')
-		}
-	}
-	return u64(storage) + entry.offset
+	mut state := image_tls_thread()
+	entry := state.runtime.tls_descriptors[descriptor] or { panic('iOS: unknown TLV descriptor') }
+	return u64(image_tls_block(mut state, entry.storage)) + entry.offset
 }
 
 fn image_cxa_atexit(function ImageDestructor, argument voidptr, dso u64) int {
@@ -193,6 +186,7 @@ fn image_atexit(function ImageExit) int {
 
 @[noreturn]
 fn image_exit(status int) {
+	image_tls_finalize_current()
 	image_cxa_finalize(0)
 	C.exit(status)
 	for {}
@@ -227,13 +221,9 @@ fn image_cxa_finalize(dso u64) {
 fn image_runtime_stop() {
 	// A link/protection failure must never execute a module's terminators.
 	if image_runtime.started { image_cxa_finalize(0) }
+	image_tls_stop()
 	image_atfork_stop()
 	for storage in image_runtime.tls_modules {
-		if storage.active {
-			C.free(C.pthread_getspecific(storage.key))
-			C.pthread_setspecific(storage.key, unsafe { nil })
-			C.pthread_key_delete(storage.key)
-		}
 		unsafe { storage.template.free(); free(storage) }
 	}
 	unsafe {
@@ -244,6 +234,8 @@ fn image_runtime_stop() {
 	}
 	image_runtime.destructor_lock.destroy()
 	C.free(image_runtime.destructor_lock)
+	image_tls_lock.lock()
 	C.free(image_runtime)
 	image_runtime = unsafe { &ImageRuntime(nil) }
+	image_tls_lock.unlock()
 }
