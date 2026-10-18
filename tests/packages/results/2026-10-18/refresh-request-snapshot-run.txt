@@ -1,0 +1,21 @@
+Snapshot probe: null cache accepted=false
+Snapshot probe: unknown field accepted=false
+Snapshot probe: duplicate text accepted=false
+Snapshot probe: missing URL accepted=false
+Snapshot probe: dangling cache accepted=false
+Snapshot schema: complete typed records, ambiguity refusal, exact signed bytes, legacy whitespace and fresh/empty caches passed
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Downloading app/bin/app (14 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository publisher
+Installing Application 1.0.0 (1/1) from publisher
+Activated package generation 5
+Activated package generation 6
+Snapshot schema: failed migration preserves state/cache/recovery; restored legacy floor rejects replay, authentic renewal and revoked-publisher uninstall passed

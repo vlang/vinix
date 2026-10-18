@@ -29,9 +29,12 @@ fn (service Service) configuration() !Config {
 
 pub fn (service Service) refresh() !Catalog {
 	directory := service.directory()!
+	defer { unsafe { directory.free() } }
 	guard := acquire(directory)!
 	defer { guard.release() }
-	return refresh_progress(service.configuration()!, directory, service.progress)
+	config := service.configuration()!
+	defer { close_decoded_configuration(config) }
+	return refresh_progress(config, directory, service.progress)
 }
 
 pub fn (service Service) transact(operation string, names []string, options TransactionOptions) !State {

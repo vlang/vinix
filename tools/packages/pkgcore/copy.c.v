@@ -65,7 +65,12 @@ fn copy_file_progress(source string, target string, offset u64, maximum u64, eve
 fn fetch_file_progress(source string, target string, maximum u64, resume bool, event pkgprotocol.Progress, report fn (pkgprotocol.Progress)) !bool {
 	// Admit the source before changing a retained partial, including when an
 	// oversized partial would otherwise start a fresh transfer.
-	input := copy_source(source, maximum) or { return error('offline repository file unavailable or invalid: ${source}: ${err}') }
+	input := copy_source(source, maximum) or {
+		message := err.msg()
+		diagnostic := 'offline repository file unavailable or invalid: ' + source + ': ' + message
+		unsafe { message.free(); err.free() }
+		return error(diagnostic)
+	}
 	defer { C.close(input.fd) }
 	mut offset := u64(0)
 	if resume && ordinary_file(target) { offset = os.file_size(target) }

@@ -3752,6 +3752,19 @@ values. Low-level `resolve()` and transaction plans still borrow manifests and
 must not be closed through this method. See
 [plan observation checks](../../tests/packages/plan-observation-check.md).
 
+`Service.refresh()` and `pkgcore.refresh(config, directory)` return independent
+`Catalog` replies. Every manifest field and publisher identity belongs to that
+reply; call `catalog.close()` when finished. Repeated close of the same owner
+is harmless. Explicit refresh borrows its configuration and directory. Service
+refresh retires its loaded configuration after the reply becomes independent,
+preserving lock-before-configuration ordering. The CLI closes its update reply.
+Low-level `load_catalog()`/`snapshots_catalog()` and caller-built catalogs retain
+their existing borrowed identities; do not close them through this method.
+Refresh cleanup captures its workspace and refuses aliases, shared writable
+roots and filesystem crossings before retiring abandoned work. Publication
+still records authenticated replay floors before replacing the catalog. See
+[refresh request checks](../../tests/packages/refresh-request-check.md).
+
 Review format 2 adds the optional paired row fields
 `installed_permissions_known`/`installed_permissions`. They describe the active
 generation's declarations before the reviewed transaction, independently of

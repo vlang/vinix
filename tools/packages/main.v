@@ -341,7 +341,8 @@ fn checked(arguments []string) !int {
 		}
 		'update' {
 			if names.len != 0 { return error('update takes no package IDs') }
-			service.refresh()!
+			mut catalog := service.refresh()!
+			catalog.close()
 		}
 		'view', 'search', 'info', 'updates' {
 			mut view := pkgcore.software_view(root, offline)!

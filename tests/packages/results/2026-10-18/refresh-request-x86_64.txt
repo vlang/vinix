@@ -1,0 +1,2 @@
+PASS x86_64 packages-refresh-request (1026.1s)
+package-refresh-request x86_64: 1 passed, 0 failed, 0 skipped

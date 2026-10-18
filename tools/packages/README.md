@@ -394,6 +394,14 @@ preparation. V callers retire them with `Plan.close()`; the CLI closes its plan
 after presentation. Resolver/transaction plans keep their borrowed lifetime.
 See [plan observation checks](../../tests/packages/plan-observation-check.md).
 
+`Service.refresh()`/`refresh()` return independently owned catalogs, including
+publisher identities and nested manifests. V clients retire these replies with
+`Catalog.close()`; the CLI `update` command does so automatically. Service
+configuration and refresh paths, fetched metadata and workspace inventories
+retire on success/refusal. Low-level `load_catalog()`/`snapshots_catalog()` keep
+their borrowed publisher identities and must not use this close method. See
+[refresh request checks](../../tests/packages/refresh-request-check.md).
+
 Software releases rejected progress-frame errors under manual memory management.
 Malformed frames keep the last valid progress, and oversized lines recover at
 the next newline while human failure diagnostics remain available. See

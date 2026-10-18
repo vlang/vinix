@@ -76,7 +76,9 @@ pub fn fetch(url string, destination string, maximum u64, resume bool, offline b
 // server can refuse ranges, requiring a bounded fresh transfer instead.
 fn fetch_progress(url string, destination string, maximum u64, resume bool, offline bool, event pkgprotocol.Progress, report fn (pkgprotocol.Progress)) !bool {
 	if url.starts_with('file:///') {
-		return fetch_file_progress(url[7..], destination, maximum, resume, event, report)
+		source := url[7..]
+		defer { unsafe { source.free() } }
+		return fetch_file_progress(source, destination, maximum, resume, event, report)
 	}
 	return fetch_https_with(url, destination, maximum, resume, offline, event, report, HttpsOutputOptions{})
 }

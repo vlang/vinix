@@ -152,6 +152,7 @@ pub fn load_catalog(config Config, directory string) !Catalog {
 	return catalog_from_snapshots(config, snapshots, history, time.now().unix())
 }
 
+// Refresh replies own their manifests and publisher identities; use Catalog.close().
 pub fn refresh(config Config, directory string) !Catalog {
 	config.validate()!
 	guard := acquire(directory)!
@@ -174,22 +175,37 @@ fn refresh_progress(config Config, directory string, report fn (pkgprotocol.Prog
 		// These records own fetched text/signatures and borrow Config identities.
 		unsafe {
 			for snapshot in snapshots { snapshot.text.free(); snapshot.signature.free() }
-			snapshots.free()
+			(&array(&snapshots)).free()
 		}
 	}
 	mut encoding := new_snapshot_encoding()
 	defer { unsafe { encoding.free() } }
 	work := directory + '/refresh'
-	if os.exists(work) { os.rmdir_all(work)! }
+	defer { unsafe { work.free() } }
+	parent := refresh_parent(directory)!
+	defer { C.close(parent) }
+	found, abandoned := capture_refresh_work(parent)!
+	if found { retire_stage(parent, abandoned)! }
 	owned_directory(work, 0o700)!
-	defer { os.rmdir_all(work) or {} }
+	present, target := capture_refresh_work(parent)!
+	if !present { return error('cannot capture refresh workspace') }
+	defer {
+		retire_stage(parent, target) or {
+			message := err.msg(); unsafe { message.free(); err.free() }
+		}
+	}
 	for repository in config.repositories {
-		println('Updating trusted repository ${repository.id}')
+		message := 'Updating trusted repository ' + repository.id
+		println(message)
+		defer { unsafe { message.free() } }
 		index_path := work + '/index.json'
 		sig_path := work + '/index.sig'
-		fetch_progress(repository.url.trim_right('/') + '/index.json', index_path, max_metadata, false, config.policy.offline,
+		base := repository.url.trim_right('/')
+		index_url := base + '/index.json'; sig_url := base + '/index.sig'
+		defer { unsafe { index_path.free(); sig_path.free(); base.free(); index_url.free(); sig_url.free() } }
+		fetch_progress(index_url, index_path, max_metadata, false, config.policy.offline,
 			pkgprotocol.Progress{ phase: 'metadata', repository: repository.id, path: 'index.json' }, report)!
-		fetch_progress(repository.url.trim_right('/') + '/index.sig', sig_path, 256, false, config.policy.offline,
+		fetch_progress(sig_url, sig_path, 256, false, config.policy.offline,
 			pkgprotocol.Progress{ phase: 'metadata', repository: repository.id, path: 'index.sig' }, report)!
 		text := read_metadata(index_path)!
 		raw_signature := read_metadata(sig_path) or { unsafe { text.free() }; return err }
@@ -216,8 +232,10 @@ fn refresh_progress(config Config, directory string, report fn (pkgprotocol.Prog
 	// Record authenticated sequence/digest floors before exposing the new cache.
 	// Revocation and empty refreshes never discard identities from this history.
 	save_history(directory, history)!
-	atomic_write(directory + '/catalog.json', encoded)!
+	cache_path := directory + '/catalog.json'
+	defer { unsafe { cache_path.free() } }
+	atomic_write(cache_path, encoded)!
 	report(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 })
 	published = true
-	return catalog
+	return owned_refresh_catalog(catalog)
 }

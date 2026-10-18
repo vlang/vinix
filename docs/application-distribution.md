@@ -768,6 +768,14 @@ configuration, state, catalogs and solver buffers retire on success/refusal;
 resolver/transaction plans retain their borrowed lifetime and JSON stays
 compatible. See [plan observation ownership](../tests/packages/plan-observation-check.md).
 
+Public refresh replies likewise own publisher identities and nested manifests;
+V clients retire them with `Catalog.close()`, and CLI `update` closes its reply.
+Service refresh retires configuration and temporary request storage on success
+and refusal. Its captured workspace cleanup refuses aliases and writable roots,
+preserving foreign files and retained signed metadata. Replay history still
+publishes before the cache, including when cache publication later fails. See
+[refresh request ownership](../tests/packages/refresh-request-check.md).
+
 Software keeps a proposal readable when its space estimate does not fit. Its
 status and plan/review readers identify the filesystem and exact additional
 bytes needed, including reserved space, and Confirm is unavailable. Free space,

@@ -1,0 +1,2 @@
+PASS aarch64 packages-refresh-request (985.7s)
+package-refresh-request aarch64: 1 passed, 0 failed, 0 skipped
