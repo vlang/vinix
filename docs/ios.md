@@ -8261,21 +8261,42 @@ SRV query and 65,535-byte answer capacity were inspected with V/Mach-O/LLVM.
 Pinned inputs, native measurements, probe/audit logs and eleven generated
 C/executable pairs are retained under `build/ios/fortnite/resolver-query-checks`.
 
-The actual IPA now exits with status 1 before application entry at
-`_CCKeyDerivationPBKDF` from `libSystem.B.dylib`. Fortnite remains unplayable
-and full iOS regression remains unpassed.
+`CCKeyDerivationPBKDF` implements PBKDF2 in V using SHA1, SHA224, SHA256,
+SHA384 and SHA512. It preserves CommonCrypto's separate PRF numbering,
+parameter errors and nine-argument LP64 ABI. Binary passwords and salts,
+empty inputs, long HMAC keys and partial output blocks are supported. Null
+passwords, zero rounds/output lengths, overflowing pointer ranges and output
+lengths exceeding the four-byte PBKDF2 block counter are rejected before writes.
+Three owned hash states are reused across all rounds and freed on completion;
+the round loop allocates no memory and stack key/output temporaries are wiped.
+
+`tests/ios/native-checks.v build-pbkdf` builds the fixture. It compares all five
+PRFs against the installed Mac CommonCrypto, checks RFC 6070 vectors, protected
+buffer boundaries, error paths and concurrent callers. V/Mach-O/LLVM inspection
+of the actual IPA found two SHA1 callers: one derives 16 bytes using eight salt
+bytes and 1,000 rounds; the other uses 10,000 rounds and a runtime output length.
+Both profiles are included in the fixture.
+
+Eight retained host ASan/UBSan runs and four ARM64 Vinix suites pass, covering
+PBKDF2, DNS, native zlib stream bounds and Storefront.current. Pinned sources,
+Mac/IPA inspection, probe/audit logs and eleven generated C/executable pairs are
+retained under `build/ios/fortnite/pbkdf-checks`.
+
+The actual IPA now exits with status 1 before application entry at `_NDR_record`
+from `libSystem.B.dylib`. Fortnite remains unplayable and full iOS regression
+remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,690 | 470 | 79 |
+| Fortnite executable | 1,691 | 469 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,525 | 473 | 120 |
+| All images | 2,526 | 472 | 120 |
 
-The C++/GLES/Text variant reports 2,539 resolved imports, 459 unresolved strong
+The C++/GLES/Text variant reports 2,540 resolved imports, 458 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

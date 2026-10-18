@@ -197,6 +197,7 @@ fn common_crypto_symbol(symbol string) ?u64 {
 		'_CC_SHA512' { u64(unsafe { voidptr(cc_sha512) }) }
 		'_CCHmac' { u64(unsafe { voidptr(cc_hmac) }) }
 		'_CCCrypt' { u64(unsafe { voidptr(cc_crypt) }) }
+		'_CCKeyDerivationPBKDF' { u64(unsafe { voidptr(cc_key_derivation_pbkdf) }) }
 		'_CCRandomGenerateBytes' { u64(unsafe { voidptr(cc_random_generate) }) }
 		else { return none }
 	}
