@@ -8999,17 +8999,39 @@ probe passes `_getprogname` and stops before entry at `_host_page_size`.
 V/Mach-O/LLVM inspection identifies its call at `0x1005a715c` for the next
 adapter. Fortnite remains unplayable and the full iOS regression is unpassed.
 
+V now resolves `_host_page_size` from the same writable cache exported as
+`_vm_page_size`. Native ARM64 disassembly shows that Darwin's public function
+ignores the host port, stores the cached eight-byte `vm_size_t` and returns
+success. The V adapter follows that behavior using Vinix's page size, preserves
+errno and floating-point state, and adds no allocation or port lifetime.
+
+`tests/ios/native-checks.v build-host-page-size` builds its fixture. Two host
+ASan/UBSan runs and the ARM64 Vinix suite pass for native comparison, null/dead/
+unknown port names, dirty upper argument bits, guarded aligned and unaligned
+outputs, adjacent canaries, cache changes and aliasing, eight concurrent callers,
+import scoping and two system-data lifecycles. Explicit byte-copy casts avoid
+typed alignment checks; the initial sanitizer failure and its correction are
+retained. Generated C review verifies the stack snapshot and exact eight-byte
+copy. Unconfigured calls fail explicitly.
+
+Measurements, joined logs, pinned inputs and five generated C/executable pairs
+are retained under `build/ios/fortnite/host-page-size-checks`. The fresh IPA probe
+passes `_host_page_size` and stops before entry at `_host_statistics`. Native
+statistics count negotiation, port/flavor errors and output extents are retained
+for the next adapter. Fortnite remains unplayable and the full iOS regression
+is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,739 | 421 | 79 |
+| Fortnite executable | 1,740 | 420 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,574 | 424 | 120 |
+| All images | 2,575 | 423 | 120 |
 
-The C++/GLES/Text variant reports 2,588 resolved imports, 410 unresolved strong
+The C++/GLES/Text variant reports 2,589 resolved imports, 409 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

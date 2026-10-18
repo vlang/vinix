@@ -136,8 +136,19 @@ fn system_data_stop() {
 	system_data = unsafe { nil }
 }
 
+// Darwin's public host_page_size reads the cached vm_page_size without a
+// host RPC or port validation. Copy exactly vm_size_t's eight ARM64 bytes;
+// the exported _vm_page_size cell and this getter share the same storage.
+fn darwin_host_page_size(_ u32, output &u64) i32 {
+	if system_data == unsafe { nil } { panic('iOS: host page size requires configured system data') }
+	value := system_data.page_size
+	unsafe { C.memcpy(voidptr(output), voidptr(&value), 8) }
+	return 0
+}
+
 fn system_data_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_host_page_size' { u64(unsafe { voidptr(darwin_host_page_size) }) }
 		'_NDR_record' {
 			if system_data == unsafe { nil } { return none }
 			u64(unsafe { &system_data.ndr_record[0] })
