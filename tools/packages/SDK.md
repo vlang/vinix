@@ -2677,6 +2677,12 @@ independently of configuration, preparation and other replies. Retire each with
 decoded states, deployment documents, prepared plans and staging/download scratch
 retire on success or refusal. See
 [activation request qualification](../../tests/packages/activation-request-check.md).
+HTTPS request arguments and Range-fallback messages also retire on completion
+or refusal. Repeated public fetch, signed refresh and install operations against
+local TLS retain zero scoped V request/reply storage while preserving certificate,
+redirect, size, resume and activation checks. Curl/OpenSSL process memory and
+guest TLS are separate boundaries. See
+[HTTPS ownership qualification](../../tests/packages/https-owner-check.md).
 Internal activation states, low-level fresh `read_state` values and caller-built
 states can borrow metadata and retain their existing lifetimes. Public preview
 plans have their separate `Plan.close()` contract. Status skips payload

@@ -409,6 +409,12 @@ download scratch retire on success and refusal. Internal activation states
 retain their borrowed lifetime. See
 [activation request checks](../../tests/packages/activation-request-check.md).
 
+HTTPS acquisition retires argument construction and Range-fallback messages
+across complete transfers and refusals. Scoped repeated process checks and live
+host TLS fetch/refresh/install requests preserve byte bounds, signed state,
+output guards and child/descriptor retirement. See
+[HTTPS ownership checks](../../tests/packages/https-owner-check.md).
+
 Software releases rejected progress-frame errors under manual memory management.
 Malformed frames keep the last valid progress, and oversized lines recover at
 the next newline while human failure diagnostics remain available. See

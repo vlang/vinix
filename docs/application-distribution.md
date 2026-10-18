@@ -784,6 +784,13 @@ refusal. The CLI closes successful replies. Internal activation keeps its
 borrowed plan contract. See
 [activation request ownership](../tests/packages/activation-request-check.md).
 
+HTTPS acquisition also retires argument construction and Range-fallback messages.
+Repeated local TLS fetch, signed refresh and installation requests check parent V
+storage through reply/error retirement, with preserved trust, byte bounds,
+recovery and activation. Both native targets exercise the shared process/output
+paths; real TLS repetition is host-qualified. See
+[HTTPS request ownership](../tests/packages/https-owner-check.md).
+
 Software keeps a proposal readable when its space estimate does not fit. Its
 status and plan/review readers identify the filesystem and exact additional
 bytes needed, including reserved space, and Confirm is unavailable. Free space,
