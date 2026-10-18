@@ -70,7 +70,7 @@ fn main() {
 			}, '-d', 'nofloat']
 	} else {
 		[compiler, '-nocache', '-os', 'linux', '-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' },
-			'-gc', 'none', '-prod', '-o', work + '/workloads.c', root + '/tools/linux-compat/workloads']
+			'-gc', 'none', '-enable-globals', '-path', '@vlib|@vmodules|' + root, '-prod', '-o', work + '/workloads.c', root + '/tools/linux-compat/workloads']
 	}
 	if glibc { generate << ['-d', 'glibc'] }
 	mut compile := []string{}

@@ -98,9 +98,18 @@ and supports `launch`, `uri`, `open.with`,
 workspace count/switch/rename/layout, clipboard offer/request and settings actions.
 Settings mutations require the actual Settings application's authenticated PID.
 Administrative history, policy, service controls, grants and shutdown require
-the attached compositor PID. Running the client from an unrelated terminal does
-not grant a user gesture. This PID association has attach-race and PID-reuse
-limits; see [session selector filters](../docs/security.md#session-selector-filters).
+the compositor's private inherited connection. `attach` only confirms that
+connection; it cannot claim authority through the public socket, even with the
+same PID. Running the client from an unrelated terminal does not grant a user
+gesture. See [session selector filters](../docs/security.md#session-selector-filters).
+
+The compositor creates a socket pair before launching `vinix-session`, keeps one
+endpoint private, and passes the other to the broker at startup. Both endpoints
+are then close-on-exec, so applications and services do not inherit the capability.
+The broker requires this connection at startup; `--session-owner=PID` is no
+longer accepted. Closing or losing the connection saves session state and shuts
+down supervised services. A restarted compositor launches a fresh broker and
+connection, restoring durable alarms and service configuration from snapshots.
 
 The private 0700 runtime directory is `/run/vinix-session.<uid>`; its Unix socket
 is 0600. Kernel peer credentials supply identity. `VINIX_SESSION_RUNTIME` can

@@ -316,6 +316,8 @@ compositor, fonts or application artwork. ARM64 and x86-64 image builds compile
 and install all three. The desktop's older `--session-services` and
 `--time-service` commands exec the corresponding helper for compatibility;
 saved built-in clock service records migrate while preserving their policy.
+The session helper now requires the compositor's private inherited control
+socket; a public `attach` or a PID argument cannot grant administrative access.
 
 Run `V=/path/to/v v run desktop/tools/test-services.v` for the standalone
 authorization, persistence, restart, crash-cleanup and allocation checks.

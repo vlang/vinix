@@ -75,7 +75,7 @@ const session_unknown_operation = IError(&SessionFilterError{'unknown session op
 
 const session_rules = {
 	'ping':               &SessionRule{.ping, 'ping', 'application/session/ping', .application, 1, 1}
-	'attach':             &SessionRule{.attach, 'attach', 'application/session/attach', .application, 1, 1}
+	'attach':             &SessionRule{.attach, 'attach', 'compositor/session/attach', .compositor, 1, 1}
 	'clipboard.offer':    &SessionRule{.clipboard_offer, 'clipboard.offer', 'application/clipboard/offer', .application, 4, 4}
 	'clipboard.read':     &SessionRule{.clipboard_read, 'clipboard.read', 'application/clipboard/read', .application, 2, 2}
 	'clipboard.request':  &SessionRule{.clipboard_request, 'clipboard.request', 'application/clipboard/request', .application, 1, 1}
@@ -112,10 +112,10 @@ const session_rules = {
 // never from fields in a request. UID 0 receives no exception to these checks.
 pub struct SessionCaller {
 pub:
-	pid            int
-	uid            u32
-	session_uid    u32
-	compositor_pid int
+	pid         int
+	uid         u32
+	session_uid u32
+	compositor  bool
 }
 
 // Authorize before decoding argument values or entering any operation handler.
@@ -132,8 +132,8 @@ pub fn authorize_session(command string, field_count int, caller SessionCaller, 
 	if field_count < rule.min_fields || field_count > rule.max_fields {
 		return session_invalid_arguments
 	}
-	// Domain filter: privileged selectors belong to the attached compositor.
-	if rule.domain == .compositor && (caller.compositor_pid <= 0 || caller.pid != caller.compositor_pid) {
+	// Only the broker's inherited private transport can supply this authority.
+	if rule.domain == .compositor && !caller.compositor {
 		return rule
 	}
 	// Selector filter: check current policy even for previously issued grants.

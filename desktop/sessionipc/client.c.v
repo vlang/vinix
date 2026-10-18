@@ -153,8 +153,6 @@ pub fn session_send_message(fd int, data string) bool {
 }
 
 pub fn session_call(command string, arguments []string) !string {
-	fd := session_connect() or { return error('session services unavailable') }
-	defer { desktop_close(fd) }
 	mut writer := sessioncore.Writer{}
 	writer.add(command)
 	for arg in arguments {
@@ -163,13 +161,49 @@ pub fn session_call(command string, arguments []string) !string {
 	}
 	request := writer.finish()
 	defer { unsafe { request.free() } }
-	if !session_send_message(fd, request) { return error('could not send session request') }
-	reply := session_receive_timeout(fd, if command in ['quiet', 'alarm', 'alarm.cancel', 'settings.set',
+	return session_request(request, if command in ['quiet', 'alarm', 'alarm.cancel', 'settings.set',
 		'policy.set', 'service.enable', 'service.import', 'service.remove', 'dismiss'] {
 		2000
 	} else {
 		300
-	})!
+	})
+}
+
+// Both normal text calls and raw clipboard records use the same capability.
+fn session_request(request string, timeout int) !string {
+	control := session_has_control()
+	fd := if control {
+		session_control_fd
+	} else {
+		session_connect() or { return error('session services unavailable') }
+	}
+	defer { if !control { desktop_close(fd) } }
+	if control && session_control_pending {
+		// Startup is asynchronous. Do not send a request (and start its reply
+		// timeout) until the broker announces that initialization is complete.
+		mut readiness := C.pollfd{ fd: fd, events: C.POLLIN }
+		if C.poll(&readiness, 1, 0) <= 0 { return error('session services starting') }
+		ready := session_receive(fd) or {
+			session_close_control()
+			return err
+		}
+		defer { unsafe { ready.free() } }
+		if ready != 'ready' {
+			session_close_control()
+			return error('invalid session startup response')
+		}
+		session_control_pending = false
+	}
+	if !session_send_message(fd, request) {
+		if control { session_close_control() }
+		return error('could not send session request')
+	}
+	reply := session_receive_timeout(fd, timeout) or {
+		// A timeout can leave a partial frame. Never reuse or reconnect a lost
+		// control channel; a new broker needs a new inherited endpoint.
+		if control { session_close_control() }
+		return err
+	}
 	if reply.starts_with('error\t') {
 		unsafe { reply.free() }
 		return error('session request rejected')
@@ -178,9 +212,21 @@ pub fn session_call(command string, arguments []string) !string {
 }
 
 pub fn session_call_ok(command string, arguments []string) bool {
-	reply := session_call(command, arguments) or { return false }
+	reply := session_call(command, arguments) or {
+		session_discard_error(err)
+		return false
+	}
 	defer { unsafe { reply.free() } }
 	return reply == 'ok' || reply.starts_with('ok\t')
+}
+
+// IPC transport errors are owned results, unlike the broker's shared rules.
+fn session_discard_error(err IError) {
+	message := err.msg()
+	unsafe {
+		message.free()
+		err.free()
+	}
 }
 
 pub fn session_peer(fd int) ?SessionCredentials {

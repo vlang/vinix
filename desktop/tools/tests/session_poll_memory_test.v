@@ -2,6 +2,7 @@
 module main
 
 import desktop.sessioncore
+import desktop.sessionipc
 import os
 import time
 
@@ -90,15 +91,14 @@ fn test_idle_shell_service_ipc_keeps_no_poll_allocations() {
 		os.rmdir_all(base) or {}
 		unsafe { base.free() }
 	}
-	mut process := os.new_process(os.real_path('build/session-runtime/vinix-session'))
-	process.set_args(['--session-home=' + base, '--session-owner=' + C.getpid().str()])
-	process.run()
-	broker := process.pid
+	assert session_start(base)
+	broker := session_child_pid
 	defer {
 		C.kill(broker, C.SIGKILL)
 		mut status := 0
 		C.waitpid(broker, &status, 0)
-		process.close()
+		sessionipc.session_close_control()
+		session_child_pid = 0
 	}
 	mut ready := false
 	for _ in 0 .. 100 {

@@ -82,13 +82,9 @@ fn main() {
 	for legacy in [false, true] {
 		if legacy && !os.is_executable('/usr/bin/vinix-desktop') { break }
 		program := if legacy { '/usr/bin/vinix-desktop' } else { '/usr/bin/vinix-session' }
-		mut broker := os.new_process(program)
-		mut args := ['--session-home=/root/services-smoke']
-		if legacy { args << '--session-services' }
-		broker.set_args(args)
-		broker.run()
+		broker := sessionipc.session_start_broker_at('/root/services-smoke', program) or { panic('cannot launch broker') }
 		wait_ready()
-		wait_identity(broker.pid, 'vinix-session')
+		wait_identity(broker, 'vinix-session')
 		assert sessionipc.session_call_ok('attach', [])
 		runner := clock_runner()
 		wait_identity(runner, 'vinix-service-runner')
@@ -96,21 +92,20 @@ fn main() {
 		wait_identity(clock, 'vinix-timesync')
 		println('SERVICE CHECK: independent session, runner and timesync identities PASS (legacy=${legacy})')
 		assert sessionipc.session_call_ok('shutdown', [])
-		broker.wait()
-		assert broker.code == 0
-		broker.close()
+		mut status := 0
+		assert C.waitpid(broker, &status, 0) == broker && status == 0
+		sessionipc.session_close_control()
 		wait_gone([runner, clock])
 		println('SERVICE CHECK: graceful shutdown retires runner and clock PASS')
 	}
-	mut broker := os.new_process('/usr/bin/vinix-session')
-	broker.set_args(['--session-home=/root/services-smoke'])
-	broker.run()
+	broker := sessionipc.session_start_broker('/root/services-smoke') or { panic('cannot launch broker') }
 	wait_ready()
 	runner := clock_runner()
 	clock := clock_child(runner)
-	broker.signal_kill()
-	broker.wait()
-	broker.close()
+	C.kill(broker, C.SIGKILL)
+	mut status := 0
+	assert C.waitpid(broker, &status, 0) == broker
+	sessionipc.session_close_control()
 	wait_gone([runner, clock])
 	println('SERVICE CHECK: broker crash closes the lease and retires the group PASS')
 	println('SESSION SERVICES PASS')

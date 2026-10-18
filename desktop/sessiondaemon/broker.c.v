@@ -25,7 +25,6 @@ mut:
 	supervisor         sessioncore.Supervisor
 	queue              [64]sessionipc.SessionMessage
 	queue_count        int
-	compositor         int
 	home               string
 	changed            bool
 	last_save          i64
@@ -53,22 +52,24 @@ mut:
 	expires i64
 }
 
-fn (mut daemon SessionDaemon) handle(peer sessionipc.SessionCredentials, request string) !string {
+fn (mut daemon SessionDaemon) handle(peer sessionipc.SessionCredentials, request string, compositor bool) !string {
 	f := sessioncore.fields(request)!
 	operation := sessioncore.authorize_session(f.values[0], f.count, sessioncore.SessionCaller{
-		pid:            peer.pid
-		uid:            peer.uid
-		session_uid:    C.getuid()
-		compositor_pid: daemon.compositor
+		pid:         peer.pid
+		uid:         peer.uid
+		session_uid: C.getuid()
+		compositor:  compositor
 	}, &daemon.policy)!
 	route := unsafe { &session_routes[int(operation)] }
-	mut request_state := &SessionRequest{peer: peer, fields: f}
+	mut request_state := &SessionRequest{ peer: peer, fields: f, compositor: compositor }
 	defer { unsafe { free(request_state) } }
 	if !route.raw_payload {
 		request_state.message.pid = peer.pid
 		request_state.message.count = f.count
 		request_state.message.fields[0].set(f.values[0])!
-		for i in 1 .. f.count { request_state.message.fields[i] = sessioncore.unfield(f.values[i])! }
+		for i in 1 .. f.count {
+			request_state.message.fields[i] = sessioncore.unfield(f.values[i])!
+		}
 	}
 	return route.handler(mut daemon, mut request_state)
 }
@@ -87,7 +88,9 @@ fn (mut daemon SessionDaemon) save() ! {
 	daemon.changed = false
 }
 
-pub fn run(home string, owner int) {
+pub fn run(home string, control int) {
+	control_peer := sessionipc.session_control_peer(control) or { return }
+	defer { sessionipc.desktop_close(control) }
 	sessionipc.desktop_ignore_broken_pipe()
 	directory := sessionipc.session_runtime_directory()
 	defer { unsafe { directory.free() } }
@@ -121,7 +124,8 @@ pub fn run(home string, owner int) {
 		return
 	}
 	os.chmod(path, 0o600) or { return }
-	mut daemon := &SessionDaemon{ home: home, compositor: owner }
+	mut daemon := &SessionDaemon{ home: home }
+	mut control_live := true
 	daemon.exchange = &sessioncore.Exchange{}
 	policy_path := '${home}/.vinix-shell-policy'
 	policy_record := sessioncore.load(policy_path, 32768) or { '' }
@@ -145,6 +149,7 @@ pub fn run(home string, owner int) {
 		state_path.free()
 		record.free()
 	}
+	if !sessionipc.session_send_message(control, 'ready') { return }
 	for {
 		if daemon.policy.timezone.len > 0 { daemon.policy.timezone_minutes = time.offset() / 60 }
 		if unsafe { session_daemon_stop } {
@@ -163,8 +168,21 @@ pub fn run(home string, owner int) {
 			daemon.save() or { session_log_error('vinix-session: ', err) }
 			return
 		}
-		mut readiness := C.pollfd{ fd: fd, events: C.POLLIN }
-		if C.poll(&readiness, 1, 100) <= 0 { continue }
+		mut readiness := [C.pollfd{ fd: fd, events: C.POLLIN },
+			C.pollfd{ fd: if control_live { control } else { -1 }, events: C.POLLIN }]!
+		if C.poll(unsafe { &readiness[0] }, 2, 100) <= 0 { continue }
+		if control_live && readiness[1].revents != 0 {
+			if readiness[1].revents & (C.POLLHUP | C.POLLERR | C.POLLNVAL) != 0
+				|| !daemon.serve_request(control, control_peer, true) {
+				// No public connection can take over after EOF, a partial frame,
+				// or a timeout. Shut down services before a new broker starts.
+				control_live = false
+				if !daemon.stop { daemon.stop_deadline = sessionipc.monotonic_millis() + 30000 }
+				daemon.stop = true
+				daemon.supervisor.stopping = true
+			}
+		}
+		if readiness[0].revents & C.POLLIN == 0 { continue }
 		client := C.accept(fd, unsafe { nil }, unsafe { nil })
 		if client < 0 { continue }
 		sessionipc.desktop_set_cloexec(client, true)
@@ -174,16 +192,19 @@ pub fn run(home string, owner int) {
 }
 
 fn (mut daemon SessionDaemon) serve_client(client int) {
+	defer { sessionipc.desktop_close(client) }
 	peer := sessionipc.session_peer(client) or {
-		sessionipc.desktop_close(client)
 		return
 	}
+	_ = daemon.serve_request(client, peer, false)
+}
+
+fn (mut daemon SessionDaemon) serve_request(client int, peer sessionipc.SessionCredentials, compositor bool) bool {
 	request := sessionipc.session_receive(client) or {
 		session_release_error(err, err.msg())
-		sessionipc.desktop_close(client)
-		return
+		return false
 	}
-	mut reply := daemon.handle(peer, request) or {
+	mut reply := daemon.handle(peer, request, compositor) or {
 		session_log_error('vinix-session: request rejected: ', err)
 		'error\tdenied'
 	}
@@ -197,14 +218,14 @@ fn (mut daemon SessionDaemon) serve_client(client int) {
 			reply = 'error\tdenied'
 		}
 	}
-	_ = sessionipc.session_send_message(client, reply)
-	sessionipc.desktop_close(client)
+	sent := sessionipc.session_send_message(client, reply)
 	unsafe {
 		request.free()
 		if reply.len > 0 && reply != 'ok' && reply != 'empty' && reply != 'error\tdenied' {
 			reply.free()
 		}
 	}
+	return sent
 }
 
 fn (mut daemon SessionDaemon) services_tick() {

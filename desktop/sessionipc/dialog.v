@@ -18,6 +18,7 @@ pub fn dialog_open(key string, kind int, title string, directory string, filenam
 pub fn dialog_take(key string) ?string {
 	args := [key]
 	reply := session_call('dialog.take', args) or {
+		session_discard_error(err)
 		unsafe { (&array(&args)).free() }
 		return ''
 	}
@@ -35,8 +36,6 @@ pub fn dialog_take(key string) ?string {
 }
 
 pub fn offer_data(kind sessioncore.DataKind, data string, sensitive bool) bool {
-	fd := session_connect() or { return false }
-	defer { desktop_close(fd) }
 	mut w := sessioncore.Writer{}
 	w.add('clipboard.offer\t')
 	w.number(int(kind))
@@ -46,8 +45,10 @@ pub fn offer_data(kind sessioncore.DataKind, data string, sensitive bool) bool {
 	w.field(data)
 	request := w.finish()
 	defer { unsafe { request.free() } }
-	if !session_send_message(fd, request) { return false }
-	reply := session_receive(fd) or { return false }
+	reply := session_request(request, 300) or {
+		session_discard_error(err)
+		return false
+	}
 	defer { unsafe { reply.free() } }
 	return reply == 'ok'
 }

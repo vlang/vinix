@@ -5,8 +5,9 @@ import desktop.sessioncore
 import desktop.sessionipc
 
 struct SessionRequest {
-	peer   sessionipc.SessionCredentials
-	fields sessioncore.Fields
+	peer       sessionipc.SessionCredentials
+	fields     sessioncore.Fields
+	compositor bool
 mut:
 	message sessionipc.SessionMessage
 }
@@ -65,13 +66,8 @@ fn session_handle_ping(mut _ SessionDaemon, mut _ SessionRequest) !string {
 	return 'ok'
 }
 
-fn session_handle_attach(mut daemon SessionDaemon, mut request SessionRequest) !string {
-	peer := request.peer
-	// Only an existing compositor may replace its own lease while alive.
-	if daemon.compositor != 0 && daemon.compositor != peer.pid && C.kill(daemon.compositor, 0) == 0 {
-		return error('compositor already attached')
-	}
-	daemon.compositor = peer.pid
+fn session_handle_attach(mut _ SessionDaemon, mut _ SessionRequest) !string {
+	// Authorization already requires the inherited compositor connection.
 	return 'ok'
 }
 
@@ -93,7 +89,7 @@ fn session_handle_clipboard_offer(mut daemon SessionDaemon, mut request SessionR
 	mut offer := sessioncore.Clip{ owner_uid: peer.uid, owner_pid: peer.pid, kind: kind, sensitive: sensitive, len: data.len }
 	for i, byte in data { offer.bytes[i] = byte }
 	daemon.offers[slot] = offer
-	if peer.pid == daemon.compositor {
+	if request.compositor {
 		daemon.exchange.history_enabled = daemon.policy.clipboard_history
 		daemon.exchange.copy(peer.uid, peer.pid, kind, data, sensitive)!
 		return 'ok'

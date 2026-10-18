@@ -6,6 +6,11 @@ module guestfixture
 #include <sys/stat.h>
 #include <poll.h>
 #include <string.h>
+#include <fcntl.h>
+
+__global service_private_fd i32
+__global service_private_owner i32
+__global service_private_attached bool
 
 struct C.sockaddr_un {
 	sun_family u16
@@ -23,6 +28,8 @@ fn C.connect(i32, voidptr, u32) i32
 fn C.poll(&C.pollfd, usize, i32) i32
 fn C.mkdir(&char, u32) i32
 fn C.strlen(&char) usize
+fn C.socketpair(i32, i32, i32, &i32) i32
+fn C.fcntl(i32, i32, ...voidptr) i32
 
 fn service_socket_path() [108]char {
 	unsafe {
@@ -84,11 +91,15 @@ fn service_request(fields [4]&char, count int, denied bool) [4096]char {
 			for j in 0 .. n { request[used + j] = encoded[j] }
 			used += n
 		}
-		fd := C.socket(C.AF_UNIX, C.SOCK_STREAM | C.SOCK_CLOEXEC | C.SOCK_NONBLOCK, 0)
+		private := service_private_fd >= 3 && service_private_attached && service_private_owner == C.getpid()
+		fd := if private { service_private_fd }
+			else { C.socket(C.AF_UNIX, C.SOCK_STREAM | C.SOCK_CLOEXEC | C.SOCK_NONBLOCK, 0) }
 		check(fd >= 0, 457)
-		mut address := C.sockaddr_un{sun_family: u16(C.AF_UNIX)}
-		address.sun_path = service_socket_path()
-		check(C.connect(fd, voidptr(&address), u32(sizeof(C.sockaddr_un))) == 0, 458)
+		if !private {
+			mut address := C.sockaddr_un{sun_family: u16(C.AF_UNIX)}
+			address.sun_path = service_socket_path()
+			check(C.connect(fd, voidptr(&address), u32(sizeof(C.sockaddr_un))) == 0, 458)
+		}
 		mut header := [char(used), char(used >> 8), char(used >> 16), char(used >> 24)]!
 		service_transfer(fd, &header[0], 4, true)
 		service_transfer(fd, &request[0], used, true)
@@ -98,16 +109,22 @@ fn service_request(fields [4]&char, count int, denied bool) [4096]char {
 		check(size > 0 && size < reply.len, 459)
 		service_transfer(fd, &reply[0], size, false)
 		reply[size] = 0
-		check(C.close(fd) == 0, 460)
+		if !private { check(C.close(fd) == 0, 460) }
 		check((size >= 6 && C.memcmp(&reply[0], c'error\t', 6) == 0) == denied, 461)
 		return reply
 	}
 }
 
 fn service_call(command &char, argument &char, extra &char) {
+	if C.strcmp(command, c'attach') == 0 { service_private_attached = true }
 	reply := service_request([command, argument, extra, unsafe { &char(nil) }]!,
 		if argument == unsafe { nil } { 1 } else if extra == unsafe { nil } { 2 } else { 3 }, false)
 	check(C.strcmp(unsafe { &reply[0] }, c'ok') == 0, 484)
+	if C.strcmp(command, c'shutdown') == 0 {
+		check(C.close(service_private_fd) == 0, 460)
+		service_private_fd = 0
+		service_private_attached = false
+	}
 }
 
 fn service_config(mut encoded [8192]char) {
@@ -143,17 +160,27 @@ fn service_wait(stopped bool) i32 {
 
 fn service_broker() i32 {
 	unsafe {
+		if service_private_fd >= 3 { check(C.close(service_private_fd) == 0, 460) }
+		service_private_attached = false
+		mut pair := [i32(-1), i32(-1)]!
+		check(C.socketpair(C.AF_UNIX, C.SOCK_STREAM | C.SOCK_CLOEXEC | C.SOCK_NONBLOCK, 0, &pair[0]) == 0, 466)
 		pid := C.fork()
 		check(pid >= 0, 466)
 		if pid == 0 {
+			check(C.close(pair[0]) == 0 && C.dup2(pair[1], 3) == 3, 460)
+			if pair[1] != 3 { C.close(pair[1]) }
+			check(C.fcntl(3, C.F_SETFD, 0) == 0, 460)
 			log := C.open(c'/home/developer/service-broker.log', C.O_WRONLY | C.O_CREAT | C.O_APPEND, u32(0o600))
 			if log < 0 || C.dup2(log, 1) != 1 || C.dup2(log, 2) != 2 { C._exit(125) }
 			if log > 2 { C.close(log) }
 			argv := [&char(c'/usr/bin/vinix-session'),
-				&char(c'--session-home=/home/developer'), &char(nil)]!
+				&char(c'--session-home=/home/developer'), &char(c'--session-control-fd=3'), &char(nil)]!
 			C.execv(argv[0], &argv[0])
 			C._exit(127)
 		}
+		check(C.close(pair[1]) == 0, 460)
+		service_private_fd = pair[0]
+		service_private_owner = C.getpid()
 		deadline := job_clock() + 10000000000
 		mut address := C.sockaddr_un{sun_family: u16(C.AF_UNIX)}
 		address.sun_path = service_socket_path()
@@ -171,6 +198,12 @@ fn service_broker() i32 {
 			check(retry && C.kill(pid, 0) == 0 && job_clock() < deadline, 467)
 			C.usleep(10000)
 		}
+		mut ready_header := [4]char{}
+		mut ready := [5]char{}
+		service_transfer(service_private_fd, &ready_header[0], 4, false)
+		check(ready_header[0] == char(5) && ready_header[1] == 0 && ready_header[2] == 0 && ready_header[3] == 0, 459)
+		service_transfer(service_private_fd, &ready[0], 5, false)
+		check(C.memcmp(&ready[0], c'ready', 5) == 0, 459)
 		service_call(c'ping', nil, nil)
 		return pid
 	}

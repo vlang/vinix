@@ -16,6 +16,111 @@ fn session_test_wait() {
 	assert false, 'session broker did not become ready'
 }
 
+fn session_test_start(home string) int {
+	assert !sessionipc.session_has_control()
+	pid := sessionipc.session_start_broker(home) or { panic('cannot start session broker') }
+	session_test_wait()
+	return pid
+}
+
+fn session_test_kill(pid int) {
+	C.kill(pid, C.SIGKILL)
+	mut status := 0
+	C.waitpid(pid, &status, 0)
+	sessionipc.session_close_control()
+}
+
+fn session_test_public(request string) string {
+	fd := sessionipc.session_connect() or { return '' }
+	defer { sessionipc.desktop_close(fd) }
+	if !sessionipc.session_send_message(fd, request) { return '' }
+	return sessionipc.session_receive(fd) or { '' }
+}
+
+fn session_test_wait_exit(pid int) int {
+	mut status := 0
+	for _ in 0 .. 200 {
+		if C.waitpid(pid, &status, C.WNOHANG) == pid { return status }
+		time.sleep(20 * time.millisecond)
+	}
+	assert false, 'broker did not exit after losing its compositor connection'
+	return -1
+}
+
+fn test_only_inherited_connection_grants_compositor_authority() {
+	base := '${os.temp_dir()}/vinix-compositor-capability-${C.getpid()}'
+	os.mkdir(base, mode: 0o700)!
+	os.setenv('VINIX_SESSION_RUNTIME', base, true)
+	defer {
+		os.rmdir_all(base) or {}
+		unsafe { base.free() }
+	}
+	mut broker := session_test_start(base)
+	defer { if broker > 0 { session_test_kill(broker) } }
+	// The public connection has exactly the compositor's own PID and UID.
+	// It must still fail before and after attach, rather than winning a race.
+	for _ in 0 .. 2 {
+		for request in ['attach', 'shutdown', 'settings.set\tzz', 'policy.set\tzz',
+			'service.import\tzz\tzz\tzz'] {
+			reply := session_test_public(request)
+			assert reply == 'error\tdenied'
+			unsafe { reply.free() }
+		}
+		assert sessionipc.session_call_ok('attach', [])
+	}
+	// Public offers from the same PID remain application offers, and cannot
+	// publish the compositor clipboard without a grant/gesture decision.
+	offer := session_test_public('clipboard.offer\t0\t0\t7075626c6963')
+	assert offer == 'ok'
+	unsafe { offer.free() }
+	snapshot := sessionipc.session_call('clipboard.snapshot', [])!
+	assert snapshot == 'empty'
+	unsafe { snapshot.free() }
+	// Exec must not leak the capability to applications. Keep the child alive
+	// while closing the compositor endpoint to also detect inherited duplicates.
+	mut child := os.new_process(sessionipc.helper_path('vinix-session'))
+	child.set_args(['--session-control', 'attach'])
+	child.run()
+	child.wait()
+	assert child.code != 0
+	child.close()
+	for argument in ['--session-owner=${C.getpid()}', '--session-control-fd=999999'] {
+		mut invalid := os.new_process(sessionipc.helper_path('vinix-session'))
+		invalid.set_args(['--session-home=' + base, argument])
+		invalid.run()
+		invalid.wait()
+		assert invalid.code != 0
+		invalid.close()
+	}
+	assert sessionipc.session_call_ok('ping', [])
+	mut sleeper := os.new_process('/bin/sleep')
+	sleeper.set_args(['5'])
+	sleeper.run()
+	defer {
+		sleeper.signal_kill()
+		sleeper.wait()
+		sleeper.close()
+	}
+	sessionipc.session_close_control()
+	assert !sessionipc.session_has_control()
+	// There is no reconnection/takeover path after the private endpoint dies.
+	denied := session_test_public('attach')
+	assert denied == '' || denied == 'error\tdenied'
+	unsafe { denied.free() }
+	assert session_test_wait_exit(broker) == 0
+	broker = 0
+	// A restarted compositor launches a broker with a fresh capability.
+	broker = session_test_start(base)
+	assert sessionipc.session_call_ok('attach', [])
+	public_reply := session_test_public('shutdown')
+	assert public_reply == 'error\tdenied'
+	unsafe { public_reply.free() }
+	assert sessionipc.session_call_ok('shutdown', [])
+	assert session_test_wait_exit(broker) == 0
+	broker = 0
+	sessionipc.session_close_control()
+}
+
 fn test_broker_credentials_durable_alarms_dialogs_exchange_and_shutdown() {
 	base := '${os.temp_dir()}/vinix-session-test-${C.getpid()}'
 	os.mkdir(base) or { panic(err) }
@@ -26,15 +131,10 @@ fn test_broker_credentials_durable_alarms_dialogs_exchange_and_shutdown() {
 	os.mkdir(home) or { panic(err) }
 	binary := os.real_path('build/session-runtime/vinix-session')
 	assert os.is_file(binary)
-	mut broker := os.new_process(binary)
-	broker.set_args(['--session-home=${home}'])
-	broker.run()
+	mut broker := session_test_start(home)
 	defer {
-		broker.signal_kill()
-		broker.wait()
-		broker.close()
+		if broker > 0 { session_test_kill(broker) }
 	}
-	session_test_wait()
 	assert sessionipc.session_call_ok('attach', [])
 	assert sessionipc.session_call_ok('quiet', ['2', '3600'])
 	mut client := os.new_process(binary)
@@ -108,13 +208,8 @@ fn test_broker_credentials_durable_alarms_dialogs_exchange_and_shutdown() {
 	}
 	// Restart the broker before the deadline. The detached alarm is restored
 	// from the synchronized snapshot, while ephemeral clipboard grants vanish.
-	broker.signal_kill()
-	broker.wait()
-	broker.close()
-	broker = os.new_process(binary)
-	broker.set_args(['--session-home=${home}'])
-	broker.run()
-	session_test_wait()
+	session_test_kill(broker)
+	broker = session_test_start(home)
 	assert sessionipc.session_call_ok('attach', [])
 	time.sleep(1100 * time.millisecond)
 	history := sessionipc.session_call('history', []) or { panic(err) }
@@ -123,8 +218,9 @@ fn test_broker_credentials_durable_alarms_dialogs_exchange_and_shutdown() {
 	assert notices.items[0].title.str() == 'App closed timer'
 	assert notices.mode == .focus
 	assert sessionipc.session_call_ok('shutdown', [])
-	broker.wait()
-	assert broker.code == 0
+	assert session_test_wait_exit(broker) == 0
+	broker = 0
+	sessionipc.session_close_control()
 	unsafe {
 		base.free()
 		home.free()
@@ -161,15 +257,10 @@ fn test_real_service_groups_restart_dependencies_and_broker_crash_cleanup() {
 	sessioncore.save('${base}/.vinix-services', config) or { panic(err) }
 	binary := os.real_path('build/session-runtime/vinix-session')
 	defer { unsafe { binary.free() } }
-	mut broker := os.new_process(binary)
-	broker.set_args(['--session-home=${base}'])
-	broker.run()
+	mut broker := session_test_start(base)
 	defer {
-		broker.signal_kill()
-		broker.wait()
-		broker.close()
+		if broker > 0 { session_test_kill(broker) }
 	}
-	session_test_wait()
 	assert sessionipc.session_call_ok('attach', [])
 	mut first := [0, 0]!
 	for _ in 0 .. 100 {
@@ -211,8 +302,8 @@ fn test_real_service_groups_restart_dependencies_and_broker_crash_cleanup() {
 		time.sleep(20 * time.millisecond)
 	}
 	assert children[0] > 0 && children[1] > 0
-	broker.signal_kill()
-	broker.wait()
+	session_test_kill(broker)
+	broker = 0
 	for _ in 0 .. 100 {
 		if session_test_process_gone(next[0]) && session_test_process_gone(next[1]) && session_test_process_gone(children[0]) && session_test_process_gone(children[1]) {
 			break

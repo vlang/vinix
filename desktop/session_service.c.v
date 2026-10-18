@@ -36,31 +36,13 @@ fn session_call_ok(command string, args []string) bool {
 }
 
 fn session_start(home string) bool {
-	if session_call_ok('ping', []) { return true }
+	if sessionipc.session_has_control() && session_call_ok('ping', []) { return true }
 	if session_child_pid > 0 {
 		mut status := 0
 		if C.waitpid(session_child_pid, &status, C.WNOHANG) == 0 { return true }
 		session_child_pid = 0
 	}
-	executable := sessionipc.helper_path('vinix-session')
-	home_arg := '--session-home=${home}'
-	owner_arg := '--session-owner=${C.getpid()}'
-	defer { unsafe { owner_arg.free() } }
-	argv := [&char(executable.str), &char(home_arg.str), &char(owner_arg.str), &char(unsafe { nil })]!
-	defer {
-		unsafe {
-			executable.free()
-			home_arg.free()
-		}
-	}
-	pid := C.fork()
-	if pid < 0 { return false }
-	if pid == 0 {
-		C.setsid()
-		for fd in 3 .. 4096 { C.close(fd) }
-		C.execv(&char(executable.str), &argv[0])
-		C._exit(127)
-	}
+	pid := sessionipc.session_start_broker(home) or { return false }
 	// No startup wait on the compositor's input thread. Later polls connect.
 	session_child_pid = pid
 	return true

@@ -17,14 +17,14 @@ fn main() {
 		return
 	}
 	mut home := '/root'
-	mut owner := 0
+	mut control := -1
 	for arg in os.args[1..] {
 		if arg.starts_with('--session-home=') {
 			home = arg['--session-home='.len..]
-		} else if arg.starts_with('--session-owner=') {
-			owner = int(sessioncore.number(arg['--session-owner='.len..], 0, 2147483647)!)
+		} else if arg.starts_with('--session-control-fd=') {
+			control = int(sessioncore.number(arg['--session-control-fd='.len..], 3, 2147483647)!)
 		} else if arg != '--session-services' {
-			eprintln('Usage: vinix-session [--session-home=PATH] [--session-owner=PID]')
+			eprintln('Usage: vinix-session [--session-home=PATH] --session-control-fd=FD')
 			exit(2)
 		}
 	}
@@ -32,5 +32,9 @@ fn main() {
 		eprintln('session home must be absolute')
 		exit(2)
 	}
-	sessiondaemon.run(home, owner)
+	if sessionipc.session_control_peer(control) == none {
+		eprintln('vinix-session: an inherited compositor connection is required')
+		exit(2)
+	}
+	sessiondaemon.run(home, control)
 }

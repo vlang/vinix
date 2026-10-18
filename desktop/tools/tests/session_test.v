@@ -3,6 +3,7 @@
 module main
 
 import desktop.sessioncore
+import desktop.sessionipc
 import json2
 import os
 import time
@@ -22,8 +23,11 @@ fn test_services_file_chooser_import_and_remove_keep_authorization_and_disabled_
 	previous := os.getenv_opt('VINIX_SESSION_RUNTIME')
 	os.setenv('VINIX_SESSION_RUNTIME', base, true)
 	defer {
-		if value := previous { os.setenv('VINIX_SESSION_RUNTIME', value, true) }
-		else { os.unsetenv('VINIX_SESSION_RUNTIME') }
+		if value := previous {
+			os.setenv('VINIX_SESSION_RUNTIME', value, true)
+		} else {
+			os.unsetenv('VINIX_SESSION_RUNTIME')
+		}
 		os.rmdir_all(base) or {}
 	}
 	home := '${base}/home'
@@ -33,14 +37,24 @@ fn test_services_file_chooser_import_and_remove_keep_authorization_and_disabled_
 	unit := '${home}/example.service'
 	os.write_file(unit, '[Service]\nType=simple\nExecStart=/bin/sleep 60\n')!
 	binary := os.real_path('build/session-runtime/vinix-session')
-	mut broker := os.new_process(binary)
-	broker.set_args(['--session-home=${home}'])
-	broker.run()
-	defer { broker.signal_kill(); broker.wait(); broker.close() }
+	mut broker := sessionipc.session_start_broker(home) or { panic('cannot start broker') }
+	defer {
+		if broker > 0 {
+			C.kill(broker, C.SIGKILL)
+			mut status := 0
+			C.waitpid(broker, &status, 0)
+		}
+		sessionipc.session_close_control()
+	}
 	session_test_wait()
-	assert !session_call_ok('service.import', ['example.service', unit, '0'])
+	mut untrusted := os.new_process(binary)
+	untrusted.set_args(['--session-control', 'service.import', 'example.service', unit, '0'])
+	untrusted.run()
+	untrusted.wait()
+	assert untrusted.code != 0
+	untrusted.close()
 	assert session_call_ok('attach', [])
-	mut d := Desktop{home: home, canvas: Canvas{width: 1600, height: 900}}
+	mut d := Desktop{ home: home, canvas: Canvas{ width: 1600, height: 900 } }
 	d.initialize_shell_hub()
 	d.hub.attached = true
 	assert d.handle_session_hub_action('session.service.import')
@@ -57,8 +71,9 @@ fn test_services_file_chooser_import_and_remove_keep_authorization_and_disabled_
 	assert d.hub.service_count == 0 && d.hub.service_status.str() == 'Service removed.'
 	assert os.read_file(config)! == 'vinix-services\t1\n'
 	assert session_call_ok('shutdown', [])
-	broker.wait()
-	assert broker.code == 0
+	mut status := 0
+	assert C.waitpid(broker, &status, 0) == broker && status == 0
+	broker = 0
 }
 
 fn test_local_file_uri_decoding_rejects_remote_hosts_and_nul() {

@@ -42,10 +42,15 @@ fn check_software_deployment_chooser(broker_path string) ! {
 		os.rmdir_all(base) or {}
 		unsafe { base.free() }
 	}
-	mut broker := os.new_process(broker_path)
-	broker.set_args(['--session-home=' + base])
-	broker.run()
-	defer { if broker.is_alive() { broker.signal_kill(); broker.wait() }; broker.close() }
+	mut broker := sessionipc.session_start_broker_at(base, broker_path) or { panic('cannot launch broker') }
+	defer {
+		if broker > 0 {
+			C.kill(broker, C.SIGKILL)
+			mut status := 0
+			C.waitpid(broker, &status, 0)
+		}
+		sessionipc.session_close_control()
+	}
 	mut ready := false
 	for _ in 0 .. 200 {
 		if sessionipc.session_call_ok('ping', []) { ready = true; break }
@@ -122,7 +127,10 @@ fn check_software_deployment_chooser(broker_path string) ! {
 	software_repository_text(mut app.deployment_path, deployment_fixture_path)
 	app.handle('software.deployment.choose')!
 	deployment_choice_request('/private/tmp')!
-	broker.signal_kill(); broker.wait()
+	C.kill(broker, C.SIGKILL)
+	mut broker_status := 0
+	assert C.waitpid(broker, &broker_status, 0) == broker
+	broker = 0
 	assert app.poll() && !app.deployment_choice_pending && app.status.contains('kept intact')
 	app.handle('software.deployment.choose')!
 	assert !app.deployment_choice_pending && app.status.contains('unavailable') && app.status.contains('absolute')

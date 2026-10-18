@@ -28,5 +28,14 @@ fn main() {
 		if test == 'poll_memory' { flags << ['-d', 'track_heap'] }
 		run(compiler, [...flags, '-o', binary, root + '/desktop/sessiondaemon/' + test + '_test.v'])!
 	}
+	// Exercise the compositor's real startup wrapper without a UI dependency.
+	client := output + '/control-start'
+	os.mkdir_all(client)!
+	os.write_file(client + '/v.mod', "Module { name: 'session_control_start_checks' }")!
+	os.cp(root + '/desktop/session_service.c.v', client + '/session_service.c.v')!
+	os.cp(root + '/desktop/tools/tests/session_control_start_test.v', client + '/control_start_test.v')!
+	run(compiler, ['-new-compiler', '-cc', 'clang', '-gc', 'none', '-manualfree', '-enable-globals',
+		'-d', 'no_segfault_handler', '-path', '@vlib|@vmodules|' + root, '-stats', '-o',
+		output + '/check-control-start', client + '/control_start_test.v'])!
 	println('Session services: authorization, migration, persistence, restart, crash cleanup and allocation checks passed')
 }

@@ -9,8 +9,8 @@ fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
 
 fn test_selector_lookup_and_refusal_retain_no_allocations() {
-	caller := sessioncore.SessionCaller{ pid: 100, uid: 1000, session_uid: 1000, compositor_pid: 200 }
-	foreign := sessioncore.SessionCaller{ pid: 200, uid: 0, session_uid: 1000, compositor_pid: 200 }
+	caller := sessioncore.SessionCaller{ pid: 100, uid: 1000, session_uid: 1000 }
+	foreign := sessioncore.SessionCaller{ pid: 200, uid: 0, session_uid: 1000, compositor: true }
 	policy := sessioncore.Policy{ clipboard_apps: false }
 	// A positive control prevents a missing heap-tracking flag from producing
 	// a false pass. Retire it before measuring the actual request paths.

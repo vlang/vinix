@@ -2,11 +2,11 @@
 module sessioncore
 
 fn selector_test_caller() SessionCaller {
-	return SessionCaller{ pid: 100, uid: 1000, session_uid: 1000, compositor_pid: 200 }
+	return SessionCaller{ pid: 100, uid: 1000, session_uid: 1000 }
 }
 
 fn selector_test_compositor() SessionCaller {
-	return SessionCaller{ pid: 200, uid: 1000, session_uid: 1000, compositor_pid: 200 }
+	return SessionCaller{ pid: 200, uid: 1000, session_uid: 1000, compositor: true }
 }
 
 fn test_session_registry_has_unique_complete_locked_definitions() {
@@ -32,9 +32,9 @@ fn test_session_registry_has_unique_complete_locked_definitions() {
 fn test_application_selectors_keep_existing_protocol_and_reject_wrong_arity() {
 	caller := selector_test_caller()
 	policy := Policy{}
-	for command in ['ping', 'attach', 'clipboard.offer', 'clipboard.read', 'clipboard.request',
-		'exchange.take', 'policy', 'time.offset', 'settings.status', 'dialog.open', 'dialog.take',
-		'services', 'notify', 'alarm', 'alarm.cancel', 'action'] {
+	for command in ['ping', 'clipboard.offer', 'clipboard.read', 'clipboard.request', 'exchange.take',
+		'policy', 'time.offset', 'settings.status', 'dialog.open', 'dialog.take', 'services', 'notify',
+		'alarm', 'alarm.cancel', 'action'] {
 		mut found := false
 		for _, rule in session_rules {
 			if rule.command != command { continue }
@@ -56,7 +56,7 @@ fn test_compositor_domain_cannot_be_reached_by_application_selectors() {
 	caller := selector_test_caller()
 	compositor := selector_test_compositor()
 	policy := Policy{}
-	for command in ['history', 'clipboard.promote', 'clipboard.snapshot', 'clipboard.clear',
+	for command in ['attach', 'history', 'clipboard.promote', 'clipboard.snapshot', 'clipboard.clear',
 		'exchange.grant', 'dialog.result', 'settings.set', 'policy.set', 'take', 'quiet', 'dismiss',
 		'alarm.remove', 'service.import', 'service.remove', 'service.enable', 'shutdown'] {
 		mut found := false
@@ -78,10 +78,10 @@ fn test_compositor_domain_cannot_be_reached_by_application_selectors() {
 fn test_global_identity_filter_cannot_be_overridden_even_by_root_or_compositor() {
 	policy := Policy{}
 	for caller in [
-		SessionCaller{ pid: 0, uid: 1000, session_uid: 1000, compositor_pid: 0 },
-		SessionCaller{ pid: -1, uid: 1000, session_uid: 1000, compositor_pid: -1 },
-		SessionCaller{ pid: 200, uid: 0, session_uid: 1000, compositor_pid: 200 },
-		SessionCaller{ pid: 200, uid: 1001, session_uid: 1000, compositor_pid: 200 },
+		SessionCaller{ pid: 0, uid: 1000, session_uid: 1000, compositor: true },
+		SessionCaller{ pid: -1, uid: 1000, session_uid: 1000, compositor: true },
+		SessionCaller{ pid: 200, uid: 0, session_uid: 1000, compositor: true },
+		SessionCaller{ pid: 200, uid: 1001, session_uid: 1000, compositor: true },
 	] {
 		for _, rule in session_rules {
 			if _ := authorize_session(rule.command, rule.min_fields, caller, &policy) {
@@ -89,7 +89,7 @@ fn test_global_identity_filter_cannot_be_overridden_even_by_root_or_compositor()
 			}
 		}
 	}
-	root_session := SessionCaller{ pid: 100, uid: 0, session_uid: 0, compositor_pid: 200 }
+	root_session := SessionCaller{ pid: 100, uid: 0, session_uid: 0 }
 	assert authorize_session('ping', 1, root_session, &policy)! == .ping
 	if _ := authorize_session('shutdown', 1, root_session, &policy) {
 		assert false, 'same-account root does not bypass the compositor domain'
