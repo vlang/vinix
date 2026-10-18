@@ -8167,22 +8167,40 @@ and eleven generated C/executable pairs are retained under
 `build/ios/fortnite/storekit-constants-checks`. The fixture is available through
 `tests/ios/native-checks.v build-storekit-constants` and the native inventories.
 
-The actual IPA now exits with status 1 before application entry at `_adler32`
-from `libz.1.dylib` in the static runner. The optional GLES/Text profile
-implements a separate limited set of zlib exports. Fortnite remains unplayable
-and full iOS regression remains unpassed.
+The subsequent `_adler32` import now has a V implementation independent of
+the graphics backend. It preserves the Darwin unsigned-long seed/result and
+32-bit length ABI, normalizes seed halves, supports incremental updates,
+and uses bounded block sums without allocations or runtime-owned state.
+The fixture compares native zlib and an independent per-byte reference across
+guarded/read-only buffers, three byte patterns, arbitrary seeds, chunk
+boundaries through 1 MiB, known vectors and eight concurrent callers.
+Native zlib's null-buffer/one-byte fast path faults on this Mac; the V entry
+safely returns the reset checksum for every null-buffer length. That unsafe
+native call is excluded from subsequent comparisons, with its diagnostic
+retained. The fixture is available through
+`tests/ios/native-checks.v build-zlib-checksum` and the native inventories.
+
+Eight further host ASan/UBSan runs and four ARM64 Vinix suites cover Adler-32,
+the StoreKit constants, NSString bridging and Storefront.current. The actual
+IPA consumer's reset and incremental calls were inspected with V/Mach-O/LLVM.
+Pinned native/IPA evidence and eleven generated C/executable pairs are retained
+under `build/ios/fortnite/zlib-checksum-checks`.
+
+The actual IPA now exits with status 1 before application entry at `_compress2`
+from `libz.1.dylib`. Fortnite remains unplayable and full iOS regression remains
+unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,685 | 475 | 79 |
+| Fortnite executable | 1,686 | 474 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,520 | 478 | 120 |
+| All images | 2,521 | 477 | 120 |
 
-The C++/GLES/Text variant reports 2,534 resolved imports, 464 unresolved strong
+The C++/GLES/Text variant reports 2,535 resolved imports, 463 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
