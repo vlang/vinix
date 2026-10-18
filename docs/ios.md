@@ -9311,17 +9311,41 @@ locking, error paths and descriptor cleanup. Evidence is under
 and stops before entry at `_nextafterf`. Fortnite remains unplayable; the full
 iOS regression is unpassed.
 
+`_nextafterf` now uses a V adapter measured against this Mac's ARM64 libSystem.
+Finite values step by one float representation; equal comparisons return the
+target, preserving its signed-zero representation. Native float comparisons
+retain flush-to-zero and input-denormal behavior. A float addition supplies
+NaN payload/signaling priority and default-NaN behavior. Explicit volatile
+floating operations raise the measured underflow/overflow exceptions without
+being optimized away, including the flush-to-zero underflow policy. The
+adapter preserves errno, rounding/control bits and existing exception flags;
+its ordinary path allocates nothing.
+
+`tests/ios/native-checks.v build-nextafter` builds the fixture. Native reference
+digests cover 3,312 input pairs across all normal exponents, subnormal/zero
+boundaries, infinities, NaN combinations and deterministic random samples.
+The 64 profiles combine four rounding modes, flush-to-zero/default-NaN controls
+and four sticky-flag presets. Six host ASan/UBSan runs cover this adapter,
+logbf and libSystem; the new host fixture runs with optimization. The ARM64
+fixture also passes, including eight callers and two image lifetimes.
+Generated C and optimized ARM64 disassembly review confirm the scalar float
+ABI, exception instructions and absence of direct control/status-register
+writes. Evidence is under `build/ios/fortnite/nextafter-checks`. The fresh
+Fortnite probe clears `_nextafterf` and stops before entry at
+`_os_unfair_lock_lock`. Fortnite remains unplayable; the full iOS regression
+is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,761 | 399 | 79 |
+| Fortnite executable | 1,762 | 398 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,596 | 402 | 120 |
+| All images | 2,597 | 401 | 120 |
 
-The C++/GLES/Text variant reports 2,610 resolved imports, 388 unresolved strong
+The C++/GLES/Text variant reports 2,611 resolved imports, 387 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
