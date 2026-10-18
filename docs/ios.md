@@ -9226,17 +9226,41 @@ target ownership, atomic counts, lock order and cleanup. Evidence is under
 `_mach_port_request_notification` and stops before entry at `_madvise`.
 Fortnite remains unplayable and the full iOS regression is unpassed.
 
+The V `madvise` adapter now translates Darwin's advice values and outward page
+rounding to Vinix's Linux ABI. It supports normal/random/sequential/will-need
+hints, non-destructive `MADV_DONTNEED`, private anonymous `MADV_FREE` and
+`MADV_FREE_REUSABLE`, and `MADV_FREE_REUSE`. Free/reusable eagerly discard the
+permitted contents, so reuse cannot leave a lazy-free page eligible for later
+reclamation. Whole-range mapping, protection and backing validation precedes
+discard; holes, overflow and failures preserve the measured errno behavior for
+the supported profile. Shared Mach aliases and file mappings explicitly reject
+free/reusable with `ENOTSUP` rather than losing their shared backing. Wired-page
+zeroing, reusable-state queries, pageout and zero-page advice remain unsupported
+on Vinix. macOS validation uses the native implementation.
+
+`tests/ios/native-checks.v build-madvise` builds the fixture. Native measurements,
+four host ASan/UBSan runs and the ARM64 Vinix fixture cover unaligned/empty
+ranges, overflow, holes, protection, contents after reuse, actual eager discard,
+shared aliases, file guards, long mapping names, errno and two image lifetimes.
+The existing Mach memory-entry regression also passes under the host sanitizers.
+Generated C review checks the scalar ABI, bounded stack parsing, complete-range
+validation, namespace locking and absence of retained allocations. Evidence is
+under `build/ios/fortnite/madvise-checks`. The fresh Fortnite probe passes
+`_madvise` and stops before entry at `_malloc_create_zone`, called with a 4 MiB
+initial size at `0x10489c068`. Fortnite remains unplayable; the full iOS regression
+is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,752 | 408 | 79 |
+| Fortnite executable | 1,753 | 407 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,587 | 411 | 120 |
+| All images | 2,588 | 410 | 120 |
 
-The C++/GLES/Text variant reports 2,601 resolved imports, 397 unresolved strong
+The C++/GLES/Text variant reports 2,602 resolved imports, 396 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

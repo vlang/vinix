@@ -160,6 +160,7 @@ fn files_symbol(symbol string) ?u64 {
 		'_mmap' { u64(unsafe { voidptr(darwin_mmap) }) }
 		'_munmap' { u64(unsafe { voidptr(darwin_munmap) }) }
 		'_mprotect' { u64(unsafe { voidptr(darwin_mprotect) }) }
+		'_madvise' { u64(unsafe { voidptr(darwin_madvise) }) }
 		'_mlock' { u64(unsafe { voidptr(C.mlock) }) }
 		'_munlock' { u64(unsafe { voidptr(C.munlock) }) }
 		else { return none }
