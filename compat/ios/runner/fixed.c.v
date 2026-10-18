@@ -195,6 +195,7 @@ fn fixed_symbol(symbol string) ?u64 {
 		'___sincos_stret' { u64(unsafe { voidptr(darwin_sincos_double) }) }
 		'_ldexp' { u64(unsafe { voidptr(C.ldexp) }) }
 		'_ldexpf' { u64(unsafe { voidptr(C.ldexpf) }) }
+		'_logbf' { u64(unsafe { voidptr(darwin_logbf) }) }
 		'_frexp' { u64(unsafe { voidptr(C.frexp) }) }
 		'_modf' { u64(unsafe { voidptr(C.modf) }) }
 		'_modff' { u64(unsafe { voidptr(C.modff) }) }

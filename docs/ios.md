@@ -9058,17 +9058,41 @@ pairs are under `build/ios/fortnite/host-statistics-checks`. The fresh IPA probe
 passes all three imports and stops before entry at `_logbf`. Fortnite remains
 unplayable and the full iOS regression is unpassed.
 
+V now resolves `_logbf` with scalar float ABI and exact finite exponents.
+Normal and subnormal inputs use integer bit inspection, so flush-to-zero does
+not turn a nonzero input into a pole. Both signed zeros return negative infinity
+and raise divide-by-zero. Infinities and NaNs use the native ARM64 floating
+multiply: signaling NaNs raise invalid, payloads/signs survive normally, and
+default-NaN mode produces the canonical positive NaN. Errno, rounding controls
+and previously raised flags are preserved. The adapter allocates nothing and
+does not call a logarithm backend.
+
+`tests/ios/native-checks.v build-logb` builds the regression fixture. Two host
+ASan/UBSan runs and the ARM64 Vinix suite pass for every finite exponent class,
+both signs, subnormal boundaries, zero poles, NaN cases, four rounding modes,
+all combinations of flush-to-zero/default-NaN controls, sticky flags and eight
+concurrent callers. The host suite also runs these cases against native `logbf`.
+Generated C and both optimized runner binaries are reviewed; LLVM confirms
+single-precision special-value multiplication and the explicit zero exception.
+
+Native references, joined logs, pinned inputs and five generated C/executable
+pairs are under `build/ios/fortnite/logb-checks`. The IPA's color-packing call at
+`0x10063b454` consumes the float result before `ldexpf`. The fresh probe passes
+`_logbf` and stops before entry at `_mach_make_memory_entry_64`. Its call sites
+and native permission/size negotiation and shared aliases are measured for the
+next adapter. Fortnite remains unplayable and the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,743 | 417 | 79 |
+| Fortnite executable | 1,744 | 416 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,578 | 420 | 120 |
+| All images | 2,579 | 419 | 120 |
 
-The C++/GLES/Text variant reports 2,592 resolved imports, 406 unresolved strong
+The C++/GLES/Text variant reports 2,593 resolved imports, 405 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
