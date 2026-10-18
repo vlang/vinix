@@ -264,6 +264,34 @@ callbacks. The native fixture also passes on the M1 Air over SSH. These are
 protocol checks, not a Vinix boot or a GPU-rendering result. Apple binaries and
 live captures remain untracked under `tools/agx-re/build`.
 
+### Prepared GPU test deployment (2026-10-18)
+
+Built an isolated snapshot of `f53bb378d`, including the G13 publication and
+failure-handling fixes in `a5b3be959`. The AArch64 kernel uses `LIMINE_MP=1`;
+the compact desktop image includes the static and GPU desktops, Mesa 25.0.5
+Asahi, Firefox, and `run-m1-agx-smoke`. The complete desktop image preflight
+passes, including comparison of the archived triangle C source against the
+snapshot's V source. The compressed image is 280935554 bytes.
+
+The staged boot profile selects `vinix.apple_gpu=1 vinix.apple_dcp=0`, and the
+installer appends `vinix.apple_speakers=0` so this kernel skips speaker
+initialization entirely. It retains the Air's existing persistent-partition
+configuration and inherited framebuffer.
+
+| Input | SHA-256 |
+| --- | --- |
+| Kernel | `e983bd8a4f179fbb307edb3df4e5ceeb6dde1bdc6299bdbbe63d4626974073dc` |
+| Compressed desktop image | `7c0b8f2b4fb7346e47289b8f806dc83675d1c1f1f057427809a6b5ba247201ae` |
+| Limine 12.9.3 EFI loader | `3a23c79b75dd78fbacb6430472ce4aa5e90ef89089a4970459a0282cf44ccb4f` |
+
+Deployment is pending: the Air stopped responding to SSH before rsync could
+transfer the payload. No EFI files were changed. The prepared image and
+native V deployment helpers remain under `logs/m1-gpu-deploy-20261018` and
+`logs/m1-{push,install}-20261018.v`; the attempted installation log is
+`logs/m1-deploy-install-20261018.log`. Resume with the Air awake in macOS,
+then verify the installed hashes and all four Limine configuration copies.
+Hardware boot, compute, and render acceptance remain untested.
+
 ## Acceptance sequence
 
 A `/dev/dri` node and an "initialized" log line are not evidence that the GPU
