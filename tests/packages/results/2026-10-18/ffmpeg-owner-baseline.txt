@@ -1,0 +1,76 @@
+FFMPEG OWNER case=complete retained=192344 allocations=649
+FFMPEG OWNER complete canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=nested retained=192509 allocations=649
+FFMPEG OWNER nested canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=version retained=0 allocations=0
+FFMPEG OWNER version canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=runtime-range retained=55 allocations=1
+FFMPEG OWNER runtime-range canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=missing-root retained=55 allocations=1
+FFMPEG OWNER missing-root canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=missing-architecture retained=1408 allocations=10
+FFMPEG OWNER missing-architecture canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=wrong-target retained=2077 allocations=13
+FFMPEG OWNER wrong-target canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=wrong-mode retained=2077 allocations=13
+FFMPEG OWNER wrong-mode canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=missing-notice retained=2077 allocations=13
+FFMPEG OWNER missing-notice canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=empty-notice retained=2077 allocations=13
+FFMPEG OWNER empty-notice canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=notice-directory retained=2077 allocations=13
+FFMPEG OWNER notice-directory canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=missing-source retained=2077 allocations=13
+FFMPEG OWNER missing-source canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=source-size retained=2077 allocations=13
+FFMPEG OWNER source-size canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=source-executable retained=2077 allocations=13
+FFMPEG OWNER source-executable canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=source-pin retained=52169 allocations=297
+FFMPEG OWNER source-pin canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=import-source retained=52169 allocations=297
+FFMPEG OWNER import-source canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=no-output-space retained=2132 allocations=14
+FFMPEG OWNER no-output-space canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=no-temp-space retained=2182 allocations=15
+FFMPEG OWNER no-temp-space canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=space-error retained=2132 allocations=14
+FFMPEG OWNER space-error canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=created retained=2182 allocations=15
+FFMPEG OWNER created canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=packed-1 retained=13891 allocations=70
+FFMPEG OWNER packed-1 canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=packed-2 retained=17484 allocations=99
+FFMPEG OWNER packed-2 canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=packed-3 retained=26651 allocations=157
+FFMPEG OWNER packed-3 canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=packed-4 retained=37077 allocations=210
+FFMPEG OWNER packed-4 canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=packed-5 retained=45371 allocations=240
+FFMPEG OWNER packed-5 canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=packed-6 retained=52169 allocations=297
+FFMPEG OWNER packed-6 canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=ready retained=207129 allocations=647
+FFMPEG OWNER ready canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=import-elf retained=37218 allocations=212
+FFMPEG OWNER import-elf canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=import-notice retained=36949 allocations=209
+FFMPEG OWNER import-notice canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=import-directory retained=36723 allocations=207
+FFMPEG OWNER import-directory canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=changed-lock retained=207129 allocations=647
+FFMPEG OWNER changed-lock canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=occupied retained=55 allocations=1
+FFMPEG OWNER occupied canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=raced-target retained=207129 allocations=647
+FFMPEG OWNER raced-target canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=flush retained=207129 allocations=647
+FFMPEG OWNER flush canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=cleanup retained=192127 allocations=646
+FFMPEG OWNER cleanup canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=root-replaced retained=2182 allocations=15
+FFMPEG OWNER root-replaced canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=inventory-replaced retained=2182 allocations=15
+FFMPEG OWNER inventory-replaced canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER case=lock-replaced retained=2182 allocations=15
+FFMPEG OWNER lock-replaced canonical retry, saved output, source and descriptor preservation PASS

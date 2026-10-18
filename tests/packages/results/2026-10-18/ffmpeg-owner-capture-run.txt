@@ -1,0 +1,29 @@
+IMPORT WORKSPACE CAPTURE case=ordinary retained=0 allocations=0
+IMPORT WORKSPACE CAPTURE ordinary preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE case=root-directory retained=0 allocations=0
+IMPORT WORKSPACE CAPTURE root-directory preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE case=root-alias retained=0 allocations=0
+IMPORT WORKSPACE CAPTURE root-alias preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE case=root-mode retained=0 allocations=0
+IMPORT WORKSPACE CAPTURE root-mode preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE case=payload-directory retained=0 allocations=0
+IMPORT WORKSPACE CAPTURE payload-directory preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE case=payload-alias retained=0 allocations=0
+IMPORT WORKSPACE CAPTURE payload-alias preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE case=manifest-directory retained=0 allocations=0
+IMPORT WORKSPACE CAPTURE manifest-directory preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE case=manifest-file retained=0 allocations=0
+IMPORT WORKSPACE CAPTURE manifest-file preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE case=manifest-alias retained=0 allocations=0
+IMPORT WORKSPACE CAPTURE manifest-alias preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE case=manifest-fifo retained=0 allocations=0
+IMPORT WORKSPACE CAPTURE manifest-fifo preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE case=manifest-content retained=0 allocations=0
+IMPORT WORKSPACE CAPTURE manifest-content preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE case=unexpected-directory retained=0 allocations=0
+IMPORT WORKSPACE CAPTURE unexpected-directory preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE case=renamed-parent retained=0 allocations=0
+IMPORT WORKSPACE CAPTURE renamed-parent preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE 16 public root/payload/manifest/content/unexpected-entry refusals preserve source, publication timing and canonical retry PASS
+IMPORT WORKSPACE CAPTURE case=creation-refusal retained=0 allocations=0
+IMPORT WORKSPACE CAPTURE creation refusal closes both captured descriptors, retires scratch and identifies retained unadmitted data PASS

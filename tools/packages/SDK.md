@@ -1472,6 +1472,15 @@ the LGPL/GPL configuration split. LGPL notices and corresponding
 upstream source are retained with the runtime; runtime versions are an explicit
 publisher compatibility declaration, not inferred ABI certification.
 
+V callers own the dynamic metadata returned in `FfmpegProfileInfo` and release it
+with `info.close()`. Replies are independent of caller inputs; repeated close is
+safe and preserves the published lock. The CLI closes its reply after encoding.
+The [ownership qualification](../../tests/packages/ffmpeg-owner-check.md) covers
+templates, partial imports, canonicalization, preflight, publication, retirement
+and reply/error disposal after JSON metadata initialization. Both guests check
+the metadata boundary and an explicit subset of complete-call cases using the
+full reviewed source archive. Other profile/catalog/release owners remain separate.
+
 ```sh
 ffmpeg-build /secure/ffmpeg-8.0.1.tar.xz /build/new-ffmpeg-inputs
 vinix-package ffmpeg-catalog 1.0.0 /build/new-ffmpeg-inputs/roots /build/new-ffmpeg-lock

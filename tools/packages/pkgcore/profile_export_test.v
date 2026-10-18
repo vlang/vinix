@@ -228,7 +228,7 @@ fn profile_export_run(kind string, work string, target string, options CatalogOp
 	match kind {
 		'native' { mut info := native_catalog_with('1.0.0', work + '/roots', target, options)!; info.close() }
 		'sqlite' { mut info := sqlite_catalog_with('3.53.4', '1.0.0', work + '/roots', target, options)!; info.close() }
-		'ffmpeg' { ffmpeg_catalog_with('1.0.0', work + '/roots', target, options)! }
+		'ffmpeg' { mut info := ffmpeg_catalog_with('1.0.0', work + '/roots', target, options)!; info.close() }
 		'wine' { wine_catalog_with(work + '/recipes', work + '/roots', target, options)! }
 		else { apple_catalog_with(work + '/recipes', work + '/roots', target, options)! }
 	}

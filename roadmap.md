@@ -674,6 +674,14 @@ architectures; broader release/catalog/runtime acceptance remains open.
     tracked allocations while preserving canonical locks, compatible runtime
     updates and saved-output/recovery diagnostics. Other complete publisher,
     catalog/release and broader graphical/runtime acceptance remain open.
+  - [x] [Owned FFmpeg profile construction](tests/packages/ffmpeg-owner-check.md)
+    retires templates, six partial inventories, canonicalization, filesystem
+    budgets and independently closeable replies. After JSON initialization,
+    76 host calls and 1,152 metadata cycles retain zero tracked allocations;
+    both guests check metadata and eight selected complete-call cases using
+    the full reviewed source archive. Source pins, canonical locks and explicit
+    licenses/runtime bounds are preserved. Other profile/catalog/release owners
+    and broader graphical/runtime acceptance remain open.
   - [x] [Owned packing inventories and replies](tests/packages/pack-ownership-check.md)
     retire discarded template inventories, partial walked files and copy scratch
     across cold/cache success and late refusal. Independently closeable pack/root

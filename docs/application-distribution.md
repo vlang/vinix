@@ -416,6 +416,13 @@ idempotent, preserves the published lock and owns its data independently of
 caller arguments. The CLI releases it after encoding; compatible runtime-only
 updates keep the application metadata unchanged. First-call JSON metadata and
 other complete publisher/catalog/release owners remain separate boundaries.
+The [FFmpeg ownership checks](../tests/packages/ffmpeg-owner-check.md) extend
+this to FFmpeg/FFprobe and their shared runtime. Independently closeable replies,
+templates, partial imports and canonicalization retain no tracked allocations in
+76 host calls and 1,152 metadata cycles after initialization. Both guests check
+the metadata boundary and eight selected complete-call cases with the full
+reviewed source archive. Catalog bytes, notices, permissions and runtime-update
+semantics are preserved; first-call JSON metadata and broader acceptance remain separate.
 The workspace builder also owns its metadata/disk-budget plan and returns an
 independently closeable `CatalogInfo`. It finishes metadata admission and budgeting
 before touching prepared roots or destination parents, retaining the existing

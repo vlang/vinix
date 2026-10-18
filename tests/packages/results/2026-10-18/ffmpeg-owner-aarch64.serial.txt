@@ -1,0 +1,550 @@
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FC86000 start failed: Unsupported
+Error: Image at 0007FC0B000 start failed: Not Found
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+BdsDxe: starting Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x760c8000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x760c8000 to 0xffffffff80000000, length: 0x2f0000
+vmm: Kernel: Mapping 0x763b8000 to 0xffffffff802f0000, length: 0x2c000
+vmm: Kernel: Mapping 0x763e4000 to 0xffffffff8031c000, length: 0x15e6000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x760c8000 +0x31c000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 29
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 30
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 1000000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+init smp...
+smp: BSP MPIDR:       0
+smp: Discovered CPUs: 4
+smp: Starting CPUs:   4
+security: PAN enabled
+smp: CPU 0 online!
+smp: CPU 1 online!
+smp: CPU 2 online!
+smp: CPU 3 online!
+smp: 4 CPUs online
+smp done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+initramfs: Module:  1
+initramfs: Address: 0xffff00007527e000
+initramfs: Size:    14981120
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=22
+!>+ [11] ./sbin/init sz=310832
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/profile sz=1115048
+!>+ [15] ./usr/share/package-fixtures/ffmpeg.tar.xz sz=11388848
+!>+ [16] ./usr/share/package-fixtures/builder sz=1186344
+!>+ [17] ./usr/share/package-fixtures/metadata sz=968312
+!>initramfs: no ustar sig at 0xffff0000760c7400
+initramfs: Done (17 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 1000000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+pci: Found [0:2:0:-1]
+devcore: 3 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 3 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+HWTEST START packages-ffmpeg-owner
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+random: reseeded from 57553 events, 4 hardware words
+FFMPEG METADATA imports=0 fault=none retained=0 allocations=0
+FFMPEG METADATA imports=1 fault=none retained=0 allocations=0
+FFMPEG METADATA imports=2 fault=none retained=0 allocations=0
+FFMPEG METADATA imports=3 fault=none retained=0 allocations=0
+FFMPEG METADATA imports=4 fault=none retained=0 allocations=0
+FFMPEG METADATA imports=5 fault=none retained=0 allocations=0
+FFMPEG METADATA imports=6 fault=none retained=0 allocations=0
+FFMPEG METADATA imports=6 fault=duplicate retained=0 allocations=0
+FFMPEG METADATA imports=0 fault=empty retained=0 allocations=0
+FFMPEG METADATA 1152 cycles retire templates, partial inventories, canonicalization, replies and late refusals PASS
+FFMPEG METADATA independent replies survive caller retirement and close idempotently PASS
+FFMPEG OWNER PROCESS metadata  PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+FFMPEG OWNER PROCESS profile  PASS
+FFMPEG OWNER resources before grace complete:
+Limit: 118272000
+OwnerLimit: 59136000
+Charged: 3943088
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 464 2953844
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 21 591872
+process 4 55006
+thread 3 317280
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER resources after grace complete:
+Limit: 118272000
+OwnerLimit: 59136000
+Charged: 963764
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 21 591872
+process 2 27478
+thread 3 317280
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+FFMPEG OWNER case=complete retained=0 allocations=0
+FFMPEG OWNER complete canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER PROCESS builder case complete PASS
+FFMPEG OWNER resources before grace packed-3:
+Limit: 118272000
+OwnerLimit: 59136000
+Charged: 3129854
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 310 1983878
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 23 642816
+process 4 55034
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER resources after grace packed-3:
+Limit: 118272000
+OwnerLimit: 59136000
+Charged: 1120468
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 23 642816
+process 2 27478
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+FFMPEG OWNER case=packed-3 retained=0 allocations=0
+FFMPEG OWNER packed-3 canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER PROCESS builder case packed-3 PASS
+FFMPEG OWNER resources before grace packed-6:
+Limit: 118272000
+OwnerLimit: 59136000
+Charged: 3286814
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 310 1983878
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 25 694016
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER resources after grace packed-6:
+Limit: 118272000
+OwnerLimit: 59136000
+Charged: 1277428
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 25 694016
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+FFMPEG OWNER case=packed-6 retained=0 allocations=0
+FFMPEG OWNER packed-6 canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER PROCESS builder case packed-6 PASS
+FFMPEG OWNER resources before grace import-elf:
+Limit: 118272000
+OwnerLimit: 59136000
+Charged: 3286814
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 310 1983878
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 25 694016
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER resources after grace import-elf:
+Limit: 118272000
+OwnerLimit: 59136000
+Charged: 1277428
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 25 694016
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+FFMPEG OWNER case=import-elf retained=0 allocations=0
+FFMPEG OWNER import-elf canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER PROCESS builder case import-elf PASS
+FFMPEG OWNER resources before grace import-source:
+Limit: 118272000
+OwnerLimit: 59136000
+Charged: 3535024
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 342 2181140
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 27 744960
+process 4 55038
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER resources after grace import-source:
+Limit: 118272000
+OwnerLimit: 59136000
+Charged: 1328372
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 27 744960
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+FFMPEG OWNER case=import-source retained=0 allocations=0
+FFMPEG OWNER import-source canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER PROCESS builder case import-source PASS
+FFMPEG OWNER resources before grace changed-lock:
+Limit: 118272000
+OwnerLimit: 59136000
+Charged: 3388712
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 310 1983878
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 29 795904
+process 4 55044
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER resources after grace changed-lock:
+Limit: 118272000
+OwnerLimit: 59136000
+Charged: 1379316
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 29 795904
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+FFMPEG OWNER case=changed-lock retained=0 allocations=0
+FFMPEG OWNER changed-lock canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER PROCESS builder case changed-lock PASS
+FFMPEG OWNER resources before grace flush:
+Limit: 118272000
+OwnerLimit: 59136000
+Charged: 3439644
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 310 1983868
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 31 846848
+process 4 55042
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER resources after grace flush:
+Limit: 118272000
+OwnerLimit: 59136000
+Charged: 1430260
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 31 846848
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+FFMPEG OWNER case=flush retained=0 allocations=0
+FFMPEG OWNER flush canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER PROCESS builder case flush PASS
+FFMPEG OWNER resources before grace cleanup:
+Limit: 118272000
+OwnerLimit: 59136000
+Charged: 3439620
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 310 1983858
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 31 846848
+process 4 55028
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER resources after grace cleanup:
+Limit: 118272000
+OwnerLimit: 59136000
+Charged: 1430260
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 31 846848
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+FFMPEG OWNER case=cleanup retained=0 allocations=0
+FFMPEG OWNER cleanup canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER PROCESS builder case cleanup PASS
+HWTEST PASS packages-ffmpeg-owner
+syspower: power off: stopping devices

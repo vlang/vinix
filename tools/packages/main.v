@@ -176,7 +176,8 @@ fn checked(arguments []string) !int {
 		}
 		'ffmpeg-catalog' {
 			if names.len != 3 { return error('ffmpeg-catalog requires runtime version, prepared roots and a new lock directory') }
-			println(json2.encode(pkgcore.ffmpeg_catalog(names[0], names[1], names[2])!))
+			mut info := pkgcore.ffmpeg_catalog(names[0], names[1], names[2])!
+			publisher_reply(mut info)
 			return 0
 		}
 		'wine-catalog' {

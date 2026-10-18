@@ -1,0 +1,413 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=22
+!>+ [11] ./sbin/init sz=216384
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/profile sz=1119808
+!>+ [15] ./usr/share/package-fixtures/ffmpeg.tar.xz sz=11388848
+!>+ [16] ./usr/share/package-fixtures/builder sz=1147472
+!>+ [17] ./usr/share/package-fixtures/metadata sz=932392
+!>initramfs: no ustar sig at 0xff000000370f4200
+initramfs: Done (17 entries)
+HWTEST START packages-ffmpeg-owner
+FFMPEG METADATA imports=0 fault=none retained=0 allocations=0
+FFMPEG METADATA imports=1 fault=none retained=0 allocations=0
+FFMPEG METADATA imports=2 fault=none retained=0 allocations=0
+FFMPEG METADATA imports=3 fault=none retained=0 allocations=0
+FFMPEG METADATA imports=4 fault=none retained=0 allocations=0
+FFMPEG METADATA imports=5 fault=none retained=0 allocations=0
+FFMPEG METADATA imports=6 fault=none retained=0 allocations=0
+FFMPEG METADATA imports=6 fault=duplicate retained=0 allocations=0
+FFMPEG METADATA imports=0 fault=empty retained=0 allocations=0
+FFMPEG METADATA 1152 cycles retire templates, partial inventories, canonicalization, replies and late refusals PASS
+FFMPEG METADATA independent replies survive caller retirement and close idempotently PASS
+FFMPEG OWNER PROCESS metadata  PASS
+FFMPEG OWNER PROCESS profile  PASS
+FFMPEG OWNER resources before grace complete:
+Limit: 119927296
+OwnerLimit: 59963648
+Charged: 4234664
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 464 3267676
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 27 323072
+process 4 54590
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER resources after grace complete:
+Limit: 119927296
+OwnerLimit: 59963648
+Charged: 941716
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 27 323072
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER case=complete retained=0 allocations=0
+FFMPEG OWNER complete canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER PROCESS builder case complete PASS
+FFMPEG OWNER resources before grace packed-3:
+Limit: 119927296
+OwnerLimit: 59963648
+Charged: 2645756
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 224 1634196
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 31 367616
+process 4 54618
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER resources after grace packed-3:
+Limit: 119927296
+OwnerLimit: 59963648
+Charged: 986260
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 31 367616
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER case=packed-3 retained=0 allocations=0
+FFMPEG OWNER packed-3 canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER PROCESS builder case packed-3 PASS
+FFMPEG OWNER resources before grace packed-6:
+Limit: 119927296
+OwnerLimit: 59963648
+Charged: 3232268
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 224 1634196
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 389888
+process 4 54618
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER resources after grace packed-6:
+Limit: 119927296
+OwnerLimit: 59963648
+Charged: 1030804
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 35 412160
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER case=packed-6 retained=0 allocations=0
+FFMPEG OWNER packed-6 canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER PROCESS builder case packed-6 PASS
+FFMPEG OWNER resources before grace import-elf:
+Limit: 119927296
+OwnerLimit: 59963648
+Charged: 2712572
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 224 1634196
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 434432
+process 4 54618
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER resources after grace import-elf:
+Limit: 119927296
+OwnerLimit: 59963648
+Charged: 1053076
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 434432
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER case=import-elf retained=0 allocations=0
+FFMPEG OWNER import-elf canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER PROCESS builder case import-elf PASS
+FFMPEG OWNER resources before grace import-source:
+Limit: 119927296
+OwnerLimit: 59963648
+Charged: 2932110
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 256 1831458
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 39 456704
+process 4 54622
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER resources after grace import-source:
+Limit: 119927296
+OwnerLimit: 59963648
+Charged: 1075348
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 39 456704
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER case=import-source retained=0 allocations=0
+FFMPEG OWNER import-source canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER PROCESS builder case import-source PASS
+FFMPEG OWNER resources before grace changed-lock:
+Limit: 119927296
+OwnerLimit: 59963648
+Charged: 2801670
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 224 1634196
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 45 523520
+process 4 54628
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER resources after grace changed-lock:
+Limit: 119927296
+OwnerLimit: 59963648
+Charged: 1142164
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 45 523520
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER case=changed-lock retained=0 allocations=0
+FFMPEG OWNER changed-lock canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER PROCESS builder case changed-lock PASS
+FFMPEG OWNER resources before grace flush:
+Limit: 119927296
+OwnerLimit: 59963648
+Charged: 2823940
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 224 1634196
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 47 545792
+process 4 54626
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER resources after grace flush:
+Limit: 119927296
+OwnerLimit: 59963648
+Charged: 1164436
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 47 545792
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER case=flush retained=0 allocations=0
+FFMPEG OWNER flush canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER PROCESS builder case flush PASS
+FFMPEG OWNER resources before grace cleanup:
+Limit: 119927296
+OwnerLimit: 59963648
+Charged: 2846198
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 224 1634196
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 49 568064
+process 4 54612
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER resources after grace cleanup:
+Limit: 119927296
+OwnerLimit: 59963648
+Charged: 1186708
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 49 568064
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+FFMPEG OWNER case=cleanup retained=0 allocations=0
+FFMPEG OWNER cleanup canonical retry, saved output, source and descriptor preservation PASS
+FFMPEG OWNER PROCESS builder case cleanup PASS
+HWTEST PASS packages-ffmpeg-owner

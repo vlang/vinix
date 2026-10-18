@@ -1,0 +1,15 @@
+IMPORT WORKSPACE CAPTURE ordinary preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE root-directory preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE root-alias preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE root-mode preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE payload-directory preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE payload-alias preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE manifest-directory preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE manifest-file preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE manifest-alias preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE manifest-fifo preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE manifest-content preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE unexpected-directory preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE renamed-parent preservation and captured-parent retirement PASS
+IMPORT WORKSPACE CAPTURE 16 public root/payload/manifest/content/unexpected-entry refusals preserve source, publication timing and canonical retry PASS
+IMPORT WORKSPACE CAPTURE creation refusal closes both captured descriptors, retires scratch and identifies retained unadmitted data PASS

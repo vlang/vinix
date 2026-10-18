@@ -1,0 +1,4 @@
+FFMPEG OWNER journal guard=sources refuses before compilation PASS
+FFMPEG OWNER journal guard=artifact refuses before compilation PASS
+FFMPEG OWNER journal guard=existing refuses before compilation PASS
+FFMPEG OWNER intact completed journal resumes with all original timings and artifact pins PASS
