@@ -95,7 +95,13 @@ fn offered_apps(arch string) ![]string {
 		if arch != 'arm64' && block.all_before('},').contains('arm64_only:      true') {
 			continue
 		}
-		category := block.all_after('category:').all_before('\n').trim_space().trim_left('.')
+		// An app without a category has the enum's zero value, its first
+		// member: the browsers name none.
+		category := if block.contains('category:') {
+			block.all_after('category:').all_before('\n').trim_space().trim_left('.')
+		} else {
+			source.all_after('enum FirstRunCategory {').trim_space().all_before('\n').trim_space()
+		}
 		by_category[category] << name
 	}
 	mut apps := []string{}
@@ -122,6 +128,14 @@ fn start(options Options) !Vm {
 	os.mkdir_all(options.out)!
 	for name in ['serial.log', 'qmp.sock', 'disk.img', 'vars.fd'] {
 		os.rm(os.join_path(options.out, name)) or {}
+	}
+	// The disk image is sparse and grows by every app installed, to about
+	// 8 GiB. When the host's own disk filled, QEMU's write stalled, the guest's
+	// disk request timed out and the run hung halfway, which looks like a
+	// Vinix failure.
+	usage := os.disk_usage(options.out)!
+	if usage.available < u64(10) << 30 {
+		return error('${options.out} has ${usage.available >> 20} MiB free; a full run needs 10 GiB')
 	}
 	disk := os.join_path(options.out, 'disk.img')
 	mut file := os.create(disk)!
