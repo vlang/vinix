@@ -146,6 +146,7 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 		'__NSGetEnviron' { unsafe { voidptr(darwin_ns_get_environ) } }
 		'_puts' { unsafe { voidptr(darwin_puts) } }
 		'_atoi' { unsafe { voidptr(darwin_atoi) } }
+		'_div' { unsafe { voidptr(darwin_div) } }
 		'_malloc' { unsafe { voidptr(darwin_malloc) } }
 		'_free' { unsafe { voidptr(darwin_free) } }
 		'_strlen' { unsafe { voidptr(darwin_strlen) } }

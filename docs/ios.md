@@ -8886,17 +8886,45 @@ three semaphore imports and stops before application entry at `_div`. A native
 scout verifies its signed 32-bit arguments and eight-byte quotient/remainder
 result. Fortnite remains unplayable and the full iOS regression is unpassed.
 
+V now implements `_div` with Darwin ARM64's eight-byte `div_t`: signed
+32-bit quotient and remainder fields return together in `x0`. Results truncate
+toward zero, and a nonzero remainder has the numerator's sign. The adapter
+uses integer arithmetic without allocations or changes to errno, rounding mode
+or sticky floating-point flags. Explicit branches reproduce the measured ARM64
+results for zero divisors and `INT_MIN / -1`, without evaluating undefined C
+division in the generated code. Those inputs remain outside the C language
+contract; their behavior here follows the native ARM64 library.
+
+LLVM inspection of this Mac's `div` confirms 32-bit `SDIV`/`MSUB` arithmetic
+and packing into `x0`. V/Mach-O/LLVM inspection finds Fortnite's call at
+`0x10027279c`, followed by a shift extracting the remainder from the upper
+32 bits. `tests/ios/native-checks.v build-division` builds the new fixture. Two
+host ASan/UBSan runs and the ARM64 Vinix suite pass for signed boundaries,
+exhaustive small operands, 32,768 full-width pairs, native oracle comparisons,
+four rounding modes and eight concurrent callers. A machine-code call probe
+checks dirty upper input bits, packed return fields, a protected indirect-result
+address, a callee-saved register and output canaries.
+
+Native measurements, disassembly, the corrected test pointer-cast build failure,
+pinned inputs, joined logs and five generated C/executable pairs are retained
+under `build/ios/fortnite/division-checks`. The fresh IPA probe passes `_div`
+and stops before application entry at `_exception_raise`. Native exception
+client scouts verify the three client signatures and invalid-destination errors
+without invoking a live exception server. Mach exception delivery remains
+unimplemented. Fortnite remains unplayable and the full iOS regression is
+unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,733 | 427 | 79 |
+| Fortnite executable | 1,734 | 426 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,568 | 430 | 120 |
+| All images | 2,569 | 429 | 120 |
 
-The C++/GLES/Text variant reports 2,582 resolved imports, 416 unresolved strong
+The C++/GLES/Text variant reports 2,583 resolved imports, 415 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
