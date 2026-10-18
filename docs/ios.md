@@ -8972,17 +8972,44 @@ nonblocking unlock at `0x1005a752c`. The fresh IPA probe passes `_flock` and sto
 before entry at `_getprogname`. Native RE verifies its stable borrowed basename
 pointer. Fortnite remains unplayable and the full iOS regression is unpassed.
 
+V now resolves `_getprogname` from the main image's original `argv[0]`.
+Startup installs a borrowed basename pointer before dependency binding and
+initializers; it remains available through entry, joined workers and teardown.
+Later edits to the original bytes remain visible, while replacing the argv cell
+or introducing another slash does not recompute the pointer. The bounded scan
+stops at the first NUL, handles empty and trailing-slash names, and adds no
+allocation. Calls without a configured image fail explicitly. Native Darwin
+measurements and LLVM disassembly verify its stored-pointer behavior.
+
+`tests/ios/native-checks.v build-progname` builds the regression fixture.
+Two host ASan/UBSan runs and the ARM64 Vinix suite pass for guarded read-only
+inputs, long and UTF-8 names, embedded NULs, mutable aliases, errno and
+floating-point state, eight concurrent readers, import scoping and invalid
+lifecycle states. A generated ARM64 Mach-O binds the real import and verifies
+initializer, entry and destructor callbacks over two complete executions,
+including replacement of its argv cell. Generated C review confirms the bounded
+scan, borrowed lifetime and initialization order.
+
+Native references, joined logs, pinned inputs and five generated C/executable
+pairs are retained under `build/ios/fortnite/progname-checks`. Failed fixture
+attempts are retained: the legacy import table initially lacked its nlist entry,
+and an incorrect ADRP displacement reached the wrong page. LLVM verifies all
+three corrected callback stubs in both executed host fixtures. The fresh IPA
+probe passes `_getprogname` and stops before entry at `_host_page_size`.
+V/Mach-O/LLVM inspection identifies its call at `0x1005a715c` for the next
+adapter. Fortnite remains unplayable and the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,738 | 422 | 79 |
+| Fortnite executable | 1,739 | 421 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,573 | 425 | 120 |
+| All images | 2,574 | 424 | 120 |
 
-The C++/GLES/Text variant reports 2,587 resolved imports, 411 unresolved strong
+The C++/GLES/Text variant reports 2,588 resolved imports, 410 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

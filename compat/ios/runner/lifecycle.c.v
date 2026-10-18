@@ -31,6 +31,7 @@ struct ImageRuntime {
 mut:
 	base u64
 	path string
+	progname &char = unsafe { nil }
 	image macho.Image
 	layout macho.Layout
 	started bool
