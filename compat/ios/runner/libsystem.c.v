@@ -151,6 +151,7 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 		'_atexit' { unsafe { voidptr(image_atexit) } }
 		'_exit' { unsafe { voidptr(image_exit) } }
 		'__exit' { unsafe { voidptr(image_immediate_exit) } }
+		'__Exit' { unsafe { voidptr(darwin_c11_exit) } }
 		'_puts' { unsafe { voidptr(darwin_puts) } }
 		'_atoi' { unsafe { voidptr(darwin_atoi) } }
 		'_malloc' { unsafe { voidptr(darwin_malloc) } }

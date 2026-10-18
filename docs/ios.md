@@ -72,7 +72,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | Signal subset | Darwin 16-byte `sigaction` and `signal`, translated native numbers/masks, one-argument handlers, `SA_RESTART`/`SA_NODEFER`, and callback draining before image unload |
 | Entry point | `LC_MAIN`, `argc`/`argv`, empty null-terminated environment and Apple vectors, integer exit status |
 | Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; app-bundled dylibs with `@executable_path`, `@loader_path` and own/executable `@rpath` lookup, shared mappings for repeated dependencies; checked lazy function slots resolve on first call through register-preserving ARM64 thunks; built-in and already-linked library `dlopen`/`dlsym`/`dlerror`, image/section lookup |
-| Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order image-scoped `atexit`/`__cxa_atexit`/`__cxa_finalize` callbacks; native `exit` and immediate `_exit` termination |
+| Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order image-scoped `atexit`/`__cxa_atexit`/`__cxa_finalize` callbacks; native `exit` and immediate `_exit`/`_Exit` process termination |
 | Thread-local storage | Darwin TLV descriptors, independent initialized and zero-filled templates for each image, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
 | Swift heap subset | Aligned allocation for native ARC classes and local/generic heap contexts; synchronized strong, batch, bridge and unknown ARC, x20 deallocating destructors, checked object/class and uninitialized deallocation; owners drain before metadata/thunk retirement |
 | C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings and legacy growth/substring helpers, integer sorts, streams, regex, futures, shared/weak ownership and synchronization; V adapters for Darwin random_device and variadic abort |
@@ -8300,21 +8300,43 @@ record, native zlib stream bounds, PBKDF2 and Storefront.current. Pinned inputs,
 native/IPA inspection, probe/audit logs and eleven generated C/executable pairs
 are retained under `build/ios/fortnite/ndr-record-checks`.
 
-The actual IPA now exits with status 1 before application entry at `__Exit` from
-`libSystem.B.dylib`. Fortnite remains unplayable and full iOS regression remains
-unpassed.
+That probe exited with status 1 before application entry at `__Exit` from
+`libSystem.B.dylib`.
+
+C11 `_Exit` (Mach-O `__Exit`) now resolves through a V adapter with an explicit
+signed 32-bit argument and a no-return contract. The native libc backend
+terminates the whole process from either the main thread or a worker, without
+running libc/image exit callbacks, C++/TLS destructors or flushing buffered
+stdio. It also works before image runtime initialization and allocates no memory.
+
+`tests/ios/native-checks.v build-immediate-exit` builds the subprocess fixture.
+It compares Vinix's adapter against the installed Mac `_Exit`, including negative
+and wrapping status values, and uses regular exit, image cleanup and thread
+return as positive controls for the callbacks and buffered output. V/Mach-O/LLVM
+inspection of the actual IPA follows both levels of branch islands and finds
+three direct callers and a tail forwarder, each passing zero in `w0`.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites pass, covering immediate
+exit, native zlib stream bounds, the writable NDR record and Storefront.current.
+Pinned inputs, native/IPA inspection, joined probe/audit logs and eleven
+generated C/executable pairs are retained under
+`build/ios/fortnite/immediate-exit-checks`.
+
+The actual IPA now exits with status 1 before application entry at
+`__NSGetEnviron` from `libSystem.B.dylib`. Fortnite remains unplayable and full
+iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,692 | 468 | 79 |
+| Fortnite executable | 1,693 | 467 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,527 | 471 | 120 |
+| All images | 2,528 | 470 | 120 |
 
-The C++/GLES/Text variant reports 2,541 resolved imports, 457 unresolved strong
+The C++/GLES/Text variant reports 2,542 resolved imports, 456 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
