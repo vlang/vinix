@@ -25,6 +25,7 @@ struct SystemData {
 mut:
 	guard u64
 	page_size u64
+	page_mask u64
 	task_self u32
 	host_name u32
 	host_refs u32
@@ -32,6 +33,7 @@ mut:
 	semaphores &MachSemaphore = unsafe { nil }
 	main_queue [8]u64
 	vm_mappings []MachMapping
+	memory_entries &MachMemoryEntry = unsafe { nil }
 	vm_sequence u64
 	in6_any [16]u8
 	in6_loopback [16]u8
@@ -62,7 +64,7 @@ mut:
 __global system_data = unsafe { &SystemData(nil) }
 
 fn system_data_start() ! {
-	system_data = &SystemData{page_size: u64(C.getpagesize()), task_self: 1}
+	system_data = &SystemData{page_size: u64(C.getpagesize()), page_mask: u64(C.getpagesize()) - 1, task_self: 1}
 	system_data.in6_loopback[15] = 1
 	system_queries_start()!
 	system_data.vm_mappings.flags |= .noslices
@@ -165,6 +167,7 @@ fn system_data_symbol(symbol string) ?u64 {
 		'_in6addr_loopback' { u64(unsafe { &system_data.in6_loopback[0] }) }
 		'_mach_task_self_' { u64(unsafe { &system_data.task_self }) }
 		'_vm_page_size' { u64(unsafe { &system_data.page_size }) }
+		'_vm_page_mask' { u64(unsafe { &system_data.page_mask }) }
 		'_acos' { u64(unsafe { voidptr(C.acos) }) }
 		'_asin' { u64(unsafe { voidptr(C.asin) }) }
 		'_atan' { u64(unsafe { voidptr(C.atan) }) }

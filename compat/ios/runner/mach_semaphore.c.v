@@ -93,6 +93,7 @@ fn mach_semaphore_bad_name(name u32, destroying bool) i32 {
 	C.ios_mach_threads_lock()
 	defer { C.ios_mach_threads_unlock() }
 	if !mach_semaphore_known(name) && system_data != unsafe { nil } {
+		if mach_memory_find(name) != unsafe { nil } { return if destroying { i32(4) } else { i32(20) } }
 		$if macos {
 			mut kind := u32(0)
 			if C.ios_native_port_type(name, unsafe { &kind }) == 0 {

@@ -9082,17 +9082,54 @@ pairs are under `build/ios/fortnite/logb-checks`. The IPA's color-packing call a
 and native permission/size negotiation and shared aliases are measured for the
 next adapter. Fortnite remains unplayable and the full iOS regression is unpassed.
 
+V now resolves `_mach_make_memory_entry_64`, `_vm_map` and `_vm_page_mask`.
+Named entries retain independent backing descriptors, with send-right type/ref
+queries, reference changes, deallocation and retired names. Exception arguments,
+host statistics and wrong-type semaphore operations recognize these rights.
+One namespace lock protects mappings, entries and fork cleanup. Dropping the last
+right closes its descriptor and frees the entry; mapped aliases remain valid.
+
+The current-task subset exports regions allocated or mapped by the compatibility
+VM, rounds unaligned source ranges, returns the available part of a source region,
+and supports restricted child entries. Shared mappings alias the same bytes.
+Copy mappings take an eager backing snapshot, so later writes to either mapping
+stay separate. Protection limits are checked and retained by remaps. Fixed
+replacement requires a fully owned destination range; splitting and deallocation
+retain the surviving backing offsets. Foreign malloc/mmap regions, cross-task
+export, memory-entry flags, alignment masks, other inheritance modes and executable
+anonymous mappings remain unsupported. The existing four-GiB mapping limit remains.
+BSD fixed mmap, munmap and mprotect reject overlapping compatibility VM regions
+with `ENOTSUP`, preventing stale ownership records; ordinary BSD regions retain
+their existing behavior.
+
+`tests/ios/native-checks.v build-memory-entry` builds the fixture. Native Mach
+measurements, eight host ASan/UBSan runs and the ARM64 Vinix fixture cover region
+negotiation, parent slices, reference ownership, alias/snapshot independence,
+read-only replacements, split deallocation, remap protection limits, errno,
+eight concurrent callers, fork and image retirement. The host runs include the
+existing thread, semaphore and exception suites. Generated C review checks entry
+allocation/free, descriptor cleanup, lock coverage and temporary snapshot views.
+The Mac's POSIX shared-memory descriptors reject `pread`/`pwrite`; the initial
+failed attempt and its mapped-view correction are retained.
+
+Evidence and compressed generated C/executables are under
+`build/ios/fortnite/memory-entry-checks`. LLVM inspection confirms the IPA's
+entry calls at `0x1000b1cb8` and `0x1000b1d44`, followed by read-only copy mapping
+over an allocated destination and immediate send-right removal. The fresh probe
+passes these three imports and stops before entry at `_mach_msg`. Fortnite remains
+unplayable and the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,744 | 416 | 79 |
+| Fortnite executable | 1,747 | 413 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,579 | 419 | 120 |
+| All images | 2,582 | 416 | 120 |
 
-The C++/GLES/Text variant reports 2,593 resolved imports, 405 unresolved strong
+The C++/GLES/Text variant reports 2,596 resolved imports, 402 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -3,7 +3,9 @@ module main
 
 // Mach's current-task, no-copy remaps must alias the same bytes. A private
 // backing descriptor and shared mappings provide that relationship on Vinix.
-// This subset does not provide cross-task mappings or copy-on-write remaps.
+// Named entries also retain these descriptors independently of their source
+// mappings. All mapping and entry state uses the shared Mach namespace lock.
+// Cross-task mappings and copy-on-write vm_remap remain unsupported.
 fn C.fcntl(i32, i32, ...i32) i32
 $if linux { fn C.memfd_create(&char, u32) i32 }
 
@@ -13,6 +15,8 @@ mut:
 	size u64
 	offset u64
 	fd i32
+	protection i32 = 3
+	maximum i32 = 7
 }
 
 fn mach_page_size() u64 { return u64(C.getpagesize()) }
@@ -55,10 +59,12 @@ fn mach_map(fd i32, offset u64, size u64, address u64, anywhere bool) ?u64 {
 }
 
 fn darwin_vm_allocate(task u32, address &u64, size u64, flags i32) i32 {
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
 	if task != system_data.task_self || address == unsafe { nil } || flags !in [i32(0), 1] { return 4 }
 	rounded := mach_size(size) or { return 4 }
-	C.ios_objc_initialize_lock()
-	defer { C.ios_objc_initialize_unlock() }
+	C.ios_mach_threads_lock()
+	defer { C.ios_mach_threads_unlock() }
 	fd := mach_backing(rounded)
 	if fd < 0 { return 3 } // KERN_NO_SPACE
 	requested := unsafe { *address } & ~(mach_page_size() - 1)
@@ -70,6 +76,8 @@ fn darwin_vm_allocate(task u32, address &u64, size u64, flags i32) i32 {
 
 fn darwin_vm_remap(task u32, address &u64, size u64, mask u64, flags i32,
 	source_task u32, source u64, copy i32, current &i32, maximum &i32, inheritance i32) i32 {
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
 	if task != system_data.task_self || source_task != system_data.task_self ||
 		address == unsafe { nil } || current == unsafe { nil } || maximum == unsafe { nil } ||
 		flags !in [i32(0), 1] { return 4 }
@@ -77,39 +85,45 @@ fn darwin_vm_remap(task u32, address &u64, size u64, mask u64, flags i32,
 	page := mach_page_size()
 	if source & (page - 1) != 0 { return 4 }
 	rounded := mach_size(size) or { return 4 }
-	C.ios_objc_initialize_lock()
-	defer { C.ios_objc_initialize_unlock() }
+	C.ios_mach_threads_lock()
+	defer { C.ios_mach_threads_unlock() }
 	for mapping in system_data.vm_mappings {
 		if source < mapping.address || source - mapping.address >= mapping.size { continue }
 		delta := source - mapping.address
 		if rounded > mapping.size - delta { return 1 } // KERN_INVALID_ADDRESS
+		// mach_map currently creates writable aliases. Do not elevate access to
+		// a read-only mapping introduced by vm_map.
+		if mapping.protection != 3 { return 46 }
 		fd := C.fcntl(mapping.fd, C.F_DUPFD_CLOEXEC, 0)
 		if fd < 0 { return 3 }
 		requested := unsafe { *address } & ~(page - 1)
 		mapped := mach_map(fd, mapping.offset + delta, rounded, requested, flags == 1) or { C.close(fd); return 3 }
-		system_data.vm_mappings << MachMapping{address: mapped, size: rounded, offset: mapping.offset + delta, fd: fd}
-		unsafe { *address = mapped; *current = 3; *maximum = 7 }
+		system_data.vm_mappings << MachMapping{address: mapped, size: rounded, offset: mapping.offset + delta, fd: fd, protection: mapping.protection, maximum: mapping.maximum}
+		unsafe { *address = mapped; *current = mapping.protection; *maximum = mapping.maximum }
 		return 0
 	}
 	return 1
 }
 
 fn darwin_vm_deallocate(task u32, address u64, size u64) i32 {
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
 	if task != system_data.task_self || address & (mach_page_size() - 1) != 0 { return 4 }
 	rounded := mach_size(size) or { return 4 }
-	C.ios_objc_initialize_lock()
-	defer { C.ios_objc_initialize_unlock() }
-	for index, mapping in system_data.vm_mappings {
-		if mapping.address != address || mapping.size != rounded { continue }
-		if C.munmap(unsafe { voidptr(address) }, usize(rounded)) != 0 { return 1 }
-		C.close(mapping.fd)
-		system_data.vm_mappings.delete(index)
-		return 0
-	}
-	return 1
+	C.ios_mach_threads_lock()
+	defer { C.ios_mach_threads_unlock() }
+	if !mach_mapping_covers(address, rounded) { return 1 }
+	// Reserve the only possible extra split descriptor before unmapping.
+	fd := mach_mapping_split_fd(address, rounded) or { return 3 }
+	if C.munmap(unsafe { voidptr(address) }, usize(rounded)) != 0 { if fd >= 0 { C.close(fd) }; return 1 }
+	mach_mapping_remove(address, rounded, fd)
+	return 0
 }
 
 fn mach_memory_stop() {
+	C.ios_mach_threads_lock()
+	defer { C.ios_mach_threads_unlock() }
+	mach_memory_entries_clear()
 	for mapping in system_data.vm_mappings {
 		C.munmap(unsafe { voidptr(mapping.address) }, usize(mapping.size))
 		C.close(mapping.fd)
@@ -118,6 +132,7 @@ fn mach_memory_stop() {
 }
 
 fn mach_memory_symbol(symbol string) ?u64 {
+	if address := mach_memory_entry_symbol(symbol) { return address }
 	return match symbol {
 		'_vm_allocate' { u64(unsafe { voidptr(darwin_vm_allocate) }) }
 		'_vm_remap' { u64(unsafe { voidptr(darwin_vm_remap) }) }

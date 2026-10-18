@@ -102,9 +102,29 @@ fn darwin_mmap(address voidptr, size usize, protection i32, flags i32, file i32,
 		mut native := flags & (1 | 2 | 0x10)
 		if flags & 0x1000 != 0 { native |= C.MAP_ANONYMOUS }
 		if flags & 0x40 != 0 { native |= C.MAP_NORESERVE }
+		if native & C.MAP_FIXED != 0 { return darwin_mmap_fixed(address, size, protection, native, file, offset) }
 		return C.mmap(address, size, protection, native, file, offset)
 	}
+	if flags & C.MAP_FIXED != 0 { return darwin_mmap_fixed(address, size, protection, flags, file, offset) }
 	return C.mmap(address, size, protection, flags, file, offset)
+}
+
+fn darwin_mmap_fixed(address voidptr, size usize, protection i32, flags i32, file i32, offset i64) voidptr {
+	C.ios_mach_threads_lock(); defer { C.ios_mach_threads_unlock() }
+	if mach_mapping_overlaps(u64(address), u64(size)) { darwin_set_errno(45); return unsafe { voidptr(-1) } }
+	return C.mmap(address, size, protection, flags, file, offset)
+}
+
+fn darwin_munmap(address voidptr, size usize) i32 {
+	C.ios_mach_threads_lock(); defer { C.ios_mach_threads_unlock() }
+	if mach_mapping_overlaps(u64(address), u64(size)) { darwin_set_errno(45); return -1 }
+	return i32(C.munmap(address, size))
+}
+
+fn darwin_mprotect(address voidptr, size usize, protection i32) i32 {
+	C.ios_mach_threads_lock(); defer { C.ios_mach_threads_unlock() }
+	if mach_mapping_overlaps(u64(address), u64(size)) { darwin_set_errno(45); return -1 }
+	return i32(C.mprotect(address, size, protection))
 }
 
 fn files_symbol(symbol string) ?u64 {
@@ -138,8 +158,8 @@ fn files_symbol(symbol string) ?u64 {
 		'_write' { u64(unsafe { voidptr(C.write) }) }
 		'_lseek' { u64(unsafe { voidptr(C.lseek) }) }
 		'_mmap' { u64(unsafe { voidptr(darwin_mmap) }) }
-		'_munmap' { u64(unsafe { voidptr(C.munmap) }) }
-		'_mprotect' { u64(unsafe { voidptr(C.mprotect) }) }
+		'_munmap' { u64(unsafe { voidptr(darwin_munmap) }) }
+		'_mprotect' { u64(unsafe { voidptr(darwin_mprotect) }) }
 		'_mlock' { u64(unsafe { voidptr(C.mlock) }) }
 		'_munlock' { u64(unsafe { voidptr(C.munlock) }) }
 		else { return none }

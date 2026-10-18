@@ -21,6 +21,7 @@ fn mach_exception_right(name u32) MachExceptionRight {
 	if name == 0 || name == 0xffffffff { return .dead }
 	if name == system_data.task_self { return .send }
 	if mach_host_known(name) { return if mach_host_live(name) { MachExceptionRight.send } else { MachExceptionRight.missing } }
+	if mach_memory_known(name) { return if mach_memory_find(name) != unsafe { nil } { MachExceptionRight.send } else { MachExceptionRight.missing } }
 	if mach_semaphore_known(name) {
 		semaphore := mach_semaphore_find(name)
 		if semaphore == unsafe { nil } { return .missing }
@@ -53,7 +54,7 @@ fn mach_exception_kernel_result(destination u32, worker u32, task u32, descripto
 	C.ios_mach_threads_lock()
 	defer { C.ios_mach_threads_unlock() }
 	$if macos {
-		if destination != system_data.task_self && !mach_semaphore_known(destination) { return none }
+		if destination != system_data.task_self && !mach_semaphore_known(destination) && !mach_memory_known(destination) { return none }
 	}
 	mach_threads_refresh()
 	if mach_exception_right(destination) != .send { return i32(0x10000003) }
