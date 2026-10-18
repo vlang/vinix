@@ -1,5 +1,10 @@
 # Owned complete package collection requests
 
+The [full native stress qualification](collection-stress-check.md) now diagnoses
+and resolves the fixture reservation limit recorded below, measuring 64 calls
+per case on both targets and running all six retirement controls independently.
+The results below preserve the original eight-call native qualification.
+
 `Service.collect()` retires its state-directory path and freshly loaded
 configuration on success and refusal. The writer lock still precedes loading
 configuration. Explicit `collect(config, directory)` borrows both arguments.
@@ -66,7 +71,8 @@ Those restarted 35 checks all passed. Native execution then exposed a separate
 stress limit: the 64-call fixture failed during file creation or directory
 enumeration with `ENOMEM`, also when each case ran in a separate child. A
 diagnostic guest reported over 800 MiB free and no memory pressure. The precise
-cause remains unqualified; this change does not claim to fix that limit. Raw
+cause was unqualified at that revision. The later stress qualification above
+identifies creator reservations retained across the filesystem grace period. Raw
 64-call refusal and memory-diagnostic serial logs are retained. Native repetition
 is therefore explicitly bounded to 8, with the 64-call host scope retained.
 On x86_64, combining the full older retirement suite and its final allocation

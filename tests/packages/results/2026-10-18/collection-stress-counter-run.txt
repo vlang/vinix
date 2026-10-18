@@ -1,0 +1,2 @@
+COLLECTION STRESS counter accepts full-width unsigned values and rejects missing, duplicate, coerced and overflowing fields PASS
+COLLECTION STRESS fixed reservation ceiling preserves its allowance and rejects overflow PASS

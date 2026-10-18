@@ -1,0 +1,45 @@
+FAIL aarch64 packages-collection-request (33.3s)
+  forbidden "HWTEST FAIL" in the line: HWTEST FAIL packages-collection-request
+  last 40 serial lines:
+  | scratch 2 16638
+  | Denied.invalid: 0
+  | Denied.accounts: 0
+  | Denied.objects: 0
+  | Denied.global: 0
+  | Denied.owner: 3
+  | Denied.cgroup: 0
+  | LastDenied: owner
+  | LastDeniedOwner: 2/2
+  | LastDeniedKind: scratch
+  | LastDeniedRequested: 8318
+  | LastDeniedGlobalBytes: 60662424
+  | LastDeniedOwnerBytes: 59751330
+  | 
+  | # class      size    objects   pages
+  | size-16 16 1322 8
+  | size-32 32 149 4
+  | size-48 48 235 5
+  | size-64 64 179 9
+  | size-96 96 102 7
+  | size-128 128 7 3
+  | size-192 192 582 51
+  | size-256 256 866 21
+  | size-384 384 619 22
+  | size-512 512 566 24
+  | size-768 768 173 11
+  | size-1024 1024 6 5
+  | size-1536 1536 19 5
+  | size-2048 2048 0 1
+  | size-2688 2688 0 0
+  | size-4048 4048 0 0
+  | size-5392 5392 0 0
+  | size-8096 8096 0 0
+  | large - - 176
+  | # written after free 0
+  | 
+  | /Users/alex/code/vinix/build/package-collection-stress-work/probe-source/collection_request_test.v:153: fn test_complete_collection_requests_retire_success_and_refusal_storage failed propagation with error: failed to open file "/tmp/vinix-collection-request-aarch64-55197/root/var/lib/vinix-packages/objects/a6ae735a06a998f192858a5c8568710e890b99249a6acaa97cf623d1f64d9d26"
+  | native collection request fixture failed: /usr/share/package-fixtures/request
+  | HWTEST FAIL packages-collection-request
+  | syspower: power off: stopping devices
+  logs: /Users/alex/code/vinix/build/scs-arm-drain/packages-collection-request
+package-collection-request aarch64: 0 passed, 1 failed, 0 skipped

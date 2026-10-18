@@ -1,0 +1,220 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=27
+!>+ [11] ./sbin/init sz=229512
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/retirement-4 sz=981576
+!>+ [15] ./usr/share/package-fixtures/retirement-3 sz=981576
+!>+ [16] ./usr/share/package-fixtures/retirement-2 sz=981576
+!>+ [17] ./usr/share/package-fixtures/retirement-5 sz=981576
+!>+ [18] ./usr/share/package-fixtures/limit sz=934112
+!>+ [19] ./usr/share/package-fixtures/retirement-0 sz=981576
+!>+ [20] ./usr/share/package-fixtures/retirement-1 sz=981576
+!>+!>+!>initramfs: no ustar sig at 0xff000000370f3400
+initramfs: Done (22 entries)
+HWTEST START packages-collection-stress
+COLLECTION STRESS file baseline=2048 ceiling=133120
+COLLECTION REQUEST aarch64 service fresh retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=3841842 bytes=2048 waits=7
+COLLECTION REQUEST aarch64 service retained retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297714 bytes=2048 waits=6
+COLLECTION REQUEST aarch64 service reclaim retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=44930946 bytes=2048 waits=7
+COLLECTION REQUEST aarch64 service leased retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=44930944 bytes=2048 waits=7
+COLLECTION REQUEST aarch64 service unsafe-root retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=44930946 bytes=2048 waits=7
+COLLECTION REQUEST aarch64 service unsafe-stage retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=44930946 bytes=2048 waits=6
+COLLECTION REQUEST aarch64 service bad-number retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=45815968 bytes=2048 waits=7
+COLLECTION REQUEST aarch64 service object-directory retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=46710208 bytes=2048 waits=7
+COLLECTION REQUEST aarch64 service bad-current retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297708 bytes=2048 waits=6
+COLLECTION REQUEST aarch64 service bad-previous retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297714 bytes=2048 waits=6
+COLLECTION REQUEST aarch64 service busy-before-config retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297714 bytes=2048 waits=6
+COLLECTION REQUEST aarch64 explicit fresh retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=3841842 bytes=2048 waits=6
+COLLECTION REQUEST aarch64 explicit retained retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297714 bytes=2048 waits=6
+COLLECTION REQUEST aarch64 explicit reclaim retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=44930946 bytes=2048 waits=6
+COLLECTION REQUEST aarch64 explicit leased retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=44930946 bytes=2048 waits=6
+COLLECTION REQUEST aarch64 explicit unsafe-root retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=44930946 bytes=2048 waits=7
+COLLECTION REQUEST aarch64 explicit unsafe-stage retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=44930946 bytes=2048 waits=6
+COLLECTION REQUEST aarch64 explicit bad-number retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=45815970 bytes=2048 waits=7
+COLLECTION REQUEST aarch64 explicit object-directory retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=46710210 bytes=2048 waits=7
+COLLECTION REQUEST aarch64 explicit bad-current retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297714 bytes=2048 waits=6
+COLLECTION REQUEST aarch64 explicit bad-previous retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297712 bytes=2048 waits=6
+COLLECTION REQUEST aarch64 explicit busy-before-config retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297714 bytes=2048 waits=6
+COLLECTION REQUEST aarch64 service bad-config retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297712 bytes=2048 waits=6
+COLLECTION REQUEST aarch64 service invalid-root retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297714 bytes=2048 waits=6
+COLLECTION REQUEST x86_64 service fresh retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=3841840 bytes=2048 waits=6
+COLLECTION REQUEST x86_64 service retained retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297712 bytes=2048 waits=6
+COLLECTION REQUEST x86_64 service reclaim retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=44930942 bytes=2048 waits=7
+COLLECTION REQUEST x86_64 service leased retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=44930944 bytes=2048 waits=7
+COLLECTION REQUEST x86_64 service unsafe-root retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=44930944 bytes=2048 waits=7
+COLLECTION REQUEST x86_64 service unsafe-stage retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=44930944 bytes=2048 waits=7
+COLLECTION REQUEST x86_64 service bad-number retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=45815968 bytes=2048 waits=7
+COLLECTION REQUEST x86_64 service object-directory retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=46710208 bytes=2048 waits=7
+COLLECTION REQUEST x86_64 service bad-current retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297712 bytes=2048 waits=6
+COLLECTION REQUEST x86_64 service bad-previous retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297712 bytes=2048 waits=6
+COLLECTION REQUEST x86_64 service busy-before-config retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297712 bytes=2048 waits=6
+COLLECTION REQUEST x86_64 explicit fresh retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=3841838 bytes=2048 waits=6
+COLLECTION REQUEST x86_64 explicit retained retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297712 bytes=2048 waits=6
+COLLECTION REQUEST x86_64 explicit reclaim retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=44930944 bytes=2048 waits=6
+COLLECTION REQUEST x86_64 explicit leased retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=44930944 bytes=2048 waits=7
+COLLECTION REQUEST x86_64 explicit unsafe-root retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=44930944 bytes=2048 waits=7
+COLLECTION REQUEST x86_64 explicit unsafe-stage retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=44930944 bytes=2048 waits=7
+COLLECTION REQUEST x86_64 explicit bad-number retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=45815968 bytes=2048 waits=7
+COLLECTION REQUEST x86_64 explicit object-directory retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=46710208 bytes=2048 waits=7
+COLLECTION REQUEST x86_64 explicit bad-current retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297710 bytes=2048 waits=5
+COLLECTION REQUEST x86_64 explicit bad-previous retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297712 bytes=2048 waits=6
+COLLECTION REQUEST x86_64 explicit busy-before-config retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297712 bytes=2048 waits=6
+COLLECTION REQUEST x86_64 service bad-config retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297712 bytes=2048 waits=6
+COLLECTION REQUEST x86_64 service invalid-root retained 0 tracked bytes
+COLLECTION REQUEST selected case PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/request: initial=297712 bytes=2048 waits=6
+COLLECTION STRESS 48 cases with 64 measured calls after 8 warmups PASS
+COLLECTION RETIREMENT writable-root refused=true preserved=true
+COLLECTION RETIREMENT unsafe root preserves all generations, interrupted stages and cache; restored root retries PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/retirement-0: initial=285164 bytes=2048 waits=6
+COLLECTION RETIREMENT changed parent refuses even with unchanged generation and lease inodes; restored parent retries PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/retirement-1: initial=235970 bytes=2048 waits=6
+COLLECTION RETIREMENT ten changed nested/ancestor directories preserve data and the named lease; restored inventories retry PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/retirement-2: initial=1536066 bytes=2048 waits=6
+COLLECTION RETIREMENT ten post-inventory root/lease replacements refuse before deletion; restored identities retry PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/retirement-3: initial=1536096 bytes=2048 waits=7
+COLLECTION RETIREMENT 128-generation batch, 64-level tree, 1024 long-name files and 128 success/refusal loops pass below 32 descriptors; live lease protected PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/retirement-4: initial=50336618 bytes=51334 waits=7
+COLLECTION RETIREMENT 128 successful removals and 128 refusals retain zero removal-helper allocations PASS
+COLLECTION STRESS settled /usr/share/package-fixtures/retirement-5: initial=34981404 bytes=2048 waits=9
+COLLECTION STRESS all six retirement cases in separate processes PASS
+Package collection: 128 obsolete generations under RLIMIT_NOFILE=32; live lease preserved then retired
+COLLECTION STRESS settled /usr/share/package-fixtures/limit: initial=4909128 bytes=39028 waits=7
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Restored packages from generation 2 in generation 4; application data was retained
+COLLECTION STRESS settled /usr/share/package-fixtures/service: initial=3538262 bytes=2048 waits=6
+HWTEST PASS packages-collection-stress

@@ -17,6 +17,14 @@ fn collection_request_cycles() int {
 	return 64
 }
 
+fn collection_request_warmups() int {
+	// Repeated fixture creation also owns kernel namespace reservations until
+	// the filesystem grace period. Eight calls initialize every request path;
+	// the stress runner still measures all 64 subsequent calls independently.
+	$if collection_request_stress ? { return 8 }
+	return collection_request_cycles()
+}
+
 fn collection_request_state(directory string, arch string, generation u64, previous u64, digest string) ! {
 	name := generation.str(); path := directory + '/generations/' + name
 	os.mkdir_all(path)!; os.write_file(path + '/lease', '')!
@@ -85,7 +93,8 @@ fn collection_request_scope(arch string, service Service, config Config, directo
 	config_path := service.root + '/etc/vinix-packages/config.json'
 	mut total := u64(0)
 	for pass in 0 .. 2 {
-		for _ in 0 .. collection_request_cycles() {
+		loops := if pass == 0 { collection_request_warmups() } else { collection_request_cycles() }
+		for _ in 0 .. loops {
 			if mode == 'fresh' { os.rmdir_all(directory)! }
 			lease := collection_request_prepare(directory, mode)!
 			$if track_heap ? { C.vinix_heap_begin() }

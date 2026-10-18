@@ -828,8 +828,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     and durability scratch on success/refusal. Both public APIs preserve
     active/rollback payloads, busy leases, recovery preflight and borrowed
     configuration across 64 host calls in each of 24 cases per architecture
-    declaration. Native runs use eight calls per case; the 64-call guest stress
-    limit, activation/refresh ownership and broader release gates remain open.
+    declaration. [Full native repetition](tests/packages/collection-stress-check.md)
+    also measures 64 calls per case with eight warmups and settled creator
+    reservations between fixtures, covering all six retirement controls.
+    Activation/refresh ownership and broader release gates remain open.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,
   permissions, progress, uninstall, updates and useful failure diagnostics.
   - [x] [Reviewed permission changes](tests/packages/review-permissions-check.md)

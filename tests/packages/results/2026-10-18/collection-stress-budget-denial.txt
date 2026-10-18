@@ -1,0 +1,45 @@
+FAIL aarch64 packages-collection-request (14.7s)
+  forbidden "HWTEST FAIL" in the line: HWTEST FAIL packages-collection-request
+  last 40 serial lines:
+  | socket 0 0
+  | ipc 2 139264
+  | mapping 327 8483584
+  | process 4 55006
+  | thread 3 317280
+  | scratch 2 16638
+  | Denied.invalid: 0
+  | Denied.accounts: 0
+  | Denied.objects: 0
+  | Denied.global: 0
+  | Denied.owner: 1
+  | Denied.cgroup: 0
+  | LastDenied: owner
+  | LastDeniedOwner: 2/2
+  | LastDeniedKind: file
+  | LastDeniedRequested: 100608
+  | LastDeniedGlobalBytes: 60569722
+  | LastDeniedOwnerBytes: 59725956
+  | 
+  | MemTotal:       933744 kB
+  | MemFree:        853856 kB
+  | MemAvailable:   853856 kB
+  | Buffers:               0 kB
+  | Cached:         0 kB
+  | SwapTotal:      0 kB
+  | SwapFree:       0 kB
+  | Zswap:          0 kB
+  | Zswapped:       0 kB
+  | VinixPageouts:  0
+  | VinixRefaults:  0
+  | VinixSwapErrors: 0
+  | Slab:           10688 kB
+  | VinixMemoryPressure: 0
+  | 
+  | /Users/alex/code/vinix/build/package-collection-stress-work/probe-source/collection_request_test.v:97: fn collection_request_scope
+  |     assert expected != '' && message.contains(expected), message
+  |         Message: cannot read import directory
+  | native collection request fixture failed: /usr/share/package-fixtures/request
+  | HWTEST FAIL packages-collection-request
+  | syspower: power off: stopping devices
+  logs: /Users/alex/code/vinix/build/scs-arm-1/packages-collection-request
+package-collection-request aarch64: 0 passed, 1 failed, 0 skipped
