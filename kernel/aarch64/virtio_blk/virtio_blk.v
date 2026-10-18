@@ -95,6 +95,9 @@ pub mut:
 	used            u64
 	last_used       u16
 	next_available  u16
+	// Set once the device has completed a request: a device that has answered
+	// before is slow when it takes long, not missing.
+	answered        bool
 	request_phys    u64
 	request_virt    u64
 	data_phys       u64
@@ -179,20 +182,30 @@ fn setup_queue(mut device VirtioBlockDevice) bool {
 // Wait for the device to hand one buffer back, and consume it. Requests are
 // polled rather than waited on, and `last_used` counts what this driver has
 // collected; the caller submits at most one at a time.
+//
+// A device that has answered before is waited for however long it takes: a
+// virtio disk cannot report a request it lost, and a busy host stalled one
+// for more than the timeout. Failing it then made the filesystem's journal
+// stop the root for good, so a slow host meant a dead machine. A device that
+// has never answered still times out, so a broken one cannot hold up boot.
 fn (mut device VirtioBlockDevice) collect_one() bool {
-	deadline := timer.get_ns() + request_timeout_ns
-	mut spins := u64(0)
+	mut deadline := timer.get_ns() + request_timeout_ns
 	for {
 		cpu.dmb_ish()
 		if unsafe { *&u16(device.used + 2) } != device.last_used {
 			break
 		}
-		spins++
-		if spins > 1_000_000_000 || timer.get_ns() >= deadline {
-			uart.puts(c'virtio-blk: request timed out\n')
-			return false
+		now := timer.get_ns()
+		if now >= deadline {
+			if !device.answered {
+				uart.puts(c'virtio-blk: request timed out\n')
+				return false
+			}
+			uart.puts(c'virtio-blk: still waiting for the device\n')
+			deadline = now + request_timeout_ns
 		}
 	}
+	device.answered = true
 	device.last_used++
 	cpu.dmb_ish()
 	interrupts := mmio_r32(device.base + reg_interrupt_status)
