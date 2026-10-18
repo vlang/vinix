@@ -3,7 +3,7 @@
 @[has_globals]
 module wifi
 
-import apple.wifi.m1core as _
+import apple.wifi.m1core
 
 import aarch64.pmgr
 import crypto.sha256
@@ -406,15 +406,15 @@ fn alloc_aligned(bytes u64) u64 {
 	return (u64(raw) + 0x3fff) & ~u64(0x3fff)
 }
 
-fn setup(mut p Plan) bool {
+fn setup(mut p Plan) i32 {
 	pool := alloc_aligned(0x400000)
 	tables := alloc_aligned(0x8000)
 	if pool == 0 || tables == 0 {
-		return false
+		return -2 // BW_ENOSPC
 	}
 	for power in p.power {
 		if !pmgr.enable_region(power.region.base, power.region.size, power.offset) {
-			return false
+			return -3 // BW_EIO
 		}
 	}
 	mut c := C.bw_m1_plan{
@@ -441,7 +441,27 @@ fn setup(mut p Plan) bool {
 		mac: p.mac
 		antenna: p.antenna
 	}
-	return C.brcm_m1_prepare(&c) == 0
+	return C.brcm_m1_prepare(&c)
+}
+
+fn probe_stage_name(stage u32) string {
+	return match stage {
+		0 { 'resources or power' }
+		1 { 'loader endpoint ownership' }
+		2 { 'PHY REFCLK0' }
+		3 { 'PHY REFCLK1' }
+		4 { 'port readiness' }
+		5 { 'PCIe link' }
+		6 { 'PCI identity' }
+		7 { 'interrupt capabilities' }
+		8 { 'BAR sizing' }
+		9 { 'BAR assignment' }
+		10 { 'DART setup' }
+		11 { 'protocol resources' }
+		12 { 'chip inventory or OTP' }
+		13 { 'chip ready' }
+		else { 'unknown' }
+	}
 }
 
 fn requested() bool {
@@ -467,17 +487,20 @@ pub fn initialise() {
 		println('wifi: missing/unsupported J313 device tree, calibration, or boot entropy; not probing')
 		return
 	}
-	ok := setup(mut p)
+	result := setup(mut p)
 	wifi_res = &WifiDevice{}
 	wifi_res.stat.mode = 0o600 | stat.ifchr
 	wifi_res.stat.blksize = 1514
 	wifi_res.stat.rdev = resource.create_dev_id()
 	wifi_res.status = file.pollout
 	fs.devtmpfs_add_device(wifi_res, 'wlan0')
-	if ok {
+	if result == 0 {
 		println('wifi: BCM4378 detected; upload matching firmware with wifi-ctl')
 	} else {
-		println('wifi: PCIe/DART/chip probe failed; /dev/wlan0 exposes diagnostics only')
+		stage := m1core.probe_stage()
+		name := probe_stage_name(stage)
+		C.kprintf(c'wifi: probe failed: error %lld at stage %u (%.*s); /dev/wlan0 exposes diagnostics only\n',
+			i64(result), stage, i32(name.len), name.str)
 	}
 }
 

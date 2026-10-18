@@ -539,6 +539,7 @@ pub fn m1_platform_start() i32 {
 	unsafe {
 	p := &bw_m1_host.p
 	e := i32(0)
+	bw_m1_probe_stage = 1
 	// Existing link: do not take a combo device away from an active driver.
 
 	if m1_r32(p.port + u64(520)) & u32(1) {
@@ -558,12 +559,14 @@ pub fn m1_platform_start() i32 {
 	m1_w32(p.gpio, gpio | u32((if p.gpio_active_low { 0 } else { 1 })))
 	m1_set(p.phy + u64(4), 1 << 15)
 	m1_set(p.phy, u32(1))
+	bw_m1_probe_stage = 2
 	e = m1_wait_bits(p.phy, u32(4), u32(4), u32(500))
 	if e {
 		 goto reset
 		 
 	}
 	m1_set(p.phy, u32(2))
+	bw_m1_probe_stage = 3
 	e = m1_wait_bits(p.phy, u32(8), u32(8), u32(500))
 	if e {
 		 goto reset
@@ -576,6 +579,7 @@ pub fn m1_platform_start() i32 {
 	m1_set(p.port + u64(2068), u32(1))
 	m1_w32(p.gpio, gpio | u32((if p.gpio_active_low { 1 } else { 0 })))
 	m1_delay(u32(100000))
+	bw_m1_probe_stage = 4
 	e = m1_wait_bits(p.port + u64(2052), u32(1), u32(1), u32(2500))
 	if e {
 		 goto reset
@@ -583,6 +587,7 @@ pub fn m1_platform_start() i32 {
 	}
 	m1_w32(p.port + u64(264), u32(4294967295))
 	m1_w32(p.port + u64(128), u32(1))
+	bw_m1_probe_stage = 5
 	e = m1_wait_bits(p.port + u64(520), u32(1), u32(1), u32(1000))
 	if e {
 		 goto reset
@@ -591,6 +596,7 @@ pub fn m1_platform_start() i32 {
 	// Only the root port and the fixed DT secondary bus are configured.
 
 	rc := p.config
+	bw_m1_probe_stage = 6
 	if (m1_r32(rc + u64(8)) >> 16) != u32(1540) {
 		e = i32(Bw_error.bw_enotsup)
 		 goto reset
@@ -606,6 +612,7 @@ pub fn m1_platform_start() i32 {
 	}
 	bw_m1_host.endpoint_valid = 1
 	m1_w16(bw_m1_host.endpoint + u64(4), u16(1024))
+	bw_m1_probe_stage = 7
 	e = m1_disable_interrupts()
 	if e {
 		 goto reset
@@ -613,6 +620,7 @@ pub fn m1_platform_start() i32 {
 	}
 	size0 := u64(0)
 	size2 := u64(0)
+	bw_m1_probe_stage = 8
 
 	e = m1_bar_size(u32(16), &size0)
 	if e || m1_assign_error( &e , i32(m1_bar_size(u32(24), &size2))) {
@@ -624,6 +632,7 @@ pub fn m1_platform_start() i32 {
 		 goto reset
 		 
 	}
+	bw_m1_probe_stage = 9
 	arena := (p.window_bus + p.window_size - u64(32 * 1024 * 1024)) & ~u64(1048575)
 	a0 := (arena + size0 - u64(1)) & ~(size0 - u64(1))
 	a2 := (a0 + size0 + size2 - u64(1)) & ~(size2 - u64(1))
@@ -647,6 +656,7 @@ pub fn m1_platform_start() i32 {
 	bw_m1_host.bar2 = p.window + (a2 - p.window_bus)
 	bw_m1_host.bar0_len = u32(size0)
 	bw_m1_host.bar2_len = u32(size2)
+	bw_m1_probe_stage = 10
 	e = m1_dart_prepare()
 	if e {
 		 goto reset
@@ -669,11 +679,16 @@ pub fn m1_platform_start() i32 {
 		receive:  m1_receive
 	}
 
+	bw_m1_probe_stage = 11
 	e = C.bw_init(&bw_m1_host.dev, &ops, voidptr((voidptr(0))), voidptr(usize(p.pool_cpu)), u64(268435456), usize((4 * 1024 * 1024)), bw_m1_host.bar0_len, bw_m1_host.bar2_len)
-	if e || m1_assign_error( &e , i32(C.bw_probe(&bw_m1_host.dev))) {
+	if e { goto reset }
+	bw_m1_probe_stage = 12
+	e = C.bw_probe(&bw_m1_host.dev)
+	if e {
 		 goto reset
 		 
 	}
+	bw_m1_probe_stage = 13
 	return 0
 	reset:
 	m1_stop_dma(voidptr((voidptr(0))))
@@ -686,6 +701,14 @@ pub fn m1_platform_start() i32 {
 	return e
 
 	}
+}
+
+__global bw_m1_probe_stage u32
+
+// Retained independently of the protocol state, including failures before
+// bw_init. Reading diagnostics never touches MMIO or a failed DMA stream.
+pub fn probe_stage() u32 {
+	return unsafe { bw_m1_probe_stage }
 }
 
 @[export: 'brcm_m1_prepare']

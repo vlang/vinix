@@ -7,6 +7,12 @@ association still need validation after booting the patched kernel on the M1.
 
 See [build, validation and hardware bring-up instructions](../tests/m1-wifi/README.md).
 
+A failed boot-time probe now reports its error and stage alongside the
+diagnostic-device message. The stages distinguish loader endpoint ownership, PHY
+clocks, port/link readiness, PCI identity, interrupt capabilities, BAR sizing
+and assignment, DART setup, protocol resources and chip/OTP discovery. This is
+separate from firmware loading; a probe failure occurs before any bundle upload.
+
 Hardware probing remains opt-in with `vinix.apple_wifi=1`; firmware is not
 included. The normal `desktop` and `desktop-drivers` deployments now supply
 that argument, and `scripts/kek.sh desktop-wifi` names the Wi-Fi-only choice explicitly.
