@@ -89,6 +89,18 @@ fn version(value string) bool {
 	return components == 3 && digits > 0
 }
 
+// The action describes the same installed state as the version fields. Updates
+// may retain a version (repair/provenance changes) or go backwards (rollback).
+fn review_action_valid(row &ReviewPackage, operation string) bool {
+	if operation == 'remove' && row.action !in ['keep', 'remove']! { return false }
+	return match row.action {
+		'install', 'export' { row.installed_version == '' }
+		'keep', 'remove' { row.installed_version == row.version }
+		'update' { row.installed_version != '' }
+		else { false }
+	}
+}
+
 pub fn (review &Review) validate() ! {
 	if review.format !in [1, 2]! || review.operation !in ['install', 'remove', 'upgrade', 'deploy', 'repair', 'rollback', 'mirror']
 		|| review.architecture !in ['aarch64', 'x86_64'] || !digest(review.fingerprint)
@@ -110,7 +122,7 @@ pub fn (review &Review) validate() ! {
 			|| (row.architecture == 'all' && row.kind != 'data')
 			|| (row.kind in ['linux', 'windows', 'apple'] && row.runtime == '')
 			|| (row.runtime != '' && !identifier(row.runtime)) || !identifier(row.repository)
-			|| !digest(row.public_key) || row.action !in ['install', 'update', 'keep', 'remove', 'export']
+			|| !digest(row.public_key) || !review_action_valid(row, review.operation)
 			|| ((row.action == 'export') != (review.operation == 'mirror'))
 			|| (review.operation == 'repair' && (row.action !in ['keep', 'update'] || row.installed_version != row.version))
 			|| !view_permissions(row.permissions)

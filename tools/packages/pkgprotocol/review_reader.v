@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Complete bounded format-1 review schemas; no generic decoder allocations.
+// Complete bounded review schemas (formats 1/2); no generic decoder allocations.
 module pkgprotocol
 
 const review_package_keys = ['id', 'name', 'description', 'version', 'installed_version', 'architecture', 'kind', 'runtime', 'repository', 'public_key', 'license', 'proprietary', 'firmware', 'permissions', 'requested', 'action', 'installed_permissions_known', 'installed_permissions']

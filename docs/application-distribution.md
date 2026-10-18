@@ -748,6 +748,11 @@ uninstall removes the package's declarations. Older-service facts stay explicitl
 unavailable. Current policy and runtime isolation still govern access. Review
 format 2 carries the frozen history; deploy the updated Software and tools
 together. See [qualification](../tests/packages/review-permissions-check.md).
+Both formats require actions and installed versions to agree. New installs and
+exports have no installed version; updates identify one, and keep/remove rows
+retain it. Contradictions refuse before approval, including nested exports;
+missing history stays unknown for existing-package actions. See
+[action checks](../tests/packages/review-actions-check.md).
 
 Software keeps a proposal readable when its space estimate does not fit. Its
 status and plan/review readers identify the filesystem and exact additional

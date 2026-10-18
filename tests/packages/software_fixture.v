@@ -64,13 +64,16 @@ fn console_field(id string, text string, x int, y int, width int, _ bool) ui2.El
 fn frame_elements(capacity int) []ui2.Element { return []ui2.Element{cap: capacity} }
 
 fn fixture_review(operation string, names []string) pkgprotocol.Review {
+	version := if operation in ['repair', 'remove']! { '1.0.0' } else { '2.0.0' }
+	previous := if operation == 'mirror' { '' } else { '1.0.0' }
+	action := if operation == 'remove' { 'remove' } else if operation == 'mirror' { 'export' } else { 'update' }
 	return pkgprotocol.Review{
 		format: 1, operation: operation, names: names, architecture: 'aarch64', generation: 3,
 		target_generation: if operation == 'rollback' { u64(2) } else { u64(0) },
-		fingerprint: 'c'.repeat(64), requested: ['editor'], disk_needed: 4096, disk_available: 65536, disk_reserve: 1024,
+		fingerprint: 'c'.repeat(64), requested: if operation == 'remove' { []string{} } else { ['editor'] }, disk_needed: 4096, disk_available: 65536, disk_reserve: 1024,
 		rows: [
-			pkgprotocol.ReviewPackage{ id: 'editor', name: 'Editor', description: 'Write documents', version: if operation == 'repair' { '1.0.0' } else { '2.0.0' }, installed_version: '1.0.0', architecture: 'aarch64', kind: 'linux', runtime: 'runtime', repository: 'trusted', public_key: 'a'.repeat(64), license: 'MIT', permissions: ['files'], requested: true, action: 'update' },
-			pkgprotocol.ReviewPackage{ id: 'runtime', name: 'Runtime', description: 'Required shared runtime', version: if operation == 'repair' { '1.0.0' } else { '2.0.0' }, installed_version: '1.0.0', architecture: 'aarch64', kind: 'runtime', repository: 'runtime-publisher', public_key: 'b'.repeat(64), license: 'Vendor-EULA', proprietary: true, firmware: true, permissions: ['network', 'process'], action: 'update' },
+			pkgprotocol.ReviewPackage{ id: 'editor', name: 'Editor', description: 'Write documents', version: version, installed_version: previous, architecture: 'aarch64', kind: 'linux', runtime: 'runtime', repository: 'trusted', public_key: 'a'.repeat(64), license: 'MIT', permissions: ['files'], requested: operation != 'remove', action: action },
+			pkgprotocol.ReviewPackage{ id: 'runtime', name: 'Runtime', description: 'Required shared runtime', version: version, installed_version: previous, architecture: 'aarch64', kind: 'runtime', repository: 'runtime-publisher', public_key: 'b'.repeat(64), license: 'Vendor-EULA', proprietary: true, firmware: true, permissions: ['network', 'process'], action: action },
 		]
 	}
 }
@@ -406,6 +409,8 @@ fn main() {
 	if os.args.len == 2 && os.args[1] == 'progress-memory' { check_software_progress_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'permissions' { check_software_review_permissions() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'permissions-memory' { check_software_review_permissions_memory() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'review-actions' { check_software_review_actions() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'review-actions-memory' { check_software_review_actions_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'failure-memory' { check_software_failure_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'repair-memory' { check_software_repair_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'health-memory' { check_software_health_memory() or { panic(err) }; return }
@@ -615,6 +620,7 @@ fn main() {
 	assert C.waitpid(pid, &child_status, 0) == pid
 	check_package_review()
 	check_software_review_permissions() or { panic(err) }
+	check_software_review_actions() or { panic(err) }
 	check_software_space() or { panic(err) }
 	check_software_package_navigation() or { panic(err) }
 	check_resolved_updates() or { panic(err) }
@@ -1078,8 +1084,8 @@ fn software_deployment_service_fixture(args []string) !bool {
 			pkgprotocol.Review{ ...review, operation: 'upgrade', names: [] }
 		} else if path == '/empty.json' {
 			pkgprotocol.Review{ ...review, names: [], requested: [], rows: [
-				pkgprotocol.ReviewPackage{ ...review.rows[0], requested: false, action: 'remove' },
-				pkgprotocol.ReviewPackage{ ...review.rows[1], action: 'remove' },
+				pkgprotocol.ReviewPackage{ ...review.rows[0], version: '1.0.0', requested: false, action: 'remove' },
+				pkgprotocol.ReviewPackage{ ...review.rows[1], version: '1.0.0', action: 'remove' },
 			] }
 		} else { review }))
 		return true

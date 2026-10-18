@@ -3712,6 +3712,15 @@ escaped spellings), invalid UTF-8/Unicode, noncanonical or overflowing integers
 and trailing input are refused before a review is presented for confirmation.
 Future schema extensions require a new supported format.
 
+Both formats require row actions to agree with installed versions: `install`
+and `export` have no installed version, `update` has one, and `keep`/`remove`
+have the same installed and displayed version. Updates may retain a version
+(repair or changed provenance) or lower it (rollback). A remove operation contains
+only keep/remove rows; repair still preserves every version. Contradictory rows
+refuse before confirmation, including inside either offline-export envelope.
+Missing permission history never makes an existing-package action a new install.
+See [action validation checks](../../tests/packages/review-actions-check.md).
+
 Review format 2 adds the optional paired row fields
 `installed_permissions_known`/`installed_permissions`. They describe the active
 generation's declarations before the reviewed transaction, independently of

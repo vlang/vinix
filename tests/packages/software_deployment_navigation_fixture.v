@@ -65,7 +65,7 @@ fn check_software_distribution_path_paste() ! {
 fn deployment_navigation_review(empty bool) pkgprotocol.Review {
 	base := fixture_review('deploy', if empty { []string{} } else { ['editor'] })
 	if !empty { return base }
-	rows := base.rows.map(pkgprotocol.ReviewPackage{ ...it, requested: false, action: 'remove' })
+	rows := base.rows.map(pkgprotocol.ReviewPackage{ ...it, version: '1.0.0', requested: false, action: 'remove' })
 	// Transfer row strings and permission arrays into the removal projection.
 	unsafe { (&array(&base.rows)).free(); (&array(&base.requested)).free() }
 	return pkgprotocol.Review{ ...base, requested: [], rows: rows }

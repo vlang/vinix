@@ -1,0 +1,1 @@
+REVIEW ACTIONS Software rejects contradictory current/legacy rows before confirmation, clears prior proposals and preserves conservative permission history PASS

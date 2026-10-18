@@ -157,7 +157,7 @@ fn check_package_plan_maximum() ! {
 		number := index.str(); zeros := '0'.repeat(5 - number.len); id := 'p' + zeros + number
 		unsafe { number.free(); zeros.free() }
 		if index < 4096 { names << id.clone(); requested << id.clone() }
-		row := pkgprotocol.ReviewPackage{ id: id, name: id.clone(), version: '1.0.0', architecture: 'aarch64', kind: 'native',
+		row := pkgprotocol.ReviewPackage{ id: id, name: id.clone(), version: '1.0.0', installed_version: '1.0.0', architecture: 'aarch64', kind: 'native',
 			repository: 'trusted', public_key: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', license: 'MIT', requested: index < 4096, action: 'keep' }
 		unsafe { rows.push_many(&row, 1) }
 	}

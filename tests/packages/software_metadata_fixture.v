@@ -55,7 +55,7 @@ fn check_software_metadata_memory() ! {
 	$if track_heap ? {
 		base := fixture_review('install', ['editor'])
 		export := pkgprotocol.Review{ ...base, operation: 'mirror', generation: 0,
-			rows: base.rows.map(pkgprotocol.ReviewPackage{ ...it, action: 'export' }) }
+			rows: base.rows.map(pkgprotocol.ReviewPackage{ ...it, installed_version: '', action: 'export' }) }
 		mirror := pkgprotocol.MirrorReview{ format: 1, input_destination: '/media/new export', destination: '/media/new export', review: export }
 		texts := [json2.encode(base), json2.encode(mirror), json2.encode(pkgprotocol.DeploymentMirrorReview{ format: 1,
 			deployment: '/company/apps.json', deployment_sha256: 'd'.repeat(64), mirror: mirror })]

@@ -1,0 +1,6 @@
+/Users/alex/code/vinix/build/package-review-actions-work/baseline/review_actions_test.v:78: fn test_review_actions_match_versions_in_current_legacy_and_nested_reviews
+   > assert valid == c.accepted, c.operation + '/' + c.action + '/' + c.previous
+     Left value (len: 4): `true`
+    Right value (len: 5): `false`
+        Message: upgrade/update/
+

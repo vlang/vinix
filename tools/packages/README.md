@@ -376,6 +376,10 @@ each version-labelled change in **Package details → Permissions**, including
 rollback and uninstall. Legacy prior facts stay unavailable. Deploy the updated
 Software and tools together; older strict readers refuse the new format. See
 [permission review checks](../../tests/packages/review-permissions-check.md).
+Both review formats also reject actions that contradict installed versions,
+including nested exports, before presenting confirmation. Missing prior facts
+remain unknown for an existing-package action. See
+[action validation checks](../../tests/packages/review-actions-check.md).
 
 Software releases rejected progress-frame errors under manual memory management.
 Malformed frames keep the last valid progress, and oversized lines recover at

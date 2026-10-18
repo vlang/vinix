@@ -3,12 +3,16 @@ module main
 
 import tools.packages.pkgprotocol
 
+fn software_review_unknown_permissions(row &pkgprotocol.ReviewPackage) bool {
+	return !row.installed_permissions_known && (row.installed_version != '' || row.action != 'install')
+}
+
 // Counts include dependencies. Unknown installed facts never count as empty.
 fn (a &SoftwareApp) review_permission_counts() [3]int {
 	mut counts := [3]int{}
 	if a.review_snapshot.operation == 'mirror' { return counts }
 	for row in a.review_snapshot.rows {
-		if row.installed_version != '' && !row.installed_permissions_known { counts[2]++; continue }
+		if software_review_unknown_permissions(row) { counts[2]++; continue }
 		if row.action != 'remove' {
 			for permission in row.permissions { if permission !in row.installed_permissions { counts[0]++ } }
 		}
@@ -41,11 +45,12 @@ fn software_review_permission_values(row pkgprotocol.ReviewPackage, mut values [
 		values << 'Export copies the declared package. It does not change installed permission declarations.'.clone()
 		return
 	}
-	if row.installed_version == '' { values << 'Previous declarations: Not installed'.clone() }
-	else if !row.installed_permissions_known {
+	if software_review_unknown_permissions(row) {
 		values << 'Previous declarations: Unavailable from this service; changes cannot be compared.'.clone()
 		return
-	} else {
+	}
+	if row.action == 'install' { values << 'Previous declarations: Not installed'.clone() }
+	else {
 		values << 'Previous declarations describe installed version ' + row.installed_version
 		if row.installed_permissions.len == 0 { values << 'Previous permissions: None declared'.clone() }
 		for permission in row.installed_permissions { values << 'Previous permission: ' + permission }

@@ -1,0 +1,2 @@
+REVIEW ACTIONS both hosts and formats admit seventeen legitimate cases, refuse sixteen contradictions and protect nested offline reviews PASS
+REVIEW ACTIONS 1000 complete/omitted/refused decode and retirement cycles per format and architecture retain zero tracked bytes PASS

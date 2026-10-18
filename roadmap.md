@@ -810,6 +810,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     compare frozen installed and target declarations across dependencies,
     updates, repair, rollback and removal. Format 2 carries owned prior facts;
     full/compact readers preserve approval state and explicit legacy uncertainty.
+    [Action/version validation](tests/packages/review-actions-check.md) refuses
+    contradictory installed-state claims in both formats and nested exports
+    before confirmation; unavailable history stays explicitly unknown.
   - [x] [Owned live progress rejection](tests/packages/software-progress-memory-check.md)
     retires ignored decoder errors, preserving admitted progress, bounded stream
     recovery and human diagnostics. Fragmented valid/invalid/oversized streams
