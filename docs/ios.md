@@ -8186,21 +8186,44 @@ IPA consumer's reset and incremental calls were inspected with V/Mach-O/LLVM.
 Pinned native/IPA evidence and eleven generated C/executable pairs are retained
 under `build/ios/fortnite/zlib-checksum-checks`.
 
-The actual IPA now exits with status 1 before application entry at `_compress2`
-from `libz.1.dylib`. Fortnite remains unplayable and full iOS regression remains
-unpassed.
+`compress2` and `compressBound` now have V implementations with the Darwin
+64-bit buffer-length and 32-bit level/status ABI. The encoder uses LZ77 with a
+32 KiB window and fixed Huffman blocks; levels control match-search effort.
+Level zero uses stored blocks, also used as a fallback for incompressible data
+to keep output within `compressBound`. The history uses at most 512 KiB per
+active compression call and is freed on success and error. No graphics backend
+or native zlib library is required. Encoded bytes and compression ratios can
+differ from native zlib; the resulting RFC 1950 streams remain interoperable.
+
+The fixture checks native errors, headers and unsigned-long bound arithmetic,
+and decodes V output using both native zlib and an independent V inflater.
+It covers all levels, four input patterns, exact 32 KiB match distances,
+64 KiB block boundaries, guarded/read-only input, bounded output, length-cell
+canaries, insufficient buffers, real compression and eight concurrent callers.
+The fixture is available through `tests/ios/native-checks.v build-zlib-compress`
+and the native inventories.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites cover compression,
+Adler-32, NSString bridging and Storefront.current. The actual IPA's compression
+call and its level selection were inspected with V/Mach-O/LLVM. Pinned inputs,
+native measurements, joined probe/audit logs and eleven generated C/executable
+pairs are retained under `build/ios/fortnite/zlib-compress-checks`.
+
+The actual IPA now exits with status 1 before application entry at
+`_deflateBound` from `libz.1.dylib`. Fortnite remains unplayable and full iOS
+regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,686 | 474 | 79 |
+| Fortnite executable | 1,688 | 472 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,521 | 477 | 120 |
+| All images | 2,523 | 475 | 120 |
 
-The C++/GLES/Text variant reports 2,535 resolved imports, 463 unresolved strong
+The C++/GLES/Text variant reports 2,537 resolved imports, 461 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

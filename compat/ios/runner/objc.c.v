@@ -738,6 +738,7 @@ fn format_double(destination &char, size usize, format &char, value f64) int {
 fn runtime_symbol(library string, symbol string) !u64 {
 	if library == '/usr/lib/libz.1.dylib' {
 		if address := zlib_checksum_symbol(symbol) { return address }
+		if address := zlib_compress_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
 	if symbol in ['_OBJC_CLASS_$_MTLTextureDescriptor', '_OBJC_METACLASS_$_MTLTextureDescriptor']!
