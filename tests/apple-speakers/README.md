@@ -2,6 +2,10 @@ The independent J313 speaker fixture models two TAS amplifiers, their I2C FIFOs,
 ADMAC sample/report rings, MCA power sequencing, and a double-precision thermal
 oracle. Its V bodies preserve all 175 assertions and all 20 groups from the
 1,234-line fixture frozen at `e29fe9529b8d998d28f17ac120b27fb93902c6f6`.
+The amplifier group additionally checks the physical J313 macOS initialization
+recorded in `docs/m1-speakers.md`, including rejected writes on either bus and
+an acknowledged but lost clock synchronization write. The historical group
+markers, output comparison and explicit allocation counts remain unchanged.
 
 Run `tests/apple-speakers/run.sh` for the immutable C/V comparison under
 ASan/UBSan. On macOS ARM64, `--host-arch amd64` also tests the actual x86 SDK and

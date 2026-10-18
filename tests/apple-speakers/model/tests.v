@@ -64,6 +64,7 @@ fn test_nco() {
 
 fn test_amplifier_setup() {
 	unsafe {
+		check_board_initialization()
 		boot()
 		for i := i32(0); i < 2; i++ {
 			r := &amps[i].regs[0]
@@ -88,10 +89,40 @@ fn test_amplifier_setup() {
 		C.memset(&sut, 0, sizeof(sut))
 		amps[1].address = 0x35
 		sut.io = bind_io()
-		mut cfg := machine_config()
-		C.assert(C.vinix_spk_core_c_init(&sut, &cfg) == 0)
+		fixture_config = machine_config()
+		C.assert(C.vinix_spk_core_c_init(&sut, &fixture_config) == 0)
 		C.assert((reg_get(fake_gpio) & u32(C.GPIO_DATA)) == 0)
 		tests++
+	}
+}
+
+// Values recovered from the live J313's AppleTAS5770LAmp, rather than from
+// the production core. Keep the historical 20 group markers unchanged.
+fn check_board_initialization() {
+	unsafe {
+		boot()
+		for amp in 0 .. 2 {
+			C.assert(amps[amp].regs[0x08] == 0x40) // Class-D clock synchronization
+			C.assert(amps[amp].regs[0x1c] == 0x82) // J313 bop-config
+			C.assert(amps[amp].regs[0x1d] == 0x06)
+			C.assert(amps[amp].regs[0x16] == 0x50)
+			C.assert(amps[amp].regs[0x17] == 0x04)
+			C.assert(amps[amp].regs[0x15] == 0x14) // Apple's default lim-config
+			C.assert(amps[amp].regs[0x1b] == 0x01)
+		}
+		for amp in 0 .. 2 {
+			for reg in [0x08, 0x1c, 0x1d, 0x16, 0x17, 0x15, 0x1b]! {
+				boot()
+				amps[amp].reject_register = reg
+				C.assert(C.vinix_spk_core_c_init(&sut, &fixture_config) == 0)
+				C.assert((reg_get(fake_gpio) & u32(C.GPIO_DATA)) == 0)
+				C.assert(chans[tx_ch].running == 0 && chans[sense_ch].running == 0)
+			}
+			boot()
+			amps[amp].drop_register = 0x08
+			C.assert(C.vinix_spk_core_c_init(&sut, &fixture_config) == 0)
+			C.assert((reg_get(fake_gpio) & u32(C.GPIO_DATA)) == 0)
+		}
 	}
 }
 
@@ -289,22 +320,21 @@ fn test_negative_power_faults() {
 
 fn test_thermal_limiting() {
 	unsafe {
-		mut status := C.vinix_apple_speakers_status{}
 		boot()
 		C.vinix_spk_core_configure(&sut, 48000)
 		tone_level = 1.0
 		tone_hz = 200
 		pump(20000000, 1)
-		C.vinix_spk_core_get_status(&sut, &status)
-		C.assert(status.model_gain_mdb < -1000)
+		C.vinix_spk_core_get_status(&sut, &thermal_status)
+		C.assert(thermal_status.model_gain_mdb < -1000)
 		limited_attenuation := i32(amps[0].regs[u32(C.TAS_PLAY_CFG2)])
-		C.assert(limited_attenuation >= (-status.model_gain_mdb + 499) / 500)
-		C.assert(status.coil_mc[0] > 100000 && status.coil_mc[0] < 135000)
+		C.assert(limited_attenuation >= (-thermal_status.model_gain_mdb + 499) / 500)
+		C.assert(thermal_status.coil_mc[0] > 100000 && thermal_status.coil_mc[0] < 135000)
 		C.assert(sut.state == i32(C.ST_RUNNING))
 		C.assert(count_events(i32(C.SPK_EV_GAIN)) >= 1)
 		pump(60000000, 1)
-		C.vinix_spk_core_get_status(&sut, &status)
-		C.assert(status.coil_mc[0] < 125000 && status.coil_mc[1] < 125000)
+		C.vinix_spk_core_get_status(&sut, &thermal_status)
+		C.assert(thermal_status.coil_mc[0] < 125000 && thermal_status.coil_mc[1] < 125000)
 		C.assert(sut.state == i32(C.ST_RUNNING))
 		tone_hz = 1000
 		tests++

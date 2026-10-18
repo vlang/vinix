@@ -182,11 +182,13 @@ fn q32(value i64) i64 { return value << 32 }
 
 struct FakeAmp {
 mut:
-	regs          [128]u8
-	address       u8
-	resets        i32
-	fail_writes   i32
-	writes_to_dvc i32
+	regs            [128]u8
+	address         u8
+	resets          i32
+	fail_writes     i32
+	writes_to_dvc   i32
+	reject_register i32
+	drop_register   i32
 }
 
 struct FakeBus {
@@ -361,6 +363,10 @@ __global (
 	tone_phase      = f64(0)
 	tone_level      = f64(0.5)
 	tone_hz         = f64(1000)
+	// C calls use shared scratch storage: these tests are serialized, and
+	// taking the address of a local otherwise makes V box it on the heap.
+	fixture_config C.vinix_apple_speakers_config
+	thermal_status C.vinix_apple_speakers_status
 )
 
 fn reg_slot(address u64) &u32 {
@@ -429,8 +435,11 @@ fn bus_write(bus &FakeBus, offset u64, value u32) {
 			if bus.have_pointer == 0 {
 				bus.pointer = byte
 				bus.have_pointer = 1
-			} else if bus.amp.fail_writes != 0 {
+			} else if bus.amp.fail_writes != 0 || int(bus.pointer) == bus.amp.reject_register {
 				bus.nack = 1
+			} else if int(bus.pointer) == bus.amp.drop_register {
+				// ACK a lost write: only a readback can detect this.
+				bus.pointer++
 			} else {
 				bus.amp.regs[bus.pointer & 0x7f] = byte
 				if bus.pointer == u32(C.TAS_SW_RST) && (byte & 1) != 0 {
@@ -730,7 +739,6 @@ pub fn io_cache(cookie voidptr, address u64, length u32) {}
 fn machine_config() C.vinix_apple_speakers_config {
 	unsafe {
 		mut cfg := C.vinix_apple_speakers_config{}
-		C.memset(&cfg, 0, sizeof(cfg))
 		cfg.mca_clusters = fake_mca
 		cfg.mca_cluster_count = 6
 		cfg.mca_switch = fake_switch
@@ -788,6 +796,10 @@ fn boot() {
 		amps[1].resets = 0
 		amps[0].fail_writes = 0
 		amps[1].fail_writes = 0
+		amps[0].reject_register = -1
+		amps[1].reject_register = -1
+		amps[0].drop_register = -1
+		amps[1].drop_register = -1
 		amps[0].writes_to_dvc = 0
 		amps[1].writes_to_dvc = 0
 		buses[0].amp = &amps[0]
@@ -803,8 +815,8 @@ fn boot() {
 		played_count = 0
 		sense_mode = mode_normal
 		sut.io = bind_io()
-		mut cfg := machine_config()
-		C.assert(C.vinix_spk_core_c_init(&sut, &cfg) == 1)
+		fixture_config = machine_config()
+		C.assert(C.vinix_spk_core_c_init(&sut, &fixture_config) == 1)
 	}
 }
 

@@ -815,6 +815,34 @@ pub fn tas_power(s &Speakers, amp i32, mode u8) i32 {
 	}
 }
 
+// J313's AppleTAS5770LAmp::ConfigureSpeakers/applyBOPConfig, recovered from
+// the running Mac's 930.11 driver (CDCF8585-2F62-3858-966C-7AA63FA7F3A2).
+// These are independent of the serial sample format. In particular, CLASSD_SYNC
+// locks the output stage to the audio clock, and the board's bop-config sets
+// the supply threshold and recovery timing. A software reset loses all of it.
+// Keep the amplifier in shutdown while programming and verifying the settings.
+// The thermal/sense policy still controls the output gain.
+@[export: 'vinix_spk_core_tas_board_init']
+pub fn tas_board_init(s &Speakers, amp i32) i32 {
+	unsafe {
+		registers := [u8(0x08), 0x1c, 0x1d, 0x16, 0x17, 0x15, 0x1b]!
+		values := [u8(0x40), 0x82, 0x06, 0x50, 0x04, 0x14, 0x01]!
+		for index in 0 .. registers.len {
+			result := i2c_write(s, amp, registers[index], values[index])
+			if result != 0 {
+				return result
+			}
+		}
+		for index in 0 .. registers.len {
+			result := tas_expect(s, amp, registers[index], 0xff, values[index])
+			if result != 0 {
+				return result
+			}
+		}
+		return 0
+	}
+}
+
 @[export: 'vinix_spk_core_tas_init']
 pub fn tas_init(s &Speakers, amp i32) i32 {
 	unsafe {
@@ -849,6 +877,10 @@ pub fn tas_init(s &Speakers, amp i32) i32 {
 			return error_
 		}
 		error_ = i2c_write(s, amp, u8(5), u8(201))
+		if error_ {
+			return error_
+		}
+		error_ = tas_board_init(s, amp)
 		if error_ {
 			return error_
 		}

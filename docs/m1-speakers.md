@@ -20,7 +20,13 @@ they change state only while their clock runs. Each stream powers a cluster up
 after its clock starts and down before it stops, in the order `mca.c` uses,
 and touches a cluster's registers only while it is powered.
 
-Everything is taken from the device tree the Asahi boot chain passes on: the
+After resetting each amplifier, Vinix also restores J313's Class-D clock
+synchronization, brownout threshold/timing and limiter settings, recovered
+from Apple's driver on the physical Mac. Every setting is read back while
+the amplifier is still shut down; any failed write or mismatch holds the
+shared shutdown line low. These settings supplement the thermal model.
+
+The wiring is taken from the device tree the Asahi boot chain passes on: the
 `Speakers` link of the `apple,j313-macaudio` sound node names the MCA ports
 and the amplifiers, and those lead to the clocks, DMA channels, buses, pins
 and power domains. Some J313 boot trees omit the codecs' shared
@@ -88,19 +94,77 @@ kernel built without the driver; `scripts/deploy-m1-efi.sh --sound-initramfs` an
 
 To turn the driver off, boot with `vinix.apple_speakers=0` on the kernel
 command line, or build the kernel with `-d no_apple_speakers`.
+The `desktop-basic` deployment mode adds that disable flag. For a desktop
+with speakers, use `desktop-sound` or `desktop-drivers`. Replacing a kernel
+alone preserves the installed command line, including any disable flag;
+check all copies of `limine.conf` on the EFI partition when enabling audio.
 
 ## Tests
 
-`tests/apple-speakers/run.sh` compiles the production C file on the host
+`tests/apple-speakers/run.sh` compiles the production V core on the host
 against a simulated machine: amplifiers behind the I2C FIFOs, ADMAC rings
 that move real samples in simulated time, and sense data derived from what
 the amplifiers are playing. It checks the register programming, that what is
 written is exactly what is played, each protection rule, and that the
 fixed-point model matches a double-precision port of speakersafetyd to
 within 0.005 °C over 90 seconds.
+It also checks the recovered J313 initialization, rejects a failed write to
+each of its registers on either amplifier, and detects an acknowledged write
+that did not reach the clock synchronization register.
 
 ```sh
 CC=clang sh tests/apple-speakers/run.sh
 ```
 
-None of this has been checked on the machine itself yet.
+The macOS reference was collected on the physical M1 Air. Vinix playback
+still requires an audible check after booting the updated kernel; the host
+model does not prove that the speaker wiring or clocks work on hardware.
+
+## macOS reference, 2026-10-18
+
+SSH to the deployment host reported `MacBookAir10,1`, macOS 26.3.1 (a), build
+`25D771280a`, kernel UUID `527D5275-825C-3A45-AA90-5021F6817874`.
+`chosen/boot-objects-path` selected the active kernel cache, whose SHA-256 is
+`528687f2c5e18a6f991de53b29654eca85bcdd0125aca4e711c03d8718314596`.
+The extracted drivers matched the UUIDs reported by `kmutil showloaded`:
+
+| Driver | Version | UUID |
+| --- | --- | --- |
+| AppleTAS5770LAmp | 930.11 | CDCF8585-2F62-3858-966C-7AA63FA7F3A2 |
+| AppleMCA2-T8103 | 1000.4 | 3E3008E9-7688-3F8F-A140-65600EECA8BA |
+| AudioDMAController-T8103 | 530.10 | 6DDE9AAE-7C0A-39D4-AC97-98E003DCA656 |
+| AppleS5L8960XNCO | 1 | 5E48459C-500B-3105-B42D-9BD6C9D1740F |
+
+The live `audio-tas5770L-spkr-l@31` node contains
+`speaker-config=<000a0000010a0000>`,
+`bop-config=<820650040000000000000000>` and
+`function-reset=<6e0000004f495047b500000001000100>`.
+The second amplifier is `audio-tas5770L-spkr-r@34`, reached through `speaker1`.
+These confirm the existing gain 10, I2C addresses and shared AP GPIO 181.
+The left control node owns the configuration for both amplifiers.
+
+`AppleTAS5770LAmp::ConfigureSpeakers` starts at `0xfffffe0009a93f20`.
+Its common setup path and `applyBOPConfig` (`0xfffffe0009a9475c`) write:
+
+| Page 0 register | Value | Evidence |
+| --- | --- | --- |
+| 0x08 PDM_CFG0 | 0x40 | Common setup, 0xfffffe0009a943b4: Class-D synchronization |
+| 0x1c BOP_CFG1 | 0x82 | bop-config byte 0, applyBOPConfig |
+| 0x1d BOP_CFG2 | 0x06 | bop-config byte 1, applyBOPConfig |
+| 0x16 LIM_CFG1 | 0x50 | bop-config byte 2, applyBOPConfig |
+| 0x17 LIM_CFG2 | 0x04 | bop-config byte 3, applyBOPConfig |
+| 0x15 LIM_CFG0 | 0x14 | initLIMConfig default when lim-config is absent |
+| 0x1b BOP_CFG0 | 0x01 | Common setup, 0xfffffe0009a944fc |
+
+The register meanings are cross-checked against the
+[TI TAS2770/TAS5770LC0 data sheet](https://www.ti.com/lit/ds/symlink/tas2770.pdf),
+sections 8.5.2.9 and 8.5.2.22–30. Class-D synchronization was previously off;
+the brownout threshold and recovery timing were reset defaults rather than
+J313's values. Apple's optional page-0xfd buzz/OCP patches are gated by
+`enable-buzz-fix` and `maximize-ocp-threshold`; neither property exists on
+this Mac, so those patches are not applied. Serial format settings remain
+those for Vinix's S16_LE I2S stream and sense capture.
+
+Use the read-only [audio probe](../tools/apple-audio/README.md) to repeat the
+capture. The extracted amplifier Mach-O SHA-256 is
+`a72d41308319a2cee0c629f24cbf4448b9f8a6ca3a770bf8b4c7c128f024ac13`.
