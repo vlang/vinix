@@ -1,0 +1,7 @@
+APPLE METADATA imports=0 fault=none retained=0 allocations=0
+APPLE METADATA imports=1 fault=none retained=0 allocations=0
+APPLE METADATA imports=2 fault=none retained=0 allocations=0
+APPLE METADATA imports=2 fault=duplicate retained=0 allocations=0
+APPLE METADATA imports=0 fault=empty retained=0 allocations=0
+APPLE METADATA 640 cycles retire decoded templates, partial manifests, canonicalization, replies and late refusals PASS
+APPLE METADATA independent replies survive plan and caller retirement and close idempotently PASS

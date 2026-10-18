@@ -2,7 +2,6 @@
 module pkgcore
 
 import compat.ios.plist
-import json2
 import os
 
 const apple_application_notice = 'licenses/application-LICENSE.txt'
@@ -20,6 +19,72 @@ pub:
 	runtime string
 	runtime_version string
 	architectures []string
+}
+
+// Replies own their metadata independently of caller paths and decoded plans.
+pub fn (mut info AppleProfileInfo) close() {
+	unsafe {
+		info.directory.free(); info.catalog.free(); info.catalog_sha256.free()
+		info.application.free(); info.version.free(); info.runtime.free(); info.runtime_version.free()
+		for architecture in info.architectures { architecture.free() }
+		(&array(&info.architectures)).free()
+	}
+	info = AppleProfileInfo{}
+}
+
+fn apple_profile_result(app Package, runtime Package, directory string, canonical string) AppleProfileInfo {
+	architectures := ['aarch64']
+	defer { unsafe { (&array(&architectures)).free() } }
+	return AppleProfileInfo{ directory: directory.clone(), catalog: directory + '/catalog.json', catalog_sha256: index_digest(canonical),
+		application: app.id.clone(), version: app.version.clone(), runtime: runtime.id.clone(), runtime_version: runtime.version.clone(),
+		architectures: review_strings(architectures) }
+}
+
+// Decoded templates own their selectors. Packed manifests are independent;
+// catalog wrappers borrow only the selectors and the literal architecture.
+struct AppleProfilePlan {
+mut:
+	imports []RootRecipe
+	packages []CatalogImport
+}
+
+fn (mut plan AppleProfilePlan) close() {
+	for item in plan.packages { close_decoded_package(item.recipe.manifest) }
+	for recipe in plan.imports { close_decoded_root_recipe(recipe) }
+	unsafe { (&array(&plan.packages)).free(); (&array(&plan.imports)).free() }
+	plan = AppleProfilePlan{}
+}
+
+fn apple_profile_plan(recipes string) !AppleProfilePlan {
+	mut plan := AppleProfilePlan{ imports: []RootRecipe{cap: 2}, packages: []CatalogImport{cap: 2} }
+	mut accepted := false
+	defer { if !accepted { plan.close() } }
+	for role in ['application', 'runtime']! {
+		path := recipes + '/aarch64/' + role + '.json'
+		defer { unsafe { path.free() } }
+		text := read_metadata(path)!
+		defer { unsafe { text.free() } }
+		recipe := decode_root_recipe(text)!
+		apple_profile_recipe(recipe, role == 'application') or { close_decoded_root_recipe(recipe); return err }
+		// Transfer the decoded owner without V's implicit deep clone on append.
+		unsafe { plan.imports.push_many(&recipe, 1) }
+	}
+	app := plan.imports[0].manifest; runtime := plan.imports[1].manifest
+	if app.runtime != runtime.id || app.id == runtime.id { return error('Apple profile runtime does not match its application dependency') }
+	accepted = true
+	return plan
+}
+
+fn (plan AppleProfilePlan) canonical() !string {
+	architectures := ['aarch64']
+	defer { unsafe { (&array(&architectures)).free() } }
+	text := publisher_json(CatalogRecipe{ format: 1, architectures: architectures, packages: plan.packages })
+	defer { unsafe { text.free() } }
+	input := catalog_recipe(text)!
+	defer { close_decoded_catalog(input) }
+	canonical := publisher_json(input)
+	if canonical.len > max_metadata { unsafe { canonical.free() }; return error('Apple catalog lock exceeds metadata limit') }
+	return canonical
 }
 
 // Borrow the declared bundle executable from the captured recipe. A single
@@ -105,52 +170,50 @@ pub fn apple_catalog(recipes string, source_roots string, destination string) !A
 }
 
 fn apple_catalog_with(recipes string, source_roots string, destination string, options CatalogOptions) !AppleProfileInfo {
-	mut imports := []RootRecipe{cap: 2}
-	defer { for recipe in imports { close_decoded_root_recipe(recipe) }; unsafe { (&array(&imports)).free() } }
-	for role in ['application', 'runtime'] {
-		text := read_metadata(recipes + '/aarch64/' + role + '.json')!
-		defer { unsafe { text.free() } }
-		recipe := decode_root_recipe(text)!
-		apple_profile_recipe(recipe, role == 'application') or { close_decoded_root_recipe(recipe); return err }
-		imports << recipe
-	}
-	app := imports[0].manifest; runtime := imports[1].manifest
-	if app.runtime != runtime.id || app.id == runtime.id { return error('Apple profile runtime does not match its application dependency') }
+	mut plan := apple_profile_plan(recipes)!
+	defer { plan.close() }
 	root := capture_prepared_root(source_roots, 'Apple profile')!
 	defer { C.close(root) }
 	fd := catalog_source_root(root, 'aarch64')!
 	defer { C.close(fd) }
 	target := export_target(destination, 'Apple profile')!
+	defer { unsafe { target.free() } }
 	parent := os.dir(target)
+	temporary := import_temporary_directory()
+	defer { unsafe { parent.free(); temporary.free() } }
 	mut needed := u64(4 * 1024 * 1024); mut scratch := u64(0)
-	for recipe in imports {
+	for recipe in plan.imports {
 		bytes := apple_profile_payload(fd, recipe)!
 		needed = mirror_cost(needed, bytes)!
 		if bytes > scratch { scratch = bytes }
 	}
 	scratch = mirror_cost(scratch, scratch)!
 	disk_check(options.available_space(parent)!, mirror_cost(needed, scratch)!, 64 * 1024 * 1024)!
-	disk_check(options.available_space(os.temp_dir())!, scratch, 64 * 1024 * 1024)!
+	disk_check(options.available_space(temporary)!, scratch, 64 * 1024 * 1024)!
 	mut exporting := create_profile_stage(parent, '.vinix-apple-profile', 'Apple profile')!
 	defer { exporting.close() }
-	canonical := write_apple_profile(imports, fd, target, options, mut exporting) or { return exporting.failure(err) }
+	canonical := write_apple_profile(mut plan, fd, target, options, mut exporting) or { return exporting.failure(err) }
 	defer { unsafe { canonical.free() } }
 	exporting.finish(target)!
-	return AppleProfileInfo{ directory: target, catalog: target + '/catalog.json', catalog_sha256: index_digest(canonical),
-		application: app.id.clone(), version: app.version.clone(), runtime: runtime.id.clone(), runtime_version: runtime.version.clone(), architectures: ['aarch64'] }
+	return apple_profile_result(plan.imports[0].manifest, plan.imports[1].manifest, target, canonical)
 }
 
-fn write_apple_profile(imports []RootRecipe, fd int, target string, options CatalogOptions, mut exporting ProfileStage) !string {
+fn write_apple_profile(mut plan AppleProfilePlan, fd int, target string, options CatalogOptions, mut exporting ProfileStage) !string {
 	stage := exporting.stage.path
 	exporting.checkpoint('created', options)!
-	mut packages := []CatalogImport{cap: 2}
-	for recipe in imports {
-		p := pack_root_descriptor(recipe, fd, stage + '/inventory', false)!
-		mut notices := []string{}
+	inventory := stage + '/inventory'; object_path := inventory + '/objects'
+	defer { unsafe { inventory.free(); object_path.free() } }
+	for recipe in plan.imports {
+		p := pack_root_descriptor(recipe, fd, inventory, false)!
+		mut transferred := false
+		defer { if !transferred { close_decoded_package(p) } }
+		mut notices := []string{cap: recipe.entries.len}
 		defer { unsafe { (&array(&notices)).free() } }
-		for entry in recipe.entries { if entry.path.starts_with('licenses/') { notices << entry.path } }
+		for entry in recipe.entries {
+			if entry.path.starts_with('licenses/') { unsafe { notices.push_many(&entry.path, 1) } }
+		}
 		profile_file_inventory(recipe, p, notices)!
-		objects := C.open((stage + '/inventory/objects').str, C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC)
+		objects := C.open(object_path.str, C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC)
 		if objects < 0 { return error('cannot inspect Apple profile inventory') }
 		defer { C.close(objects) }
 		program := if p.kind == 'apple' { apple_program(p)! } else { '' }
@@ -164,11 +227,14 @@ fn write_apple_profile(imports []RootRecipe, fd int, target string, options Cata
 				profile_elf(objects, file.sha256, 'aarch64', 'static', false)!
 			}
 		}
-		packages << CatalogImport{ source: 'aarch64', recipe: RootRecipe{ ...recipe, manifest: p } }
+		plan.packages << CatalogImport{ source: 'aarch64', recipe: RootRecipe{ ...recipe, manifest: p } }
+		transferred = true
 		exporting.checkpoint('packed', options)!
 	}
-	canonical := json2.encode(catalog_recipe(json2.encode(CatalogRecipe{ format: 1, architectures: ['aarch64'], packages: packages }))!) + '\n'
-	if canonical.len > max_metadata { return error('Apple catalog lock exceeds metadata limit') }
+	canonical := plan.canonical()!
+	mut published := false
+	defer { if !published { unsafe { canonical.free() } } }
 	exporting.publish(canonical, target, options)!
+	published = true
 	return canonical
 }

@@ -188,7 +188,8 @@ fn checked(arguments []string) !int {
 		}
 		'apple-catalog' {
 			if names.len != 3 { return error('apple-catalog requires a recipe directory, prepared roots and a new lock directory') }
-			println(json2.encode(pkgcore.apple_catalog(names[0], names[1], names[2])!))
+			mut info := pkgcore.apple_catalog(names[0], names[1], names[2])!
+			publisher_reply(mut info)
 			return 0
 		}
 		'publish', 'publish-release' {

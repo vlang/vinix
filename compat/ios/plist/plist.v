@@ -138,10 +138,13 @@ fn append_utf8(mut bytes []u8, code u32) {
 
 pub fn parse(data []u8) !Value {
 	if data.len == 0 || data.len > 16777216 { return error('plist: input exceeds size limit') }
-	if data.len < 8 || data[..8] != 'bplist00'.bytes() { return parse_xml(data)! }
+	if data.len < 8 || unsafe { tos(&data[0], 8) } != 'bplist00' { return parse_xml(data)! }
 	if data.len < 40 { return error('plist: truncated binary trailer') }
 	trailer := u64(data.len) - 32
-	mut r := Binary{data: data, count: 0, top: 0, table: 0, offset_size: 0, ref_size: 0}
+	// Recursive calls borrow this reader. Retire its map and header on every
+	// return, including trailer validation failures before the first object.
+	mut r := &Binary{data: data}
+	defer { unsafe { r.visited.free(); free(r) } }
 	count := r.number(trailer + 8, 8, u64(data.len))!
 	top := r.number(trailer + 16, 8, u64(data.len))!
 	table := r.number(trailer + 24, 8, u64(data.len))!
@@ -150,8 +153,10 @@ pub fn parse(data []u8) !Value {
 	if count == 0 || count > 65536 || top >= count || table < 8 || table > trailer
 		|| offset_size !in [u64(1), 2, 4, 8] || ref_size !in [u64(1), 2, 4, 8]
 		|| count > (trailer - table) / offset_size { return error('plist: invalid binary trailer/table') }
-	r = Binary{data: data, count: count, top: top, table: table, offset_size: offset_size, ref_size: ref_size}
-	defer { unsafe { r.visited.free() } }
+	unsafe {
+		r.visited.free()
+		*r = Binary{data: data, count: count, top: top, table: table, offset_size: offset_size, ref_size: ref_size}
+	}
 	return r.object(top, 0)
 }
 
@@ -233,15 +238,16 @@ fn (mut r XmlReader) open(root bool) !(string, bool) {
 
 fn (mut r XmlReader) content(name string, empty bool) !string {
     if empty { return ''.clone() }
-    mut output := strings.new_builder(64)
+    mut output := []u8{cap: 64}
+    output.flags |= .noslices
     defer { unsafe { output.free() } }
     for r.position < r.text.len {
-        if r.at('</') { r.close(name)!; return output.str() }
+        if r.at('</') { r.close(name)!; return output.bytestr() }
         if r.at('<!--') { r.comment()!; continue }
         if r.at('<![CDATA[') {
             start := r.position + 9
             end := r.text.index_after(']]>', start) or { return error('plist: incomplete CDATA') }
-            for i in start .. end { output.write_u8(r.text[i]) }
+            for i in start .. end { output << r.text[i] }
             r.position = end + 3
             continue
         }
@@ -253,7 +259,7 @@ fn (mut r XmlReader) content(name string, empty bool) !string {
         if encoded.contains(']]>') { return error('plist: CDATA terminator in text') }
         decoded := xml_unescape(encoded)!
         defer { unsafe { decoded.free() } }
-        output.write_string(decoded)
+        for c in decoded { output << c }
     }
     return error('plist: incomplete scalar element')
 }
@@ -271,12 +277,16 @@ fn xml_unescape(text string) !string {
 		end := text.index_after(';', i + 1) or { return error('plist: incomplete XML entity') }
 		if end - i > 16 { return error('plist: invalid XML entity') }
 		entity := text[i + 1..end]
+		defer { unsafe { entity.free() } }
 		code := match entity {
 			'amp' { u32(`&`) } 'lt' { u32(`<`) } 'gt' { u32(`>`) }
 			'quot' { u32(`"`) } 'apos' { u32(`'`) }
 			else {
 				if !entity.starts_with('#') { return error('plist: unknown XML entity') }
-				number := if entity.starts_with('#x') { strconv.parse_uint(entity[2..], 16, 32)! } else { strconv.parse_uint(entity[1..], 10, 32)! }
+				hex := entity.starts_with('#x')
+				digits := entity[if hex { 2 } else { 1 }..]
+				defer { unsafe { digits.free() } }
+				number := strconv.parse_uint(digits, if hex { 16 } else { 10 }, 32)!
 				if number > 0x10ffff || (number >= 0xd800 && number <= 0xdfff) || (number < 32 && number !in [u64(9), 10, 13]) { return error('plist: invalid XML character reference') }
 				u32(number)
 			}
@@ -402,7 +412,8 @@ pub fn encode_xml(value Value) !string {
 fn parse_xml(data []u8) !Value {
     text := data.bytestr()
     defer { unsafe { text.free() } }
-    mut r := XmlReader{text: text}
+    mut r := &XmlReader{text: text}
+    defer { unsafe { free(r) } }
     if r.at('\xef\xbb\xbf') { r.position += 3 }
     r.between()!
     if r.at('<?xml') {

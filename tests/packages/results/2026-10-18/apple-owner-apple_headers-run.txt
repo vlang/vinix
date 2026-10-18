@@ -1,0 +1,2 @@
+APPLE-HEADERS: thin ARM64/iOS admission; malformed/truncated/oversized, ARM64e/x86/simulator/macOS, encrypted, segment and entry refusals PASS
+APPLE-PLIST: XML/binary bundle identity/executable/type, duplicate/type/missing/malformed and size refusals PASS

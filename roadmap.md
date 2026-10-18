@@ -690,6 +690,15 @@ architectures; broader release/catalog/runtime acceptance remains open.
     complete-call cases. Captured declarations, licenses/runtime bounds and
     canonical retries survive; real Wine/translation execution, other complete
     publishers and broader catalog/graphical acceptance remain open.
+  - [x] [Owned Apple profile construction](tests/packages/apple-owner-check.md)
+    retires captured declarations, partial imports, canonicalization, filesystem
+    budgets and independently closeable replies. After JSON initialization,
+    384 complete host calls, 640 metadata cycles and 1,920 Mach-O/XML/binary
+    bundle-admission cycles retain zero tracked allocations. Both guests check
+    metadata, admission and twelve selected complete-call cases, preserving
+    canonical retries, explicit runtime/license bounds and recovery data.
+    Broader catalog/release ownership, graphical acceptance and real application
+    compatibility remain separate; section 14 stays open.
   - [x] [Owned packing inventories and replies](tests/packages/pack-ownership-check.md)
     retire discarded template inventories, partial walked files and copy scratch
     across cold/cache success and late refusal. Independently closeable pack/root

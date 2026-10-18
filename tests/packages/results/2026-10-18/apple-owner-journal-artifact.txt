@@ -1,0 +1,10 @@
+tests/packages/apple-owner-check.v:89: FAIL: fn main.qualify: assert workspace_pin(pin.path)! == pin
+   left value: workspace_pin(pin.path)! = WorkspacePin{
+    path: '/Users/alex/code/vinix/build/package-apple-owner-work/host-2/cli-compile.txt'
+    sha256: 'ab81827edc966a2734aa0ae67a1acfe94cce9e3a750061c72bceff075e79d5d7'
+}
+  right value: pin = WorkspacePin{
+    path: '/Users/alex/code/vinix/build/package-apple-owner-work/host-2/cli-compile.txt'
+    sha256: 'invalid'
+}
+V panic: Assertion failed...

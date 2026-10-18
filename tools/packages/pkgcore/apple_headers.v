@@ -99,7 +99,7 @@ fn profile_apple_image(root int, path string) ! {
 				if width != 24 || profile_le(c[16..20]) != 0 { return error('Apple profile refuses encrypted Mach-O payloads') }
 			}
 			else {
-				if cmd & 0x80000000 != 0 && cmd !in [u64(0x80000018), 0x8000001c, 0x80000022, 0x80000033, 0x80000034] {
+				if cmd & 0x80000000 != 0 && cmd !in [u64(0x80000018), 0x8000001c, 0x80000022, 0x80000033, 0x80000034]! {
 					return error('Apple profile has an unsupported required load command')
 				}
 			}

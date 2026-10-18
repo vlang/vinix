@@ -1,0 +1,29 @@
+Updating trusted repository wine
+Installing Reviewed Win64 application 1.0.0 (1/2) from wine
+Downloading org.example.win64/bin/program.exe (1024 bytes)
+Downloading org.example.win64/licenses/application-LICENSE.txt (71 bytes)
+Installing Reviewed Wine closure 1.0.0 (2/2) from wine
+Downloading org.example.wine/bin/wine-runner (512 bytes)
+Downloading org.example.wine/licenses/runtime-LICENSE.txt (24 bytes)
+Downloading org.example.wine/share/closure.txt (46 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Reviewed Win64 application 1.0.0 (1/2) from wine
+Installing Reviewed Wine closure 1.0.0 (2/2) from wine
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository wine
+Installing Reviewed Win64 application 1.0.0 (1/2) from wine
+Downloading org.example.win64/bin/program.exe (1024 bytes)
+Downloading org.example.win64/licenses/application-LICENSE.txt (71 bytes)
+Installing Reviewed Wine closure 1.0.0 (2/2) from wine
+Downloading org.example.wine/bin/wine-runner (512 bytes)
+Downloading org.example.wine/licenses/runtime-LICENSE.txt (24 bytes)
+Downloading org.example.wine/share/closure.txt (45 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Reviewed Win64 application 1.0.0 (1/2) from wine
+Installing Reviewed Wine closure 1.0.0 (2/2) from wine
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+WINE OWNER production CLI format-1 replies, paths with spaces, compatible runtime update and exact refusal preservation PASS

@@ -196,21 +196,44 @@ fn test_apple_profile_refuses_unbounded_runtime_incorrect_hosts_bad_arguments_mi
 	assert alias && !os.exists(work + '/refused')
 }
 
+fn apple_cli(arguments []string) os.Result {
+	mut child := os.new_process(arguments[0]); child.set_args(arguments[1..]); child.set_redirect_stdio_merged()
+	child.run(); output := child.stdout_slurp(); child.wait(); code := child.code; child.close()
+	return os.Result{ output: output, exit_code: code }
+}
+
 fn test_apple_profile_cli_matches_api_and_rejects_bad_arity_and_occupied_output() {
 	cli := os.getenv('VINIX_PACKAGE_APPLE_CLI'); if cli == '' { return }
 	work := apple_fixture()!
 	defer { os.rmdir_all(work) or {} }
-	expected := apple_catalog(work + '/recipes', work + '/roots', work + '/api')!
-	result := os.exec([cli, 'apple-catalog', work + '/recipes', work + '/roots', work + '/cli'])
+	mut expected := apple_catalog(work + '/recipes', work + '/roots', work + '/api')!
+	defer { expected.close() }
+	result := apple_cli([cli, 'apple-catalog', work + '/recipes', work + '/roots', work + '/cli'])
 	assert result.exit_code == 0, result.output
-	actual := json2.decode[AppleProfileInfo](result.output)!
+	mut actual := json2.decode[AppleProfileInfo](result.output)!
+	defer { actual.close(); actual.close() }
+	assert actual.format == 1 && actual.profile == 'apple-ios-arm64'
+	assert actual.application == expected.application && actual.version == expected.version && actual.runtime == expected.runtime && actual.runtime_version == expected.runtime_version
 	assert actual.catalog_sha256 == expected.catalog_sha256 && actual.architectures == ['aarch64']
-	packed := os.exec([cli, 'pack-catalog', actual.catalog, work + '/roots', work + '/workspace'])
+	packed := apple_cli([cli, 'pack-catalog', actual.catalog, work + '/roots', work + '/workspace'])
 	assert packed.exit_code == 0 && json2.decode[CatalogInfo](packed.output)!.package_count == 2, packed.output
 	for args in [ []string{}, [work + '/recipes'], [work + '/recipes', work + '/roots'], [work + '/recipes', work + '/roots', work + '/cli', 'extra'] ] {
-		invalid := os.exec([cli, 'apple-catalog', ...args]); assert invalid.exit_code == 1 && invalid.output.contains('requires a recipe directory')
+		invalid := apple_cli([cli, 'apple-catalog', ...args]); assert invalid.exit_code == 1 && invalid.output.contains('requires a recipe directory')
 	}
-	occupied := os.exec([cli, 'apple-catalog', work + '/recipes', work + '/roots', work + '/cli'])
+	occupied := apple_cli([cli, 'apple-catalog', work + '/recipes', work + '/roots', work + '/cli'])
 	assert occupied.exit_code == 1 && occupied.output.contains('must be new')
 	assert read_metadata(actual.catalog)! == read_metadata(expected.catalog)!
+	runtime := apple_fixture_recipe(false)
+	os.write_file(work + '/recipes/aarch64/runtime.json', json2.encode(RootRecipe{ ...runtime, manifest: Package{ ...runtime.manifest, version: '1.1.0' } }))!
+	updated := apple_cli([cli, 'apple-catalog', work + '/recipes', work + '/roots', work + '/updated lock with spaces'])
+	assert updated.exit_code == 0, updated.output
+	mut reply := json2.decode[AppleProfileInfo](updated.output)!
+	assert reply.runtime_version == '1.1.0' && reply.application == actual.application && reply.version == actual.version
+	assert reply.architectures == ['aarch64'] && reply.catalog_sha256 == index_digest(read_metadata(reply.catalog)!)
+	before := catalog_recipe(read_metadata(actual.catalog)!)!; after := catalog_recipe(read_metadata(reply.catalog)!)!
+	defer { close_decoded_catalog(before); close_decoded_catalog(after) }
+	assert before.packages[0].recipe.manifest == after.packages[0].recipe.manifest
+	reply.close(); reply.close()
+	assert os.is_file(work + '/updated lock with spaces/catalog.json')
+	println('APPLE CLI format-1 reply, literal paths, compatible runtime update, unchanged application and close preservation PASS')
 }

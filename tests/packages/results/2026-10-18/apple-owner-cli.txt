@@ -1,0 +1,41 @@
+Updating trusted repository apple
+Installing Reviewed Apple application 1.0.0 (1/2) from apple
+Downloading org.example.apple/Example.app/Example (16384 bytes)
+Downloading org.example.apple/Example.app/Info.plist (195 bytes)
+Downloading org.example.apple/licenses/application-LICENSE.txt (50 bytes)
+Installing Reviewed iOS runtime closure 1.0.0 (2/2) from apple
+Downloading org.example.ios-runtime/bin/run-ios (512 bytes)
+Downloading org.example.ios-runtime/licenses/runtime-LICENSE.txt (24 bytes)
+Downloading org.example.ios-runtime/share/closure.txt (28 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Reviewed Apple application 1.0.0 (1/2) from apple
+Installing Reviewed iOS runtime closure 1.0.0 (2/2) from apple
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository apple
+APPLE-PROFILE: reproducible single-target lock, explicit grants/licenses, signed offline install, association/removal/rollback and unsupported-host refusal PASS
+Updating trusted repository mixed
+Installing Reviewed Apple application 1.0.0 (1/3) from mixed
+Downloading org.example.apple/Example.app/Example (16384 bytes)
+Downloading org.example.apple/Example.app/Info.plist (195 bytes)
+Downloading org.example.apple/licenses/application-LICENSE.txt (50 bytes)
+Installing Reviewed iOS runtime closure 1.0.0 (2/3) from mixed
+Downloading org.example.ios-runtime/bin/run-ios (512 bytes)
+Downloading org.example.ios-runtime/licenses/runtime-LICENSE.txt (24 bytes)
+Downloading org.example.ios-runtime/share/closure.txt (28 bytes)
+Installing Package Hello 1.0.0 (3/3) from mixed
+Downloading org.vinix.package-hello/licenses/application-sdk-MIT.txt (23 bytes)
+Downloading org.vinix.package-hello/licenses/musl-MIT.txt (12 bytes)
+Downloading org.vinix.package-hello/licenses/v-MIT.txt (9 bytes)
+Activated package generation 1
+Installing Package Hello 1.0.0 (1/1) from mixed
+Activated package generation 2
+Installing Reviewed Apple application 1.0.0 (1/3) from mixed
+Installing Reviewed iOS runtime closure 1.0.0 (2/3) from mixed
+Installing Package Hello 1.0.0 (3/3) from mixed
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+APPLE-PROFILE: real producer locks combine Apple/native runtime closures for an explicit ARM host; x86 refuses, signed offline removal/rollback preserve independent apps PASS
+APPLE-PROFILE: copied image/plist/notices/runner rechecks, directory substitution, space/lock/destination refusal, cleanup/retry and captured declarations PASS
+APPLE CLI format-1 reply, literal paths, compatible runtime update, unchanged application and close preservation PASS

@@ -1,0 +1,16 @@
+APPLE ADMISSION selection=0 retained=0 allocations=0
+APPLE ADMISSION selection=1 retained=0 allocations=0
+APPLE ADMISSION selection=2 retained=0 allocations=0
+APPLE ADMISSION selection=3 retained=0 allocations=0
+APPLE ADMISSION selection=4 retained=0 allocations=0
+APPLE ADMISSION selection=5 retained=0 allocations=0
+APPLE ADMISSION selection=6 retained=0 allocations=0
+APPLE ADMISSION selection=7 retained=0 allocations=0
+APPLE ADMISSION selection=8 retained=0 allocations=0
+APPLE ADMISSION selection=9 retained=0 allocations=0
+APPLE ADMISSION selection=10 retained=0 allocations=0
+APPLE ADMISSION selection=11 retained=0 allocations=0
+APPLE ADMISSION selection=12 retained=0 allocations=0
+APPLE ADMISSION selection=13 retained=0 allocations=0
+APPLE ADMISSION selection=14 retained=0 allocations=0
+APPLE ADMISSION 1920 Mach-O and XML/binary plist cycles retire successful and refused admission storage PASS

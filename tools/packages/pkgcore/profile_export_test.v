@@ -230,7 +230,7 @@ fn profile_export_run(kind string, work string, target string, options CatalogOp
 		'sqlite' { mut info := sqlite_catalog_with('3.53.4', '1.0.0', work + '/roots', target, options)!; info.close() }
 		'ffmpeg' { mut info := ffmpeg_catalog_with('1.0.0', work + '/roots', target, options)!; info.close() }
 		'wine' { mut info := wine_catalog_with(work + '/recipes', work + '/roots', target, options)!; info.close() }
-		else { apple_catalog_with(work + '/recipes', work + '/roots', target, options)! }
+		else { mut info := apple_catalog_with(work + '/recipes', work + '/roots', target, options)!; info.close() }
 	}
 }
 

@@ -1624,6 +1624,16 @@ files under `roots/aarch64/`. The format-1 result has `profile: "apple-ios-arm64
 on x86-64 does not produce an x86-64 application variant. The profile supplies
 no translation runtime, Apple SDK, signing entitlement or proprietary payload.
 
+V callers own the returned dynamic metadata and release it with idempotent
+`AppleProfileInfo.close()`. Replies survive retirement of decoded templates and
+caller paths; closing a reply preserves the published lock. The CLI releases its
+reply after format-1 JSON encoding. The
+[ownership qualification](../../tests/packages/apple-owner-check.md) measures
+complete publication/refusal paths, partial imports, metadata and XML/binary
+bundle admission after JSON initialization. It preserves captured declarations,
+canonical locks, explicit license/runtime bounds and compatible runtime updates.
+Broader catalog/release ownership and graphical/runtime acceptance remain open.
+
 The application template declares `kind: "apple"`, `architecture: "aarch64"`,
 `entrypoint: "bin/run-ios"` and a first argument
 `"@APP@/BUNDLE.app/EXECUTABLE"`. Use one top-level `.app` directory and a direct

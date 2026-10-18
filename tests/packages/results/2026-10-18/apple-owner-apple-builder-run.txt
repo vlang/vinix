@@ -1,0 +1,96 @@
+APPLE OWNER case=complete retained=0 allocations=0
+APPLE OWNER complete canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=nested retained=0 allocations=0
+APPLE OWNER nested canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=missing-recipes retained=0 allocations=0
+APPLE OWNER missing-recipes canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=missing-recipe retained=0 allocations=0
+APPLE OWNER missing-recipe canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=invalid-json retained=0 allocations=0
+APPLE OWNER invalid-json canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=invalid-schema retained=0 allocations=0
+APPLE OWNER invalid-schema canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=wrong-architecture retained=0 allocations=0
+APPLE OWNER wrong-architecture canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=pinned-template retained=0 allocations=0
+APPLE OWNER pinned-template canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=firmware retained=0 allocations=0
+APPLE OWNER firmware canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=app-kind retained=0 allocations=0
+APPLE OWNER app-kind canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=unbounded-runtime retained=0 allocations=0
+APPLE OWNER unbounded-runtime canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=missing-selector retained=0 allocations=0
+APPLE OWNER missing-selector canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=runtime-grants retained=0 allocations=0
+APPLE OWNER runtime-grants canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=empty-arguments retained=0 allocations=0
+APPLE OWNER empty-arguments canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=nested-program retained=0 allocations=0
+APPLE OWNER nested-program canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=runtime-mismatch retained=0 allocations=0
+APPLE OWNER runtime-mismatch canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=missing-root retained=0 allocations=0
+APPLE OWNER missing-root canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=missing-architecture retained=0 allocations=0
+APPLE OWNER missing-architecture canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=wrong-macho retained=0 allocations=0
+APPLE OWNER wrong-macho canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=wrong-plist retained=0 allocations=0
+APPLE OWNER wrong-plist canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=invalid-plist retained=0 allocations=0
+APPLE OWNER invalid-plist canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=wrong-target retained=0 allocations=0
+APPLE OWNER wrong-target canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=wrong-mode retained=0 allocations=0
+APPLE OWNER wrong-mode canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=missing-notice retained=0 allocations=0
+APPLE OWNER missing-notice canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=empty-notice retained=0 allocations=0
+APPLE OWNER empty-notice canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=notice-directory retained=0 allocations=0
+APPLE OWNER notice-directory canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=no-output-space retained=0 allocations=0
+APPLE OWNER no-output-space canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=no-temp-space retained=0 allocations=0
+APPLE OWNER no-temp-space canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=space-error retained=0 allocations=0
+APPLE OWNER space-error canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=created retained=0 allocations=0
+APPLE OWNER created canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=packed-1 retained=0 allocations=0
+APPLE OWNER packed-1 canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=packed-2 retained=0 allocations=0
+APPLE OWNER packed-2 canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=ready retained=0 allocations=0
+APPLE OWNER ready canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=import-macho retained=0 allocations=0
+APPLE OWNER import-macho canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=import-plist retained=0 allocations=0
+APPLE OWNER import-plist canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=import-elf retained=0 allocations=0
+APPLE OWNER import-elf canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=import-mode retained=0 allocations=0
+APPLE OWNER import-mode canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=import-notice retained=0 allocations=0
+APPLE OWNER import-notice canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=import-directory retained=0 allocations=0
+APPLE OWNER import-directory canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=changed-template retained=0 allocations=0
+APPLE OWNER changed-template canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=changed-lock retained=0 allocations=0
+APPLE OWNER changed-lock canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=occupied retained=0 allocations=0
+APPLE OWNER occupied canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=raced-target retained=0 allocations=0
+APPLE OWNER raced-target canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=flush retained=0 allocations=0
+APPLE OWNER flush canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=cleanup retained=0 allocations=0
+APPLE OWNER cleanup canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=root-replaced retained=0 allocations=0
+APPLE OWNER root-replaced canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=inventory-replaced retained=0 allocations=0
+APPLE OWNER inventory-replaced canonical retry, saved output, source and descriptor preservation PASS
+APPLE OWNER case=lock-replaced retained=0 allocations=0
+APPLE OWNER lock-replaced canonical retry, saved output, source and descriptor preservation PASS

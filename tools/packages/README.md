@@ -573,6 +573,11 @@ and explicit notices/licenses/runtime bounds before publishing. See the
 [publisher checks](../../tests/packages/apple-profile-check.md). It supplies no
 Apple SDK, proprietary payload or x86-64 translation variant.
 
+`AppleProfileInfo.close()` idempotently releases independently owned V reply
+metadata. Complete builder, partial-import and bundle-admission lifetimes are
+covered by the [ownership checks](../../tests/packages/apple-owner-check.md),
+including canonical retry and recovery-data preservation.
+
 Apple launches now derive the iOS compatibility runtime's Documents and keychain
 overrides from admitted private app data. They retain their containers through
 updates, rollback and uninstall without adding sandbox grants. The

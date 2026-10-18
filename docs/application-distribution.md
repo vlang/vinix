@@ -2159,6 +2159,13 @@ sessions, qualify wider filesystem/device crash windows and measure wider
 runtime sandbox profiles. Apple packaging does not provide general macOS/AppKit
 compatibility; Windows/Linux packaging does not expand runtime API coverage.
 
+The [Apple publisher ownership checks](../tests/packages/apple-owner-check.md)
+add complete-call retirement of captured templates, partial inventories,
+canonicalization and reply/error metadata. Repeated bundle admission also
+retires XML/binary plist parser storage. Canonical locks, compatible runtime
+updates, explicit license policy and recovery output retain their behavior.
+Broader catalog/release ownership and the release gates above remain open.
+
 The [Apple package boundary check](../tests/packages/apple-runtime-check.md)
 adds signed ARM64 iOS Mach-O execution through the real static compatibility
 runtime in the production sandbox. Apple launch plans now derive the runtime's
