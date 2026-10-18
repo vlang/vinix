@@ -8525,8 +8525,39 @@ measurements, the preliminary rounding failure, pinned inputs, joined logs
 and eleven generated C/executable pairs are retained under
 `build/ios/fortnite/inverse-hyperbolic-checks`.
 
-The fresh IPA probe gets past the inverse hyperbolic imports and stops at
+That IPA probe gets past the inverse hyperbolic imports and stops at
 `_arc4random` from `libSystem.B.dylib`, still before application entry.
+Fortnite remains unplayable and the full iOS regression is unpassed.
+
+V now implements `_arc4random` and `_arc4random_buf`, and the existing
+`_arc4random_uniform` uses the same OS entropy reader. The typed APIs return
+an unsigned 32-bit word, fill exactly the requested `size_t` byte count, and
+use rejection sampling for bounded values. Zero and one bounds return zero.
+The adapters preserve errno and floating-point state, allocate no temporary
+buffers, and keep no userspace generator state or locks across fork. Buffers
+are filled in at most 256-byte `getentropy` calls through CommonCrypto's
+existing backend. Entropy failure terminates the call instead of returning
+uninitialized output; the void Darwin ABI cannot report an error.
+
+SDK declarations and typed calls into this Mac's libSystem confirm the ABI,
+zero-length null/protected buffers, errno and exception behavior. V/Mach-O/LLVM
+inspection confirms the IPA's unsigned word calls at `0x100077828` and
+`0x10007782c`, and its 8-byte buffer calls at `0x100546450` and `0x100546854`.
+
+`tests/ios/native-checks.v build-arc4random` builds the fixture. Eight host
+ASan/UBSan runs and four ARM64 Vinix suites pass, covering random APIs,
+inverse hyperbolic functions, TLV destruction and native zlib bounds. The
+random fixture checks both guarded buffer ends, zero/chunk/page boundaries,
+buffers above 16 MiB, all four rounding modes, sticky exception flags,
+thread-local errno, eight concurrent callers and fresh parent/child output
+after fork. Native measurements, IPA inspection, pinned inputs, joined logs
+and eleven generated C/executable pairs are retained under
+`build/ios/fortnite/arc4random-checks`.
+
+The fresh IPA probe passes the random imports and stops at `_asl_add_log_file`
+from `libSystem.B.dylib`, before application entry. Its caller at `0x100083950`
+passes a stored client pointer and descriptor 2. Preliminary typed native ASL
+measurements are retained for the next adapter; no log messages were sent.
 Fortnite remains unplayable and the full iOS regression is unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -8534,12 +8565,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,705 | 455 | 79 |
+| Fortnite executable | 1,707 | 453 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,540 | 458 | 120 |
+| All images | 2,542 | 456 | 120 |
 
-The C++/GLES/Text variant reports 2,554 resolved imports, 444 unresolved strong
+The C++/GLES/Text variant reports 2,556 resolved imports, 442 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

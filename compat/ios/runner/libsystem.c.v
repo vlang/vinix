@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
-import crypto.rand
-
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -22,18 +20,6 @@ fn C.memcmp(voidptr, voidptr, usize) int
 fn C.memchr(voidptr, int, usize) voidptr
 fn C.memmove(voidptr, voidptr, usize) voidptr
 fn C.floorf(f32) f32
-
-fn darwin_random_uniform(bound u32) u32 {
-	if bound < 2 { return 0 }
-	// Rejection sampling avoids modulo bias; crypto.rand uses each host's OS RNG.
-	threshold := (u32(0) - bound) % bound
-	for {
-		bytes := rand.bytes(4) or { panic('iOS: random source failed') }
-		value := u32(bytes[0]) | u32(bytes[1]) << 8 | u32(bytes[2]) << 16 | u32(bytes[3]) << 24
-		unsafe { bytes.free() }
-		if value >= threshold { return value % bound }
-	}
-}
 
 fn darwin_strlen(text &char) usize {
 	mut length := usize(0)
@@ -106,6 +92,7 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 		return error('iOS: library is not implemented: ${library} (${symbol})')
 	}
 	if address := inverse_hyperbolic_symbol(symbol) { return address }
+	if address := random_symbol(symbol) { return address }
 	if address := pthread_symbol(symbol) { return address }
 	if address := stdio_symbol(symbol) { return address }
 	if address := dyld_symbol(symbol) { return address }
@@ -167,7 +154,6 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 		'_memcmp' { unsafe { voidptr(C.memcmp) } }
 		'_memchr' { unsafe { voidptr(C.memchr) } }
 		'_bzero' { unsafe { voidptr(darwin_bzero) } }
-		'_arc4random_uniform' { unsafe { voidptr(darwin_random_uniform) } }
 		'_floorf' { unsafe { voidptr(C.floorf) } }
 		else { return error('iOS: libSystem symbol is not implemented: ${symbol}') }
 	}
