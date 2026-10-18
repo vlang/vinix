@@ -8914,17 +8914,47 @@ without invoking a live exception server. Mach exception delivery remains
 unimplemented. Fortnite remains unplayable and the full iOS regression is
 unpassed.
 
+V now resolves `_exception_raise`, `_exception_raise_state` and
+`_exception_raise_state_identity` for the current Mach task/thread/semaphore
+namespace. The clients check the native limits of two signed 32-bit exception
+codes and 1,296 unsigned 32-bit state words before port lookup, returning
+`MIG_ARRAY_TOO_LARGE` for oversized inputs. Missing or dead destinations return
+`MACH_SEND_INVALID_DEST`; missing descriptor rights return
+`MACH_SEND_INVALID_RIGHT`. Live kernel ports reject the RPC with the measured
+`KERN_FAILURE` or `KERN_INVALID_ARGUMENT`, preserving inputs, outputs, flavor,
+count, send references, semaphore credits, errno and floating-point state.
+Destroying a semaphore preserves any retained send rights until their last
+reference is dropped. Native Mac ports use the native transport in host tests.
+
+This is a client validation and kernel-port error subset: Vinix still has no
+public Mach receive ports, user exception-message delivery or kernel fault
+interception. V/Mach-O/LLVM inspection finds Fortnite's three forwarding calls
+at `0x1000b459c`, `0x1000b4650` and `0x1000b4618`, including the state clients'
+ninth through eleventh arguments on the stack.
+`tests/ios/native-checks.v build-mach-exception` builds the fixture. Two host
+ASan/UBSan runs and the
+ARM64 Vinix suite pass for bounds and error precedence, live/retired rights,
+ownership, eight concurrent callers, fork and two image teardowns. Generated-C
+review verifies stack temporaries, lock release and no new adapter allocations.
+
+Native measurements, failed test assumptions and their corrections, joined
+logs, pinned inputs and five final generated C/executable pairs are retained
+under `build/ios/fortnite/mach-exception-checks`. The IPA probe passes all three
+client imports and stops before entry at `_flock`. Native RE verifies its
+locking flags and Fortnite's nonblocking unlock at `0x1005a752c`. Fortnite
+remains unplayable and the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,734 | 426 | 79 |
+| Fortnite executable | 1,737 | 423 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,569 | 429 | 120 |
+| All images | 2,572 | 426 | 120 |
 
-The C++/GLES/Text variant reports 2,583 resolved imports, 415 unresolved strong
+The C++/GLES/Text variant reports 2,586 resolved imports, 412 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
