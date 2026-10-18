@@ -1,5 +1,19 @@
 # ATA, NVMe and Apple ANS health/status qualification
 
+For the ANS transport, namespace enumeration, health and status subset:
+
+```sh
+V=/path/to/v build-support/run-v-tool.sh tests/storage-health/run.v \
+  --work /tmp/ans-host --ans-only
+```
+
+The namespace model implements only Identify CNS 0/1 and exercises the actual
+submission, NVMMU, completion and namespace parser. It checks sparse/inactive
+IDs, scan and slot limits, malformed metadata, completed errors, timeouts and
+wrong command tags. CNS 2 must be refused before any hardware submission.
+All four ANS entries run with Clang ASan/UBSan. This subset avoids dependencies
+on the separate AHCI/NVMe fixture bindings.
+
 The host controller and fixtures are V throughout:
 
 ```sh

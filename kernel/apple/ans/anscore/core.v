@@ -916,8 +916,8 @@ pub fn a_command_allowed(q u32, c &u8) i32 {
 				// Create I/O SQ/CQ 1
 			}
 			6 { // case comp body kind=ReturnStmt is_enum=false
-				return i32(a_le32(c + 40) <= u32(2))
-				// Identify NS/ans_controller/active list
+				return i32(a_le32(c + 40) <= u32(1))
+				// Apple ANS only supports Identify Namespace/Controller.
 			}
 			9 { // case comp body kind=ReturnStmt is_enum=false
 				return i32(a_le32(c + 40) == u32(7) && a_le32(c + 44) == u32(0))
@@ -1163,6 +1163,39 @@ pub fn a_parse_namespace(ns &Ans_namespace, id u32, p &u8) i32 {
 		ns.id = id
 		ns.sector = 1 << shift
 		ns.blocks = blocks
+		return 0
+	}
+}
+
+// ANS implements the NVMe 1.0 Identify selectors (0/1), even when it
+// advertises a newer version. CNS=2 is treated as CNS=0 with NSID=0 and
+// completes with Invalid Namespace (0xb). Scan individual IDs instead.
+pub fn a_enumerate_namespaces(a &Ans, nn u32) i32 {
+	unsafe {
+		// Bound controller-controlled work independently of the eight live
+		// namespace slots; sparse IDs are allowed within this scan window.
+		if nn == 0 || nn > 1024 || a.nns != 0 {
+			return a_fail(a, ans_namespace)
+		}
+		for id := u32(1); id <= nn; id++ {
+			rc := a_identify(a, id, 0)
+			if rc != 0 {
+				// Only Invalid Namespace is an absent ID. Transport faults,
+				// other completion errors and invalid metadata remain fatal.
+				if rc == -ans_completion && !a.dead && (a.last_status & 0x7ff) == 0xb {
+					continue
+				}
+				return a_fail(a, -rc)
+			}
+			p := a.dma + 131072
+			if a_le64(p) == 0 { continue } // Inactive namespace, per Identify NS.
+			if a.nns == 8 { return a_fail(a, ans_namespace) }
+			rc = a_parse_namespace(&a.ns[0] + a.nns, id, p)
+			if rc != 0 { return a_fail(a, -rc) }
+			a.nns++
+		}
+		if a.nns == 0 { return a_fail(a, ans_namespace) }
+		a.last_status = 0
 		return 0
 	}
 }
@@ -1961,35 +1994,9 @@ pub fn a_start(a &Ans) i32 {
 		}
 		a.ioq_active = u32(1)
 		a.stage = u32(5)
-		rc = a_identify(a, u32(0), u32(2))
+		rc = a_enumerate_namespaces(a, nn)
 		if rc {
-			return a_fail(a, -rc)
-		}
-		ids := [8]u32{}
-		nids := u32(0)
-		for i := u32(0); i < 4096 / u32(4); i++ {
-			nsid := a_le32(a.dma + 131072 + (i * u32(4)))
-			if !nsid {
-				break
-			}
-			if nsid == u32(4294967295) || nsid > nn || (nids && nsid <= ids[nids - u32(1)]) || nids == 8 {
-				return a_fail(a, i32(ans_namespace))
-			}
-			ids[nids++] = nsid
-		}
-		if !nids {
-			return a_fail(a, i32(ans_namespace))
-		}
-		for i := u32(0); i < nids; i++ {
-			rc = a_identify(a, ids[i], u32(0))
-			if rc {
-				return a_fail(a, -rc)
-			}
-			rc = a_parse_namespace(&a.ns[0] + a.nns, ids[i], a.dma + 131072)
-			if rc {
-				return a_fail(a, -rc)
-			}
-			a.nns++
+			return rc
 		}
 		a.stage = u32(6)
 		for i := u32(0); i < a.nns; i++ {

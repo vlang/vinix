@@ -14,10 +14,11 @@ NVMe, ASC, mailbox, SART, reset and power resources from the bootloader's Linux
 DeviceTree, starts the preloaded ANS firmware using RTKit, and submits commands
 through ANS2 linear queues and the NVMMU.
 
-**The full V/kernel build and a physical M1 SSD test have not been performed.**
-Host tests exercise the production C with synthetic firmware/MMIO/DMA, not real
-hardware. The production C cross-compiles as freestanding AArch64. The V binding
-and hardware cache coherency still need end-to-end validation.
+ARM64 kernel builds and synthetic transport tests pass. A physical J313 boot
+reached namespace enumeration and exposed the Identify quirk described below;
+successful SSD reads and mounts still require validation. Host tests exercise
+the production V transport with synthetic firmware/MMIO/DMA. The binding and
+hardware cache coherency still need end-to-end validation.
 
 **This revision does not provide a writable SSD root filesystem or switch root
 to the SSD.** The existing initramfs remains the root filesystem and recovery
@@ -147,12 +148,25 @@ submission queues must not be applied to this ANS2 linear mode. NVMMU TCBs are
 contract. Completion tags, queue IDs, phases, status and TCB invalidation are
 checked before a command can be reused.
 
-Identify/controller, Identify/namespace, Identify/active-list, single-I/O-queue
+Identify/controller, Identify/namespace, single-I/O-queue
 setup and NVM Read are the only admitted commands. Up to eight active namespaces
 with 512-byte or 4096-byte logical blocks and no metadata/protection information
 are supported. Read sizes respect MDTS and the 64 KiB bounce limit. PRP1,
 direct PRP2 and one-page PRP lists are supported. Arbitrary byte-aligned reads
 are assembled through the bounce buffer with overflow and extent validation.
+
+ANS only implements Identify CNS 0/1. Sending CNS 2 (Active Namespace List)
+with NSID 0 produces the stage-5 `NVMe status 0xb` failure seen on the J313
+on 2026-10-18. The driver now probes IDs 1 through the controller's `NN`
+individually, with a maximum scan window of 1024 IDs and eight active slots.
+An Invalid Namespace completion or successful zero-size response denotes an
+absent/inactive ID. Other completion errors, malformed metadata and transport
+faults remain fatal. CNS 2 is also rejected by command authorization before
+submission. This follows the
+[Apple driver's Identify CNS quirk](https://github.com/torvalds/linux/blob/master/drivers/nvme/host/apple.c)
+and [sequential namespace scanning](https://github.com/torvalds/linux/blob/master/drivers/nvme/host/core.c).
+The persistent-volume check still refuses to continue when the requested
+filesystem cannot be mounted safely.
 
 All waits have timer deadlines and finite iteration bounds, including a stopped
 counter guard. RTKit messages are serviced during initialization and I/O; there

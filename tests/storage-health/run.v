@@ -36,7 +36,7 @@ fn function(source string, name string) !string {
 	return error('Missing production function ${name}')
 }
 
-fn host(root string, work string) ! {
+fn host(root string, work string, ans_only bool) ! {
 	put(work, 'v.mod', "Module { name: 'storage_health_host' }\n")!
 	put(work, 'pci/pci.v', 'module pci\npub struct PCIBar {}\n')!
 	put(work, 'devcore/core.v', 'module devcore\npub struct Device {}\n')!
@@ -74,17 +74,25 @@ fn host(root string, work string) ! {
 	ans_host(root, work)!
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
+	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
 	// Compile each maintained test entry directly so qualification needs no
 	// separately built host test utility or its thread/GC runtime.
-	for name in ['ahci/health_test', 'fs/ioctl_test', 'nvme/boot_test', 'nvme/completion_test',
-		'nvme/health_test', 'anscore/health_test', 'ans/health_test', 'ans/status_test'] {
+	names := if ans_only { ['anscore/health_test', 'anscore/namespace_test', 'ans/health_test', 'ans/status_test'] } else {
+		['ahci/health_test', 'fs/ioctl_test', 'nvme/boot_test', 'nvme/completion_test',
+		'nvme/health_test', 'anscore/health_test', 'anscore/namespace_test', 'ans/health_test', 'ans/status_test']
+	}
+	for name in names {
 		binary := work + '/' + name + '-host'
-		command([v, '-nocache', '-gc', 'none', '-no-closures', '-target-libc-headers', '-enable-globals', '-cc', 'clang',
+		mut flags := [v, '-nocache', '-gc', 'none', '-no-closures', '-enable-globals', '-cc', 'clang',
 			'-cflags', '-fsanitize=address,undefined', '-ldflags', '-fsanitize=address,undefined',
-			'-o', binary, work + '/' + name + '.v'])!
+			'-o', binary]
+		flags << if ans_only { ['-d', 'no_backtrace'] } else { ['-target-libc-headers'] }
+		flags << work + '/' + name + '.v'
+		command(flags)!
 		print(command([binary])!)
 		println('PASS: ${name}')
 	}
+	if ans_only { return }
 	cli := work + '/health-cli-host'
 	command([v, '-nocache', '-gc', 'none', '-no-closures', '-target-libc-headers', '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 		'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -136,6 +144,7 @@ fn ans_host(root string, work string) ! {
 	put(work, 'anscore/api.v', '@[translated]\nmodule anscore\n' + api)!
 	put(work, 'anscore/model.v', os.read_file(root + '/tests/storage-health/ans_model.v')!)!
 	os.cp(root + '/tests/storage-health/ans_core_test.v', work + '/anscore/health_test.v')!
+	os.cp(root + '/tests/storage-health/ans_namespace_test.v', work + '/anscore/namespace_test.v')!
 	put(work, 'ext2core/core.v', os.read_file(root + '/kernel/apple/ans/ext2core/core.v')!)!
 	put(work, 'ans/health.v', os.read_file(root + '/kernel/apple/ans/health.v')!
 		.replace('import apple.ans.anscore', 'import anscore'))!
@@ -160,7 +169,7 @@ fn audit_generated(path string) ! {
 		'ans__AnsBlock__block_health', 'ans__AnsBlock__block_status', 'ans__AnsBlock__record_failed',
 		'ans__AnsBlock__read', 'ans__AnsBlock__write', 'ans__AnsBlock__sync',
 		'anscore__namespace_status', 'anscore__namespace_failed', 'anscore__set_namespace_id',
-		'anscore__a_count_transfer', 'anscore__a_count_flush',
+		'anscore__a_count_transfer', 'anscore__a_count_flush', 'anscore__a_enumerate_namespaces',
 		'anscore__a_read_bytes', 'anscore__a_write_partition', 'anscore__a_flush_ns', 'anscore__a_health',
 		'anscore__health', 'anscore__a_submit', 'anscore__a_command_allowed', 'anscore__a_authorize',
 		'anscore__a_pump', 'anscore__a_begin', 'anscore__a_expired', 'anscore__a_fail',
@@ -203,12 +212,14 @@ fn audit_generated(path string) ! {
 }
 
 fn main() {
-	if (os.args.len != 3 && os.args.len != 5) || os.args[1] != '--work' || os.exists(os.args[2])
-		|| (os.args.len==5 && os.args[3]!='--generated') {
-		eprintln('Usage: run.v --work NEW_DIRECTORY [--generated KERNEL_BLOB_C]'); exit(2)
+	ans_only := '--ans-only' in os.args
+	args := os.args.filter(it != '--ans-only')
+	if (args.len != 3 && args.len != 5) || args[1] != '--work' || os.exists(args[2])
+		|| (args.len==5 && args[3]!='--generated') {
+		eprintln('Usage: run.v --work NEW_DIRECTORY [--ans-only] [--generated KERNEL_BLOB_C]'); exit(2)
 	}
-	work := os.abs_path(os.args[2])
+	work := os.abs_path(args[2])
 	os.mkdir(work) or { eprintln(err); exit(1) }
-	host(os.dir(os.dir(os.dir(@FILE))), work) or { eprintln(err); exit(1) }
-	if os.args.len==5 { audit_generated(os.args[4]) or { eprintln(err); exit(1) } }
+	host(os.dir(os.dir(os.dir(@FILE))), work, ans_only) or { eprintln(err); exit(1) }
+	if args.len==5 { audit_generated(args[4]) or { eprintln(err); exit(1) } }
 }
