@@ -237,7 +237,14 @@ fn first_run_stage_vendor(download FirstRunDownload, archive string, payload str
 	first_run_unpack(archive, payload, download.deb)!
 	if steam {
 		first_run_unpack(payload + '/' + download.binary, payload + '/client', false)!
-		first_run_elf_arch(payload + '/client/linux32/steam', 'i386')!
+		// Valve's bootstrap moved the 32-bit client from linux32/, which now
+		// holds only the error reporter, to ubuntu12_32/.
+		client := if os.exists(payload + '/client/ubuntu12_32/steam') {
+			payload + '/client/ubuntu12_32/steam'
+		} else {
+			payload + '/client/linux32/steam'
+		}
+		first_run_elf_arch(client, 'i386')!
 	} else {
 		first_run_elf_arch(payload + '/' + download.binary, download.arch)!
 	}

@@ -43,6 +43,35 @@ fn test_setup_runtime_index_keeps_only_resolution_fields() {
 	}
 }
 
+fn test_setup_steam_bootstrap_holds_its_client_in_either_layout() {
+	root := os.join_path(os.temp_dir(), 'vinix-steam-bootstrap-${os.getpid()}')
+	os.mkdir_all(root)!
+	defer { os.rmdir_all(root) or {} }
+	// A 32-bit x86 executable, as the bootstrap's client is.
+	mut elf := []u8{len: 64}
+	elf[0], elf[1], elf[2], elf[3] = 127, `E`, `L`, `F`
+	elf[4], elf[5], elf[6], elf[16], elf[18] = 1, 1, 1, 2, 3
+	download := FirstRunDownload{
+		arch:   'i386'
+		binary: 'usr/lib/steam/bootstraplinux_ubuntu12_32.tar.xz'
+	}
+	// Valve's current bootstrap keeps it in ubuntu12_32/; older ones in linux32/.
+	for layout in ['ubuntu12_32', 'linux32'] {
+		bootstrap := '${root}/${layout}/bootstrap'
+		os.mkdir_all('${bootstrap}/${layout}')!
+		os.write_file_array('${bootstrap}/${layout}/steam', elf)!
+		os.chmod('${bootstrap}/${layout}/steam', 0o755)!
+		package := '${root}/${layout}/package'
+		os.mkdir_all('${package}/usr/lib/steam')!
+		first_run_tool(['/usr/bin/tar', '-cJf', '${package}/usr/lib/steam/bootstraplinux_ubuntu12_32.tar.xz',
+			'-C', bootstrap, '.'])!
+		archive := '${root}/${layout}/steam.tar'
+		first_run_tool(['/usr/bin/tar', '-cf', archive, '-C', package, '.'])!
+		first_run_stage_vendor(download, archive, '${root}/${layout}/payload', true)!
+		assert os.read_bytes('${root}/${layout}/payload/client/${layout}/steam')! == elf
+	}
+}
+
 fn test_setup_vendor_archive_verification_and_atomic_publication() {
 	root := os.join_path(os.temp_dir(), 'vinix-vendor-install-${os.getpid()}')
 	os.mkdir_all(root + '/source')!
