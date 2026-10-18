@@ -82,6 +82,10 @@ fn darwin_kill(pid i32, signal i32) i32 {
 
 fn darwin_malloc_size(pointer voidptr) usize {
 	if pointer == unsafe { nil } { return 0 }
+	saved_errno := unsafe { *C.ios_errno_address() }; defer { darwin_set_errno(saved_errno) }
+	heap_lock(); defer { heap_unlock() }
+	block := heap_block_find(pointer)
+	if block != unsafe { nil } { return block.capacity }
 	$if macos { return C.malloc_size(pointer) }
 	$else { return C.malloc_usable_size(pointer) }
 }

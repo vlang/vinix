@@ -69,10 +69,16 @@ fn darwin_puts(text &char) int {
 }
 
 fn darwin_malloc(size usize) voidptr {
+	if system_data != unsafe { nil } { return darwin_zone_malloc(darwin_default_zone(), size) }
 	return C.malloc(size)
 }
 
 fn darwin_free(pointer voidptr) {
+	if pointer == unsafe { nil } { return }
+	saved_errno := unsafe { *C.ios_errno_address() }; defer { darwin_set_errno(saved_errno) }
+	heap_lock(); defer { heap_unlock() }
+	block := heap_block_find(pointer)
+	if block != unsafe { nil } { heap_release(block); return }
 	C.free(pointer)
 }
 
@@ -87,11 +93,12 @@ fn darwin_bzero(pointer voidptr, size usize) {
 // Fixed-argument AAPCS64 calls with compatible Apple and musl layouts.
 // Varargs, Darwin FILE*, errno/TLS and pthread objects use explicit adapters.
 fn libsystem_symbol(library string, symbol string) !u64 {
-	if library == '/usr/lib/libSystem.B.dylib' && symbol == '_posix_memalign' { return u64(unsafe { voidptr(C.posix_memalign) }) }
+	if library == '/usr/lib/libSystem.B.dylib' && symbol == '_posix_memalign' { return u64(unsafe { voidptr(darwin_posix_memalign) }) }
 	if library != '/usr/lib/libSystem.B.dylib' {
 		return error('iOS: library is not implemented: ${library} (${symbol})')
 	}
 	if address := inverse_hyperbolic_symbol(symbol) { return address }
+	if address := malloc_zone_symbol(symbol) { return address }
 	if address := random_symbol(symbol) { return address }
 	if address := pthread_symbol(symbol) { return address }
 	if address := stdio_symbol(symbol) { return address }

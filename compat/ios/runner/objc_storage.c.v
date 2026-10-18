@@ -131,7 +131,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	for gesture in header.gestures { objc_release(gesture) }
 	unsafe { header.items.free(); header.keys.free(); header.gestures.free(); header.data.free() }
 	if header.file != unsafe { nil } { C.fclose(header.file) }
-	if header.free_data { C.free(unsafe { voidptr(header.external_data) }) }
+	if header.free_data { darwin_free(unsafe { voidptr(header.external_data) }) }
 	objc_destroy_weak(unsafe { &header.target })
 	if ios_runtime.first_responder == object { ios_runtime.first_responder = 0 }
 	C.free(header.text)

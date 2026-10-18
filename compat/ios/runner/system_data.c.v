@@ -24,6 +24,9 @@ fn C.ios_host_stdio(int) voidptr
 struct SystemData {
 mut:
 	guard u64
+	default_heap DarwinHeapZone
+	heap_zones &DarwinHeapZone = unsafe { nil }
+	heap_blocks [1024]&DarwinHeapBlock
 	page_size u64
 	page_mask u64
 	task_self u32
@@ -68,6 +71,7 @@ __global system_data = unsafe { &SystemData(nil) }
 fn system_data_start() ! {
 	system_data = &SystemData{page_size: u64(C.getpagesize()), page_mask: u64(C.getpagesize()) - 1, task_self: 1}
 	system_data.in6_loopback[15] = 1
+	heap_start()
 	system_queries_start()!
 	system_data.vm_mappings.flags |= .noslices
 	bytes := rand.bytes(8)!
@@ -138,6 +142,7 @@ fn system_data_stop() {
 		C.free(unsafe { voidptr(file) })
 	}
 	C.free(system_data.runes)
+	heap_stop()
 	unsafe { system_data.dl_error.free() }
 	unsafe { system_data.streams.free(); system_data.mutexes.free(); system_data.rwlocks.free(); system_data.conditions.free(); system_data.once.free(); system_data.dispatch_once.free(); free(system_data) }
 	system_data = unsafe { nil }

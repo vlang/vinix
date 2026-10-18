@@ -36,7 +36,7 @@ fn cm_block_dispose(mut header ObjHeader) {
 	state.free_proc = 0
 	if state.base != 0 {
 		if callback != 0 { unsafe { CMBlockFree(voidptr(callback))(state.context, state.base, state.block_length) } }
-		else if state.owned { C.free(unsafe { voidptr(state.base) }) }
+		else if state.owned { darwin_free(unsafe { voidptr(state.base) }) }
 	}
 	header.cm_block = unsafe { nil }
 	C.free(state)

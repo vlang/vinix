@@ -9250,17 +9250,50 @@ under `build/ios/fortnite/madvise-checks`. The fresh Fortnite probe passes
 initial size at `0x10489c068`. Fortnite remains unplayable; the full iOS regression
 is unpassed.
 
+The V allocator now implements Fortnite's seven malloc-zone imports: creation,
+destruction, allocation, realloc, free, exact pointer lookup and consistency
+checks. Zones expose the version-5 ARM64 callback table, including size, calloc,
+page-aligned allocation and memalign. Their introspection table supplies size
+rounding, consistency checks, locking and statistics; remote enumeration and
+debug printing/logging remain unsupported. Creation accepts the measured zero
+flags; the initial size is an allocation hint.
+
+A hash table and per-zone lists track payload ownership without reading guest
+memory or adding private headers to returned blocks. Imported malloc, calloc,
+realloc, strdup and posix_memalign use an embedded default zone. Global free and
+realloc recognize custom-zone blocks, and malloc_size reports their tracked
+capacity. Failed resize preserves the original bytes and ownership. Zero-sized
+allocations and realloc return usable storage. NSData and CMBlockBuffer disposal
+remove tracked ownership before freeing transferred guest buffers. Zone lookup
+covers allocations through these adapters; allocations made inside native
+bridge/C++ libraries are outside that registry, while existing native-pointer
+free/realloc/size operations retain their native fallback.
+
+The namespace gate serializes heap metadata and already spans fork, so child
+allocations remain independently usable. Zone destruction reclaims outstanding
+blocks; image retirement also releases the default heap and zone headers.
+`tests/ios/native-checks.v build-malloc-zone` builds the fixture. Ten host
+ASan/UBSan runs cover the allocator, libSystem, Mach memory entries, block
+buffers and Objective-C storage. Native allocator measurements run separately
+from ASan's allocator interposition; the existing native class-lifetime fixture
+is rebuilt for this cohort. The ARM64 fixture covers callback layout, ownership,
+alignment, failure, transferred buffers, eight callers, fork and two image
+lifetimes. Generated C review checks allocation/free paths and pointer stability.
+Evidence is under `build/ios/fortnite/malloc-zone-checks`. Fortnite now passes
+the zone imports and stops before entry at `_mkstemp`, called at `0x1000a960c`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,753 | 407 | 79 |
+| Fortnite executable | 1,760 | 400 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,588 | 410 | 120 |
+| All images | 2,595 | 403 | 120 |
 
-The C++/GLES/Text variant reports 2,602 resolved imports, 396 unresolved strong
+The C++/GLES/Text variant reports 2,609 resolved imports, 389 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
