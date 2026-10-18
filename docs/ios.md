@@ -71,7 +71,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | Mach thread policy subset | Calling-thread standard/fair scheduling reaches native libc; cache-affinity hints return the measured ARM64 `KERN_NOT_SUPPORTED`; remote and unrepresentable scheduling changes are rejected |
 | Signal subset | Darwin 16-byte `sigaction` and `signal`, translated native numbers/masks, one-argument handlers, `SA_RESTART`/`SA_NODEFER`, and callback draining before image unload |
 | Entry point | `LC_MAIN`, `argc`/`argv`, empty null-terminated environment and Apple vectors, integer exit status |
-| Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; app-bundled dylibs with `@executable_path`, `@loader_path` and own/executable `@rpath` lookup, shared mappings for repeated dependencies; checked lazy function slots resolve on first call through register-preserving ARM64 thunks; built-in and already-linked library `dlopen`/`dlsym`/`dlerror`, image/section lookup |
+| Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; app-bundled dylibs with `@executable_path`, `@loader_path` and own/executable `@rpath` lookup, shared mappings for repeated dependencies; checked lazy function slots resolve on first call through register-preserving ARM64 thunks; built-in and already-linked library `dlopen`/`dlsym`/`dlerror`, image/section lookup; main executable path with a checked 32-bit buffer size |
 | Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order image-scoped `atexit`/`__cxa_atexit`/`__cxa_finalize` callbacks; native `exit` and immediate `_exit`/`_Exit` process termination |
 | Thread-local storage | Darwin TLV descriptors, independent initialized and zero-filled templates for each image, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
 | Swift heap subset | Aligned allocation for native ARC classes and local/generic heap contexts; synchronized strong, batch, bridge and unknown ARC, x20 deallocating destructors, checked object/class and uninitialized deallocation; owners drain before metadata/thunk retirement |
@@ -8345,21 +8345,45 @@ Storefront.current. Native/IPA inspection, joined logs, pinned inputs and eleven
 generated C/executable pairs are retained under
 `build/ios/fortnite/crt-environ-checks`.
 
+That probe exited with status 1 before application entry at
+`__NSGetExecutablePath` from `libSystem.B.dylib`.
+
+`_NSGetExecutablePath` (Mach-O `__NSGetExecutablePath`) now copies the main
+image's cached path through a V adapter. It uses the Darwin 32-bit result and
+size pointer, includes the NUL byte in the required size, leaves successful
+capacity and errno unchanged, and reports insufficient buffers before touching
+their contents. The path is available before image initializers and remains
+stable across working-directory changes. The getter allocates no memory.
+
+`tests/ios/native-checks.v build-executable-path` builds the fixture. It compares
+the installed Mac behavior, checks protected source/output/size boundaries,
+read-only successful size pointers, paths longer than PATH_MAX, UTF-8, eight
+concurrent readers and two retired runtimes. Missing or retired main-image
+state and invalid output parameters reject explicitly. V/Mach-O/LLVM inspection
+of the actual IPA finds the zero-size query at `0x1000a68a8`, allocation using
+that 32-bit result and the buffer-fill call at `0x1000a68c0`.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites pass, covering executable
+paths, native zlib stream bounds, the CRT environment cell and Storefront.current.
+Native/IPA inspection, pinned inputs, joined logs and eleven generated
+C/executable pairs are retained under
+`build/ios/fortnite/executable-path-checks`.
+
 The actual IPA now exits with status 1 before application entry at
-`__NSGetExecutablePath` from `libSystem.B.dylib`. Fortnite remains unplayable and
-full iOS regression remains unpassed.
+`__dispatch_source_type_timer` from `libSystem.B.dylib`. Fortnite remains
+unplayable and full iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,694 | 466 | 79 |
+| Fortnite executable | 1,695 | 465 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,529 | 469 | 120 |
+| All images | 2,530 | 468 | 120 |
 
-The C++/GLES/Text variant reports 2,543 resolved imports, 455 unresolved strong
+The C++/GLES/Text variant reports 2,544 resolved imports, 454 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

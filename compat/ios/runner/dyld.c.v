@@ -166,6 +166,7 @@ fn darwin_platform_at_least(platform u32, major u32, minor u32, patch u32) bool 
 
 fn dyld_symbol(symbol string) ?u64 {
 	return match symbol {
+		'__NSGetExecutablePath' { u64(unsafe { voidptr(darwin_ns_get_executable_path) }) }
 		'_dlopen' { u64(unsafe { voidptr(darwin_dlopen) }) }
 		'_dlsym' { u64(unsafe { voidptr(darwin_dlsym) }) }
 		'_dlclose' { u64(unsafe { voidptr(darwin_dlclose) }) }
