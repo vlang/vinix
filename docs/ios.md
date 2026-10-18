@@ -8369,21 +8369,46 @@ Native/IPA inspection, pinned inputs, joined logs and eleven generated
 C/executable pairs are retained under
 `build/ios/fortnite/executable-path-checks`.
 
+That probe exited with status 1 before application entry at
+`__dispatch_source_type_timer` from `libSystem.B.dylib`.
+
+The dispatch timer source type now resolves to a direct, aligned, read-only
+V constant. The public type is opaque: clients pass the object's address to
+`dispatch_source_create`, without loading a pointer cell or depending on
+Apple's private descriptor fields. Its identity is independent of queue and
+image runtime initialization and teardown; resolving it allocates no memory.
+This export does not implement source creation, timer delivery or cancellation.
+
+`tests/ios/native-checks.v build-dispatch-timer-type` builds the fixture. It
+checks library and symbol scope, read-only storage, unchanged errno, eight
+concurrent readers and stable identity across two retired runtimes. The Mac
+reference confirms the public macro and dynamic export name the same data
+object and that its native timer factory accepts zero and strict masks.
+V/Mach-O/LLVM inspection finds four actual IPA consumers at `0x100007b78`,
+`0x10001553c`, `0x1000399d8` and `0x10009e4e0`, each loading the import slot
+directly into the factory's first argument.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites pass, covering the timer
+type, native zlib stream bounds, the CRT environment cell and Storefront.current.
+Native/IPA inspection, pinned inputs, joined logs and eleven generated
+C/executable pairs are retained under
+`build/ios/fortnite/dispatch-timer-type-checks`.
+
 The actual IPA now exits with status 1 before application entry at
-`__dispatch_source_type_timer` from `libSystem.B.dylib`. Fortnite remains
-unplayable and full iOS regression remains unpassed.
+`__dyld_get_image_header` from `libSystem.B.dylib`. Fortnite remains unplayable
+and full iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,695 | 465 | 79 |
+| Fortnite executable | 1,696 | 464 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,530 | 468 | 120 |
+| All images | 2,531 | 467 | 120 |
 
-The C++/GLES/Text variant reports 2,544 resolved imports, 454 unresolved strong
+The C++/GLES/Text variant reports 2,545 resolved imports, 453 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
