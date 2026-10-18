@@ -8322,21 +8322,44 @@ Pinned inputs, native/IPA inspection, joined probe/audit logs and eleven
 generated C/executable pairs are retained under
 `build/ios/fortnite/immediate-exit-checks`.
 
+That probe exited with status 1 before application entry at `__NSGetEnviron`
+from `libSystem.B.dylib`.
+
+`_NSGetEnviron` (Mach-O `__NSGetEnviron`) now returns the writable libc process
+environment cell through a V adapter. Its address stays stable when callers
+replace the vector or libc grows it; the existing `getenv`, `setenv` and
+`unsetenv` imports observe the same live vector. The getter is independent of
+image initialization, preserves errno and allocates no memory.
+
+`tests/ios/native-checks.v build-crt-environ` builds the isolated subprocess
+fixture. It compares the installed Mac getter with the V adapter, checks empty,
+UTF-8 and embedded-equals values, growth, overwrite/removal, null/empty vector
+replacement and eight concurrent readers. Each child owns its mutations; the
+driver's environment stays intact. V/Mach-O/LLVM inspection of the actual IPA
+finds the call at `0x1006b5634`, followed by loading the returned cell and walking
+eight-byte string pointers until the null terminator.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites pass, covering the CRT
+environment getter, native zlib stream bounds, immediate process exit and
+Storefront.current. Native/IPA inspection, joined logs, pinned inputs and eleven
+generated C/executable pairs are retained under
+`build/ios/fortnite/crt-environ-checks`.
+
 The actual IPA now exits with status 1 before application entry at
-`__NSGetEnviron` from `libSystem.B.dylib`. Fortnite remains unplayable and full
-iOS regression remains unpassed.
+`__NSGetExecutablePath` from `libSystem.B.dylib`. Fortnite remains unplayable and
+full iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,693 | 467 | 79 |
+| Fortnite executable | 1,694 | 466 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,528 | 470 | 120 |
+| All images | 2,529 | 469 | 120 |
 
-The C++/GLES/Text variant reports 2,542 resolved imports, 456 unresolved strong
+The C++/GLES/Text variant reports 2,543 resolved imports, 455 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
