@@ -28,6 +28,21 @@ fn test_setup_runtime_resolution_handles_alternatives_providers_and_cycles() {
 	}
 }
 
+fn test_setup_runtime_index_keeps_only_resolution_fields() {
+	// The last package has no blank line after it.
+	index := 'Package: first\nDescription: a tool\n Depends: not-a-field\n .\nPre-Depends: base\nDepends: second (>= 1) | other\nSHA256: aa\nFilename: pool/first.deb\n\nPackage: second\nFilename: pool/second.deb\nProvides: api, other-api (= 2)\n\nPackage: base\nFilename: pool/base.deb'
+	packages := first_run_debian_packages(index)
+	assert packages.map(it.name) == ['first', 'second', 'base']
+	assert packages[0].depends == 'base, second (>= 1) | other'
+	assert packages[0].sha256 == 'aa'
+	assert packages[1].provides == ['api', 'other-api']
+	selected := first_run_debian_resolve(packages, ['first', 'api'])!
+	assert selected.map(it.name) == ['first', 'second', 'base']
+	if _ := first_run_debian_resolve(packages, ['missing']) {
+		assert false
+	}
+}
+
 fn test_setup_vendor_archive_verification_and_atomic_publication() {
 	root := os.join_path(os.temp_dir(), 'vinix-vendor-install-${os.getpid()}')
 	os.mkdir_all(root + '/source')!
