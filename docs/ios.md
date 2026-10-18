@@ -8602,17 +8602,60 @@ wrapper and preliminary guarded native backtrace measurements are retained
 for the next adapter. Fortnite remains unplayable and the full iOS regression
 is unpassed.
 
+V now implements `_backtrace` for ARM64 frame chains. A naked V entry captures
+the incoming frame pointer, return address and stack pointer before any
+compiler-generated frame. The V walker writes the immediate caller PC, then
+follows ascending, aligned, complete 16-byte frame records within the current
+thread's live stack bounds. It strips return-address authentication bits and
+frame-link top-byte tags, preserves interior null PCs and trims trailing null
+PCs. The walk allocates no storage and preserves errno and floating-point
+state. Zero or negative capacities return zero without touching the buffer;
+negative counts are a defensive policy, not the native unsigned-count behavior.
+
+The existing pthread stack-bounds bridge supplies the current stack range.
+If those bounds cannot be obtained, or the captured SP is outside them, the
+adapter returns only the caller PC. Alternate signal stacks, asynchronous
+Swift stack reconstruction, symbolication and DWARF/C++ exception unwinding
+remain unsupported. This adapter does not depend on ELF metadata for the
+application's mapped Mach-O frames.
+
+Typed native libSystem measurements and LLVM inspection confirm the pointer
+array/int32 ABI, frame decoding and trailing-null trimming. V/Mach-O/LLVM
+inspection follows the IPA's guarded forwarding wrapper at `0x104844e98` to
+actual callers, including fixed capacities of 100, 66 and 10 frames and a
+variable-capacity buffer. `tests/ios/native-checks.v build-backtrace` builds
+the new fixture.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites pass, covering backtrace,
+ASL, TLV destruction and native zlib bounds. The backtrace fixture emits three
+real ARM64 call frames into executable memory and checks their exact return
+PCs against both native libSystem and the V adapter. It also checks guarded
+buffer ends, malformed/cyclic/tagged links, incomplete records at a guard
+page, all four rounding modes, sticky exception flags, preserved errno,
+512 concurrent captures and a forked child. Native measurements, IPA consumers,
+preliminary helper compiler failures, pinned inputs, joined logs and eleven
+generated C/executable pairs are retained under
+`build/ios/fortnite/backtrace-checks`.
+
+The fresh IPA probe passes `_backtrace` and stops at `_dispatch_data_create`
+from `libSystem.B.dylib`, before application entry. The IPA also imports
+`_dispatch_data_create_concat`; its callers create data with stack-block
+destructors, concatenate it and release the input objects. Preliminary typed
+native measurements establish default-buffer copying, the empty singleton,
+retained concatenation inputs and mapped subrange bytes for the next adapter.
+Fortnite remains unplayable and the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,711 | 449 | 79 |
+| Fortnite executable | 1,712 | 448 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,546 | 452 | 120 |
+| All images | 2,547 | 451 | 120 |
 
-The C++/GLES/Text variant reports 2,560 resolved imports, 438 unresolved strong
+The C++/GLES/Text variant reports 2,561 resolved imports, 437 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
