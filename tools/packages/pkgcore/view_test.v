@@ -5,6 +5,7 @@ import json2
 import os
 import time
 import tools.packages.pkgprotocol
+import tools.packages.signing
 
 $if track_heap ? {
 	#include "@VMODROOT/../../../desktop/tools/tests/heap_tracker.h"
@@ -46,6 +47,149 @@ fn view_configuration() Config {
 
 fn view_row(view SoftwareView, id string) SoftwareRow {
 	return view.rows.filter(it.id == id)[0]
+}
+
+fn test_software_views_own_independent_rows_after_input_and_sibling_retirement() {
+	for architecture in ['aarch64', 'x86_64']! {
+		base := Config{ ...view_configuration(), architecture: architecture, launch_user: 'alex' }
+		config := decode_configuration(json2.encode(base))!
+		p := Package{ ...view_package('app', '1.0.0', 'native'), architecture: architecture,
+			permissions: ['display'], dependencies: [Dependency{id: 'assets', minimum: '1.0.0', before: '3.0.0'}] }
+		assets := view_installed(view_package('assets', '1.0.0', 'data'))
+		current := decode_persistent_state(json2.encode(State{ architecture: architecture, generation: 1, requested: ['app'], packages: [view_installed(p), assets] }), architecture)!
+		updated := decode_persistent_state(json2.encode(State{ ...current, generation: 2, packages: [
+			view_installed(Package{ ...p, version: '2.0.0', permissions: ['files'] }), assets] }), architecture)!
+		catalog := Catalog{ packages: updated.packages }
+		mut first := catalog_view(config, catalog, current, '')!
+		mut second := catalog_view(config, catalog, current, '')!
+		assert first == second && first.rows.data != second.rows.data && first.architecture.str != second.architecture.str
+		old := view_row(first, 'app'); other := view_row(second, 'app')
+		assert old.name.str != other.name.str && old.installed_name.str != other.installed_name.str
+		assert old.permissions.data != other.permissions.data && old.installed_permissions.data != other.installed_permissions.data
+		assert old.installed_dependencies.data != other.installed_dependencies.data && old.installed_dependencies[0].id.str != other.installed_dependencies[0].id.str
+		text := json2.encode(second)
+		close_decoded_configuration(config); close_decoded_state(current); close_decoded_state(updated)
+		first.close(); first.close()
+		assert first.rows.len == 0 && first.architecture == ''
+		assert view_row(second, 'app').name == 'app' && view_row(second, 'app').installed_dependencies[0].before == '3.0.0'
+		assert view_row(second, 'app').permissions == ['files'] && view_row(second, 'app').installed_permissions == ['display']
+		assert view_row(second, 'app').installed_license == 'MIT' && view_row(second, 'app').repository == 'fixture'
+		mut wire := pkgprotocol.decode_software_view(text)!
+		assert json2.encode(second) == text && wire.architecture == architecture
+		wire.close(); second.close(); second.close()
+		unsafe { text.free() }
+	}
+	println('SOFTWARE VIEW OWNERSHIP independent catalog rows survive source and sibling retirement; both architectures and unchanged protocol fields PASS')
+}
+
+fn test_software_catalog_projection_retires_rows_resolution_policy_and_refusal_scratch() {
+	$if track_heap ? {
+		base := view_configuration()
+		app := view_installed(view_package('app', '1.0.0', 'native'))
+		current := State{ architecture: 'aarch64', generation: 1, requested: ['app'], packages: [app] }
+		for mode in ['update', 'unresolved', 'revoked', 'denied', 'fresh', 'growing']! {
+			config := if mode == 'revoked' { Config{ ...base, repositories: [] } }
+				else if mode == 'denied' { Config{ ...base, policy: Policy{ allowed: ['other'] } } } else { base }
+			mut packages := [Installed{ ...app, package: Package{ ...app.package, version: '2.0.0',
+				dependencies: if mode == 'unresolved' { [Dependency{id: 'missing'}] } else { []Dependency{} } } }]
+			if mode == 'growing' {
+				for index in 0 .. 64 { packages << view_installed(view_package('app-' + index.str(), '1.0.0', 'native')) }
+			}
+			catalog := Catalog{packages: packages}
+			C.vinix_heap_begin()
+			for _ in 0 .. 1000 {
+				mut view := catalog_view(config, catalog, if mode == 'fresh' { State{architecture: 'aarch64'} } else { current },
+					if mode == 'revoked' { 'Publisher revoked' } else { '' })!
+				assert view.rows.len == if mode == 'growing' { 65 } else { 1 }
+				if mode in ['unresolved', 'denied']! { assert view.update_error != '' }
+				view.close(); view.close()
+			}
+			kept := C.vinix_heap_end()
+			assert kept == 0 && C.vinix_heap_count() == 0, mode + ': retained ' + kept.str() + ' bytes'
+		}
+		mut packages := []Installed{cap: 4097}
+		for index in 0 .. 4097 { packages << view_installed(view_package('app-' + index.str(), '1.0.0', 'native')) }
+		C.vinix_heap_begin()
+		for _ in 0 .. 16 {
+			if mut view := catalog_view(base, Catalog{packages: packages}, State{architecture: 'aarch64'}, '') {
+				view.close(); assert false
+			} else { message := err.msg(); assert message.contains('row limit'); unsafe { message.free(); err.free() } }
+		}
+		kept := C.vinix_heap_end()
+		assert kept == 0 && C.vinix_heap_count() == 0, 'row-limit refusals retained ' + kept.str()
+		println('SOFTWARE VIEW OWNERSHIP 1000 update/unresolved/revoked/denied/fresh/65-row cycles and sixteen row-limit refusals retain zero tracked bytes PASS')
+	}
+}
+
+fn test_public_software_view_retires_fresh_authenticated_and_failed_read_storage() {
+	root := os.temp_dir() + '/vinix-view-owned-' + os.getpid().str() + '-' + time.now().unix_micro().str()
+	os.mkdir_all(root + '/etc/vinix-packages')!
+	defer { os.rmdir_all(root) or {} }
+	path := root + '/etc/vinix-packages/config.json'; directory := state_directory(root)
+	fresh := json2.encode(Config{architecture: 'aarch64', launch_user: 'alex'})
+	os.write_file(path, fresh)!
+	$if track_heap ? { C.vinix_heap_begin() }
+	for _ in 0 .. 1000 {
+		mut view := software_view(root, true)!
+		assert view.offline && view.catalog_error.contains('repo-enroll') && view.rows.len == 0
+		view.close(); view.close()
+	}
+	$if track_heap ? { kept := C.vinix_heap_end(); assert kept == 0, 'fresh reads retained ' + kept.str() }
+	assert os.read_file(path)! == fresh && !os.exists(directory)
+	private := signing.new_key_from_seed([]u8{len: 32, init: 7})
+	repository := Repository{id: 'fixture', url: 'file:///offline/repository', public_key: private.public_key().hex()}
+	config := Config{architecture: 'aarch64', launch_user: 'alex', repositories: [repository]}
+	text := json2.encode(config); os.write_file(path, text)!
+	app := view_package('app', '1.0.0', 'native')
+	installed := Installed{package: app, repository: repository.id, public_key: repository.public_key, sequence: 1}
+	state := State{architecture: 'aarch64', generation: 1, requested: ['app'], packages: [installed]}
+	guard := acquire(directory)!; guard.release()
+	os.mkdir_all(directory + '/generations/1')!
+	state_text := json2.encode(state); os.write_file(directory + '/generations/1/state.json', state_text)!
+	os.symlink('generations/1', directory + '/current')!
+	index := canonical_index(Index{repository: repository.id, sequence: 1, expires: time.now().unix() + 3600,
+		packages: [Package{ ...app, version: '2.0.0' }]})!
+	bytes := index.bytes(); signature := signing.sign(private, bytes)!
+	cache := json2.encode([Snapshot{repository: repository, text: index, signature: signature.hex()}])
+	os.write_file(directory + '/catalog.json', cache)!
+	// Initialize generic metadata tables outside the measured read boundary.
+	mut warm := software_view(root, false)!; warm.close()
+	for failed in [false, true]! {
+		if failed { os.write_file(directory + '/catalog.json', '{invalid catalog')! }
+		$if track_heap ? { C.vinix_heap_begin() }
+		for _ in 0 .. if failed { 1000 } else { 128 } {
+			mut view := software_view(root, false)!
+			assert view.rows.len == 1 && view.rows[0].installed_version == '1.0.0'
+			assert view.rows[0].version == if failed { '1.0.0' } else { '2.0.0' }
+			assert (view.catalog_error != '') == failed && view.rows[0].updatable == !failed
+			view.close(); view.close()
+		}
+		$if track_heap ? { kept := C.vinix_heap_end(); assert kept == 0, 'cached reads retained ' + kept.str() }
+	}
+	// Failed configuration and busy-reader refusals release all partial storage.
+	for busy in [false, true]! {
+		writer := if busy { acquire(directory)! } else { Lock{fd: -1} }
+		os.write_file(path, '{invalid configuration')!
+		$if track_heap ? { C.vinix_heap_begin() }
+		for _ in 0 .. 1000 {
+			if mut view := software_view(root, false) { view.close(); assert false }
+			else { message := err.msg(); if busy { assert message.contains('another package transaction') }; unsafe { message.free(); err.free() } }
+		}
+		$if track_heap ? { kept := C.vinix_heap_end(); assert kept == 0, 'refused reads retained ' + kept.str() }
+		if busy { writer.release() }
+		os.write_file(path, text)!
+	}
+	os.write_file(directory + '/catalog.json', cache)!
+	mut retained := software_view(root, true)!; mut sibling := software_view(root, false)!
+	assert retained.rows.data != sibling.rows.data && retained.rows[0].name.str != sibling.rows[0].name.str
+	sibling.close(); sibling.close()
+	assert os.read_file(path)! == text && os.read_file(directory + '/generations/1/state.json')! == state_text
+	assert os.readlink(directory + '/current')! == 'generations/1' && os.ls(directory + '/objects')!.len == 0
+	os.write_file(path, '{replaced configuration')!; os.rm(directory + '/catalog.json')!
+	assert retained.rows[0].version == '2.0.0' && retained.rows[0].installed_version == '1.0.0' && retained.offline
+	retained.close(); retained.close()
+	unsafe { bytes.free(); signature.free(); index.free(); cache.free(); state_text.free(); fresh.free(); text.free() }
+	println('SOFTWARE VIEW OWNERSHIP public reads preserve stored bytes and independently retire 1000 fresh/catalog-failure/configuration-failure/busy reads plus 128 authenticated reads PASS')
 }
 
 fn test_updates_expose_resolved_runtime_data_and_new_dependencies() {

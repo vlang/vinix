@@ -355,6 +355,13 @@ Update previews and policy/trust failures preserve the installed disclosure;
 review details describe their reviewed target. See
 [installed payload checks](../../tests/packages/software-payload-check.md).
 
+V clients retire responses from `pkgcore.software_view()` with `.close()`.
+Each response owns its headers, rows and nested permissions/requirements,
+independently of source metadata or another observation. Complete reads retire
+configuration, catalog, state and planning scratch; the CLI closes catalog
+responses after presentation. See
+[catalog observation checks](../../tests/packages/software-view-owner-check.md).
+
 Software's **Clean up versions → Read review** presents the complete admitted
 generation list, fingerprint, retained current/rollback identities and deletion
 rules through the shared reader, including compact windows. Back/Escape keeps

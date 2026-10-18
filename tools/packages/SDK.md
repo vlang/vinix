@@ -2667,6 +2667,15 @@ captured observation, rather than a continuing lease on installed files. Wire
 fields and output bytes are unchanged. See
 [status ownership qualification](../../tests/packages/status-ownership-check.md).
 
+`pkgcore.software_view(root, offline)` also returns an independently owned
+`SoftwareView`. Call `.close()` after rendering, encoding or replacing it;
+repeated close of one owner is harmless. Headers, rows, permissions and installed
+requirements survive configuration/catalog/state retirement and closing another
+view. Reader locks, fresh-image behavior, field ordering and JSON contracts are
+unchanged. The observation grants no lease or maintenance authority. Caller-built
+values may borrow data and keep their caller-managed lifetime. See
+[catalog observation ownership](../../tests/packages/software-view-owner-check.md).
+
 [`pkgprotocol.decode_software_view`](pkgprotocol/view_reader.v) returns an owned
 `SoftwareView`; call `.close()` on cancellation, replacement or retirement.
 All eight header fields and eighteen base row fields are required, including

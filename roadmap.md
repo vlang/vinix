@@ -801,6 +801,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
   interrupted-download recovery and coherent persistent package state.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,
   permissions, progress, uninstall, updates and useful failure diagnostics.
+  - [x] [Owned catalog observations](tests/packages/software-view-owner-check.md)
+    give V callers independently closeable rows and nested metadata, retiring
+    configuration, catalogs, installed state and resolution scratch. Tracked
+    public reads and refusal paths preserve locks, activation and stored bytes;
+    CLI and native checks retain existing presentation and maintenance behavior.
   - [x] [Actionable HTTPS failures](tests/packages/https-diagnostics-check.md)
     preserve transport status and add recovery guidance for connection, DNS,
     proxy, timeout, interruption, HTTP/TLS, size-limit and missing-tool errors.

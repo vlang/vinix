@@ -50,8 +50,38 @@ pub:
 }
 
 fn view_policy_allows(p Package, policy Policy) bool {
-	check_policy(p, policy) or { return false }
+	check_policy(p, policy) or { unsafe { err.free() }; return false }
 	return true
+}
+
+fn owned_view_dependencies(values []Dependency) []Dependency {
+	mut owned := []Dependency{cap: values.len}
+	for value in values {
+		item := Dependency{id: value.id.clone(), minimum: value.minimum.clone(), before: value.before.clone()}
+		pointer := unsafe { &item }
+		unsafe { owned.push_many(pointer, 1) }
+	}
+	return owned
+}
+
+// Only service/catalog observations own all row fields. Caller-built values
+// may borrow data and must retain their caller-managed lifetime.
+pub fn (mut view SoftwareView) close() {
+	unsafe {
+		view.architecture.free(); view.launch_user.free(); view.catalog_error.free(); view.update_error.free()
+		for row in view.rows {
+			row.id.free(); row.name.free(); row.description.free(); row.version.free(); row.installed_version.free()
+			row.installed_repository.free(); row.installed_public_key.free(); row.installed_license.free(); row.installed_runtime.free()
+			row.installed_name.free(); row.installed_kind.free(); row.architecture.free(); row.kind.free(); row.runtime.free()
+			row.repository.free(); row.public_key.free(); row.license.free(); row.update_action.free(); row.diagnostic.free()
+			for permission in row.permissions { permission.free() }; (&array(&row.permissions)).free()
+			for permission in row.installed_permissions { permission.free() }; (&array(&row.installed_permissions)).free()
+			for dependency in row.installed_dependencies { dependency.id.free(); dependency.minimum.free(); dependency.before.free() }
+			(&array(&row.installed_dependencies)).free()
+		}
+		(&array(&view.rows)).free()
+	}
+	view = SoftwareView{}
 }
 
 // New applications advertise catalog metadata; installation still requires
@@ -64,6 +94,7 @@ fn catalog_view(config Config, catalog Catalog, current State, catalog_error str
 	defer { unsafe { publisher_keys.free() } }
 	mut installed := map[string]Installed{}
 	mut choices := map[string]Installed{}
+	defer { unsafe { installed.free(); choices.free() } }
 	for item in current.packages {
 		installed[item.package.id] = item
 		choices[item.package.id] = item
@@ -83,14 +114,20 @@ fn catalog_view(config Config, catalog Catalog, current State, catalog_error str
 		}
 	}
 	mut update_error := ''
+	defer { unsafe { update_error.free() } }
 	mut changes := map[string]string{}
+	defer { unsafe { changes.free() } }
 	if catalog_error == '' && current.requested.len > 0 {
 		plan := resolve(catalog, config, current, current.requested, true) or {
-			update_error = err.msg()
+			message := err.msg()
+			update_error = message.clone()
+			unsafe { message.free(); err.free() }
 			Plan{}
 		}
+		defer { unsafe { (&array(&plan.requested)).free(); (&array(&plan.packages)).free() } }
 		if update_error == '' {
 			mut targets := map[string]bool{}
+			defer { unsafe { targets.free() } }
 			for candidate in plan.packages {
 				id := candidate.package.id
 				targets[id] = true
@@ -103,14 +140,16 @@ fn catalog_view(config Config, catalog Catalog, current State, catalog_error str
 					changes[id] = 'update'
 				}
 			}
-			for id in installed.keys() {
+			for id, _ in installed {
 				if id !in targets { changes[id] = 'remove' }
+				unsafe { id.free() }
 			}
 		}
 	}
-	mut rows := []SoftwareRow{}
 	mut ids := choices.keys()
+	defer { unsafe { for id in ids { id.free() }; (&array(&ids)).free() } }
 	if ids.len > 4096 { return error('software catalog exceeds its supported row limit') }
+	mut rows := []SoftwareRow{cap: ids.len}
 	ids.sort()
 	for id in ids {
 		candidate := choices[id]
@@ -124,69 +163,79 @@ fn catalog_view(config Config, catalog Catalog, current State, catalog_error str
 			package_diagnostic(config, candidate, mut publisher_keys)
 		}
 		action := changes[id] or { '' }
-		rows << SoftwareRow{
-			id:                id
-			name:              p.name
-			description:       p.description
-			version:           p.version
-			installed_version: old.package.version
-			installed_repository: old.repository
-			installed_public_key: old.public_key
+		row := SoftwareRow{
+			id:                id.clone()
+			name:              p.name.clone()
+			description:       p.description.clone()
+			version:           p.version.clone()
+			installed_version: old.package.version.clone()
+			installed_repository: old.repository.clone()
+			installed_public_key: old.public_key.clone()
 			installed_dependencies_known: old.package.id != ''
-			installed_dependencies: old.package.dependencies
-			installed_license: old.package.license
+			installed_dependencies: owned_view_dependencies(old.package.dependencies)
+			installed_license: old.package.license.clone()
 			installed_proprietary: old.package.proprietary
 			installed_firmware: old.package.firmware
-			installed_runtime: old.package.runtime
-			installed_name:    old.package.name
-			installed_kind:    old.package.kind
-			installed_permissions: old.package.permissions
+			installed_runtime: old.package.runtime.clone()
+			installed_name:    old.package.name.clone()
+			installed_kind:    old.package.kind.clone()
+			installed_permissions: review_strings(old.package.permissions)
 			installed_window_protocol: old.package.window_protocol
-			architecture:      p.architecture
-			kind:              p.kind
-			runtime:           p.runtime
-			repository:        candidate.repository
-			public_key:        candidate.public_key
-			license:           p.license
+			architecture:      p.architecture.clone()
+			kind:              p.kind.clone()
+			runtime:           p.runtime.clone()
+			repository:        candidate.repository.clone()
+			public_key:        candidate.public_key.clone()
+			license:           p.license.clone()
 			proprietary:       p.proprietary
 			firmware:          p.firmware
-			permissions:       p.permissions
+			permissions:       review_strings(p.permissions)
 			requested:         id in current.requested
 			updatable:         action != ''
-			update_action:     action
+			update_action:     action.clone()
 			diagnostic:        diagnostic
 		}
+		pointer := unsafe { &row }
+		unsafe { rows.push_many(pointer, 1) }
 	}
 	return SoftwareView{
 		generation:    current.generation
-		architecture:  config.architecture
+		architecture:  config.architecture.clone()
 		offline:       config.policy.offline
-		catalog_error: catalog_error
-		update_error:  update_error
+		catalog_error: catalog_error.clone()
+		update_error:  update_error.clone()
 		rows:          rows
-		launch_user:   if os.geteuid() == 0 { config.launch_user } else { '' }
+		launch_user:   if os.geteuid() == 0 { config.launch_user.clone() } else { '' }
 	}
 }
 
 fn read_software_view(root string, offline bool) !SoftwareView {
 	initial := load_config(root)!
+	defer { close_decoded_configuration(initial) }
 	config := Config{ ...initial, policy: Policy{ ...initial.policy, offline: offline || initial.policy.offline } }
 	directory := state_directory(root)
+	defer { unsafe { directory.free() } }
 	current := read_state(directory, config.architecture)!
+	defer { if current.generation != 0 { close_decoded_state(current) } }
 	mut catalog_error := if config.repositories.len == 0 {
 		'No trusted repositories are configured. An administrator must enroll a publisher with vinix-package repo-enroll.'
 	} else {
 		''
 	}
+	defer { unsafe { catalog_error.free() } }
 	catalog := load_catalog(config, directory) or {
-		catalog_error = err.msg()
+		message := err.msg()
+		catalog_error = message.clone()
+		unsafe { message.free(); err.free() }
 		Catalog{}
 	}
+	defer { close_authenticated_catalog(catalog) }
 	return catalog_view(config, catalog, current, catalog_error)
 }
 
 pub fn software_view(root string, offline bool) !SoftwareView {
 	directory := state_directory(root)
+	defer { unsafe { directory.free() } }
 	if state_requires_lock(directory) {
 		guard := acquire_reader(directory)!
 		defer { guard.release() }

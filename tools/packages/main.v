@@ -340,9 +340,11 @@ fn checked(arguments []string) !int {
 			service.refresh()!
 		}
 		'view', 'search', 'info', 'updates' {
-			view := pkgcore.software_view(root, offline)!
+			mut view := pkgcore.software_view(root, offline)!
+			defer { view.close() }
 			if command == 'view' {
 				text := json2.encode(view)
+				defer { unsafe { text.free() } }
 				if text.len > pkgcore.max_metadata { return error('software catalog exceeds metadata limit') }
 				println(text)
 				return 0
@@ -367,8 +369,8 @@ fn checked(arguments []string) !int {
 				}
 			}
 			if command == 'info' && !found { return error('package not found: ${query}') }
-			if view.catalog_error != '' { return error(view.catalog_error) }
-			if command == 'updates' && view.update_error != '' { return error(view.update_error) }
+			if view.catalog_error != '' { return error(view.catalog_error.clone()) }
+			if command == 'updates' && view.update_error != '' { return error(view.update_error.clone()) }
 		}
 		'status', 'list', 'verify' {
 			mut state := if command == 'verify' { service.verify()! } else { service.state()! }

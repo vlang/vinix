@@ -1,0 +1,13 @@
+SOFTWARE VIEW OWNERSHIP independent catalog rows survive source and sibling retirement; both architectures and unchanged protocol fields PASS
+SOFTWARE VIEW OWNERSHIP 1000 update/unresolved/revoked/denied/fresh/65-row cycles and sixteen row-limit refusals retain zero tracked bytes PASS
+SOFTWARE VIEW OWNERSHIP public reads preserve stored bytes and independently retire 1000 fresh/catalog-failure/configuration-failure/busy reads plus 128 authenticated reads PASS
+SOFTWARE PROVENANCE both hosts retain installed publisher across previews, removal, revocation, activation, restored generations and unavailable catalogs PASS
+SOFTWARE DEPENDENCIES both hosts retain installed requirements across update previews, removals, revocation, activation and rollback PASS
+SOFTWARE PAYLOAD both hosts keep installed license, proprietary/firmware flags and runtime distinct across previews, policy/trust failures and generation changes PASS
+Updating trusted repository fixture
+Installing app 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (20 bytes)
+Installing runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Package diagnostics: 128 valid/invalid/revoked/policy graph reads and retirement cycles retain zero tracked bytes PASS

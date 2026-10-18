@@ -1287,6 +1287,7 @@ cannot become coordination files. A busy writer or exclusive generation holder
 returns a retry diagnostic instead of waiting indefinitely. Read-only status,
 Software views, trust and policy requests require a lock whenever durable
 catalog/history or active state exists; fresh-image reads still create no state.
+
 Refusal preserves malformed entries, retained metadata, payloads and abandoned
 stages. Stop package workers and application processes before repairing a lock
 or lease: replacing a file that is still held would separate its existing holders
@@ -1297,6 +1298,14 @@ inode before and after locking. Writers acquire exclusion before changing lock
 permissions. Launch, collection and data purge share the lease checks; malformed
 obsolete leases stop collection preflight before any generation/cache removal.
 See [identity qualification](../tests/packages/coordination-identity-check.md).
+
+V catalog observations from `pkgcore.software_view()` own their fields and
+support idempotent `.close()`. Configuration, authenticated catalog, installed
+state and planning scratch retire before the response returns; independent
+responses can be held and closed in any order. The CLI retires catalog responses
+after encoding or presentation. This lifetime contract preserves the existing
+wire fields, reader locking and read-only behavior. See
+[catalog observation ownership](../tests/packages/software-view-owner-check.md).
 
 Personal data under `~/.local/share/vinix-apps/ID` survives uninstall/rollback.
 Launch captures the account home and each data-parent directory without following

@@ -1,0 +1,3 @@
+Software catalog reader: 1000 wide/partial-invalid/legacy reload, display/details and retirement cycles retain zero tracked bytes
+Software search paste: 1000 literal/rejected/selected/empty input and catalog retirement cycles retain zero tracked bytes
+Software compact catalog: 1000 search/filter/select/details/resize/ignored-write/Back and retirement cycles retain zero tracked bytes
