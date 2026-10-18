@@ -8495,23 +8495,51 @@ inspection, pinned inputs, joined logs and eleven generated C/executable pairs
 are retained under `build/ios/fortnite/tlv-atexit-checks`. Preliminary build
 and source-review attempts are retained separately within that cohort.
 
-The fresh IPA probe now stops at `_acosh` from `libSystem.B.dylib`, before
+That IPA probe stopped at `_acosh` from `libSystem.B.dylib`, before
 application entry. Its scalar-double call at `0x101b9beac` and branch-island
 forwarder are confirmed by LLVM disassembly. Native Mac boundary, NaN,
 infinity, errno and floating-exception measurements are retained for the next
 adapter. Fortnite remains unplayable and the full iOS regression is unpassed.
+
+V now implements `_acosh`, `_asinh` and `_atanh` for `libSystem.B.dylib`.
+The adapters preserve errno, signed zeros, NaN signs and payloads, and existing
+floating-exception flags. Domain errors and poles raise the measured Darwin
+exceptions. Tiny `asinh`/`atanh` values reproduce Darwin's rounding-dependent
+underflow thresholds and one-step magnitude adjustments. Ordinary finite
+arguments use the native scalar math backend with the shared double ABI.
+
+The V fixture contains 1,694 vectors measured from this Mac's libSystem,
+with finite accuracy independently checked using the installed MPFR library
+at 256-bit precision. It checks four rounding modes, existing exception flags,
+thread-local errno and eight concurrent callers. Normal results are checked
+within two representable steps of the reference in nearest rounding and three
+in directed modes; special values and exception effects are checked exactly.
+MPFR is used only to generate reference data and is not linked into the runner.
+LLVM inspection confirms all three IPA scalar-double calls and their branch
+islands at `0x101b9beac`, `0x101b9bd2c` and `0x101b9c02c`.
+
+`tests/ios/native-checks.v build-inverse-hyperbolic` builds the new fixture.
+Eight host ASan/UBSan runs and four ARM64 Vinix suites pass, covering these
+functions, TLV destruction, dyld callbacks and native zlib bounds. Native/MPFR
+measurements, the preliminary rounding failure, pinned inputs, joined logs
+and eleven generated C/executable pairs are retained under
+`build/ios/fortnite/inverse-hyperbolic-checks`.
+
+The fresh IPA probe gets past the inverse hyperbolic imports and stops at
+`_arc4random` from `libSystem.B.dylib`, still before application entry.
+Fortnite remains unplayable and the full iOS regression is unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,702 | 458 | 79 |
+| Fortnite executable | 1,705 | 455 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,537 | 461 | 120 |
+| All images | 2,540 | 458 | 120 |
 
-The C++/GLES/Text variant reports 2,551 resolved imports, 447 unresolved strong
+The C++/GLES/Text variant reports 2,554 resolved imports, 444 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

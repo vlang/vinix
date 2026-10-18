@@ -105,6 +105,7 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 	if library != '/usr/lib/libSystem.B.dylib' {
 		return error('iOS: library is not implemented: ${library} (${symbol})')
 	}
+	if address := inverse_hyperbolic_symbol(symbol) { return address }
 	if address := pthread_symbol(symbol) { return address }
 	if address := stdio_symbol(symbol) { return address }
 	if address := dyld_symbol(symbol) { return address }
