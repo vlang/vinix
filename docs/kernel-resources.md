@@ -36,6 +36,13 @@ The charged paths cover:
 
 - File descriptions, descriptor tables and copies, created VFS nodes, tmpfs
   resources, sparse page-slot metadata, directory listings and tmpfs attributes.
+  A node created on a disk filesystem is charged only while it is created:
+  the disk bounds those, the node stays cached for as long as the file exists,
+  and its charge kept every creator's account slot alive. With one account per
+  process, 4096 short-lived processes that each left a file behind (Minecraft's
+  asset download runs a curl per file) took every slot, and no process could
+  start again. Memory-backed nodes (tmpfs, devtmpfs, cgroups, device wrappers)
+  keep their charge until they are removed.
 - UNIX endpoints, accepted connections, receive buffers, backlogs, packet
   records and passed descriptors; native Internet socket pool reservations;
   netlink buffers and reply scratch. UNIX packet metadata and backlogs each

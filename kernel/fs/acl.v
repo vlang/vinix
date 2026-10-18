@@ -2,6 +2,7 @@
 module fs
 
 import errno
+import kbudget
 import posix_acl
 import proc
 import resource
@@ -63,4 +64,26 @@ fn commit_created_node(mut node VFSNode, parent &VFSNode) ? {
 		errno.set(failure)
 		return none
 	}
+	settle_creation_charge(mut node)
+}
+
+// A node on a disk caches what the disk holds, which the disk's size already
+// bounds, and it stays cached for as long as the file exists. Kept charged to
+// its creator, every file a user had ever written counted against the kernel
+// memory that user's processes need: installing a few applications as root
+// filled the account, and from then on no process or thread could start. The
+// reservation still admits the creation; nodes whose memory is the file itself
+// -- tmpfs, devtmpfs, cgroups, device wrappers -- keep theirs until removed.
+fn settle_creation_charge(mut node VFSNode) {
+	if node.resource == unsafe { nil } || node.overlay != unsafe { nil } {
+		return
+	}
+	res := unsafe { *node.resource }
+	if res is TmpFSResource || res is DevTmpFSResource || res is CGroupResource
+		|| res is MknodDeviceResource || res is SysFSResource || res is ProcFSResource
+		|| res is NsFSResource {
+		return
+	}
+	kbudget.release(node.kernel_charge)
+	node.kernel_charge = kbudget.Charge{}
 }
