@@ -168,6 +168,8 @@ fn darwin_platform_at_least(platform u32, major u32, minor u32, patch u32) bool 
 
 fn dyld_symbol(symbol string) ?u64 {
 	return match symbol {
+		'__dyld_register_func_for_add_image' { u64(unsafe { voidptr(darwin_dyld_register_func_for_add_image) }) }
+		'__dyld_register_func_for_remove_image' { u64(unsafe { voidptr(darwin_dyld_register_func_for_remove_image) }) }
 		'__dyld_image_count' { u64(unsafe { voidptr(darwin_dyld_image_count) }) }
 		'__dyld_get_image_header' { u64(unsafe { voidptr(darwin_dyld_get_image_header) }) }
 		'__dyld_get_image_name' { u64(unsafe { voidptr(darwin_dyld_get_image_name) }) }

@@ -41,6 +41,7 @@ fn execute(image macho.Image, arguments []string) !int {
 		dispatch_stop()
 		if image_runtime.started { image_cxa_finalize(0) }
 		signals_stop()
+		dyld_images_retire()
 		objc_stop()
 		$if ios_gles ? { gles_stop() }
 		image_runtime_stop()

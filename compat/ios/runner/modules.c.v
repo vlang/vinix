@@ -14,6 +14,7 @@ mut:
 	dependencies map[string]int
 	initializers []u64
 	visiting     bool
+	dyld_published bool
 }
 
 struct ModuleRuntime {
@@ -25,6 +26,10 @@ mut:
 	binding  int
 	bytes    u64
 	auditing bool
+	dyld_add []u64
+	dyld_remove []u64
+	dyld_retiring bool
+	dyld_retired bool
 }
 
 __global module_runtime = unsafe { &ModuleRuntime(nil) }
@@ -95,7 +100,11 @@ fn module_image_free(image macho.Image) {
 }
 
 fn modules_start(image macho.Image, layout macho.Layout, base u64, path string, auditing bool) {
+	dyld_callbacks_lock()
+	defer { dyld_callbacks_unlock() }
 	module_runtime = &ModuleRuntime{ auditing: auditing }
+	module_runtime.dyld_add.flags |= .noslices
+	module_runtime.dyld_remove.flags |= .noslices
 	module_runtime.modules.flags |= .noslices
 	module_runtime.lookup_order.flags |= .noslices
 	module_runtime.order.flags |= .noslices
@@ -230,9 +239,13 @@ fn module_bind_all() ! {
 			}
 		}
 	}
+	dyld_images_publish()
 }
 
 fn modules_stop() {
+	dyld_callbacks_lock()
+	defer { dyld_callbacks_unlock() }
+	dyld_images_retire()
 	for index, loaded in module_runtime.modules {
 		if index != 0 {
 			if !module_runtime.auditing {
@@ -252,6 +265,8 @@ fn modules_stop() {
 		module_runtime.lookup_order.free()
 		module_runtime.paths.free()
 		module_runtime.order.free()
+		module_runtime.dyld_add.free()
+		module_runtime.dyld_remove.free()
 		free(module_runtime)
 	}
 	module_runtime = unsafe { nil }

@@ -72,7 +72,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | Signal subset | Darwin 16-byte `sigaction` and `signal`, translated native numbers/masks, one-argument handlers, `SA_RESTART`/`SA_NODEFER`, and callback draining before image unload |
 | Entry point | `LC_MAIN`, `argc`/`argv`, empty null-terminated environment and Apple vectors, integer exit status |
 | Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; app-bundled dylibs with `@executable_path`, `@loader_path` and own/executable `@rpath` lookup, shared mappings for repeated dependencies; checked lazy function slots resolve on first call through register-preserving ARM64 thunks; built-in and already-linked library `dlopen`/`dlsym`/`dlerror`, indexed mapped-image enumeration with signed slides and image/section lookup; main executable path with a checked 32-bit buffer size |
-| Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order image-scoped `atexit`/`__cxa_atexit`/`__cxa_finalize` callbacks; native `exit` and immediate `_exit`/`_Exit` process termination |
+| Image lifecycle | Bound-image add/remove notifications with synchronous, reentrant registration; superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order image-scoped `atexit`/`__cxa_atexit`/`__cxa_finalize` callbacks; native `exit` and immediate `_exit`/`_Exit` process termination |
 | Thread-local storage | Darwin TLV descriptors, independent initialized and zero-filled templates for each image, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
 | Swift heap subset | Aligned allocation for native ARC classes and local/generic heap contexts; synchronized strong, batch, bridge and unknown ARC, x20 deallocating destructors, checked object/class and uninitialized deallocation; owners drain before metadata/thunk retirement |
 | C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings and legacy growth/substring helpers, integer sorts, streams, regex, futures, shared/weak ownership and synchronization; V adapters for Darwin random_device and variadic abort |
@@ -8423,21 +8423,56 @@ timer type. Native/IPA inspection, pinned inputs, joined logs and eleven
 generated C/executable pairs are retained under
 `build/ios/fortnite/dyld-images-checks`.
 
+That IPA probe exited with status 1 before application entry at
+`__dyld_register_func_for_add_image` from `libSystem.B.dylib`.
+
+The V dyld adapter now implements `_dyld_register_func_for_add_image` and
+`_dyld_register_func_for_remove_image`. Add registration synchronously replays
+published images before retaining the callback, preserving the measured native
+ordering for duplicate and nested registrations. A fully bound and protected
+batch is published before Objective-C `+load` or image initializers. Linked
+bundle libraries stay mapped across `dlclose`; actual execution retirement
+delivers removal notifications in reverse initialization order after
+destructors, with headers, paths, Objective-C and TLS still available.
+
+A process-lifetime recursive native mutex serializes callback registration,
+delivery and module retirement independently of the Objective-C lock.
+Per-execution callback arrays release their replaced buffers and are freed
+before the module registry. An active callback pins the registry across a
+concurrent teardown. Failed binding and static audits execute no notifications.
+
+`tests/ios/native-checks.v build-dyld-callbacks` builds the fixture. It checks
+real guarded Mach-O headers and signed slides, duplicate/nested replay, batch
+publication, eight concurrent registrars, linked reopens and callback draining.
+It also executes a V-generated ARM64 Mach-O twice through constructor, main,
+destructor and removal callback; the callback uses live Objective-C and TLS,
+and its constructor joins an Objective-C worker to check lock independence.
+The Mac reference measures real dylib publication and unload, including
+duplicate removal callbacks and image-query visibility during removal.
+V/Mach-O/LLVM inspection finds the IPA's add call at `0x1000a8ae4`, remove tail
+call at `0x1000a8af8` and an add callback that uses `dladdr`.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites pass, covering dyld
+callbacks, image queries, native zlib bounds and cached executable paths.
+Native/IPA inspection, pinned inputs, joined logs and eleven generated
+C/executable pairs are retained under
+`build/ios/fortnite/dyld-callbacks-checks`.
+
 The fresh IPA probe exits with status 1 before application entry at
-`__dyld_register_func_for_add_image` from `libSystem.B.dylib`. Fortnite remains
-unplayable and full iOS regression remains unpassed.
+`__tlv_atexit` from `libSystem.B.dylib`. Fortnite remains unplayable and full
+iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,699 | 461 | 79 |
+| Fortnite executable | 1,701 | 459 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,534 | 464 | 120 |
+| All images | 2,536 | 462 | 120 |
 
-The C++/GLES/Text variant reports 2,548 resolved imports, 450 unresolved strong
+The C++/GLES/Text variant reports 2,550 resolved imports, 448 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
