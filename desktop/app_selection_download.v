@@ -45,9 +45,13 @@ fn first_run_download(url string, destination string) ! {
 	if !url.starts_with('https://') { return error('setup downloads require HTTPS') }
 	println('Downloading ${url}')
 	// Follow only HTTPS redirects; never run a vendor installation script.
+	// Retry whatever failed: curl retries only timeouts and server errors by
+	// itself, and one refused connection among the two hundred packages of a
+	// vendor app's runtime then failed the whole install.
 	first_run_tool(['/usr/bin/curl', '--fail', '--location', '--proto', '=https', '--proto-redir',
-		'=https', '--retry', '3', '--connect-timeout', '20', '--speed-limit', '1024', '--speed-time',
-		'60', '--silent', '--show-error', '--output', destination, url])!
+		'=https', '--retry', '5', '--retry-all-errors', '--retry-delay', '3', '--connect-timeout',
+		'20', '--speed-limit', '1024', '--speed-time', '60', '--silent', '--show-error', '--output',
+		destination, url])!
 }
 
 fn first_run_file_hash(path string) !string {
