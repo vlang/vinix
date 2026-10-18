@@ -71,7 +71,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | Mach thread policy subset | Calling-thread standard/fair scheduling reaches native libc; cache-affinity hints return the measured ARM64 `KERN_NOT_SUPPORTED`; remote and unrepresentable scheduling changes are rejected |
 | Signal subset | Darwin 16-byte `sigaction` and `signal`, translated native numbers/masks, one-argument handlers, `SA_RESTART`/`SA_NODEFER`, and callback draining before image unload |
 | Entry point | `LC_MAIN`, `argc`/`argv`, empty null-terminated environment and Apple vectors, integer exit status |
-| Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; app-bundled dylibs with `@executable_path`, `@loader_path` and own/executable `@rpath` lookup, shared mappings for repeated dependencies; checked lazy function slots resolve on first call through register-preserving ARM64 thunks; built-in and already-linked library `dlopen`/`dlsym`/`dlerror`, image/section lookup; main executable path with a checked 32-bit buffer size |
+| Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; app-bundled dylibs with `@executable_path`, `@loader_path` and own/executable `@rpath` lookup, shared mappings for repeated dependencies; checked lazy function slots resolve on first call through register-preserving ARM64 thunks; built-in and already-linked library `dlopen`/`dlsym`/`dlerror`, indexed mapped-image enumeration with signed slides and image/section lookup; main executable path with a checked 32-bit buffer size |
 | Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order image-scoped `atexit`/`__cxa_atexit`/`__cxa_finalize` callbacks; native `exit` and immediate `_exit`/`_Exit` process termination |
 | Thread-local storage | Darwin TLV descriptors, independent initialized and zero-filled templates for each image, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
 | Swift heap subset | Aligned allocation for native ARC classes and local/generic heap contexts; synchronized strong, batch, bridge and unknown ARC, x20 deallocating destructors, checked object/class and uninitialized deallocation; owners drain before metadata/thunk retirement |
@@ -8394,21 +8394,50 @@ Native/IPA inspection, pinned inputs, joined logs and eleven generated
 C/executable pairs are retained under
 `build/ios/fortnite/dispatch-timer-type-checks`.
 
-The actual IPA now exits with status 1 before application entry at
-`__dyld_get_image_header` from `libSystem.B.dylib`. Fortnite remains unplayable
-and full iOS regression remains unpassed.
+That probe exited with status 1 before application entry at
+`__dyld_get_image_header` from `libSystem.B.dylib`.
+
+The V dyld adapter now implements `_dyld_image_count`, `_dyld_get_image_header`,
+`_dyld_get_image_name` and `_dyld_get_image_vmaddr_slide` (Mach-O `__dyld_*`).
+It enumerates the main executable followed by mapped bundled Mach-O libraries,
+returns their live headers and borrowed UTF-8 paths, and computes signed
+64-bit slides from each mapping's preferred address. A header can sit above
+the mapping's lowest segment; `dladdr` and `getsectiondata` now agree with that
+header address. Invalid 32-bit indices return null/zero without changing errno.
+Queries allocate no memory, and their borrowed pointers remain valid until
+application activity and destructors drain at module teardown. Static import
+audits expose an empty image set because they create no Mach-O mappings.
+
+`tests/ios/native-checks.v build-dyld-images` builds the fixture. It maps three
+V-generated and parsed images between guard pages, checks real load commands,
+positive and negative slides, UTF-8 names, section lookup, upper-bound indices,
+eight readers and two teardown cycles. The Mac reference checks the public
+API, native shared-cache headers and an empty compiler-produced dylib's
+publication, repeated opens and unload. V/Mach-O/LLVM inspection finds four
+actual header-query callers, including `0x10008bd74` and `0x10062e1b0`, which
+identify the main image by file type and walk its load commands.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites pass, covering dyld image
+queries, native zlib stream bounds, cached executable paths and the dispatch
+timer type. Native/IPA inspection, pinned inputs, joined logs and eleven
+generated C/executable pairs are retained under
+`build/ios/fortnite/dyld-images-checks`.
+
+The fresh IPA probe exits with status 1 before application entry at
+`__dyld_register_func_for_add_image` from `libSystem.B.dylib`. Fortnite remains
+unplayable and full iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,696 | 464 | 79 |
+| Fortnite executable | 1,699 | 461 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,531 | 467 | 120 |
+| All images | 2,534 | 464 | 120 |
 
-The C++/GLES/Text variant reports 2,545 resolved imports, 453 unresolved strong
+The C++/GLES/Text variant reports 2,548 resolved imports, 450 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -89,13 +89,15 @@ fn darwin_dlerror() &char {
 
 fn darwin_dladdr(address u64, info &DarwinDlInfo) i32 {
 	if info == unsafe { nil } { return 0 }
-	if module_runtime == unsafe { nil } { return 0 }
+	if module_runtime == unsafe { nil } || module_runtime.auditing { return 0 }
 	for loaded in module_runtime.modules {
 		for segment in loaded.image.segments {
 			if segment.name == '__PAGEZERO' { continue }
 			start := loaded.base + segment.address - loaded.layout.base
 			if address >= start && address - start < segment.size {
-				unsafe { *info = DarwinDlInfo{filename: &char(loaded.path.str), base: voidptr(loaded.base)} }
+				header := dyld_mapped_header(loaded)
+				if header == 0 { return 0 }
+				unsafe { *info = DarwinDlInfo{filename: &char(loaded.path.str), base: voidptr(header)} }
 				return 1
 			}
 		}
@@ -106,9 +108,9 @@ fn darwin_dladdr(address u64, info &DarwinDlInfo) i32 {
 fn darwin_getsectiondata(header u64, segment_name &char, section_name &char, size &u64) u64 {
 	if size == unsafe { nil } { return 0 }
 	unsafe { *size = 0 }
-	if module_runtime == unsafe { nil } { return 0 }
+	if module_runtime == unsafe { nil } || module_runtime.auditing || header == 0 { return 0 }
 	for loaded in module_runtime.modules {
-		if header != loaded.base { continue }
+		if header != dyld_mapped_header(loaded) { continue }
 		for segment in loaded.image.segments {
 			if segment.name != ctext(u64(segment_name)) { continue }
 			for section in segment.sections {
@@ -166,6 +168,10 @@ fn darwin_platform_at_least(platform u32, major u32, minor u32, patch u32) bool 
 
 fn dyld_symbol(symbol string) ?u64 {
 	return match symbol {
+		'__dyld_image_count' { u64(unsafe { voidptr(darwin_dyld_image_count) }) }
+		'__dyld_get_image_header' { u64(unsafe { voidptr(darwin_dyld_get_image_header) }) }
+		'__dyld_get_image_name' { u64(unsafe { voidptr(darwin_dyld_get_image_name) }) }
+		'__dyld_get_image_vmaddr_slide' { u64(unsafe { voidptr(darwin_dyld_get_image_vmaddr_slide) }) }
 		'__NSGetExecutablePath' { u64(unsafe { voidptr(darwin_ns_get_executable_path) }) }
 		'_dlopen' { u64(unsafe { voidptr(darwin_dlopen) }) }
 		'_dlsym' { u64(unsafe { voidptr(darwin_dlsym) }) }
