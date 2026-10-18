@@ -1,0 +1,154 @@
+tools/packages/stage.v:49:6: notice: variable `arguments` shadows a function declaration
+   47 |     mut applications_explicit := false
+   48 |     mut deployment_output := ''
+   49 |     mut arguments := os.args[1..].clone()
+      |         ~~~~~~~~~
+   50 |     for arguments.len > 0 {
+   51 |         if arguments[0] == '--check' { check = true; arguments = arguments[1..].clone(); continue }
+tools/packages/pkgcore/configuration.v:4:4: notice: unused function: `configuration_field`
+    2 | module pkgcore
+    3 | 
+    4 | fn configuration_field(parent string, key string) bool {
+      |    ~~~~~~~~~~~~~~~~~~~
+    5 |     return match parent {
+    6 |         '' { key in ['format', 'architecture', 'repositories', 'policy', 'launch_user']! }
+tools/packages/pkgcore/configuration.v:14:4: notice: unused function: `configuration_value_type`
+   12 | }
+   13 | 
+   14 | fn configuration_value_type(parent string, key string, token u8) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~
+   15 |     if parent == '' {
+   16 |         if key == 'format' { return token == `-` || (token >= `0` && token <= `9`) }
+tools/packages/pkgcore/document_keys.v:27:4: notice: unused function: `document_keys`
+   25 | // independent key sets. Decode escaped
+   26 | // key spelling before comparison; never reinterpret already validated values.
+   27 | fn document_keys(text string, allowed fn (string, string) bool) ! {
+      |    ~~~~~~~~~~~~~
+   28 |     document_keys_required(text, allowed, document_optional_fields)!
+   29 | }
+tools/packages/pkgcore/export.v:58:4: notice: unused function: `export_stage`
+   56 | }
+   57 | 
+   58 | fn export_stage(parent string, prefix string) !string {
+      |    ~~~~~~~~~~~~
+   59 |     mut template := (parent + '/' + prefix + '-XXXXXX').bytes()
+   60 |     template << u8(0)
+tools/packages/pkgcore/history_schema.v:8:4: notice: unused function: `trust_history_field`
+    6 | }
+    7 | 
+    8 | fn trust_history_field(parent string, key string) bool {
+      |    ~~~~~~~~~~~~~~~~~~~
+    9 |     return if parent == '' { key in ['format', 'repositories']! }
+   10 |         else { parent == 'repositories' && history_floor_field(key) }
+tools/packages/pkgcore/history_schema.v:13:4: notice: unused function: `release_history_field`
+   11 | }
+   12 | 
+   13 | fn release_history_field(parent string, key string) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+   14 |     return if parent == '' { key in ['format', 'indexes']! }
+   15 |         else { parent == 'indexes' && history_floor_field(key) }
+tools/packages/pkgcore/history_schema.v:24:4: notice: unused function: `trust_history_required`
+   22 | }
+   23 | 
+   24 | fn trust_history_required(parent string, keys []string) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~~
+   25 |     if parent == '' {
+   26 |         for key in ['format', 'repositories']! {
+tools/packages/pkgcore/history_schema.v:32:4: notice: unused function: `release_history_required`
+   30 | }
+   31 | 
+   32 | fn release_history_required(parent string, keys []string) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~
+   33 |     if parent == '' {
+   34 |         for key in ['format', 'indexes']! {
+tools/packages/pkgcore/history_schema.v:40:4: notice: unused function: `history_value_type`
+   38 | }
+   39 | 
+   40 | fn history_value_type(parent string, key string, token u8) bool {
+      |    ~~~~~~~~~~~~~~~~~~
+   41 |     if parent == '' && key in ['repositories', 'indexes']! { return token == `[` }
+   42 |     if key in ['format', 'sequence']! { return token >= `0` && token <= `9` }
+tools/packages/pkgcore/policy.v:81:4: notice: unused function: `read_policy_document`
+   79 | }
+   80 | 
+   81 | fn read_policy_document(path string, architecture string) !PolicyDocument {
+      |    ~~~~~~~~~~~~~~~~~~~~
+   82 |     text := read_metadata(path)!
+   83 |     defer { unsafe { text.free() } }
+tools/packages/pkgcore/progress.v:16:4: notice: unused function: `monitor_transfer`
+   14 | // Borrowed event strings are valid during the callback; retaining observers
+   15 | // clone them. Monitoring reaps the transfer child before returning on any error.
+   16 | fn monitor_transfer(mut process os.Process, destination string, maximum u64, event pkgprotocol.Progress, report fn (pkgprotocol.Progress)) ! {
+      |    ~~~~~~~~~~~~~~~~
+   17 |     code := monitor_transfer_status(mut process, destination, maximum, event, report)!
+   18 |     if code != 0 { return error('download failed (${code}); retained partial data for retry') }
+tools/packages/pkgcore/snapshot_schema.v:4:4: notice: unused function: `snapshot_field`
+    2 | module pkgcore
+    3 | 
+    4 | fn snapshot_field(parent string, key string) bool {
+      |    ~~~~~~~~~~~~~~
+    5 |     return if parent == '' { key in ['repository', 'text', 'signature']! }
+    6 |         else { parent == 'repository' && key in ['id', 'url', 'public_key']! }
+tools/packages/pkgcore/snapshot_schema.v:9:4: notice: unused function: `snapshot_required`
+    7 | }
+    8 | 
+    9 | fn snapshot_required(parent string, keys []string) ! {
+      |    ~~~~~~~~~~~~~~~~~
+   10 |     if parent == '' {
+   11 |         for key in ['repository', 'text', 'signature']! {
+tools/packages/pkgcore/snapshot_schema.v:21:4: notice: unused function: `snapshot_value_type`
+   19 | }
+   20 | 
+   21 | fn snapshot_value_type(parent string, key string, token u8) bool {
+      |    ~~~~~~~~~~~~~~~~~~~
+   22 |     return if parent == '' && key == 'repository' { token == `{` } else { token == `"` }
+   23 | }
+tools/packages/pkgcore/state.v:21:4: notice: unused function: `state_required_fields`
+   19 | }
+   20 | 
+   21 | fn state_required_fields(parent string, keys []string) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+   22 |     if parent == '' {
+   23 |         for key in ['format', 'generation', 'previous', 'architecture', 'requested', 'packages']! {
+tools/packages/pkgcore/state.v:38:4: notice: unused function: `state_value_type`
+   36 | }
+   37 | 
+   38 | fn state_value_type(parent string, key string, token u8) bool {
+      |    ~~~~~~~~~~~~~~~~
+   39 |     if parent == '' {
+   40 |         if key in ['requested', 'packages']! { return token == `[` }
+tools/packages/pkgcore/transaction.v:189:4: notice: unused function: `cached_payload`
+  187 | }
+  188 | 
+  189 | fn cached_payload(config Config, installed Installed, payload Payload, directory string) !string {
+      |    ~~~~~~~~~~~~~~
+  190 |     return cached_payload_progress(config, installed, payload, directory, no_progress)
+  191 | }
+tools/packages/pkgcore/transaction.v:318:4: notice: unused function: `activate_plan_locked`
+  316 | // Callers validate the complete plan and any review identity under the writer
+  317 | // lock before reaching this shared transactional activation boundary.
+  318 | fn activate_plan_locked(config Config, directory string, current State, plan Plan, operation string, options TransactionOptions) !State {
+      |    ~~~~~~~~~~~~~~~~~~~~
+  319 |     repairs := transaction_repairs(directory, current, plan, operation)
+  320 |     defer { close_transaction_repairs(repairs) }
+tools/packages/signing/internal/edwards25519/element.v:736:4: notice: unused function: `swap_endianness`
+  734 | }
+  735 | 
+  736 | fn swap_endianness(mut buf []u8) []u8 {
+      |    ~~~~~~~~~~~~~~~
+  737 |     for i := 0; i < buf.len / 2; i++ {
+  738 |         buf[i], buf[buf.len - i - 1] = buf[buf.len - i - 1], buf[i]
+tools/packages/signing/internal/edwards25519/point.v:478:4: notice: unused function: `check_on_curve`
+  476 | }
+  477 | 
+  478 | fn check_on_curve(points ...Point) bool {
+      |    ~~~~~~~~~~~~~~
+  479 |     for p in points {
+  480 |         mut xx := Element{}
+tools/packages/signing/internal/edwards25519/scalar.v:1151:4: notice: unused function: `generate_notzero_scalar`
+ 1149 | type NotZeroScalar = Scalar
+ 1150 | 
+ 1151 | fn generate_notzero_scalar(size int) !NotZeroScalar {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+ 1152 |     mut s := Scalar{}
+ 1153 |     for s == sc_zero {

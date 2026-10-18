@@ -233,6 +233,25 @@ after use; close is repeatable. Keep ancestor directories controlled throughout
 the build. Staging updates other tool files individually and does not make the
 whole image build transactional; publish the completed image only after success.
 
+Tool compilation now uses a captured, exclusive mode-0700 workspace with random
+names. All three static target executables are validated and captured before
+any existing tool is replaced. Each must be an owned, ordinary single-link file
+of at most 64 MiB. Publication checks the complete temporary-output disk budget,
+opens controlled image parents without directory aliases on the image filesystem,
+and flushes mode-0755 private temporaries before atomic per-file renames.
+Existing `.new` entries are preserved. Compiler/validation failures preserve prior
+tools; a later publication/flush failure reports incomplete staging and any saved
+tool. Retrying a full build remains necessary before distribution. See
+[tool staging qualification](../../tests/packages/image-tools-check.md).
+
+Custom V image builders may use `configuration.prepare_tool_build()`, obtain an
+owned workspace path with `build.directory()!`, and call `build.check()!` before
+and after every compiler invocation. Write `vinix-package`, `vinix-session` and
+`vinix-linux-runner` there, then call `build.publish()!` and checked
+`build.retire()!`. Close on every path with `build.close()`; retirement and close
+are repeatable. On compilation/publication refusal, return `build.failure(err)`
+to combine the primary error with cleanup diagnostics and release the plan.
+
 After boot, the normal Refresh, review/install, updates, rollback and uninstall
 flows use this configuration. Image seeding does not fetch catalogs or accept
 unsigned metadata. See [qualification](../../tests/packages/image-configuration-check.md),

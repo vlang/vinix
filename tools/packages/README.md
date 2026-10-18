@@ -32,6 +32,13 @@ and missing configuration beside retained package state requires recovery.
 See [image configuration](SDK.md#release-image-configuration) and its
 [qualification](../../tests/packages/image-configuration-check.md).
 
+The three package tools compile together in a private captured workspace. A
+compiler or target-validation failure preserves existing tool versions; all
+outputs and private destination temporaries are prepared before replacement.
+See [captured tool staging](../../tests/packages/image-tools-check.md) for
+failure/recovery checks and native execution on both architectures. The complete
+image build still requires successful completion before distribution.
+
 For an offline image, `--repositories DIRECTORY` or
 `VINIX_PACKAGE_IMAGE_REPOSITORIES=/absolute/DIRECTORY` captures complete signed
 release exports under their configured IDs. Their reviewed URLs must be

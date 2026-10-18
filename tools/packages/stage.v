@@ -14,6 +14,26 @@ fn invoke(program string, arguments []string) ! {
 	if code != 0 { return error('${program} failed (${code})') }
 }
 
+fn compile_image_tools(build &pkgcore.ImageToolBuild, architecture string, repository string, v string, cc string, compiler_args []string) ! {
+	work := build.directory()!
+	defer { unsafe { work.free() } }
+	for pair in [['vinix-package', 'tools/packages/main.v'], ['vinix-session', 'tools/accounts/session.v'],
+		['vinix-linux-runner', 'tools/packages/linux-runner.v']] {
+		source := work + '/' + pair[0] + '.c'
+		binary := work + '/' + pair[0]
+		defer { unsafe { source.free(); binary.free() } }
+		build.check()!
+		invoke(v, ['-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-gc', 'none', '-d', 'no_backtrace', '-d', 'no_segfault_handler', '-os', 'linux', '-arch',
+			if architecture == 'aarch64' { 'arm64' } else { 'amd64' }, '-o', source, repository + '/' + pair[1]])!
+		build.check()!
+		invoke(cc, [...compiler_args[1..], '-static', '-O2', '-std=gnu11', '-D_GNU_SOURCE', source,
+			'-o', binary, '-lm', '-lpthread'])!
+		build.check()!
+	}
+	build.publish()!
+}
+
 fn stage() ! {
 	mut architecture := ''
 	mut staging := ''
@@ -105,36 +125,10 @@ fn stage() ! {
 	compiler_v := if configured_v == '' { 'v' } else { configured_v }
 	v := os.find_abs_path_of_executable(compiler_v)!
 	repository := os.dir(os.dir(os.dir(@FILE)))
-	work := os.join_path(os.temp_dir(), 'vinix-package-stage-' + os.getpid().str())
-	os.mkdir_all(work)!
-	defer { os.rmdir_all(work) or {} }
-	for tool, input in {
-		'usr/bin/vinix-package':  'tools/packages/main.v'
-		'usr/sbin/vinix-session': 'tools/accounts/session.v'
-		'usr/libexec/vinix/vinix-linux-runner': 'tools/packages/linux-runner.v'
-	} {
-		source := work + '/' + os.file_name(tool) + '.c'
-		invoke(v, ['-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
-			'-gc', 'none', '-d', 'no_backtrace', '-d', 'no_segfault_handler', '-os', 'linux', '-arch',
-			if architecture == 'aarch64' { 'arm64' } else { 'amd64' }, '-o', source,
-			repository + '/' + input])!
-		binary := work + '/' + os.file_name(tool)
-		invoke(cc, [...compiler_args[1..], '-static', '-O2', '-std=gnu11', '-D_GNU_SOURCE', source,
-			'-o', binary, '-lm', '-lpthread'])!
-		data := os.read_bytes(binary)!
-		if data.len < 20 || data[..6] != [u8(0x7f), `E`, `L`, `F`, 2, 1]
-			|| int(data[18]) + (int(data[19]) << 8) != if architecture == 'aarch64' {
-				183
-			} else {
-				62
-			} {
-			return error('${tool} compiler produced the wrong target architecture')
-		}
-		os.mkdir_all(os.dir(staging + '/' + tool))!
-		os.cp(binary, staging + '/' + tool + '.new')!
-		os.chmod(staging + '/' + tool + '.new', 0o755)!
-		os.rename(staging + '/' + tool + '.new', staging + '/' + tool)!
-	}
+	mut tool_build := unsafe { &image_configuration }.prepare_tool_build()!
+	defer { tool_build.close() }
+	compile_image_tools(unsafe { &tool_build }, architecture, repository, v, cc, compiler_args) or { return tool_build.failure(err) }
+	tool_build.retire()!
 	// Retain the pinned signing implementation's license in binary releases.
 	notices := staging + '/usr/share/licenses/vinix-packages'
 	os.mkdir_all(notices)!

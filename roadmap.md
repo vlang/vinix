@@ -724,6 +724,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     exact application locks, policy refusals, replacements and recovery data.
     Production publisher/catalog migration and graphical/runtime acceptance
     remain open.
+  - [x] [Captured image tool builds](tests/packages/image-tools-check.md)
+    compile and validate all three static target tools before replacing prior
+    versions. Private workspaces and destination temporaries preserve unrelated
+    aliases and report replacement/flush recovery. Host and native guest checks
+    cover both architectures; complete image publication remains per-file, and
+    production catalog/graphical/runtime acceptance remains open.
   - [x] [Owned packing inventories and replies](tests/packages/pack-ownership-check.md)
     retire discarded template inventories, partial walked files and copy scratch
     across cold/cache success and late refusal. Independently closeable pack/root

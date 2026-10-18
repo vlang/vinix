@@ -16,6 +16,12 @@ The desktop cache tracks the selected input and its contents. See
 [the image contract](../tools/packages/SDK.md#release-image-configuration) and
 [clean-image native catalog qualification](../tests/packages/image-configuration-check.md).
 
+[Captured tool builds](../tests/packages/image-tools-check.md) compile and validate
+all three static package tools before replacing existing image tools. Private
+workspaces, captured outputs and destination descriptors preserve prior versions
+on compiler/validation refusal and retain replaced recovery trees. Final writes
+remain atomic per file; late publication failures report incomplete image staging.
+
 [Ordinary Software image qualification](../tests/packages/software-image-check.md)
 now joins that staged trust with the real administrator and isolated-launch
 services. Both target guests exercise Software's actual controller and UI trees,
