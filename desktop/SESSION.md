@@ -98,8 +98,9 @@ and supports `launch`, `uri`, `open.with`,
 workspace count/switch/rename/layout, clipboard offer/request and settings actions.
 Settings mutations require the actual Settings application's authenticated PID.
 Administrative history, policy, service controls, grants and shutdown require
-the compositor lease. Running the client from an unrelated terminal does not
-grant a user gesture or administrative lease.
+the attached compositor PID. Running the client from an unrelated terminal does
+not grant a user gesture. This PID association has attach-race and PID-reuse
+limits; see [session selector filters](../docs/security.md#session-selector-filters).
 
 The private 0700 runtime directory is `/run/vinix-session.<uid>`; its Unix socket
 is 0600. Kernel peer credentials supply identity. `VINIX_SESSION_RUNTIME` can

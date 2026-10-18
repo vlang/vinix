@@ -7,8 +7,50 @@ import desktop.sessionipc
 
 fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
+fn C.socketpair(i32, i32, i32, &i32) i32
+fn C.dup(i32) i32
+fn C.dup2(i32, i32) i32
 
 fn broker_poll_kept(_ string) u64 { return C.vinix_heap_end() }
+
+fn test_broker_denied_socket_requests_and_logging_keep_no_allocations() {
+	mut daemon := &SessionDaemon{ compositor: int(C.getpid()) + 1 }
+	defer { unsafe { free(daemon) } }
+	daemon.policy.clipboard_apps = false
+	// Suppress only the flood's diagnostics; the production logger still runs.
+	saved_stderr := C.dup(2)
+	sink := C.open(c'/dev/null', C.O_WRONLY | C.O_CLOEXEC, 0)
+	assert saved_stderr >= 0 && sink >= 0
+	assert C.dup2(i32(sink), 2) >= 0
+	defer {
+		C.dup2(saved_stderr, 2)
+		C.close(saved_stderr)
+		C.close(sink)
+	}
+	C.vinix_heap_begin()
+	for _ in 0 .. 200 {
+		for request in ['shutdown', 'settings.set\tzz', 'clipboard.read\tzz',
+			'sbp/selectors/register\tzz', 'ping\tzz', 'action\tzz']! {
+			mut pair := [i32(-1), -1]!
+			assert C.socketpair(C.AF_UNIX, C.SOCK_STREAM, 0, unsafe { &pair[0] }) == 0
+			assert sessionipc.desktop_set_cloexec(int(pair[1]), true)
+			assert sessionipc.desktop_set_nonblocking(int(pair[1]), true)
+			assert sessionipc.session_send_message(int(pair[0]), request)
+			daemon.serve_client(int(pair[1]))
+			reply := sessionipc.session_receive(int(pair[0])) or { panic(err) }
+			assert reply == 'error\tdenied'
+			unsafe { reply.free() }
+			C.close(pair[0])
+		}
+	}
+	// Unlike registry denials, ordinary handler errors own their text and box.
+	for _ in 0 .. 200 {
+		session_log_error('vinix-session: request rejected: ', error('owned diagnostic'.clone()))
+	}
+	kept := C.vinix_heap_end()
+	C.dup2(saved_stderr, 2)
+	assert kept == 0, 'broker rejection receive/authorize/decode/log/reply retained ${kept} bytes'
+}
 
 fn test_broker_idle_replies_keep_no_request_allocations() {
 	mut daemon := &SessionDaemon{ compositor: C.getpid() }

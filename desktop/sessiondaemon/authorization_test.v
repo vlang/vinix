@@ -2,6 +2,22 @@
 module sessiondaemon
 
 import desktop.sessionipc
+import desktop.sessioncore
+
+fn test_every_authorized_operation_has_one_direct_handler() {
+	assert session_routes.len == int(sessioncore.SessionOperation.shutdown) + 1
+	for i, route in session_routes {
+		assert int(route.operation) == i
+		assert route.raw_payload == (route.operation == .clipboard_offer)
+	}
+	mut daemon := &SessionDaemon{}
+	defer { unsafe { free(daemon) } }
+	mut request := &SessionRequest{}
+	defer { unsafe { free(request) } }
+	if _ := session_routes[0].handler(mut daemon, mut request) {
+		assert false, 'the invalid operation must never dispatch successfully'
+	}
+}
 
 fn test_broker_selector_filters_run_before_argument_decoding_or_side_effects() {
 	mut daemon := &SessionDaemon{ compositor: int(C.getpid()) + 1 }

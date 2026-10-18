@@ -51,14 +51,22 @@ argument counts are rejected. Existing wire command names remain compatible;
 canonical `application/...` and `compositor/...` names identify domain and
 clipboard policy denials in broker diagnostics without logging arguments.
 
+An exact-key map finds the authorization rule. After authorization and bounded
+decoding, a private fixed table maps the operation directly to its typed handler;
+there is no second chain of operation comparisons. Tests check that every
+operation has exactly one rule and one handler at its corresponding table index.
+
 Every request passes the global same-account peer identity check, the domain's
 compositor requirement when applicable, and current selector-specific privacy
 checks before argument values are decoded or handlers run. A more specific
 filter cannot override a denial. The broker supplies caller identity from kernel
-peer credentials and its own compositor lease; UID 0 has no special bypass.
+peer credentials and its stored compositor PID; UID 0 has no special bypass.
 Queued application actions still require the compositor's existing gesture and
-Settings ownership checks when consumed. Attaching a compositor still requires
-that an existing compositor has exited or is the caller itself.
+Settings ownership checks when consumed. Compositor identity is currently an
+attached PID, with a liveness check before another process can attach. This is
+not a broker-issued capability: a same-account process can win the initial or
+post-exit attach race, and PID reuse remains possible. An inherited connection,
+pidfd or another unforgeable compositor credential remains separate work.
 
 Disabling application clipboard access blocks offers, requests, grant retrieval,
 grant creation, promotion and reads, including reads using an already issued
@@ -73,6 +81,13 @@ rules and allocation checks. The latter measures 1,000 iterations through
 successful lookup and every denial layer with `-gc none -manualfree` and heap
 tracking. The session integration suite also checks denial before decoding and
 clipboard token revocation through the real broker socket.
+
+`V=/path/to/v v run desktop/tools/test-services.v` additionally measures the
+production receive/authorize/decode/log/reply path over Unix socket pairs. The
+rejection regression sends 1,200 requests, including malformed encoded arguments,
+and requires zero retained bytes with `-gc none -manualfree -d track_heap`.
+Logging prints error messages directly, releases owned errors after use, and
+preserves shared selector denials; interpolating an error would allocate again.
 
 ## Authenticated UEFI images
 
