@@ -643,6 +643,7 @@ fn objc_stop() {
 	nw_stop()
 	reachability_stop()
 	dispatch_stop()
+	dispatch_specific_stop()
 	reachability_free()
 	nw_free()
 	connection_stop()

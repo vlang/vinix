@@ -8695,17 +8695,60 @@ inheritance during current-queue lookup, child overrides and nil removal for
 the next adapter. Fortnite remains unplayable and the full iOS regression is
 unpassed.
 
+V now implements `_dispatch_get_specific`, `_dispatch_queue_set_specific` and
+`_dispatch_queue_get_specific`. Keys are compared as pointer identities without
+reading their memory. Direct lookup reads one queue; current-queue lookup
+follows its target chain, including child overrides and inheritance restored
+by nil removal. The main thread denotes the main queue outside callbacks.
+Native measurements also distinguish implicitly targeted serial queues from
+queues explicitly targeting the public default global queue; Vinix now keeps
+those roots separate so their associations stay independent.
+
+Each nonnull association owns one entry. Replacement, removal and the queue's
+last release retire its old destructor on the default global concurrent queue.
+Replacing an unchanged pointer still retires the previous association. Nil
+keys are ignored; nil contexts ignore the supplied new destructor. Queued work
+keeps its queue and associations alive through callback completion. Callbacks
+run outside the scheduler lock and can query or modify other associations.
+Lookup allocates no temporary storage, and the V entry points preserve errno
+and floating-point state.
+
+Shutdown joins workers and invokes cancelled owned destructors, then drains
+remaining main/global/application queue associations while Objective-C and
+application storage remain live. Remaining shutdown destructors run
+synchronously; new nonnull associations are rejected during that phase.
+Nested synchronous dispatch restores the caller's current-queue TLS value.
+
+V/Mach-O/LLVM inspection confirms the IPA's lookup at `0x100007544` and setter
+at `0x1000070dc`, with additional consumers using the same pointer-key ABI.
+`tests/ios/native-checks.v build-dispatch-specific` builds the fixture.
+Eight host ASan/UBSan runs and four ARM64 Vinix suites pass, covering specific
+contexts, dispatch data, queue Objective-C ownership and native zlib bounds.
+The new fixture compares native lookup/lifetime behavior, exercises protected
+keys, main/global/foreign threads, nested dispatch, all four rounding modes,
+sticky exceptions, 1,024 concurrent association lifetimes, queued-work retention,
+reentrant destructor queries, deterministic cancellation and two drained
+shutdowns. Native measurements, preliminary measurement/compiler failures,
+pinned inputs, joined logs and eleven generated C/executable pairs are retained
+under `build/ios/fortnite/dispatch-specific-checks`.
+
+The fresh IPA probe passes both required queue-specific imports and stops
+before entry at `_dispatch_group_async` from `libSystem.B.dylib`. Preliminary
+native group measurements cover membership, empty/immediate waits, asynchronous
+work and completion notification for the next adapter. Fortnite remains
+unplayable and the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,714 | 446 | 79 |
+| Fortnite executable | 1,716 | 444 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,549 | 449 | 120 |
+| All images | 2,551 | 447 | 120 |
 
-The C++/GLES/Text variant reports 2,563 resolved imports, 435 unresolved strong
+The C++/GLES/Text variant reports 2,565 resolved imports, 433 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

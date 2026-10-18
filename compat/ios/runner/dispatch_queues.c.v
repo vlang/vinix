@@ -15,6 +15,7 @@ mut:
 	immortal bool
 	context voidptr
 	finalizer DispatchFunction = unsafe { nil }
+	specific &DispatchSpecific = unsafe { nil }
 }
 
 @[heap]
@@ -39,6 +40,7 @@ mut:
 	key u64
 	queues map[u64]&DispatchQueue
 	globals [5]u64
+	default_root u64
 	jobs []&DispatchJob
 	retired []&DispatchQueue
 	workers [4]usize
@@ -128,13 +130,26 @@ fn darwin_dispatch_get_global_queue(identifier i64, flags u64) u64 {
 	return dispatch_global_locked(index).identity
 }
 
+// Native implicit serial targets use a different root from the public
+// default global queue. Their queue-specific associations are independent.
+fn dispatch_default_root_locked() &DispatchQueue {
+	if dispatch_runtime.default_root != 0 { return dispatch_queue_locked(dispatch_runtime.default_root) }
+	mut queue := dispatch_queue_allocate(c'com.apple.root.default-qos.overcommit')
+	queue.concurrent = true
+	queue.immortal = true
+	queue.isa = dispatch_runtime.objc_classes[2]
+	dispatch_runtime.default_root = queue.identity
+	dispatch_runtime.queues[queue.identity] = queue
+	return queue
+}
+
 fn darwin_dispatch_queue_create_with_target(label &char, attributes u64, target u64) u64 {
 	if attributes != 0 { panic('iOS: dispatch queue attributes are not implemented') }
 	C.pthread_mutex_lock(dispatch_runtime.mutex)
 	defer { C.pthread_mutex_unlock(dispatch_runtime.mutex) }
 	if dispatch_runtime.stopping { panic('iOS: dispatch queue created during image shutdown') }
 	mut queue := dispatch_queue_allocate(label)
-	queue.target = if target == 0 { dispatch_global_locked(2) } else { dispatch_queue_locked(target) }
+	queue.target = if target == 0 { dispatch_default_root_locked() } else { dispatch_queue_locked(target) }
 	if !queue.target.immortal { queue.target.refs++ }
 	dispatch_runtime.queues[queue.identity] = queue
 	return queue.identity
@@ -222,6 +237,8 @@ fn dispatch_retire() {
 		C.pthread_mutex_lock(dispatch_runtime.mutex)
 		if dispatch_runtime.retired.len == 0 { C.pthread_mutex_unlock(dispatch_runtime.mutex); return }
 		queue := dispatch_runtime.retired.pop()
+		specific := queue.specific
+		unsafe { queue.specific = nil }
 		// A finalizer itself keeps the target alive until it has run.
 		if !dispatch_runtime.stopping && queue.finalizer != unsafe { nil } && queue.context != unsafe { nil } {
 			dispatch_add_locked(queue.target, 0, 0, queue.context, queue.finalizer, false)
@@ -229,6 +246,7 @@ fn dispatch_retire() {
 		if queue.target != unsafe { nil } { dispatch_queue_drop_locked(mut queue.target) }
 		C.pthread_cond_broadcast(dispatch_runtime.condition)
 		C.pthread_mutex_unlock(dispatch_runtime.mutex)
+		dispatch_specific_retire(specific)
 		C.free(queue.label)
 		unsafe { free(queue) }
 	}
@@ -508,6 +526,7 @@ fn dispatch_stop() {
 fn dispatch_free() {
 	if dispatch_runtime == unsafe { nil } { return }
 	dispatch_stop()
+	dispatch_specific_stop()
 	dispatch_data_stop()
 	dispatch_data_free()
 	C.free(dispatch_runtime.empty_data)
