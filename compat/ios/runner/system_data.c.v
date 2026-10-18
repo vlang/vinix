@@ -48,6 +48,8 @@ mut:
 	dispatch_once map[u64]voidptr
 	logs &OsLogHandle = unsafe { nil }
 	log_count int
+	asl_clients &AslClient = unsafe { nil }
+	asl_filter u16 = 63
 	log_default [8]u8
 	log_disabled [8]u8
 	// MIG's exported NDR_record is a writable eight-byte object, not a
@@ -105,6 +107,7 @@ fn system_data_stop() {
 	signals_stop()
 	dispatch_free()
 	os_log_stop()
+	asl_stop()
 	system_queries_stop()
 	mach_memory_stop()
 	mach_threads_stop()

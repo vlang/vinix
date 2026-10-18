@@ -8554,23 +8554,65 @@ after fork. Native measurements, IPA inspection, pinned inputs, joined logs
 and eleven generated C/executable pairs are retained under
 `build/ios/fortnite/arc4random-checks`.
 
-The fresh IPA probe passes the random imports and stops at `_asl_add_log_file`
+That IPA probe passes the random imports and stops at `_asl_add_log_file`
 from `libSystem.B.dylib`, before application entry. Its caller at `0x100083950`
 passes a stored client pointer and descriptor 2. Preliminary typed native ASL
 measurements are retained for the next adapter; no log messages were sent.
 Fortnite remains unplayable and the full iOS regression is unpassed.
+
+V now implements the ASL client profile imported by this IPA: `_asl_open`,
+`_asl_set_filter`, `_asl_add_log_file` and variadic `_asl_log`. `_asl_close`,
+`_asl_remove_log_file` and `_asl_vlog` share the same client implementation.
+Each client owns a copy of its sender/facility strings in one allocation;
+close and runtime shutdown free that allocation. Logging snapshots the filter,
+options and a bounded sender prefix under the registry lock, then formats and
+writes outside that lock. A concurrent close cannot invalidate the snapshot.
+
+Native libSystem calls establish the default filter of 63, 16-bit mask storage,
+out-of-range levels clamped to debug, preserved errno and explicit stderr's
+filter bypass. Vinix directs the filtered server stream to local stderr with
+an `ident: message` prefix. Legacy file attachments follow the measured modern
+libSystem behavior: valid client/nil handles accept descriptors without using
+or owning them; the SDK marks this functionality unsupported.
+
+A naked V ARM64 entry passes the incoming stack pointer to a fixed-signature
+V formatter. It supports printf scalar, string and pointer conversions with
+width/precision, including mixed integer/double arguments and output beyond
+the small stack buffer. Unsupported message objects, positional formats,
+long doubles, wide strings, `%n` and `%m` return failure explicitly. The profile
+limits formats to 65,535 bytes and output to 1 MiB. No Apple ASL library supplies
+guest logging.
+
+V/Mach-O/LLVM inspection confirms the IPA's open at `0x1000838c8`, filter at
+`0x1000838e4` and log at `0x100083ca4`. The log passes a nil message, a 32-bit
+level, `%s` at `0x10c7344bc` and one string pointer on the stack.
+`tests/ios/native-checks.v build-asl` builds the fixture.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites pass, covering ASL,
+random APIs, TLV destruction and native zlib bounds. The ASL fixture checks
+real variadic calls, mixed scalar/string arguments, large output, filtered
+protected pointers, errno, 1,024 threaded client lifetimes and two runtime
+shutdown cycles. Native measurements, IPA inspection, the preliminary compiler
+failures, pinned inputs, joined logs and eleven generated C/executable pairs
+are retained under `build/ios/fortnite/asl-checks`.
+
+The fresh IPA probe resolves all four ASL imports and stops at `_backtrace`
+from `libSystem.B.dylib`, before application entry. The IPA's forwarding
+wrapper and preliminary guarded native backtrace measurements are retained
+for the next adapter. Fortnite remains unplayable and the full iOS regression
+is unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,707 | 453 | 79 |
+| Fortnite executable | 1,711 | 449 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,542 | 456 | 120 |
+| All images | 2,546 | 452 | 120 |
 
-The C++/GLES/Text variant reports 2,556 resolved imports, 442 unresolved strong
+The C++/GLES/Text variant reports 2,560 resolved imports, 438 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
