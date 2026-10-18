@@ -119,6 +119,7 @@ fn (a &SoftwareApp) package_plan_values(mut values []string) {
 	software_details_count(mut values, 'Available disk space (bytes): ', a.review_snapshot.disk_available)
 	software_details_count(mut values, 'Reserved disk space (bytes): ', a.review_snapshot.disk_reserve)
 	a.review_space_values(mut values)
+	a.review_permission_summary(mut values)
 	if a.deployment_pending != '' {
 		path := software_failure_text(a.deployment_pending)
 		values << 'Frozen deployment file: ' + path

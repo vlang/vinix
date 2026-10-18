@@ -542,6 +542,12 @@ fn (mut a SoftwareApp) load_review() {
 	} else {
 		a.set_status('Review every application and dependency, including retained packages and removals. Personal data stays on disk. Confirm applies this exact package set.')
 	}
+	if a.review_snapshot.operation != 'mirror' {
+		notice := a.review_permission_notice()
+		message := a.status + '\n' + notice
+		a.set_status(message)
+		unsafe { notice.free(); message.free() }
+	}
 }
 
 fn software_output_tail(bytes []u8) string {

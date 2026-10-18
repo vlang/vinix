@@ -2,19 +2,28 @@
 // Complete bounded format-1 review schemas; no generic decoder allocations.
 module pkgprotocol
 
-const review_package_keys = ['id', 'name', 'description', 'version', 'installed_version', 'architecture', 'kind', 'runtime', 'repository', 'public_key', 'license', 'proprietary', 'firmware', 'permissions', 'requested', 'action']
+const review_package_keys = ['id', 'name', 'description', 'version', 'installed_version', 'architecture', 'kind', 'runtime', 'repository', 'public_key', 'license', 'proprietary', 'firmware', 'permissions', 'requested', 'action', 'installed_permissions_known', 'installed_permissions']
+
+fn (mut r MetadataReader) review_package_member(seen u32) !int {
+	key := r.quoted(32)!
+	index := review_package_keys.index(key)
+	unsafe { key.free() }
+	if index < 0 || seen & (u32(1) << index) != 0 { return error('unknown or duplicate review package field') }
+	r.expect(`:`)!
+	return index
+}
 
 fn (mut r MetadataReader) parse_review_package() !ReviewPackage {
 	r.expect(`{`)!
 	mut value := ReviewPackage{}
 	mut accepted := false
 	defer { if !accepted { close_review_package(value) } }
-	mut seen := u16(0)
+	mut seen := u32(0)
 	mut first := true
 	for r.next(first, `}`)! {
 		first = false
-		member := r.member(review_package_keys, seen)!
-		seen |= u16(1) << member
+		member := r.review_package_member(seen)!
+		seen |= u32(1) << member
 		match member {
 			0 { value = ReviewPackage{ ...value, id: r.quoted(128)! } }
 			1 { value = ReviewPackage{ ...value, name: r.quoted(256)! } }
@@ -32,10 +41,14 @@ fn (mut r MetadataReader) parse_review_package() !ReviewPackage {
 			13 { value = ReviewPackage{ ...value, permissions: r.strings(16, 5)! } }
 			14 { value = ReviewPackage{ ...value, requested: r.boolean()! } }
 			15 { value = ReviewPackage{ ...value, action: r.quoted(16)! } }
+			16 { value = ReviewPackage{ ...value, installed_permissions_known: r.boolean()! } }
+			17 { value = ReviewPackage{ ...value, installed_permissions: r.strings(16, 5)! } }
 			else {}
 		}
 	}
-	if seen != 65535 { return error('missing review package field') }
+	if seen & 65535 != 65535 { return error('missing review package field') }
+	permissions_group := seen >> 16
+	if permissions_group != 0 && permissions_group != 3 { return error('partial installed review permissions') }
 	accepted = true
 	return value
 }
@@ -54,7 +67,7 @@ fn (mut r MetadataReader) parse_review() !Review {
 		member := r.member(review_keys, seen)!
 		seen |= u16(1) << member
 		match member {
-			0 { r.expect(`1`)!; value = Review{ ...value, format: 1 } }
+			0 { value = Review{ ...value, format: int(r.unsigned(2)!) } }
 			1 { value = Review{ ...value, operation: r.quoted(16)! } }
 			2 { value = Review{ ...value, names: r.strings(128, 4096)! } }
 			3 { value = Review{ ...value, architecture: r.quoted(16)! } }

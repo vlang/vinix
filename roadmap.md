@@ -806,6 +806,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     exemptions; the service repeats its final disk check before changes.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,
   permissions, progress, uninstall, updates and useful failure diagnostics.
+  - [x] [Reviewed permission changes](tests/packages/review-permissions-check.md)
+    compare frozen installed and target declarations across dependencies,
+    updates, repair, rollback and removal. Format 2 carries owned prior facts;
+    full/compact readers preserve approval state and explicit legacy uncertainty.
   - [x] [Owned live progress rejection](tests/packages/software-progress-memory-check.md)
     retires ignored decoder errors, preserving admitted progress, bounded stream
     recovery and human diagnostics. Fragmented valid/invalid/oversized streams

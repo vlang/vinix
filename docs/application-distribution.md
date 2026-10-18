@@ -740,6 +740,15 @@ explicit upgrades retain newest-first selection. See
 
 ## Install, maintenance and recovery
 
+Software reviews summarize added/removed permission declarations across all
+packages, including dependencies. **Package details → Permissions** compares
+the version-labelled installed set with the reviewed target and lists added,
+removed and unchanged declarations. Rollback compares with the active generation;
+uninstall removes the package's declarations. Older-service facts stay explicitly
+unavailable. Current policy and runtime isolation still govern access. Review
+format 2 carries the frozen history; deploy the updated Software and tools
+together. See [qualification](../tests/packages/review-permissions-check.md).
+
 Software keeps a proposal readable when its space estimate does not fit. Its
 status and plan/review readers identify the filesystem and exact additional
 bytes needed, including reserved space, and Confirm is unavailable. Free space,

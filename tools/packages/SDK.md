@@ -3704,12 +3704,36 @@ The lightweight [`pkgprotocol` V module](pkgprotocol/review.v) provides `Review`
 for consumers with manual memory management. Service-created and decoded reviews
 own their presentation fields. Renderers should retain the snapshot while it
 is on screen, pass literal arguments to `apply`, then close it on cancellation,
-replacement or handoff. Format 1 requires every declared root and row field,
+replacement or handoff. The service emits review format 2; the reader also
+accepts legacy format 1. Both require every original root and row field,
 including empty strings/arrays, zero counters and false proprietary, firmware and
 requested flags. Missing/null/coerced fields, unknown or duplicate keys (including
 escaped spellings), invalid UTF-8/Unicode, noncanonical or overflowing integers
 and trailing input are refused before a review is presented for confirmation.
 Future schema extensions require a new supported format.
+
+Review format 2 adds the optional paired row fields
+`installed_permissions_known`/`installed_permissions`. They describe the active
+generation's declarations before the reviewed transaction, independently of
+the target `permissions`; a known empty set is explicit. Both fields must be
+present together or omitted together. Omission means unavailable. A false flag
+requires an empty array. Nonempty/known facts require an installed version and
+format 2 and are forbidden for mirror exports. Keep/removal/repair facts must
+match the package's unchanged declarations; an install action cannot claim an
+existing known set. Permissions remain bounded unique SDK grants. The current
+SDK's inert false/empty pair is also accepted when serializing legacy format-1
+values, and carries no prior facts. Other unknown fields remain refused.
+
+Software counts additions/removals across the complete plan and discloses
+previous/added/removed/unchanged declarations in each package's Permissions
+reader. Unknown prior facts are counted separately, including legacy reviews.
+Removals compare against an empty target; exports do not change installed
+access. These are declarations, not additional authority over policy/isolation.
+Both sets are independently owned and released by `Review.close()`. The review
+fingerprint already binds current and target manifests, so admission does not
+change. Deploy updated consumers with the package service: older strict
+readers refuse format 2 before approval. See
+[permission review qualification](../../tests/packages/review-permissions-check.md).
 
 The same bounded reader covers `decode_repositories`, `decode_repository_review`,
 `decode_mirror_review` and `decode_deployment_mirror_review`, including repository

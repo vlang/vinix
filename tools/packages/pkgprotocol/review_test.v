@@ -33,7 +33,7 @@ fn test_public_review_rejects_unknown_formats_and_incomplete_package_sets() {
 	decoded.validate()!
 	decoded.close()
 	assert decoded.rows.len == 0 && decoded.fingerprint == ''
-	for bad in [Review{ ...valid, format: 2 }, Review{ ...valid, format: 0 },
+	for bad in [Review{ ...valid, format: 3 }, Review{ ...valid, format: 0 },
 		Review{ ...valid, operation: 'shell' }, Review{ ...valid, fingerprint: 'unsigned' },
 		Review{ ...valid, rows: [] }, Review{ ...valid, requested: ['missing'] },
 		Review{ ...valid, rows: [valid.rows[0], valid.rows[0]] },

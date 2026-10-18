@@ -370,6 +370,13 @@ charging acquisition twice on a shared filesystem. No-op package plans and
 fully cached separate exports keep their service reserve exemptions. See
 [space review checks](../../tests/packages/software-space-check.md).
 
+Review format 2 compares installed permission declarations with the target set.
+Software summarizes known additions/removals across dependencies and exposes
+each version-labelled change in **Package details → Permissions**, including
+rollback and uninstall. Legacy prior facts stay unavailable. Deploy the updated
+Software and tools together; older strict readers refuse the new format. See
+[permission review checks](../../tests/packages/review-permissions-check.md).
+
 Software releases rejected progress-frame errors under manual memory management.
 Malformed frames keep the last valid progress, and oversized lines recover at
 the next newline while human failure diagnostics remain available. See

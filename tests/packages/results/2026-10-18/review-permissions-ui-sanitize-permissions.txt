@@ -1,0 +1,1 @@
+REVIEW PERMISSIONS Software compares complete dependency/removal plans, all maintenance operations, full/compact readers, frozen approval and explicit legacy uncertainty PASS

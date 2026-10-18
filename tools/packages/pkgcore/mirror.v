@@ -193,7 +193,7 @@ fn mirror_review(config Config, directory string, destination string, names []st
 	mut result := pkgprotocol.MirrorReview{
 		format: 1, destination: prepared.target.clone(), input_destination: destination.clone(),
 		cache_needed: prepared.acquired, cache_available: cache_available, shared_disk: prepared.shared_disk,
-		review: pkgprotocol.Review{ format: 1, operation: 'mirror'.clone(), names: review_strings(names),
+		review: pkgprotocol.Review{ format: 2, operation: 'mirror'.clone(), names: review_strings(names),
 			architecture: config.architecture.clone(), fingerprint: prepared.fingerprint.clone(),
 			requested: review_strings(prepared.plan.requested), rows: rows,
 			disk_needed: disk_needed, disk_available: disk_available,

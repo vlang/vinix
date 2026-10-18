@@ -404,6 +404,8 @@ fn main() {
 	if os.args.len == 2 && os.args[1] == 'space' { check_software_space() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'space-memory' { check_software_space_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'progress-memory' { check_software_progress_memory() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'permissions' { check_software_review_permissions() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'permissions-memory' { check_software_review_permissions_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'failure-memory' { check_software_failure_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'repair-memory' { check_software_repair_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'health-memory' { check_software_health_memory() or { panic(err) }; return }
@@ -485,7 +487,7 @@ fn main() {
 			if args.len > 3 && args[3] == 'broken' { eprintln('fixture: dependency unavailable'); exit(17) }
 			review := fixture_review(args[2], args[3..])
 			println(json2.encode(if args.len > 3 && args[3] == 'wrong-format' {
-				pkgprotocol.Review{ ...review, format: 2 }
+				pkgprotocol.Review{ ...review, format: 3 }
 			} else if args.len > 3 && args[3] == 'wrong-intent' {
 				pkgprotocol.Review{ ...review, names: ['other'] }
 			} else { review }))
@@ -612,6 +614,7 @@ fn main() {
 	mut child_status := 0
 	assert C.waitpid(pid, &child_status, 0) == pid
 	check_package_review()
+	check_software_review_permissions() or { panic(err) }
 	check_software_space() or { panic(err) }
 	check_software_package_navigation() or { panic(err) }
 	check_resolved_updates() or { panic(err) }
@@ -1070,7 +1073,7 @@ fn software_deployment_service_fixture(args []string) !bool {
 		if path == '/missing.json' { eprintln('fixture: deployment file unavailable'); exit(18) }
 		review := fixture_review('deploy', ['editor'])
 		println(json2.encode(if path == '/wrong-format.json' {
-			pkgprotocol.Review{ ...review, format: 2 }
+			pkgprotocol.Review{ ...review, format: 3 }
 		} else if path == '/wrong-operation.json' {
 			pkgprotocol.Review{ ...review, operation: 'upgrade', names: [] }
 		} else if path == '/empty.json' {

@@ -1,0 +1,1 @@
+REVIEW PERMISSIONS both hosts admit complete/legacy/known-empty groups, reject fifteen malformed groups and retire 1000 valid/legacy/refused cycles PASS

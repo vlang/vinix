@@ -18,6 +18,8 @@ pub:
 	proprietary       bool
 	firmware          bool
 	permissions       []string
+	installed_permissions_known bool
+	installed_permissions []string // optional format-2 pair; frozen active-generation declarations
 	requested         bool
 	action            string // install, update, keep, remove, export (mirror only)
 }
@@ -88,7 +90,7 @@ fn version(value string) bool {
 }
 
 pub fn (review &Review) validate() ! {
-	if review.format != 1 || review.operation !in ['install', 'remove', 'upgrade', 'deploy', 'repair', 'rollback', 'mirror']
+	if review.format !in [1, 2]! || review.operation !in ['install', 'remove', 'upgrade', 'deploy', 'repair', 'rollback', 'mirror']
 		|| review.architecture !in ['aarch64', 'x86_64'] || !digest(review.fingerprint)
 		|| review.rows.len > 8192 || review.names.len > 4096 || review.requested.len > 4096
 		|| review.names.any(!identifier(it)) || review.requested.any(!identifier(it))
@@ -112,6 +114,13 @@ pub fn (review &Review) validate() ! {
 			|| ((row.action == 'export') != (review.operation == 'mirror'))
 			|| (review.operation == 'repair' && (row.action !in ['keep', 'update'] || row.installed_version != row.version))
 			|| !view_permissions(row.permissions)
+			|| !view_permissions(row.installed_permissions)
+			|| (review.format == 1 && (row.installed_permissions_known || row.installed_permissions.len > 0))
+			|| (!row.installed_permissions_known && row.installed_permissions.len > 0)
+			|| (row.installed_permissions_known && (row.installed_version == '' || review.operation == 'mirror'))
+			|| (row.installed_permissions_known && (row.action == 'install'
+				|| ((row.action in ['keep', 'remove']! || review.operation == 'repair')
+					&& (row.permissions.len != row.installed_permissions.len || row.permissions.any(it !in row.installed_permissions)))))
 			|| row.requested != (row.id in review.requested) || (row.action == 'remove' && row.requested) {
 			return error('invalid package in review response')
 		}
@@ -131,6 +140,8 @@ fn close_review_package(row ReviewPackage) {
 		row.repository.free(); row.public_key.free(); row.license.free(); row.action.free()
 		for permission in row.permissions { permission.free() }
 		(&array(&row.permissions)).free()
+		for permission in row.installed_permissions { permission.free() }
+		(&array(&row.installed_permissions)).free()
 	}
 }
 

@@ -145,6 +145,11 @@ fn review_row(installed Installed, previous_version string, requested bool, acti
 	}
 }
 
+fn review_row_previous(installed Installed, previous Installed, requested bool, action string) pkgprotocol.ReviewPackage {
+	return pkgprotocol.ReviewPackage{...review_row(installed, previous.package.version, requested, action),
+		installed_permissions_known: true, installed_permissions: review_strings(previous.package.permissions)}
+}
+
 pub fn review_operation(config Config, directory string, operation string, names []string) !pkgprotocol.Review {
 	config.validate()!
 	guard := acquire_reader(directory)!
@@ -181,7 +186,7 @@ fn review_plan(config Config, directory string, current State, operation string,
 		})!
 		unsafe { encoded.free() }
 	}
-	mut rows := []pkgprotocol.ReviewPackage{}
+	mut rows := []pkgprotocol.ReviewPackage{cap: plan.packages.len + current.packages.len}
 	for installed in plan.packages {
 		previous := current.packages.filter(it.package.id == installed.package.id)
 		version := if previous.len == 0 { '' } else { previous[0].package.version }
@@ -194,11 +199,13 @@ fn review_plan(config Config, directory string, current State, operation string,
 		} else {
 			'update'
 		}
-		rows << review_row(installed, version, installed.package.id in plan.requested, action)
+		rows << if previous.len == 0 { review_row(installed, version, installed.package.id in plan.requested, action) }
+			else { review_row_previous(installed, previous[0], installed.package.id in plan.requested, action) }
+		unsafe { (&array(&previous)).free() }
 	}
 	for installed in current.packages {
 		if !plan.packages.any(it.package.id == installed.package.id) {
-			rows << review_row(installed, installed.package.version, false, 'remove')
+			rows << review_row_previous(installed, installed, false, 'remove')
 		}
 	}
 	rows.sort(a.id < b.id)
@@ -208,7 +215,7 @@ fn review_plan(config Config, directory string, current State, operation string,
 		estimate_transaction_space(plan, directory, current, operation)!
 	}
 	review := pkgprotocol.Review{
-		format:            1
+		format:            2
 		operation:         operation.clone()
 		names:             review_strings(names)
 		architecture:      config.architecture.clone()

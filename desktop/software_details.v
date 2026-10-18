@@ -174,12 +174,18 @@ fn (mut a SoftwareApp) prepare_details_context(row SoftwareRow, action string, r
 	}
 	a.details_values(2, publisher); software_policy_free_lines(mut publisher)
 	mut permissions := []string{cap: 12}
+	unsafe { permissions.flags |= .noslices }
 	if row.permissions.len == 0 { permissions << 'Displayed package permissions: None declared'.clone() }
 	for value in row.permissions { permissions << 'Displayed package permission: ' + value }
 	if !reviewing && row.installed_version != '' {
 		if row.installed_kind == '' { permissions << 'Installed permissions: Unavailable from this service'.clone() }
 		else if row.installed_permissions.len == 0 { permissions << 'Installed permissions: None declared'.clone() }
 		else { for value in row.installed_permissions { permissions << 'Installed permission: ' + value } }
+	}
+	if reviewing {
+		for reviewed in a.review_snapshot.rows {
+			if reviewed.id == row.id { software_review_permission_values(reviewed, mut permissions); break }
+		}
 	}
 	a.details_values(3, permissions); software_policy_free_lines(mut permissions)
 	mut licensing := ['License: ' + row.license, 'Proprietary payload: ' + if row.proprietary { 'Yes' } else { 'No' },
