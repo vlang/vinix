@@ -1,0 +1,10 @@
+protocol-compile PASS
+protocol-run PASS
+ui-compile PASS
+ui-memory PASS
+ui-functional PASS
+protocol-sanitize-compile PASS
+protocol-sanitize-run PASS
+ui-sanitize-compile PASS
+ui-sanitize-memory PASS
+ui-sanitize-functional PASS

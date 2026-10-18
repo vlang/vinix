@@ -403,6 +403,7 @@ fn main() {
 	if os.args.len == 2 && os.args[1] == 'view-memory' { check_software_view_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'space' { check_software_space() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'space-memory' { check_software_space_memory() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'progress-memory' { check_software_progress_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'failure-memory' { check_software_failure_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'repair-memory' { check_software_repair_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'health-memory' { check_software_health_memory() or { panic(err) }; return }

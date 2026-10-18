@@ -965,6 +965,11 @@ generation can be published. HTTPS transfer monitoring reaps failed/oversized
 children, retains bounded partial downloads for retry, and enforces authenticated
 size bounds while the child runs.
 
+Software retires rejected progress-frame errors as well as replaced events.
+Malformed frames leave the last valid progress intact; oversized lines recover
+at the next newline, and human diagnostics remain available. See
+[stream allocation qualification](../tests/packages/software-progress-memory-check.md).
+
 The command service loads configuration after acquiring that lock, so a completed
 repository revocation, key replacement or policy change cannot be followed by a
 transaction using the command's earlier configuration. Refresh, deployment,

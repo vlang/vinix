@@ -2853,8 +2853,13 @@ limits, JSON field types and formats are validated by
 [`pkgprotocol.decode_progress`](pkgprotocol/progress.v). The nonrecursive reader
 also rejects unknown/escaped-duplicate fields, invalid UTF-8 and noncanonical
 numbers, and retires partial results on refusal. Decoded events own their
-strings; `.close()` releases them under manual memory management. Operation consumers
-ignore unsupported/malformed frames and continue to report human diagnostics
+strings; `.close()` releases them under manual memory management. A rejected
+decode returns an owned error: consumers that discard it must free it too.
+Software retires those errors while leaving the last admitted progress and
+human diagnostic stream intact. Its fragmented stream, size-limit recovery,
+phase rendering and repeated retirement have
+[allocation checks](../../tests/packages/software-progress-memory-check.md).
+Operation consumers ignore unsupported/malformed frames and continue to report human diagnostics
 and process exit status. Counter progress is sampled approximately every 200 ms
 during HTTPS transfers and local copies, plus initial/final transfer counters;
 package and verification boundaries may emit additional frames.

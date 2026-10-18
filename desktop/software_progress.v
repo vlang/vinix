@@ -34,7 +34,10 @@ fn software_progress_text(event pkgprotocol.Progress) string {
 
 fn (mut a SoftwareApp) operation_line(line string) {
 	if line.starts_with(pkgprotocol.progress_prefix) {
-		mut event := pkgprotocol.decode_progress(unsafe { tos(line.str + pkgprotocol.progress_prefix.len, line.len - pkgprotocol.progress_prefix.len) }) or { return }
+		mut event := pkgprotocol.decode_progress(unsafe { tos(line.str + pkgprotocol.progress_prefix.len, line.len - pkgprotocol.progress_prefix.len) }) or {
+			unsafe { err.free() }
+			return
+		}
 		a.progress_snapshot.close()
 		a.progress_snapshot = event
 		a.progress_seen = true

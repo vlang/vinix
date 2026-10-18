@@ -370,6 +370,11 @@ charging acquisition twice on a shared filesystem. No-op package plans and
 fully cached separate exports keep their service reserve exemptions. See
 [space review checks](../../tests/packages/software-space-check.md).
 
+Software releases rejected progress-frame errors under manual memory management.
+Malformed frames keep the last valid progress, and oversized lines recover at
+the next newline while human failure diagnostics remain available. See
+[stream allocation checks](../../tests/packages/software-progress-memory-check.md).
+
 Software's **Clean up versions → Read review** presents the complete admitted
 generation list, fingerprint, retained current/rollback identities and deletion
 rules through the shared reader, including compact windows. Back/Escape keeps

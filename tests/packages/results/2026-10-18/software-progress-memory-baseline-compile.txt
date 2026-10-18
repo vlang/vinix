@@ -1,0 +1,245 @@
+build/package-progress-retirement-work/software/software_progress_memory_fixture.v:5:8: warning: module 'ui2' is imported but never used. Use `import ui2 as _`, to silence this warning, or just remove the unused import line
+    3 | 
+    4 | import json2
+    5 | import ui2
+      |        ~~~
+    6 | import tools.packages.pkgprotocol
+    7 |
+build/package-view-reader-work/desktop/modules/ui2/ui/control_state.c.v:4:9: warning: module 'macos' is imported but never used. Use `import macos as _`, to silence this warning, or just remove the unused import line
+    2 | 
+    3 | $if macos && !ui2_custom_rendering ? {
+    4 |     import macos
+      |            ~~~~~
+    5 | }
+    6 |
+build/package-progress-retirement-work/software/software_cleanup_navigation_fixture.v:193:3: notice: variable `arguments` shadows a function declaration
+  191 |         text := json2.encode(review); empty_text := json2.encode(empty)
+  192 |         review.close(); empty.close()
+  193 |         arguments := ['cleanup-apply']
+      |         ~~~~~~~~~
+  194 |         defer { unsafe { text.free(); empty_text.free(); (&array(&arguments)).free() } }
+  195 |         mut app := SoftwareApp{ cleanup_mode: true, output: []u8{cap: 128 * 1024} }
+build/package-progress-retirement-work/software/software_data_navigation_fixture.v:163:3: notice: variable `arguments` shadows a function declaration
+  161 |         mut status := pkgprotocol.PersonalDataStatus{ rows: rows }; status.close()
+  162 |         defer { unsafe { text.free() } }
+  163 |         arguments := ['purge-data', 'app-1']
+      |         ~~~~~~~~~
+  164 |         defer { unsafe { (&array(&arguments)).free() } }
+  165 |         mut app := SoftwareApp{ administration_required: true, data_mode: true, output: []u8{cap: 8192} }
+build/package-progress-retirement-work/software/software_deployment_navigation_fixture.v:224:3: notice: variable `arguments` shadows a function declaration
+  222 |         texts := [json2.encode(normal), json2.encode(empty)]!
+  223 |         normal.close(); empty.close()
+  224 |         arguments := ['deployment-apply']
+      |         ~~~~~~~~~
+  225 |         defer { unsafe { for text in texts { text.free() }; (&array(&arguments)).free() } }
+  226 |         mut app := SoftwareApp{ output: []u8{cap: 8192} }
+build/package-progress-retirement-work/software/software_failure_fixture.v:227:3: notice: variable `arguments` shadows a function declaration
+  225 |         app.set_status('Local validation: /private/é🚀/a long source path; restore trusted metadata before retrying.\n\x1b\xff')
+  226 |         for byte in 'Cause: é🚀 long path and escaped controls\x1b\xff\n'.repeat(20) { app.output << byte }
+  227 |         arguments := ['install', 'diagnostic-app']
+      |         ~~~~~~~~~
+  228 |         for warmup in 0 .. 2 {
+  229 |             if warmup == 1 { C.vinix_heap_begin() }
+build/package-progress-retirement-work/software/software_health.v:35:6: notice: variable `arguments` shadows a function declaration
+   33 |     a.focus = false; a.select_all = false
+   34 |     a.health_focus = false; a.health_select_all = false
+   35 |     mut arguments := ['--json', '--progress', 'health']
+      |         ~~~~~~~~~
+   36 |     a.start(arguments, true)
+   37 |     unsafe { (&array(&arguments)).free() }
+build/package-progress-retirement-work/software/software_health_fixture.v:364:3: notice: variable `arguments` shadows a function declaration
+  362 |         bad := pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'unknown', package: 'editor', repository: 'trusted' }) + '\n'
+  363 |         oversized := 'x'.repeat(pkgprotocol.progress_limit + 1) + '\n'
+  364 |         arguments := ['--json', '--progress', 'health']
+      |         ~~~~~~~~~
+  365 |         defer { unsafe { oversized.free(); (&array(&arguments)).free() } }
+  366 |         mut app := SoftwareApp{ query: []u8{cap: 256}, output: []u8{cap: 8192} }
+build/package-progress-retirement-work/software/software_launch_navigation_fixture.v:63:2: notice: variable `arguments` shadows a function declaration
+   61 | 
+   62 | fn check_launch_empty_paste(mut app SoftwareApp) {
+   63 |     arguments := editor_bytes_text(app.launch_arguments); file := editor_bytes_text(app.launch_file)
+      |     ~~~~~~~~~
+   64 |     argument_storage := app.launch_arguments.data; file_storage := app.launch_file.data
+   65 |     status := app.status; selected := app.launch_file_selected; scroll := app.launch_file_scroll
+build/package-progress-retirement-work/software/software_launch_navigation_fixture.v:101:2: notice: variable `arguments` shadows a function declaration
+   99 |     focus := app.launch_focus; selection := app.select_all
+  100 |     selected := app.launch_file_selected; scroll := app.launch_file_scroll
+  101 |     arguments := editor_bytes_text(app.launch_arguments); file := editor_bytes_text(app.launch_file)
+      |     ~~~~~~~~~
+  102 |     argument_storage := app.launch_arguments.data; file_storage := app.launch_file.data; files := app.launch_documents.data
+  103 |     id := app.launch_id; name := app.launch_name; cwd := app.launch_data_cwd; allowed := app.launch_files_allowed; status := app.status
+build/package-progress-retirement-work/software/software_launch_navigation_fixture.v:141:2: notice: variable `arguments` shadows a function declaration
+  139 |     padding := '文'.repeat(1359)
+  140 |     long_file := '/private/tmp/' + padding + 'é.txt'
+  141 |     arguments := 'λ'.repeat(2048)
+      |     ~~~~~~~~~
+  142 |     defer { pkgprotocol.free_command_values(mut files); unsafe { padding.free(); long_file.free(); arguments.free() } }
+  143 |     unsafe { files[255].free() }; files[255] = long_file.clone()
+build/package-progress-retirement-work/software/software_launch_navigation_fixture.v:318:3: notice: variable `arguments` shadows a function declaration
+  316 |         for index in 0 .. 256 { files << '/private/tmp/document-' + index.str() + ' é; $literal.txt' }
+  317 |         defer { pkgprotocol.free_command_values(mut files) }
+  318 |         arguments := ['run-args']
+      |         ~~~~~~~~~
+  319 |         defer { unsafe { (&array(&arguments)).free() } }
+  320 |         mut app := launch_navigation_app()
+build/package-progress-retirement-work/software/software_mirror_navigation_fixture.v:312:3: notice: variable `arguments` shadows a function declaration
+  310 |     $if track_heap ? {
+  311 |         text := json2.encode(software_snapshot_export_review(software_snapshot_fixture_path, false))
+  312 |         arguments := ['mirror-deployment-apply']
+      |         ~~~~~~~~~
+  313 |         defer { unsafe { text.free(); (&array(&arguments)).free() } }
+  314 |         mut app := SoftwareApp{ output: []u8{cap: 8192} }
+build/package-progress-retirement-work/software/software_package_navigation_fixture.v:400:3: notice: variable `arguments` shadows a function declaration
+  398 |             texts << json2.encode(review); review.close()
+  399 |         }
+  400 |         arguments := ['apply']
+      |         ~~~~~~~~~
+  401 |         defer { unsafe { for text in texts { text.free() }; (&array(&texts)).free(); (&array(&arguments)).free() } }
+  402 |         mut app := SoftwareApp{ output: []u8{cap: 8192}, query: 'Editor'.bytes(), filter: 1 }
+build/package-progress-retirement-work/software/software_policy.v:63:6: notice: variable `arguments` shadows a function declaration
+   61 |     a.clear_policy_pages()
+   62 |     a.policy_ready = false; a.focus = false; a.select_all = false
+   63 |     mut arguments := ['policy']
+      |         ~~~~~~~~~
+   64 |     a.start(arguments, true)
+   65 |     unsafe { (&array(&arguments)).free() }
+build/package-progress-retirement-work/software/software_policy.v:100:6: notice: variable `arguments` shadows a function declaration
+   98 |     a.policy_pending = path.clone()
+   99 |     a.focus = false; a.select_all = false
+  100 |     mut arguments := ['policy-review', a.policy_pending]
+      |         ~~~~~~~~~
+  101 |     a.start(arguments, false)
+  102 |     unsafe { (&array(&arguments)).free() }
+build/package-progress-retirement-work/software/software_policy.v:163:8: notice: variable `arguments` shadows a function declaration
+  161 |                 unsafe { encoded.free() }
+  162 |             }
+  163 |             mut arguments := ['policy-apply', a.policy_snapshot.fingerprint, a.policy_pending]
+      |                 ~~~~~~~~~
+  164 |             a.start(arguments, false)
+  165 |             unsafe { (&array(&arguments)).free() }
+build/package-progress-retirement-work/software/software_policy_navigation_fixture.v:208:3: notice: variable `arguments` shadows a function declaration
+  206 |         document_text := json2.encode(document); review_text := json2.encode(review)
+  207 |         document.close(); review.close()
+  208 |         arguments := ['policy-apply']
+      |         ~~~~~~~~~
+  209 |         defer { unsafe { document_text.free(); review_text.free(); (&array(&arguments)).free() } }
+  210 |         mut app := SoftwareApp{ policy_mode: true, output: []u8{cap: 8192} }
+build/package-progress-retirement-work/software/software_repository_navigation_fixture.v:329:3: notice: variable `arguments` shadows a function declaration
+  327 |         repositories := [pkgprotocol.Repository{ id: 'fixture', url: repository_fixture_url, public_key: old_key }]
+  328 |         configuration := json2.encode(pkgprotocol.RepositoryConfiguration{ format: 1, scope: 'configuration', architecture: 'aarch64', repositories: repositories })
+  329 |         arguments := ['repo-apply']
+      |         ~~~~~~~~~
+  330 |         defer { unsafe { url.free(); key.free(); old_key.free(); fingerprint.free(); digest.free(); configuration.free(); for text in texts { text.free() }; (&array(&repositories)).free(); (&array(&arguments)).free() } }
+  331 |         mut app := SoftwareApp{ repository_mode: true, output: []u8{cap: 8192} }
+build/package-progress-retirement-work/software/software_verify_navigation_fixture.v:149:3: notice: variable `arguments` shadows a function declaration
+  147 |     $if track_heap ? {
+  148 |         live := verify_navigation_frame(false); complete := verify_navigation_frame(true)
+  149 |         arguments := ['--progress', 'verify']
+      |         ~~~~~~~~~
+  150 |         defer { unsafe { live.free(); complete.free(); (&array(&arguments)).free() } }
+  151 |         mut app := verify_navigation_app(true)
+build/package-progress-retirement-work/software/software_window.v:39:6: notice: variable `arguments` shadows a function declaration
+   37 |     unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+   38 |     a.clear_window()
+   39 |     mut arguments := ['run-window', request.id]
+      |         ~~~~~~~~~
+   40 |     if request.document != '' { arguments << request.document }
+   41 |     defer { unsafe { (&array(&arguments)).free() } }
+build/package-progress-retirement-work/software/software_window.v:157:7: notice: variable `arguments` shadows a function declaration
+  155 |     if event_id == 'software.window.back' && a.worker == unsafe { nil } {
+  156 |         a.clear_window()
+  157 |         mut arguments := ['view']
+      |             ~~~~~~~~~
+  158 |         a.start(arguments, true)
+  159 |         unsafe { (&array(&arguments)).free() }
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_compiled.v:85:4: notice: unused function: `vml_dispatch_compiled`
+   83 | }
+   84 | 
+   85 | fn vml_dispatch_compiled[T](mut model T, name string, arguments []string) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+   86 |     $for method in T.methods {
+   87 |         if method.name == name {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1243:4: notice: unused function: `v_validate_action`
+ 1241 | }
+ 1242 | 
+ 1243 | fn v_validate_action[T](expr &VExpression, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~
+ 1244 |     if expr.kind != .call || !expr.value.starts_with('app.') {
+ 1245 |         return error('event handlers must call an app action at line ${expr.line}')
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1258:4: notice: unused function: `v_validate_assignment`
+ 1256 | }
+ 1257 | 
+ 1258 | fn v_validate_assignment[T](expr &VExpression, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+ 1259 |     if expr.kind != .assignment || expr.left.kind != .path || !expr.left.value.starts_with('app.')
+ 1260 |         || expr.left.value.count('.') != 1 {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1269:4: notice: unused function: `v_validate_repeater_schema`
+ 1267 | }
+ 1268 | 
+ 1269 | fn v_validate_repeater_schema[T](node &VNode, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1270 |     model_expr := node.expressions['model'] or {
+ 1271 |         return error('Repeater requires `model` at line ${node.line}')
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1294:4: notice: unused function: `v_validate_node_schema`
+ 1292 | }
+ 1293 | 
+ 1294 | fn v_validate_node_schema[T](node &VNode, incoming_scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~~
+ 1295 |     mut scope := incoming_scope.clone()
+ 1296 |     if node.id.len > 0 {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1375:4: notice: unused function: `v_validate_template`
+ 1373 | }
+ 1374 | 
+ 1375 | fn v_validate_template[T](root &VNode, model T) ! {
+      |    ~~~~~~~~~~~~~~~~~~~
+ 1376 |     v_validate_node_schema[T](root, {
+ 1377 |         'app': v_schema_from(model)
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1451:4: notice: unused function: `vml_writable_field_type`
+ 1449 | }
+ 1450 | 
+ 1451 | fn vml_writable_field_type[T](name string) !string {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+ 1452 |     return vml_writable_path_type($zero(T), name.split('.'), name)
+ 1453 | }
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1455:4: notice: unused function: `type_check_action`
+ 1453 | }
+ 1454 | 
+ 1455 | fn type_check_action[T](name string, args []VSchema, line int) ! {
+      |    ~~~~~~~~~~~~~~~~~
+ 1456 |     $for method in T.methods {
+ 1457 |         if method.name == name {
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1483:4: notice: unused function: `vml_set_field`
+ 1481 | }
+ 1482 | 
+ 1483 | fn vml_set_field[T](mut model T, name string, value VValue) ! {
+      |    ~~~~~~~~~~~~~
+ 1484 |     vml_set_path(mut model, name.split('.'), name, value)!
+ 1485 | }
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1487:4: notice: unused function: `vml_dispatch`
+ 1485 | }
+ 1486 | 
+ 1487 | fn vml_dispatch[T](mut model T, invocation VmlInvocation) ! {
+      |    ~~~~~~~~~~~~
+ 1488 |     mut scope := invocation.scope.clone()
+ 1489 |     // The app object is intentionally refreshed here. Repeater-local values stay
+build/package-view-reader-work/desktop/modules/ui2/ui/vml_model.v:1513:4: notice: unused function: `vml_apply_assignment`
+ 1511 | }
+ 1512 | 
+ 1513 | fn vml_apply_assignment[T](mut model T, assignment VmlAssignment) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~
+ 1514 |     mut scope := assignment.scope.clone()
+ 1515 |     scope['app'] = v_value_from(model)
+tools/packages/pkgadmin/socket.c.v:84:2: notice: variable `path` shadows a function declaration
+   82 |     private_directory(directory, uid)!
+   83 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+   84 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+   85 |     mut accepted := false
+   86 |     defer { if !accepted { unsafe { path.free() } } }
+tools/packages/pkgadmin/socket.c.v:103:2: notice: variable `path` shadows a function declaration
+  101 |     private_directory(directory, uid)!
+  102 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+  103 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+  104 |     defer { unsafe { path.free() } }
+  105 |     location := address(path)!

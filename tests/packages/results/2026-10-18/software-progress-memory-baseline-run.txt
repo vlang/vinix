@@ -1,0 +1,5 @@
+/Users/alex/code/vinix/build/package-progress-retirement-work/software/software_progress_memory_fixture.v:89: FAIL: fn main.check_software_progress_memory: assert kept == 0, 'progress case ' + index.str() + ' retained ' + kept.str() + ' bytes'
+   left value: kept = 32000
+  right value: 0
+      message: progress case 0 retained 32000 bytes
+V panic: Assertion failed...

@@ -806,6 +806,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     exemptions; the service repeats its final disk check before changes.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,
   permissions, progress, uninstall, updates and useful failure diagnostics.
+  - [x] [Owned live progress rejection](tests/packages/software-progress-memory-check.md)
+    retires ignored decoder errors, preserving admitted progress, bounded stream
+    recovery and human diagnostics. Fragmented valid/invalid/oversized streams
+    and rendering have repeated allocation and sanitizer checks.
   - [x] [Owned catalog observations](tests/packages/software-view-owner-check.md)
     give V callers independently closeable rows and nested metadata, retiring
     configuration, catalogs, installed state and resolution scratch. Tracked

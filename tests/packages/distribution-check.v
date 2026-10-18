@@ -359,6 +359,7 @@ fn check() ! {
 	os.cp(repository + '/desktop/software_repository_navigation.v', work + '/software/software_repository_navigation.v')!
 	os.cp(repository + '/tests/packages/software_repository_navigation_fixture.v', work + '/software/repository_navigation_fixture.v')!
 	os.cp(repository + '/desktop/software_progress.v', work + '/software/software_progress.v')!
+	os.cp(repository + '/tests/packages/software_progress_memory_fixture.v', work + '/software/progress_memory_fixture.v')!
 	os.cp(repository + '/desktop/software_failure.v', work + '/software/software_failure.v')!
 	os.cp(repository + '/tests/packages/software_failure_fixture.v', work + '/software/failure_fixture.v')!
 	os.cp(repository + '/tests/packages/software_verify_fixture.v', work + '/software/verify_fixture.v')!
@@ -424,6 +425,7 @@ fn check() ! {
 	run(work + '/window-broker-memory', ['metadata-memory'])!
 	run(work + '/window-broker-memory', ['details-memory'])!
 	run(work + '/window-broker-memory', ['view-memory'])!
+	run(work + '/window-broker-memory', ['progress-memory'])!
 	run(work + '/window-broker-memory', ['failure-memory'])!
 	run(work + '/window-broker-memory', ['repair-memory'])!
 	run(work + '/window-broker-memory', ['health-memory'])!
