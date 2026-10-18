@@ -264,7 +264,7 @@ callbacks. The native fixture also passes on the M1 Air over SSH. These are
 protocol checks, not a Vinix boot or a GPU-rendering result. Apple binaries and
 live captures remain untracked under `tools/agx-re/build`.
 
-### Prepared GPU test deployment (2026-10-18)
+### Verified GPU test deployment (2026-10-18)
 
 Built an isolated snapshot of `f53bb378d`, including the G13 publication and
 failure-handling fixes in `a5b3be959`. The AArch64 kernel uses `LIMINE_MP=1`;
@@ -273,10 +273,10 @@ Asahi, Firefox, and `run-m1-agx-smoke`. The complete desktop image preflight
 passes, including comparison of the archived triangle C source against the
 snapshot's V source. The compressed image is 280935554 bytes.
 
-The staged boot profile selects `vinix.apple_gpu=1 vinix.apple_dcp=0`, and the
-installer appends `vinix.apple_speakers=0` so this kernel skips speaker
-initialization entirely. It retains the Air's existing persistent-partition
-configuration and inherited framebuffer.
+The installed boot profile selects `vinix.apple_gpu=1 vinix.apple_dcp=0
+vinix.apple_speakers=0` so this kernel skips speaker initialization entirely.
+It retains the Air's existing persistent-partition configuration and inherited
+framebuffer.
 
 | Input | SHA-256 |
 | --- | --- |
@@ -284,13 +284,21 @@ configuration and inherited framebuffer.
 | Compressed desktop image | `7c0b8f2b4fb7346e47289b8f806dc83675d1c1f1f057427809a6b5ba247201ae` |
 | Limine 12.9.3 EFI loader | `3a23c79b75dd78fbacb6430472ce4aa5e90ef89089a4970459a0282cf44ccb4f` |
 
-Deployment is pending: the Air stopped responding to SSH before rsync could
-transfer the payload. No EFI files were changed. The prepared image and
-native V deployment helpers remain under `logs/m1-gpu-deploy-20261018` and
-`logs/m1-{push,install}-20261018.v`; the attempted installation log is
-`logs/m1-deploy-install-20261018.log`. Resume with the Air awake in macOS,
-then verify the installed hashes and all four Limine configuration copies.
-Hardware boot, compute, and render acceptance remain untested.
+Deployed over SSH to the MacBookAir10,1 host named in `deploy-to-m1.sh`.
+The exact transferred image passed the desktop GPU preflight on the Air, and
+`e2fsck -p` reported its configured Vinix data filesystem clean. The installed
+kernel, image, and loader on `disk0s4` match the SHA-256 values above; all four
+Limine configuration copies match and include the GPU-on and speakers-off
+flags. The existing `m1n1/boot.bin` and `vendorfw/u-boot` boot chain was retained.
+The installer synced and unmounted the EFI partition, then reported
+`VINIX M1 GPU DEPLOY: VERIFIED (GPU enabled, speakers disabled)`.
+
+The successful installation log is `logs/m1-deploy-install-verified-20261018.log`.
+The isolated build and native V deployment helpers remain under
+`logs/m1-gpu-deploy-20261018` and `logs/m1-{push,install}-20261018.v`.
+The Air was left running macOS for the user to reboot into Vinix. Hardware
+boot, compute, and render acceptance remain untested; after boot, run
+`run-m1-agx-smoke --rebuild` to exercise the installed native GPU test.
 
 ## Acceptance sequence
 
