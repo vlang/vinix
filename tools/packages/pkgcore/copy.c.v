@@ -73,7 +73,9 @@ fn fetch_file_progress(source string, target string, maximum u64, resume bool, e
 	}
 	defer { C.close(input.fd) }
 	mut offset := u64(0)
-	if resume && ordinary_file(target) { offset = os.file_size(target) }
+	mut info := C.stat{}
+	if resume && C.lstat(target.str, unsafe { &info }) == 0 && info.st_mode & 0o170000 == 0o100000
+		&& info.st_size >= 0 { offset = u64(info.st_size) }
 	if offset > input.bytes { offset = 0 }
 	copy_opened(input, source, target, offset, event, report)!
 	return offset > 0

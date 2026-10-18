@@ -102,8 +102,8 @@ fn decode_deployment(text string, architecture string) !DeploymentLock {
 }
 
 fn deployment_plan(config Config, directory string, current State, document DeploymentLock) !Plan {
-	// Activation still returns borrowed manifests. Review requests instead close
-	// this preparation after constructing their independent protocol reply.
+	// Legacy internal callers retain this borrowed plan's preparation. Public
+	// requests keep its owner explicitly until their independent reply is built.
 	return prepare_deployment_plan(config, directory, current, document)!.plan
 }
 
@@ -190,19 +190,26 @@ pub fn (service Service) review_deployment(path string) !pkgprotocol.Review {
 
 fn (service Service) deploy_document(path string, expected string) !State {
 	directory := service.directory()!
+	defer { unsafe { directory.free() } }
 	guard := acquire(directory)!
 	defer { guard.release() }
 	config := service.configuration()!
+	defer { close_decoded_configuration(config) }
 	current := read_state(directory, config.architecture)!
-	document := read_deployment(path, config.architecture)!
-	plan := deployment_plan(config, directory, current, document)!
+	defer { if current.generation != 0 { close_decoded_state(current) } }
+	mut document := read_deployment(path, config.architecture)!
+	defer { document.close() }
+	mut prepared := prepare_deployment_plan(config, directory, current, document)!
+	defer { prepared.close() }
+	plan := prepared.plan
 	repairs := transaction_repairs(directory, current, plan, 'deploy')
 	defer { close_transaction_repairs(repairs) }
 	fingerprint := deployment_fingerprint(config, current, document, plan, repairs)
 	defer { unsafe { fingerprint.free() } }
 	check_review(expected, fingerprint)!
 	service.progress(pkgprotocol.Progress{ phase: 'resolve' })
-	return activate_repair_plan_locked(config, directory, current, plan, 'deploy', repairs, TransactionOptions{ progress: service.progress })
+	state := activate_repair_plan_locked(config, directory, current, plan, 'deploy', repairs, TransactionOptions{ progress: service.progress })!
+	return owned_transaction_state(state)
 }
 
 pub fn (service Service) deploy(path string) !State {

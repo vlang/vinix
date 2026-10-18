@@ -1,0 +1,116 @@
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Restarting app/bin/app: resumed payload failed verification
+Activated package generation 3
+Package download recovery: damaged resumed prefix restarted once and verified before activation
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Restarting app/bin/app: resumed payload failed verification
+Installing Application 1.0.0 (1/1) from trusted
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Installing Application 1.0.0 (1/1) from trusted
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Package download recovery: bad source refused after bounded attempts; activation and rollback preserved
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (139264 bytes)
+Activated package generation 3

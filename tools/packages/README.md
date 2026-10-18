@@ -402,6 +402,13 @@ retire on success/refusal. Low-level `load_catalog()`/`snapshots_catalog()` keep
 their borrowed publisher identities and must not use this close method. See
 [refresh request checks](../../tests/packages/refresh-request-check.md).
 
+Public transactions, rollback and deployment replies also own their complete
+state independently. V clients call `State.close()` after use; the CLI closes
+successful replies. Request configuration, plans, source states and staging or
+download scratch retire on success and refusal. Internal activation states
+retain their borrowed lifetime. See
+[activation request checks](../../tests/packages/activation-request-check.md).
+
 Software releases rejected progress-frame errors under manual memory management.
 Malformed frames keep the last valid progress, and oversized lines recover at
 the next newline while human failure diagnostics remain available. See

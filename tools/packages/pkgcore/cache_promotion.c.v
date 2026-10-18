@@ -18,7 +18,7 @@ fn open_cache_partial(parent int, name string, path string) !CachePartial {
 	fd := C.openat(parent, name.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
 	if fd < 0 { return error('cannot open ordinary partial download: ${path}') }
 	mut info := C.stat{}
-	if C.fstat(fd, &info) != 0 || info.st_mode & 0o170000 != 0o100000 || info.st_size < 0 || info.st_nlink != 1 {
+	if C.fstat(fd, unsafe { &info }) != 0 || info.st_mode & 0o170000 != 0o100000 || info.st_size < 0 || info.st_nlink != 1 {
 		C.close(fd)
 		return error('partial download must be an ordinary regular file without hard links; inspect retained data before retrying: ${path}')
 	}
@@ -28,9 +28,9 @@ fn open_cache_partial(parent int, name string, path string) !CachePartial {
 fn check_cache_partial(parent int, name string, partial CachePartial) ! {
 	mut opened := C.stat{}
 	mut named := C.stat{}
-	if C.fstat(partial.fd, &opened) != 0 || opened.st_mode & 0o170000 != 0o100000
+	if C.fstat(partial.fd, unsafe { &opened }) != 0 || opened.st_mode & 0o170000 != 0o100000
 		|| opened.st_nlink != 1 || opened.st_size < 0 || u64(opened.st_size) != partial.bytes
-		|| C.fstatat(parent, name.str, &named, C.AT_SYMLINK_NOFOLLOW) != 0
+		|| C.fstatat(parent, name.str, unsafe { &named }, C.AT_SYMLINK_NOFOLLOW) != 0
 		|| named.st_mode & 0o170000 != 0o100000 || u64(named.st_dev) != partial.device || u64(named.st_ino) != partial.inode {
 		return error('partial download changed before cache publication; inspect retained data and retry')
 	}
@@ -67,7 +67,7 @@ fn promote_cached_payload_with(directory string, payload Payload, options CacheP
 	if fd < 0 { return error('cannot open ordinary package object directory') }
 	defer { C.close(fd) }
 	mut info := C.stat{}
-	if C.fstat(fd, &info) != 0 || info.st_mode & 0o170000 != 0o040000 { return error('cannot inspect package object directory') }
+	if C.fstat(fd, unsafe { &info }) != 0 || info.st_mode & 0o170000 != 0o040000 { return error('cannot inspect package object directory') }
 	device := u64(info.st_dev)
 	inode := u64(info.st_ino)
 	partial := open_cache_partial(fd, name, path)!

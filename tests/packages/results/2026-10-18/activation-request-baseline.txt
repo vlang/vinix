@@ -1,0 +1,572 @@
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST aarch64 service install retained 120526 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST aarch64 service upgrade retained 155014 tracked bytes
+ACTIVATION REQUEST aarch64 service install-kept retained 71368 tracked bytes
+ACTIVATION REQUEST aarch64 service repair retained 41510 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST aarch64 service damaged-repair retained 125156 tracked bytes
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+ACTIVATION REQUEST aarch64 service remove retained 78894 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST aarch64 service file-download retained 159338 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+ACTIVATION REQUEST aarch64 service offline-missing retained 109046 tracked bytes
+ACTIVATION REQUEST aarch64 service stale-review retained 71368 tracked bytes
+Installing Application é🚀 1.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing Application é🚀 1.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing Application é🚀 1.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing Application é🚀 1.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+ACTIVATION REQUEST aarch64 service rollback retained 158674 tracked bytes
+ACTIVATION REQUEST aarch64 service rollback-unavailable retained 41510 tracked bytes
+ACTIVATION REQUEST aarch64 service rollback-revoked retained 41256 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST aarch64 explicit install retained 112832 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST aarch64 explicit upgrade retained 147320 tracked bytes
+ACTIVATION REQUEST aarch64 explicit install-kept retained 63674 tracked bytes
+ACTIVATION REQUEST aarch64 explicit repair retained 33816 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST aarch64 explicit damaged-repair retained 117462 tracked bytes
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+ACTIVATION REQUEST aarch64 explicit remove retained 71200 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST aarch64 explicit file-download retained 151644 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+ACTIVATION REQUEST aarch64 explicit offline-missing retained 101412 tracked bytes
+ACTIVATION REQUEST aarch64 explicit stale-review retained 63674 tracked bytes
+Installing Application é🚀 1.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing Application é🚀 1.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing Application é🚀 1.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing Application é🚀 1.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+ACTIVATION REQUEST aarch64 explicit rollback retained 150980 tracked bytes
+ACTIVATION REQUEST aarch64 explicit rollback-unavailable retained 33816 tracked bytes
+ACTIVATION REQUEST aarch64 explicit rollback-revoked retained 33816 tracked bytes
+ACTIVATION REQUEST aarch64 service upgrade-noop retained 71368 tracked bytes
+ACTIVATION REQUEST aarch64 service blocked-remove retained 41510 tracked bytes
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+ACTIVATION REQUEST aarch64 service empty-deploy retained 78530 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST aarch64 service resume-download retained 160874 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+ACTIVATION REQUEST aarch64 service missing-source retained 109226 tracked bytes
+ACTIVATION REQUEST aarch64 service disk-refusal retained 71368 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+ACTIVATION REQUEST aarch64 service interrupted retained 154038 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+ACTIVATION REQUEST aarch64 service prepare-damage retained 154038 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+ACTIVATION REQUEST aarch64 service published-damage retained 154222 tracked bytes
+ACTIVATION REQUEST aarch64 service bad-state retained 7694 tracked bytes
+ACTIVATION REQUEST aarch64 service bad-cache retained 41510 tracked bytes
+ACTIVATION REQUEST aarch64 service bad-history retained 41510 tracked bytes
+ACTIVATION REQUEST aarch64 service unsafe-stage retained 71368 tracked bytes
+ACTIVATION REQUEST aarch64 service counter-exhausted retained 71368 tracked bytes
+ACTIVATION REQUEST aarch64 service busy retained 128 tracked bytes
+ACTIVATION REQUEST aarch64 service bad-config retained 128 tracked bytes
+ACTIVATION REQUEST aarch64 service invalid-root retained 0 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST aarch64 service deployment-legacy retained 155868 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST aarch64 service deployment-lock retained 157160 tracked bytes
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+ACTIVATION REQUEST aarch64 service deployment-empty retained 79376 tracked bytes
+ACTIVATION REQUEST aarch64 service deployment-stale retained 73514 tracked bytes
+ACTIVATION REQUEST aarch64 service deployment-malformed retained 41510 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST x86_64 service install retained 120520 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST x86_64 service upgrade retained 155004 tracked bytes
+ACTIVATION REQUEST x86_64 service install-kept retained 71358 tracked bytes
+ACTIVATION REQUEST x86_64 service repair retained 41504 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST x86_64 service damaged-repair retained 125150 tracked bytes
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+ACTIVATION REQUEST x86_64 service remove retained 78888 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST x86_64 service file-download retained 159328 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+ACTIVATION REQUEST x86_64 service offline-missing retained 109036 tracked bytes
+ACTIVATION REQUEST x86_64 service stale-review retained 71358 tracked bytes
+Installing Application é🚀 1.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing Application é🚀 1.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing Application é🚀 1.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing Application é🚀 1.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+ACTIVATION REQUEST x86_64 service rollback retained 158664 tracked bytes
+ACTIVATION REQUEST x86_64 service rollback-unavailable retained 41504 tracked bytes
+ACTIVATION REQUEST x86_64 service rollback-revoked retained 41250 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST x86_64 explicit install retained 112828 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST x86_64 explicit upgrade retained 147312 tracked bytes
+ACTIVATION REQUEST x86_64 explicit install-kept retained 63666 tracked bytes
+ACTIVATION REQUEST x86_64 explicit repair retained 33812 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST x86_64 explicit damaged-repair retained 117458 tracked bytes
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+ACTIVATION REQUEST x86_64 explicit remove retained 71196 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST x86_64 explicit file-download retained 151636 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+ACTIVATION REQUEST x86_64 explicit offline-missing retained 101404 tracked bytes
+ACTIVATION REQUEST x86_64 explicit stale-review retained 63666 tracked bytes
+Installing Application é🚀 1.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing Application é🚀 1.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing Application é🚀 1.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Installing Application é🚀 1.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+ACTIVATION REQUEST x86_64 explicit rollback retained 150972 tracked bytes
+ACTIVATION REQUEST x86_64 explicit rollback-unavailable retained 33812 tracked bytes
+ACTIVATION REQUEST x86_64 explicit rollback-revoked retained 33812 tracked bytes
+ACTIVATION REQUEST x86_64 service upgrade-noop retained 71358 tracked bytes
+ACTIVATION REQUEST x86_64 service blocked-remove retained 41504 tracked bytes
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+ACTIVATION REQUEST x86_64 service empty-deploy retained 78524 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST x86_64 service resume-download retained 160864 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Downloading app/bin/app (11 bytes)
+ACTIVATION REQUEST x86_64 service missing-source retained 109216 tracked bytes
+ACTIVATION REQUEST x86_64 service disk-refusal retained 71358 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+ACTIVATION REQUEST x86_64 service interrupted retained 154028 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+ACTIVATION REQUEST x86_64 service prepare-damage retained 154028 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+ACTIVATION REQUEST x86_64 service published-damage retained 154212 tracked bytes
+ACTIVATION REQUEST x86_64 service bad-state retained 7692 tracked bytes
+ACTIVATION REQUEST x86_64 service bad-cache retained 41504 tracked bytes
+ACTIVATION REQUEST x86_64 service bad-history retained 41504 tracked bytes
+ACTIVATION REQUEST x86_64 service unsafe-stage retained 71358 tracked bytes
+ACTIVATION REQUEST x86_64 service counter-exhausted retained 71358 tracked bytes
+ACTIVATION REQUEST x86_64 service busy retained 128 tracked bytes
+ACTIVATION REQUEST x86_64 service bad-config retained 128 tracked bytes
+ACTIVATION REQUEST x86_64 service invalid-root retained 0 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST x86_64 service deployment-legacy retained 155856 tracked bytes
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+Installing Application é🚀 2.0.0 (1/2) from fixture
+Installing Assets 1.0.0 (2/2) from fixture
+Activated package generation 3
+ACTIVATION REQUEST x86_64 service deployment-lock retained 157146 tracked bytes
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+ACTIVATION REQUEST x86_64 service deployment-empty retained 79368 tracked bytes
+ACTIVATION REQUEST x86_64 service deployment-stale retained 73500 tracked bytes
+ACTIVATION REQUEST x86_64 service deployment-malformed retained 41504 tracked bytes

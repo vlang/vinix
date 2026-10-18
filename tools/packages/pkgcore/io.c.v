@@ -60,8 +60,10 @@ pub fn replace_path(source string, destination string) ! {
 fn ordinary_file(path string) bool {
 	// This compiler's os.is_file only excludes directories, so it accepts
 	// FIFOs/devices. Inspect the file type before any potentially blocking read.
-	info := os.lstat(path) or { return false }
-	return info.mode & 0o170000 == 0o100000
+	// A missing resume target is normal. Avoid allocating an os.Stat record
+	// and an unretired error merely to answer this predicate.
+	mut info := C.stat{}
+	return C.lstat(path.str, unsafe { &info }) == 0 && info.st_mode & 0o170000 == 0o100000
 }
 
 pub fn copy_file(source string, target string, offset u64, maximum u64) ! {

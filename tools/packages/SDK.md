@@ -2668,9 +2668,18 @@ defer { installed.close() }
 println(installed.generation)
 ```
 
-This close contract applies to owned status/verification observations. Transaction
-and plan results, low-level fresh `read_state` values and caller-built states can
-borrow metadata and must retain their existing lifetimes. Status skips payload
+This close contract also applies to public transaction, rollback and deployment
+replies, including no-ops: `Service.transact`, `transact`, `Service.rollback`,
+`rollback`, `rollback_reviewed`, `Service.deploy` and `Service.apply_deployment`.
+They own every requested ID, publisher identity, architecture and nested manifest
+independently of configuration, preparation and other replies. Retire each with
+`State.close()`; CLI maintenance commands do so after success. Configuration,
+decoded states, deployment documents, prepared plans and staging/download scratch
+retire on success or refusal. See
+[activation request qualification](../../tests/packages/activation-request-check.md).
+Internal activation states, low-level fresh `read_state` values and caller-built
+states can borrow metadata and retain their existing lifetimes. Public preview
+plans have their separate `Plan.close()` contract. Status skips payload
 scanning; verify holds its reader lock through completion. Returned metadata is a
 captured observation, rather than a continuing lease on installed files. Wire
 fields and output bytes are unchanged. See

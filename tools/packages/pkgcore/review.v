@@ -67,8 +67,8 @@ fn (mut prepared PreparedOperationPlan) close() {
 	prepared = PreparedOperationPlan{}
 }
 
-// Legacy plan/activation APIs return manifests borrowing the preparation's
-// storage. Keep that lifetime until those APIs have an independently owned reply.
+// Legacy internal callers retain this borrowed plan's preparation. Public
+// requests keep its owner explicitly until their independent reply is built.
 fn operation_plan(config Config, directory string, current State, operation string, names []string) !Plan {
 	return prepare_operation_plan(config, directory, current, operation, names)!.plan
 }

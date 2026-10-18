@@ -1,0 +1,33 @@
+STAGE RECOVERY root-alias refused=true preserved=true
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+Activated package generation 3
+STAGE RECOVERY 12 malformed-root transaction/collection refusals preserve all stages, generations, cache and outside data; restored roots retry PASS
+STAGE RECOVERY five changed captured roots preserve original and replacement identities; restored inode retires PASS
+STAGE RECOVERY ten replaced nested/ancestor directories refuse without traversing aliases or deleting saved/replacement data; restored trees retire PASS
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-14114-1792320861669239/store/generations/.stage-2: package generation directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-14114-1792320861677527/store/generations/.stage-2: package generation directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-14114-1792320861685721/store/generations/.stage-2: package generation directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-14114-1792320861694407/store/generations/.stage-2: package generation directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-14114-1792320861702740/store/generations/.stage-2: package generation directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-14114-1792320861711377/store/generations/.stage-2: package generation directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-14114-1792320861720248/store/generations/.stage-2: package generation directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-14114-1792320861728797/store/generations/.stage-2: package generation directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-14114-1792320861736904/store/generations/.stage-2: package generation directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+Unpublished package stage retained for inspection at /tmp/vinix-stage-recovery-14114-1792320861745489/store/generations/.stage-2: package generation directory identity changed: .stage-2; retain recovery data and retry after inspection
+Activated package generation 2
+STAGE RECOVERY ten in-flight prepared/staged replacements preserve saved stages and outside data; restored originals retry PASS
+STAGE RECOVERY incomplete 64-level tree and 128 mixed-tree retirements/refusals keep descriptors below 32 without traversing aliases or opening FIFOs PASS
+STAGE RECOVERY 1024 long-name files spanning directory buffers retire completely in one recovery pass PASS

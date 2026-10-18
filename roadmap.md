@@ -831,15 +831,22 @@ architectures; broader release/catalog/runtime acceptance remains open.
     declaration. [Full native repetition](tests/packages/collection-stress-check.md)
     also measures 64 calls per case with eight warmups and settled creator
     reservations between fixtures, covering all six retirement controls.
-    Activation ownership and broader release gates remain open.
+    Broader release gates remain open.
   - [x] [Owned catalog refresh requests](tests/packages/refresh-request-check.md)
     return independently closeable publisher identities and nested manifests,
     retiring configuration, fetched metadata, paths and captured workspace
     inventories on success/refusal. Both APIs preserve signed cache/history and
     writer-lock ordering across 64 calls in each of 72 file-repository/offline
     cases. Late publication failures retire decoded replies; abandoned nested
-    work retires without following aliases or shared writable roots. Activation,
-    live HTTPS repetition and broader release acceptance remain separate.
+    work retires without following aliases or shared writable roots.
+    Live HTTPS repetition and broader release acceptance remain separate.
+  - [x] [Owned activation, rollback and deployment requests](tests/packages/activation-request-check.md)
+    return independent complete states retired with `State.close()`, including
+    no-ops. Configuration, source states, prepared plans, deployment documents,
+    staging paths and file-download scratch retire on success/refusal. Repeated
+    requests preserve writer-lock ordering, stale-review and disk preflight,
+    interrupted stages and retained failed publications. Live HTTPS repetition,
+    production catalog migration and broader graphical/runtime gates remain open.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,
   permissions, progress, uninstall, updates and useful failure diagnostics.
   - [x] [Reviewed permission changes](tests/packages/review-permissions-check.md)

@@ -1,0 +1,2 @@
+PASS aarch64 packages-activation-request (1353.3s)
+package-activation-request aarch64: 1 passed, 0 failed, 0 skipped

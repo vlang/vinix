@@ -256,7 +256,8 @@ fn checked(arguments []string) !int {
 		}
 		'deployment-apply' {
 			if names.len != 2 { return error('deployment-apply requires a review fingerprint and deployment document') }
-			service.apply_deployment(names[1], names[0])!
+			mut state := service.apply_deployment(names[1], names[0])!
+			state.close()
 		}
 		'policy' {
 			if names.len != 0 { return error('policy takes no arguments') }
@@ -404,7 +405,8 @@ fn checked(arguments []string) !int {
 			}
 		}
 		'install', 'remove', 'upgrade', 'repair' {
-			service.transact(command, names, pkgcore.TransactionOptions{})!
+			mut state := service.transact(command, names, pkgcore.TransactionOptions{})!
+			state.close()
 		}
 		'plan' {
 			if names.len < 1 { return error('plan requires an operation') }
@@ -429,18 +431,22 @@ fn checked(arguments []string) !int {
 			}
 			if names[1] == 'rollback' {
 				if names.len != 2 { return error('rollback takes no package IDs') }
-				service.rollback(names[0])!
+				mut state := service.rollback(names[0])!
+				state.close()
 			} else {
-				service.transact(names[1], names[2..], pkgcore.TransactionOptions{ expected_review: names[0] })!
+				mut state := service.transact(names[1], names[2..], pkgcore.TransactionOptions{ expected_review: names[0] })!
+				state.close()
 			}
 		}
 		'deploy' {
 			if names.len != 1 { return error('deploy requires a deployment manifest') }
-			service.deploy(names[0])!
+			mut state := service.deploy(names[0])!
+			state.close()
 		}
 		'rollback' {
 			if names.len != 0 { return error('rollback takes no arguments') }
-			service.rollback('')!
+			mut state := service.rollback('')!
+			state.close()
 		}
 		'gc' {
 			if names.len != 0 { return error('gc takes no arguments') }

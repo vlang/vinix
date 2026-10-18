@@ -68,9 +68,9 @@ fn close_decoded_state(state State) {
 	}
 }
 
-// Retire an independently owned observation returned by Service.state/verify.
-// Transaction, plan and caller-built states can borrow fields: do not close
-// those values through this method. Repeated close of one owner is harmless.
+// Retire an independently owned public state/verify, transaction, rollback or
+// deployment reply. Internal activation and caller-built states can borrow
+// fields and keep their own lifetime. Repeated close of one owner is harmless.
 pub fn (mut state State) close() {
 	close_decoded_state(state)
 	state = State{}

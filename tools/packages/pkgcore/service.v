@@ -39,9 +39,12 @@ pub fn (service Service) refresh() !Catalog {
 
 pub fn (service Service) transact(operation string, names []string, options TransactionOptions) !State {
 	directory := service.directory()!
+	defer { unsafe { directory.free() } }
 	guard := acquire(directory)!
 	defer { guard.release() }
-	return transact_locked(service.configuration()!, directory, operation, names,
+	config := service.configuration()!
+	defer { close_decoded_configuration(config) }
+	return transact_locked(config, directory, operation, names,
 		TransactionOptions{ ...options, progress: service.progress })
 }
 
@@ -68,9 +71,12 @@ pub fn (service Service) review(operation string, names []string) !pkgprotocol.R
 
 pub fn (service Service) rollback(expected string) !State {
 	directory := service.directory()!
+	defer { unsafe { directory.free() } }
 	guard := acquire(directory)!
 	defer { guard.release() }
-	return rollback_progress(service.configuration()!, directory, expected, service.progress)
+	config := service.configuration()!
+	defer { close_decoded_configuration(config) }
+	return rollback_progress(config, directory, expected, service.progress)
 }
 
 pub fn (service Service) collect() ! {

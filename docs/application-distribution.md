@@ -776,6 +776,14 @@ preserving foreign files and retained signed metadata. Replay history still
 publishes before the cache, including when cache publication later fails. See
 [refresh request ownership](../tests/packages/refresh-request-check.md).
 
+Public activation, rollback and deployment replies own every field independently
+and retire with `State.close()`. Service configuration, decoded source states,
+prepared plans and deployment documents retire before returning; staging paths,
+payload acquisition and progress text have explicit lifetimes on success and
+refusal. The CLI closes successful replies. Internal activation keeps its
+borrowed plan contract. See
+[activation request ownership](../tests/packages/activation-request-check.md).
+
 Software keeps a proposal readable when its space estimate does not fit. Its
 status and plan/review readers identify the filesystem and exact additional
 bytes needed, including reserved space, and Confirm is unavailable. Free space,
