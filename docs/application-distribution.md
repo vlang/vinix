@@ -408,6 +408,14 @@ including disk-space failures, all six partial imports and retained recovery or
 published output. All measured calls retain zero tracked V allocations and stable
 descriptors. Shared ELF checks also retire signature scratch on both targets;
 other complete publisher builders and broader release/runtime acceptance remain open.
+The [complete SQLite builder checks](../tests/packages/sqlite-builder-check.md)
+extend that ownership to the Linux CLI/runtime profile: 256 complete calls and
+896 metadata cycles retire template arguments/selectors, partial inventories,
+canonicalization and reply/error storage. `SqliteProfileInfo.close()` is
+idempotent, preserves the published lock and owns its data independently of
+caller arguments. The CLI releases it after encoding; compatible runtime-only
+updates keep the application metadata unchanged. First-call JSON metadata and
+other complete publisher/catalog/release owners remain separate boundaries.
 The workspace builder also owns its metadata/disk-budget plan and returns an
 independently closeable `CatalogInfo`. It finishes metadata admission and budgeting
 before touching prepared roots or destination parents, retaining the existing

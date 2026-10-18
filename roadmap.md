@@ -667,6 +667,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     publication, retirement and reply/error disposal after JSON metadata
     initialization, with zero retained tracked V allocations across 256 calls.
     Other complete profile/catalog/release builders remain separate boundaries.
+  - [x] [Owned complete SQLite profile construction](tests/packages/sqlite-builder-check.md)
+    retires templates, partial imports, canonicalization, filesystem budgets,
+    wrapped errors and independently closeable replies. After JSON metadata
+    initialization, 256 complete calls and 896 metadata cycles retain zero
+    tracked allocations while preserving canonical locks, compatible runtime
+    updates and saved-output/recovery diagnostics. Other complete publisher,
+    catalog/release and broader graphical/runtime acceptance remain open.
   - [x] [Owned packing inventories and replies](tests/packages/pack-ownership-check.md)
     retire discarded template inventories, partial walked files and copy scratch
     across cold/cache success and late refusal. Independently closeable pack/root

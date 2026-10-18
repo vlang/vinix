@@ -1340,6 +1340,15 @@ temporary payloads; an abrupt kill can leave a private `.vinix-sqlite-profile-*`
 directory for inspection and removal. Keep prepared roots stable and review the
 lock; `pack-catalog` rejects changes to its pinned inputs.
 
+V API callers own the returned `SqliteProfileInfo` and release it with
+`info.close()`. Its strings and architecture list are independent of the caller
+arguments; repeated close is safe and leaves the published lock available.
+The CLI closes its reply after encoding. The
+[complete SQLite builder qualification](../../tests/packages/sqlite-builder-check.md)
+measures templates, partial imports, canonicalization, preflight, publication,
+retirement and reply/error disposal after one-time JSON metadata initialization.
+Other complete publisher/catalog/release builders remain separate boundaries.
+
 ```sh
 vinix-package sqlite-catalog 3.53.4 1.0.0 /build/sqlite-roots /build/sqlite-lock
 vinix-package pack-catalog /build/sqlite-lock/catalog.json /build/sqlite-roots /build/sqlite-workspace

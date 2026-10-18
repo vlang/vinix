@@ -1,0 +1,5 @@
+IMPORT LIMITS 129th directory refuses before materialization; source and ancestor state preserved PASS
+IMPORT LIMITS exact 128-level directory/file boundary and nested selector parents match final pack rules PASS
+IMPORT LIMITS shared 32768-entry budget counts selected roots, empty directories and repeated aliases; refusal precedes output and retry resets budget PASS
+IMPORT LIMITS remaining-budget enumeration refuses partial lists and preserves sorted exact-boundary names PASS
+IMPORT LIMITS 32 failed/successful public imports retire descriptors and private scratch, preserve source bytes and permit exact retry PASS

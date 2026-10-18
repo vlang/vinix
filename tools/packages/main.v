@@ -170,7 +170,8 @@ fn checked(arguments []string) !int {
 		}
 		'sqlite-catalog' {
 			if names.len != 4 { return error('sqlite-catalog requires SQLite version, runtime version, prepared roots and a new lock directory') }
-			println(json2.encode(pkgcore.sqlite_catalog(names[0], names[1], names[2], names[3])!))
+			mut info := pkgcore.sqlite_catalog(names[0], names[1], names[2], names[3])!
+			publisher_reply(mut info)
 			return 0
 		}
 		'ffmpeg-catalog' {

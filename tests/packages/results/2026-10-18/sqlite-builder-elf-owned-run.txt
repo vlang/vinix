@@ -1,0 +1,1 @@
+ELF OWNERSHIP 150 static/PIE/shared target, signature, range, interpreter and file cases; 1200 checks retain zero tracked bytes/allocations and stable descriptors PASS

@@ -1,0 +1,44 @@
+FAIL x86_64 packages-sqlite-builder (604.2s)
+  timed out after 600 s without "HWTEST PASS packages-sqlite-builder", "SQLITE BUILDER PROCESS profile-export sqlite 3 PASS"
+  last 40 serial lines:
+  | Denied: 0
+  | Kind Objects Bytes
+  | file 606 3729466
+  | descriptor 4 16768
+  | socket 0 0
+  | ipc 0 0
+  | mapping 101 1155840
+  | process 4 54622
+  | thread 2 1128480
+  | scratch 1 8318
+  | Denied.invalid: 0
+  | Denied.accounts: 0
+  | Denied.objects: 0
+  | Denied.global: 0
+  | Denied.owner: 0
+  | Denied.cgroup: 0
+  | 
+  | SQLITE BUILDER resources after grace profile-export-3:
+  | Limit: 121178112
+  | OwnerLimit: 60589056
+  | Charged: 1774484
+  | Accounts: 1
+  | Denied: 0
+  | Kind Objects Bytes
+  | file 2 2048
+  | descriptor 4 16768
+  | socket 0 0
+  | ipc 0 0
+  | mapping 101 1155840
+  | process 2 27270
+  | thread 1 564240
+  | scratch 1 8318
+  | Denied.invalid: 0
+  | Denied.accounts: 0
+  | Denied.objects: 0
+  | Denied.global: 0
+  | Denied.owner: 0
+  | Denied.cgroup: 0
+  | 
+  | PROFILE EXPORT sqlite cohort 3 16 substitutions recovery source pins exact retry 32 descriptors PASS
+  logs: /Users/alex/code/vinix/build/sbo-x86-1/packages-sqlite-builder

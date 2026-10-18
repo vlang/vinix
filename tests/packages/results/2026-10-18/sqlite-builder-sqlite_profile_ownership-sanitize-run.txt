@@ -1,0 +1,2 @@
+SQLITE OWNERSHIP 896 metadata cycles retire templates, partial inventories, canonicalization, replies and late refusals PASS
+SQLITE OWNERSHIP independent replies survive caller retirement and close idempotently PASS

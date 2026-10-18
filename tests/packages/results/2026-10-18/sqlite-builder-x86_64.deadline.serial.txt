@@ -1,0 +1,1724 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=24
+!>+ [11] ./sbin/init sz=216392
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/profile-export sz=1351192
+!>+ [15] ./usr/share/package-fixtures/sqlite-profile sz=1171016
+!>+ [16] ./usr/share/package-fixtures/sqlite-owned sz=928128
+!>+ [17] ./usr/share/package-fixtures/builder sz=1134464
+!>initramfs: no ustar sig at 0xff000000370f5c00
+initramfs: Done (17 entries)
+HWTEST START packages-sqlite-builder
+SQLITE OWNERSHIP imports=0 fault=none retained=0 allocations=0
+SQLITE OWNERSHIP imports=1 fault=none retained=0 allocations=0
+SQLITE OWNERSHIP imports=2 fault=none retained=0 allocations=0
+SQLITE OWNERSHIP imports=3 fault=none retained=0 allocations=0
+SQLITE OWNERSHIP imports=4 fault=none retained=0 allocations=0
+SQLITE OWNERSHIP imports=4 fault=duplicate retained=0 allocations=0
+SQLITE OWNERSHIP imports=0 fault=empty retained=0 allocations=0
+SQLITE OWNERSHIP 896 metadata cycles retire templates, partial inventories, canonicalization, replies and late refusals PASS
+SQLITE OWNERSHIP independent replies survive caller retirement and close idempotently PASS
+SQLITE BUILDER PROCESS sqlite-owned  PASS
+SQLITE BUILDER PROCESS sqlite-profile  PASS
+SQLITE BUILDER resources before grace complete:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 7954562
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1138 7032360
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 23 278272
+process 4 54604
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace complete:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 980888
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 12 63748
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 25 300544
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=complete retained=0 allocations=0
+SQLITE BUILDER complete canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case complete PASS
+SQLITE BUILDER resources before grace nested:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 8296454
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1094 6742926
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 29 345344
+process 4 54618
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace nested:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 963988
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 29 345344
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=nested retained=0 allocations=0
+SQLITE BUILDER nested canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case nested PASS
+SQLITE BUILDER resources before grace version:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 9428864
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1274 7853068
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 31 367616
+process 4 54614
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace version:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1008532
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 389888
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=version retained=0 allocations=0
+SQLITE BUILDER version canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case version PASS
+SQLITE BUILDER resources before grace runtime-version:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 3401834
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 294 1803764
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 389888
+process 4 54616
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace runtime-version:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1218126
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 36 211642
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 389888
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=runtime-version retained=0 allocations=0
+SQLITE BUILDER runtime-version canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case runtime-version PASS
+SQLITE BUILDER resources before grace runtime-range:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 3446412
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 294 1803782
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 434432
+process 4 54632
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace runtime-range:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1053076
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 434432
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=runtime-range retained=0 allocations=0
+SQLITE BUILDER runtime-range canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case runtime-range PASS
+SQLITE BUILDER resources before grace missing-root:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 2948984
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 294 1803782
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 501248
+process 4 54628
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace missing-root:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1119892
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 501248
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=missing-root retained=0 allocations=0
+SQLITE BUILDER missing-root canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case missing-root PASS
+SQLITE BUILDER resources before grace missing-architecture:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 3513222
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 294 1803782
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 501248
+process 4 54626
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace missing-architecture:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1119892
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 501248
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=missing-architecture retained=0 allocations=0
+SQLITE BUILDER missing-architecture canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case missing-architecture PASS
+SQLITE BUILDER resources before grace wrong-target:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 3015814
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 294 1803782
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 49 568064
+process 4 54642
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace wrong-target:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1186708
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 49 568064
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=wrong-target retained=0 allocations=0
+SQLITE BUILDER wrong-target canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case wrong-target PASS
+SQLITE BUILDER resources before grace wrong-mode:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 3015798
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 294 1803782
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 49 568064
+process 4 54626
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace wrong-mode:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1754726
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 94 570066
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 49 568064
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=wrong-mode retained=0 allocations=0
+SQLITE BUILDER wrong-mode canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case wrong-mode PASS
+SQLITE BUILDER resources before grace missing-notice:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 3038066
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 294 1803782
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 51 590336
+process 4 54622
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace missing-notice:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1208980
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 51 590336
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=missing-notice retained=0 allocations=0
+SQLITE BUILDER missing-notice canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case missing-notice PASS
+SQLITE BUILDER resources before grace empty-notice:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 3659174
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 296 1816098
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 55 634880
+process 4 54630
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace empty-notice:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1253524
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 55 634880
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=empty-notice retained=0 allocations=0
+SQLITE BUILDER empty-notice canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case empty-notice PASS
+SQLITE BUILDER resources before grace notice-directory:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 3104886
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 294 1803782
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 57 657152
+process 4 54626
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace notice-directory:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1275796
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 57 657152
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=notice-directory retained=0 allocations=0
+SQLITE BUILDER notice-directory canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case notice-directory PASS
+SQLITE BUILDER resources before grace no-output-space:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 3693748
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 298 1828396
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 57 657152
+process 4 54634
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace no-output-space:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1275796
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 57 657152
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=no-output-space retained=0 allocations=0
+SQLITE BUILDER no-output-space canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case no-output-space PASS
+SQLITE BUILDER resources before grace no-temp-space:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 3714188
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 294 1803782
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 61 702208
+process 4 54632
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace no-temp-space:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1320852
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 61 702208
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=no-temp-space retained=0 allocations=0
+SQLITE BUILDER no-temp-space canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case no-temp-space PASS
+SQLITE BUILDER resources before grace space-error:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 3172180
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 294 1803746
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 63 724480
+process 4 54628
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace space-error:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1343124
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 63 724480
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=space-error retained=0 allocations=0
+SQLITE BUILDER space-error canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case space-error PASS
+SQLITE BUILDER resources before grace created:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 3758706
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 294 1803764
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 65 746752
+process 4 54624
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace created:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1365396
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 65 746752
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=created retained=0 allocations=0
+SQLITE BUILDER created canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case created PASS
+SQLITE BUILDER resources before grace packed-1:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 3539100
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 342 2099766
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 69 795392
+process 4 54616
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace packed-1:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1414036
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 69 795392
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=packed-1 retained=0 allocations=0
+SQLITE BUILDER packed-1 canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case packed-1 PASS
+SQLITE BUILDER resources before grace packed-2:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 5489310
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 566 3481638
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 69 799488
+process 4 54618
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace packed-2:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1442802
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 6 26718
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 69 799488
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=packed-2 retained=0 allocations=0
+SQLITE BUILDER packed-2 canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case packed-2 PASS
+SQLITE BUILDER resources before grace packed-3:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 6796682
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 774 4766738
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 71 821760
+process 4 54618
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace packed-3:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1440404
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 71 821760
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=packed-3 retained=0 allocations=0
+SQLITE BUILDER packed-3 canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case packed-3 PASS
+SQLITE BUILDER resources before grace packed-4:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 7139524
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 826 5087308
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 73 844032
+process 4 54618
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace packed-4:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1462676
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 73 844032
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=packed-4 retained=0 allocations=0
+SQLITE BUILDER packed-4 canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case packed-4 PASS
+SQLITE BUILDER resources before grace ready:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 7766650
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1012 6234130
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 77 888576
+process 4 54618
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace ready:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1507220
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 77 888576
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=ready retained=0 allocations=0
+SQLITE BUILDER ready canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case ready PASS
+SQLITE BUILDER resources before grace import-elf:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 8528132
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 1040 6409106
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 79 910848
+process 4 54612
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace import-elf:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1689854
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 28 162410
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 79 910848
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=import-elf retained=0 allocations=0
+SQLITE BUILDER import-elf canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case import-elf PASS
+SQLITE BUILDER resources before grace import-notice:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 7290214
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 836 5148906
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 81 933120
+process 4 54622
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace import-notice:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1551764
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 81 933120
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=import-notice retained=0 allocations=0
+SQLITE BUILDER import-notice canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case import-notice PASS
+SQLITE BUILDER resources before grace import-directory:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 6732400
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 742 4568814
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 83 955392
+process 4 54628
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace import-directory:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 2080146
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 84 508158
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 83 955392
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=import-directory retained=0 allocations=0
+SQLITE BUILDER import-directory canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case import-directory PASS
+SQLITE BUILDER resources before grace changed-lock:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 6966018
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 780 4802426
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 83 955392
+process 4 54634
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace changed-lock:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1598734
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 6 26746
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 83 955392
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=changed-lock retained=0 allocations=0
+SQLITE BUILDER changed-lock canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case changed-lock PASS
+SQLITE BUILDER resources before grace occupied:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 4460984
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 458 2817096
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 87 999936
+process 4 54626
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace occupied:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1618580
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 87 999936
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=occupied retained=0 allocations=0
+SQLITE BUILDER occupied canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case occupied PASS
+SQLITE BUILDER resources before grace raced-target:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 3568302
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 310 1902150
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 89 1022208
+process 4 54618
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace raced-target:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1640852
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 89 1022208
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=raced-target retained=0 allocations=0
+SQLITE BUILDER raced-target canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case raced-target PASS
+SQLITE BUILDER resources before grace flush:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 5827736
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 676 4161576
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 89 1022208
+process 4 54626
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace flush:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1640852
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 89 1022208
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=flush retained=0 allocations=0
+SQLITE BUILDER flush canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case flush PASS
+SQLITE BUILDER resources before grace cleanup:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 7149286
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 890 5483140
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 89 1022208
+process 4 54612
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace cleanup:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1640852
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 89 1022208
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=cleanup retained=0 allocations=0
+SQLITE BUILDER cleanup canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case cleanup PASS
+SQLITE BUILDER resources before grace root-replaced:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 6541486
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 788 4853064
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 91 1044480
+process 4 54616
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace root-replaced:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1663124
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 91 1044480
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=root-replaced retained=0 allocations=0
+SQLITE BUILDER root-replaced canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case root-replaced PASS
+SQLITE BUILDER resources before grace inventory-replaced:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 4030280
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 374 2297302
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 95 1089024
+process 4 54628
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace inventory-replaced:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1707668
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 95 1089024
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=inventory-replaced retained=0 allocations=0
+SQLITE BUILDER inventory-replaced canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case inventory-replaced PASS
+SQLITE BUILDER resources before grace lock-replaced:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 4593792
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 374 2296564
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 95 1089024
+process 4 54638
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace lock-replaced:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 2028046
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 54 322426
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 95 1089024
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER case=lock-replaced retained=0 allocations=0
+SQLITE BUILDER lock-replaced canonical retry, saved output, source and descriptor preservation PASS
+SQLITE BUILDER PROCESS builder case lock-replaced PASS
+SQLITE BUILDER resources before grace profile-export-0:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 4615992
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 374 2296502
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 97 1111296
+process 4 54628
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace profile-export-0:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1729940
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 97 1111296
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+PROFILE EXPORT baseline sqlite refused=true replacement-preserved=true
+PROFILE EXPORT sqlite cohort 0 16 substitutions recovery source pins exact retry 32 descriptors PASS
+PROFILE EXPORT selected profiles retain canonical saved locks after flush, moved-parent and replaced-inventory cleanup failures PASS
+SQLITE BUILDER PROCESS profile-export sqlite 0 PASS
+SQLITE BUILDER resources before grace profile-export-1:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 7342958
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 812 5001202
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 99 1133568
+process 4 54622
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace profile-export-1:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1752212
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 99 1133568
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+PROFILE EXPORT sqlite cohort 1 16 substitutions recovery source pins exact retry 32 descriptors PASS
+SQLITE BUILDER PROCESS profile-export sqlite 1 PASS
+SQLITE BUILDER resources before grace profile-export-2:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 6628932
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 788 4851416
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 99 1133568
+process 4 54622
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace profile-export-2:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1813898
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 12 63734
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 99 1133568
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+PROFILE EXPORT sqlite cohort 2 16 substitutions recovery source pins exact retry 32 descriptors PASS
+SQLITE BUILDER PROCESS profile-export sqlite 2 PASS
+SQLITE BUILDER resources before grace profile-export-3:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 6093494
+Accounts: 2
+Denied: 0
+Kind Objects Bytes
+file 606 3729466
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 101 1155840
+process 4 54622
+thread 2 1128480
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+SQLITE BUILDER resources after grace profile-export-3:
+Limit: 121178112
+OwnerLimit: 60589056
+Charged: 1774484
+Accounts: 1
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 101 1155840
+process 2 27270
+thread 1 564240
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+PROFILE EXPORT sqlite cohort 3 16 substitutions recovery source pins exact retry 32 descriptors PASS
+SQLITE BUILDER PROCESS profile-export sqlite 3 PASS
