@@ -8787,17 +8787,78 @@ timer sources begin suspended, resume activates their deadline, event data
 counts expirations, and cancellation runs its handler after the event callback.
 Fortnite remains unplayable and the full iOS regression is unpassed.
 
+V now implements timer-source creation, timer configuration, event/cancel
+handlers in Blocks and function-pointer forms, cancellation queries and source
+data/handle/mask access. `_dispatch_resume` activates a newly created source;
+`_dispatch_suspend` and later resumes maintain a balanced suspension count.
+The same calls suspend queues, including their serial target descendants.
+`_dispatch_set_target_queue` supports inactive sources and idle application
+queues, retaining their new targets and rejecting cycles or changes that would
+invalidate running work.
+
+Timers use the existing dispatch workers, scheduler condition and queue jobs.
+One-shot and repeating timers preserve monotonic or wall-clock deadlines,
+coalesce missed expirations, and prevent concurrent invocation of one source
+even on a concurrent target. Reconfiguration clears accumulated pending data.
+Forever deadlines disarm delivery; zero intervals become one nanosecond. The
+timer flag profile accepts ordinary and strict timers and fires at the requested
+deadline without adding a deliberate leeway delay. Other source kinds remain
+unsupported.
+
+Handler updates are queued within the source. Event functions receive the
+context captured when registration takes effect, while cancel functions receive
+the source context current at delivery. Updates submitted during an event may
+take effect after the source yields its target queue. Copied blocks and the
+source's target queue remain owned until replacement, cancellation or shutdown.
+Explicit cancellation suppresses future events and delivers its handler after
+any running event returns. Cancellation before activation or during suspension
+waits for a resume. Native measurements also show that the last external release
+implicitly cancels an active source without invoking its cancel handler.
+
+The eight-byte `OS_dispatch_source` facade inherits from `OS_dispatch_object`.
+ObjC and Swift unknown-object ARC use separate external and internal source
+references. Queue work pins the source through callback return and capture
+disposal. Shutdown joins workers, cancels queued jobs and disposes all remaining
+handler updates/captures before retiring class metadata or application storage;
+sources remain registered while cross-source capture cycles are dismantled.
+
+`tests/ios/native-checks.v build-dispatch-source` builds the new fixture. Ten
+host ASan/UBSan runs and five ARM64 Vinix suites pass for timer sources, groups,
+queue-specific contexts, dispatch data and queue ObjC ownership. Native/V tests
+exercise deferred contexts, handler replacement during execution, copied block
+ownership, 128 concurrent source lifetimes, one-shot rearming, clock domains,
+suspension, nonreentrant callbacks, explicit/implicit cancellation and floating
+state. Vinix additionally tests source/queue targets, main delivery, ObjC/Swift
+ownership and two shutdowns with queued and cyclic captures. The sanitizer run
+identified a mutable-map pointer lowering issue in the V compiler; scheduler
+loops now bind each stored pointer to a local before passing it to a helper.
+Generated-C checks verify that those calls receive source storage rather than
+the address of a map slot.
+
+V/Mach-O/LLVM inspection locates timer creation at `0x100007b8c` and balanced
+suspension at `0x1000156d0`. Native measurements, initial invalid test
+assumptions and the sanitizer failure, corrected runs, pinned inputs, joined
+logs and thirteen generated C/executable pairs are retained under
+`build/ios/fortnite/dispatch-source-checks`.
+
+The fresh IPA probe passes eight more required imports and stops before
+application entry at `_dispatch_semaphore_create`. A native scout verifies token
+consumption, immediate timeout value 49, signaling with and without a blocked
+waiter, and balanced release. The initial invalid-count and unbalanced-release
+scouts trapped and are preserved separately. Fortnite remains unplayable and
+the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,722 | 438 | 79 |
+| Fortnite executable | 1,730 | 430 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,557 | 441 | 120 |
+| All images | 2,565 | 433 | 120 |
 
-The C++/GLES/Text variant reports 2,571 resolved imports, 427 unresolved strong
+The C++/GLES/Text variant reports 2,579 resolved imports, 419 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

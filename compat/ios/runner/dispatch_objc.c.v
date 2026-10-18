@@ -6,7 +6,7 @@ module main
 fn dispatch_objc_name(name string) bool {
 	return name in ['OS_object', 'OS_dispatch_object', 'OS_dispatch_queue',
 		'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial',
-		'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'OS_dispatch_group', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty']!
+		'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'OS_dispatch_group', 'OS_dispatch_source', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty']!
 }
 
 // Symbol lookup borrows static names; slicing the caller's string would
@@ -16,6 +16,7 @@ fn dispatch_objc_import_name(symbol string) ?string {
 		'_OBJC_CLASS_$_OS_object', '_OBJC_METACLASS_$_OS_object' { 'OS_object' }
 		'_OBJC_CLASS_$_OS_dispatch_object', '_OBJC_METACLASS_$_OS_dispatch_object' { 'OS_dispatch_object' }
 		'_OBJC_CLASS_$_OS_dispatch_group', '_OBJC_METACLASS_$_OS_dispatch_group' { 'OS_dispatch_group' }
+		'_OBJC_CLASS_$_OS_dispatch_source', '_OBJC_METACLASS_$_OS_dispatch_source' { 'OS_dispatch_source' }
 		'_OBJC_CLASS_$_OS_dispatch_queue', '_OBJC_METACLASS_$_OS_dispatch_queue' { 'OS_dispatch_queue' }
 		'_OBJC_CLASS_$_OS_dispatch_queue_serial_executor', '_OBJC_METACLASS_$_OS_dispatch_queue_serial_executor' { 'OS_dispatch_queue_serial_executor' }
 		'_OBJC_CLASS_$_OS_dispatch_queue_serial', '_OBJC_METACLASS_$_OS_dispatch_queue_serial' { 'OS_dispatch_queue_serial' }
@@ -76,6 +77,8 @@ fn dispatch_objc_publish_classes() {
 	for _,mut data in dispatch_runtime.data { data.isa = dispatch_runtime.data_classes[if data.immortal {1} else {0}] }
 	dispatch_runtime.group_class = ios_runtime.names['OS_dispatch_group']
 	for _, mut group in dispatch_runtime.groups { group.isa = dispatch_runtime.group_class }
+	dispatch_runtime.source_class = ios_runtime.names['OS_dispatch_source']
+	for _, mut source in dispatch_runtime.sources { source.isa = dispatch_runtime.source_class }
 }
 
 struct DispatchObjcView {
@@ -95,6 +98,10 @@ fn dispatch_objc_view(identity u64) ?DispatchObjcView {
 	if group := dispatch_runtime.groups[identity] {
 		if group.isa == 0 { return none }
 		return DispatchObjcView{cls: group.isa, refs: group.refs}
+	}
+	if source := dispatch_runtime.sources[identity] {
+		if source.isa == 0 { return none }
+		return DispatchObjcView{cls: source.isa, refs: source.external_refs}
 	}
 	queue := dispatch_runtime.queues[identity] or { return none }
 	if queue.isa == 0 { return none }
