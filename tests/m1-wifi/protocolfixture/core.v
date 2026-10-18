@@ -50,6 +50,7 @@ mut:
 	state         i32
 	revision      u8
 	pcie_revision u8
+	ram_size      u32
 	otp           C.bw_otp
 	allocated     usize
 	rings         [6]C.bw_ring
@@ -183,10 +184,13 @@ mut:
 	withhold_key           i32
 	bad_shared             i32
 	malformed_scan         i32
+	reject_prepare         i32
 	version                i32
 }
 
 __global protocol_tests = u32(0)
+__global fixture_otp = C.bw_otp{}
+__global fixture_firmware = C.bw_firmware{}
 
 @[cinit]
 __global protocol_ops = C.bw_ops{ @read: C.wifi_protocol_read, write: C.wifi_protocol_write, time_us: C.wifi_protocol_time, delay_us: C.wifi_protocol_delay, sync: C.wifi_protocol_sync, stop_dma: C.wifi_protocol_stop, receive: C.wifi_protocol_receive }
@@ -501,6 +505,9 @@ pub fn read_bus(cookie voidptr, space u32, offset u32, width u32) u32 {
 pub fn write_bus(cookie voidptr, space u32, offset u32, width u32, value u32) {
 	unsafe {
 		fake := &Fake(cookie)
+		if fake.reject_prepare != 0 && space == u32(C.BW_REGS) && offset == 0xe64 && fake.cfg[0x80 / 4] == 0x18001000 {
+			return
+		}
 		mut pointer := &u8(nil)
 		if space == u32(C.BW_CONFIG) {
 			C.assert(offset + width <= 4096)
@@ -623,16 +630,20 @@ fn destroy(fake &Fake) {
 }
 
 fn start(fake &Fake) i32 {
+	return start_layout(fake, 0x534d4152, 0x100000)
+}
+
+fn start_layout(fake &Fake, magic u32, ram_size u32) i32 {
 	unsafe {
 		mut code := [128]u8{}
 		mut seed := [256]u8{}
 		for i := u32(0); i < 256; i++ { seed[i] = u8(i) }
 		w32(&code[0], 0x352080)
-		w32(&code[0x6c], 0x534d4152)
-		w32(&code[0x70], 0x100000)
+		w32(&code[0x6c], magic)
+		w32(&code[0x70], ram_size)
 		nvram := &char(c'boardrev=0x123\nmacaddr=02:11:22:33:44:55\n')
 		blob := [u8(1), u8(2), u8(3), u8(4)]!
-		mut firmware := C.bw_firmware{ nvram: &u8(nvram), code_len: sizeof(code), nvram_len: C.strlen(nvram), clm_len: sizeof(blob), txcap_len: sizeof(blob), calibration_len: sizeof(blob), seed_len: sizeof(seed), silicon_revision: 3, mac: [
+		fixture_firmware = C.bw_firmware{ nvram: &u8(nvram), code_len: sizeof(code), nvram_len: C.strlen(nvram), clm_len: sizeof(blob), txcap_len: sizeof(blob), calibration_len: sizeof(blob), seed_len: sizeof(seed), silicon_revision: 3, mac: [
 			u8(2),
 			u8(0x11),
 			u8(0x22),
@@ -644,13 +655,13 @@ fn start(fake &Fake) i32 {
 		code_address := usize(&code[0])
 		seed_address := usize(&seed[0])
 		blob_address := usize(&blob[0])
-		C.memcpy(&firmware.code, &code_address, sizeof(code_address))
-		C.memcpy(&firmware.seed, &seed_address, sizeof(seed_address))
-		C.memcpy(&firmware.clm, &blob_address, sizeof(blob_address))
-		C.memcpy(&firmware.txcap, &blob_address, sizeof(blob_address))
-		C.memcpy(&firmware.calibration, &blob_address, sizeof(blob_address))
+		C.memcpy(&fixture_firmware.code, &code_address, sizeof(code_address))
+		C.memcpy(&fixture_firmware.seed, &seed_address, sizeof(seed_address))
+		C.memcpy(&fixture_firmware.clm, &blob_address, sizeof(blob_address))
+		C.memcpy(&fixture_firmware.txcap, &blob_address, sizeof(blob_address))
+		C.memcpy(&fixture_firmware.calibration, &blob_address, sizeof(blob_address))
 		error := C.bw_probe(fake.device)
-		return if error != 0 { error } else { C.bw_start(fake.device, &firmware) }
+		return if error != 0 { error } else { C.bw_start(fake.device, &fixture_firmware) }
 	}
 }
 

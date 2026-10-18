@@ -38,9 +38,9 @@ fn test_otp() {
 fn test_otp_bounds() {
 	unsafe {
 		bytes := [u8(0x15), u8(255), u8(8)]!
-		mut otp := C.bw_otp{}
-		C.assert(C.bw_otp_parse(&bytes[0], sizeof(bytes), &otp) == i32(C.BW_EPROTO))
-		C.assert(C.bw_otp_parse(nil, 0, &otp) == i32(C.BW_EINVAL))
+		fixture_otp = C.bw_otp{}
+		C.assert(C.bw_otp_parse(&bytes[0], sizeof(bytes), &fixture_otp) == i32(C.BW_EPROTO))
+		C.assert(C.bw_otp_parse(nil, 0, &fixture_otp) == i32(C.BW_EINVAL))
 	}
 }
 
@@ -73,6 +73,7 @@ fn test_probe_revision() {
 }
 
 fn test_boot_and_rings() {
+	check_apple_boot_layout()
 	unsafe {
 		fake := fixture()
 		C.assert(start(fake) == 0)
@@ -80,6 +81,33 @@ fn test_boot_and_rings() {
 		C.assert(fake.device.allocated < u32(C.BW_POOL_MIN) && fake.commands >= 9 && fake.syncs > 100)
 		C.assert(fake.device.rings[3].item == 24 && fake.device.rings[4].item == 40)
 		destroy(fake)
+	}
+}
+
+fn check_apple_boot_layout() {
+	unsafe {
+		// Apple's B1 raw image has 0xfa at the optional RAMS header offset.
+		raw := fixture()
+		w32(raw.bp + 0x1e64, 0x1234567b)
+		C.assert(start_layout(raw, 0xfafafafa, 0xfafafafa) == 0)
+		C.assert(raw.device.ram_size == 0x100000)
+		C.assert(le32(raw.bp + 0x1e64) == 0x12345679)
+		destroy(raw)
+		for size in [u32(0), u32(0x100004), u32(0xfffff)]! {
+			bad := fixture()
+			C.assert(start_layout(bad, 0x534d4152, size) == i32(C.BW_EPROTO))
+			C.assert(bad.stopped == 1 && bad.device.state == i32(C.BW_FAULT))
+			destroy(bad)
+		}
+		empty := fixture()
+		w32(empty.bp + 0x3000, 0)
+		C.assert(start_layout(empty, 0xfafafafa, 0xfafafafa) == i32(C.BW_EPROTO))
+		C.assert(empty.stopped == 1)
+		destroy(empty)
+		lost := fixture()
+		lost.reject_prepare = 1
+		C.assert(start(lost) == i32(C.BW_EIO) && lost.stopped == 1)
+		destroy(lost)
 	}
 }
 
@@ -282,7 +310,7 @@ fn test_parser_mutations() {
 		mut rng := u32(0x98765432)
 		mut bytes := [1024]u8{}
 		mut output := [2048]u8{}
-		mut otp := C.bw_otp{}
+		fixture_otp = C.bw_otp{}
 		mut used := usize(0)
 		for iteration := u32(0); iteration < 100000; iteration++ {
 			rng ^= rng << 13
@@ -296,7 +324,7 @@ fn test_parser_mutations() {
 				bytes[i] = u8(rng)
 			}
 			C.bw_nvram_pack(&bytes[0], length, &output[0], sizeof(output), &used)
-			C.bw_otp_parse(&bytes[0], length, &otp)
+			C.bw_otp_parse(&bytes[0], length, &fixture_otp)
 		}
 	}
 }

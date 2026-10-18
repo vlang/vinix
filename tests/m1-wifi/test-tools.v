@@ -72,11 +72,11 @@ fn package_checks(work string) ! {
 	provenance := os.read_file(output + '/provenance.json')!
 	assert provenance.ends_with('\n') && provenance.contains('\\u03bb\\"')
 	records := json2.decode[map[string]json2.Any](provenance)!
-	assert records.keys() == ['firmware.bin', 'nvram.txt', 'clm.blob', 'txcap.blob']
+	assert records.keys().sorted() == ['clm.blob', 'firmware.bin', 'nvram.txt', 'txcap.blob']
 	for name, record in records {
 		fields := record.as_map()
 		data := os.read_bytes(output + '/' + name)!
-		assert fields.keys() == ['source', 'sha256', 'bytes']
+		assert fields.keys().sorted() == ['bytes', 'sha256', 'source']
 		assert fields['bytes']!.int() == data.len
 		assert fields['sha256']!.str() == sha256.sum(data).hex()
 		// A separate executable checks the saved file digest too.
@@ -116,10 +116,11 @@ fn package_checks(work string) ! {
 	expect_package_failure(work, work + '/unicode', 'not ASCII', 1)!
 	os.write_file(work + '/nvram', 'board=1\n')!
 	os.write_file(work + '/firmware', 'short')!
-	expect_package_failure(work, work + '/short-firmware', 'RAMS header', 2)!
+	expect_package_failure(work, work + '/short-firmware', 'reset/vector table', 2)!
 	firmware[0x6c] = `x`
 	os.write_file_array(work + '/firmware', firmware)!
-	expect_package_failure(work, work + '/bad-rams', 'RAMS header', 2)!
+	checked(package_args(work, work + '/no-rams-header'), os.environ())!
+	assert os.read_bytes(work + '/no-rams-header/firmware.bin')! == firmware
 	firmware[0x6c] = `R`
 	os.write_file_array(work + '/firmware', firmware)!
 	for row in [['firmware', '4194305'], ['nvram', '65537'], ['clm-λ"', '1048577'],

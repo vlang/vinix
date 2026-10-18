@@ -2,38 +2,41 @@
 @[translated]
 module platformfixture
 
+// Tests run serially; keep C ABI arguments out of V's implicit heap boxes.
+__global fixture_plan = C.bw_m1_plan{}
+
 fn test_validation() {
 	unsafe {
-		mut p := plan()
-		p.sid = 2
-		reject(&p)
-		p = plan()
-		p.pool_physical = 0
-		reject(&p)
-		p = plan()
-		p.tables_physical = p.pool_physical + 0x4000
-		reject(&p)
-		p = plan()
-		p.tables_physical = u64(1) << 36
-		reject(&p)
-		p = plan()
-		p.pool_cpu++
-		reject(&p)
-		p = plan()
-		p.config_size = 4096
-		reject(&p)
-		p = plan()
-		p.window_bus = 0xfffff000
-		reject(&p)
-		p = plan()
-		p.seed_len = 0
-		reject(&p)
-		p = plan()
-		p.calibration_len = 0
-		reject(&p)
-		p = plan()
-		p.antenna[0] = 0
-		reject(&p)
+		fixture_plan = plan()
+		fixture_plan.sid = 2
+		reject(&fixture_plan)
+		fixture_plan = plan()
+		fixture_plan.pool_physical = 0
+		reject(&fixture_plan)
+		fixture_plan = plan()
+		fixture_plan.tables_physical = fixture_plan.pool_physical + 0x4000
+		reject(&fixture_plan)
+		fixture_plan = plan()
+		fixture_plan.tables_physical = u64(1) << 36
+		reject(&fixture_plan)
+		fixture_plan = plan()
+		fixture_plan.pool_cpu++
+		reject(&fixture_plan)
+		fixture_plan = plan()
+		fixture_plan.config_size = 4096
+		reject(&fixture_plan)
+		fixture_plan = plan()
+		fixture_plan.window_bus = 0xfffff000
+		reject(&fixture_plan)
+		fixture_plan = plan()
+		fixture_plan.seed_len = 0
+		reject(&fixture_plan)
+		fixture_plan = plan()
+		fixture_plan.calibration_len = 0
+		reject(&fixture_plan)
+		fixture_plan = plan()
+		fixture_plan.antenna[0] = 0
+		reject(&fixture_plan)
 	}
 }
 
@@ -120,29 +123,29 @@ fn test_stop_revokes() {
 fn test_public_stop_after_flush_failure() {
 	unsafe {
 		reset()
-		mut p := plan()
+		fixture_plan = plan()
 		mut tables := voidptr(0)
 		C.assert(C.posix_memalign(&tables, 16384, 32768) == 0)
-		p.tables_cpu = usize(tables)
-		reg_set(p.phy, 12)
-		reg_set(p.port + 0x804, 1)
-		reg_set(p.port + 0x208, 1)
-		reg_set(p.config + 8, 0x06040000)
-		reg_set(p.config + 0x100000, 0x442514e4)
-		probe_bar = p.config + 0x100010
+		fixture_plan.tables_cpu = usize(tables)
+		reg_set(fixture_plan.phy, 12)
+		reg_set(fixture_plan.port + 0x804, 1)
+		reg_set(fixture_plan.port + 0x208, 1)
+		reg_set(fixture_plan.config + 8, 0x06040000)
+		reg_set(fixture_plan.config + 0x100000, 0x442514e4)
+		probe_bar = fixture_plan.config + 0x100010
 		probe_size = 0x4000
-		probe_bar2 = p.config + 0x100018
+		probe_bar2 = fixture_plan.config + 0x100018
 		probe_size2 = 0x400000
 		reg_set(probe_bar, 4)
 		reg_set(probe_bar2, 4)
-		reg_set(p.dart, u32(14) << 24)
-		timeout_register = p.dart + 0x20
-		C.assert(C.brcm_m1_prepare(&p) == i32(C.BW_ETIME) && host().prepared != 0 && usize(host().dev.ops.stop_dma) == 0)
+		reg_set(fixture_plan.dart, u32(14) << 24)
+		timeout_register = fixture_plan.dart + 0x20
+		C.assert(C.brcm_m1_prepare(&fixture_plan) == i32(C.BW_ETIME) && host().prepared != 0 && usize(host().dev.ops.stop_dma) == 0)
 		C.assert(host().dev.state == i32(C.BW_FAULT) && host().dev.error == i32(C.BW_ETIME))
 		C.brcm_m1_stop()
-		C.assert(reg_get(p.dart + 0x104) == 0)
+		C.assert(reg_get(fixture_plan.dart + 0x104) == 0)
 		C.brcm_m1_stop()
-		C.assert(reg_get(p.dart + 0x104) == 0)
+		C.assert(reg_get(fixture_plan.dart + 0x104) == 0)
 		C.free(tables)
 	}
 }

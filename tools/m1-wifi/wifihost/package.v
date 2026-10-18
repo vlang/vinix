@@ -84,6 +84,10 @@ pub fn package(a PackageOptions) ! {
 		}
 		copy(mut manifest[row[0]..row[0] + row[2]], value)
 	}
+	package_files(a, manifest, [])!
+}
+
+fn package_files(a PackageOptions, manifest []u8, sources []string) ! {
 	mut parts := []Part{}
 	names := ['firmware.bin', 'nvram.txt', 'clm.blob', 'txcap.blob']
 	limits := [u64(4 * 1024 * 1024), 65536, 1024 * 1024, 1024 * 1024]
@@ -95,8 +99,8 @@ pub fn package(a PackageOptions) ! {
 		}
 		data := os.read_bytes(source)!
 		if u64(data.len) != size { return SelectionError{'file changed while reading: ' + source} }
-		if i == 0 && (data.len < 0x74 || data[0x6c..0x70].bytestr() != 'RAMS') {
-			return SelectionError{'firmware has no expected RAMS header'}
+		if i == 0 && data.len < 0x74 {
+			return SelectionError{'firmware is shorter than the reset/vector table'}
 		}
 		if i == 1 {
 			if u8(0) in data {
@@ -104,7 +108,7 @@ pub fn package(a PackageOptions) ! {
 			}
 			if data.any(it > 127) { return error('NVRAM is not ASCII text') }
 		}
-		parts << Part{names[i], source, data}
+		parts << Part{names[i], if sources.len == 4 { sources[i] } else { source }, data}
 	}
 	output := path_value(a.output)
 	package_parents(parent_path(output))!

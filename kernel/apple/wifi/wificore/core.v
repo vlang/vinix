@@ -1003,6 +1003,13 @@ pub fn wifi_firmware_boot(d &C.bw_device, f &C.bw_firmware) i32 {
 	if e {
 		return e
 	}
+	// BCM4378 prepareHardware selects mode 1 in the PCIe core's 0xe64
+	// field after the watchdog reset. Preserve the other register bits.
+	prepare := wifi_core(d, 2108).base + u32(0xe64)
+	wifi_bp_write(d, prepare, (wifi_bp_read(d, prepare) & ~u32(3)) | u32(1))
+	if (wifi_bp_read(d, prepare) & u32(3)) != u32(1) {
+		return i32(Bw_error.bw_eio)
+	}
 	wifi_wr(d, u32(Bw_space.bw_regs), wifi_pcie_off(d, u32(76), u32(3124)), u32(4), u32(0))
 	// polled; no MSI
 
@@ -1017,10 +1024,15 @@ pub fn wifi_firmware_boot(d &C.bw_device, f &C.bw_firmware) i32 {
 		wifi_bp_write(d, ram.base + u32(16), i)
 		total += ((wifi_bp_read(d, ram.base + u32(64)) & u32(127)) + u32(1)) * u32(8192)
 	}
-	if f.code_len < usize(116) || wifi_l32(voidptr(f.code + 108)) != u32(1397571922) {
+	if f.code_len < usize(116) {
 		return i32(i32(Bw_error.bw_eproto))
 	}
-	d.ram_size = wifi_l32(voidptr(f.code + 112))
+	// Apple's raw B1 firmware has no RAMS override. In that case the
+	// SYSMEM banks determine RAM size, as in brcmf_pcie_adjust_ramsize.
+	d.ram_size = total
+	if wifi_l32(voidptr(f.code + 108)) == u32(1397571922) {
+		d.ram_size = wifi_l32(voidptr(f.code + 112))
+	}
 	if !total || d.ram_size > total || d.ram_size < u32(131072) || !wifi_range(d.ram_base, usize(d.ram_size), u32(0), d.tcm_size) || (d.ram_size & u32(3)) {
 		return i32(i32(Bw_error.bw_eproto))
 	}

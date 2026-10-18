@@ -6,11 +6,10 @@ Ethernet/control interface. Actual M1 firmware boot, WPA2 association, and DMA
 operation have not been verified on hardware. The V integration and complete clean debug/production ARM64 kernel builds
 are now verified. Do not replace your only working boot entry.
 
-Vinix's existing socket implementation supports Unix-domain sockets, not an IP
-network stack. Even an authenticated Layer-2 link from this driver does not make
-AF_INET applications, DNS, DHCP, `curl`, or ordinary `ping` work. An IP stack and
-its socket integration are separate unfinished work, not hidden dependencies
-that this patch supplies.
+Vinix now attaches an authenticated Wi-Fi link to its IP stack with DHCP.
+Physical firmware boot and association still require hardware validation.
+The [live-Mac capture and startup findings](../../docs/apple-wifi.md) describe
+the BCM4378 preparation and raw firmware layout fixes from 2026-10-18.
 
 ## Source layout
 
@@ -138,7 +137,7 @@ volatile byte stores, and can run the same checks in both model guests.
 
 ## Firmware and association
 
-No proprietary firmware is included or downloaded. Firmware, textual board
+No proprietary firmware is included in the repository. Firmware, textual board
 NVRAM, CLM and TXCAP must be extracted locally and explicitly selected for the
 reported chip revision, `apple,shikoku` board, module, vendor, module revision,
 and antenna. The per-device calibration blob comes from the device tree.
@@ -193,10 +192,10 @@ one-way `wifi-ctl stop` command.
 This is not a suspend/resume implementation. Bluetooth shares the physical
 combo-chip reset and may be affected; takeover is refused when it is observed
 bus-mastering. Trackpad/keyboard drivers are unrelated. WPA3, enterprise Wi-Fi,
-AP mode, joining from Settings, roaming, reconnect, powersave, and
-IPv4/IPv6/socket support are not implemented. These limitations are
-substantial: this bundle is a bring-up contribution, not a completed answer to
-making normal networking work.
+AP mode, joining from Settings, roaming, automatic reconnect and powersave are
+not implemented.
+Physical radio operation remains unverified; passing simulated transport tests
+does not establish working networking on the M1.
 
 ## Primary implementation references and licensing
 

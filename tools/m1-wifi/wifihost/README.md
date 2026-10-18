@@ -4,8 +4,18 @@ nineteen-symbol kernel policy remain unchanged.
 
 `tools/m1-wifi/package` checks the saved 256-byte status, revision/board and all
 five identity fields before creating an exclusive output directory. It preserves
-the 128-byte manifest, payload limits, RAMS check, ASCII NVRAM and ordered SHA256
-provenance. Firmware is selected locally; packaging does not access hardware.
+the 128-byte manifest, payload limits, minimum vector-table size, ASCII NVRAM
+and SHA256 provenance. The RAMS override is optional; the driver validates RAM
+bounds using the chip's SYSMEM banks. Firmware is selected locally; packaging
+does not access hardware.
+
+`tools/m1-wifi/capture.v` is a read-only SSH alternative for a running macOS
+J313. It binds the bundle to the live module and antenna identity, copying only
+the four files explicitly selected by AppleBCMWLANCore. macOS evidence is kept
+separate from a successful Vinix chip probe; the runtime manifest check is
+unchanged. See [capture instructions and evidence](../../../docs/apple-wifi.md).
+`v test tools/m1-wifi/wifihost` checks this parser and manifest path, including
+ambiguous identities and mismatched or unsafe filenames.
 
 `tools/m1-wifi/compile-v` and `tests/m1-wifi/compile-provider` select the repository
 compiler, stage the unchanged source, retain the original freestanding/manualfree
