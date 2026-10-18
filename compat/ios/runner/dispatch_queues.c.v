@@ -58,6 +58,8 @@ mut:
 	groups map[u64]&DispatchGroup
 	source_class u64
 	sources map[u64]&DispatchSource
+	semaphore_class u64
+	semaphores map[u64]&DispatchSemaphore
 }
 
 __global dispatch_runtime = unsafe { &DispatchRuntime(nil) }
@@ -199,7 +201,7 @@ fn dispatch_objc_is_object(identity u64) bool {
 	if dispatch_runtime == unsafe { nil } { return false }
 	C.pthread_mutex_lock(dispatch_runtime.mutex)
 	defer { C.pthread_mutex_unlock(dispatch_runtime.mutex) }
-	return identity in dispatch_runtime.queues || identity in dispatch_runtime.data || identity in dispatch_runtime.groups || identity in dispatch_runtime.sources
+	return identity in dispatch_runtime.queues || identity in dispatch_runtime.data || identity in dispatch_runtime.groups || identity in dispatch_runtime.sources || identity in dispatch_runtime.semaphores
 }
 
 fn dispatch_objc_retain(identity u64) bool {
@@ -209,6 +211,7 @@ fn dispatch_objc_retain(identity u64) bool {
 	if mut data := dispatch_runtime.data[identity] { dispatch_data_retain_locked(mut data); return true }
 	if mut group := dispatch_runtime.groups[identity] { group.refs++; return true }
 	if mut source := dispatch_runtime.sources[identity] { source.refs++; source.external_refs++; return true }
+	if mut semaphore := dispatch_runtime.semaphores[identity] { semaphore.refs++; return true }
 	mut queue := dispatch_runtime.queues[identity] or { return false }
 	if !queue.immortal { queue.refs++ }
 	return true
@@ -217,6 +220,12 @@ fn dispatch_objc_retain(identity u64) bool {
 fn dispatch_objc_release(identity u64) bool {
 	if dispatch_runtime == unsafe { nil } { return false }
 	C.pthread_mutex_lock(dispatch_runtime.mutex)
+	if mut semaphore := dispatch_runtime.semaphores[identity] {
+		removed := dispatch_semaphore_drop_locked(mut semaphore)
+		C.pthread_mutex_unlock(dispatch_runtime.mutex)
+		if removed { C.free(semaphore) }
+		return true
+	}
 	if mut source := dispatch_runtime.sources[identity] {
 		if source.external_refs == 0 { panic('iOS: unbalanced dispatch source release') }
 		source.external_refs--
@@ -290,6 +299,7 @@ fn darwin_dispatch_release(identity u64) {
 
 fn darwin_dispatch_set_context(identity u64, context voidptr) {
 	C.pthread_mutex_lock(dispatch_runtime.mutex)
+	if mut semaphore := dispatch_runtime.semaphores[identity] { semaphore.context = context; C.pthread_mutex_unlock(dispatch_runtime.mutex); return }
 	if mut source := dispatch_runtime.sources[identity] { source.context = context; C.pthread_mutex_unlock(dispatch_runtime.mutex); return }
 	if mut group := dispatch_runtime.groups[identity] {
 		group.context = context
@@ -304,6 +314,7 @@ fn darwin_dispatch_set_context(identity u64, context voidptr) {
 fn darwin_dispatch_get_context(identity u64) voidptr {
 	C.pthread_mutex_lock(dispatch_runtime.mutex)
 	defer { C.pthread_mutex_unlock(dispatch_runtime.mutex) }
+	if semaphore := dispatch_runtime.semaphores[identity] { return semaphore.context }
 	if source := dispatch_runtime.sources[identity] { return source.context }
 	if group := dispatch_runtime.groups[identity] { return group.context }
 	return dispatch_queue_locked(identity).context
@@ -311,6 +322,7 @@ fn darwin_dispatch_get_context(identity u64) voidptr {
 
 fn darwin_dispatch_set_finalizer_f(identity u64, function DispatchFunction) {
 	C.pthread_mutex_lock(dispatch_runtime.mutex)
+	if mut semaphore := dispatch_runtime.semaphores[identity] { semaphore.finalizer = function; C.pthread_mutex_unlock(dispatch_runtime.mutex); return }
 	if mut source := dispatch_runtime.sources[identity] { source.finalizer = function; C.pthread_mutex_unlock(dispatch_runtime.mutex); return }
 	if mut group := dispatch_runtime.groups[identity] {
 		group.finalizer = function
@@ -591,6 +603,11 @@ fn dispatch_free() {
 	dispatch_retire()
 	for _, group in dispatch_runtime.groups { C.free(group) }
 	unsafe { dispatch_runtime.groups.free() }
+	for _, semaphore in dispatch_runtime.semaphores {
+		if semaphore.waiters != 0 { panic('iOS: dispatch semaphore waiter still active at unmap') }
+		C.free(semaphore)
+	}
+	unsafe { dispatch_runtime.semaphores.free() }
 	for _, queue in dispatch_runtime.queues {
 		if queue.busy != 0 { panic('iOS: dispatch callback still running when its image unmaps') }
 		C.free(queue.label)

@@ -8844,21 +8844,59 @@ logs and thirteen generated C/executable pairs are retained under
 The fresh IPA probe passes eight more required imports and stops before
 application entry at `_dispatch_semaphore_create`. A native scout verifies token
 consumption, immediate timeout value 49, signaling with and without a blocked
-waiter, and balanced release. The initial invalid-count and unbalanced-release
-scouts trapped and are preserved separately. Fortnite remains unplayable and
-the full iOS regression is unpassed.
+waiter, and balanced release. The initial scouts released unbalanced
+semaphores and trapped; the invalid-count case was not isolated in those runs.
+They are preserved separately. Fortnite remains unplayable and the full iOS
+regression is unpassed.
+
+V now implements `_dispatch_semaphore_create`, `_dispatch_semaphore_wait` and
+`_dispatch_semaphore_signal`. Negative creation returns null; a positive initial
+count permits that many immediate acquisitions. Empty waits support immediate,
+monotonic, wall-clock and forever deadlines, returning Darwin timeout value 49.
+A signal grants exactly one registered waiter or adds one available token, and
+returns whether it woke a waiter. The scheduler mutex serializes grants and
+timeout removal, so a timed-out wait cannot consume a later signal. Each wait
+record stays on its thread's stack, with no allocation on the wait/signal path.
+
+The eight-byte `OS_dispatch_semaphore` facade inherits from
+`OS_dispatch_object`; dispatch, ObjC, Swift unknown-object ARC and copied Block
+captures share its ownership. Contexts and finalizers use the existing dispatch
+object APIs. Final release requires all waits to have returned and the original
+token balance to have been restored, then schedules its finalizer outside the
+mutex. Shutdown disposes queued captures before freeing remaining semaphore
+storage. Generic ObjC allocation remains rejected. A new isolated native test
+corrects the earlier invalid-count note: negative creation returns null, while
+releasing a consumed positive-count semaphore traps.
+
+`tests/ios/native-checks.v build-dispatch-semaphore` builds the fixture. Ten host
+ASan/UBSan runs and five ARM64 Vinix suites pass for semaphores, timer sources,
+groups, dispatch data and queue ObjC ownership. The semaphore suite compares
+native and V behavior for eight blocked waiters, 2,048 handoffs through a
+three-token resource pool, 64 timeout/signal races, timer callback signaling,
+stack Block captures, contexts/finalizers and floating-point state. Vinix also
+checks ObjC/Swift ownership, unbalanced-release diagnosis and two drained
+shutdowns. Generated-C review found and corrected V heap promotion of the wait
+record; the first passing cohort is retained alongside the corrected runs.
+
+V/Mach-O/LLVM inspection finds creation at `0x10214f270` followed by
+`MKW_GetCurrent` and a forever wait at `0x10214f2a4`. Native reference results,
+pinned inputs, joined logs and thirteen generated C/executable pairs are under
+`build/ios/fortnite/dispatch-semaphore-checks`. The fresh IPA probe passes all
+three semaphore imports and stops before application entry at `_div`. A native
+scout verifies its signed 32-bit arguments and eight-byte quotient/remainder
+result. Fortnite remains unplayable and the full iOS regression is unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,730 | 430 | 79 |
+| Fortnite executable | 1,733 | 427 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,565 | 433 | 120 |
+| All images | 2,568 | 430 | 120 |
 
-The C++/GLES/Text variant reports 2,579 resolved imports, 419 unresolved strong
+The C++/GLES/Text variant reports 2,582 resolved imports, 416 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
