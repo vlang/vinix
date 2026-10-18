@@ -10,6 +10,8 @@ pub:
 	description       string
 	version           string
 	installed_version string
+	installed_repository string
+	installed_public_key string
 	installed_name    string
 	installed_kind    string
 	installed_permissions []string
@@ -122,6 +124,8 @@ fn catalog_view(config Config, catalog Catalog, current State, catalog_error str
 			description:       p.description
 			version:           p.version
 			installed_version: old.package.version
+			installed_repository: old.repository
+			installed_public_key: old.public_key
 			installed_name:    old.package.name
 			installed_kind:    old.package.kind
 			installed_permissions: old.package.permissions

@@ -39,12 +39,12 @@ fn software_details_text_valid(value string, limit int) bool {
 fn software_details_row_valid(row SoftwareRow) bool {
 	if row.id == '' || row.name == '' || row.permissions.len > 5 || row.installed_permissions.len > 5
 		|| row.installed_window_protocol < 0 || row.installed_window_protocol > 2 { return false }
-	for value in [row.id, row.runtime, row.repository]! { if !software_details_text_valid(value, 128) { return false } }
+	for value in [row.id, row.runtime, row.repository, row.installed_repository]! { if !software_details_text_valid(value, 128) { return false } }
 	for value in [row.name, row.installed_name, row.license]! { if !software_details_text_valid(value, 256) { return false } }
 	for value in [row.description, row.diagnostic]! { if !software_details_text_valid(value, 4096) { return false } }
 	for value in [row.version, row.installed_version]! { if !software_details_text_valid(value, 29) { return false } }
 	for value in [row.kind, row.installed_kind, row.architecture, row.update_action]! { if !software_details_text_valid(value, 16) { return false } }
-	if !software_details_text_valid(row.public_key, 64) { return false }
+	if !software_details_text_valid(row.public_key, 64) || !software_details_text_valid(row.installed_public_key, 64) { return false }
 	for value in row.permissions { if !software_details_text_valid(value, 16) { return false } }
 	for value in row.installed_permissions { if !software_details_text_valid(value, 16) { return false } }
 	return true
@@ -156,6 +156,16 @@ fn (mut a SoftwareApp) prepare_details_context(row SoftwareRow, action string, r
 	mut description := [if row.description == '' { 'No description supplied.'.clone() } else { row.description.clone() }]
 	a.details_values(1, description); software_policy_free_lines(mut description)
 	mut publisher := ['Displayed package repository: ' + row.repository, 'Publisher key: ' + row.public_key]
+	unsafe { publisher.flags |= .noslices }
+	if !reviewing && row.installed_version != '' {
+		if row.installed_repository == '' {
+			publisher << 'Installed publisher: Unavailable from this service'.clone()
+		} else {
+			publisher << 'Installed package repository: ' + row.installed_repository
+			publisher << 'Installed publisher key: ' + row.installed_public_key
+			publisher << 'Installed provenance records the source at installation. Current repository trust may have changed; see Diagnostics.'.clone()
+		}
+	}
 	a.details_values(2, publisher); software_policy_free_lines(mut publisher)
 	mut permissions := []string{cap: 12}
 	if row.permissions.len == 0 { permissions << 'Displayed package permissions: None declared'.clone() }

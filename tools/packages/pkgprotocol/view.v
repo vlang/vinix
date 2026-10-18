@@ -11,6 +11,8 @@ pub:
 	description string
 	version string
 	installed_version string
+	installed_repository string
+	installed_public_key string
 	installed_name string
 	installed_kind string
 	installed_permissions []string
@@ -92,12 +94,18 @@ pub fn (view &SoftwareView) validate() ! {
 			return error('incomplete installed launch metadata in Software view')
 		}
 		ids[row.id] = true
+		if (row.installed_repository == '') != (row.installed_public_key == '')
+			|| (row.installed_repository != '' && (row.installed_version == ''
+				|| !identifier(row.installed_repository) || !digest(row.installed_public_key))) {
+			return error('invalid installed publisher provenance in Software view')
+		}
 	}
 }
 
 fn close_software_row(row SoftwareRow) {
 	unsafe {
 		row.id.free(); row.name.free(); row.description.free(); row.version.free(); row.installed_version.free()
+		row.installed_repository.free(); row.installed_public_key.free()
 		row.installed_name.free(); row.installed_kind.free(); row.architecture.free(); row.kind.free(); row.runtime.free()
 		row.repository.free(); row.public_key.free(); row.license.free(); row.update_action.free(); row.diagnostic.free()
 		for value in row.permissions { value.free() }; (&array(&row.permissions)).free()

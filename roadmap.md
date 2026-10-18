@@ -801,6 +801,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
   interrupted-download recovery and coherent persistent package state.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,
   permissions, progress, uninstall, updates and useful failure diagnostics.
+  - [x] [Installed publisher provenance](tests/packages/software-provenance-check.md)
+    keeps the installed generation's repository/key separate from a displayed
+    update, including key rotation, revocation and unavailable catalogs. Complete
+    and compact details show both identities or explicit legacy unavailability;
+    malformed replies preserve the previous view. Graphical-session and broader
+    catalog/runtime release acceptance remain open.
   - [x] [Deployment file selection](tests/packages/software-deployment-chooser-check.md)
     uses the session file dialog for organization manifests and exported locks,
     preserves drafts on cancellation/failure, and discards late selections after

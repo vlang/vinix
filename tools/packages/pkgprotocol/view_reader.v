@@ -2,7 +2,7 @@
 module pkgprotocol
 
 const software_view_keys = ['format', 'generation', 'architecture', 'offline', 'catalog_error', 'update_error', 'rows', 'launch_user']
-const software_row_keys = ['id', 'name', 'description', 'version', 'installed_version', 'architecture', 'kind', 'runtime', 'repository', 'public_key', 'license', 'proprietary', 'firmware', 'permissions', 'requested', 'updatable', 'update_action', 'diagnostic', 'installed_name', 'installed_kind', 'installed_permissions', 'installed_window_protocol']
+const software_row_keys = ['id', 'name', 'description', 'version', 'installed_version', 'architecture', 'kind', 'runtime', 'repository', 'public_key', 'license', 'proprietary', 'firmware', 'permissions', 'requested', 'updatable', 'update_action', 'diagnostic', 'installed_name', 'installed_kind', 'installed_permissions', 'installed_window_protocol', 'installed_repository', 'installed_public_key']
 
 // Both presentation projections ignore additive/service-owned fields. Known
 // fields remain typed, mandatory and unique, including escaped key spellings.
@@ -95,16 +95,22 @@ fn (mut r MetadataReader) parse_software_row() !SoftwareRow {
 			19 { row = SoftwareRow{ ...row, installed_kind: r.quoted(16)! } }
 			20 { row = SoftwareRow{ ...row, installed_permissions: r.strings(16, 5)! } }
 			21 { row = SoftwareRow{ ...row, installed_window_protocol: int(r.unsigned(2)!) } }
+			22 { row = SoftwareRow{ ...row, installed_repository: r.quoted(128)! } }
+			23 { row = SoftwareRow{ ...row, installed_public_key: r.quoted(64)! } }
 			else { r.skip_view_extension(0)! }
 		}
 	}
 	if seen & 262143 != 262143 { return error('missing Software package field') }
 	// SDK-1 services before installed launch columns, before window protocol,
 	// and the current four-column group are the supported legacy shapes.
-	if seen >> 18 !in [u32(0), 7, 15]! { return error('partial installed launch fields in Software view') }
-	if seen >> 18 != 0 && row.installed_version != '' && (row.installed_name == '' || row.installed_kind == '') {
+	launch := (seen >> 18) & 15
+	if launch !in [u32(0), 7, 15]! { return error('partial installed launch fields in Software view') }
+	if launch != 0 && row.installed_version != '' && (row.installed_name == '' || row.installed_kind == '') {
 		return error('empty installed launch fields in Software view')
 	}
+	// Provenance is additive to every SDK-1 launch shape. An omitted or empty
+	// pair means unavailable; a partial pair must never borrow catalog identity.
+	if (seen >> 22) & 3 !in [u32(0), 3]! { return error('partial installed publisher provenance in Software view') }
 	accepted = true
 	return row
 }

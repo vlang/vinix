@@ -4,6 +4,7 @@ module pkgcore
 import json2
 import os
 import time
+import tools.packages.pkgprotocol
 
 $if track_heap ? {
 	#include "@VMODROOT/../../../desktop/tools/tests/heap_tracker.h"
@@ -103,6 +104,43 @@ fn test_launch_presentation_retains_installed_metadata_when_an_update_changes_ki
 	row := view_row(view, 'app')
 	assert row.updatable && row.name == 'Planned assets' && row.kind == 'data' && row.permissions == ['files']
 	assert row.installed_name == 'Installed app' && row.installed_kind == 'native' && row.installed_permissions.len == 0
+}
+
+fn test_software_provenance_retains_installation_identity_through_preview_revocation_activation_and_rollback() {
+	for architecture in ['aarch64', 'x86_64']! {
+		base := view_configuration()
+		replacement := Repository{ ...base.repositories[0], public_key: '3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c' }
+		config := Config{ ...base, architecture: architecture, repositories: [replacement] }
+		assets := view_installed(view_package('assets', '1.0.0', 'data'))
+		old := view_installed(Package{ ...view_package('app', '1.0.0', 'native'), architecture: architecture, dependencies: [Dependency{ id: 'assets' }] })
+		incoming := Installed{ ...old, package: Package{ ...old.package, version: '2.0.0', dependencies: [] }, repository: replacement.id, public_key: replacement.public_key }
+		fresh := Installed{ ...incoming, package: Package{ ...incoming.package, id: 'fresh' } }
+		current := State{ architecture: architecture, generation: 1, requested: ['app'], packages: [old, assets] }
+		catalog := Catalog{ packages: [incoming, fresh] }
+		view := catalog_view(config, catalog, current, '')!
+		row := view_row(view, 'app')
+		assert row.version == '2.0.0' && row.installed_version == '1.0.0' && row.update_action == 'update'
+		assert row.repository == replacement.id && row.public_key == replacement.public_key
+		assert row.installed_repository == old.repository && row.installed_public_key == old.public_key
+		mut wire := pkgprotocol.decode_software_view(json2.encode(view))!
+		assert wire.rows.filter(it.id == 'app')[0].installed_public_key == old.public_key
+		assert wire.rows.filter(it.id == 'app')[0].public_key == replacement.public_key
+		wire.close()
+		assert row.diagnostic.contains('revoked')
+		removed := view_row(view, 'assets')
+		assert removed.update_action == 'remove' && removed.installed_repository == assets.repository && removed.installed_public_key == assets.public_key
+		assert view_row(view, 'fresh').installed_repository == '' && view_row(view, 'fresh').installed_public_key == ''
+		revoked := catalog_view(Config{ ...config, repositories: [] }, Catalog{}, current, 'publisher revoked')!
+		assert view_row(revoked, 'app').installed_repository == old.repository && view_row(revoked, 'app').installed_public_key == old.public_key
+		assert view_row(revoked, 'app').diagnostic.contains('revoked') && !view_row(revoked, 'app').updatable
+		activated := catalog_view(config, catalog, State{ ...current, generation: 2, packages: [incoming] }, '')!
+		assert view_row(activated, 'app').installed_repository == incoming.repository && view_row(activated, 'app').installed_public_key == incoming.public_key
+		restored := catalog_view(config, catalog, State{ ...current, generation: 3 }, '')!
+		assert view_row(restored, 'app').installed_repository == old.repository && view_row(restored, 'app').installed_public_key == old.public_key
+		unavailable := catalog_view(config, Catalog{}, current, 'catalog unavailable')!
+		assert view_row(unavailable, 'app').installed_repository == old.repository && view_row(unavailable, 'app').installed_public_key == old.public_key
+	}
+	println('SOFTWARE PROVENANCE both hosts retain installed publisher across previews, removal, revocation, activation, restored generations and unavailable catalogs PASS')
 }
 
 fn test_updates_disclose_dependency_removals_and_retain_explicit_roots() {
@@ -226,6 +264,8 @@ fn test_disk_view_is_read_only_and_uses_package_reader_lock() {
 	assert view.generation == state.generation && view.offline && !load_config(root)!.policy.offline
 	assert view.rows.filter(it.updatable).map(it.id) == ['runtime']
 	assert view_row(view, 'runtime').version == '2.0.0'
+	assert view_row(view, 'runtime').installed_repository == 'fixture' && view_row(view, 'runtime').installed_public_key == key
+	assert view_row(view, 'app').installed_repository == 'fixture' && view_row(view, 'app').installed_public_key == key
 	assert os.ls(directory + '/objects')! == objects && os.ls(directory + '/generations')! == generations
 	assert read_state(directory, 'aarch64')! == state
 	guard := acquire(directory)!

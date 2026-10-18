@@ -138,6 +138,7 @@ fn details_fixture_row() SoftwareRow {
 	return SoftwareRow{ id: 'org.' + 'a'.repeat(120), name: 'Long name é🚀 '.repeat(14),
 		description: 'A complete description é🚀 '.repeat(120), version: '2.0.0', installed_version: '1.0.0',
 		installed_name: 'Installed application', installed_kind: 'native', installed_permissions: ['display', 'files'], installed_window_protocol: 2,
+		installed_repository: 'installed-publisher-' + 'c'.repeat(100), installed_public_key: 'b'.repeat(64),
 		architecture: 'aarch64', kind: 'linux', runtime: 'runtime-' + 'a'.repeat(110), repository: 'publisher-' + 'b'.repeat(110),
 		public_key: 'a'.repeat(64), license: 'Vendor license é '.repeat(12), proprietary: true, firmware: true,
 		permissions: ['files', 'network', 'process'], requested: true, updatable: true, update_action: 'update', diagnostic: 'Denied:\n' + 'long é🚀 reason '.repeat(160) }
@@ -374,6 +375,8 @@ fn check_software_details() ! {
 	assert details_fixture_values(&app, 1) == [row.description]
 	assert 'Publisher key: ' + row.public_key in details_fixture_values(&app, 2)
 	assert 'Displayed package repository: ' + row.repository in details_fixture_values(&app, 2)
+	assert 'Installed package repository: ' + row.installed_repository in details_fixture_values(&app, 2)
+	assert 'Installed publisher key: ' + row.installed_public_key in details_fixture_values(&app, 2)
 	assert 'License: ' + row.license in details_fixture_values(&app, 4)
 	assert 'Proprietary payload: Yes' in details_fixture_values(&app, 4) && 'Firmware payload: Yes' in details_fixture_values(&app, 4)
 	assert 'Installed native-window protocol: 2' in details_fixture_values(&app, 0)
@@ -419,6 +422,7 @@ fn check_software_details() ! {
 		assert 'Package ID: runtime' in details_fixture_values(&app, 0)
 		if operation == 'rollback' { assert 'Restore from generation: 2' in details_fixture_values(&app, 0) }
 		assert 'License: Vendor-EULA' in details_fixture_values(&app, 4)
+		assert !details_fixture_values(&app, 2).any(it.starts_with('Installed package repository:') || it.starts_with('Installed publisher key:'))
 		if operation == 'deploy' { assert 'Deployment file: ' + app.deployment_pending in details_fixture_values(&app, 5) }
 		for hidden in ['software.confirm', 'software.cancel', 'software.row.0', 'software.reload'] { app.handle(hidden)! }
 		assert app.review_ready && app.review_selected == 1 && app.review_scroll == 1 && app.worker == unsafe { nil }
@@ -437,6 +441,11 @@ fn check_software_details() ! {
 	app.open_details()
 	assert 'Installed permissions: Unavailable from this service' in details_fixture_values(&app, 3)
 	app.clear_details()
+	app.rows[0] = SoftwareRow{ ...row, installed_repository: '', installed_public_key: '' }
+	app.open_details()
+	assert 'Installed publisher: Unavailable from this service' in details_fixture_values(&app, 2)
+	assert 'Publisher key: ' + row.public_key in details_fixture_values(&app, 2)
+	app.clear_details()
 	for bad in [SoftwareRow{ ...row, description: '\xff' }, SoftwareRow{ ...row, description: 'x'.repeat(4097) }, SoftwareRow{ ...row, installed_window_protocol: 3 }] {
 		app.rows[0] = bad; app.open_details()
 		assert !app.details_mode && app.details_pages.len == 0 && app.status.contains('supported text limits')
@@ -450,6 +459,7 @@ fn check_software_details() ! {
 	assert !app.details_mode && app.selected == -1
 	println('Software compact package details: complete catalog/seven-operation review pages, twelve-byte UTF-8 fragments, section/page/keyboard navigation, resize anchors, tiny Back, frozen review and cache retirement PASS')
 	println('Software package details: complete Unicode descriptions/provenance/licenses/diagnostics, installed versus displayed permissions, paging, frozen review, hidden-action refusal, legacy fields and invalid-text refusal passed')
+	println('SOFTWARE PROVENANCE details disclose full installed and displayed publishers across compact pages; legacy unavailable and reviewed-target scope PASS')
 }
 
 fn check_software_details_memory() ! {

@@ -1,0 +1,1 @@
+SOFTWARE PROVENANCE protocol keeps installed and displayed publishers distinct; legacy groups, duplicate/partial/invalid identity and uninstalled rows PASS

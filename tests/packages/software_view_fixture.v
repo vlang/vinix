@@ -11,6 +11,7 @@ fn software_view_fixture() SoftwareView {
 		rows << SoftwareRow{ id: 'app-' + index.str(), name: 'Application é🚀', description: 'Complete description ÉKİé🚀 '.repeat(16),
 			version: '2.0.0', installed_version: '1.0.0', installed_name: 'Installed application', installed_kind: 'native',
 			installed_permissions: ['display'], installed_window_protocol: 2, architecture: 'aarch64', kind: 'linux', runtime: 'runtime',
+			installed_repository: 'original-publisher', installed_public_key: 'b'.repeat(64),
 			repository: 'publisher', public_key: 'a'.repeat(64), license: 'Vendor-EULA', proprietary: true, firmware: true,
 			permissions: ['files', 'network'], requested: true, updatable: true, update_action: 'update' }
 	}
@@ -33,6 +34,8 @@ fn software_view_service_fixture(args []string) bool {
 		'missing' { text.replace('"firmware":true,', '') }
 		'duplicate' { text.replace('"firmware":true', '"firmware":true,"firm\\u0077are":false') }
 		'partial' { text.replace('"installed_permissions":["display"],', '') }
+		'provenance-partial' { text.replace('"installed_repository":"original-publisher",', '') }
+		'provenance-invalid' { text.replace('"installed_repository":"original-publisher"', '"installed_repository":"../outside"') }
 		'coherence' { text.replace('"updatable":true', '"updatable":false') }
 		else { panic('unknown view fixture') }
 	})
@@ -42,6 +45,7 @@ fn software_view_service_fixture(args []string) bool {
 fn software_view_legacy(text string) string {
 	return text.replace('"installed_name":"Installed application",', '').replace('"installed_kind":"native",', '')
 		.replace('"installed_permissions":["display"],', '').replace('"installed_window_protocol":2,', '')
+		.replace('"installed_repository":"original-publisher",', '').replace('"installed_public_key":"' + 'b'.repeat(64) + '",', '')
 }
 
 fn check_software_view_reader() ! {
@@ -54,6 +58,7 @@ fn check_software_view_reader() ! {
 	assert app.rows.len == 32 && app.rows[31].firmware && app.rows[31].proprietary && app.rows[31].updatable
 	assert app.rows[31].permissions == ['files', 'network'] && app.rows[31].installed_permissions == ['display']
 	assert app.rows[31].installed_window_protocol == 2
+	assert app.rows[31].installed_repository == 'original-publisher' && app.rows[31].installed_public_key == 'b'.repeat(64)
 	app.focus = true
 	app.key_input('APPLICATION É🚀'); assert app.matching.len == 32
 	app.key_input('\x01'); app.key_input('éki'); assert app.matching.len == 32
@@ -71,12 +76,13 @@ fn check_software_view_reader() ! {
 	wait_for_software(mut app); assert app.matching == [31] && app.query.bytestr() == 'APP-31'
 	app.key_input('\x01'); app.key_input('\x7f')
 	app.selected = 31
-	for mode in ['missing', 'duplicate', 'partial', 'coherence'] {
+	for mode in ['missing', 'duplicate', 'partial', 'coherence', 'provenance-partial', 'provenance-invalid'] {
 		os.setenv('VINIX_SOFTWARE_VIEW_FIXTURE', mode, true)
 		app.start(['view'], true); wait_for_software(mut app)
 		assert app.status.starts_with('Invalid response from the package service:') && !app.admin_prompt && app.worker == unsafe { nil }
 		assert app.rows.len == 32 && app.selected == 31 && app.rows[31].updatable && app.rows[31].firmware
 		assert app.rows[31].installed_permissions == ['display'] && app.rows[31].installed_window_protocol == 2
+		assert app.rows[31].installed_repository == 'original-publisher' && app.rows[31].installed_public_key == 'b'.repeat(64)
 		app.handle('software.confirm')!
 		assert !app.admin_prompt && app.worker == unsafe { nil }
 	}
@@ -84,6 +90,7 @@ fn check_software_view_reader() ! {
 	assert app.rows.len == 32 && app.rows[0].installed_kind == '' && app.rows[0].installed_window_protocol == 0
 	app.selected = 0; app.open_details()
 	assert 'Installed permissions: Unavailable from this service' in details_fixture_values(&app, 3)
+	assert 'Installed publisher: Unavailable from this service' in details_fixture_values(&app, 2)
 	app.clear_details()
 	println('Software catalog reader: complete typed flags, installed-versus-planned launch fields, asynchronous malformed-response refusal, prior-valid-view preservation and explicit legacy details passed')
 }

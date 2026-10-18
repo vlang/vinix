@@ -84,6 +84,37 @@ fn test_view_reader_supports_only_complete_legacy_installed_field_groups() {
 	}
 }
 
+fn test_view_reader_keeps_installed_provenance_independent_of_catalog_and_legacy_launch_shapes() {
+	row := SoftwareRow{ ...fixture_software_row(), installed_repository: 'original-publisher', installed_public_key: 'b'.repeat(64) }
+	text := json2.encode(SoftwareView{ ...fixture_software_view(), rows: [row] })
+	for legacy_launch in [false, true]! {
+		input := if legacy_launch { text.replace('"installed_name":"Installed editor",', '').replace('"installed_kind":"native",', '')
+			.replace('"installed_permissions":["display"],', '').replace('"installed_window_protocol":2,', '') } else { text }
+		mut view := decode_software_view(input)!
+		assert view.rows[0].installed_repository == 'original-publisher' && view.rows[0].installed_public_key == 'b'.repeat(64)
+		assert view.rows[0].repository == 'trusted' && view.rows[0].public_key == 'a'.repeat(64)
+		view.close(); view.close()
+		for field in ['"installed_repository":"original-publisher",', '"installed_public_key":"' + 'b'.repeat(64) + '",'] {
+			assert refuses_software_view(input.replace(field, ''))
+		}
+		without := input.replace('"installed_repository":"original-publisher",', '').replace('"installed_public_key":"' + 'b'.repeat(64) + '",', '')
+		mut older := decode_software_view(without)!
+		assert older.rows[0].installed_repository == '' && older.rows[0].installed_public_key == ''
+		older.close()
+	}
+	for bad in [text.replace('"installed_repository":"original-publisher"', '"installed_repository":"original-publisher","installed_repos\\u0069tory":"other"'),
+		text.replace('"installed_public_key":"' + 'b'.repeat(64) + '"', '"installed_public_key":"' + 'b'.repeat(64) + '","installed_public_key":"' + 'c'.repeat(64) + '"'),
+		text.replace('"installed_repository":"original-publisher"', '"installed_repository":null'),
+		text.replace('"installed_public_key":"' + 'b'.repeat(64) + '"', '"installed_public_key":false'),
+		text.replace('original-publisher', ''), text.replace('b'.repeat(64), ''), text.replace('original-publisher', '../outside'),
+		text.replace('original-publisher', 'x'.repeat(129)), text.replace('original-publisher', '\\ud800'),
+		text.replace('b'.repeat(64), 'B'.repeat(64)), text.replace('b'.repeat(64), 'b'.repeat(65))] { assert refuses_software_view(bad) }
+	uninstalled := SoftwareRow{ ...fixture_software_row(), installed_version: '', installed_name: '', installed_kind: '', installed_permissions: [],
+		installed_window_protocol: 0, requested: false, updatable: false, update_action: '', installed_repository: row.installed_repository, installed_public_key: row.installed_public_key }
+	assert refuses_software_view(json2.encode(SoftwareView{ ...fixture_software_view(), rows: [uninstalled] }))
+	println('SOFTWARE PROVENANCE protocol keeps installed and displayed publishers distinct; legacy groups, duplicate/partial/invalid identity and uninstalled rows PASS')
+}
+
 fn test_view_reader_ignores_valid_additive_values_without_accepting_broken_json() {
 	text := json2.encode(fixture_software_view())
 	extension := '"extension":{"text":"é\\ud83d\\ude80","array":[null,true,false,-1.25e+2,{"later":[]}],"large":1e9999},'

@@ -1430,6 +1430,15 @@ bytes appear as `\xHH`. Catalog and update details identify the displayed versio
 separately from installed launch permissions and native-window protocol; older
 services report unavailable installed fields explicitly.
 
+The Publisher section also shows the installed version's repository and signing
+key separately from the displayed catalog/update publisher. A reviewed key
+rotation can advertise an update under a new key while the current generation
+still records the old key. Revocation and unavailable catalogs keep that
+historical source visible alongside the launch diagnostic. Missing installed
+provenance is shown as unavailable; it is never inferred from a candidate.
+Viewing these facts changes no trust or package state. See
+[installed provenance qualification](../tests/packages/software-provenance-check.md).
+
 In compact catalog windows, **Browse catalog** provides search, a button cycling
 Catalog/Installed/Updates, Previous/Next package and complete **Details** at
 180×220 or larger. Tab focuses search; Enter leaves search and then opens

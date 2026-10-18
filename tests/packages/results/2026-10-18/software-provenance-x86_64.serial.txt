@@ -1,0 +1,30 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=29
+!>+ [11] ./sbin/init sz=206848
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/protocol sz=697032
+!>+ [15] ./usr/share/package-fixtures/view sz=1696016
+!>initramfs: no ustar sig at 0xff000000370f2e00
+initramfs: Done (15 entries)
+HWTEST START packages-software-provenance
+SOFTWARE PROVENANCE both hosts retain installed publisher across previews, removal, revocation, activation, restored generations and unavailable catalogs PASS
+Updating trusted repository fixture
+Installing app 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (20 bytes)
+Installing runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+SOFTWARE PROVENANCE protocol keeps installed and displayed publishers distinct; legacy groups, duplicate/partial/invalid identity and uninstalled rows PASS
+HWTEST PASS packages-software-provenance

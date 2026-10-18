@@ -2688,6 +2688,18 @@ are freed on refusal under manual memory management. Software publishes only a
 complete valid view and frees refusal errors. See
 [catalog metadata qualification](../../tests/packages/view-metadata-check.md).
 
+Software rows also carry the additive `installed_repository` and
+`installed_public_key` pair. These identify the installed generation's recorded
+source, independently of `repository`/`public_key` for the displayed catalog or
+update candidate. Both fields must be present together or omitted together.
+An omitted or explicitly empty pair means unavailable; a nonempty pair requires
+an installed version, valid repository ID and canonical 64-character key.
+Partial, duplicate, coerced or invalid pairs refuse the entire reply. Historical
+provenance remains visible after revocation or key rotation and does not grant
+trust. Both strings belong to the owned view and are freed by `.close()`.
+Existing SDK-1 readers ignore the additive fields. See
+[installed provenance checks](../../tests/packages/software-provenance-check.md).
+
 `pkgprotocol.decode_registration(text)` reads the desktop presentation projection
 of a format-1 installed generation. Its owned `RegistrationSnapshot` contains
 `format`, positive `generation`, `architecture` and `packages`; each
@@ -3646,11 +3658,13 @@ lines, with chunks of at most 48 bytes ending at UTF-8 boundaries. Page caches
 can grow without retaining replaced buffers under `-gc none -manualfree`.
 
 Catalog/update pages distinguish displayed permissions from installed launch
-permissions/kind/window protocol. A service without installed launch fields
-reports them as unavailable. Review pages retain the decoded snapshot and
+permissions/kind/window protocol. The Publisher section separately shows the
+installed repository/key when available, including after key rotation; it never
+substitutes candidate provenance for missing installed provenance. A service
+without installed fields reports them as unavailable. Review pages retain the decoded snapshot and
 literal deployment/export inputs without enabling actions through the inspector;
 returning preserves the fingerprint, selected package and review scroll. This
-presentation adds no protocol fields or package state. See the
+inspector changes no package state or repository trust. See the
 [package-details qualification](../../tests/packages/details-ui-check.md).
 
 [The V example](../../examples/package-hello/main.v) and target manifests show a
