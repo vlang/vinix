@@ -9142,7 +9142,7 @@ tracked from allocation through enqueue or failure. Fork freezes the queues and
 retires the child's inherited namespace. Image teardown checks for active calls
 before freeing packets and native synchronization objects. Host-statistics and
 exception RPCs to these user ports reject unsupported delivery explicitly.
-Port sets, cross-process transport, complex descriptors, transferred reply/voucher
+Cross-process transport, complex descriptors, transferred reply/voucher
 rights, send-once rights, alternate trailers and kernel exception delivery remain
 unsupported. Only the measured message options are accepted.
 
@@ -9161,17 +9161,48 @@ LLVM inspection confirms Fortnite's receive loop at `0x1000b416c`, stop send at
 passes `_mach_msg` and stops before entry at `_mach_port_move_member`. Fortnite
 remains unplayable and the full iOS regression is unpassed.
 
+The V adapter now also allocates port sets and implements
+`mach_port_move_member`. Fortnite's constructor attaches two receive ports to
+one set before starting the receive loop above. Membership moves preserve the
+member queues; removing a member from no set returns `KERN_NOT_IN_SET`.
+Set receives rotate between ready member queues while retaining FIFO order
+within each port. Successful receives and `MACH_RCV_LARGE_IDENTITY` identify
+the member port. An oversized `MACH_RCV_LARGE` receive retains the packet but
+still rotates that member behind the other ready queues, as measured on macOS.
+Direct receives remain available while a port belongs to a set.
+
+Port-set type/ref queries, removal through destroy/mod-refs/deallocate and
+blocked receiver wakeups follow native measurements. Set destruction preserves
+the member ports and queued messages. Namespace locking, call pins and queue
+guards protect selection against concurrent direct receives, membership changes
+and destruction. A sender releases its queue guard before notifying the set;
+the receiver holds the set guard across the empty scan and condition wait.
+Membership adds no allocation. Fork and image retirement use the existing
+queue ownership and synchronization cleanup. Multiple simultaneous memberships
+through `mach_port_insert_member`, transferred rights and cross-process message
+transport remain unsupported.
+
+`tests/ios/native-checks.v build-mach-port-set` builds the port-set fixture.
+Native comparisons cover rights, error precedence, ready queue selection,
+oversized retry and guarded output extents. Sanitizer and ARM64 checks exercise
+blocked receivers, sender pressure, membership changes, destruction, errno,
+fork and image retirement. Evidence is retained under
+`build/ios/fortnite/mach-port-set-checks`. The fresh Fortnite probe passes
+`_mach_port_move_member` and stops before entry at
+`_mach_port_request_notification`. Fortnite remains unplayable; the full iOS
+regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,750 | 410 | 79 |
+| Fortnite executable | 1,751 | 409 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,585 | 413 | 120 |
+| All images | 2,586 | 412 | 120 |
 
-The C++/GLES/Text variant reports 2,599 resolved imports, 399 unresolved strong
+The C++/GLES/Text variant reports 2,600 resolved imports, 398 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

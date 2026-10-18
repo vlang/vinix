@@ -23,7 +23,7 @@ struct MachPreparedSend {
 fn mach_message_prepare(message voidptr, size u32, name u32, disposition u32) MachPreparedSend {
 	C.ios_mach_threads_lock(); defer { C.ios_mach_threads_unlock() }
 	mut port := mach_receive_find(name)
-	if port == unsafe { nil } || !port.receive || ((disposition == 17 || disposition == 19) && port.refs == 0) {
+	if port == unsafe { nil } || !port.receive || port.is_set || ((disposition == 17 || disposition == 19) && port.refs == 0) {
 		code := if system_data != unsafe { nil } && mach_exception_right(name) == .send { i32(0x10000013) } else { i32(0x10000003) }
 		return MachPreparedSend{code: code}
 	}
@@ -74,6 +74,7 @@ fn mach_message_send(message voidptr, size u32, options u32, timeout u32) i32 {
 	defer { mach_receive_unpin(mut port) }
 	mut packet := prepared.packet
 	result := mach_message_enqueue(mut port, mut packet, options, timeout)
+	if result == 0 { mach_port_set_notify(port) }
 	if result != 0 {
 		returned_name := mach_receive_restore_send(mut port)
 		mach_message_write32(message, 0, 17); mach_message_write32(message, 4, size)
@@ -96,7 +97,7 @@ fn mach_message_enqueue(mut port MachReceivePort, mut packet MachInlineMessage, 
 	// the message is discarded rather than pseudo-received by the sender.
 	if port.dead { C.free(packet); return 0 }
 	packet.next = unsafe { nil }
-	if port.tail == unsafe { nil } { port.head = packet } else { port.tail.next = packet }
+	if port.tail == unsafe { nil } { port.head = packet; port.ready_order = mach_receive_next_order() } else { port.tail.next = packet }
 	port.tail = packet; port.count++
 	if C.pthread_cond_broadcast(port.changed) != 0 { panic('iOS: cannot wake message receiver') }
 	return 0
@@ -105,6 +106,7 @@ fn mach_message_enqueue(mut port MachReceivePort, mut packet MachInlineMessage, 
 fn mach_message_receive(message voidptr, limit u32, name u32, options u32, timeout u32) i32 {
 	mut port := mach_receive_pin(name) or { return i32(0x10004002) }
 	defer { mach_receive_unpin(mut port) }
+	if port.is_set { return mach_port_set_receive(mut port, message, limit, options, timeout) }
 	deadline := mach_message_deadline(timeout)
 	if C.pthread_mutex_lock(port.guard) != 0 { panic('iOS: cannot guard message receive') }
 	defer { C.pthread_mutex_unlock(port.guard) }
@@ -112,6 +114,11 @@ fn mach_message_receive(message voidptr, limit u32, name u32, options u32, timeo
 		if !mach_message_wait(port, options & 0x100 != 0, deadline) { return i32(0x10004003) }
 	}
 	if port.dead { return i32(0x10004006) }
+	return mach_message_copy_locked(mut port, message, limit, name, options)
+}
+
+// Caller owns the member guard, whether receiving directly or through a set.
+fn mach_message_copy_locked(mut port MachReceivePort, message voidptr, limit u32, name u32, options u32) i32 {
 	packet := port.head
 	large := limit < packet.size + 8
 	if large && options & 4 != 0 {
@@ -120,9 +127,13 @@ fn mach_message_receive(message voidptr, limit u32, name u32, options u32, timeo
 		if message == unsafe { nil } && limit >= 8 { return i32(0x10004008) }
 		if limit >= 8 { mach_message_write32(message, 4, packet.size) }
 		if options & 8 != 0 && limit >= 16 { mach_message_write32(message, 12, name) }
+		// A retained oversized peek still rotates this ready member behind
+		// the other ready queues, including when receiving directly by name.
+		port.ready_order = mach_receive_next_order()
 		return i32(0x10004004)
 	}
 	port.head = packet.next; if port.head == unsafe { nil } { port.tail = unsafe { nil } }; port.count--
+	port.ready_order = if port.head == unsafe { nil } { u64(0) } else { mach_receive_next_order() }
 	defer { C.free(packet) }
 	if C.pthread_cond_broadcast(port.changed) != 0 { panic('iOS: cannot wake message sender') }
 	if message == unsafe { nil } || limit < 24 { return i32(0x10004008) }
