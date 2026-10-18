@@ -221,26 +221,49 @@ fn test_wine_profile_refuses_inconsistent_hosts_unbounded_runtime_missing_notice
 	assert alias && !os.exists(work + '/refused')
 }
 
+fn wine_test_command(arguments []string) os.Result {
+	mut child := os.new_process(arguments[0]); child.set_args(arguments[1..]); child.set_redirect_stdio_merged()
+	child.run(); output := child.stdout_slurp(); child.wait(); code := child.code; child.close()
+	return os.Result{ exit_code: code, output: output }
+}
+
 fn test_wine_profile_cli_matches_public_api_and_refuses_bad_arity_and_reused_output() {
 	cli := os.getenv('VINIX_PACKAGE_WINE_CLI')
 	if cli == '' { return } // The maintained qualification driver supplies it.
 	work := wine_fixture()!
 	defer { os.rmdir_all(work) or {} }
-	expected := wine_catalog(work + '/recipes', work + '/roots', work + '/api')!
-	result := os.exec([cli, 'wine-catalog', work + '/recipes', work + '/roots', work + '/cli'])
+	mut expected := wine_catalog(work + '/recipes', work + '/roots', work + '/api')!
+	defer { expected.close() }
+	result := wine_test_command([cli, 'wine-catalog', work + '/recipes', work + '/roots', work + '/cli'])
 	assert result.exit_code == 0, result.output
 	actual := json2.decode[WineProfileInfo](result.output)!
 	assert actual.catalog_sha256 == expected.catalog_sha256 && actual.architectures == ['aarch64', 'x86_64']
 	assert actual.application == expected.application && actual.runtime_version == expected.runtime_version
-	packed := os.exec([cli, 'pack-catalog', actual.catalog, work + '/roots', work + '/workspace'])
+	packed := wine_test_command([cli, 'pack-catalog', actual.catalog, work + '/roots', work + '/workspace'])
 	assert packed.exit_code == 0, packed.output
 	assert json2.decode[CatalogInfo](packed.output)!.package_count == 4
 	for arguments in [ []string{}, [work + '/recipes'], [work + '/recipes', work + '/roots'],
 		[work + '/recipes', work + '/roots', work + '/cli', 'extra'] ] {
-		invalid := os.exec([cli, 'wine-catalog', ...arguments])
+		invalid := wine_test_command([cli, 'wine-catalog', ...arguments])
 		assert invalid.exit_code == 1 && invalid.output.contains('requires a recipe directory')
 	}
-	occupied := os.exec([cli, 'wine-catalog', work + '/recipes', work + '/roots', work + '/cli'])
+	occupied := wine_test_command([cli, 'wine-catalog', work + '/recipes', work + '/roots', work + '/cli'])
 	assert occupied.exit_code == 1 && occupied.output.contains('must be new')
 	assert read_metadata(actual.catalog)! == read_metadata(expected.catalog)!
+	for architecture in ['aarch64', 'x86_64']! {
+		runtime := wine_fixture_recipe(architecture, false)
+		os.write_file(work + '/recipes/' + architecture + '/runtime.json', json2.encode(RootRecipe{
+			...runtime, manifest: Package{ ...runtime.manifest, version: '1.1.0' } }))!
+	}
+	target := work + '/CLI runtime update'
+	updated := wine_test_command([cli, 'wine-catalog', work + '/recipes', work + '/roots', target])
+	assert updated.exit_code == 0, updated.output
+	mut reply := json2.decode[WineProfileInfo](updated.output)!
+	assert reply.format == 1 && reply.profile == 'wine-win64' && reply.directory == target && reply.catalog == target + '/catalog.json'
+	assert reply.application == actual.application && reply.version == actual.version && reply.runtime == actual.runtime && reply.runtime_version == '1.1.0'
+	assert reply.architectures == actual.architectures && reply.catalog_sha256 == index_digest(read_metadata(reply.catalog)!)
+	before := catalog_recipe(read_metadata(actual.catalog)!)!; after := catalog_recipe(read_metadata(reply.catalog)!)!
+	assert before.packages.filter(it.recipe.manifest.kind == 'windows') == after.packages.filter(it.recipe.manifest.kind == 'windows')
+	reply.close(); reply.close(); assert os.is_file(target + '/catalog.json')
+	println('WINE OWNER production CLI format-1 replies, paths with spaces, compatible runtime update and exact refusal preservation PASS')
 }

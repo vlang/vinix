@@ -1,0 +1,9 @@
+SQLITE OWNERSHIP imports=0 fault=none retained=0 allocations=0
+SQLITE OWNERSHIP imports=1 fault=none retained=0 allocations=0
+SQLITE OWNERSHIP imports=2 fault=none retained=0 allocations=0
+SQLITE OWNERSHIP imports=3 fault=none retained=0 allocations=0
+SQLITE OWNERSHIP imports=4 fault=none retained=0 allocations=0
+SQLITE OWNERSHIP imports=4 fault=duplicate retained=0 allocations=0
+SQLITE OWNERSHIP imports=0 fault=empty retained=0 allocations=0
+SQLITE OWNERSHIP 896 metadata cycles retire templates, partial inventories, canonicalization, replies and late refusals PASS
+SQLITE OWNERSHIP independent replies survive caller retirement and close idempotently PASS

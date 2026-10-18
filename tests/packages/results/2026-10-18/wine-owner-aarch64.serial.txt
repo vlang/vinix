@@ -1,0 +1,771 @@
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FC86000 start failed: Unsupported
+Error: Image at 0007FC0B000 start failed: Not Found
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+BdsDxe: starting Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x760a0000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x760a0000 to 0xffffffff80000000, length: 0x2f0000
+vmm: Kernel: Mapping 0x76390000 to 0xffffffff802f0000, length: 0x2c000
+vmm: Kernel: Mapping 0x763bc000 to 0xffffffff8031c000, length: 0x15e6000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x760a0000 +0x31c000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 29
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 30
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 1000000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+init smp...
+smp: BSP MPIDR:       0
+smp: Discovered CPUs: 4
+smp: Starting CPUs:   4
+security: PAN enabled
+smp: CPU 0 online!
+smp: CPU 1 online!
+smp: CPU 2 online!
+smp: CPU 3 online!
+smp: 4 CPUs online
+smp done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+initramfs: Module:  1
+initramfs: Address: 0xffff000075cb7000
+initramfs: Size:    4100096
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./usr/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./etc/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./root/ sz=0
+!>+ [8] ./dev/ sz=0
+!>+ [9] ./tmp/ sz=0
+!>+ [10] ./etc/hwtest-scenario sz=20
+!>+ [11] ./sbin/init sz=310928
+!>+ [12] ./usr/share/ sz=0
+!>+ [13] ./usr/share/package-fixtures/ sz=0
+!>+ [14] ./usr/share/package-fixtures/profile sz=1619792
+!>+ [15] ./usr/share/package-fixtures/builder sz=1187848
+!>+ [16] ./usr/share/package-fixtures/metadata sz=970616
+!>initramfs: no ustar sig at 0xffff00007609fc00
+initramfs: Done (16 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 1000000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+pci: Found [0:2:0:-1]
+devcore: 3 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 3 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+HWTEST START packages-wine-owner
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+WINE METADATA imports=0 fault=none retained=0 allocations=0
+WINE METADATA imports=1 fault=none retained=0 allocations=0
+WINE METADATA imports=2 fault=none retained=0 allocations=0
+WINE METADATA imports=3 fault=none retained=0 allocations=0
+WINE METADATA imports=4 fault=none retained=0 allocations=0
+WINE METADATA imports=4 fault=duplicate retained=0 allocations=0
+WINE METADATA imports=0 fault=empty retained=0 allocations=0
+WINE METADATA 896 cycles retire decoded templates, partial manifests, canonicalization, replies and late refusals PASS
+WINE METADATA independent replies survive plan and caller retirement and close idempotently PASS
+WINE OWNER PROCESS metadata  PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+Updating trusted repository wine
+Installing Reviewed Win64 application 1.0.0 (1/2) from wine
+Downloading org.example.win64/bin/program.exe (1024 bytes)
+Downloading org.example.win64/licenses/application-LICENSE.txt (71 bytes)
+Installing Reviewed Wine closure 1.0.0 (2/2) from wine
+Downloading org.example.wine/bin/wine-runner (512 bytes)
+Downloading org.example.wine/licenses/runtime-LICENSE.txt (24 bytes)
+Downloading org.example.wine/share/closure.txt (46 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Reviewed Win64 application 1.0.0 (1/2) from wine
+Installing Reviewed Wine closure 1.0.0 (2/2) from wine
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+Updating trusted repository wine
+Installing Reviewed Win64 application 1.0.0 (1/2) from wine
+Downloading org.example.win64/bin/program.exe (1024 bytes)
+Downloading org.example.win64/licenses/application-LICENSE.txt (71 bytes)
+Installing Reviewed Wine closure 1.0.0 (2/2) from wine
+Downloading org.example.wine/bin/wine-runner (512 bytes)
+Downloading org.example.wine/licenses/runtime-LICENSE.txt (24 bytes)
+Downloading org.example.wine/share/closure.txt (45 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Reviewed Win64 application 1.0.0 (1/2) from wine
+Installing Reviewed Wine closure 1.0.0 (2/2) from wine
+Activated package generation 3
+Restored packages from generation 1 in generation 3; application data was retained
+WINE OWNER PROCESS profile  PASS
+WINE OWNER resources before grace complete:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 9632880
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 1344 8282900
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 31 846848
+process 4 55006
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+random: reseeded from 50772 events, 4 hardware words
+WINE OWNER resources after grace complete:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 1373794
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 10 51342
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 31 846848
+process 2 27478
+thread 4 423040
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+WINE OWNER case=complete retained=0 allocations=0
+WINE OWNER complete canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER PROCESS builder case complete PASS
+WINE OWNER resources before grace invalid-schema:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 6779308
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 864 5323540
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 31 846848
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+WINE OWNER resources after grace invalid-schema:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 1430260
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 31 846848
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+WINE OWNER case=invalid-schema retained=0 allocations=0
+WINE OWNER invalid-schema canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER PROCESS builder case invalid-schema PASS
+WINE OWNER resources before grace host-mismatch:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 3100754
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 260 1594030
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 897792
+process 4 55046
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+WINE OWNER resources after grace host-mismatch:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 1481204
+Accounts: 3
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 897792
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+WINE OWNER case=host-mismatch retained=0 allocations=0
+WINE OWNER host-mismatch canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER PROCESS builder case host-mismatch PASS
+WINE OWNER resources before grace wrong-pe:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 3100752
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 260 1594030
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 897792
+process 4 55044
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+WINE OWNER resources after grace wrong-pe:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 1481204
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 33 897792
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+WINE OWNER case=wrong-pe retained=0 allocations=0
+WINE OWNER wrong-pe canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER PROCESS builder case wrong-pe PASS
+WINE OWNER resources before grace wrong-target:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 3151686
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 260 1594030
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 35 948736
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+WINE OWNER resources after grace wrong-target:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 1532148
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 35 948736
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+WINE OWNER case=wrong-target retained=0 allocations=0
+WINE OWNER wrong-target canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER PROCESS builder case wrong-target PASS
+WINE OWNER resources before grace packed-2:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 3202638
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 260 1594030
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 999680
+process 4 55042
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+WINE OWNER resources after grace packed-2:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 1583092
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 37 999680
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+WINE OWNER case=packed-2 retained=0 allocations=0
+WINE OWNER packed-2 canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER PROCESS builder case packed-2 PASS
+WINE OWNER resources before grace packed-4:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 6216118
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 740 4556574
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 39 1050624
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+WINE OWNER resources after grace packed-4:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 1634036
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 39 1050624
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+WINE OWNER case=packed-4 retained=0 allocations=0
+WINE OWNER packed-4 canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER PROCESS builder case packed-4 PASS
+WINE OWNER resources before grace import-pe:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 7561046
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 958 5901502
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 39 1050624
+process 4 55034
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+WINE OWNER resources after grace import-pe:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 1634036
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 39 1050624
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+WINE OWNER case=import-pe retained=0 allocations=0
+WINE OWNER import-pe canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER PROCESS builder case import-pe PASS
+WINE OWNER resources before grace import-elf:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 7156024
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 884 5445534
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 41 1101568
+process 4 55036
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+WINE OWNER resources after grace import-elf:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 1684980
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 41 1101568
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+WINE OWNER case=import-elf retained=0 allocations=0
+WINE OWNER import-elf canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER PROCESS builder case import-elf PASS
+WINE OWNER resources before grace changed-template:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 8292730
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 1060 6531294
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 1152512
+process 4 55038
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+WINE OWNER resources after grace changed-template:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 1735924
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 1152512
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+WINE OWNER case=changed-template retained=0 allocations=0
+WINE OWNER changed-template canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER PROCESS builder case changed-template PASS
+WINE OWNER resources before grace flush:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 8381480
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 1074 6620032
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 1152512
+process 4 55050
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+WINE OWNER resources after grace flush:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 1735924
+Accounts: 5
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 1152512
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+WINE OWNER case=flush retained=0 allocations=0
+WINE OWNER flush canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER PROCESS builder case flush PASS
+WINE OWNER resources before grace cleanup:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 5269762
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 570 3508336
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 1152512
+process 4 55028
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+WINE OWNER resources after grace cleanup:
+Limit: 119631872
+OwnerLimit: 59815936
+Charged: 1735924
+Accounts: 4
+Denied: 0
+Kind Objects Bytes
+file 2 2048
+descriptor 4 16768
+socket 0 0
+ipc 0 0
+mapping 43 1152512
+process 2 27478
+thread 5 528800
+scratch 1 8318
+Denied.invalid: 0
+Denied.accounts: 0
+Denied.objects: 0
+Denied.global: 0
+Denied.owner: 0
+Denied.cgroup: 0
+
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40019c
+WINE OWNER case=cleanup retained=0 allocations=0
+WINE OWNER cleanup canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER PROCESS builder case cleanup PASS
+HWTEST PASS packages-wine-owner
+syspower: power off: stopping devices

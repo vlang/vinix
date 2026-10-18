@@ -682,6 +682,14 @@ architectures; broader release/catalog/runtime acceptance remains open.
     the full reviewed source archive. Source pins, canonical locks and explicit
     licenses/runtime bounds are preserved. Other profile/catalog/release owners
     and broader graphical/runtime acceptance remain open.
+  - [x] [Owned Wine profile construction](tests/packages/wine-owner-check.md)
+    retires decoded declarations, PE/native launcher preflight, partial imports,
+    comparison/canonicalization scratch and independently closeable replies.
+    After JSON initialization, 368 host calls and 896 metadata cycles retain
+    zero tracked allocations; both guests check metadata and twelve selected
+    complete-call cases. Captured declarations, licenses/runtime bounds and
+    canonical retries survive; real Wine/translation execution, other complete
+    publishers and broader catalog/graphical acceptance remain open.
   - [x] [Owned packing inventories and replies](tests/packages/pack-ownership-check.md)
     retire discarded template inventories, partial walked files and copy scratch
     across cold/cache success and late refusal. Independently closeable pack/root

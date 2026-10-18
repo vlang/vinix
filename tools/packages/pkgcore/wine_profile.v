@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import json2
 import os
 
 const wine_application_notice = 'licenses/application-LICENSE.txt'
@@ -21,9 +20,93 @@ pub:
 	architectures []string
 }
 
+// Reply strings are independent of the decoded declarations and caller paths.
+pub fn (mut info WineProfileInfo) close() {
+	unsafe {
+		info.directory.free(); info.catalog.free(); info.catalog_sha256.free()
+		info.application.free(); info.version.free(); info.runtime.free(); info.runtime_version.free()
+		for architecture in info.architectures { architecture.free() }
+		(&array(&info.architectures)).free()
+	}
+	info = WineProfileInfo{}
+}
+
+fn wine_profile_result(app Package, runtime Package, directory string, canonical string) WineProfileInfo {
+	architectures := ['aarch64', 'x86_64']
+	defer { unsafe { (&array(&architectures)).free() } }
+	return WineProfileInfo{ directory: directory.clone(), catalog: directory + '/catalog.json', catalog_sha256: index_digest(canonical),
+		application: app.id.clone(), version: app.version.clone(), runtime: runtime.id.clone(), runtime_version: runtime.version.clone(),
+		architectures: review_strings(architectures) }
+}
+
 struct WineImport {
 	architecture string
 	recipe RootRecipe
+}
+
+// Imports own complete decoded templates. Packed manifests are independent;
+// their catalog wrappers borrow only the import selectors and architecture.
+struct WineProfilePlan {
+mut:
+	imports []WineImport
+	packages []CatalogImport
+}
+
+fn (mut plan WineProfilePlan) close() {
+	for item in plan.packages { close_decoded_package(item.recipe.manifest) }
+	for item in plan.imports { close_decoded_root_recipe(item.recipe) }
+	unsafe { (&array(&plan.packages)).free(); (&array(&plan.imports)).free() }
+	plan = WineProfilePlan{}
+}
+
+fn wine_profile_plan(recipes string) !WineProfilePlan {
+	mut plan := WineProfilePlan{ imports: []WineImport{cap: 4}, packages: []CatalogImport{cap: 4} }
+	mut accepted := false
+	defer { if !accepted { plan.close() } }
+	// Capture declarations once; later callbacks cannot replace approvals.
+	for architecture in ['aarch64', 'x86_64']! {
+		for role in ['application', 'runtime']! {
+			path := recipes + '/' + architecture + '/' + role + '.json'
+			defer { unsafe { path.free() } }
+			text := read_metadata(path)!
+			defer { unsafe { text.free() } }
+			recipe := decode_root_recipe(text)!
+			wine_profile_recipe(recipe, architecture, role == 'application') or {
+				close_decoded_root_recipe(recipe)
+				return err
+			}
+			plan.imports << WineImport{ architecture: architecture, recipe: recipe }
+		}
+	}
+	// Only architecture may differ: retain descriptions, permissions, licenses
+	// and runtime compatibility declarations exactly across both hosts.
+	for index in 0 .. 2 {
+		first := plan.imports[index].recipe.manifest
+		second := plan.imports[index + 2].recipe.manifest
+		one := publisher_json(Package{ ...first, architecture: 'x86_64' })
+		two := publisher_json(second)
+		defer { unsafe { one.free(); two.free() } }
+		if one != two { return error('Wine profile application/runtime declarations must match across both hosts') }
+	}
+	app := plan.imports[0].recipe.manifest
+	runtime := plan.imports[1].recipe.manifest
+	if app.runtime != runtime.id || app.id == runtime.id {
+		return error('Wine profile runtime does not match its application dependency')
+	}
+	accepted = true
+	return plan
+}
+
+fn (plan WineProfilePlan) canonical() !string {
+	architectures := ['aarch64', 'x86_64']
+	defer { unsafe { (&array(&architectures)).free() } }
+	text := publisher_json(CatalogRecipe{ format: 1, architectures: architectures, packages: plan.packages })
+	defer { unsafe { text.free() } }
+	input := catalog_recipe(text)!
+	defer { close_decoded_catalog(input) }
+	canonical := publisher_json(input)
+	if canonical.len > max_metadata { unsafe { canonical.free() }; return error('Wine catalog lock exceeds metadata limit') }
+	return canonical
 }
 
 // A publisher supplies a complete runtime, including a native static launcher
@@ -50,7 +133,7 @@ fn wine_profile_recipe(recipe RootRecipe, architecture string, application bool)
 		|| p.entrypoint != '' || p.arguments.len != 0 || p.permissions.len != 0 || p.associations.len != 0 {
 		return error('Wine profile runtime must contain its complete closure without launchers or implicit grants')
 	}
-	required := if application { ['bin/program.exe', wine_application_notice] } else { ['bin/wine-runner', wine_runtime_notice] }
+	required := if application { ['bin/program.exe', wine_application_notice]! } else { ['bin/wine-runner', wine_runtime_notice]! }
 	for path in required {
 		if !recipe.entries.any(it.path == path) { return error('Wine profile requires an explicit file selector: ' + path) }
 	}
@@ -77,78 +160,54 @@ fn wine_profile_payload(root int, recipe RootRecipe, application bool) !u64 {
 }
 
 fn wine_catalog_with(recipes string, source_roots string, destination string, options CatalogOptions) !WineProfileInfo {
-	// Read each bounded template once before creating output. Keep these exact
-	// declarations through materialization; callbacks cannot replace approvals.
-	mut imports := []WineImport{}
-	defer { for item in imports { close_decoded_root_recipe(item.recipe) } }
-	for architecture in ['aarch64', 'x86_64'] {
-		for role in ['application', 'runtime'] {
-			text := read_metadata(recipes + '/' + architecture + '/' + role + '.json')!
-			defer { unsafe { text.free() } }
-			recipe := decode_root_recipe(text)!
-			wine_profile_recipe(recipe, architecture, role == 'application') or {
-				close_decoded_root_recipe(recipe)
-				return err
-			}
-			imports << WineImport{ architecture: architecture, recipe: recipe }
-		}
-	}
-	// Descriptions, grants, proprietary declarations and compatibility ranges
-	// must agree across hosts; only the explicit target architecture may differ.
-	for index in 0 .. 2 {
-		first := imports[index].recipe.manifest
-		second := imports[index + 2].recipe.manifest
-		if json2.encode(Package{ ...first, architecture: 'x86_64' }) != json2.encode(second) {
-			return error('Wine profile application/runtime declarations must match across both hosts')
-		}
-	}
-	app := imports[0].recipe.manifest
-	runtime := imports[1].recipe.manifest
-	if app.runtime != runtime.id || app.id == runtime.id {
-		return error('Wine profile runtime does not match its application dependency')
-	}
+	mut plan := wine_profile_plan(recipes)!
+	defer { plan.close() }
 	root := capture_prepared_root(source_roots, 'Wine profile')!
 	defer { C.close(root) }
 	target := export_target(destination, 'Wine profile')!
+	defer { unsafe { target.free() } }
 	mut roots := map[string]int{}
-	defer { for _, fd in roots { C.close(fd) } }
+	defer { for _, fd in roots { C.close(fd) }; unsafe { roots.free() } }
 	mut needed := u64(4 * 1024 * 1024)
 	mut scratch := u64(0)
-	for architecture in ['aarch64', 'x86_64'] {
+	for architecture in ['aarch64', 'x86_64']! {
 		fd := catalog_source_root(root, architecture)!
 		roots[architecture] = fd
 	}
-	for item in imports {
+	for item in plan.imports {
 		bytes := wine_profile_payload(roots[item.architecture], item.recipe, item.recipe.manifest.kind == 'windows')!
 		needed = mirror_cost(needed, bytes)!
 		if bytes > scratch { scratch = bytes }
 	}
 	parent := os.dir(target)
+	temporary := import_temporary_directory()
+	defer { unsafe { parent.free(); temporary.free() } }
 	scratch = mirror_cost(scratch, scratch)!
 	disk_check(options.available_space(parent)!, mirror_cost(needed, scratch)!, 64 * 1024 * 1024)!
-	disk_check(options.available_space(os.temp_dir())!, scratch, 64 * 1024 * 1024)!
+	disk_check(options.available_space(temporary)!, scratch, 64 * 1024 * 1024)!
 	mut exporting := create_profile_stage(parent, '.vinix-wine-profile', 'Wine profile')!
 	defer { exporting.close() }
-	canonical := write_wine_profile(imports, roots, target, options, mut exporting) or { return exporting.failure(err) }
+	canonical := write_wine_profile(mut plan, roots, target, options, mut exporting) or { return exporting.failure(err) }
 	defer { unsafe { canonical.free() } }
 	exporting.finish(target)!
-	return WineProfileInfo{ directory: target, catalog: target + '/catalog.json', catalog_sha256: index_digest(canonical),
-		application: app.id.clone(), version: app.version.clone(), runtime: runtime.id.clone(), runtime_version: runtime.version.clone(),
-		architectures: ['aarch64', 'x86_64'] }
+	return wine_profile_result(plan.imports[0].recipe.manifest, plan.imports[1].recipe.manifest, target, canonical)
 }
 
-fn write_wine_profile(imports []WineImport, roots map[string]int, target string, options CatalogOptions, mut exporting ProfileStage) !string {
+fn write_wine_profile(mut plan WineProfilePlan, roots map[string]int, target string, options CatalogOptions, mut exporting ProfileStage) !string {
 	stage := exporting.stage.path
 	exporting.checkpoint('created', options)!
-	mut packages := []CatalogImport{}
-	for item in imports {
+	inventory := stage + '/inventory'; object_path := inventory + '/objects'
+	defer { unsafe { inventory.free(); object_path.free() } }
+	for item in plan.imports {
 		recipe := item.recipe
-		p := pack_root_descriptor(recipe, roots[item.architecture], stage + '/inventory', false)!
-		mut notices := []string{}
+		p := pack_root_descriptor(recipe, roots[item.architecture], inventory, false)!
+		mut transferred := false
+		defer { if !transferred { close_decoded_package(p) } }
+		mut notices := []string{cap: recipe.entries.len}
 		for entry in recipe.entries { if entry.path.starts_with('licenses/') { notices << entry.path } }
 		defer { unsafe { notices.free() } }
 		profile_file_inventory(recipe, p, notices)!
-		objects := C.open((stage + '/inventory/objects').str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
+		objects := C.open(object_path.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
 		if objects < 0 { return error('cannot inspect Wine profile inventory') }
 		defer { C.close(objects) }
 		// Recheck the copied bytes too; preflight did not freeze source contents.
@@ -159,12 +218,14 @@ fn write_wine_profile(imports []WineImport, roots map[string]int, target string,
 				profile_elf(objects, file.sha256, item.architecture, 'static', false)!
 			}
 		}
-		packages << CatalogImport{ source: item.architecture, recipe: RootRecipe{ ...recipe, manifest: p } }
+		plan.packages << CatalogImport{ source: item.architecture, recipe: RootRecipe{ ...recipe, manifest: p } }
+		transferred = true
 		exporting.checkpoint('packed', options)!
 	}
-	text := json2.encode(CatalogRecipe{ format: 1, architectures: ['aarch64', 'x86_64'], packages: packages })
-	canonical := json2.encode(catalog_recipe(text)!) + '\n'
-	if canonical.len > max_metadata { return error('Wine catalog lock exceeds metadata limit') }
+	canonical := plan.canonical()!
+	mut published := false
+	defer { if !published { unsafe { canonical.free() } } }
 	exporting.publish(canonical, target, options)!
+	published = true
 	return canonical
 }

@@ -1,0 +1,2 @@
+FFMPEG METADATA 1152 cycles retire templates, partial inventories, canonicalization, replies and late refusals PASS
+FFMPEG METADATA independent replies survive caller retirement and close idempotently PASS

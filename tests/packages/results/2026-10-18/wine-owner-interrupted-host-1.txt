@@ -1,0 +1,18 @@
+cli-compile PASS
+capture-compile PASS
+workspace-compile PASS
+capture-run PASS
+native-compile PASS
+native-run PASS
+workspace-run PASS
+builder-compile PASSelf-owned-compile PASS
+
+sqlite-builder-compile PASS
+elf-owned-run PASS
+sqlite-builder-run PASS
+builder-run PASS
+ffmpeg-owned-compile PASS
+sqlite-owned-compile PASS
+ffmpeg-owned-run PASS
+sqlite-owned-run PASS
+ffmpeg-builder-compile PASS

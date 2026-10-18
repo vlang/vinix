@@ -1503,6 +1503,15 @@ both hosts. It produces the same canonical lock consumed by `pack-catalog`,
 publisher, accept proprietary terms or turn a host-wide Wine installation into
 an isolated runtime.
 
+V callers own the dynamic metadata returned in `WineProfileInfo` and release it
+with `info.close()`. Replies are independent of decoded templates and caller
+paths; repeated close is safe and preserves the published lock. The CLI closes
+its reply after encoding. The [ownership qualification](../../tests/packages/wine-owner-check.md)
+covers complete successful/refused calls, partial templates/imports, PE/native
+launcher preflight, canonicalization and publication after JSON initialization.
+Both guests check metadata ownership and twelve selected complete-call cases;
+real Wine/translation execution remains a separate qualification boundary.
+
 Supply four ordinary bounded prepared-root recipe files:
 
 ```text

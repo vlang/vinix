@@ -182,7 +182,8 @@ fn checked(arguments []string) !int {
 		}
 		'wine-catalog' {
 			if names.len != 3 { return error('wine-catalog requires a recipe directory, prepared roots and a new lock directory') }
-			println(json2.encode(pkgcore.wine_catalog(names[0], names[1], names[2])!))
+			mut info := pkgcore.wine_catalog(names[0], names[1], names[2])!
+			publisher_reply(mut info)
 			return 0
 		}
 		'apple-catalog' {

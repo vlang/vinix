@@ -1,0 +1,3 @@
+/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/../lib/gcc/aarch64-linux-musl/14.2.0/../../../../aarch64-linux-musl/bin/ld: /var/folders/5s/gdmd5zq90y52hchygpfzp2m00000gn/T//ccGKP1nP.o: in function `os__exec':
+profile.c:(.text+0x699f8): undefined reference to `v_os_exec_capture_start'
+collect2: error: ld returned 1 exit status

@@ -14,7 +14,7 @@ fn profile_win64(root int, path string) ! {
 	defer { unsafe { dos.free() } }
 	profile_read_at(node.fd, 0, mut dos)!
 	pe := profile_le(dos[60..64])
-	if dos[..2] != [u8(`M`), `Z`] || pe < 64 || pe > node.bytes || node.bytes - pe < 24 {
+	if dos[0] != `M` || dos[1] != `Z` || pe < 64 || pe > node.bytes || node.bytes - pe < 24 {
 		return error('Wine profile has invalid DOS/PE headers: ' + path)
 	}
 	mut header := []u8{len: 24}
@@ -23,7 +23,7 @@ fn profile_win64(root int, path string) ! {
 	count := profile_le(header[6..8])
 	width := profile_le(header[20..22])
 	flags := profile_le(header[22..24])
-	if header[..4] != [u8(`P`), `E`, 0, 0] || profile_le(header[4..6]) != 0x8664
+	if header[0] != `P` || header[1] != `E` || header[2] != 0 || header[3] != 0 || profile_le(header[4..6]) != 0x8664
 		|| flags & 2 == 0 || flags & 0x2000 != 0 || count == 0 || count > 96
 		|| width < 112 || width > 4096 || width > node.bytes - pe - 24 {
 		return error('Wine profile requires an x86-64 PE32+ application, not a DLL: ' + path)
@@ -36,7 +36,7 @@ fn profile_win64(root int, path string) ! {
 	headers_size := profile_le(optional[60..64])
 	subsystem := profile_le(optional[68..70])
 	sections := pe + 24 + width
-	if profile_le(optional[..2]) != 0x20b || subsystem !in [u64(2), 3] || entry == 0
+	if profile_le(optional[..2]) != 0x20b || subsystem !in [u64(2), 3]! || entry == 0
 		|| entry >= image_size || headers_size < sections || headers_size > node.bytes
 		|| sections > node.bytes || count * 40 > node.bytes - sections
 		|| sections + count * 40 > headers_size {

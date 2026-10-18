@@ -1,0 +1,5 @@
+x86_64-linux-musl-gcc -static -O1 -w -fpermissive -D_GNU_SOURCE -o /Users/alex/code/vinix/build/wio-x86-1/guest/program-2/profile /Users/alex/code/vinix/build/wio-x86-1/guest/program-2/profile.c -lm -lpthread
+x86_64-linux-musl-gcc: exit status 1
+/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/../lib/gcc/x86_64-linux-musl/14.2.0/../../../../x86_64-linux-musl/bin/ld: /var/folders/5s/gdmd5zq90y52hchygpfzp2m00000gn/T//cc16CQmY.o: in function `os__exec':
+profile.c:(.text+0x74f50): undefined reference to `v_os_exec_capture_start'
+collect2: error: ld returned 1 exit status

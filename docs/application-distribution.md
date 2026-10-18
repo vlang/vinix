@@ -259,6 +259,13 @@ permissions, notices, proprietary licensing and bounded runtime updates in the
 normal signed catalog. It does not supply or qualify Wine itself. See
 [publisher checks](../tests/packages/wine-profile-check.md) for reproducible
 offline maintenance, policy and failure coverage.
+The [Wine ownership checks](../tests/packages/wine-owner-check.md) cover decoded
+declarations, PE/native launcher preflight, partial manifests, canonicalization
+and independently closeable replies. After JSON initialization, 368 host calls
+and 896 metadata cycles retain zero tracked allocations while preserving
+captured approvals, canonical locks and explicit licenses/runtime bounds.
+Both guests check metadata ownership and twelve selected complete-call cases;
+real Wine/translation and graphical execution remain separate.
 
 The [Apple iOS ARM64 publisher profile](../tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
 adds a bounded thin-Mach-O header/map check, matching XML/binary bundle identity,

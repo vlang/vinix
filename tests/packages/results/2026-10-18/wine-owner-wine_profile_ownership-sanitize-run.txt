@@ -1,0 +1,2 @@
+WINE METADATA 896 cycles retire decoded templates, partial manifests, canonicalization, replies and late refusals PASS
+WINE METADATA independent replies survive plan and caller retirement and close idempotently PASS

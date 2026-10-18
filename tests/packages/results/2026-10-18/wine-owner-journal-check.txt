@@ -1,0 +1,4 @@
+WINE OWNER journal guard=sources refuses before compilation PASS
+WINE OWNER journal guard=artifact refuses before compilation PASS
+WINE OWNER journal guard=existing refuses before compilation PASS
+WINE OWNER intact completed journal resumes with all original timings and artifact pins PASS

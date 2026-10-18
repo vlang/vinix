@@ -1,0 +1,92 @@
+WINE OWNER case=complete retained=0 allocations=0
+WINE OWNER complete canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=nested retained=0 allocations=0
+WINE OWNER nested canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=missing-recipes retained=0 allocations=0
+WINE OWNER missing-recipes canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=missing-recipe retained=0 allocations=0
+WINE OWNER missing-recipe canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=invalid-json retained=0 allocations=0
+WINE OWNER invalid-json canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=invalid-schema retained=0 allocations=0
+WINE OWNER invalid-schema canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=wrong-architecture retained=0 allocations=0
+WINE OWNER wrong-architecture canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=pinned-template retained=0 allocations=0
+WINE OWNER pinned-template canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=firmware retained=0 allocations=0
+WINE OWNER firmware canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=app-kind retained=0 allocations=0
+WINE OWNER app-kind canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=unbounded-runtime retained=0 allocations=0
+WINE OWNER unbounded-runtime canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=missing-selector retained=0 allocations=0
+WINE OWNER missing-selector canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=runtime-grants retained=0 allocations=0
+WINE OWNER runtime-grants canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=host-mismatch retained=0 allocations=0
+WINE OWNER host-mismatch canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=runtime-mismatch retained=0 allocations=0
+WINE OWNER runtime-mismatch canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=missing-root retained=0 allocations=0
+WINE OWNER missing-root canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=missing-architecture retained=0 allocations=0
+WINE OWNER missing-architecture canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=wrong-pe retained=0 allocations=0
+WINE OWNER wrong-pe canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=wrong-target retained=0 allocations=0
+WINE OWNER wrong-target canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=wrong-mode retained=0 allocations=0
+WINE OWNER wrong-mode canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=missing-notice retained=0 allocations=0
+WINE OWNER missing-notice canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=empty-notice retained=0 allocations=0
+WINE OWNER empty-notice canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=notice-directory retained=0 allocations=0
+WINE OWNER notice-directory canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=no-output-space retained=0 allocations=0
+WINE OWNER no-output-space canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=no-temp-space retained=0 allocations=0
+WINE OWNER no-temp-space canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=space-error retained=0 allocations=0
+WINE OWNER space-error canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=created retained=0 allocations=0
+WINE OWNER created canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=packed-1 retained=0 allocations=0
+WINE OWNER packed-1 canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=packed-2 retained=0 allocations=0
+WINE OWNER packed-2 canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=packed-3 retained=0 allocations=0
+WINE OWNER packed-3 canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=packed-4 retained=0 allocations=0
+WINE OWNER packed-4 canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=ready retained=0 allocations=0
+WINE OWNER ready canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=import-pe retained=0 allocations=0
+WINE OWNER import-pe canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=import-elf retained=0 allocations=0
+WINE OWNER import-elf canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=import-mode retained=0 allocations=0
+WINE OWNER import-mode canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=import-notice retained=0 allocations=0
+WINE OWNER import-notice canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=import-directory retained=0 allocations=0
+WINE OWNER import-directory canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=changed-template retained=0 allocations=0
+WINE OWNER changed-template canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=changed-lock retained=0 allocations=0
+WINE OWNER changed-lock canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=occupied retained=0 allocations=0
+WINE OWNER occupied canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=raced-target retained=0 allocations=0
+WINE OWNER raced-target canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=flush retained=0 allocations=0
+WINE OWNER flush canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=cleanup retained=0 allocations=0
+WINE OWNER cleanup canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=root-replaced retained=0 allocations=0
+WINE OWNER root-replaced canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=inventory-replaced retained=0 allocations=0
+WINE OWNER inventory-replaced canonical retry, saved output, source and descriptor preservation PASS
+WINE OWNER case=lock-replaced retained=0 allocations=0
+WINE OWNER lock-replaced canonical retry, saved output, source and descriptor preservation PASS
