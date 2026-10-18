@@ -716,6 +716,14 @@ architectures; broader release/catalog/runtime acceptance remains open.
     selected complete-call cases and canonicalization, preserving exact signed
     retries, captured seeds, reserved sequence floors and recovery data. Production
     publisher/catalog migration and graphical/runtime acceptance remain open.
+  - [x] [Owned offline release-image inputs](tests/packages/image-owner-check.md)
+    retire configuration encoding, capture/copy paths, directory creation,
+    filesystem queries and cleanup diagnostics. After JSON initialization,
+    264 host calls across 33 modes and both architecture declarations retain
+    zero tracked allocations. Both guests check ten selected modes, preserving
+    exact application locks, policy refusals, replacements and recovery data.
+    Production publisher/catalog migration and graphical/runtime acceptance
+    remain open.
   - [x] [Owned packing inventories and replies](tests/packages/pack-ownership-check.md)
     retire discarded template inventories, partial walked files and copy scratch
     across cold/cache success and late refusal. Independently closeable pack/root

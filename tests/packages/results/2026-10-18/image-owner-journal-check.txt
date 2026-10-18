@@ -1,0 +1,4 @@
+IMAGE OWNER journal guard=sources refuses before compilation PASS
+IMAGE OWNER journal guard=artifact refuses before compilation PASS
+IMAGE OWNER journal guard=existing refuses before compilation PASS
+IMAGE OWNER intact completed journal resumes with all original timings and artifact pins PASS

@@ -306,6 +306,15 @@ retirement or the failed export. Renamed parents cannot redirect deletion into
 their replacements. A final directory-flush failure retains the published bundle
 and reports its saved path. See [capture qualification](../../tests/packages/image-capture-check.md).
 
+The [image input ownership qualification](../../tests/packages/image-owner-check.md)
+measures 264 complete calls across 33 modes and both architecture declarations
+after JSON initialization. Configuration encoding, copied repository paths,
+directory creation and disk-query scratch are retired on success and refusal.
+Checked retirement closes metadata even when cleanup preserves recovery data;
+reports and saved declarations survive plan closure. Both guests exercise ten
+selected modes. Target compilation and production catalog/graphical/runtime
+acceptance remain separate.
+
 No consumer catalog, replay floor, generation or installed state is created by
 bundling. After boot, normal Refresh authenticates the bundled index and normal
 review/install creates package state. Signed updates and runtime versions keep

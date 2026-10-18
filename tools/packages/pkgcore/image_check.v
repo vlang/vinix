@@ -150,7 +150,8 @@ fn (configuration &ImageConfiguration) plan_inputs(repositories &ImageRepositori
 			index_sha256: index_digest(repository.text), packages: repository.index.packages.len,
 			aarch64_packages: arm, x86_64_packages: x86, shared_packages: shared, proprietary_packages: proprietary,
 			firmware_packages: firmware, objects: objects.len, payload_bytes: bytes }
-		unsafe { rows.push_many(&row, 1) }
+		pointer := unsafe { &row }
+		unsafe { rows.push_many(pointer, 1) }
 	}
 	rows.sort(a.id < b.id)
 	digest := index_digest(text)

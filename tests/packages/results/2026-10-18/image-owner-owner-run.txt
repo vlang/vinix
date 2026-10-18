@@ -1,0 +1,132 @@
+IMAGE OWNER arch=aarch64 case=complete retained=0 allocations=0
+IMAGE OWNER aarch64 complete exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=check-only retained=0 allocations=0
+IMAGE OWNER aarch64 check-only exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=preserve retained=0 allocations=0
+IMAGE OWNER aarch64 preserve exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=export retained=0 allocations=0
+IMAGE OWNER aarch64 export exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=existing-config retained=0 allocations=0
+IMAGE OWNER aarch64 existing-config exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=empty-bundle retained=0 allocations=0
+IMAGE OWNER aarch64 empty-bundle exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=invalid-config retained=0 allocations=0
+IMAGE OWNER aarch64 invalid-config exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=wrong-architecture retained=0 allocations=0
+IMAGE OWNER aarch64 wrong-architecture exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=missing-source retained=0 allocations=0
+IMAGE OWNER aarch64 missing-source exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=alias-source retained=0 allocations=0
+IMAGE OWNER aarch64 alias-source exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=unsafe-source retained=0 allocations=0
+IMAGE OWNER aarch64 unsafe-source exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=wrong-key retained=0 allocations=0
+IMAGE OWNER aarch64 wrong-key exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=second-index retained=0 allocations=0
+IMAGE OWNER aarch64 second-index exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=missing-object retained=0 allocations=0
+IMAGE OWNER aarch64 missing-object exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=deny-license retained=0 allocations=0
+IMAGE OWNER aarch64 deny-license exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=deny-firmware retained=0 allocations=0
+IMAGE OWNER aarch64 deny-firmware exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=deny-permission retained=0 allocations=0
+IMAGE OWNER aarch64 deny-permission exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=no-output-space retained=0 allocations=0
+IMAGE OWNER aarch64 no-output-space exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=no-temp-space retained=0 allocations=0
+IMAGE OWNER aarch64 no-temp-space exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=space-error retained=0 allocations=0
+IMAGE OWNER aarch64 space-error exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=captured retained=0 allocations=0
+IMAGE OWNER aarch64 captured exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=staged retained=0 allocations=0
+IMAGE OWNER aarch64 staged exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=changed-source retained=0 allocations=0
+IMAGE OWNER aarch64 changed-source exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=captured-index retained=0 allocations=0
+IMAGE OWNER aarch64 captured-index exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=staged-object retained=0 allocations=0
+IMAGE OWNER aarch64 staged-object exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=capture-replaced retained=0 allocations=0
+IMAGE OWNER aarch64 capture-replaced exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=stage-replaced retained=0 allocations=0
+IMAGE OWNER aarch64 stage-replaced exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=unsafe-retire retained=0 allocations=0
+IMAGE OWNER aarch64 unsafe-retire exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=flush retained=0 allocations=0
+IMAGE OWNER aarch64 flush exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=raced-target retained=0 allocations=0
+IMAGE OWNER aarch64 raced-target exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=changed-config retained=0 allocations=0
+IMAGE OWNER aarch64 changed-config exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=changed-root retained=0 allocations=0
+IMAGE OWNER aarch64 changed-root exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=aarch64 case=existing-different retained=0 allocations=0
+IMAGE OWNER aarch64 existing-different exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=complete retained=0 allocations=0
+IMAGE OWNER x86_64 complete exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=check-only retained=0 allocations=0
+IMAGE OWNER x86_64 check-only exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=preserve retained=0 allocations=0
+IMAGE OWNER x86_64 preserve exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=export retained=0 allocations=0
+IMAGE OWNER x86_64 export exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=existing-config retained=0 allocations=0
+IMAGE OWNER x86_64 existing-config exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=empty-bundle retained=0 allocations=0
+IMAGE OWNER x86_64 empty-bundle exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=invalid-config retained=0 allocations=0
+IMAGE OWNER x86_64 invalid-config exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=wrong-architecture retained=0 allocations=0
+IMAGE OWNER x86_64 wrong-architecture exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=missing-source retained=0 allocations=0
+IMAGE OWNER x86_64 missing-source exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=alias-source retained=0 allocations=0
+IMAGE OWNER x86_64 alias-source exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=unsafe-source retained=0 allocations=0
+IMAGE OWNER x86_64 unsafe-source exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=wrong-key retained=0 allocations=0
+IMAGE OWNER x86_64 wrong-key exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=second-index retained=0 allocations=0
+IMAGE OWNER x86_64 second-index exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=missing-object retained=0 allocations=0
+IMAGE OWNER x86_64 missing-object exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=deny-license retained=0 allocations=0
+IMAGE OWNER x86_64 deny-license exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=deny-firmware retained=0 allocations=0
+IMAGE OWNER x86_64 deny-firmware exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=deny-permission retained=0 allocations=0
+IMAGE OWNER x86_64 deny-permission exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=no-output-space retained=0 allocations=0
+IMAGE OWNER x86_64 no-output-space exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=no-temp-space retained=0 allocations=0
+IMAGE OWNER x86_64 no-temp-space exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=space-error retained=0 allocations=0
+IMAGE OWNER x86_64 space-error exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=captured retained=0 allocations=0
+IMAGE OWNER x86_64 captured exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=staged retained=0 allocations=0
+IMAGE OWNER x86_64 staged exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=changed-source retained=0 allocations=0
+IMAGE OWNER x86_64 changed-source exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=captured-index retained=0 allocations=0
+IMAGE OWNER x86_64 captured-index exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=staged-object retained=0 allocations=0
+IMAGE OWNER x86_64 staged-object exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=capture-replaced retained=0 allocations=0
+IMAGE OWNER x86_64 capture-replaced exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=stage-replaced retained=0 allocations=0
+IMAGE OWNER x86_64 stage-replaced exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=unsafe-retire retained=0 allocations=0
+IMAGE OWNER x86_64 unsafe-retire exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=flush retained=0 allocations=0
+IMAGE OWNER x86_64 flush exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=raced-target retained=0 allocations=0
+IMAGE OWNER x86_64 raced-target exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=changed-config retained=0 allocations=0
+IMAGE OWNER x86_64 changed-config exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=changed-root retained=0 allocations=0
+IMAGE OWNER x86_64 changed-root exact declaration retry, trust, sources, recovery and descriptors PASS
+IMAGE OWNER arch=x86_64 case=existing-different retained=0 allocations=0
+IMAGE OWNER x86_64 existing-different exact declaration retry, trust, sources, recovery and descriptors PASS

@@ -77,6 +77,11 @@ the saved path and newline-inclusive digest. The target image remains unchanged.
 See [the export contract](SDK.md#export-an-image-application-deployment) and
 [qualification](../../tests/packages/image-export-check.md).
 
+Image input preparation, reporting, export and publication retire temporary
+storage on success and refusal while preserving exact declarations and recovery
+data. See [image ownership checks](../../tests/packages/image-owner-check.md)
+for 264 measured calls, sanitizer checks and both native guest runs.
+
 Software's **Deployment → Choose file…** selects an organization manifest,
 release deployment lock or saved installed snapshot through the session file
 dialog. Selection fills the literal path; **Review deployment** and confirmation

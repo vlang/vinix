@@ -1,0 +1,2 @@
+IMAGE OWNER arch=aarch64 case=complete retained=76440 allocations=106
+IMAGE OWNER aarch64 complete exact declaration retry, trust, sources, recovery and descriptors PASS

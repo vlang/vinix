@@ -1,0 +1,4 @@
+ADMINISTRATION METADATA configuration and both history formats preserve exact JSON, escaping, defaults, u64 widths and reader round-trips PASS
+ADMINISTRATION METADATA limit-minus-one and exact 8 MiB accepted; newline and escape expansion overflow refused PASS
+ADMINISTRATION METADATA review fingerprints preserve legacy digests and bind configuration, history, intent, publisher and index bytes PASS
+ADMINISTRATION METADATA repeated writes remain readable; oversized and publication failures preserve prior documents and source models PASS

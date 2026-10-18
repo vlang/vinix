@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import json2
 import os
 
 // A captured, validated image-build input. It never replaces an installed
@@ -85,9 +84,7 @@ fn image_configuration_text(source string, architecture string) !string {
 	if source == '' {
 		config := Config{ architecture: architecture }
 		defer { close_owned_policy(config.policy) }
-		encoded := json2.encode(config)
-		defer { unsafe { encoded.free() } }
-		return encoded + '\n'
+		return publisher_json(config)
 	}
 	input := read_metadata(source)!
 	defer { unsafe { input.free() } }
@@ -100,10 +97,12 @@ fn image_configuration_text(source string, architecture string) !string {
 		key := admitted_publisher_key(repository.public_key)!
 		unsafe { key.free() }
 	}
-	encoded := json2.encode(config)
-	defer { unsafe { encoded.free() } }
-	if encoded.len >= max_metadata { return error('canonical image package configuration exceeds the metadata limit') }
-	return encoded + '\n'
+	text := publisher_json(config)
+	if text.len > max_metadata {
+		unsafe { text.free() }
+		return error('canonical image package configuration exceeds the metadata limit')
+	}
+	return text
 }
 
 // Preparing reads one bounded input before compilation begins. Later edits or
@@ -119,7 +118,7 @@ pub fn prepare_image_configuration(root string, architecture string, source stri
 		|| (info.st_uid != 0 && info.st_uid != u32(os.geteuid())) {
 		return error('package image root must be an ordinary controlled directory without shared write access')
 	}
-	physical := os.real_path(path)
+	physical := publisher_real_path(path)!
 	mut accepted := false
 	defer { if !accepted { unsafe { physical.free() } } }
 	if physical == '/' { return error('image package staging cannot target the running system root') }
@@ -150,7 +149,7 @@ pub fn (plan &ImageConfiguration) publish() !bool {
 	image_configuration_fresh_state(plan.root)!
 	parent := os.dir(plan.path)
 	defer { unsafe { parent.free() } }
-	os.mkdir_all(parent, mode: 0o755)!
+	make_package_directories(parent, 0o755)!
 	image_configuration_parents(plan.root)!
 	if !image_configuration_root_matches(plan.root, plan.device, plan.inode) { return error('package image root changed before configuration publication') }
 	atomic_write_new(plan.path, plan.text)!

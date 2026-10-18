@@ -19,17 +19,22 @@ fn image_deployment_target(root string, destination string) !string {
 	parent := os.dir(destination)
 	defer { unsafe { name.free(); parent.free() } }
 	if name in ['', '.', '..']! { return error('image deployment export requires a new file name') }
-	if !os.is_dir(parent) { return error('image deployment export parent directory must already exist') }
+	mut info := C.stat{}
+	if C.fstatat(C.AT_FDCWD, parent.str, unsafe { &info }, 0) != 0 || info.st_mode & 0o170000 != 0o040000 {
+		return error('image deployment export parent directory must already exist')
+	}
 	fd := capture_prepared_root(root, 'package image root')!
 	defer { C.close(fd) }
 	publisher_outside_source(fd, parent) or {
 		unsafe { err.free() }
 		return error('image deployment export must be outside the target image in an accessible directory')
 	}
-	physical := os.real_path(parent)
+	physical := publisher_real_path(parent)!
 	defer { unsafe { physical.free() } }
 	check_export_parent(physical, 'image deployment export')!
-	return physical.trim_right('/') + '/' + name
+	base := physical.trim_right('/')
+	defer { unsafe { base.free() } }
+	return base + '/' + name
 }
 
 // The returned report names the saved canonical format-2 lock and its exact

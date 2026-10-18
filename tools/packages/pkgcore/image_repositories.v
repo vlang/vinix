@@ -33,7 +33,7 @@ mut:
 struct ImageRepositoriesOptions {
 	available_space fn (string) !u64 = free_bytes
 	checkpoint fn (string, string) ! = mirror_no_checkpoint
-	temporary_directory fn () string = os.temp_dir
+	temporary_directory fn () string = import_temporary_directory
 	flush fn (int) int = atomic_flush
 }
 
@@ -55,8 +55,13 @@ fn image_repository_objects(index Index) !map[string]Payload {
 }
 
 fn image_repository_copy(source string, target string, repository ImageRepository) ! {
-	os.mkdir(target, mode: 0o700)!
-	os.mkdir(target + '/objects', mode: 0o755)!
+	if C.mkdir(target.str, 0o700) != 0 { return error('cannot create image repository directory') }
+	object_path := target + '/objects'
+	index_path := target + '/index.json'
+	signature_path := target + '/index.sig'
+	signed_text := repository.signature + '\n'
+	defer { unsafe { object_path.free(); index_path.free(); signature_path.free(); signed_text.free() } }
+	if C.mkdir(object_path.str, 0o755) != 0 { return error('cannot create image repository object directory') }
 	objects := image_repository_objects(repository.index)!
 	defer { unsafe { objects.free() } }
 	for hash, payload in objects {
@@ -67,10 +72,10 @@ fn image_repository_copy(source string, target string, repository ImageRepositor
 		os.chmod(path, 0o644)!
 		if !verified_file_with(path, payload, HashReadOptions{ mode: 0o644 }) { return error('image repository payload changed during capture') }
 	}
-	atomic_write_new(target + '/index.json', repository.text)!
-	atomic_write_new(target + '/index.sig', repository.signature + '\n')!
+	atomic_write_new(index_path, repository.text)!
+	atomic_write_new(signature_path, signed_text)!
 	verify_release_stage(target, repository.text, repository.signature, objects, false)!
-	flush_tree(target + '/objects')!
+	flush_tree(object_path)!
 	os.chmod(target, 0o755)!
 	sync_directory(target)!
 	verify_release_stage(target, repository.text, repository.signature, objects, true)!
@@ -146,7 +151,7 @@ fn (configuration &ImageConfiguration) prepare_repositories_with(source string, 
 	defer { unsafe { input.free() } }
 	fd := capture_prepared_root(input, 'image repository bundle')!
 	defer { C.close(fd) }
-	physical := os.real_path(input)
+	physical := publisher_real_path(input)!
 	defer { unsafe { physical.free() } }
 	mut source_info := C.stat{}
 	if C.fstat(fd, unsafe { &source_info }) != 0 || source_info.st_uid != u32(os.geteuid()) || source_info.st_mode & 0o022 != 0
@@ -157,7 +162,9 @@ fn (configuration &ImageConfiguration) prepare_repositories_with(source string, 
 	mut expected := map[string]u64{}
 	defer { unsafe { expected.free() } }
 	for repository in config.repositories {
-		if repository.url == 'file://' + image_repositories_path + '/' + repository.id { expected[repository.id] = 0 }
+		url := 'file://' + image_repositories_path + '/' + repository.id
+		defer { unsafe { url.free() } }
+		if repository.url == url { expected[repository.id] = 0 }
 	}
 	if expected.len == 0 { return error('image repository bundle needs explicitly configured file repositories under ' + image_repositories_path) }
 	export_stage_directory(physical, expected, 0)!
@@ -166,11 +173,14 @@ fn (configuration &ImageConfiguration) prepare_repositories_with(source string, 
 		if repository.id !in expected { continue }
 		path := physical + '/' + repository.id
 		defer { unsafe { path.free() } }
-		index_text := read_metadata(path + '/index.json')!
+		index_path := path + '/index.json'
+		signature_path := path + '/index.sig'
+		defer { unsafe { index_path.free(); signature_path.free() } }
+		index_text := read_metadata(index_path)!
 		mut item := ImageRepository{ id: repository.id.clone(), text: index_text }
 		mut transferred := false
 		defer { if !transferred { unsafe { item.id.free(); item.text.free(); item.signature.free() }; close_decoded_index(item.index) } }
-		signature := read_metadata(path + '/index.sig')!
+		signature := read_metadata(signature_path)!
 		defer { unsafe { signature.free() } }
 		item = ImageRepository{ ...item, signature: signature.trim_space() }
 		index := verify_index(repository, item.text, item.signature, time.now().unix())!
@@ -188,11 +198,19 @@ fn (configuration &ImageConfiguration) prepare_repositories_with(source string, 
 	}
 	// Check both filesystems before making a potentially large private capture.
 	ancestor := image_repositories_parents(plan.root)!
+	defer { unsafe { ancestor.free() } }
 	temporary_path := options.temporary_directory()
-	temporary := os.real_path(temporary_path)
-	defer { unsafe { ancestor.free(); temporary_path.free(); temporary.free() } }
+	defer { unsafe { temporary_path.free() } }
+	temporary := publisher_real_path(temporary_path)!
+	defer { unsafe { temporary.free() } }
 	disk_check(options.available_space(ancestor)!, needed, 64 * 1024 * 1024)!
-	scratch := if os.stat(ancestor)!.dev == os.stat(temporary)!.dev { mirror_cost(needed, needed)! } else { needed }
+	mut output_info := C.stat{}
+	mut temporary_info := C.stat{}
+	if C.fstatat(C.AT_FDCWD, ancestor.str, unsafe { &output_info }, 0) != 0
+		|| C.fstatat(C.AT_FDCWD, temporary.str, unsafe { &temporary_info }, 0) != 0 {
+		return error('cannot inspect image repository capture filesystems')
+	}
+	scratch := if output_info.st_dev == temporary_info.st_dev { mirror_cost(needed, needed)! } else { needed }
 	disk_check(options.available_space(temporary)!, scratch, 64 * 1024 * 1024)!
 	mut capturing := create_export_stage(temporary, '.vinix-image-repositories', 'image repository capture')!
 	mut transferred := false
@@ -206,7 +224,12 @@ fn (configuration &ImageConfiguration) prepare_repositories_with(source string, 
 }
 
 fn (plan &ImageRepositories) capture_from(source string, options ImageRepositoriesOptions, mut capturing ExportStage) ! {
-	for item in plan.repositories { image_repository_copy(source + '/' + item.id, capturing.path + '/' + item.id, item)! }
+	for item in plan.repositories {
+		input := source + '/' + item.id
+		target := capturing.path + '/' + item.id
+		defer { unsafe { input.free(); target.free() } }
+		image_repository_copy(input, target, item)!
+	}
 	plan.verify(capturing.path, 0o700)!
 	options.checkpoint('captured', capturing.path)!
 	capturing.check()!
@@ -226,7 +249,7 @@ fn (plan &ImageRepositories) publish_with(options ImageRepositoriesOptions) !boo
 	defer { unsafe { target.free(); parent.free() } }
 	if image_configuration_exists(target)! { plan.verify(target, 0o755)!; return false }
 	disk_check(options.available_space(ancestor)!, plan.needed, 64 * 1024 * 1024)!
-	os.mkdir_all(parent, mode: 0o755)!
+	make_package_directories(parent, 0o755)!
 	checked := image_repositories_parents(plan.root)!
 	unsafe { checked.free() }
 	mut exporting := create_export_stage(parent, '.vinix-image-repositories', 'image repositories')!
@@ -238,7 +261,12 @@ fn (plan &ImageRepositories) publish_with(options ImageRepositoriesOptions) !boo
 fn (plan &ImageRepositories) write_stage(target string, options ImageRepositoriesOptions, mut exporting ExportStage) ! {
 	stage := exporting.path
 	plan.capture_stage.check()!
-	for item in plan.repositories { image_repository_copy(plan.capture + '/' + item.id, stage + '/' + item.id, item)! }
+	for item in plan.repositories {
+		input := plan.capture + '/' + item.id
+		target_path := stage + '/' + item.id
+		defer { unsafe { input.free(); target_path.free() } }
+		image_repository_copy(input, target_path, item)!
+	}
 	options.checkpoint('staged', stage)!
 	exporting.check()!
 	plan.verify(plan.capture, 0o700)!
@@ -258,9 +286,10 @@ pub fn (mut plan ImageRepositories) retire() ! {
 	defer { plan.close_metadata() }
 	if plan.capture != '' {
 		plan.capture_stage.retire() or {
-			message := err.msg()
-			defer { unsafe { message.free(); err.free() } }
-			return error('image repository capture cleanup refused at ' + plan.capture + ': ' + message + '; retain recovery data for inspection')
+			cause := unsafe { (&err).msg() }
+			message := 'image repository capture cleanup refused at ' + plan.capture + ': ' + cause + '; retain recovery data for inspection'
+			unsafe { cause.free(); (&err).free() }
+			return error(message)
 		}
 	}
 }

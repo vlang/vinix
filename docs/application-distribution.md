@@ -2117,6 +2117,14 @@ replies preserve signed output and reserved sequence floors. Both guests check
 twelve selected complete-call cases and canonicalization, retaining exact signed
 retries, captured seed semantics and recovery data. Production publisher/catalog
 migration and broader graphical/runtime acceptance remain separate.
+The [offline image input ownership checks](../tests/packages/image-owner-check.md)
+extend this to configuration capture, authenticated repositories, reports,
+exports, application declaration publication and checked retirement. All 264
+measured host calls across 33 modes and both architecture declarations retain
+zero tracked allocations after JSON initialization. Both guests check ten
+selected modes, preserving exact locks, explicit license/firmware/permission
+policy, replacement directories and saved recovery data. Target compilation
+and the production/graphical/runtime release gates remain separate.
 The [accounts guest suite](../tests/accounts/README.md) adds a `packages` scenario
 for signed installation, the root-to-account handoff, literal documents,
 user-owned data, publisher revocation and uninstall. Its sandbox substitute

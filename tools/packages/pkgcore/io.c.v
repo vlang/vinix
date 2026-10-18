@@ -85,7 +85,7 @@ pub fn free_bytes(path string) !u64 {
 	// Read statvfs directly: this V's os.disk_usage frees its borrowed path,
 	// which corrupts the transaction's state-directory string with -gc none.
 	mut usage := C.statvfs{}
-	if C.statvfs(path.str, &usage) != 0 {
+	if C.statvfs(path.str, unsafe { &usage }) != 0 {
 		return error('cannot determine available disk space: ${path}')
 	}
 	// Block counts use fundamental allocation units, not the preferred I/O
