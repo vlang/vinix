@@ -1312,6 +1312,13 @@ inspect storage and restore an empty regular lease under the writer lock before
 retrying. Active and rollback generations and busy leases remain protected.
 See [collection retirement checks](../tests/packages/collection-retirement-check.md).
 
+Complete collection requests also retire service configuration, directory paths
+and cache enumeration/removal/flush scratch on success and refusal. Explicit
+configuration callers retain ownership of their inputs. Repeated tracked calls
+cover both architecture declarations, protected active/rollback payloads and
+live leases, malformed retained state, unsafe recovery roots, busy locks and
+cache-file removal failures. See [request ownership checks](../tests/packages/collection-request-check.md).
+
 Installed package verification now checks each complete `apps/ID` namespace too.
 Extra files, empty directories and FIFOs, directory aliases, hard-linked payloads,
 foreign ownership and changed directory permissions fail verification and produce

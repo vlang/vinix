@@ -72,9 +72,12 @@ pub fn (service Service) rollback(expected string) !State {
 
 pub fn (service Service) collect() ! {
 	directory := service.directory()!
+	defer { unsafe { directory.free() } }
 	guard := acquire(directory)!
 	defer { guard.release() }
-	collect_locked(service.configuration()!, directory)!
+	config := service.configuration()!
+	defer { close_decoded_configuration(config) }
+	collect_locked(config, directory)!
 }
 
 pub fn (service Service) mirror(destination string, names []string) ! {

@@ -807,6 +807,12 @@ and the live lock under the package writer lock. See
 [collection qualification](../../tests/packages/collection-limit-check.md) for
 the reproduced 128-generation / 32-descriptor failure and corrected workflow.
 
+Complete `Service.collect()` requests retire their configuration and directory
+storage on success and refusal. Collection also retires cache enumeration,
+partial-name checks, removal paths and flush paths; explicit `collect()` borrows
+its configuration. Retained payloads and live generation leases keep their
+existing protection. See [request ownership checks](../../tests/packages/collection-request-check.md).
+
 A damaged resumed download now retries once from byte zero with the same signed
 payload requirements. Invalid complete/oversized partials start fresh; a bad
 source stops without changing activation or rollback. Metadata, verification and

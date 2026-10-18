@@ -1,0 +1,4 @@
+REVIEWED CLEANUP both architectures, offline/revoked catalog independence, retained active/rollback/live leases, cache, stages and personal data PASS
+REVIEWED CLEANUP stale configuration/activation/set/root/parent/lease/busy/release approvals and damaged rollback/unsafe roots refuse before removal PASS
+REVIEWED CLEANUP read-only fresh observation, reader/writer exclusion and required approval PASS
+REVIEWED CLEANUP root-owned reader/inventory checks require guest root

@@ -1,0 +1,2 @@
+PASS x86_64 packages-collection-request (30.1s)
+package-collection-request x86_64: 1 passed, 0 failed, 0 skipped

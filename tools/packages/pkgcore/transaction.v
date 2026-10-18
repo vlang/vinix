@@ -567,12 +567,35 @@ fn collect_locked(config Config, directory string) ! {
 	defer { close_collection_targets(targets) }
 	recover_generation_stages(directory)!
 	for target in targets { remove_collection_target(target)! }
-	for name in os.ls(directory + '/objects')! {
-		if digest_valid(name) && name !in keep { os.rm(directory + '/objects/' + name)! }
-		if name.ends_with('.part') && digest_valid(name.all_before_last('.part')) {
-			os.rm(directory + '/objects/' + name)!
+	objects := directory + '/objects'
+	defer { unsafe { objects.free() } }
+	names := publisher_flush_names(objects)!
+	defer { unsafe { names.free() } }
+	for name in names {
+		mut partial := false
+		if name.len == 69 && name.ends_with('.part') {
+			digest := name[..64]
+			partial = digest_valid(digest)
+			unsafe { digest.free() }
+		}
+		if (digest_valid(name) && name !in keep) || partial {
+			path := objects + '/' + name
+			defer { unsafe { path.free() } }
+			// os.rm's wrapped diagnostic retains an intermediate concatenation
+			// under manualfree. Keep its remove(3) semantics and POSIX code while
+			// giving every temporary string an explicit lifetime.
+			if C.remove(path.str) != 0 {
+				code := C.errno
+				prefix := 'Failed to remove "${path}": '
+				message := prefix + os.posix_get_error_msg(code)
+				defer { unsafe { prefix.free() } }
+				// The returned error owns message; its caller retires it.
+				return error_with_code(message, code)
+			}
 		}
 	}
-	sync_directory(directory + '/generations')!
-	sync_directory(directory + '/objects')!
+	generations := directory + '/generations'
+	defer { unsafe { generations.free() } }
+	sync_directory(generations)!
+	sync_directory(objects)!
 }

@@ -823,6 +823,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     preference and signed state across 64 calls in each of 48 cases per
     architecture declaration; 1,000 nested-copy cycles retain independent
     fields. Resolver/transaction plans and broader release gates remain separate.
+  - [x] [Owned complete collection requests](tests/packages/collection-request-check.md)
+    retire service configuration and cache enumeration, partial-name, removal
+    and durability scratch on success/refusal. Both public APIs preserve
+    active/rollback payloads, busy leases, recovery preflight and borrowed
+    configuration across 64 host calls in each of 24 cases per architecture
+    declaration. Native runs use eight calls per case; the 64-call guest stress
+    limit, activation/refresh ownership and broader release gates remain open.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,
   permissions, progress, uninstall, updates and useful failure diagnostics.
   - [x] [Reviewed permission changes](tests/packages/review-permissions-check.md)

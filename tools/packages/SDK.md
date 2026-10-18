@@ -42,6 +42,15 @@ removal fails after lease unlink, inspect storage and restore an empty regular
 lease under the writer lock before retrying. See
 [collection retirement qualification](../../tests/packages/collection-retirement-check.md).
 
+`Service.collect()` owns its loaded configuration and state-directory path for
+the duration of the writer lock and retires them on success or refusal.
+`collect(config, directory)` borrows both arguments. Cache enumeration names,
+partial-digest scratch, removal/flush paths and failed-removal diagnostics have
+explicit lifetimes under `-gc none -manualfree`; callers retire returned errors.
+Collection still preserves active/rollback payload objects, busy generation
+leases and unrecognized cache names. It does not authenticate a catalog or
+rewrite retained metadata. See [complete request qualification](../../tests/packages/collection-request-check.md).
+
 `cleanup-review` returns a format-1 `CleanupReview` with `architecture`, current
 `generation`, retained `previous`, `fingerprint` and an ascending unique
 `generations` list (at most 4096 IDs). Both retained IDs are excluded, as are busy
