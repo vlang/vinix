@@ -852,6 +852,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
   package format, signing/publishing process and developer documentation.
 - [ ] Support offline repositories/caches and organization-managed deployment;
   keep firmware, proprietary payload licensing and runtime updates explicit.
+  - [x] [Installed payload disclosure](tests/packages/software-payload-check.md)
+    separates installed licenses, proprietary/firmware declarations and runtime
+    IDs from update previews, including policy/trust failures and legacy replies.
+    Full and compact inspectors retain complete version-labelled facts;
+    reviewed targets retain their scope. Production catalog and graphical/runtime
+    acceptance remain open.
   - [x] [Owned image repository captures](tests/packages/image-capture-check.md)
     bind preparation, preflight, application declarations and publication to
     captured directories. Checked retirement preserves replaced recovery trees,

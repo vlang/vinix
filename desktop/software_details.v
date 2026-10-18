@@ -39,8 +39,8 @@ fn software_details_text_valid(value string, limit int) bool {
 fn software_details_row_valid(row SoftwareRow) bool {
 	if row.id == '' || row.name == '' || row.permissions.len > 5 || row.installed_permissions.len > 5 || row.installed_dependencies.len > 128
 		|| row.installed_window_protocol < 0 || row.installed_window_protocol > 2 { return false }
-	for value in [row.id, row.runtime, row.repository, row.installed_repository]! { if !software_details_text_valid(value, 128) { return false } }
-	for value in [row.name, row.installed_name, row.license]! { if !software_details_text_valid(value, 256) { return false } }
+	for value in [row.id, row.runtime, row.installed_runtime, row.repository, row.installed_repository]! { if !software_details_text_valid(value, 128) { return false } }
+	for value in [row.name, row.installed_name, row.license, row.installed_license]! { if !software_details_text_valid(value, 256) { return false } }
 	for value in [row.description, row.diagnostic]! { if !software_details_text_valid(value, 4096) { return false } }
 	for value in [row.version, row.installed_version]! { if !software_details_text_valid(value, 29) { return false } }
 	for value in [row.kind, row.installed_kind, row.architecture, row.update_action]! { if !software_details_text_valid(value, 16) { return false } }
@@ -148,6 +148,7 @@ fn (mut a SoftwareApp) prepare_details_context(row SoftwareRow, action string, r
 		general << 'Update status: ' + if a.update_error != '' { 'Updates unavailable; see Diagnostics' } else if row.updatable { row.update_action } else { 'No resolved change' }
 		if row.installed_version != '' {
 			general << 'Installed requirements and usage: See Diagnostics'.clone()
+			general << 'Installed license, payload and runtime: See License'.clone()
 			if row.installed_kind == '' { general << 'Installed launch metadata is unavailable from this service.'.clone() }
 			else {
 				general << 'Installed name: ' + row.installed_name
@@ -183,6 +184,20 @@ fn (mut a SoftwareApp) prepare_details_context(row SoftwareRow, action string, r
 	a.details_values(3, permissions); software_policy_free_lines(mut permissions)
 	mut licensing := ['License: ' + row.license, 'Proprietary payload: ' + if row.proprietary { 'Yes' } else { 'No' },
 		'Firmware payload: ' + if row.firmware { 'Yes' } else { 'No' }]
+	unsafe { licensing.flags |= .noslices }
+	licensing << 'Runtime ID: ' + if row.runtime == '' { 'None declared' } else { row.runtime }
+	if !reviewing && row.installed_version != '' {
+		licensing << 'Displayed payload facts describe version ' + row.version
+		if row.installed_license == '' {
+			licensing << 'Installed license, payload and runtime: Unavailable from this service'.clone()
+		} else {
+			licensing << 'Installed payload facts describe version ' + row.installed_version
+			licensing << 'Installed license: ' + row.installed_license
+			licensing << 'Installed proprietary payload: ' + if row.installed_proprietary { 'Yes' } else { 'No' }
+			licensing << 'Installed firmware payload: ' + if row.installed_firmware { 'Yes' } else { 'No' }
+			licensing << 'Installed runtime ID: ' + if row.installed_runtime == '' { 'None declared' } else { row.installed_runtime }
+		}
+	}
 	a.details_values(4, licensing); software_policy_free_lines(mut licensing)
 	mut diagnostics := []string{cap: 8}
 	unsafe { diagnostics.flags |= .noslices }

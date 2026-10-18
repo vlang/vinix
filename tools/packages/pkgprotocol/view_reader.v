@@ -2,7 +2,7 @@
 module pkgprotocol
 
 const software_view_keys = ['format', 'generation', 'architecture', 'offline', 'catalog_error', 'update_error', 'rows', 'launch_user']
-const software_row_keys = ['id', 'name', 'description', 'version', 'installed_version', 'architecture', 'kind', 'runtime', 'repository', 'public_key', 'license', 'proprietary', 'firmware', 'permissions', 'requested', 'updatable', 'update_action', 'diagnostic', 'installed_name', 'installed_kind', 'installed_permissions', 'installed_window_protocol', 'installed_repository', 'installed_public_key', 'installed_dependencies_known', 'installed_dependencies']
+const software_row_keys = ['id', 'name', 'description', 'version', 'installed_version', 'architecture', 'kind', 'runtime', 'repository', 'public_key', 'license', 'proprietary', 'firmware', 'permissions', 'requested', 'updatable', 'update_action', 'diagnostic', 'installed_name', 'installed_kind', 'installed_permissions', 'installed_window_protocol', 'installed_repository', 'installed_public_key', 'installed_dependencies_known', 'installed_dependencies', 'installed_license', 'installed_proprietary', 'installed_firmware', 'installed_runtime']
 
 fn (mut r MetadataReader) software_dependency() !SoftwareDependency {
 	r.expect(`{`)!
@@ -140,6 +140,10 @@ fn (mut r MetadataReader) parse_software_row() !SoftwareRow {
 			23 { row = SoftwareRow{ ...row, installed_public_key: r.quoted(64)! } }
 			24 { row = SoftwareRow{ ...row, installed_dependencies_known: r.boolean()! } }
 			25 { row = SoftwareRow{ ...row, installed_dependencies: r.software_dependencies()! } }
+			26 { row = SoftwareRow{ ...row, installed_license: r.quoted(256)! } }
+			27 { row = SoftwareRow{ ...row, installed_proprietary: r.boolean()! } }
+			28 { row = SoftwareRow{ ...row, installed_firmware: r.boolean()! } }
+			29 { row = SoftwareRow{ ...row, installed_runtime: r.quoted(128)! } }
 			else { r.skip_view_extension(0)! }
 		}
 	}
@@ -155,6 +159,7 @@ fn (mut r MetadataReader) parse_software_row() !SoftwareRow {
 	// pair means unavailable; a partial pair must never borrow catalog identity.
 	if (seen >> 22) & 3 !in [u32(0), 3]! { return error('partial installed publisher provenance in Software view') }
 	if (seen >> 24) & 3 !in [u32(0), 3]! { return error('partial installed dependency metadata in Software view') }
+	if (seen >> 26) & 15 !in [u32(0), 15]! { return error('partial installed payload metadata in Software view') }
 	accepted = true
 	return row
 }

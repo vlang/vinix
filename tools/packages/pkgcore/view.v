@@ -14,6 +14,10 @@ pub:
 	installed_public_key string
 	installed_dependencies_known bool
 	installed_dependencies []Dependency
+	installed_license string
+	installed_proprietary bool
+	installed_firmware bool
+	installed_runtime string
 	installed_name    string
 	installed_kind    string
 	installed_permissions []string
@@ -130,6 +134,10 @@ fn catalog_view(config Config, catalog Catalog, current State, catalog_error str
 			installed_public_key: old.public_key
 			installed_dependencies_known: old.package.id != ''
 			installed_dependencies: old.package.dependencies
+			installed_license: old.package.license
+			installed_proprietary: old.package.proprietary
+			installed_firmware: old.package.firmware
+			installed_runtime: old.package.runtime
 			installed_name:    old.package.name
 			installed_kind:    old.package.kind
 			installed_permissions: old.package.permissions

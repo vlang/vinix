@@ -2718,6 +2718,26 @@ shared dependencies and cycles. It warns when legacy rows leave the usage graph
 incomplete. Review inspectors retain their reviewed-target scope. See
 [installed dependency checks](../../tests/packages/software-dependencies-check.md).
 
+The additive `installed_license`, `installed_proprietary`, `installed_firmware`
+and `installed_runtime` group records payload declarations from the installed
+generation. The displayed `license`, `proprietary`, `firmware` and `runtime`
+continue to describe the catalog/update candidate. All four installed fields
+must be supplied together or omitted together. An omitted group, or an empty
+license with false flags and an empty runtime, means unavailable information;
+Software reports that explicitly instead of borrowing the candidate's facts.
+A nonempty license requires an installed version and a printable identifier of
+at most 256 bytes. A runtime is empty or a valid package ID of at most 128 bytes;
+known installed Linux/Windows/Apple kinds require one. Partial, duplicate,
+coerced and malformed groups refuse the entire response. The two strings are
+owned and retired by `.close()`. Existing SDK-1 readers ignore these additions.
+
+Software's License inspector labels the displayed and installed versions,
+licenses, proprietary/firmware declarations and runtime IDs, preserving complete
+values in full and compact pages. These are historical declarations, not license
+acceptance, firmware authorization or runtime-update approval. Reviewed-target
+details retain their reviewed scope. See
+[installed payload checks](../../tests/packages/software-payload-check.md).
+
 `pkgprotocol.decode_registration(text)` reads the desktop presentation projection
 of a format-1 installed generation. Its owned `RegistrationSnapshot` contains
 `format`, positive `generation`, `architecture` and `packages`; each

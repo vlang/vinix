@@ -348,6 +348,13 @@ Read [administration/recovery](../../docs/application-distribution.md) and
 [SDK 1](SDK.md) for enrollment, policy, packaging and limits. Release publisher
 enrollment and catalog/runtime guest qualification remain required.
 
+Software's **Details → License** separates the displayed version's license,
+proprietary/firmware declarations and runtime from the installed generation's
+recorded facts. Legacy services report unavailable installed information.
+Update previews and policy/trust failures preserve the installed disclosure;
+review details describe their reviewed target. See
+[installed payload checks](../../tests/packages/software-payload-check.md).
+
 Software's **Clean up versions → Read review** presents the complete admitted
 generation list, fingerprint, retained current/rollback identities and deletion
 rules through the shared reader, including compact windows. Back/Escape keeps

@@ -151,6 +151,48 @@ fn test_software_provenance_retains_installation_identity_through_preview_revoca
 	println('SOFTWARE DEPENDENCIES both hosts retain installed requirements across update previews, removals, revocation, activation and rollback PASS')
 }
 
+fn test_installed_payload_facts_survive_preview_policy_revocation_and_generation_changes() {
+	for architecture in ['aarch64', 'x86_64']! {
+		for flagged in [false, true]! {
+			base := view_configuration()
+			config := Config{ ...base, architecture: architecture, policy: Policy{ licenses: ['Installed-EULA', 'New-License'], allow_firmware: true } }
+			runtime := view_installed(Package{ ...view_package('old-runtime', '1.0.0', 'runtime'), architecture: architecture })
+			old := view_installed(Package{ ...view_package('app', '1.0.0', 'native'), architecture: architecture,
+				kind: 'linux', runtime: 'old-runtime', dependencies: [Dependency{id: 'old-runtime'}],
+				license: 'Installed-EULA', proprietary: flagged, firmware: flagged })
+			incoming := view_installed(Package{ ...view_package('app', '2.0.0', 'native'), architecture: architecture,
+				license: 'New-License', proprietary: !flagged, firmware: !flagged })
+			fresh := Installed{ ...incoming, package: Package{ ...incoming.package, id: 'fresh' } }
+			current := State{ architecture: architecture, generation: 1, requested: ['app'], packages: [old, runtime] }
+			catalog := Catalog{packages: [incoming, fresh]}
+			view := catalog_view(config, catalog, current, '')!
+			row := view_row(view, 'app')
+			assert row.updatable && row.license == 'New-License' && row.proprietary == !flagged && row.firmware == !flagged && row.runtime == ''
+			for presented in [view,
+				catalog_view(Config{ ...config, repositories: [] }, Catalog{}, current, 'publisher revoked')!,
+				catalog_view(Config{ ...config, policy: Policy{} }, Catalog{}, current, 'catalog unavailable')!,
+				catalog_view(config, catalog, State{ ...current, generation: 3 }, '')!] {
+				installed := view_row(presented, 'app')
+				assert installed.installed_license == 'Installed-EULA' && installed.installed_runtime == 'old-runtime'
+				assert installed.installed_proprietary == flagged && installed.installed_firmware == flagged
+				mut wire := pkgprotocol.decode_software_view(json2.encode(presented))!
+				decoded := wire.rows.filter(it.id == 'app')[0]
+				assert decoded.installed_license == installed.installed_license && decoded.installed_runtime == installed.installed_runtime
+				assert decoded.installed_proprietary == flagged && decoded.installed_firmware == flagged
+				wire.close()
+			}
+			removed := view_row(view, 'old-runtime')
+			assert removed.update_action == 'remove' && removed.installed_license == runtime.package.license
+			uninstalled := view_row(view, 'fresh')
+			assert uninstalled.installed_license == '' && uninstalled.installed_runtime == '' && !uninstalled.installed_proprietary && !uninstalled.installed_firmware
+			activated := view_row(catalog_view(config, catalog, State{ ...current, generation: 2, packages: [incoming] }, '')!, 'app')
+			assert activated.installed_license == 'New-License' && activated.installed_runtime == ''
+			assert activated.installed_proprietary == !flagged && activated.installed_firmware == !flagged
+		}
+	}
+	println('SOFTWARE PAYLOAD both hosts keep installed license, proprietary/firmware flags and runtime distinct across previews, policy/trust failures and generation changes PASS')
+}
+
 fn test_updates_disclose_dependency_removals_and_retain_explicit_roots() {
 	config := view_configuration()
 	assets := view_installed(view_package('assets', '1.0.0', 'data'))

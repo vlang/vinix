@@ -740,6 +740,16 @@ explicit upgrades retain newest-first selection. See
 
 ## Install, maintenance and recovery
 
+In Software, **Details → License** shows separate displayed and installed
+licenses, proprietary/firmware declarations and runtime IDs, with each version
+identified. Installed facts come from persistent generation metadata, so a
+preview, revoked publisher or unavailable catalog cannot replace them. Older
+services explicitly report unavailable installed facts. The inspector retains
+complete values in small windows; reviewed package details describe the reviewed
+target. These declarations do not change license acceptance, firmware policy
+or the runtime-update approval process. See
+[installed payload qualification](../tests/packages/software-payload-check.md).
+
 ```sh
 vinix-package update
 vinix-package search editor

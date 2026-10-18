@@ -77,6 +77,65 @@ fn test_view_reader_admits_only_complete_bounded_installed_dependency_facts() {
 	println('SOFTWARE DEPENDENCIES protocol preserves installed bounds, explicit empty/legacy facts and refuses partial/duplicate/coerced/oversized requirements PASS')
 }
 
+fn test_view_reader_keeps_installed_payload_facts_complete_typed_and_optional() {
+	row := SoftwareRow{ ...fixture_software_row(), installed_license: 'Installed-EULA é', installed_proprietary: true,
+		installed_firmware: true, installed_runtime: 'old-runtime' }
+	text := json2.encode(SoftwareView{ ...fixture_software_view(), rows: [row] })
+	fields := ['"installed_license":"Installed-EULA é",', '"installed_proprietary":true,', '"installed_firmware":true,', '"installed_runtime":"old-runtime",']
+	// Every subset is tested: only an entirely omitted or complete group is legal.
+	for mask in 0 .. 16 {
+		mut input := text.clone()
+		for index, field in fields {
+			assert text.contains(field)
+			if mask & (1 << index) == 0 { next := input.replace(field, ''); unsafe { input.free() }; input = next }
+		}
+		if mask in [0, 15]! {
+			mut decoded := decode_software_view(input)!
+			actual := decoded.rows[0]
+			assert actual.license == 'MIT' && actual.runtime == 'runtime'
+			assert actual.installed_license == if mask == 0 { '' } else { row.installed_license }
+			assert actual.installed_runtime == if mask == 0 { '' } else { 'old-runtime' }
+			assert actual.installed_proprietary == (mask == 15) && actual.installed_firmware == (mask == 15)
+			decoded.close(); decoded.close()
+		} else { assert refuses_software_view(input) }
+		unsafe { input.free() }
+	}
+	for bad in [text.replace('Installed-EULA é', 'x'.repeat(257)), text.replace('Installed-EULA é', 'bad\\nlicense'),
+		text.replace('Installed-EULA é', '\\ud800'), text.replace('"installed_license":"Installed-EULA é"', '"installed_license":null'),
+		text.replace('"installed_license":"Installed-EULA é"', '"installed_license":""'),
+		text.replace('"installed_proprietary":true', '"installed_proprietary":1'),
+		text.replace('"installed_firmware":true', '"installed_firmware":"true"'),
+		text.replace('"installed_runtime":"old-runtime"', '"installed_runtime":false'),
+		text.replace('old-runtime', '../outside'), text.replace('old-runtime', 'x'.repeat(129)),
+		text.replace('"installed_license":"Installed-EULA é"', '"installed_license":"Installed-EULA é","installed_licen\\u0073e":"MIT"'),
+		text.replace('"installed_proprietary":true', '"installed_proprietary":true,"installed_propriet\\u0061ry":false'),
+		text.replace('"installed_firmware":true', '"installed_firmware":true,"installed_firm\\u0077are":false'),
+		text.replace('"installed_runtime":"old-runtime"', '"installed_runtime":"old-runtime","installed_runt\\u0069me":"other"')] {
+		assert refuses_software_view(bad)
+	}
+	for kind in ['linux', 'windows', 'apple']! {
+		foreign := SoftwareRow{ ...row, installed_kind: kind, installed_window_protocol: 0 }
+		mut decoded := decode_software_view(json2.encode(SoftwareView{ ...fixture_software_view(), rows: [foreign] }))!
+		decoded.close()
+		assert refuses_software_view(json2.encode(SoftwareView{ ...fixture_software_view(), rows: [SoftwareRow{ ...foreign, installed_runtime: '' }] }))
+	}
+	for invalid in [SoftwareRow{ ...row, installed_version: '', installed_name: '', installed_kind: '', installed_permissions: [],
+		installed_window_protocol: 0, requested: false, updatable: false, update_action: '' },
+		SoftwareRow{ ...row, installed_license: '', installed_runtime: '', installed_proprietary: false },
+		SoftwareRow{ ...row, installed_license: '', installed_runtime: '', installed_firmware: false },
+		SoftwareRow{ ...row, installed_license: '', installed_proprietary: false, installed_firmware: false }] {
+		assert refuses_software_view(json2.encode(SoftwareView{ ...fixture_software_view(), rows: [invalid] }))
+	}
+	mut bounded := decode_software_view(text.replace('Installed-EULA é', 'x'.repeat(256)).replace('old-runtime', 'r'.repeat(128)))!
+	assert bounded.rows[0].installed_license.len == 256 && bounded.rows[0].installed_runtime.len == 128
+	bounded.close()
+	mut empty_facts := decode_software_view(json2.encode(SoftwareView{ ...fixture_software_view(), rows: [SoftwareRow{ ...row,
+		installed_license: 'MIT', installed_proprietary: false, installed_firmware: false, installed_runtime: '' }] }))!
+	assert empty_facts.rows[0].installed_license == 'MIT' && empty_facts.rows[0].installed_runtime == '' && !empty_facts.rows[0].installed_proprietary && !empty_facts.rows[0].installed_firmware
+	empty_facts.close()
+	println('SOFTWARE PAYLOAD protocol preserves installed disclosure; complete/legacy groups, flags, runtime, bounds, duplicates and malformed fields PASS')
+}
+
 fn test_view_reader_requires_every_header_and_base_package_field() {
 	text := json2.encode(fixture_software_view())
 	for field in ['"format":1,', '"generation":7,', '"architecture":"aarch64",', '"offline":false,',

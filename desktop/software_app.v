@@ -306,6 +306,8 @@ fn software_free_row(row SoftwareRow) {
 		row.version.free()
 		row.installed_version.free()
 		row.installed_repository.free()
+		row.installed_license.free()
+		row.installed_runtime.free()
 		row.installed_public_key.free()
 		row.installed_name.free()
 		row.installed_kind.free()

@@ -1,0 +1,9 @@
+SOFTWARE PROVENANCE both hosts retain installed publisher across previews, removal, revocation, activation, restored generations and unavailable catalogs PASS
+SOFTWARE DEPENDENCIES both hosts retain installed requirements across update previews, removals, revocation, activation and rollback PASS
+SOFTWARE PAYLOAD both hosts keep installed license, proprietary/firmware flags and runtime distinct across previews, policy/trust failures and generation changes PASS
+Updating trusted repository fixture
+Installing app 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (20 bytes)
+Installing runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
