@@ -736,6 +736,9 @@ fn format_double(destination &char, size usize, format &char, value f64) int {
 }
 
 fn runtime_symbol(library string, symbol string) !u64 {
+	if library == '/usr/lib/libresolv.9.dylib' {
+		if address := resolver_query_symbol(symbol) { return address }
+	}
 	if library == '/usr/lib/libz.1.dylib' {
 		if address := zlib_checksum_symbol(symbol) { return address }
 		if address := zlib_compress_symbol(symbol) { return address }

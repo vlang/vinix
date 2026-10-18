@@ -8238,21 +8238,44 @@ from the Mac's zlib 1.2.12 and Vinix's packaged zlib 1.3.2 both finish within
 the V bounds. Pinned inputs, native/IPA inspection and eleven generated
 C/executable pairs are retained under `build/ios/fortnite/zlib-bound-checks`.
 
+`res_9_query` now constructs standard recursive DNS questions in V, including
+SRV records, escaped label bytes, root names and the full 16-bit class/type
+fields. It classifies returned DNS response codes and answer counts into BIND's
+`h_errno` values, preserves reply bytes, and bounds every write by the supplied
+answer capacity. Query construction and classification allocate no heap memory.
+The existing libc `res_send` handles configured nameservers, retries, UDP and
+TCP fallback. Queries use the default recursive profile without EDNS extensions.
+
+`tests/ios/native-checks.v build-resolver-query` builds the fixture. A local DNS
+server supplies real SRV replies, negative answers and a 65,535-byte TCP reply
+after UDP truncation. The fixture compares Mac BIND behavior and checks protected
+input/output boundaries, invalid and short arguments, error translation and
+eight concurrent query builders. Test VM resolver configuration points to its
+own loopback server. musl discards some DNS error responses that Mac BIND returns;
+these follow musl's retry policy and become `TRY_AGAIN` with Darwin's timeout
+error when the exchange expires.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites pass, covering DNS,
+native zlib stream bounds, NSString bridging and Storefront.current. The IPA's
+SRV query and 65,535-byte answer capacity were inspected with V/Mach-O/LLVM.
+Pinned inputs, native measurements, probe/audit logs and eleven generated
+C/executable pairs are retained under `build/ios/fortnite/resolver-query-checks`.
+
 The actual IPA now exits with status 1 before application entry at
-`_res_9_query` from `libresolv.9.dylib`. Fortnite remains unplayable and full iOS
-regression remains unpassed.
+`_CCKeyDerivationPBKDF` from `libSystem.B.dylib`. Fortnite remains unplayable
+and full iOS regression remains unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,689 | 471 | 79 |
+| Fortnite executable | 1,690 | 470 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,524 | 474 | 120 |
+| All images | 2,525 | 473 | 120 |
 
-The C++/GLES/Text variant reports 2,538 resolved imports, 460 unresolved strong
+The C++/GLES/Text variant reports 2,539 resolved imports, 459 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
