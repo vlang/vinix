@@ -135,6 +135,7 @@ fn files_symbol(symbol string) ?u64 {
 		'_ioctl' { u64(unsafe { voidptr(C.ios_ioctl) }) }
 		'_fsync' { u64(unsafe { voidptr(darwin_fsync) }) }
 		'_flock' { u64(unsafe { voidptr(darwin_flock) }) }
+		'_mkstemp' { u64(unsafe { voidptr(darwin_mkstemp) }) }
 		'_chmod' { u64(unsafe { voidptr(darwin_chmod) }) }
 		'_fchmod' { u64(unsafe { voidptr(darwin_fchmod) }) }
 		'_utime' { u64(unsafe { voidptr(darwin_utime) }) }

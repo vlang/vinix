@@ -9283,17 +9283,45 @@ Evidence is under `build/ios/fortnite/malloc-zone-checks`. Fortnite now passes
 the zone imports and stops before entry at `_mkstemp`, called at `0x1000a960c`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_mkstemp` is now implemented in V. Native macOS measurements and LLVM
+disassembly establish the BSD template rules: replace all trailing `X`s,
+accept shorter runs and literal names, reject an empty template, and check
+the 1,024-byte path limit before mutation. OS entropy chooses the initial
+alphanumeric suffix; collision retries enumerate the name space and terminate
+with `EEXIST`. Creation uses `O_RDWR | O_CREAT | O_EXCL`, mode `0600` filtered
+by umask, and a descriptor without close-on-exec. Existing files and final
+symlinks remain untouched. Successful retries can retain `EEXIST` in errno,
+matching the measured native behavior.
+
+Suffix and retry state stay on the stack. The Vinix adapter bounds filename
+components to 255 bytes. A parent-symlink fallback preserves exclusive creation
+and closes its temporary directory descriptor. The existing fork gate
+serializes adapter calls: concurrent creates otherwise lose directory entries
+in the frozen validation kernel. The fixture retains all 400 files until its
+eight callers join, checking both uniqueness and contents.
+
+`tests/ios/native-checks.v build-mkstemp` builds the fixture. Six host ASan/UBSan
+runs cover temporary files, file timestamps and file locking; the ARM64 fixture
+also passes. Checks include guarded template mutation, empty/literal/short
+templates, path and component boundaries, modes, flags, exhausted collisions,
+symlinks, unlink lifetime, eight callers, a heap-owned Fortnite-style template
+and two image lifetimes. Generated C review checks the scalar ABI, stack state,
+locking, error paths and descriptor cleanup. Evidence is under
+`build/ios/fortnite/mkstemp-checks`. The fresh Fortnite probe clears `_mkstemp`
+and stops before entry at `_nextafterf`. Fortnite remains unplayable; the full
+iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,760 | 400 | 79 |
+| Fortnite executable | 1,761 | 399 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,595 | 403 | 120 |
+| All images | 2,596 | 402 | 120 |
 
-The C++/GLES/Text variant reports 2,609 resolved imports, 389 unresolved strong
+The C++/GLES/Text variant reports 2,610 resolved imports, 388 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
