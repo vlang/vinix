@@ -8282,21 +8282,39 @@ PBKDF2, DNS, native zlib stream bounds and Storefront.current. Pinned sources,
 Mac/IPA inspection, probe/audit logs and eleven generated C/executable pairs are
 retained under `build/ios/fortnite/pbkdf-checks`.
 
-The actual IPA now exits with status 1 before application entry at `_NDR_record`
-from `libSystem.B.dylib`. Fortnite remains unplayable and full iOS regression
-remains unpassed.
+`NDR_record` now exports the native eight-byte MIG representation descriptor
+from V's existing system-data storage. It is a writable object with stable
+identity during an execution; lookups preserve caller changes, and a new runtime
+restores the little-endian, ASCII and IEEE defaults. The object shares its
+owner's allocation and teardown without a separate allocation or mapping.
+
+`tests/ios/native-checks.v build-ndr-record` compares the Mac SDK's field offsets,
+native bytes and writable mapping, and checks scoped lookup, guarded message
+copies, concurrent readers and two reset/teardown cycles. V/Mach-O/LLVM inspection
+of the actual IPA shows an eight-byte load through the imported address followed
+by an unaligned store at offset 24 in a 36-byte Mach message. This data export
+does not add Mach IPC services.
+
+Eight host ASan/UBSan runs and four ARM64 Vinix suites pass, covering the NDR
+record, native zlib stream bounds, PBKDF2 and Storefront.current. Pinned inputs,
+native/IPA inspection, probe/audit logs and eleven generated C/executable pairs
+are retained under `build/ios/fortnite/ndr-record-checks`.
+
+The actual IPA now exits with status 1 before application entry at `__Exit` from
+`libSystem.B.dylib`. Fortnite remains unplayable and full iOS regression remains
+unpassed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,691 | 469 | 79 |
+| Fortnite executable | 1,692 | 468 | 79 |
 | EOSSDK | 659 | 3 | 18 |
 | MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,526 | 472 | 120 |
+| All images | 2,527 | 471 | 120 |
 
-The C++/GLES/Text variant reports 2,540 resolved imports, 458 unresolved strong
+The C++/GLES/Text variant reports 2,541 resolved imports, 457 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

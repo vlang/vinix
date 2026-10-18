@@ -50,6 +50,9 @@ mut:
 	log_count int
 	log_default [8]u8
 	log_disabled [8]u8
+	// MIG's exported NDR_record is a writable eight-byte object, not a
+	// pointer cell. Darwin ARM64 uses little-endian integers, ASCII and IEEE.
+	ndr_record [8]u8 = [u8(0), 0, 0, 0, 1, 0, 0, 0]!
 }
 
 __global system_data = unsafe { &SystemData(nil) }
@@ -132,6 +135,10 @@ fn system_data_stop() {
 
 fn system_data_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_NDR_record' {
+			if system_data == unsafe { nil } { return none }
+			u64(unsafe { &system_data.ndr_record[0] })
+		}
 		'___stack_chk_guard' { u64(unsafe { &system_data.guard }) }
 		'___stdinp' { u64(unsafe { &system_data.standard[0] }) }
 		'___stdoutp' { u64(unsafe { &system_data.standard[1] }) }
