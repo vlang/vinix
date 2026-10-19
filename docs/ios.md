@@ -186,6 +186,9 @@ Exception throwing and unwinding remain unsupported.
 pointer cell through Foundation and CoreFoundation, with the native value
 `kCFLocaleCountryCodeKey`. Both spellings work with the existing NSLocale
 `objectForKey:` and `CFLocaleGetValue` country queries.
+`NSLocaleCurrencyCode` and `kCFLocaleCurrencyCode` share a distinct immutable
+NSString cell with the native value `currency` in the same sealed page.
+Currency-value queries remain explicitly unsupported.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
 The Mach VM adapter supports allocations up to 4 GiB in the current process,
@@ -10537,17 +10540,53 @@ Evidence and seven generated-C/executable pairs are retained under
 clears this import and stops before entry at `_NSLocaleCurrencyCode`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_NSLocaleCurrencyCode` now resolves through Foundation and CoreFoundation.
+Native measurements confirm that both install names and the CF spelling
+`_kCFLocaleCurrencyCode` share one aligned NSString pointer cell containing
+the exact eight-byte value `currency`, distinct from the country key.
+Fortnite's consumers at `0x104844bcc` and `0x107faf664` load GOT slot
+`0x10dc9b1d0`, dereference its pointer into x2 and pass the key to subsequent
+calls. This exports the key; currency-value queries still fail explicitly.
+Native USD/EUR/JPY, regionless and currency-override queries were measured
+as reference behavior, without adding a currency database to Vinix.
+
+The existing locale-key page now publishes both cells under the runtime lock
+before sealing the page read-only. Country storage stays at offsets 0, 32 and
+64; currency uses offsets 8, 128 and 160 without another page allocation.
+Each NS/CF alias pair selects its own cell. Cached lookup allocates nothing,
+retirement preserves existing cells for callbacks, and shutdown unregisters
+both strings before unmapping the page after pools and Swift contexts drain.
+
+`tests/ios/native-checks.v build-ns-locale-currency` builds the fixture.
+Six host ASan/UBSan runs pass the new fixture, country-key fixture and locale
+value fixture. The optimized ARM64 guest fixture also passes. Native and runtime
+checks cover eight mixed-key/alias cold publishers, both framework routes,
+distinct identities, exact storage, immutable copying, CFHash, equal-string
+dictionary lookup and autorelease pools. Currency queries retain their explicit
+diagnostic without object growth or changes to country queries. Two runtime
+lifetimes check both keys during teardown and remove both registrations.
+An initial fixture used the existing unsupported Objective-C `hash` path;
+its host/guest diagnostics, generated C and executables are preserved in
+`objc-hash-diagnostic` within this cohort. The corrected fixture uses CFHash,
+matching the established constant fixtures. Generated C and assembly review
+covers shared publication and retirement in the fixture and production runners.
+
+Evidence and seven generated-C/executable pairs are retained under
+`build/ios/fortnite/ns-locale-currency-checks`. The fresh production link probe
+clears this import and stops before entry at `_NSLocaleCurrencySymbol`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,801 | 360 | 78 |
+| Fortnite executable | 1,802 | 359 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,641 | 363 | 114 |
+| All images | 2,642 | 362 | 114 |
 
-The C++/GLES/Text variant reports 2,655 resolved imports, 349 unresolved strong
+The C++/GLES/Text variant reports 2,656 resolved imports, 348 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
