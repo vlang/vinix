@@ -188,6 +188,8 @@ pointer cell through Foundation and CoreFoundation, with the native value
 `objectForKey:` and `CFLocaleGetValue` country queries.
 `NSLocaleCurrencyCode` and `kCFLocaleCurrencyCode` share a distinct immutable
 NSString cell with the native value `currency` in the same sealed page.
+`NSLocaleCurrencySymbol` and `kCFLocaleCurrencySymbol` share a third cell with
+the native NSString value `kCFLocaleCurrencySymbolKey`.
 Currency-value queries remain explicitly unsupported.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
@@ -10576,17 +10578,55 @@ Evidence and seven generated-C/executable pairs are retained under
 clears this import and stops before entry at `_NSLocaleCurrencySymbol`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_NSLocaleCurrencySymbol` now resolves through Foundation and CoreFoundation.
+Native measurements confirm that the NS and CF spellings share the same
+aligned NSString pointer cell under both install names, containing the exact
+26-byte key `kCFLocaleCurrencySymbolKey`. Fortnite's consumer at `0x104844c08`
+loads GOT slot `0x10dc9b1d8`, dereferences it into x2 and passes the key to
+the following call. Currency-code and currency-symbol value queries remain
+explicitly unsupported in the bridge.
+
+The existing locale-key page now contains all three cells and CFSTR records.
+Country and currency-code storage retain their layouts; the symbol key uses
+offsets 16, 192 and 224 for its cell, record and NUL-terminated text.
+Publication registers all three constants under the runtime lock before
+sealing the page read-only. Cached lookup allocates nothing. Retirement keeps
+published cells available to callbacks, and shutdown unregisters all three
+before unmapping the page after pools and Swift contexts drain.
+
+`tests/ios/native-checks.v build-ns-locale-currency-symbol` builds the fixture.
+Six host ASan/UBSan runs pass the new symbol-key fixture and the existing
+currency-code and country-key fixtures. The optimized ARM64 guest fixture
+also passes. Checks cover eight mixed-key/alias concurrent readers, all three
+distinct keys, both framework routes, exact layouts, immutable copying,
+CFHash, equal-string dictionary lookup and autorelease pools. Both currency
+queries retain their explicit diagnostic without object growth or changes
+to country queries. Two runtime lifetimes check three-key callback access
+and removal of all registrations. Generated C and assembly review covers
+the fixture and both production runners.
+
+Native symbol values, including `$`, `€`, `¥`, the generic currency sign and
+a currency override, were measured separately. Repeated native queries can
+return equal strings with different identities; the reference compares their
+contents. The initial pointer-identity diagnostic is preserved under
+`native-query-identity-diagnostic` within this cohort.
+
+Evidence and seven generated-C/executable pairs are retained under
+`build/ios/fortnite/ns-locale-currency-symbol-checks`. The fresh production link
+probe clears this import and stops before entry at `_NSURLCreationDateKey`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,802 | 359 | 78 |
+| Fortnite executable | 1,803 | 358 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,642 | 362 | 114 |
+| All images | 2,643 | 361 | 114 |
 
-The C++/GLES/Text variant reports 2,656 resolved imports, 348 unresolved strong
+The C++/GLES/Text variant reports 2,657 resolved imports, 347 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

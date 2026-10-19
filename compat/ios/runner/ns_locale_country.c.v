@@ -9,7 +9,7 @@ fn ns_locale_country_symbol(symbol string) ?u64 {
 }
 
 fn ns_locale_key_cell(index int) ?u64 {
-	if index < 0 || index > 1 || ios_runtime == unsafe { nil } { return none }
+	if index < 0 || index > 2 || ios_runtime == unsafe { nil } { return none }
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if ios_runtime.ns_locale_country_arena == 0 {
@@ -18,10 +18,10 @@ fn ns_locale_key_cell(index int) ?u64 {
 		arena := C.mmap(unsafe { nil }, page, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
 		if arena == voidptr(-1) { panic('iOS: cannot allocate locale keys') }
 		base := u64(arena)
-		// Preserve the country cell, CFSTR and bytes at offsets 0, 32 and 64.
-		objects := [u64(32), 128]!
-		bytes := [u64(64), 160]!
-		for i, text in ['kCFLocaleCountryCodeKey', 'currency']! {
+		// Preserve the country and currency-code cells, CFSTRs and bytes.
+		objects := [u64(32), 128, 192]!
+		bytes := [u64(64), 160, 224]!
+		for i, text in ['kCFLocaleCountryCodeKey', 'currency', 'kCFLocaleCurrencySymbolKey']! {
 			object := base + objects[i]
 			data := base + bytes[i]
 			unsafe {
@@ -45,7 +45,7 @@ fn ns_locale_key_cell(index int) ?u64 {
 fn ns_locale_country_stop() {
 	arena := ios_runtime.ns_locale_country_arena
 	if arena == 0 { return }
-	for i in 0 .. 2 { ios_runtime.constants.delete(read64(arena + u64(i * 8))) }
+	for i in 0 .. 3 { ios_runtime.constants.delete(read64(arena + u64(i * 8))) }
 	if C.munmap(unsafe { voidptr(arena) }, usize(C.getpagesize())) != 0 { panic('iOS: cannot retire locale keys') }
 	ios_runtime.ns_locale_country_arena = 0
 }

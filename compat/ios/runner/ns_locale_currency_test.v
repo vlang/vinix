@@ -143,7 +143,7 @@ fn test_ns_locale_currency() {
   ios_runtime.swift_concurrency_retired = false
   cell := currency_shared(CurrencyApi{}); value := read64(cell); country := read64(cell - 8); currency_query_boundary(cell)
   for symbol in ['_NSLocaleCurrencyCode','_kCFLocaleCurrencyCode']! { for library in ['/System/Library/Frameworks/UIKit.framework/UIKit', '/usr/lib/libSystem.B.dylib']! { if _ := runtime_symbol(library, symbol) { assert false } } }
-  for name in ['_NSLocaleCurrencyCodeKey','_kCFLocaleCurrencyCodeKey','_NSLocaleCurrencySymbol']! { if _ := ns_locale_currency_symbol(name) { assert false } }
+  for name in ['_NSLocaleCurrencyCodeKey','_kCFLocaleCurrencyCodeKey','_NSLocaleCurrencySymbolKey']! { if _ := ns_locale_currency_symbol(name) { assert false } }
   probe := objc_allocate_class(ios_runtime.names['NSObject'], c'VinixLocaleCurrencyTeardownProbe', 0); assert probe != 0
   assert objc_add_method(probe, u64(c'dealloc'), u64(unsafe { voidptr(currency_teardown) }), c'v16@0:8')
   objc_register_class(probe); objc_autorelease(objc_new(probe))
