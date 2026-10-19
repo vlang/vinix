@@ -11391,18 +11391,58 @@ and both production runners, including the three result-register writes and
 direct return without ownership or memory access. Seven executable/generated-C
 artifact pairs and joined validation logs are archived in the same cohort.
 
+`_$s7SwiftUI19UIViewRepresentablePAAE13_makeViewList4view6inputsAA01_fG7OutputsVAA11_GraphValueVyxG_AA01_fG6InputsVtFZ`
+now has a diagnostic binding. Calling it terminates with
+`iOS: SwiftUI UIViewRepresentable view-list graph construction is not implemented`.
+The handler accesses no graph, inputs, metadata, witness, Swift self or indirect
+result storage. It never returns an uninitialized `_ViewListOutputs` and requires
+no runtime-owned storage. Unary graph construction remains unsupported.
+
+The installed UIKit/AppKit SDK declarations and pinned OpenSwiftUI source
+identify this as a unary graph-list factory. The native AppKit wrapper loads
+the inherited View witness from x3+8 and tail-calls framework machinery.
+Only its instructions were inspected; no native graph factory was executed,
+and the UIKit entry is unavailable on this Mac. Evidence is retained under
+`build/ios/fortnite/swiftui-view-list-checks`.
+
+`tests/ios/native-checks.v build-swiftui-view-list` builds the fixture. Six
+host ASan/UBSan runs pass the diagnostic entry, sizing default and Tree
+descriptor with normal and deterministic hashing. Each diagnostic fixture
+run checks 20 child calls that exit 1 with the exact error, protected input
+and x8 pointers, unchanged shared read-only/writable result pages next to a
+protected boundary, 16,384 concurrent resolutions, exact framework routing,
+callback access and two drained runtime lifetimes.
+
+The optimized ARM64 guest fixture passes the same diagnostic and shared-result
+checks. The launch probe binds `_makeViewList` and remains before application
+entry, with child status 1, at
+`_$s7SwiftUI19UIViewRepresentablePAAE14_layoutOptionsyAA013_PlatformViewd6LayoutF0V0C4TypeQzFZ`.
+Its main-image fixup is `0x10dc9b318`, stub `0x10c63aab8`, forwarder
+`0x107c28e4c` and call `0x1015be728`. These two consumer/forwarder sites were
+inspected without executing application code.
+
+The fixture, launch probe and both audits pass their expected checks. Generated
+C and ARM64 disassembly review covers both fixture variants and both production
+runners: a terminal diagnostic with no graph/result/context dereference or
+ownership operations. Seven executable/generated-C artifact pairs and joined
+validation logs are archived in the same cohort.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,826 | 335 | 78 |
+| Fortnite executable | 1,827 | 334 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,666 | 338 | 114 |
+| All images | 2,667 | 337 | 114 |
 
-The C++/GLES/Text variant reports 2,680 resolved imports, 324 unresolved strong
+The C++/GLES/Text variant reports 2,681 resolved imports, 323 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
+
+Resolved imports measure linker bindings. Diagnostic entries such as the
+view-list factory still stop execution when reached; the count does not
+measure functional API coverage.
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on
