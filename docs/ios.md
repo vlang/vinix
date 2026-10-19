@@ -154,6 +154,8 @@ User defaults use an atomically replaced per-bundle plist under
 `Documents/Library/Preferences`; `VINIX_IOS_DOCUMENTS` selects the document root.
 `CFPreferencesAppSynchronize` flushes that same store for the current application
 or its bundle identifier and reports write failures. Other domains return false.
+`CFPreferencesCopyAppValue` returns an owned immutable snapshot, with registered
+defaults as a fallback; unsupported application domains fail explicitly.
 App groups, custom preference suites and security-scoped bookmarks are unsupported.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
@@ -10074,17 +10076,52 @@ Evidence and seven generated-C/executable pairs are retained in
 `_CFPreferencesCopyAppValue`. Fortnite remains unplayable; the full iOS
 regression is unpassed.
 
+`_CFPreferencesCopyAppValue` now reads the current application's shared defaults
+store. It accepts the current-app constant or bundle identifier, compares keys
+by string content, searches persisted values before registered fallbacks, and
+returns nil for an absent key. Allocated NSStrings and registered Mach-O string
+constants are accepted for both arguments. Unsupported application domains,
+invalid arguments and unsupported preference objects fail explicitly.
+
+Each successful lookup returns an owned immutable property-list snapshot.
+Its strings, data, arrays, dictionaries and children survive replacement of the
+stored value and autorelease-pool cleanup. Construction transfers child owners
+directly to collections, and balances V's implicit map-iteration key copies.
+The existing autoreleased plist conversion now wraps the owned constructor.
+Boolean values keep their CFBoolean type through parsing, standard-defaults
+setters, serialization and restart. The supported profile consists of strings,
+signed integers, reals, Booleans, data, arrays and string-keyed dictionaries.
+Dates, other application domains, global/managed/host sources and external
+preference merging or live reload remain unsupported.
+
+`tests/ios/native-checks.v build-cf-preferences-value` builds the fixture. Six
+host ASan/UBSan runs pass value lookup, synchronization and CF dictionary checks.
+Isolated native measurements establish absent nil, content-equal keys, staged
+values, all seven supported plist types, registered-default visibility and
+retained-result lifetime. The optimized ARM64 fixture checks the two arguments
+with protected x2–x8 registers and preserved x20/x21, immutable nested ownership,
+persistent precedence, Boolean-preserving save/reload, image constants, rejected
+queries, repeated/concurrent dictionary copies, replaced-source child lifetime
+and two drained runtimes. Generated C and assembly review checks source locking,
+serializer cleanup, static rejection errors and pool-independent tree ownership.
+
+Evidence, diagnostics and seven generated-C/executable pairs are retained in
+`build/ios/fortnite/cf-preferences-value-checks`. The fresh link probe clears
+`_CFPreferencesCopyAppValue` and stops before entry at
+`_CFPreferencesSetAppValue`. Fortnite remains unplayable; the full iOS regression
+is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,788 | 373 | 78 |
+| Fortnite executable | 1,789 | 372 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,628 | 376 | 114 |
+| All images | 2,629 | 375 | 114 |
 
-The C++/GLES/Text variant reports 2,642 resolved imports, 362 unresolved strong
+The C++/GLES/Text variant reports 2,643 resolved imports, 361 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

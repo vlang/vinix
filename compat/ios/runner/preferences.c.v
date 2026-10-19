@@ -11,6 +11,7 @@ fn object_plist(object u64, depth int) !plist.Value {
 	if objc_is_kind(object, ios_runtime.names['NSString']) { return plist.Value{kind: .string, text: string_text(object).clone()} }
 	header := obj_header(object)
 	if objc_is_kind(object, ios_runtime.names['NSNumber']) {
+		if header.cf_boolean { return plist.Value{kind: .boolean, boolean: header.number != 0} }
 		return if header.is_real { plist.Value{kind: .real, real: header.real_number} } else { plist.Value{kind: .integer, integer: header.number} }
 	}
 	if objc_is_kind(object, ios_runtime.names['NSData']) {
@@ -179,6 +180,7 @@ fn defaults_dispatch(object u64, selector string, mut frame RegisterFrame) bool 
 			number := objc_allocate(ios_runtime.names['NSNumber'])
 			mut value := obj_header(number)
 			value.number = if selector == 'setBool:forKey:' { i64(frame.x[2] != 0) } else { i64(frame.x[2]) }
+			value.cf_boolean = selector == 'setBool:forKey:'
 			dictionary_put(header.fields[0], frame.x[3], number)
 			objc_release(number)
 			if !defaults_save(object) { panic('iOS: cannot save user defaults') }

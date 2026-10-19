@@ -4,36 +4,54 @@ module main
 import plist
 
 fn plist_object(value plist.Value) u64 {
+	return objc_autorelease(plist_owned_object(value))
+}
+
+// Return one owned immutable tree. Children transfer to their collection;
+// none of the intermediate objects depend on an autorelease pool.
+fn plist_owned_object(value plist.Value) u64 {
 	match value.kind {
-		.string { return make_string(unsafe { &char(value.text.str) }) }
+		.string { return owned_string(value.text) }
 		.integer, .boolean, .real {
 			object := objc_allocate(ios_runtime.names['NSNumber'])
 			mut header := obj_header(object)
 			header.number = if value.kind == .boolean { i64(value.boolean) } else { value.integer }
 			header.real_number = value.real
 			header.is_real = value.kind == .real
-			return objc_autorelease(object)
+			header.cf_boolean = value.kind == .boolean
+			return object
 		}
 		.data {
 			object := objc_allocate(ios_runtime.names['NSData'])
 			mut header := obj_header(object)
 			header.data = value.data.clone()
-			return objc_autorelease(object)
+			return object
 		}
 		.array {
 			object := objc_allocate(ios_runtime.names['NSArray'])
 			mut header := obj_header(object)
-			for item in value.values { array_append(mut header, plist_object(item)) }
-			return objc_autorelease(object)
+			header.json_immutable = true
+			for item in value.values {
+				child := plist_owned_object(item)
+				array_append(mut header, child)
+				objc_release(child)
+			}
+			return object
 		}
 		.dictionary {
 			object := objc_allocate(ios_runtime.names['NSDictionary'])
 			mut header := obj_header(object)
+			header.json_immutable = true
 			for key, item in value.fields {
-				header.keys << objc_retain(make_string(unsafe { &char(key.str) }))
-				array_append(mut header, plist_object(item))
+				header.keys << owned_string(key)
+				// V clones an escaping map iteration key. The NSString has
+				// copied its bytes, so release that iteration copy now.
+				unsafe { key.free() }
+				child := plist_owned_object(item)
+				array_append(mut header, child)
+				objc_release(child)
 			}
-			return objc_autorelease(object)
+			return object
 		}
 	}
 }
