@@ -182,6 +182,9 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	if library == '/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation' && symbol == '_CFUUIDCreateString' {
 		return u64(unsafe { voidptr(cf_uuid_create_string) })
 	}
+	if library == '/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation' && symbol == '_CFUUIDGetUUIDBytes' {
+		return u64(unsafe { voidptr(cf_uuid_get_uuid_bytes) })
+	}
 	if address := core_foundation_symbol(symbol) { return address }
 	for prefix in ['_OBJC_CLASS_$_', '_OBJC_METACLASS_$_'] {
 		if symbol.starts_with(prefix) {
