@@ -11935,17 +11935,54 @@ sites were inspected without executing application code. Text modifier
 construction, SwiftUI graph execution and rendering remain unsupported;
 Fortnite remains unplayable.
 
+The next cohort binds `_$s7SwiftUI4TextV4fontyAcA4FontVSgF` only to an explicit
+`Text.font` modifier-construction diagnostic. It exits 1 if called, before
+reading the optional Font, Text storage/modifiers, contexts or result
+storage. Only the exact symbol in the SwiftUI framework resolves. It creates
+no Text, modifier array or provider owner.
+
+Typed native host metadata and ARM64 calls confirm Text size/stride 32,
+Text.Modifier size 9/stride 16 and Font size 8. For nil and `.title` arguments
+across short, heap-backed and Unicode verbatim strings, `font(_:)` borrows
+the Font in x0 and Text in x1-x4 and returns owned Text in x0-x3. Nil adds a
+one-element font modifier with a nil payload; `.title` adds the same modifier
+with its provider pointer and retains that provider. Applying it twice
+creates a separate two-element array without changing the input array.
+Native value-witness destruction balances String, array and provider
+ownership. These measurements do not implement modifier arrays, Font
+provider ownership or text rendering in the runner.
+
+`tests/ios/native-checks.v build-swiftui-text-font` selects the fixture.
+Normal and deterministic ASan/UBSan runs pass it with its entry compiled at
+O2, plus Text.bold and Font.title regressions. The optimized ARM64 fixture
+passes eight readers and 16,384 concurrent resolutions, 32 terminal child
+calls, nil/protected/invalid Font values, protected Text/self/x8, unchanged
+shared read-only/writable result pages at both guarded boundaries, exact
+routing, callback access and two drained runtime lifetimes. Generated C and
+ARM64 review covers both fixture variants and both production runners. Seven
+executable/generated-C pairs, native measurements, SDK/Swift ABI snapshots
+and joined logs are retained under `build/ios/fortnite/swiftui-text-font-checks`.
+
+The fresh probe resolves the font import and exits 1 before application
+entry at `_$s7SwiftUI4TextVAA4ViewAAWP` (Text's View protocol witness table).
+Its main-image fixup is `0x10dc9b380` with no call stub. The consumers at
+`0x1015bff3c` and `0x1015c023c` load the table into x2 at `0x1015bff40` and
+`0x1015c0240`, then save it for later generic calls alongside Text metadata.
+These two data consumers were inspected without executing application code.
+Text modifier construction, provider ownership, SwiftUI graph execution and
+rendering remain unsupported; Fortnite remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,839 | 322 | 78 |
+| Fortnite executable | 1,840 | 321 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,679 | 325 | 114 |
+| All images | 2,680 | 324 | 114 |
 
-The C++/GLES/Text variant reports 2,693 resolved imports, 311 unresolved strong
+The C++/GLES/Text variant reports 2,694 resolved imports, 310 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
