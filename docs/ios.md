@@ -152,6 +152,8 @@ gray bitmap storage, custom ICC/pattern/indexed spaces, non-finite components
 and blend modes beyond normal source-over remain unsupported.
 User defaults use an atomically replaced per-bundle plist under
 `Documents/Library/Preferences`; `VINIX_IOS_DOCUMENTS` selects the document root.
+`CFPreferencesAppSynchronize` flushes that same store for the current application
+or its bundle identifier and reports write failures. Other domains return false.
 App groups, custom preference suites and security-scoped bookmarks are unsupported.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
@@ -10037,17 +10039,52 @@ probe clears `_CFLocaleGetValue` and stops before entry at
 `_CFPreferencesAppSynchronize`. Fortnite remains unplayable; the full iOS
 regression is unpassed.
 
+`_CFPreferencesAppSynchronize` now flushes the current application's persisted
+defaults through the same store as `NSUserDefaults`. It accepts the current-app
+constant by string content and the bundle identifier read from `Info.plist`
+(or the existing bundle-filename fallback). Its return uses CF's unsigned-byte
+Boolean ABI. Allocated NSStrings and registered Mach-O constant strings are
+accepted. Unsupported domains and invalid arguments return false. Directory
+creation, write and exact-path rename failures also return false, with the
+in-memory values available for retry. Synchronization and standard-defaults
+mutations share the runtime lock; registration defaults stay out of the plist.
+
+Preference writes now rename to exactly the plist path. V's directory-target
+rename behavior previously allowed a write into a directory at that path to
+report success. The fixture caught this behavior; the failed generated C,
+executable, debug symbols and log are retained. The store still uses one
+per-bundle application source with eager setters. External-process merging,
+live reload, custom suites, global/managed/host sources and power-loss durability
+remain unsupported; malformed bundle metadata or an invalid existing plist
+retain the existing explicit startup failure.
+
+`tests/ios/native-checks.v build-cf-preferences-sync` builds the fixture. Six
+host ASan/UBSan runs pass synchronization, CF dictionary and locale-value checks.
+Four native profiles measure empty/staged/removal synchronization and a blocked
+destination, using only an isolated temporary preference domain. The optimized
+ARM64 fixture checks the single argument with protected x1–x8 registers,
+preserved x20/x21, Boolean success/failure, bundle identity, registration
+exclusion, cold/write/rename failure recovery, concurrent writes, removal and
+persistence across two drained runtimes. Generated C and assembly review checks
+the shared locking, exact rename, owned path/identity and serializer cleanup.
+
+Evidence and seven generated-C/executable pairs are retained in
+`build/ios/fortnite/cf-preferences-sync-checks`. The fresh link probe clears
+`_CFPreferencesAppSynchronize` and stops before entry at
+`_CFPreferencesCopyAppValue`. Fortnite remains unplayable; the full iOS
+regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,787 | 374 | 78 |
+| Fortnite executable | 1,788 | 373 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,627 | 377 | 114 |
+| All images | 2,628 | 376 | 114 |
 
-The C++/GLES/Text variant reports 2,641 resolved imports, 363 unresolved strong
+The C++/GLES/Text variant reports 2,642 resolved imports, 362 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -4,6 +4,8 @@ module main
 import os
 import plist
 
+fn C.rename(&char, &char) i32
+
 fn object_plist(object u64, depth int) !plist.Value {
 	if object == 0 || depth > 64 { return error('iOS: invalid/cyclic preference object') }
 	if objc_is_kind(object, ios_runtime.names['NSString']) { return plist.Value{kind: .string, text: string_text(object).clone()} }
@@ -41,6 +43,8 @@ fn object_plist(object u64, depth int) !plist.Value {
 }
 
 fn defaults_start() u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
 	if ios_runtime.defaults != 0 { return ios_runtime.defaults }
 	defaults := objc_allocate(ios_runtime.names['NSUserDefaults'])
 	dictionary := objc_allocate(ios_runtime.names['NSMutableDictionary'])
@@ -50,24 +54,40 @@ fn defaults_start() u64 {
 	store_field(defaults, 1, registration)
 	objc_release(registration)
 	mut identifier := os.file_name(ios_runtime.bundle)
+	defer { unsafe { identifier.free() } }
 	info_path := os.join_path(ios_runtime.bundle, 'Info.plist')
+	defer { unsafe { info_path.free() } }
 	if os.is_file(info_path) {
 		bytes := os.read_bytes(info_path) or { panic('iOS: cannot read bundle preferences identity: ${err}') }
 		defer { unsafe { bytes.free() } }
 		info := plist.parse(bytes) or { panic('iOS: invalid bundle preferences identity: ${err}') }
 		defer { info.free() }
-		if info.fields['CFBundleIdentifier'].text != '' { identifier = info.fields['CFBundleIdentifier'].text.clone() }
+		if info.fields['CFBundleIdentifier'].text != '' {
+			unsafe { identifier.free() }
+			identifier = info.fields['CFBundleIdentifier'].text.clone()
+		}
 	}
 	if identifier == '' || identifier.len > 255 || identifier in ['.', '..'] { panic('iOS: invalid preference identifier') }
 	for c in identifier {
 		if !((c >= `a` && c <= `z`) || (c >= `A` && c <= `Z`) || (c >= `0` && c <= `9`) || c in [u8(`.`), `-`, `_`]) { panic('iOS: unsafe preference identifier') }
 	}
 	root := os.getenv('VINIX_IOS_DOCUMENTS')
-	documents := if root != '' { root } else { os.join_path(os.dir(ios_runtime.bundle), 'Documents') }
+	defer { unsafe { root.free() } }
+	bundle_parent := os.dir(ios_runtime.bundle)
+	defer { unsafe { bundle_parent.free() } }
+	documents := if root != '' { root.clone() } else { os.join_path(bundle_parent, 'Documents') }
+	defer { unsafe { documents.free() } }
 	directory := os.join_path(documents, 'Library', 'Preferences')
-	os.mkdir_all(directory) or { panic('iOS: cannot create preferences directory: ${err}') }
-	path := os.join_path(directory, identifier + '.plist')
-	store_field(defaults, 2, make_string(unsafe { &char(path.str) }))
+	defer { unsafe { directory.free() } }
+	filename := identifier + '.plist'
+	defer { unsafe { filename.free() } }
+	path := os.join_path(directory, filename)
+	defer { unsafe { path.free() } }
+	for i, text in [path, identifier]! {
+		value := owned_string(text)
+		store_field(defaults, i + 2, value)
+		objc_release(value)
+	}
 	if os.is_file(path) {
 		bytes := os.read_bytes(path) or { panic('iOS: cannot read preferences: ${err}') }
 		defer { unsafe { bytes.free() } }
@@ -81,16 +101,28 @@ fn defaults_start() u64 {
 }
 
 fn defaults_save(defaults u64) bool {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
 	header := obj_header(defaults)
-	value := object_plist(header.fields[0], 0) or { panic(err) }
+	value := object_plist(header.fields[0], 0) or { return false }
 	defer { value.free() }
-	text := plist.encode_xml(value) or { panic(err) }
+	text := plist.encode_xml(value) or { return false }
 	defer { unsafe { text.free() } }
 	path := string_text(header.fields[2])
+	directory := os.dir(path)
+	defer { unsafe { directory.free() } }
+	// Creating the directory belongs to the fallible write, so a cold
+	// CFPreferencesAppSynchronize can report an inaccessible document root.
+	os.mkdir_all(directory) or { return false }
 	temporary := path + '.tmp'
 	defer { unsafe { temporary.free() } }
-	os.write_file(temporary, text) or { return false }
-	os.rename(temporary, path) or { os.rm(temporary) or {}; return false }
+	os.write_file(temporary, text) or { os.rm(temporary) or {}; return false }
+	// os.rename treats a directory target as a destination folder. Preferences
+	// must replace exactly path, or fail without publishing anywhere else.
+	if C.rename(unsafe { &char(temporary.str) }, unsafe { &char(path.str) }) != 0 {
+		os.rm(temporary) or {}
+		return false
+	}
 	return true
 }
 
@@ -104,6 +136,8 @@ fn dictionary_put(dictionary u64, key u64, value u64) {
 }
 
 fn defaults_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
 	if object == ios_runtime.names['NSUserDefaults'] {
 		if selector != 'standardUserDefaults' { return false }
 		frame.x[0] = defaults_start()
