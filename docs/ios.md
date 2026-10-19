@@ -199,8 +199,11 @@ distinct cell in the same sealed page, with the native value `NSURLFileSizeKey`.
 cell with the native NSString value `NSURLIsExcludedFromBackupKey`.
 `NSURLIsRegularFileKey` and `kCFURLIsRegularFileKey` share a fourth cell with
 the native NSString value `NSURLIsRegularFileKey`.
-URL resource-date, file-size and file-type lookup, and backup-exclusion
-metadata reads and writes, remain unsupported.
+`NSURLVolumeAvailableCapacityForImportantUsageKey` and
+`kCFURLVolumeAvailableCapacityForImportantUsageKey` share a fifth cell with
+the native NSString value `NSURLVolumeAvailableCapacityForImportantUsageKey`.
+URL resource-date, file-size, file-type and volume-capacity lookup, and
+backup-exclusion metadata reads and writes, remain unsupported.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
 The Mach VM adapter supports allocations up to 4 GiB in the current process,
@@ -10756,17 +10759,55 @@ clears this import and stops before entry at
 `_NSURLVolumeAvailableCapacityForImportantUsageKey`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_NSURLVolumeAvailableCapacityForImportantUsageKey` now resolves through
+Foundation and CoreFoundation. Native measurements confirm that its NS and
+CF aliases share one aligned NSString pointer cell under both install names,
+containing the exact 48-byte value
+`NSURLVolumeAvailableCapacityForImportantUsageKey`. Its cell and NSString
+are distinct from all four existing resource keys. Fortnite's inspected
+consumer at `0x100628934` loads GOT slot `0x10dc9b200`, selects between this
+cell and `NSURLVolumeAvailableCapacityKey`, dereferences the selected cell
+into x3 and passes an output slot in x2. Volume-capacity resource queries
+remain unsupported.
+
+The shared URL-resource page preserves all four existing layouts. The new
+cell occupies unused padding at offset 96, with its CFSTR record and
+NUL-terminated text at offsets 320 and 352. All five constants register under
+the runtime lock before checked read-only publication. Cached lookup uses
+a fixed stack table and allocates nothing. Shutdown keeps all five keys
+available until pools and Swift contexts drain, then unregisters them before
+checked page unmapping.
+
+`tests/ios/native-checks.v build-ns-url-important-capacity` builds the fixture.
+Six host ASan/UBSan runs pass the new fixture and the existing regular-file
+and backup-exclusion fixtures. The optimized ARM64 guest fixture also passes.
+Native and runtime checks cover eight readers alternating all five keys and
+their NS/CF aliases under both framework routes, exact distinct storage,
+immutable copying, CFHash and equal-string dictionary lookup. Retained
+five-key and one-key NSArrays and a synthetic capacity dictionary containing
+a 5 GiB + 17 NSNumber survive pool drain. This collection check does not
+query a volume. Two runtime lifetimes check isolated storage, retirement
+guards, callback access, zero live objects and removal of all five
+registrations. Generated C and assembly review covers the fixture and both
+production runners.
+
+Evidence and seven generated-C/executable pairs are retained under
+`build/ios/fortnite/ns-url-important-capacity-checks`. The fresh production
+link probe clears this import and stops before entry at
+`_NSURLVolumeAvailableCapacityKey`. Fortnite remains unplayable; the full
+iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,807 | 354 | 78 |
+| Fortnite executable | 1,808 | 353 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,647 | 357 | 114 |
+| All images | 2,648 | 356 | 114 |
 
-The C++/GLES/Text variant reports 2,661 resolved imports, 343 unresolved strong
+The C++/GLES/Text variant reports 2,662 resolved imports, 342 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
