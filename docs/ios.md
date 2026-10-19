@@ -11176,17 +11176,62 @@ The next import's GOT cell is `0x10dc9b2e8`. Loads at `0x1015c1310` and
 conditional witness arguments in x2. Two consumer sites were inspected without
 executing application code.
 
+`_$s7SwiftUI15ModifiedContentVyxq_GAA4ViewA2aERzAA0E8ModifierR_rlMc`
+now resolves only through SwiftUI.framework to a conditional conformance
+descriptor in the existing ModifiedContent arena. Its type reference points
+to the same canonical nominal descriptor. Native measurements establish flags
+`0x20200` and two key protocol requirements: `Content: View` (`x`) and
+`Modifier: ViewModifier` (`q_`). Both protocol declarations retain six
+requirements and their `Self.Body: View` signatures.
+
+The native record has a seven-word pattern and two private conditional witness
+arguments. The compatibility declaration retains the conditional/generic flags
+and private-argument count, supplies no pattern and uses zero copied words with
+a diagnostic instantiator. The retained Swift runtime source permits this
+instantiator-only profile and a null out-of-line cache. No writable cache or
+complete witness table is supplied. Ordinary `_swift_getWitnessTable` continues
+to reject conditional/generic records before reading metadata, arguments or
+the pattern; directly calling the instantiator reports
+`iOS: SwiftUI ModifiedContent View witness instantiation is not implemented`.
+
+The shared allocation remains RX/RO and creates no dependent metadata arena
+or Swift/Objective-C owner. Cached declaration lookup remains available during
+earlier teardown callbacks; owners and Array metadata drain before unmapping.
+`tests/ios/native-checks.v build-swiftui-modified-view` builds the fixture.
+Six host ASan/UBSan runs pass conditional conformance, existing witness lookup
+and nominal ModifiedContent checks with normal and deterministic hashing.
+They cover native requirements/control measurements, eight cold readers,
+canonical shared identity, sealed pages, protected unused arguments, both
+explicit error paths, callbacks and two drained/unmapped lifetimes. Witness
+specialization, generic ModifiedContent instantiation and rendering remain
+unsupported.
+
+The optimized ARM64 fixture, startup probe and both production import audits
+pass. Generated C and assembly review covers the host/guest fixture and both
+production runners. Native measurements, SDK/Swift ABI/runtime snapshots,
+six sanitizer logs, four guest runs and seven generated-C/executable pairs are
+retained in `build/ios/fortnite/swiftui-modified-view-checks`. The fresh probe
+clears the conformance descriptor import, then stops before entry at
+`_$s7SwiftUI18LocalizedStringKeyV13stringLiteralACSS_tcfC`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
+The next initializer's GOT cell is `0x10dc9b2f0`, with stub `0x10c63aa7c`
+and branch forwarder `0x107c28eb4`. Calls at `0x1015bfd40` and `0x1015c019c`
+follow Swift string-literal construction and feed the resulting key into a
+SwiftUI Text initializer. The two call sites and one forwarder were inspected
+without executing application code.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,820 | 341 | 78 |
+| Fortnite executable | 1,821 | 340 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,660 | 344 | 114 |
+| All images | 2,661 | 343 | 114 |
 
-The C++/GLES/Text variant reports 2,674 resolved imports, 330 unresolved strong
+The C++/GLES/Text variant reports 2,675 resolved imports, 329 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
