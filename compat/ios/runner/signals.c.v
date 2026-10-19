@@ -153,9 +153,9 @@ fn darwin_sigaction(number i32, action &DarwinSignalAction, output &DarwinSignal
 	mut mask := u64(0)
 	if action != unsafe { nil } {
 		incoming = unsafe { *action }
-		// One-argument handlers, restart and nodefer are the verified subset.
+		// One-argument handlers, alternate stacks, restart and nodefer are verified.
 		// Never give an app Linux's siginfo/ucontext bytes as Darwin objects.
-		if incoming.flags & ~i32(0x12) != 0 {
+		if incoming.flags & ~i32(0x13) != 0 {
 			darwin_set_errno(45)
 			return -1
 		}
@@ -199,6 +199,7 @@ fn darwin_sigaction(number i32, action &DarwinSignalAction, output &DarwinSignal
 		} $else {
 			C.memcpy(unsafe { &native.sa_mask }, unsafe { &mask }, 8)
 			native.sa_flags = 0
+			if incoming.flags & 1 != 0 { native.sa_flags |= int(C.SA_ONSTACK) }
 			if incoming.flags & 2 != 0 { native.sa_flags |= int(C.SA_RESTART) }
 			if incoming.flags & 16 != 0 { native.sa_flags |= int(C.SA_NODEFER) }
 		}
@@ -236,6 +237,7 @@ fn signals_start() ! {
 	if signal_registry_active || signal_registry_closing {
 		return error('iOS: signal registry already active or draining')
 	}
+	sigaltstack_start()!
 	for number in 1 .. 32 {
 		C.ios_store_pointer(unsafe { &signal_slots[number].gate }, signal_open)
 		C.ios_store_pointer(unsafe { &signal_slots[number].handler }, 0)
@@ -292,6 +294,7 @@ fn signals_stop() {
 // Called with the namespace pinned by atfork. Only the calling thread survives.
 // Fork from within a signal callback is outside the verified subset.
 fn signals_fork_child() {
+	sigaltstack_fork_child()
 	signal_registry_closing = false
 	for number in 1 .. 32 {
 		C.ios_store_pointer(unsafe { &signal_slots[number].gate },
@@ -301,6 +304,7 @@ fn signals_fork_child() {
 
 fn signals_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_sigaltstack' { u64(unsafe { voidptr(darwin_sigaltstack) }) }
 		'_raise' { u64(unsafe { voidptr(darwin_raise) }) }
 		'_pause' { u64(unsafe { voidptr(darwin_pause) }) }
 		'_sigaction' { u64(unsafe { voidptr(darwin_sigaction) }) }

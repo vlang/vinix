@@ -50,7 +50,7 @@ fn signal_test_shared(native bool) {
 	for number in [i32(30), 31, 28] {
 		mut original := DarwinSignalAction{}
 		assert signal_test_action(native, number, unsafe { nil }, unsafe { &original }) == 0
-		for flags in [i32(0), 2, 16, 18] {
+		for flags in [i32(0), 1, 2, 3, 16, 17, 18, 19] {
 			other := if number == 31 { i32(30) } else { i32(31) }
 			mut action := DarwinSignalAction{
 				handler: u64(unsafe { voidptr(signal_test_callback) })
@@ -170,7 +170,7 @@ fn test_signals() {
 		signal_test_shared(false)
 		mut action := DarwinSignalAction{ handler: 1, mask: 1, flags: 2 }
 		mut old := DarwinSignalAction{}
-		for flags in [i32(1), 4, 8, 32, 64, -1] {
+		for flags in [i32(4), 8, 32, 64, -1] {
 			action.flags = flags
 			assert darwin_sigaction(30, unsafe { &action }, unsafe { &old }) == -1
 			assert unsafe { *C.ios_errno_address() } == 45 && old.handler == 0

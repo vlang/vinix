@@ -9475,17 +9475,46 @@ executable pairs and optimized ARM64 call-path review are retained under
 The fresh probe clears `_setrlimit` and stops before entry at `_sigaltstack`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_sigaltstack` now translates Darwin's 24-byte `{sp, size, flags}` record to
+the native layout and maps Darwin `SS_DISABLE=4`. Native macOS probes establish
+the 32 KiB minimum even for disable requests, size-error priority, old-record
+writes before flag/on-stack errors, and old-before-new behavior for aliased
+records. The Linux adapter reproduces these cases, including the distinct
+on-stack enable/disable errors. macOS forwards to its native API.
+
+Darwin keeps the last pointer/size while disabled; Linux clears them. Two
+native TSD slots, reserved once before bridge callbacks are enabled, retain
+only those scalar values per thread. They allocate no stack storage and use
+no registry lock on the callback path. Fork-child handling clears the history
+to match the measured native fork path; the child can install its own stack.
+The signal bridge now accepts `SA_ONSTACK` with the existing one-argument,
+restart and nodefer handlers. Stack mappings remain caller-owned: restore or
+disable native delivery before freeing them.
+
+`tests/ios/native-checks.v build-sigaltstack` builds the fixture. Six host
+ASan/UBSan runs cover alternate stacks, signal-registry and raise regressions;
+the optimized new fixture compares eight native macOS profiles. ARM64 checks
+pass guarded/unaligned records, output/error/alias ordering, disabled history,
+actual callback frame addresses inside guarded stack mappings, eight threads,
+fork reset/reinstallation, restoration before unmap and two runtime lifetimes.
+
+Evidence under `build/ios/fortnite/sigaltstack-checks` includes native probes,
+the retired initial fork diagnostic, seven final generated-C/executable pairs,
+native TSD and optimized ARM64 call-path review, and fresh probe/audit results.
+The probe clears `_sigaltstack` and stops before entry at `_swscanf`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,770 | 391 | 78 |
+| Fortnite executable | 1,771 | 390 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,610 | 394 | 114 |
+| All images | 2,611 | 393 | 114 |
 
-The C++/GLES/Text variant reports 2,624 resolved imports, 380 unresolved strong
+The C++/GLES/Text variant reports 2,625 resolved imports, 379 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
