@@ -11427,17 +11427,60 @@ runners: a terminal diagnostic with no graph/result/context dereference or
 ownership operations. Seven executable/generated-C artifact pairs and joined
 validation logs are archived in the same cohort.
 
+`_$s7SwiftUI19UIViewRepresentablePAAE14_layoutOptionsyAA013_PlatformViewd6LayoutF0V0C4TypeQzFZ`
+now resolves to the default option-producing hook. It initializes `rawValue`
+to 1 in eight bytes of caller-owned storage supplied through x8. The current
+resilient option set stores one Int; its Swift return ABI remains indirect.
+The V ARM64 entry has no borrowed-view, metadata or witness accesses, ownership
+operations, allocation or runtime-storage dependency. Custom options and
+SwiftUI layout/graph execution remain unsupported.
+
+Native metadata reports POD size/stride/alignment 8/8/8. The option-set
+constructor and getter round-trip rawValue 1 across 1,024 protected-boundary
+cases, and 1,024 native AppKit defaults also return 1 through x8. Only the
+eight result bytes change; protected borrowed arguments remain untouched and
+x20/x21 are preserved. The installed UIKit declaration confirms the resilient
+Int-backed type; the pinned OpenSwiftUI default corroborates rawValue 1.
+UIKit execution remains unverified because
+its entry is unavailable on this Mac. Evidence is retained under
+`build/ios/fortnite/swiftui-layout-options-checks`.
+
+The dedicated fixture passes normal and deterministic ASan/UBSan host runs
+with its result hook compiled at O2, plus the optimized ARM64 guest run. It
+checks both protected result-page boundaries, 16,384 concurrent calls across
+eight readers and two runtime lifetimes, 600 borrowed UIView ownership cycles,
+a read-only provider next to an inaccessible page, protected metadata/witness
+arguments, exact framework routing, and calls during and after teardown.
+Only the eight result bytes change; x0-x3/x8/x20/x21 remain intact. Host sizing
+and view-list diagnostic regressions also pass normal and deterministic
+sanitizer runs. The public test driver accepts the new fixture and rejects
+an unknown fixture.
+
+The fresh launch probe links past the layout-options import and exits 1
+before application entry at the next required SwiftUI import,
+`_$s7SwiftUI19UIViewRepresentablePAAE19_identifiedViewTree2inAA011_IdentifiedfG0O0C4TypeQz_tF`.
+Its main-image fixup is `0x10dc9b320`, stub `0x10c63aac4`, forwarder
+`0x107c28e38` and call `0x1015be664`. These two consumer/forwarder sites were
+inspected without executing application code. Fortnite remains unplayable.
+
+The fixture, launch probe and both import audits pass their expected checks.
+Generated C and ARM64 disassembly review of both fixture variants and both
+production runners confirms a constant eight-byte store through x8 and return,
+with no frame, borrowed argument/context reads, ownership, allocation or
+runtime-storage dependency. Seven executable/generated-C artifact pairs and
+joined validation logs are archived in the same cohort.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,827 | 334 | 78 |
+| Fortnite executable | 1,828 | 333 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,667 | 337 | 114 |
+| All images | 2,668 | 336 | 114 |
 
-The C++/GLES/Text variant reports 2,681 resolved imports, 323 unresolved strong
+The C++/GLES/Text variant reports 2,682 resolved imports, 322 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
