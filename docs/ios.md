@@ -177,6 +177,9 @@ and the CFUUID-specific type-ID accessor remain unimplemented.
 `NSCalendarIdentifierISO8601` exposes a shared immutable NSString pointer cell
 through Foundation and CoreFoundation, with the native value `iso8601`.
 Objective-C NSCalendar construction and calendar arithmetic remain unsupported.
+`NSInternalInconsistencyException` exposes its native exception-name NSString
+cell through Foundation and CoreFoundation, including use as an NSError domain.
+Exception throwing and unwinding remain unsupported.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
 The Mach VM adapter supports allocations up to 4 GiB in the current process,
@@ -10425,17 +10428,53 @@ Evidence and seven generated-C/executable pairs are retained under
 clears this import and stops before entry at `_NSInternalInconsistencyException`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_NSInternalInconsistencyException` now exports an aligned NSString pointer
+cell through Foundation and CoreFoundation. Native measurements confirm a
+shared cell containing the exact 32-byte `NSInternalInconsistencyException`
+CFString value. Fortnite loads that cell through its GOT at `0x100092cb4` and
+`0x100094274`, dereferences it into x2 and constructs NSError with code -1 and
+nil userInfo. These are data consumers without a function stub.
+
+The bridge uses a dedicated sealed page with one pointer cell, a CFSTR record
+and NUL-terminated static bytes. Lazy publication holds the runtime lock,
+registers the string before sealing the page read-only, and then publishes the
+shared address. Lookup creates no Objective-C objects or temporary strings.
+Retain/release, autorelease, copying, equality, hashing and dictionary-key use
+follow the existing immutable NSString behavior. Published cells remain
+available to teardown callbacks after cold publication is disabled. The string
+registration and page retire after pools, NSError owners and Swift contexts
+drain. This adds a name constant; Objective-C exception throwing and unwinding
+remain unsupported.
+
+`tests/ios/native-checks.v build-ns-internal-exception` builds the fixture.
+Six host ASan/UBSan runs pass this fixture, Foundation keys and the ISO8601
+identifier. The optimized ARM64 guest fixture also passes.
+Native and runtime checks cover both framework routes, exact data layout and
+text, eight concurrent cold publishers, immutable copying, equal-string
+dictionary lookup and NSError domains with nil or retained userInfo across
+autorelease pools. Two runtime lifetimes check retirement guards, callback
+availability, zero live objects and removal of the constant registration.
+Foundation-key and ISO8601-identifier fixtures cover the existing constant
+storage. Generated C and assembly inspection covers the cell/record/byte layout,
+publication order, allocation behavior and deferred unregister/unmap in the
+fixture and both production runners.
+
+Evidence and seven generated-C/executable pairs are retained under
+`build/ios/fortnite/ns-internal-exception-checks`. The fresh production link
+probe clears this import and stops before entry at `_NSInvalidArgumentException`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,798 | 363 | 78 |
+| Fortnite executable | 1,799 | 362 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,638 | 366 | 114 |
+| All images | 2,639 | 365 | 114 |
 
-The C++/GLES/Text variant reports 2,652 resolved imports, 352 unresolved strong
+The C++/GLES/Text variant reports 2,653 resolved imports, 351 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
