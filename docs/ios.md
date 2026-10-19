@@ -11641,17 +11641,61 @@ input/result/context access, ownership operations, allocation, runtime
 storage or custom witness dispatch. Seven executable/generated-C artifact
 pairs and joined validation logs are archived in the same cohort.
 
+The required SwiftUI import
+`_$s7SwiftUI19UIViewRepresentablePAAE4bodys5NeverOvg` now resolves to the
+primitive `Body == Never` getter. Calling it writes a fixed diagnostic and
+traps with `BRK`/`SIGTRAP`, including when stderr is closed. It does not
+return a value or access caller metadata, witnesses, Swift self or x8.
+Native generic type-name reporting and crash annotations remain unsupported.
+
+The native AppKit counterpart projects the inherited View witness from
+x1, calls its failure path and has a trailing `brk #1`. Two child probes
+deliver `SIGTRAP`, with normal and closed stderr. They use valid native
+EmptyView metadata/View conformance in a read-only surrogate witness
+projection, with protected self/x8; no NSView object is constructed. The
+normal diagnostic says the body must not be called on EmptyView. The SDK
+declares a `Swift.Never` result, and the pinned OpenSwiftUI UIKit source
+calls `bodyError()`. Native UIKit execution remains unverified because its
+entry is unavailable on this Mac. Evidence is retained under
+`build/ios/fortnite/swiftui-body-checks`.
+
+The dedicated fixture passes normal and deterministic ASan/UBSan host runs
+with the getter compiled at O2, plus the optimized ARM64 guest run. Each
+run checks 24 child calls that deliver `SIGTRAP` without returning, the
+fixed diagnostic and closed-stderr path, nil/protected/invalid metadata,
+witnesses and self, protected x8, and unchanged shared read-only/writable
+pages at a protected boundary. Eight readers complete 16,384 concurrent
+resolutions across two runtime lifetimes, with exact framework routing,
+teardown callbacks and calls after shutdown. Bridged-inputs and view-list
+host regressions also pass normal and deterministic sanitizer runs. Public
+fixture routing passes, including rejection of an unknown fixture.
+
+The fresh launch probe links past the body getter and exits 1 before
+application entry at the next required SwiftUI import,
+`_$s7SwiftUI19UIViewRepresentablePAAE9_makeView4view6inputsAA01_F7OutputsVAA11_GraphValueVyxG_AA01_F6InputsVtFZ`.
+Its main-image fixup is `0x10dc9b348`, stub `0x10c63ab00`, forwarder
+`0x107c28e50` and call `0x1015be768`. These two consumer/forwarder sites were
+inspected without executing application code. SwiftUI graph construction
+remains unsupported, and Fortnite remains unplayable.
+
+The body fixture, launch probe and both audits pass their expected checks.
+Generated C and ARM64 disassembly review of both fixture variants and both
+production runners confirms a fixed diagnostic followed by `brk #1`, with
+no return, caller-storage access, ownership operations, allocation or
+runtime storage. Seven executable/generated-C artifact pairs and joined
+validation logs are archived in the same cohort.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,832 | 329 | 78 |
+| Fortnite executable | 1,833 | 328 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,672 | 332 | 114 |
+| All images | 2,673 | 331 | 114 |
 
-The C++/GLES/Text variant reports 2,686 resolved imports, 318 unresolved strong
+The C++/GLES/Text variant reports 2,687 resolved imports, 317 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the

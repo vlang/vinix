@@ -22,6 +22,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		if address := swiftui_layout_traits_symbol(symbol) { return address }
 		if address := swiftui_size_override_symbol(symbol) { return address }
 		if address := swiftui_bridged_inputs_symbol(symbol) { return address }
+		if address := swiftui_body_symbol(symbol) { return address }
 	}
 	if library == '/System/Library/Frameworks/StoreKit.framework/StoreKit' {
 		if address := storekit_constant_symbol(symbol) { return address }
