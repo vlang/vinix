@@ -169,7 +169,9 @@ fail explicitly.
 bytes, accepting the null or system-default allocator. `CFUUIDCreateFromString`
 returns owned values using the measured native parser, including its permissive
 separator and incomplete-input handling. UUIDs compare and hash by value.
-Other CFUUID constructors and byte/string conversion APIs remain unimplemented.
+`CFUUIDCreateFromUUIDBytes` copies a by-value sixteen-byte payload into an owned
+CFUUID without changing any bits. Other CFUUID constructors and byte/string
+conversion APIs remain unimplemented.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
 The Mach VM adapter supports allocations up to 4 GiB in the current process,
@@ -10289,17 +10291,50 @@ Evidence and seven generated-C/executable pairs are retained in
 `_CFUUIDCreateFromString` and stops before entry at `_CFUUIDCreateFromUUIDBytes`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_CFUUIDCreateFromUUIDBytes` now accepts an allocator in x0 and a by-value
+sixteen-byte CFUUIDBytes aggregate in x1/x2, returning an owned CFUUID reference
+in x0. Fortnite's call site loads the two words with `ldp x1, x2, [x8]`, passes
+a null allocator and stores the result. The bridge copies both words into the
+existing inline CFUUID metadata, preserving byte order and every bit, including
+zero or nonstandard version/variant fields. The words are values, so even
+pointer-shaped payloads are accepted without dereferencing them.
+
+Null/default allocators are supported; custom allocators, `kCFAllocatorNull`
+and calls outside the runtime lifetime fail explicitly. Allocator validation
+precedes the single object allocation. The implementation reuses the existing
+CFUUID type, reference/weak-reference cleanup and value equality/hash behavior.
+It adds no UUID sidecar or autorelease, and equal byte/string-created values
+work interchangeably in collection lookup.
+
+`tests/ios/native-checks.v build-cf-uuid-bytes` builds the fixture. Six host
+ASan/UBSan runs pass byte construction, random UUID creation and string parsing.
+A typed native probe verifies 260 payloads, including every bit independently
+set and cleared, zero/all-ones and ascending/descending bytes. The host fixture
+also calls the actual native aggregate ABI through a raw register probe. Its
+261 cases include protected-address-shaped payloads, protected x3–x8 and preserved
+x20/x21. The optimized ARM64 guest fixture verifies the same payloads, rejected
+allocators, owned pool-independent results, equality/hash across constructors,
+set/weak lifetimes, eight concurrent callers and two zero-live-object teardowns.
+Generated C and assembly review verifies the allocator/two-word ABI, locked
+validation, exact scalar-to-inline copies, owned return and static unboxed
+errors in the fixture and both production runners.
+
+Evidence and seven generated-C/executable pairs are retained in
+`build/ios/fortnite/cf-uuid-bytes-checks`. The fresh link probe clears
+`_CFUUIDCreateFromUUIDBytes` and stops before entry at `_CFUUIDCreateString`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,794 | 367 | 78 |
+| Fortnite executable | 1,795 | 366 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,634 | 370 | 114 |
+| All images | 2,635 | 369 | 114 |
 
-The C++/GLES/Text variant reports 2,648 resolved imports, 356 unresolved strong
+The C++/GLES/Text variant reports 2,649 resolved imports, 355 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
