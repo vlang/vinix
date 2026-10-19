@@ -11818,17 +11818,61 @@ witness arguments in x2. This consumer was inspected without executing app
 code. Generic instantiation and SwiftUI graph execution remain unsupported,
 and Fortnite remains unplayable.
 
+The required conformance descriptor
+`_$s7SwiftUI32_EnvironmentKeyTransformModifierVyxGAA04ViewF0AAMc` now resolves
+in the existing environment-transform arena, pointing to the same nominal
+descriptor. Native inspection establishes an unconditional conformance with
+flags zero and a fixed seven-word witness table, despite the nominal type
+being generic. There are no conditional requirements, generic instantiator
+or instantiation cache. Both private protocol declarations retain the native
+six-slot ViewModifier/View signatures and `Self.Body: View` requirement.
+
+The fixed table supports ordinary `_swift_getWitnessTable` lookup without
+reading the unused metadata or argument pointers. Its four graph entries
+exit 1 with an explicit environment-transform diagnostic. Its tagged
+associated-conformance record reports that `Never: View` is unsupported.
+The associated-type slot contains the tagged mangled name `s5NeverO`; the
+current decoder rejects it explicitly before publishing metadata or writing
+the read-only table. Complete modifier specialization, Never resolution and
+environment graph execution remain unsupported.
+
+Native associated-type lookup on a valid Int specialization returns the
+canonical Swift.Never metadata. No native environment values or graph
+operations were executed. The binding introduces no dependent metadata
+arenas or Swift/Objective-C owners; its table, protocols and diagnostics
+share the existing sealed pages and their quiescent retirement.
+
+`tests/ios/native-checks.v build-swiftui-environment-conformance` selects the
+fixture. Normal and deterministic ASan/UBSan host runs pass the new fixture
+with its entry compiled at O2, plus environment-transform nominal and opacity
+regressions. The optimized ARM64 fixture checks eight cold readers and
+concurrent static-table lookup, shared identity, exact protocol signatures,
+protected unused metadata/arguments, twelve terminal graph/body/type child
+probes, tagged data, page permissions, callback access and two drained/unmapped
+lifetimes. The launch probe and both audits also pass their expected checks.
+Generated C and ARM64 review covers both fixture variants and both production
+runners. Seven executable/generated-C pairs, native measurements, SDK/Swift
+ABI snapshots and joined logs are retained under
+`build/ios/fortnite/swiftui-environment-conformance-checks`.
+
+The fresh probe clears the conformance descriptor and exits 1 before
+application entry at `_$s7SwiftUI4FontV5titleACvgZ` (`SwiftUI.Font.title`).
+Its main-image fixup is `0x10dc9b368`, stub `0x10c63ab18`, forwarder
+`0x107c28ebc` and call `0x1015bfdc4`; the caller stores the x0 result at
+`0x1015bfddc`. These two consumer/forwarder sites were inspected without
+executing application code. Fortnite remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,836 | 325 | 78 |
+| Fortnite executable | 1,837 | 324 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,676 | 328 | 114 |
+| All images | 2,677 | 327 | 114 |
 
-The C++/GLES/Text variant reports 2,690 resolved imports, 314 unresolved strong
+The C++/GLES/Text variant reports 2,691 resolved imports, 313 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
