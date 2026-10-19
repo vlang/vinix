@@ -9970,17 +9970,51 @@ link probe clears `_CFLocaleCopyCurrent` and stops before entry at
 `_CFLocaleCopyPreferredLanguages`. Fortnite remains unplayable; the full iOS
 regression is unpassed.
 
+`_CFLocaleCopyPreferredLanguages` now returns an owned immutable NSArray
+snapshot whose NSString elements remain borrowed until retained separately.
+On macOS it copies the complete native preference order, including an empty
+list, and balances the native array and temporary native autorelease pool.
+Each compatibility result has an independent lifetime and survives pool
+drains and the release of other snapshots. Native snapshots support up to
+32 entries and 1,023 UTF-8 bytes per string.
+
+Vinix uses a colon-separated `LANGUAGE` priority list, skips empty entries
+and removes duplicate normalized tags without changing preference order.
+An absent or empty list uses the existing locale environment policy and
+`en_US` compatibility default. The bounded profile supports two/three-letter
+languages, optional scripts/regions and a POSIX variant, plus measured
+Hebrew/Indonesian/Yiddish aliases and Chinese/English canonical forms. It
+accepts at most 32 distinct tags, 128 bytes per source tag and 4,095 bytes in
+`LANGUAGE`; unsupported forms fail explicitly. This is a Vinix configuration
+policy, without a CFPreferences database or full ICU canonicalization.
+
+`tests/ios/native-checks.v build-cf-preferred-languages` builds the fixture.
+Six host ASan/UBSan runs pass preferred-language, current-locale and CF
+dictionary checks. Native measurements compare the full preference list,
+array/element ownership and supported canonical tags. The optimized ARM64
+fixture checks order/deduplication, fallback precedence, 32-entry bounds,
+partial-error cleanup, non-NUL-terminated guarded parser input, protected
+argument/x8 registers, preserved x20/x21, independent snapshots, retained
+elements, eight concurrent callers and two drained runtimes. Generated C
+review verifies stack parsing, array/child cleanup and native ownership.
+
+Native measurements, seven generated-C/executable pairs and fresh probe/audit
+evidence are retained in `build/ios/fortnite/cf-preferred-languages-checks`.
+The link probe clears `_CFLocaleCopyPreferredLanguages` and stops before
+entry at `_CFLocaleGetValue`. Fortnite remains unplayable; the full iOS
+regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,785 | 376 | 78 |
+| Fortnite executable | 1,786 | 375 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,625 | 379 | 114 |
+| All images | 2,626 | 378 | 114 |
 
-The C++/GLES/Text variant reports 2,639 resolved imports, 365 unresolved strong
+The C++/GLES/Text variant reports 2,640 resolved imports, 364 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

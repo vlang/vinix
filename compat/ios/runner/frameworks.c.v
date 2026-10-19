@@ -149,6 +149,9 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	if library == '/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation' && symbol == '_CFLocaleCopyCurrent' {
 		return u64(unsafe { voidptr(cf_locale_copy_current) })
 	}
+	if library == '/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation' && symbol == '_CFLocaleCopyPreferredLanguages' {
+		return u64(unsafe { voidptr(cf_locale_copy_preferred_languages) })
+	}
 	if address := core_foundation_symbol(symbol) { return address }
 	for prefix in ['_OBJC_CLASS_$_', '_OBJC_METACLASS_$_'] {
 		if symbol.starts_with(prefix) {
