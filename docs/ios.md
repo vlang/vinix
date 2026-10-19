@@ -11730,17 +11730,60 @@ graph/input/result/context dereference, ownership operations or runtime
 storage. Seven executable/generated-C artifact pairs and joined validation
 logs are archived in the same cohort.
 
+The required SwiftUI import
+`_$s7SwiftUI19UIViewRepresentablePAAyt11CoordinatorRtzrlE04makeE0yyF`
+now resolves to the empty `makeCoordinator()` default constrained to
+`Coordinator == Void`. Swift Void has no result bytes: the entry creates no
+coordinator, leaves result storage unchanged and does not access borrowed
+self, metadata or witnesses. Custom coordinator implementations and SwiftUI
+graph execution remain unsupported.
+
+The native AppKit counterpart is a single `ret`. It passes 4,000 calls with
+protected arguments and 2,048 read-only/writable self/result boundary calls,
+preserving every byte and x0-x3/x8/x20/x21. The SDK declares the Void
+constraint and result, and the pinned OpenSwiftUI UIKit source supplies an
+empty default. Native UIKit execution remains unverified because its entry
+is unavailable on this Mac. Evidence is retained under
+`build/ios/fortnite/swiftui-coordinator-checks`.
+
+The dedicated fixture passes normal and deterministic ASan/UBSan host runs
+with its default compiled at O2, plus the optimized ARM64 guest run. It
+checks 16,384 concurrent calls across eight readers and two runtime
+lifetimes, 600 ownership cycles with unchanged ObjC/Swift aliases,
+read-only/writable borrowed self and result boundary storage, aliased
+self/result pointers, protected metadata/witness/x8/contexts,
+x0-x3/x8/x20/x21, exact framework routing, and calls during and after
+teardown. The borrowed payload exercises ownership without assuming a
+representable self layout. Bridged-inputs and view-factory host regressions
+also pass normal and deterministic sanitizer runs. Public fixture routing
+passes, including rejection of an unknown fixture.
+
+The fresh launch probe links past the coordinator default and exits 1
+before application entry at the required SwiftUI nominal type descriptor,
+`_$s7SwiftUI32_EnvironmentKeyTransformModifierVMn`. Its main-image fixup is
+`0x10dc9b358` in `__DATA_CONST,__got`; ten indirect context symbolic
+references in `__TEXT,__swift5_typeref` point to this cell. These data
+references were inspected without executing application code. SwiftUI graph
+construction remains unsupported, and Fortnite remains unplayable.
+
+The coordinator fixture, launch probe and both audits pass their expected
+checks. Generated C and ARM64 disassembly review of both fixture variants
+and both production runners confirms an empty hook and one `ret`, with no
+argument/result/context access, ownership operations, allocation, runtime
+storage or custom witness dispatch. Seven executable/generated-C artifact
+pairs and joined validation logs are archived in the same cohort.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,834 | 327 | 78 |
+| Fortnite executable | 1,835 | 326 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,674 | 330 | 114 |
+| All images | 2,675 | 329 | 114 |
 
-The C++/GLES/Text variant reports 2,688 resolved imports, 316 unresolved strong
+The C++/GLES/Text variant reports 2,689 resolved imports, 315 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
