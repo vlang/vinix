@@ -99,6 +99,7 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 	}
 	if address := inverse_hyperbolic_symbol(symbol) { return address }
 	if address := malloc_zone_symbol(symbol) { return address }
+	if address := unfair_lock_symbol(symbol) { return address }
 	if address := random_symbol(symbol) { return address }
 	if address := pthread_symbol(symbol) { return address }
 	if address := stdio_symbol(symbol) { return address }

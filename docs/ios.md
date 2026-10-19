@@ -9335,18 +9335,50 @@ Fortnite probe clears `_nextafterf` and stops before entry at
 `_os_unfair_lock_lock`. Fortnite remains unplayable; the full iOS regression
 is unpassed.
 
+The unfair-lock family now uses the caller's aligned, zero-initialized
+four-byte word, with native thread ownership and sequentially consistent V
+atomics. Lock, try-lock, unlock, owner assertions and the flagged lock entry
+are exported. Contention parks on a private futex on Vinix or the measured
+native address-wait API on macOS. Unlock publishes zero and wakes one waiter;
+interrupted waits and changed values retry acquisition. No per-lock native
+mutex, address registry or heap allocation is needed. The macOS
+`pthread_self` declaration now matches the native pointer return type and
+the current V library; Linux retains its integer handle declaration.
+
+Native checks confirm ownership, nonrecursive misuse, bool try-lock ABI,
+errno preservation and flags zero/`0x40000` (adaptive spinning). The adaptive
+flag uses the blocking path; priority inheritance and owner-death recovery
+are unsupported. Locks remain process-private and address-stable. Unknown
+flags, unaligned/null words, recursive acquisition and non-owner unlocks fail
+explicitly. Fork preserves inherited lock words and obtains fresh native
+thread identities in the child.
+
+`tests/ios/native-checks.v build-unfair-lock` builds the fixture. Six host
+ASan/UBSan runs cover unfair locks, atomic queues and libSystem, with the lock
+fixture optimized. The ARM64 fixture also passes: guarded word boundaries,
+errno, blocked/spurious wakeups, protected-data publication, eight callers,
+fork behavior, isolated misuse rejection and two runtime lifetimes. Generated
+C and optimized ARM64 review check the four-byte atomics, stack CAS expected
+value, native identities, blocking paths and absence of lock-path allocation.
+Seven generated-C/executable pairs and joined validation evidence are retained
+under `build/ios/fortnite/unfair-lock-checks`. The interrupted RAM-backed
+attempt had no persisted results; the complete validation was rebuilt in
+persistent storage. The fresh Fortnite probe clears the unfair-lock imports
+and stops before entry at `_pause`, called at `0x104862d48`. Fortnite remains
+unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,762 | 398 | 79 |
-| EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 176 | 0 | 23 |
-| All images | 2,597 | 401 | 120 |
+| Fortnite executable | 1,766 | 395 | 78 |
+| EOSSDK | 661 | 3 | 16 |
+| MarketplaceKitWrapper | 179 | 0 | 20 |
+| All images | 2,606 | 398 | 114 |
 
-The C++/GLES/Text variant reports 2,611 resolved imports, 387 unresolved strong
-imports and 120 unresolved weak imports, including its native zlib/text backends.
+The C++/GLES/Text variant reports 2,620 resolved imports, 384 unresolved strong
+imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on

@@ -19,7 +19,11 @@ fn C.pthread_cond_broadcast(voidptr) i32
 fn C.pthread_cond_wait(voidptr, voidptr) i32
 fn C.pthread_cond_timedwait(voidptr, voidptr, voidptr) i32
 fn C.pthread_once(voidptr, voidptr) int
-fn C.pthread_self() usize
+$if macos {
+	fn C.pthread_self() voidptr
+} $else {
+	fn C.pthread_self() usize
+}
 
 fn pthread_error(result int) int {
 	if result == C.EAGAIN { return 35 }
