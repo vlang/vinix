@@ -299,6 +299,7 @@ mut:
 	avfoundation_constants_arena u64 // Sealed AVFoundation NSString cells and records.
 	foundation_keys_arena u64 // Sealed Foundation key and calendar-identifier NSString cells.
 	ns_internal_exception_arena u64 // Sealed exception-name NSString cells and CFSTR records.
+	ns_locale_country_arena u64 // Shared NS/CF country-key NSString cell and CFSTR record.
 	devicecheck_arena u64 // Sealed DeviceCheck error-domain cell, CFSTR record and bytes.
 	corehaptics_constants_arena u64 // Sealed CoreHaptics NSString cells, records and bytes.
 	storekit_constants_arena u64 // Sealed StoreKit conversion NSString cells, records and bytes.
@@ -718,6 +719,7 @@ fn objc_stop() {
 	ns_url_session_constants_stop()
 	ns_foundation_keys_stop()
 	ns_internal_exception_stop()
+	ns_locale_country_stop()
 	devicecheck_stop()
 	corehaptics_constants_stop()
 	storekit_constants_stop()

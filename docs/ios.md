@@ -182,6 +182,10 @@ cell through Foundation and CoreFoundation, including use as an NSError domain.
 `NSInvalidArgumentException` exports its distinct NSString name through both
 frameworks and shares the same sealed storage lifetime.
 Exception throwing and unwinding remain unsupported.
+`NSLocaleCountryCode` and `kCFLocaleCountryCode` share one immutable NSString
+pointer cell through Foundation and CoreFoundation, with the native value
+`kCFLocaleCountryCodeKey`. Both spellings work with the existing NSLocale
+`objectForKey:` and `CFLocaleGetValue` country queries.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
 The Mach VM adapter supports allocations up to 4 GiB in the current process,
@@ -10501,17 +10505,49 @@ Evidence and seven generated-C/executable pairs are retained under
 probe clears this import and stops before entry at `_NSLocaleCountryCode`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_NSLocaleCountryCode` now resolves through Foundation and CoreFoundation.
+Native measurements show that it and `_kCFLocaleCountryCode` share the same
+aligned pointer cell and the exact 23-byte NSString value
+`kCFLocaleCountryCodeKey` under both install names. Fortnite's consumer at
+`0x10008cb44` loads the cell through GOT slot `0x10dc9b1c8`, dereferences it
+into x26 and passes the key as the x2 argument to subsequent calls.
+
+Both spellings now use one sealed page containing their shared cell, CFSTR
+record and NUL-terminated bytes at offsets 0, 32 and 64. This replaces the
+CF spelling's separate owned-string storage. Publication registers the constant
+under the runtime lock before sealing the page read-only; cached lookup
+allocates nothing. Retirement rejects cold publication while preserving the
+cached key for destructors. Shutdown unregisters and unmaps it after pools
+and Swift contexts drain.
+
+`tests/ios/native-checks.v build-ns-locale-country` builds the fixture.
+Six host ASan/UBSan runs pass the new fixture and both existing locale fixtures;
+the optimized ARM64 guest fixture also passes. Native and runtime checks cover
+eight mixed-alias concurrent readers, both framework routes, exact storage,
+immutable copying, dictionary-key use and autorelease pools. Locale queries
+through `objectForKey:` and `CFLocaleGetValue` agree for alpha/numeric/script
+regions, absent countries and an equal independently allocated key. Repeated
+queries preserve cached result identity without object growth; retained results
+survive locale release. The fixture also checks currentLocale, retirement
+callbacks and two drained runtime lifetimes. Generated C and assembly review
+covers the fixture and both production runners.
+
+Evidence and seven generated-C/executable pairs are retained under
+`build/ios/fortnite/ns-locale-country-checks`. The fresh production link probe
+clears this import and stops before entry at `_NSLocaleCurrencyCode`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,800 | 361 | 78 |
+| Fortnite executable | 1,801 | 360 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,640 | 364 | 114 |
+| All images | 2,641 | 363 | 114 |
 
-The C++/GLES/Text variant reports 2,654 resolved imports, 350 unresolved strong
+The C++/GLES/Text variant reports 2,655 resolved imports, 349 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
