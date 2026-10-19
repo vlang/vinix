@@ -11470,22 +11470,69 @@ with no frame, borrowed argument/context reads, ownership, allocation or
 runtime-storage dependency. Seven executable/generated-C artifact pairs and
 joined validation logs are archived in the same cohort.
 
+`_$s7SwiftUI19UIViewRepresentablePAAE19_identifiedViewTree2inAA011_IdentifiedfG0O0C4TypeQz_tF`
+now has an exact SwiftUI diagnostic binding. Calling it terminates with
+`iOS: SwiftUI UIViewRepresentable identified-view tree result is not implemented`
+before accessing the borrowed view, Swift self, metadata, witnesses or x8
+result storage. This does not construct an empty tree. The resilient enum's
+metadata and value witnesses, nonempty trees and application rendering remain
+unsupported.
+
+The pinned UIKit default returns `.empty`, but that semantic value is not a
+zero pointer. Native AppKit metadata reports non-POD size/stride/alignment
+169/176/8; the default obtains enum metadata and constructs an indirect result
+through x8. Its current representation has 168 zero payload bytes followed
+by tag 2. UIKit execution and layout remain unverified: this Mac cannot load
+the Catalyst SwiftUI entry into the host process. The compatibility hook does
+not copy this platform-specific layout. Evidence is retained under
+`build/ios/fortnite/swiftui-identified-tree-checks`.
+
+The native default passes 1,024 cases with result storage at both protected
+page boundaries. Only those 169 bytes change, the native enum tag getter
+reports 2, and the native destroy witness accepts each result. Inaccessible
+borrowed arguments are untouched and x20/x21 remain intact. These are AppKit
+observations; they do not verify UIKit's private enum layout.
+
+The diagnostic fixture passes normal and deterministic ASan/UBSan host runs
+with the primary hook compiled at O2, and an optimized ARM64 guest run. Each
+primary run checks 20 child calls exiting 1 with the exact enum diagnostic,
+inaccessible provider/metadata/witness/self/x8 arguments, and unchanged shared
+read-only and writable result pages next to an inaccessible page. Eight
+readers perform 16,384 concurrent resolutions across two drained runtime
+lifetimes, including teardown callbacks. Layout-options and view-list host
+regressions also pass normal and deterministic sanitizer runs. The public
+driver selects the new fixture and rejects an unknown fixture.
+
+The fresh launch probe links past this diagnostic binding and exits 1 before
+application entry at the next required SwiftUI import,
+`_$s7SwiftUI19UIViewRepresentablePAAE21_overrideLayoutTraits_3foryAA01_fG0Vz_0C4TypeQztF`.
+Its main-image fixup is `0x10dc9b328`, stub `0x10c63aad0`, forwarder
+`0x107c28e44` and call `0x1015be700`. These two consumer/forwarder sites were
+inspected without executing application code. This does not establish that
+the identified-tree method can execute; Fortnite remains unplayable.
+
+The fixture, launch probe and both audits pass their expected checks.
+Generated C and ARM64 disassembly review covers both fixture variants and
+both production runners: a terminal diagnostic with no provider/result/context
+dereference or ownership operations. Seven executable/generated-C artifact
+pairs and joined validation logs are archived in the same cohort.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,828 | 333 | 78 |
+| Fortnite executable | 1,829 | 332 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,668 | 336 | 114 |
+| All images | 2,669 | 335 | 114 |
 
-The C++/GLES/Text variant reports 2,682 resolved imports, 322 unresolved strong
+The C++/GLES/Text variant reports 2,683 resolved imports, 321 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
-view-list factory still stop execution when reached; the count does not
-measure functional API coverage.
+view-list factory and identified-tree hook still stop execution when reached;
+the count does not measure functional API coverage.
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on
