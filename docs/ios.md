@@ -9866,17 +9866,57 @@ evidence are retained in `build/ios/fortnite/uname-checks`. The loader clears
 `_uname` and stops before entry at `_vm_read_overwrite`. Fortnite remains
 unplayable; the full iOS regression is unpassed.
 
+`_vm_read_overwrite` now forwards native task reads on macOS and reads the
+current task's memory on Vinix. Its task argument is 32 bits; addresses,
+size and the output-only count are 64 bits. Fortnite passes a stack count
+pointer at `0x1000a8114`. The adapter validates the Mach destination before
+memory arguments and preserves errno. Compatibility receive queues still
+reject this typed RPC; Vinix has no cross-task Mach memory interface.
+
+The Vinix path streams address/permission prefixes from `/proc/self/maps`
+and uses kernel-assisted reads and writes. It accepts readable stack, heap,
+ordinary mmap and compatibility-owned regions. Source bytes are captured
+before destination writes, including overlap. Small snapshots stay on the
+stack; larger snapshots use a temporary mapping that is released on success
+and both copy failures. The descriptor closes on every exit. No mapping is
+added to the compatibility VM registry and no user-space heap allocation is
+retained.
+
+Native measurements distinguish Darwin's 32 KiB kernel-buffer boundary.
+Zero-length calls write a zero count without inspecting either address.
+Requests through 32 KiB reject static holes/protection failures with
+`KERN_INVALID_ADDRESS` and no copied prefix. Larger requests distinguish
+protection failures, can write a valid destination prefix, and still leave
+the count untouched on failure. Successful calls copy the eight-byte count
+last, including unaligned counts and counts that alias source or destination.
+
+`tests/ios/native-checks.v build-vm-read-overwrite` builds the fixture. Six
+host ASan/UBSan runs pass VM-read, uname and memory-entry regressions. Native
+matrix profiles and the optimized ARM64 fixture cover the 32 KiB boundary,
+small/large snapshots, static holes, permission splits, overlap, guarded and
+aliased counts, namespace errors, eight concurrent workers, fork and two
+runtime lifetimes. Generated C and ARM64 review check stack storage,
+descriptor closure and every temporary-mapping release path.
+
+Seven generated-C/executable pairs, native boundary probes and fresh
+probe/audit evidence are retained in
+`build/ios/fortnite/vm-read-overwrite-checks`. Diagnostics preserve the initial
+native function-pointer prototype error, the first guard matrix and the
+fixture's corrected unaligned count read. The loader clears
+`_vm_read_overwrite` and stops before entry at `_vm_region_64`. Fortnite
+remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,782 | 379 | 78 |
+| Fortnite executable | 1,783 | 378 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,622 | 382 | 114 |
+| All images | 2,623 | 381 | 114 |
 
-The C++/GLES/Text variant reports 2,636 resolved imports, 368 unresolved strong
+The C++/GLES/Text variant reports 2,637 resolved imports, 367 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
