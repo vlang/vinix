@@ -9906,17 +9906,49 @@ fixture's corrected unaligned count read. The loader clears
 `_vm_read_overwrite` and stops before entry at `_vm_region_64`. Fortnite
 remains unplayable; the full iOS regression is unpassed.
 
+`_vm_region_64` now has a seven-argument ABI bridge. macOS forwards queries
+to the native task, including basic, legacy basic, top and extended records,
+returned object rights and native output order. Vinix validates the Mach
+destination, then streams `/proc/self/maps` bounds to distinguish end-of-map
+from unavailable metadata. Native measurements show that end-of-map takes
+precedence over invalid flavors and short counts. Basic/legacy/extended
+records require nine words; top records require five.
+
+Vinix returns `KERN_NOT_SUPPORTED` for valid region-metadata requests and
+leaves every caller-owned buffer unchanged. Its exported map view lacks the
+complete Mach wire/inheritance attributes, object statistics and Darwin
+allocation tags needed for those records. Fortnite requests extended flavor
+13 with nine words and examines an allocation tag; that request remains
+unsupported on Vinix. No tags, object names or residency values are invented.
+Lookup uses fixed stack buffers and closes its descriptor on every exit;
+the bridge preserves errno and adds no heap lifetime or Mach references.
+
+`tests/ios/native-checks.v build-vm-region-64` builds the fixture. Six host
+ASan/UBSan runs pass region, read-overwrite and memory-entry regressions.
+Four native profiles compare complete guarded records, count thresholds,
+split protections, holes and unaligned/overlapping outputs. The optimized
+ARM64 fixture checks unchanged unsupported outputs, namespace/error
+precedence, bounded hex parsing, dirty upper arguments, eight concurrent
+workers, fork and two runtimes. Generated C and ARM64 review cover the ABI,
+descriptor cleanup and absence of Vinix output writes.
+
+Native measurements, seven generated-C/executable pairs and fresh
+probe/audit evidence are retained in
+`build/ios/fortnite/vm-region-64-checks`. The link probe clears
+`_vm_region_64` and stops before entry at `_CFLocaleCopyCurrent`. Fortnite
+remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,783 | 378 | 78 |
+| Fortnite executable | 1,784 | 377 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,623 | 381 | 114 |
+| All images | 2,624 | 380 | 114 |
 
-The C++/GLES/Text variant reports 2,637 resolved imports, 367 unresolved strong
+The C++/GLES/Text variant reports 2,638 resolved imports, 366 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

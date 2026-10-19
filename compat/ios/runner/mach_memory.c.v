@@ -141,6 +141,7 @@ fn mach_memory_stop() {
 fn mach_memory_symbol(symbol string) ?u64 {
 	if address := mach_memory_entry_symbol(symbol) { return address }
 	return match symbol {
+		'_vm_region_64' { u64(unsafe { voidptr(darwin_vm_region_64) }) }
 		'_vm_read_overwrite' { u64(unsafe { voidptr(darwin_vm_read_overwrite) }) }
 		'_vm_allocate' { u64(unsafe { voidptr(darwin_vm_allocate) }) }
 		'_vm_remap' { u64(unsafe { voidptr(darwin_vm_remap) }) }
