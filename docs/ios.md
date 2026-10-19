@@ -9770,17 +9770,51 @@ delivery. The probe clears `_thread_resume` and stops before entry at
 register mutation and kernel exception delivery remain unsupported on Vinix.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_thread_suspend` now forwards real Mach suspension on macOS. Native
+measurements verify nested counts from zero to one to two, balanced resumes,
+and self-suspension observed and resumed by another thread. The V adapter
+releases the shared namespace lock before suspending, so an adapter thread
+can acquire it to resume a suspended caller.
+
+Vinix returns `KERN_NOT_SUPPORTED` for live thread destinations because it
+has no individual-thread suspension backend. It does not stop the process,
+install a signal handler, change a suspension count or claim success.
+Subsequent resume calls retain the zero-count `KERN_FAILURE` behavior.
+Destination errors distinguish wrong kernel-object kinds, missing send
+rights, retired names and compatibility receive queues. `errno` and Mach
+references are preserved.
+
+`tests/ios/native-checks.v build-thread-suspend` builds the fixture. It covers
+native nested/self suspension, balanced resumes, eight concurrent and retired
+workers, unchanged send/dead references, right removal and reacquisition,
+dirty upper argument bits, fork and two runtime lifetimes.
+
+Six host ASan/UBSan runs pass suspension, resume and state-query regressions;
+twelve native profiles include nested counts and a different adapter thread
+resuming the suspended caller. The optimized ARM64 fixture passes explicit
+unsupported results without changing subsequent resume behavior. Generated C
+and ARM64 review confirm no adapter allocation, right mutation, remote pthread
+dereference or signal delivery.
+
+Native measurements, seven generated-C/executable pairs and fresh probe/audit
+evidence are retained in `build/ios/fortnite/thread-suspend-checks`. The probe
+clears `_thread_suspend` and stops before entry at
+`_thread_swap_exception_ports`. Individual-thread suspension, general/remote
+register capture, register mutation and kernel exception delivery remain
+unsupported on Vinix. Fortnite remains unplayable; the full iOS regression is
+unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,779 | 382 | 78 |
+| Fortnite executable | 1,780 | 381 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,619 | 385 | 114 |
+| All images | 2,620 | 384 | 114 |
 
-The C++/GLES/Text variant reports 2,633 resolved imports, 371 unresolved strong
+The C++/GLES/Text variant reports 2,634 resolved imports, 370 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
