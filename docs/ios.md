@@ -195,7 +195,10 @@ Currency-value queries remain explicitly unsupported.
 cell through Foundation and CoreFoundation, with the native value
 `NSURLCreationDateKey`. `NSURLFileSizeKey` and `kCFURLFileSizeKey` share a
 distinct cell in the same sealed page, with the native value `NSURLFileSizeKey`.
-URL resource-date and file-size lookup remain unsupported.
+`NSURLIsExcludedFromBackupKey` and `kCFURLIsExcludedFromBackupKey` share a third
+cell with the native NSString value `NSURLIsExcludedFromBackupKey`.
+URL resource-date and file-size lookup, and backup-exclusion metadata reads
+and writes, remain unsupported.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
 The Mach VM adapter supports allocations up to 4 GiB in the current process,
@@ -10683,17 +10686,51 @@ Evidence and seven generated-C/executable pairs are retained under
 clears this import and stops before entry at `_NSURLIsExcludedFromBackupKey`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_NSURLIsExcludedFromBackupKey` now resolves through Foundation and
+CoreFoundation. Native measurements confirm that it and
+`_kCFURLIsExcludedFromBackupKey` share one aligned NSString pointer cell under
+both install names, containing the exact 28-byte value
+`NSURLIsExcludedFromBackupKey`. Its cell and NSString are distinct from the
+creation-date and file-size keys. Four inspected consumers load GOT slot
+`0x10dc9b1f0`: `0x10004d49c` dereferences the key into x25 for a one-key
+NSArray, `0x1006279d4` loads it into x19, and `0x100087ef0` and `0x1006281d0`
+pass it in x3 alongside NSNumber values. Backup-exclusion metadata reads and
+writes remain unsupported.
+
+The shared URL-resource page preserves both existing layouts and adds the
+backup-exclusion cell, CFSTR record and NUL-terminated text at offsets 16,
+192 and 224. All three constants register under the runtime lock before
+read-only publication. Cached lookup allocates nothing. Shutdown keeps all
+three keys available to callbacks until pools and Swift contexts drain,
+then unregisters them before unmapping the page.
+
+`tests/ios/native-checks.v build-ns-url-backup-exclusion` builds the fixture.
+Six host ASan/UBSan runs pass the new fixture and the existing file-size and
+creation-date fixtures. The optimized ARM64 guest fixture also passes.
+Native and runtime checks cover eight readers alternating all three keys
+and their NS/CF aliases under both framework routes, exact distinct storage,
+immutable copying, CFHash and equal-string dictionary lookup. Retained
+three-key and backup-only NSArrays and an NSNumber dictionary survive pool
+drain. Two runtime lifetimes check isolated storage, retirement guards,
+callback access, zero live objects and removal of all three registrations.
+Generated C and assembly review covers the fixture and both production runners.
+
+Evidence and seven generated-C/executable pairs are retained under
+`build/ios/fortnite/ns-url-backup-exclusion-checks`. The fresh production link
+probe clears this import and stops before entry at `_NSURLIsRegularFileKey`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,805 | 356 | 78 |
+| Fortnite executable | 1,806 | 355 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,645 | 359 | 114 |
+| All images | 2,646 | 358 | 114 |
 
-The C++/GLES/Text variant reports 2,659 resolved imports, 345 unresolved strong
+The C++/GLES/Text variant reports 2,660 resolved imports, 344 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
