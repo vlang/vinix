@@ -298,6 +298,7 @@ mut:
 	coremedia_constants_arena u64 // Sealed format-description CFString cells and records.
 	avfoundation_constants_arena u64 // Sealed AVFoundation NSString cells and records.
 	foundation_keys_arena u64 // Sealed Foundation key and calendar-identifier NSString cells.
+	url_resource_keys_arena u64 // Shared NSURL/CFURL resource-key NSString cells and CFSTR records.
 	ns_internal_exception_arena u64 // Sealed exception-name NSString cells and CFSTR records.
 	ns_locale_country_arena u64 // Sealed NS/CF country, currency-code and currency-symbol key cells/CFSTRs.
 	devicecheck_arena u64 // Sealed DeviceCheck error-domain cell, CFSTR record and bytes.
@@ -718,6 +719,7 @@ fn objc_stop() {
 	ns_url_error_stop()
 	ns_url_session_constants_stop()
 	ns_foundation_keys_stop()
+	ns_url_resource_keys_stop()
 	ns_internal_exception_stop()
 	ns_locale_country_stop()
 	devicecheck_stop()

@@ -41,6 +41,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		if address := ns_invalid_argument_symbol(symbol) { return address }
 		if address := ns_locale_country_symbol(symbol) { return address }
 		if address := ns_locale_currency_symbol(symbol) { return address }
+		if address := ns_url_resource_key_symbol(symbol) { return address }
 	}
 	// The IPA imports this NSString pointer global through CoreFoundation.
 	if library == '/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation'
