@@ -156,6 +156,8 @@ User defaults use an atomically replaced per-bundle plist under
 or its bundle identifier and reports write failures. Other domains return false.
 `CFPreferencesCopyAppValue` returns an owned immutable snapshot, with registered
 defaults as a fallback; unsupported application domains fail explicitly.
+`CFPreferencesSetAppValue` stages copied values or removes keys; synchronization
+flushes these changes through the shared standard-defaults store.
 App groups, custom preference suites and security-scoped bookmarks are unsupported.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
@@ -10111,17 +10113,55 @@ Evidence, diagnostics and seven generated-C/executable pairs are retained in
 `_CFPreferencesSetAppValue`. Fortnite remains unplayable; the full iOS regression
 is unpassed.
 
+`_CFPreferencesSetAppValue` now stages changes in the current application's
+shared defaults store. Its three-pointer ABI returns void. A nil value removes
+the application's key, exposing a registered fallback if one exists; removing
+an absent key is harmless. Non-nil values are copied immediately to immutable
+property-list trees, and the store owns a copy of the key. Caller-owned values
+can be released or mutable containers changed after the call. Existing copied
+results remain valid after replacement or removal.
+
+The setter accepts the current-app constant or bundle identifier and allocated
+or registered image strings. It validates the complete supported tree under
+the same runtime lock as reads and synchronization before changing the store.
+Invalid arguments, unsupported domains or object types, raw CF collections,
+cycles/excessive depth, data over 16 MiB and non-finite real numbers fail
+explicitly. Rejected updates preserve existing values. The supported profile
+uses strings, signed integers, finite reals, Booleans, data, arrays and
+string-keyed dictionaries; dates and broader preference domains remain unsupported.
+
+CF setters perform no file writes. `CFPreferencesAppSynchronize` flushes the
+shared application source and reports persistence failures, leaving staged
+values available for retry. Existing eager `NSUserDefaults` setters also flush
+that shared source. Registered defaults remain separate from persisted values.
+
+`tests/ios/native-checks.v build-cf-preferences-set` builds the fixture. Six host
+ASan/UBSan runs pass setter, lookup and synchronization checks. Native probes
+measure value copying, equal-key lookup, nil removal, all seven supported plist
+types and persistence through an isolated temporary domain. The optimized ARM64
+fixture checks protected x3–x8 registers and preserved x20/x21, the void return
+contract, caller ownership, mutable-input isolation, image constants, rejected
+updates without mutation, repeated/concurrent replacements and removals,
+registration fallback, failure/retry synchronization and restart persistence.
+Generated C and assembly review checks validation before mutation, owned
+key/value transfer, serializer cleanup and absence of setter file writes.
+
+Evidence, diagnostics and seven generated-C/executable pairs are retained in
+`build/ios/fortnite/cf-preferences-set-checks`. The fresh link probe clears
+`_CFPreferencesSetAppValue` and stops before entry at `_CFRunLoopGetMain`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,789 | 372 | 78 |
+| Fortnite executable | 1,790 | 371 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,629 | 375 | 114 |
+| All images | 2,630 | 374 | 114 |
 
-The C++/GLES/Text variant reports 2,643 resolved imports, 361 unresolved strong
+The C++/GLES/Text variant reports 2,644 resolved imports, 360 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
