@@ -11773,17 +11773,62 @@ argument/result/context access, ownership operations, allocation, runtime
 storage or custom witness dispatch. Seven executable/generated-C artifact
 pairs and joined validation logs are archived in the same cohort.
 
+The required nominal descriptor
+`_$s7SwiftUI32_EnvironmentKeyTransformModifierVMn` now resolves through
+SwiftUI.framework to sealed type identity and its generic signature. Native
+measurement establishes a unique generic struct in module SwiftUI, one
+unconstrained type parameter, one key argument, no generic requirements and
+two fields with their offset vector at metadata word three. The frozen SDK
+declaration stores a writable environment key path and a transform closure.
+Native Int, String and Never specializations each have size/stride 24, field
+offsets 0/8, ownership flags `0x10007` and 2,147,483,647 extra inhabitants.
+
+This binding supplies no complete specialization metadata, value witnesses,
+field reflection, instantiation cache/pattern or ViewModifier conformance.
+Key-path and closure ownership and environment execution remain unsupported.
+The generic bit makes direct and indirect symbolic lookup reject before
+reading the accessor or protected generic arguments. Calling the diagnostic
+accessor reports
+`iOS: SwiftUI environment transform generic instantiation is not implemented`.
+
+One locked allocation publishes an RX diagnostic page and a read-only
+descriptor page. Cached identity remains available during earlier teardown
+callbacks; Swift owners and Array metadata drain before both pages unmap.
+Retirement guards prevent late allocation and resolution after unmapping.
+
+`tests/ios/native-checks.v build-swiftui-environment-transform` selects the
+fixture. Normal and deterministic ASan/UBSan host runs pass the new fixture
+with its entry compiled at O2, plus ModifiedContent and mangled-state lookup
+regressions. The optimized ARM64 fixture checks eight cold readers, native
+signature and page permissions, bounded direct/indirect symbolic references,
+protected arguments, four diagnostic requests per lifetime, callback access
+and two drained/unmapped lifetimes. The launch probe and both import audits
+also pass their expected checks. Generated C and ARM64 review covers locked
+publication, generic rejection and retirement in both fixture variants and
+both production runners. Seven executable/generated-C pairs, native
+measurements, SDK/Swift ABI snapshots and joined logs are retained under
+`build/ios/fortnite/swiftui-environment-transform-checks`.
+
+The fresh launch probe clears the nominal descriptor and exits 1 before
+application entry at its ViewModifier conformance descriptor,
+`_$s7SwiftUI32_EnvironmentKeyTransformModifierVyxGAA04ViewF0AAMc`.
+Its GOT cell is `0x10dc9b360`. The load at `0x1015c17f8` passes this descriptor
+as x0 to `_swift_getWitnessTable` at `0x1015c17fc`, with metadata in x1 and
+witness arguments in x2. This consumer was inspected without executing app
+code. Generic instantiation and SwiftUI graph execution remain unsupported,
+and Fortnite remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,835 | 326 | 78 |
+| Fortnite executable | 1,836 | 325 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,675 | 329 | 114 |
+| All images | 2,676 | 328 | 114 |
 
-The C++/GLES/Text variant reports 2,689 resolved imports, 315 unresolved strong
+The C++/GLES/Text variant reports 2,690 resolved imports, 314 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
