@@ -12,6 +12,8 @@ type SwiftAnyDestroyCall = fn (u64,u64)
 
 fn swift_any_full_metadata() u64 { return swift_error_metadata_arena() + u64(C.getpagesize()) + 448 }
 fn swift_any_box_metadata_checked(metadata u64) !u64 {
+	if ios_runtime != unsafe { nil } && !ios_runtime.swiftui_text_view_retired && ios_runtime.swiftui_text_view_arena != 0
+		&& metadata == ios_runtime.swiftui_text_view_arena + u64(C.getpagesize()) + 512 { return metadata + 176 }
 	if ios_runtime != unsafe { nil } && !ios_runtime.storefront_retired && ios_runtime.storefront_code != 0
 		&& metadata == ios_runtime.storefront_code + u64(C.getpagesize()) + 32 { return metadata + 288 }
 	full := swift_any_full_metadata()

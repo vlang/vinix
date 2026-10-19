@@ -7,12 +7,8 @@ fn (_ &SwiftUITextViewFailure) code() int { return 1 }
 __global swiftui_text_view_failure_value = SwiftUITextViewFailure{}
 fn swiftui_text_view_failure() IError { return unsafe { &swiftui_text_view_failure_value } }
 
-// These declaration descriptors identify the conformance only. Text's String,
-// modifier array and providers require real value witnesses before metadata can
-// be supplied. Never metadata and its View conformance are also unsupported.
-fn swiftui_text_view_metadata_unavailable(request u64) SwiftAssociatedMetadata {
-	panic('iOS: SwiftUI Text metadata and value ownership are not implemented')
-}
+// Text shares nominal identity with its complete value metadata. Never's
+// metadata/conformance and SwiftUI graph execution remain unsupported.
 fn swiftui_text_view_never_unavailable(request u64) SwiftAssociatedMetadata {
 	panic('iOS: SwiftUI Text Body Never metadata is not implemented')
 }
@@ -41,11 +37,11 @@ fn swiftui_text_view_arena_checked() !u64 {
 	arena := C.mmap(unsafe { nil }, usize(page * 2), C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
 	if arena == voidptr(-1) { return swiftui_text_view_failure() }
 	base := u64(arena); data := base + page
-	for i, target in [u64(unsafe { voidptr(swiftui_text_view_metadata_unavailable) }),
-		u64(unsafe { voidptr(swiftui_text_view_never_unavailable) }),
+	for i, target in [u64(0), u64(unsafe { voidptr(swiftui_text_view_never_unavailable) }),
 		u64(unsafe { voidptr(swiftui_text_view_graph_unavailable) }),
 		u64(unsafe { voidptr(swiftui_text_view_body_unavailable) })]! {
 		entry := base + u64(i * 16)
+		if i == 0 { continue }
 		write32(entry, 0x58000050); write32(entry + 4, 0xd61f0200)
 		unsafe { *(&u64(entry + 8)) = target }
 	}
@@ -53,7 +49,7 @@ fn swiftui_text_view_arena_checked() !u64 {
 	write32(data, 0x51)
 	swift_protocol_relative(data + 4, data + 64)
 	swift_protocol_relative(data + 8, data + 96)
-	swift_protocol_relative(data + 12, base)
+	swift_protocol_relative(data + 12, base + 64)
 	write32(data + 20, 2); write32(data + 24, 2)
 	swift_protocol_relative(data + 72, data + 80)
 	C.memcpy(voidptr(data + 80), c'SwiftUI', 8)
@@ -101,7 +97,8 @@ fn swiftui_text_view_arena_checked() !u64 {
 	// A tagged symbolic name referring indirectly to the Never descriptor.
 	swiftui_text_view_relative_bytes(data + 465, data + 192)
 	for i in u64(3) .. 7 { unsafe { *(&u64(table + i * 8)) = base + 32 } }
-	C.__builtin___clear_cache(arena, voidptr(base + 64))
+	swiftui_text_metadata_emit(base, data)
+	C.__builtin___clear_cache(arena, voidptr(base + 120))
 	if C.mprotect(arena, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(voidptr(data), usize(page), C.PROT_READ) != 0 {
 		if C.munmap(arena, usize(page * 2)) != 0 { panic('iOS: cannot retire unsealed SwiftUI Text View table') }
@@ -124,6 +121,7 @@ fn swiftui_text_view_stop() {
 fn swiftui_text_view_symbol(symbol string) ?u64 {
 	offset := match symbol {
 		'_$s7SwiftUI4TextVMn' { u64(0) }
+		'_$s7SwiftUI4TextVN' { u64(512) }
 		'_$s7SwiftUI4TextVAA4ViewAAWP' { u64(384) }
 		else { return none }
 	}

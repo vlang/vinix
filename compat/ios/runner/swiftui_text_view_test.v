@@ -52,7 +52,7 @@ fn text_view_signature(conformance u64,native bool){
   base:=ios_runtime.swiftui_text_view_arena;data:=base+u64(C.getpagesize())
   assert nominal==data&&conformance==data+352&&table==data+384&&never==data+112&&view==data+208
   assert read64(table+8)==((data+448)|1)&&read64(table+16)==((data+464)|1)&&text_view_relative(record+2)==base+48
-  assert text_view_relative(nominal+12)==base&&text_view_relative(never+12)==base+16
+  assert text_view_relative(nominal+12)==base+64&&text_view_relative(never+12)==base+16
   for i in u64(3)..7{assert read64(table+i*8)==base+32}
   path:=text_view_relative(view+28);for j,byte in [u8(`4`),`B`,`o`,`d`,`y`,2]!{assert unsafe{*(&u8(path+u64(j)))}==byte}
   assert read64(text_view_relative(path+6))==view&&text_view_text(path+10)=='Qz'
@@ -66,14 +66,13 @@ fn text_view_rejection(conformance u64){
  table:=text_view_relative(conformance+8);modifier:=text_view_indirect(conformance)
  lookup:=unsafe{TextViewLookup(voidptr(runtime_symbol('/usr/lib/swift/libswiftCore.dylib','_swift_getWitnessTable') or {panic(err)}))}
  for metadata in [u64(0),guard,~u64(0)]!{for _ in 0..64{assert swift_witness_table_checked(conformance,metadata,guard) or {panic(err)}==table;assert lookup(conformance,metadata,guard)==table}}
- for slot in [u64(3),4,5,6,1,2,0,7]!{
+ for slot in [u64(3),4,5,6,1,2,7]!{
   mut fds:=[2]i32{};assert C.pipe(unsafe{&fds[0]})==0;pid:=C.ios_fork();assert pid>=0
   if pid==0{
    C.close(fds[0]);assert C.dup2(fds[1],2)==2;C.close(fds[1])
    if slot==7{swift_mangled_lookup_request_checked(0xff,read64(table+16)&~u64(1),5,guard,guard) or {panic(err)}}
    else if slot>=3{call:=unsafe{TextViewGraph(voidptr(read64(table+slot*8)))};call(guard,guard,guard,guard)}
    else if slot==1{record:=read64(table+8)&~u64(1);call:=unsafe{TextViewBody(voidptr(text_view_relative(record+2)))};call(guard,guard,guard)}
-   else if slot==0{call:=unsafe{TextViewMetadata(voidptr(text_view_relative(text_view_nominal()+12)))};call(~u64(0))}
    else{swift_associated_type(0x1ff,table,guard,modifier+28,modifier+44)}
    C._exit(0)
   }
@@ -81,7 +80,7 @@ fn text_view_rejection(conformance u64){
   for{assert length<bytes.len;count:=C.read(fds[0],unsafe{&bytes[length]},usize(bytes.len-length));if count==0{break};if count<0&&unsafe{*C.ios_errno_address()}==C.EINTR{continue};assert count>0;length+=int(count)}
   C.close(fds[0]);mut status:=i32(0);assert C.ios_waitpid(pid,&status,0)==pid&&status==256
   output:=unsafe{tos(&bytes[0],length)}
-  expected:=if slot==7{'iOS: SwiftUI Text Body Never metadata is not implemented'}else if slot>=3{'iOS: SwiftUI Text View graph operations are not implemented'}else if slot==1{'iOS: SwiftUI Text Body Never View conformance is not implemented'}else if slot==0{'iOS: SwiftUI Text metadata and value ownership are not implemented'}else{'iOS: Swift associated-type mangled name is not implemented'}
+  expected:=if slot==7{'iOS: SwiftUI Text Body Never metadata is not implemented'}else if slot>=3{'iOS: SwiftUI Text View graph operations are not implemented'}else if slot==1{'iOS: SwiftUI Text Body Never View conformance is not implemented'}else{'iOS: Swift associated-type mangled name is not implemented'}
   assert output.contains(expected)&&!output.contains('runtime error:')&&!output.contains('AddressSanitizer')
  }
  assert read64(table+16)&1!=0&&C.munmap(voidptr(guard),page)==0
@@ -98,7 +97,7 @@ fn test_swiftui_text_view(){
 	for _ in 0..2{
 		objc_start();assert ios_runtime.swiftui_text_view_arena==0&&!ios_runtime.swiftui_text_view_retired
 		ios_runtime.swift_concurrency_retired=true;if _:=swiftui_text_view_arena_checked(){assert false};ios_runtime.swift_concurrency_retired=false
-		for symbol in ['_$s7SwiftUI4TextVN','_$s7SwiftUI4TextVMnExtra','_$s7SwiftUI4TextVAA4ViewAAMc','_$s7SwiftUI4TextVMa','_$s7SwiftUI4TextVAA4ViewAAWPExtra','_$s11SwiftUICore4TextVAA4ViewAAWP']!{if _:=swiftui_text_view_symbol(symbol){assert false}};assert ios_runtime.swiftui_text_view_arena==0
+		for symbol in ['_$s7SwiftUI4TextVNExtra','_$s7SwiftUI4TextVMnExtra','_$s7SwiftUI4TextVAA4ViewAAMc','_$s7SwiftUI4TextVMa','_$s7SwiftUI4TextVAA4ViewAAWPExtra','_$s11SwiftUICore4TextVAA4ViewAAWP']!{if _:=swiftui_text_view_symbol(symbol){assert false}};assert ios_runtime.swiftui_text_view_arena==0
 		mut workers:=[]thread u64{};for _ in 0..8{workers<<spawn text_view_reader()};mut conformance:=u64(0);for i,worker in workers{candidate:=worker.wait();if i==0{conformance=candidate}else{assert conformance==candidate}};unsafe{workers.free()}
 		text_view_signature(conformance,false);text_view_rejection(conformance)
 		for library in ['/usr/lib/swift/libswiftCore.dylib','/System/Library/Frameworks/Foundation.framework/Foundation','/System/Library/Frameworks/SwiftUICore.framework/SwiftUICore']!{if _:=runtime_symbol(library,'_$s7SwiftUI4TextVAA4ViewAAWP'){assert false}}
@@ -108,5 +107,5 @@ fn test_swiftui_text_view(){
 		assert text_view_teardown_calls==before+1&&ios_runtime.swiftui_text_view_arena==0&&ios_runtime.swiftui_text_view_retired&&ios_runtime.live==0&&ios_runtime.objects.len==0
 		$if macos{assert C.mprotect(voidptr(base),page*2,C.PROT_READ)==-1}$else{mut residency:=[u8(0),0]!;assert C.mincore(voidptr(base),page*2,unsafe{&residency[0]})==-1};if _:=swiftui_text_view_arena_checked(){assert false}
 	}
-	println('IOS-SWIFTUI-TEXT-VIEW: eight cold readers, native seven-word table and indirect Text identity, tagged symbolic Never and conformance data, sealed RX/RO pages, protected unused metadata and arguments, 16 terminal graph/body/metadata child probes, exact framework routing, callbacks and two drained/unmapped lifetimes; Text metadata/value ownership and rendering remain unsupported')
+	println('IOS-SWIFTUI-TEXT-VIEW: eight cold readers, native seven-word table and indirect Text identity, tagged symbolic Never and conformance data, sealed RX/RO pages, protected unused metadata and arguments, 14 terminal graph/body/metadata child probes, exact framework routing, callbacks and two drained/unmapped lifetimes; SwiftUI Text construction, graph execution and rendering remain unsupported')
 }

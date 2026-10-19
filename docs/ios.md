@@ -12029,17 +12029,53 @@ These two data consumers were inspected without executing application code.
 Text ownership and SwiftUI graph execution remain unsupported; Fortnite
 remains unplayable.
 
+The Text metadata slice binds `_$s7SwiftUI4TextVN` to complete struct metadata
+sharing the existing Text nominal descriptor and View table. Its measured
+layout is size/stride 32, field offsets 0/24, flags `0x02030007` and
+`INT32_MAX` extra inhabitants. The nominal accessor returns the same complete
+metadata through direct and bounded symbolic lookups.
+
+All eight value witnesses now handle Text's frozen String/object storage
+and modifier-array owner. Copying retains both owners; takes transfer them.
+Copies and assignments preserve the seven padding bytes after the storage
+tag, while initializing take copies all 32 bytes. Native deallocation probes
+confirm that assignments publish new storage before releasing its previous
+owner, then update the array. Registered non-inline boxes support shared
+buffer copies and Any, validate their provenance and destroy Text before
+deallocating the box. Field reflection, Text construction, graph execution
+and rendering remain unsupported.
+
+`tests/ios/native-checks.v build-swiftui-text-metadata` selects the fixture.
+Normal and deterministic ASan/UBSan runs cover its O2 entry plus nominal and
+View regressions. Native and runner fixtures compare all String/object
+assignment combinations, callback-visible state and reference counts,
+read-only source spans, padding, guarded enum boundaries, shared boxes and
+Any. A heap String shared by Text storage and a typed array verifies final
+element destruction. Eight cold readers and two drained lifetimes exercise
+publication and retirement. Native measurements, SDK/Swift ABI snapshots,
+seven executable/generated-C pairs and joined logs are retained under
+`build/ios/fortnite/swiftui-text-metadata-checks`.
+
+The fresh launch resolves Text metadata and exits 1 during linking at its
+localized-string initializer
+`_$s7SwiftUI4TextV_9tableName6bundle7commentAcA18LocalizedStringKeyV_SSSgSo8NSBundleCSgs06StaticI0VSgtcfC`.
+Its fixup is `0x10dc9b398`, stub `0x10c63ab3c` and forwarder `0x107c28eb8`.
+The calls at `0x1015bfd8c` and `0x1015c01e4` pass a literal LocalizedStringKey,
+nil table/bundle/comment arguments and receive Text in x0-x3. These sites
+were inspected without executing application code. Fortnite remains
+unplayable, with Text construction and SwiftUI graph/rendering still absent.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,842 | 319 | 78 |
+| Fortnite executable | 1,843 | 318 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,682 | 322 | 114 |
+| All images | 2,683 | 321 | 114 |
 
-The C++/GLES/Text variant reports 2,696 resolved imports, 308 unresolved strong
+The C++/GLES/Text variant reports 2,697 resolved imports, 307 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the

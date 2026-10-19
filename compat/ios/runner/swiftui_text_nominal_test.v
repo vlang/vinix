@@ -39,23 +39,11 @@ fn text_nominal_signature(descriptor u64,table u64,native bool){
 	assert text_nominal_relative(descriptor+12)!=0
 	if !native{
 		assert descriptor==ios_runtime.swiftui_text_view_arena+u64(C.getpagesize())&&table==descriptor+384
-		assert read32(descriptor+16)==0&&text_nominal_relative(descriptor+12)==ios_runtime.swiftui_text_view_arena
+		assert read32(descriptor+16)==0&&text_nominal_relative(descriptor+12)==ios_runtime.swiftui_text_view_arena+64
 		text_nominal_protection(ios_runtime.swiftui_text_view_arena,64,true);text_nominal_protection(descriptor,488,false)
 	}
 }
-fn text_nominal_terminal(descriptor u64,name u64,guard u64,request u64,symbolic bool){
-	mut fds:=[2]i32{};assert C.pipe(unsafe{&fds[0]})==0;pid:=C.ios_fork();assert pid>=0
-	if pid==0{
-		C.close(fds[0]);assert C.dup2(fds[1],2)==2;C.close(fds[1])
-		if symbolic{swift_mangled_state_lookup_checked(request,name,5,guard,guard) or {panic(err)}}
-		else{call:=unsafe{TextNominalAccess(voidptr(text_nominal_relative(descriptor+12)))};call(request)}
-		C._exit(0)
-	}
-	C.close(fds[1]);mut bytes:=[16384]u8{};mut length:=0
-	for{assert length<bytes.len;count:=C.read(fds[0],unsafe{&bytes[length]},usize(bytes.len-length));if count==0{break};if count<0&&unsafe{*C.ios_errno_address()}==C.EINTR{continue};assert count>0;length+=int(count)}
-	C.close(fds[0]);mut status:=i32(0);assert C.ios_waitpid(pid,&status,0)==pid&&status==256
-	output:=unsafe{tos(&bytes[0],length)};assert output.contains('iOS: SwiftUI Text metadata and value ownership are not implemented')&&!output.contains('runtime error:')&&!output.contains('AddressSanitizer')
-}
+fn text_nominal_lookup(descriptor u64,name u64,guard u64,request u64,symbolic bool){metadata:=swiftui_text_metadata();if symbolic{assert swift_mangled_state_lookup_checked(request,name,5,guard,guard) or {panic(err)}==metadata}else{call:=unsafe{TextNominalAccess(voidptr(text_nominal_relative(descriptor+12)))};assert call(request)==SwiftAssociatedMetadata{metadata:metadata}}}
 fn text_nominal_rejection(descriptor u64){
 	page:=usize(C.getpagesize());base:=u64(C.mmap(unsafe{nil},page*2,C.PROT_READ|C.PROT_WRITE,C.MAP_PRIVATE|C.MAP_ANONYMOUS,-1,0));assert base!=u64(-1)
 	guard:=base+u64(page);name:=guard-5;slot:=base+64
@@ -64,10 +52,10 @@ fn text_nominal_rejection(descriptor u64){
 		unsafe{*(&u8(name))=tag};target:=if tag==1{descriptor}else{slot};delta:=i64(target)-i64(name+1);assert delta>=-2147483648&&delta<=2147483647;bits:=u32(i32(delta))
 		for i in u64(0)..4{unsafe{*(&u8(name+1+i))=u8(bits>>(i*8))}}
 		assert C.mprotect(voidptr(base),page,C.PROT_READ)==0
-		for request in [u64(0),0x3f,0xff,0x100,0x13f,0x1ff]!{text_nominal_terminal(descriptor,name,guard,request,true)}
+		for request in [u64(0),0x3f,0xff,0x100,0x13f,0x1ff]!{text_nominal_lookup(descriptor,name,guard,request,true)}
 		assert C.mprotect(voidptr(base),page,C.PROT_READ|C.PROT_WRITE)==0
 	}
-	for request in [u64(0),0xff,0x1ff,~u64(0)]!{text_nominal_terminal(descriptor,name,guard,request,false)}
+	for request in [u64(0),0xff,0x1ff,~u64(0)]!{text_nominal_lookup(descriptor,name,guard,request,false)}
 	assert C.munmap(voidptr(base),page*2)==0
 }
 fn text_nominal_reader()u64{mut descriptor:=u64(0);for _ in 0..128{candidate:=text_nominal_resolve();if descriptor==0{descriptor=candidate}else{assert descriptor==candidate};assert read32(descriptor)==0x51&&read64(text_nominal_relative(read64(text_nominal_table())+4))==descriptor};return descriptor}
@@ -84,7 +72,7 @@ fn test_swiftui_text_nominal(){
 	for _ in 0..2{
 		objc_start();assert ios_runtime.swiftui_text_view_arena==0&&!ios_runtime.swiftui_text_view_retired
 		ios_runtime.swift_concurrency_retired=true;if _:=runtime_symbol('/System/Library/Frameworks/SwiftUI.framework/SwiftUI','_$s7SwiftUI4TextVMn'){assert false};ios_runtime.swift_concurrency_retired=false
-		for symbol in ['_$s7SwiftUI4TextVN','_$s7SwiftUI4TextVMa','_$s7SwiftUI4TextVMnExtra','_$s7SwiftUI4TextVMf','_$s11SwiftUICore4TextVMn']!{if _:=swiftui_text_view_symbol(symbol){assert false}};assert ios_runtime.swiftui_text_view_arena==0
+		for symbol in ['_$s7SwiftUI4TextVNExtra','_$s7SwiftUI4TextVMa','_$s7SwiftUI4TextVMnExtra','_$s7SwiftUI4TextVMf','_$s11SwiftUICore4TextVMn']!{if _:=swiftui_text_view_symbol(symbol){assert false}};assert ios_runtime.swiftui_text_view_arena==0
 		mut workers:=[]thread u64{};for _ in 0..8{workers<<spawn text_nominal_reader()};mut descriptor:=u64(0);for i,worker in workers{candidate:=worker.wait();if i==0{descriptor=candidate}else{assert descriptor==candidate}};unsafe{workers.free()}
 		text_nominal_signature(descriptor,text_nominal_table(),false);text_nominal_rejection(descriptor)
 		for library in ['/usr/lib/swift/libswiftCore.dylib','/System/Library/Frameworks/Foundation.framework/Foundation','/System/Library/Frameworks/SwiftUICore.framework/SwiftUICore']!{if _:=runtime_symbol(library,'_$s7SwiftUI4TextVMn'){assert false}}
@@ -94,5 +82,5 @@ fn test_swiftui_text_nominal(){
 		assert text_nominal_teardown_calls==before+1&&ios_runtime.swiftui_text_view_arena==0&&ios_runtime.swiftui_text_view_retired&&ios_runtime.live==0&&ios_runtime.objects.len==0
 		$if macos{assert C.mprotect(voidptr(base),page*2,C.PROT_READ)==-1}$else{mut residency:=[u8(0),0]!;assert C.mincore(voidptr(base),page*2,unsafe{&residency[0]})==-1};if _:=swiftui_text_view_arena_checked(){assert false}
 	}
-	println('IOS-SWIFTUI-TEXT-NOMINAL: eight cold readers, shared sealed nominal and View identity, native nongeneric signature, 32 terminal direct/indirect symbolic and metadata child probes, bounded names at a protected boundary, protected contexts/arguments, exact routing, callbacks and two drained/unmapped lifetimes; Text metadata/value ownership and rendering remain unsupported')
+	println('IOS-SWIFTUI-TEXT-NOMINAL: eight cold readers, shared sealed nominal and View identity, native nongeneric signature, 32 complete direct/indirect symbolic and metadata lookups, bounded names at a protected boundary, protected contexts/arguments, exact routing, callbacks and two drained/unmapped lifetimes; SwiftUI Text construction, graph execution and rendering remain unsupported')
 }
