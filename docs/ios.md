@@ -9387,17 +9387,55 @@ under `build/ios/fortnite/pause-checks`. The fresh Fortnite probe clears
 physical-footprint field. Fortnite remains unplayable; the full iOS regression
 is unpassed.
 
+`_proc_pid_rusage` now implements flavors 0 through 6 with measured record
+sizes 96, 144, 160, 232, 296, 304 and 464 bytes. The footprint field is at byte
+72. macOS supplies native process records; their Mach tick fields are scaled
+to the runner's nanosecond clock/timebase while byte, energy and instruction
+fields keep their native units. Native probes verify error ordering, unchanged
+failure buffers, errno preservation, child queries, mapped-memory changes and
+the CPU time conversion against `getrusage`.
+
+The Linux subset queries the calling process. CPU and child times come from
+`getrusage`; process start and RSS come from `/proc/self/stat`, with a statm
+fallback for older kernels. Wired/swap and I/O values use available status/io
+counters. The footprint is an explicit Linux approximation: RSS plus swapped
+bytes. Its lifetime maximum uses native peak RSS, bounded below by the current
+footprint. UUID, Darwin QoS, wakeup, hardware energy/cycle and unavailable
+interval counters remain zero. Other live PIDs return `ENOTSUP`; invalid PID,
+flavor and null-buffer validation follow the measured native ordering.
+
+Each proc record uses one bounded read: Vinix regenerates text per read, so an
+EOF probe could append a changed snapshot's suffix. The atomic RSS field also
+avoids statm's temporary zero result when its mapping walk cannot acquire the
+page-map lock. These cases were found with concurrent ARM64 queries. Parsers
+and snapshots stay on the stack; descriptors close on every path, and output
+is copied only after a successful complete query. Unavailable required
+counters fail instead of reporting a successful zero footprint.
+
+`tests/ios/native-checks.v build-proc-rusage` builds the fixture. Six host
+ASan/UBSan runs cover resource usage, system queries and libSystem, with the
+new fixture optimized. The ARM64 fixture passes guarded/unaligned layouts,
+native error order, real CPU/memory changes, malformed records, eight callers,
+descriptor reuse, fork and two runtime lifetimes. Native measurements, failed
+concurrency diagnostics and final evidence are retained separately under
+`build/ios/fortnite/proc-rusage-checks`.
+
+Seven final generated-C/executable pairs, optimized ARM64 call-path review and
+fresh probe/audit results are retained there. The probe clears
+`_proc_pid_rusage` and stops before entry at `_raise`. Fortnite remains
+unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,767 | 394 | 78 |
+| Fortnite executable | 1,768 | 393 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,607 | 397 | 114 |
+| All images | 2,608 | 396 | 114 |
 
-The C++/GLES/Text variant reports 2,621 resolved imports, 383 unresolved strong
+The C++/GLES/Text variant reports 2,622 resolved imports, 382 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
