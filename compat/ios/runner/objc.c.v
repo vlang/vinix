@@ -227,6 +227,8 @@ mut:
 	swiftui_tree_retired bool
 	swiftui_zstack_arena u64 // Sealed nongeneric SwiftUI ZStack descriptor/metadata and accessor.
 	swiftui_zstack_retired bool
+	swiftui_opacity_arena u64 // Sealed concrete ViewModifier table, opacity/Never metadata and diagnostics.
+	swiftui_opacity_retired bool
 	swift_objc_bool_arena u64 // Sealed ObjectiveC.ObjCBool metadata/accessor pages.
 	swift_objc_bool_retired bool // Reject resolution after quiescent metadata teardown.
 	swift_nsobject_hashable_arena u64 // Sealed NSObject conformance patterns/adapters and separate RW generic caches.

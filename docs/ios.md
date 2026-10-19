@@ -11078,17 +11078,70 @@ Swift mangling ABI. Its GOT cell is `0x10dc9b2d0`; the inspected load at
 ModifiedContent View conformance descriptor. One consumer site was inspected
 without executing application code.
 
+`_$s7SwiftUI14_OpacityEffectVAA12ViewModifierAAWP` now resolves only through
+SwiftUI.framework to a concrete, unconditional witness table.
+`_$s7SwiftUI14_OpacityEffectVMn` resolves to its nominal descriptor in the same
+arena. The ViewModifier declaration preserves its native signature, and the
+table has six requirement slots. The opacity value has complete nongeneric
+metadata with one Double field, an
+8-byte POD size/stride and zero extra inhabitants. The associated Body slot
+holds direct private metadata for Swift.Never: enum kind, zero cases, size
+zero, stride one, POD/inline flags and no extra inhabitants. Its zero-size
+witnesses share the measured Void operations without constructing a Void
+metadata arena. Field reflection and public accessor/protocol exports
+remain unsupported.
+
+The read-only table supports ordinary static `_swift_getWitnessTable` and
+direct `_swift_getAssociatedTypeWitness` lookup. Native Swift also reads the
+compatibility table without modifying its associated-type slot. Four graph
+requirements report an explicit unsupported-operation error. The associated
+Never:View requirement uses native tagged `FF 07` relative-accessor data and
+reports its own unsupported-conformance error. No incomplete View table or
+rendering output is returned. The View and ViewModifier declarations retain
+their Self.Body:View signatures; graph/default implementations and rendering
+remain unsupported.
+
+One locked allocation publishes RX metadata/diagnostic thunks and read-only
+descriptors, value witnesses and the conformance table. Lookup creates no
+Objective-C owner or dependent metadata arena. Swift owners and Array metadata
+drain before unmapping; earlier teardown callbacks can read the cached table
+and associated Body metadata.
+
+`tests/ios/native-checks.v build-swiftui-opacity` builds the fixture. Six host
+ASan/UBSan runs pass opacity, static witness lookup and CocoaError protocol
+checks with normal and deterministic hashing. Checks include eight cold
+readers, native protocol/layout comparisons, signed native static lookup,
+native direct associated-type lookup, guarded POD/zero-size copies and enum
+width boundaries/UInt32 wrapping, complete accessor context preservation,
+all graph/associated-conformance error paths, typed Array storage without
+constructing Never values, sealed pages, callbacks and two drained lifetimes.
+
+The optimized ARM64 fixture, startup probe and both production import audits
+pass. Generated C and assembly review covers the host/guest fixture and both
+production runners. Native measurements, SDK/Swift ABI snapshots, six sanitizer
+logs, four final guest runs and seven generated-C/executable pairs are retained
+in `build/ios/fortnite/swiftui-opacity-checks`. The earlier witness-only checkpoint
+and both fixture compiler diagnostics are preserved separately. The final probe
+clears both opacity imports, then stops before entry at
+`_$s7SwiftUI15ModifiedContentVMn`. Fortnite remains unplayable; the full iOS
+regression is unpassed.
+
+The next import is a generic nominal descriptor. Its GOT cell is
+`0x10dc9b2e0` in `__DATA_CONST,__got`; nine indirect context symbolic references
+in `__TEXT,__swift5_typeref` point to that cell. This inspection executed no
+application code and does not establish ModifiedContent support.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,817 | 344 | 78 |
+| Fortnite executable | 1,819 | 342 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,657 | 347 | 114 |
+| All images | 2,659 | 345 | 114 |
 
-The C++/GLES/Text variant reports 2,671 resolved imports, 333 unresolved strong
+The C++/GLES/Text variant reports 2,673 resolved imports, 331 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
