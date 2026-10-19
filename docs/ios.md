@@ -9701,17 +9701,51 @@ probe/audit evidence are retained in
 `_thread_get_exception_ports` and stops before entry at `_thread_get_state`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_thread_get_state` now forwards live native Mach queries on macOS. On ARM64
+Vinix it captures the executing thread's NEON registers `q0` through `q31`,
+FPSR and FPCR with V inline assembly for `ARM_NEON_STATE64` (flavor 17).
+The 528-byte record includes eight zeroed alignment bytes and returns a count
+of 132 four-byte words. General registers, debug and exception state, page-in
+counters, SME state and remote-thread snapshots return
+`KERN_NOT_SUPPORTED`; no register record is manufactured for those requests.
+
+Native measurements establish the accepted flavors and minimum counts, and
+show that the four-byte input count is read before destination validation.
+The adapter preserves `errno`, checks flavor/count after the destination,
+releases the namespace lock before native queries or caller writes, and
+copies a successful record before its four-byte count. Invalid flavors,
+short counts, missing rights, wrong object kinds and retired names preserve
+the caller's outputs. The capture uses stack storage and changes neither
+signal dispositions nor signal masks.
+
+`tests/ios/native-checks.v build-thread-state` builds the fixture. Six host
+ASan/UBSan runs pass state-query, thread-exception-query and exception-RPC
+regressions. Twelve native profiles compare flavor/count/error behavior and
+exact records from a suspended native thread. The optimized ARM64 guest
+fixture passes seeded hardware-register capture, guarded/unaligned/aliased
+outputs, dirty upper argument bits, eight concurrent and retired workers,
+fork and two runtime lifetimes. Generated C and ARM64 disassembly confirm
+stack-only copyout and the complete register-store sequence.
+
+Native measurements, seven generated-C/executable pairs and fresh probe/audit
+evidence are retained in `build/ios/fortnite/thread-state-checks`. The probe
+clears `_thread_get_state` and stops before entry at `_thread_resume`.
+Fortnite's inspected call sites request general registers, including unified
+flavor 1; those requests still return unsupported on Vinix. Suspension,
+register mutation and kernel exception delivery remain unsupported. Fortnite
+remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,777 | 384 | 78 |
+| Fortnite executable | 1,778 | 383 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,617 | 387 | 114 |
+| All images | 2,618 | 386 | 114 |
 
-The C++/GLES/Text variant reports 2,631 resolved imports, 373 unresolved strong
+The C++/GLES/Text variant reports 2,632 resolved imports, 372 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
