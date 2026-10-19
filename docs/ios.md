@@ -9669,17 +9669,49 @@ separately. The probe clears `_task_threads` and stops before entry at
 delivery remain unsupported. Fortnite remains unplayable; the full iOS
 regression is unpassed.
 
+`_thread_get_exception_ports` now forwards live native queries on macOS,
+including caller-owned send references for installed handlers. Vinix queries
+the initial state of live threads in its Mach namespace: no exception-action
+table, zero returned groups and untouched output arrays for every valid mask.
+Native measurements distinguish this absent table from an explicitly cleared
+table, which returns null-action groups. Thread handlers are not inherited
+from the creating thread; the query does not substitute task actions.
+
+The V adapter checks the destination before the mask, preserves `errno`,
+releases the namespace lock before native calls or caller writes, and writes
+exactly the four-byte output-only count on Vinix. Invalid masks, missing send
+rights and retired names leave all outputs unchanged. Wrong kernel-object
+kinds return `KERN_INVALID_ARGUMENT`; compatibility receive queues with send
+rights return `KERN_NOT_SUPPORTED`. Thread handler installation and kernel
+exception delivery remain unsupported.
+
+`tests/ios/native-checks.v build-thread-exception-ports` builds the fixture.
+Six host ASan/UBSan runs pass query, task-query and exception-RPC regressions;
+eight native profiles compare absent/allocated tables, two distinct handler
+groups, overlapping output order and balanced returned send references. The
+optimized ARM64 fixture passes guarded, unaligned and aliased counts, unused
+inaccessible arrays, dirty upper argument bits, mask/destination precedence,
+eight live and retired threads, unchanged send references, fork and two
+runtime lifetimes. Generated C and optimized ARM64 review confirm no adapter
+allocation and only the count write after unlocking on Vinix.
+
+Native measurements, seven generated-C/executable pairs and fresh
+probe/audit evidence are retained in
+`build/ios/fortnite/thread-exception-ports-checks`. The probe clears
+`_thread_get_exception_ports` and stops before entry at `_thread_get_state`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,776 | 385 | 78 |
+| Fortnite executable | 1,777 | 384 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,616 | 388 | 114 |
+| All images | 2,617 | 387 | 114 |
 
-The C++/GLES/Text variant reports 2,630 resolved imports, 374 unresolved strong
+The C++/GLES/Text variant reports 2,631 resolved imports, 373 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

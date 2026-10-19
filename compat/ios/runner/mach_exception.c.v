@@ -102,6 +102,7 @@ fn darwin_exception_raise_state_identity(destination u32, worker u32, task u32, 
 
 fn mach_exception_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_thread_get_exception_ports' { u64(unsafe { voidptr(darwin_thread_get_exception_ports) }) }
 		'_task_swap_exception_ports' { u64(unsafe { voidptr(darwin_task_swap_exception_ports) }) }
 		'_task_info' { u64(unsafe { voidptr(darwin_task_info) }) }
 		'_task_get_exception_ports' { u64(unsafe { voidptr(darwin_task_get_exception_ports) }) }
