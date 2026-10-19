@@ -972,20 +972,19 @@ its other end, with the V and the word *start* in white; it is brighter under
 the pointer and darker while its menu is open. `luna.v` paints all of it from
 gradients given as stops.
 
-The Start menu under this theme is Windows XP's (`start_menu_luna.v`). It
-holds what the desktop's own menu holds and does what it does; only the
-layout and the dress differ. It rises from the Start button in the screen's
-corner. The header is blue, with the user's tile in a pale frame and the name
-in white, and an orange line under it that fades toward its ends. The
-programs are a white column of 32-pixel icons: what is pinned in bold above a
-rule, then what was used recently, and at the foot *All Programs* with its
-green arrow. The places are a pale blue column of dark blue names, the first
-group in bold, with rules between the groups. The session buttons are in the
-blue foot, each after its coloured square: red for Shut down, green for
-Restart, yellow for Sleep. A row under the pointer is the selection's blue
-with white text. Windows XP's menu has no search field, so there is none
-until something is typed or *Search* is chosen from the places; then it
-takes its place at the foot of the programs.
+The Start menu under this theme follows the supplied XP reference
+(`start_menu_luna.v`): equal white and pale blue columns, without a user banner,
+rising directly from the Start button. Programs have 32-pixel icons; pinned
+programs are bold above a rule, followed by recent programs and *All Programs*
+with a beveled green arrow. Internet has Firefox's name beneath it. The right
+column has XP's My Documents, recent documents, pictures, music, computer and
+network links, followed by Control Panel, program access, connections, printers,
+help, search and Run. `luna_menu_icons.v` draws their shaded artwork. These
+destinations open Vinix folders, Settings, Software and Quick Launch. Log Off
+ends the desktop session; Turn Off Computer opens shutdown/restart choices,
+plus Sleep when supported. Hovered rows are blue with white text. Search only
+shows a field after typing or choosing Search. Other themes keep their original
+Settings, Documents, Terminal, Activity Monitor and session buttons.
 
 The discs are grey until a window is focused and show their glyphs only while
 the pointer is over the set, as macOS does. They also keep red-yellow-green

@@ -258,6 +258,7 @@ fn test_luna_start_menu_redraws_release_all_temporary_allocations() {
 	mut desktop := memory_fixture_desktop()
 	desktop.settings.theme = .windows_xp
 	desktop.start_pins = [2]
+	desktop.idle.sleep_available = true
 	// Warm the frame pool for each of the menu's layouts before measuring.
 	desktop.toggle_start_menu()
 	render_and_release(mut desktop)
@@ -267,6 +268,8 @@ fn test_luna_start_menu_redraws_release_all_temporary_allocations() {
 	desktop.handle_start_action(action_start_all)
 	render_and_release(mut desktop)
 	desktop.handle_start_action(action_start_back)
+	desktop.handle_start_action(action_start_power)
+	render_and_release(mut desktop)
 	desktop.handle_start_action(action_start_panel)
 	desktop.start_menu_open = false
 	render_and_release(mut desktop)
@@ -284,6 +287,10 @@ fn test_luna_start_menu_redraws_release_all_temporary_allocations() {
 		luna_memory_hover(mut desktop, action_start_all)
 		luna_memory_hover(mut desktop, action_start_shutdown)
 		luna_memory_hover(mut desktop, action_start_toggle)
+		desktop.handle_start_action(action_start_power)
+		render_and_release(mut desktop)
+		luna_memory_hover(mut desktop, action_start_restart)
+		desktop.handle_start_action(action_start_panel)
 		desktop.set_hover('')
 		desktop.handle_start_action(action_start_search)
 		render_and_release(mut desktop)

@@ -4903,3 +4903,47 @@ Emacs is not installed. Stage the Emacs runtime first.
 wine.emacs.exited
 Emacs exited.
 -----
+start.xp.documents
+My Documents
+-----
+start.xp.recent
+My Recent Documents
+-----
+start.xp.pictures
+My Pictures
+-----
+start.xp.music
+My Music
+-----
+start.xp.computer
+My Computer
+-----
+start.xp.network
+My Network Places
+-----
+start.xp.control_panel
+Control Panel
+-----
+start.xp.defaults
+Set Program Access and Defaults
+-----
+start.xp.connect
+Connect To
+-----
+start.xp.printers
+Printers and Faxes
+-----
+start.xp.help
+Help and Support
+-----
+start.xp.run
+Run...
+-----
+start.xp.turn_off
+Turn Off Computer
+-----
+start.xp.log_off
+Log Off
+-----
+start.xp.internet
+Internet

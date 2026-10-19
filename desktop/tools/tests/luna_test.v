@@ -368,16 +368,10 @@ fn test_windows_xp_start_menu_is_laid_out_as_windows_xps() {
 		desktop.toggle_start_menu()
 		luna_test_full_frame(mut desktop)
 
-		// The blue header, its upper corners cut round, and the orange line
-		// under it, which fades out toward the far end.
-		assert luna_test_pixel(&desktop, width - 20, y + 10) == luna_gradient(luna_menu_header, 10,
-			luna_menu_header_rows)
+		// The reference starts with the columns, without a user banner.
 		assert luna_test_pixel(&desktop, 0, y) == behind
 		assert luna_test_pixel(&desktop, width - 1, y) == luna_test_pixel(&desktop, width + 2, y)
-		orange := luna_test_pixel(&desktop, width * 3 / 10, y + luna_menu_header_rows)
-		assert luna_test_red(orange) > 0xe0 && luna_test_blue(orange) < 0x60
-		faded := luna_test_pixel(&desktop, width - 2, y + luna_menu_header_rows)
-		assert luna_test_blue(faded) > luna_test_red(faded)
+		assert height == luna_menu_height
 
 		// The white column of programs and the pale blue one of places, with
 		// the menu's own line down each side of them.
@@ -396,25 +390,26 @@ fn test_windows_xp_start_menu_is_laid_out_as_windows_xps() {
 
 		// The session buttons run leftward from the foot's right end, each with
 		// its coloured square.
-		shut := desktop.hit_target_named(action_start_shutdown) or { panic('no Shut down') }
-		restart := desktop.hit_target_named(action_start_restart) or { panic('no Restart') }
+		shut := desktop.hit_target_named(action_start_power) or { panic('no Turn Off Computer') }
+		logoff := desktop.hit_target_named(action_start_logoff) or { panic('no Log Off') }
 		assert shut.y >= top - luna_menu_foot_rows && shut.y + shut.height <= top
 		assert shut.x + shut.width == width - 8
-		assert restart.x + restart.width < shut.x && restart.y == shut.y
+		assert logoff.x + logoff.width < shut.x && logoff.y == shut.y
 		red := luna_test_pixel(&desktop, shut.x + 6 + 3, shut.y + shut.height / 2)
 		assert luna_test_red(red) > luna_test_green(red) + 0x40
 		assert luna_test_red(red) > luna_test_blue(red) + 0x40
-		green := luna_test_pixel(&desktop, restart.x + 6 + 3, restart.y + restart.height / 2)
-		assert luna_test_green(green) > luna_test_red(green) + 0x30
-		assert luna_test_green(green) > luna_test_blue(green) + 0x30
+		gold := luna_test_pixel(&desktop, logoff.x + 6 + 3, logoff.y + logoff.height / 2)
+		assert luna_test_red(gold) > luna_test_blue(gold) + 0x60
+		assert luna_test_green(gold) > luna_test_blue(gold) + 0x40
 		assert desktop.hit_target_named(action_start_sleep) == none
+		assert desktop.hit_target_named(action_start_restart) == none
 
 		// A program's row is the whole width of its column, and under the
 		// pointer it is the selection's blue.
-		first := desktop.hit_action(60, body_y + 9 + 19)
+		first := desktop.hit_action(60, body_y + 4 + 19)
 		assert first in app_start_actions
 		row := desktop.hit_target_named(first) or { panic('no program row') }
-		assert row.x == 1 + 7 && row.y == body_y + 9 && row.height == 38
+		assert row.x == 1 + 7 && row.y == body_y + 4 && row.height == luna_menu_program_height
 		assert luna_test_pixel(&desktop, row.x + 2, row.y + 19) == luna_menu_pane
 		place := desktop.hit_target_named(action_start_documents) or { panic('no Documents') }
 		assert place.x > luna_menu_left_width && place.x + place.width < width
@@ -426,35 +421,49 @@ fn test_windows_xp_start_menu_is_laid_out_as_windows_xps() {
 		luna_test_full_frame(mut desktop)
 		assert luna_test_pixel(&desktop, row.x + 2, row.y + 19) == luna_menu_pane
 		assert luna_test_pixel(&desktop, place.x + 2, place.y + place.height / 2) == luna_menu_select
-		desktop.set_hover(action_start_shutdown)
+		desktop.set_hover(action_start_power)
 		luna_test_full_frame(mut desktop)
 		assert luna_test_pixel(&desktop, shut.x + shut.width - 3, shut.y + 3) == luna_menu_foot_hover
 		desktop.set_hover('')
 
-		// What the rows say: the user's name in white on the header, the first
-		// group of places in bold dark blue and the rest plain, and All
+		// The first group of places is bold dark blue and the rest plain; All
 		// Programs in bold before its green arrow rather than a typed one.
 		tree := desktop.build_tree()
 		menu := luna_test_find(&tree, action_start_panel) or { panic('no Start menu') }
 		assert int(menu.box.radius) == 0
-		name := luna_test_find(&menu, 'start.user.name') or { panic('no user name') }
-		assert name.text_style.color == 0xffffff && name.text_style.bold && name.text_style.shadow
-		documents := luna_test_labelled(&menu, tr('start.documents')) or { panic('no Documents') }
+		assert luna_test_find(&menu, 'start.user.name') == none
+		assert luna_test_find(&menu, 'start.user.badge') == none
+		documents := luna_test_labelled(&menu, tr('start.xp.documents')) or { panic('no Documents') }
 		assert documents.text_style.bold && documents.text_style.color == luna_menu_places_text
-		system := luna_test_labelled(&menu, tr('window.system')) or { panic('no System') }
+		system := luna_test_labelled(&menu, tr('start.xp.control_panel')) or { panic('no Control Panel') }
 		assert !system.text_style.bold && system.text_style.color == luna_menu_places_text
 		all := luna_test_labelled(&menu, 'All Programs') or { panic('no All Programs') }
 		assert all.text_style.bold
 		assert luna_test_labelled(&menu, tr('start.all_programs')) == none
 		assert luna_test_pictured(&menu, 'builtin:luna_arrow')
 		assert luna_test_pictured(&menu, 'builtin:luna_power')
-		assert luna_test_pictured(&menu, 'builtin:luna_restart')
+		assert luna_test_pictured(&menu, 'builtin:luna_logoff')
 		assert !luna_test_pictured(&menu, 'builtin:luna_sleep')
-		// Nothing is pinned, so no program is in bold.
-		firefox := luna_test_labelled(&menu, app_title_text(available_apps[1].title)) or {
-			panic('no Firefox')
+		internet := luna_test_labelled(&menu, tr('start.xp.internet')) or { panic('no Internet') }
+		assert internet.text_style.bold
+		assert luna_test_labelled(&menu, 'Mozilla Firefox') != none
+		mut previous_y := 0.0
+		for link in luna_menu_links {
+			target := desktop.hit_target_named(link.action) or { panic('missing XP destination: ' + link.action) }
+			assert target.y > previous_y && target.y + target.height < shut.y
+			if link.action == action_start_defaults {
+				line1 := luna_test_find(&menu, 'start.defaults.line1') or { panic('no first defaults line') }
+				line2 := luna_test_find(&menu, 'start.defaults.line2') or { panic('no second defaults line') }
+				assert line1.text + ' ' + line2.text == tr(link.key)
+				assert line1.frame.y + line1.frame.height <= line2.frame.y
+			} else {
+				assert luna_test_labelled(&menu, tr(link.key)) != none
+			}
+			previous_y = target.y
 		}
-		assert !firefox.text_style.bold
+		for action in [action_start_files, action_start_system, action_start_terminal, action_start_activity] {
+			assert desktop.hit_target_named(action) == none
+		}
 		arrow_x := 1 + int(all.frame.x) + int(all.frame.width) + 4
 		free_tree(tree)
 		lit := desktop.hit_target_named(action_start_all) or { panic('no All Programs row') }
@@ -462,10 +471,11 @@ fn test_windows_xp_start_menu_is_laid_out_as_windows_xps() {
 		assert luna_test_green(arrow) > luna_test_red(arrow) + 0x30
 		assert luna_test_green(arrow) > luna_test_blue(arrow) + 0x30
 
-		// What is pinned is in bold, above a rule; a machine that can sleep
-		// has a third session button, before the other two.
+		// Pins stay bold above a rule, and Turn Off Computer offers Sleep on
+		// machines that support it.
 		desktop.start_pins = [2]
 		desktop.idle.sleep_available = true
+		desktop.handle_start_action(action_start_power)
 		luna_test_full_frame(mut desktop)
 		pinned_tree := desktop.build_tree()
 		pinned_menu := luna_test_find(&pinned_tree, action_start_panel) or { panic('no Start menu') }
@@ -473,17 +483,13 @@ fn test_windows_xp_start_menu_is_laid_out_as_windows_xps() {
 			panic('no pinned program')
 		}
 		assert pinned.text_style.bold
-		unpinned := luna_test_labelled(&pinned_menu, app_title_text(available_apps[1].title)) or {
-			panic('no Firefox')
-		}
-		assert !unpinned.text_style.bold
 		assert luna_test_find(&pinned_menu, 'start.pins.rule') != none
 		assert luna_test_pictured(&pinned_menu, 'builtin:luna_sleep')
 		free_tree(pinned_tree)
 		sleep := desktop.hit_target_named(action_start_sleep) or { panic('no Sleep') }
 		again := desktop.hit_target_named(action_start_restart) or { panic('no Restart') }
-		assert sleep.x + sleep.width < again.x && sleep.x > 0
-		yellow := luna_test_pixel(&desktop, sleep.x + 6 + 3, sleep.y + sleep.height / 2)
+		assert sleep.y > again.y && sleep.x == again.x && sleep.x > 0
+		yellow := luna_test_pixel(&desktop, sleep.x + 6, sleep.y + 8)
 		assert luna_test_red(yellow) > luna_test_blue(yellow) + 0x60
 		assert luna_test_green(yellow) > luna_test_blue(yellow) + 0x40
 	}
@@ -562,6 +568,85 @@ fn test_windows_xp_start_button_is_green_in_the_corner() {
 	}
 }
 
+fn test_other_themes_keep_their_original_start_destinations() {
+	for kind in [ThemeKind.default_, .macos, .windows7] {
+		mut desktop := luna_menu_test_desktop(1)
+		desktop.settings.theme = kind
+		desktop.toggle_start_menu()
+		luna_test_full_frame(mut desktop)
+		for action in [action_start_files, action_start_documents, action_start_recent,
+			action_start_settings, action_start_system, action_start_terminal, action_start_activity,
+			action_start_welcome, action_start_shutdown, action_start_restart] {
+			assert desktop.hit_target_named(action) != none, 'missing original destination: ' + action
+		}
+		assert desktop.hit_target_named(action_start_logoff) == none
+		assert desktop.hit_target_named(action_start_power) == none
+		desktop.close_start_menu()
+	}
+}
+
+fn test_xp_destinations_are_translated_with_complete_glyphs_and_footer_bounds() {
+	mut desktop := luna_menu_test_desktop(1)
+	defer { set_desktop_language(.en) }
+	for language in desktop_languages {
+		set_desktop_language(language)
+		for link in luna_menu_links {
+			assert link.key in desktop_translations[language.code()]
+			for r in tr(link.key).runes() {
+				if r == ` ` { continue }
+				for face in desktop.fonts {
+					glyph := face.glyph_for(u32(r))
+					assert glyph.width > 0 && glyph.height > 0, language.code() + ': missing XP glyph'
+				}
+			}
+		}
+		for key in ['start.xp.turn_off', 'start.xp.log_off', 'start.xp.internet'] {
+			assert key in desktop_translations[language.code()]
+		}
+		begin_frame_elements()
+		menu := desktop.start_menu_element()
+		power := luna_test_find(&menu, action_start_power) or { panic('no Turn Off Computer') }
+		logoff := luna_test_find(&menu, action_start_logoff) or { panic('no Log Off') }
+		assert logoff.frame.x >= 0
+		assert logoff.frame.x + logoff.frame.width < power.frame.x
+		assert power.frame.x + power.frame.width < menu.frame.width
+		free_tree(menu)
+	}
+}
+
+fn test_windows_xp_session_choices_and_run_dispatch_from_pointer_targets() {
+	mut desktop := luna_menu_test_desktop(1)
+	desktop.running = true
+	desktop.toggle_start_menu()
+	for action in [action_start_power, action_start_panel, action_start_run] {
+		luna_test_full_frame(mut desktop)
+		target := desktop.hit_target_named(action) or { panic('missing action: ' + action) }
+		// Empty space near the columns' edge belongs to the panel.
+		x := if action == action_start_panel { target.x + 2 } else { target.x + target.width / 2 }
+		y := if action == action_start_panel { target.y + 3 } else { target.y + target.height / 2 }
+		desktop.on_pointer_down(x, y)
+		desktop.on_pointer_up(x, y)
+		if action == action_start_power {
+			assert desktop.start_menu_open && desktop.start_menu_power_open && desktop.running
+			luna_test_full_frame(mut desktop)
+			assert desktop.hit_target_named(action_start_shutdown) != none
+			assert desktop.hit_target_named(action_start_restart) != none
+		} else if action == action_start_panel {
+			assert desktop.start_menu_open && !desktop.start_menu_power_open
+		} else {
+			assert !desktop.start_menu_open && desktop.switcher.quick_launch
+		}
+	}
+	desktop.switcher_close()
+	desktop.toggle_start_menu()
+	luna_test_full_frame(mut desktop)
+	logoff := desktop.hit_target_named(action_start_logoff) or { panic('no Log Off') }
+	desktop.on_pointer_down(logoff.x + 8, logoff.y + 8)
+	desktop.on_pointer_up(logoff.x + 8, logoff.y + 8)
+	assert !desktop.start_menu_open && !desktop.running
+	assert desktop.power == .keep_running
+}
+
 fn test_windows_xp_start_menu_shows_its_search_field_only_when_searching() {
 	mut desktop := luna_menu_test_desktop(1)
 	desktop.toggle_start_menu()
@@ -627,7 +712,7 @@ fn test_windows_xp_start_menu_partial_frames_match_full_ones() {
 		before := luna_test_pixels(&desktop)
 		top := 600 - classic_taskbar_height
 		y := int(desktop.start_menu_rect().y)
-		// The header's corner and the line under it, the two columns, the
+		// The top corner and frame, the two columns, the
 		// menu's edge over a window, and the foot with the Start button.
 		for area in [[0, y - 4, 90, 100], [100, y + 50, 200, 40], [200, y + 200, 120, 90],
 			[400, y + 30, 80, 300], [0, top - 60, 300, 60 + classic_taskbar_height],

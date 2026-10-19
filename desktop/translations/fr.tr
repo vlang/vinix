@@ -4893,3 +4893,47 @@ Zed n'est pas installé.
 wine.zed.exited
 Zed s'est fermé.
 -----
+start.xp.documents
+Mes documents
+-----
+start.xp.recent
+Documents récents
+-----
+start.xp.pictures
+Mes images
+-----
+start.xp.music
+Ma musique
+-----
+start.xp.computer
+Poste de travail
+-----
+start.xp.network
+Favoris réseau
+-----
+start.xp.control_panel
+Panneau de configuration
+-----
+start.xp.defaults
+Programmes par défaut
+-----
+start.xp.connect
+Connexions
+-----
+start.xp.printers
+Imprimantes et télécopieurs
+-----
+start.xp.help
+Aide et support
+-----
+start.xp.run
+Exécuter...
+-----
+start.xp.turn_off
+Arrêter l’ordinateur
+-----
+start.xp.log_off
+Fermer la session
+-----
+start.xp.internet
+Internet

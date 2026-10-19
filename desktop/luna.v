@@ -100,20 +100,13 @@ const luna_chevron_size = 16
 const luna_chevron_light = u32(0xa9d6ff)
 const luna_chevron_dark = u32(0x1668d6)
 
-// The Start menu's shell: the header its user tile sits in, the foot the
-// session buttons sit in, and the blue between them.
-const luna_menu_header = [LunaStop{0, 0x1868ce}, LunaStop{120, 0x0e60cb}, LunaStop{200, 0x0e60cb},
-	LunaStop{320, 0x1164cf}, LunaStop{470, 0x1b6cd3}, LunaStop{600, 0x2476dc},
-	LunaStop{770, 0x3482e3}, LunaStop{900, 0x428ee9}, LunaStop{1000, 0x4791eb}]
+// The Start menu's blue footer and narrow frame.
 const luna_menu_foot = [LunaStop{0, 0x4282d6}, LunaStop{50, 0x418ae3}, LunaStop{170, 0x418ae3},
 	LunaStop{290, 0x3482e3}, LunaStop{490, 0x2374df}, LunaStop{620, 0x196edb},
 	LunaStop{750, 0x1468d5}, LunaStop{880, 0x0f61cb}, LunaStop{1000, 0x0f61cb}]
 const luna_menu_edge = u32(0x0a48b4)
 const luna_menu_radius = 6
-// The line under the header, strongest a third of the way along it.
-const luna_menu_orange = u32(0xf59a3a)
-// The small coloured squares Windows XP sets its marks on, lit from the upper
-// left: All Programs' arrow, and the session buttons.
+// The green arrow and session tiles, lit from the upper left.
 const luna_tile_green_light = u32(0x7fd873)
 const luna_tile_green = u32(0x2c8a2c)
 const luna_tile_red_light = u32(0xf5927c)
@@ -565,31 +558,18 @@ fn (mut d Desktop) draw_luna_start(el &ui2.Element, x int, y int, w int, h int) 
 	d.canvas.draw_text(face, text_x, text_y, el.text, 0xffffff)
 }
 
-// draw_luna_menu paints the Start menu's shell: its header, its foot, the
-// blue between them, and the line round it with round upper corners.
+// The reference menu starts directly with its columns, inside a thin blue
+// frame, and finishes with a blue gradient footer.
 fn (mut d Desktop) draw_luna_menu(x int, y int, w int, h int) {
-	header := if luna_menu_header_rows < h / 2 { luna_menu_header_rows } else { h / 2 }
-	foot := if luna_menu_foot_rows < h - header { luna_menu_foot_rows } else { h - header }
+	foot := if luna_menu_foot_rows < h { luna_menu_foot_rows } else { h }
 	for row in 0 .. h {
-		// Between the header and the foot the two columns cover everything
-		// but the menu's own line down each side.
-		color := if row < header {
-			luna_gradient(luna_menu_header, row, header)
-		} else if row >= h - foot {
+		// The columns cover everything above the footer except the frame.
+		color := if row >= h - foot {
 			luna_gradient(luna_menu_foot, row - (h - foot), foot)
 		} else {
 			luna_menu_edge
 		}
 		d.luna_row(x, y, w, row, luna_menu_radius, color)
-	}
-	// The orange line under the header fades out toward both of its ends.
-	under := luna_gradient(luna_menu_header, header - 1, header)
-	peak := w * 3 / 10
-	for column in 1 .. w - 1 {
-		reach := if column < peak { peak } else { w - peak }
-		strength := 255 - abs_int(column - peak) * 255 / reach
-		d.canvas.fill_rect(x + column, y + header, 1, luna_menu_line_rows, blend(under, luna_menu_orange,
-			u32(strength)))
 	}
 	d.luna_top_edge(x, y, w, h, luna_menu_radius, luna_menu_edge)
 	d.canvas.fill_rect(x, y + h - 1, w, 1, luna_menu_edge)
@@ -620,12 +600,24 @@ fn (mut d Desktop) draw_luna_tile(x int, y int, size int, light u32, dark u32) {
 // against the backing pixels, so they stay smooth at either scale.
 fn (mut d Desktop) draw_luna_glyph(name string, x int, y int, w int, h int) {
 	size := if w < h { w } else { h }
+	if size < 4 { return }
 	left := x + (w - size) / 2
 	top := y + (h - size) / 2
+	if name == 'luna_arrow' {
+		// XP's All Programs arrow is a green triangle with a bevel.
+		for row in 1 .. size - 1 {
+			reach := (size - 3) - abs_int(row - size / 2) * (size - 3) / (size / 2)
+			if reach > 0 {
+				d.canvas.fill_rect(left + 2, top + row, reach, 1,
+					mix(luna_tile_green_light, luna_tile_green, u32(row * 255 / size)))
+			}
+		}
+		d.canvas.draw_line(left + 2, top + 2, left + 2, top + size - 3, 0x9bd58e, 1)
+		return
+	}
 	match name {
-		'luna_arrow' { d.draw_luna_tile(left, top, size, luna_tile_green_light, luna_tile_green) }
 		'luna_restart' { d.draw_luna_tile(left, top, size, luna_tile_green_light, luna_tile_green) }
-		'luna_sleep' { d.draw_luna_tile(left, top, size, luna_tile_yellow_light, luna_tile_yellow) }
+		'luna_sleep', 'luna_logoff' { d.draw_luna_tile(left, top, size, luna_tile_yellow_light, luna_tile_yellow) }
 		else { d.draw_luna_tile(left, top, size, luna_tile_red_light, luna_tile_red) }
 	}
 	scale := f64(d.canvas.scale)
@@ -642,16 +634,13 @@ fn (mut d Desktop) draw_luna_glyph(name string, x int, y int, w int, h int) {
 			// How far inside the mark this pixel is, negative outside it.
 			mut inside := -1.0
 			match name {
-				'luna_arrow' {
-					// A triangle pointing right: its height shrinks to the tip.
-					across := sample_x + unit * 0.16
-					if across >= 0 && across <= unit * 0.36 {
-						half := (unit * 0.36 - across) * 0.75
-						inside = half - math.abs(sample_y)
-						if across < 0.5 {
-							inside = math.min(inside, across)
-						}
-					}
+				'luna_logoff' {
+					key_x := sample_x - unit * 0.10
+					key_y := sample_y + unit * 0.15
+					ring := stroke - math.abs(math.sqrt(key_x * key_x + key_y * key_y) - unit * 0.16)
+					shaft := stroke - distance_to_segment(sample_x, sample_y, 0, -unit * 0.02, -unit * 0.27, unit * 0.31)
+					tooth := stroke - distance_to_segment(sample_x, sample_y, -unit * 0.23, unit * 0.26, -unit * 0.12, unit * 0.31)
+					inside = math.max(ring, math.max(shaft, tooth))
 				}
 				'luna_restart' {
 					// Three strokes crossing: the star on Windows XP's Restart.

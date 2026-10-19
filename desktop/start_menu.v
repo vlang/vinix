@@ -80,8 +80,7 @@ const start_menu_search_bg = u32(0xffffff)
 const start_menu_power = u32(0x3d6592)
 const start_menu_power_hover = u32(0x527ba9)
 
-// start_menu_luna says whether the menu is Windows XP's: the same programs and
-// places, laid out and dressed as start_menu_luna.v has them.
+// Windows XP supplies its own layout and destinations in start_menu_luna.v.
 fn (d &Desktop) start_menu_luna() bool {
 	return d.theme().chrome == .luna
 }
@@ -92,7 +91,7 @@ fn (d &Desktop) start_menu_rect() ui2.Rect {
 	if width > d.canvas.width - 2 * start_menu_margin {
 		width = d.canvas.width - 2 * start_menu_margin
 	}
-	mut height := start_menu_preferred_height
+	mut height := if luna { luna_menu_height } else { start_menu_preferred_height }
 	available_height := d.canvas.height - d.taskbar_height() - start_menu_margin
 	if height > available_height {
 		height = available_height
@@ -122,7 +121,7 @@ fn (d &Desktop) start_menu_rect() ui2.Rect {
 }
 
 // start_menu_pane_height is the height of the program pane: the menu less
-// its margins, or under Windows XP less its header and its foot.
+// its margins, or under Windows XP less its top border and footer.
 fn (d &Desktop) start_menu_pane_height() int {
 	height := int(d.start_menu_rect().height)
 	return if d.start_menu_luna() { luna_menu_pane_height(height) } else { height - 14 }
@@ -151,6 +150,7 @@ fn (mut d Desktop) toggle_start_menu() {
 	d.start_menu_all_apps = false
 	d.start_menu_page = 0
 	d.start_menu_searching = false
+	d.start_menu_power_open = false
 	d.set_start_menu_recent(start_recent_none)
 	d.free_start_menu_query()
 	d.start_menu_query = []u8{cap: start_menu_max_query}
@@ -168,6 +168,7 @@ fn (mut d Desktop) close_start_menu() {
 	d.start_menu_all_apps = false
 	d.start_menu_page = 0
 	d.start_menu_searching = false
+	d.start_menu_power_open = false
 	d.set_start_menu_recent(start_recent_none)
 	d.free_start_menu_query()
 	d.set_hover('')
@@ -319,35 +320,36 @@ fn (mut d Desktop) start_menu_program_pane(x int, y int, width int, height int) 
 	} else {
 		// Pinned programs first, then the recently used ones below a rule, as
 		// Windows 7 arranged its left column.
-		mut row_y := 9
+		mut row_y := if luna { 4 } else { 9 }
+		row_height := if luna { luna_menu_program_height } else { 38 }
 		limit := search_y - 39
 		for index in d.start_pins {
-			if index < 0 || index >= available_apps.len || row_y + 38 > limit {
+			if index < 0 || index >= available_apps.len || row_y + row_height > limit {
 				continue
 			}
 			// Windows XP sets what is pinned in bold.
-			d.start_menu_app_row(mut children, index, 7, row_y, width - 14, 38, luna)
-			row_y += 38
+			d.start_menu_app_row(mut children, index, 7, row_y, width - 14, row_height, luna)
+			row_y += row_height
 		}
 		if d.start_pins.len > 0 && row_y + 8 < limit {
-			children << ui2.view('start.pins.rule', ui2.rect(12, f64(row_y + 3), f64(width - 24), 1), ui2.BoxStyle{
+			children << ui2.view('start.pins.rule', ui2.rect(f64(if luna { 32 } else { 12 }), f64(row_y + 3), f64(width - if luna { 64 } else { 24 }), 1), ui2.BoxStyle{
 				bg: start_menu_separator
 			}, [])
 			row_y += 8
 		}
-		recent := if d.recent_programs.len > 0 { d.recent_programs } else { start_menu_favorites }
+		recent := if d.recent_programs.len > 0 { d.recent_programs } else if luna { luna_menu_favorites } else { start_menu_favorites }
 		for index in recent {
 			if index < 0 || index >= available_apps.len || d.start_is_pinned(index) {
 				continue
 			}
-			if row_y + 38 > limit {
+			if row_y + row_height > limit {
 				break
 			}
-			d.start_menu_app_row(mut children, index, 7, row_y, width - 14, 38, false)
-			row_y += 38
+			d.start_menu_app_row(mut children, index, 7, row_y, width - 14, row_height, false)
+			row_y += row_height
 		}
 		all_y := search_y - 39
-		children << ui2.view('start.programs.rule', ui2.rect(12, f64(all_y - 2), f64(width - 24), 1), ui2.BoxStyle{
+		children << ui2.view('start.programs.rule', ui2.rect(f64(if luna { 32 } else { 12 }), f64(all_y - 2), f64(width - if luna { 64 } else { 24 }), 1), ui2.BoxStyle{
 			bg: start_menu_separator
 		}, [])
 		if luna {
@@ -552,12 +554,22 @@ fn (d &Desktop) start_menu_program_row(mut children []ui2.Element, index int, x 
 	if index >= available_apps.len {
 		app := &packaged_apps.apps[index - available_apps.len]
 		d.luna_menu_row(mut children, app.start_action, app.name, 'builtin:window', x, y, width,
-			height, luna_menu_program_icon, bold, start_menu_text)
+			height, luna_menu_program_icon, bold, luna_menu_program_text)
 		return
 	}
 	factory := &available_apps[index]
+	if index == 1 && height == luna_menu_program_height {
+		d.luna_menu_row(mut children, app_start_actions[index], tr('start.xp.internet'), factory.icon,
+			x, y, width, height, luna_menu_program_icon, true, luna_menu_program_text)
+		children << ui2.label('', 'Mozilla Firefox', ui2.rect(f64(x + luna_menu_program_icon + 8),
+			f64(y + 21), f64(width - luna_menu_program_icon - 12), 18), ui2.TextStyle{
+			color: if d.hover == app_start_actions[index] { luna_menu_select_text } else { 0x808080 }
+			size: 12, lines: 1
+		})
+		return
+	}
 	d.luna_menu_row(mut children, app_start_actions[index], app_title_text(factory.title), factory.icon,
-		x, y, width, height, luna_menu_program_icon, bold, start_menu_text)
+		x, y, width, height, luna_menu_program_icon, bold, luna_menu_program_text)
 }
 
 // start_menu_app_row is a program's row with, for a program that keeps a
@@ -822,6 +834,7 @@ fn start_menu_fold(r u32) u32 {
 // query, PageUp/PageDown browse results, Return launches the first visible
 // result and Escape dismisses the menu.
 fn (mut d Desktop) start_menu_key_input(keys string) {
+	if keys.len > 0 { d.start_menu_power_open = false }
 	for i := 0; i < keys.len; i++ {
 		if keys[i] == 0x1b && i + 3 < keys.len && keys[i + 1] == `[` && keys[i + 3] == `~`
 			&& (keys[i + 2] == `5` || keys[i + 2] == `6`) {
@@ -874,8 +887,9 @@ fn (mut d Desktop) start_menu_key_input(keys string) {
 }
 
 fn (mut d Desktop) handle_start_action(action string) {
+	if action != action_start_power { d.start_menu_power_open = false }
 	match action {
-		action_start_panel, action_start_search {
+		action_start_panel, action_start_search, action_start_power_panel {
 			d.start_menu_searching = action == action_start_search
 			d.dirty = true
 		}
@@ -944,6 +958,11 @@ fn (mut d Desktop) handle_start_action(action string) {
 			// what it wakes to is the desktop and not the menu.
 			d.close_start_menu()
 			d.request_sleep()
+		}
+		action_start_pictures, action_start_music, action_start_computer,
+		action_start_network, action_start_defaults, action_start_connect,
+		action_start_printers, action_start_run, action_start_logoff, action_start_power {
+			d.handle_luna_start_action(action)
 		}
 		else {
 			if action.starts_with('start.package.') {

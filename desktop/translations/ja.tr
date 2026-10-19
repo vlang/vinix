@@ -4893,3 +4893,47 @@ Zedが未インストールです。
 wine.zed.exited
 Zedが終了しました。
 -----
+start.xp.documents
+マイ ドキュメント
+-----
+start.xp.recent
+最近使ったドキュメント
+-----
+start.xp.pictures
+マイ ピクチャ
+-----
+start.xp.music
+マイ ミュージック
+-----
+start.xp.computer
+マイ コンピュータ
+-----
+start.xp.network
+マイ ネットワーク
+-----
+start.xp.control_panel
+コントロール パネル
+-----
+start.xp.defaults
+プログラムのアクセスと既定の設定
+-----
+start.xp.connect
+接続
+-----
+start.xp.printers
+プリンタと FAX
+-----
+start.xp.help
+ヘルプとサポート
+-----
+start.xp.run
+ファイル名を指定して実行...
+-----
+start.xp.turn_off
+終了オプション
+-----
+start.xp.log_off
+ログオフ
+-----
+start.xp.internet
+インターネット

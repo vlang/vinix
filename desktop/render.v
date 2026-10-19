@@ -2043,9 +2043,22 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			}
 			d.canvas.draw_line(cx + radius / 2, cy + radius / 2, cx + radius, cy + radius, color, 2)
 		}
-		'luna_arrow', 'luna_power', 'luna_restart', 'luna_sleep' {
+		'luna_arrow', 'luna_power', 'luna_restart', 'luna_sleep', 'luna_logoff' {
 			// The coloured marks of Windows XP's Start menu. See luna.v.
 			d.draw_luna_glyph(name, x, y, w, h)
+		}
+		'luna_submenu' {
+			if h > 1 {
+				for row in 0 .. h {
+					reach := w - abs_int(row - h / 2) * w / (h / 2)
+					if reach > 0 { d.canvas.fill_rect(x, y + row, reach, 1, color) }
+				}
+			}
+		}
+		'luna_documents', 'luna_recent', 'luna_pictures', 'luna_music', 'luna_computer',
+		'luna_network', 'luna_control', 'luna_defaults', 'luna_connect', 'luna_printer',
+		'luna_help', 'luna_search', 'luna_run' {
+			d.draw_luna_menu_icon(name, x, y, w, h)
 		}
 		'luna_chevron' {
 			d.draw_luna_chevron(x, y, w, h)

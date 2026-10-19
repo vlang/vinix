@@ -196,6 +196,7 @@ mut:
 	start_menu_open      bool
 	start_menu_all_apps  bool
 	start_menu_searching bool
+	start_menu_power_open bool
 	start_menu_page      int
 	start_menu_query     []u8
 	// Programs pinned to the Start menu and the most recently launched ones,
