@@ -10953,17 +10953,57 @@ uses relative field `0x10dc7fd40` to reach GOT cell `0x10dc9b2b8`. The encoding
 agrees with the [Swift mangling ABI](https://github.com/swiftlang/swift/blob/main/docs/ABI/Mangling.rst),
 whose source snapshot is retained with the evidence. SwiftUI remains unsupported.
 
+`_$s7SwiftUI13_VStackLayoutVMn` now resolves only through SwiftUI.framework
+to a distinct nongeneric nominal descriptor with a complete metadata accessor.
+Native measurement and the SDK's frozen `_VStackLayout` declaration establish
+an alignment word at offset 0 and optional CGFloat spacing at offset 8. The
+value occupies 17 bytes with a 24-byte stride, POD/inline flags and no extra
+inhabitants. The supplied IPA references the descriptor indirectly through
+GOT cell `0x10dc9b2b8` from its Swift type-reference record at `0x10dc7fd3f`.
+
+One locked allocation holds an RX accessor page and a read-only metadata page.
+Every request returns the same complete metadata in x0/x1 while preserving
+x20/x21. Copy/take/assignment witnesses transfer exactly 17 bytes and preserve
+all seven padding bytes. Destruction is a no-op. Single-payload enum witnesses
+preserve the native 17-byte payload, optional tag byte and UInt32 wrapping
+behavior, including nonzero tag writes with a zero empty-case population.
+No Objective-C ownership or dependent metadata cache is created by lookup.
+Owned Swift buffers, heap objects and Array metadata retire before this arena
+unmaps. Cached lookup remains available to earlier teardown callbacks.
+
+`tests/ios/native-checks.v build-swiftui-vstack` builds the fixture. Six host
+ASan/UBSan runs pass the new fixture, metadata-state lookup and Dispatch QoS
+regressions. The optimized ARM64 guest fixture also passes. Native/runtime
+checks cover eight cold readers, exact field offsets and layout, guarded
+17-byte copies and unused inputs, enum populations and wrapping, indirect
+symbolic type lookup, typed Array ownership, RX/RO protection, retirement
+guards, callback access and two drained/unmapped lifetimes. Generated C and
+assembly review covers the fixture and both production runners.
+
+Evidence, native measurements, SDK/ABI source snapshots, preserved fixture
+compiler diagnostics and seven generated-C/executable pairs are retained in
+`build/ios/fortnite/swiftui-vstack-checks`. The fresh production probe clears
+the descriptor import and stops before entry at `_$s7SwiftUI13_VariadicViewO4TreeVMn`. Field reflection,
+public VStack accessors/constructors, layout/view conformances and SwiftUI
+rendering remain unsupported. Fortnite remains unplayable; the full iOS
+regression is unpassed.
+
+The next required descriptor has two inspected indirect context references
+in `__TEXT,__swift5_typeref`, at `0x10dc7fce8` and `0x10dc7fd38`, whose relative
+fields at `0x10dc7fce9` and `0x10dc7fd39` target GOT cell `0x10dc9b2c0`.
+No application code was executed during this inspection.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,814 | 347 | 78 |
+| Fortnite executable | 1,815 | 346 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,654 | 350 | 114 |
+| All images | 2,655 | 349 | 114 |
 
-The C++/GLES/Text variant reports 2,668 resolved imports, 336 unresolved strong
+The C++/GLES/Text variant reports 2,669 resolved imports, 335 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

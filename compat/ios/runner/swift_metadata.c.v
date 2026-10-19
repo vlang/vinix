@@ -175,6 +175,7 @@ fn swift_metadata_stop() {
 	// Like ARC thunks, metadata is retired only after all workers/callbacks and
 	// owned buffers have drained.
 	swift_array_stop()
+	swiftui_vstack_stop()
 	swift_nsobject_hashable_stop()
 	swift_integer_stop()
 	swift_void_stop()

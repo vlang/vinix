@@ -221,6 +221,8 @@ mut:
 	swift_integer_arena u64 // Int metadata, value witnesses and Equatable/Hashable conformances.
 	swift_dispatch_flags_arena u64 // Sealed DispatchWorkItemFlags metadata/accessor pages.
 	swift_dispatch_flags_retired bool // Reject resolution after quiescent metadata teardown.
+	swiftui_vstack_arena u64 // Sealed nongeneric SwiftUI VStack descriptor/metadata and accessor.
+	swiftui_vstack_retired bool
 	swift_objc_bool_arena u64 // Sealed ObjectiveC.ObjCBool metadata/accessor pages.
 	swift_objc_bool_retired bool // Reject resolution after quiescent metadata teardown.
 	swift_nsobject_hashable_arena u64 // Sealed NSObject conformance patterns/adapters and separate RW generic caches.
