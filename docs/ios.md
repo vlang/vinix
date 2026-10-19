@@ -11556,17 +11556,61 @@ argument/result/context access, ownership operations, allocation, runtime
 storage or custom witness dispatch. Seven executable/generated-C artifact
 pairs and joined validation logs are archived in the same cohort.
 
+`_$s7SwiftUI19UIViewRepresentablePAAE21_overrideSizeThatFits_2in6uiViewySo6CGSizeVz_AA09_ProposedF0V0C4TypeQztF`
+now resolves to the extension's empty default. It preserves every bit of the
+caller-owned inout CGSize and does not access the proposal, view, Swift self,
+generic metadata/witnesses or x8 storage. Custom sizing overrides, layout and
+graph execution remain unsupported.
+
+The native AppKit counterpart is a single `ret`. It passes 4,000 protected
+proposal calls and 2,048 read-only/writable CGSize boundary calls, including
+NaNs, negative zero and infinities. Size bits and x0-x8/x20/x21/d0/d1 remain
+unchanged. The SDK declares an inout CGSize and a proposed-size value; the
+pinned OpenSwiftUI UIKit source marks this default as empty. UIKit execution
+remains unverified because its entry is unavailable on this Mac. Evidence is
+retained under `build/ios/fortnite/swiftui-size-override-checks`.
+
+The dedicated fixture passes normal and deterministic ASan/UBSan host runs
+with its default compiled at O2, plus the optimized ARM64 guest run. It checks
+16,384 concurrent calls across eight readers and two runtime lifetimes, 600
+ownership cycles with unchanged ObjC/Swift aliases, unchanged read-only and
+writable CGSize bits at both protected boundaries, nil/finite/infinite/NaN
+proposals, read-only Swift self storage, protected metadata/witness/x8,
+x0-x8/x20/x21/d0/d1, exact framework routing, and calls during and after
+teardown. Layout-traits and sizeThatFits host regressions also pass normal
+and deterministic sanitizer runs.
+
+The initial public-driver check used a fixture table compiled before
+registration; that failure is archived under `public-route-stale-build`.
+Rebuilding from the registered source passes both valid and unknown fixture
+routing checks. The build helper now requires registration before compiling
+this driver.
+
+The fresh launch probe links past the size-override default and exits 1
+before application entry at the next required SwiftUI import,
+`_$s7SwiftUI19UIViewRepresentablePAAE24_modifyBridgedViewInputsyyAA01_gH0VzFZ`.
+Its main-image fixup is `0x10dc9b338`, stub `0x10c63aae8`, forwarder
+`0x107c28e48` and call `0x1015be714`. These two consumer/forwarder sites were
+inspected without executing application code. Fortnite remains unplayable.
+
+The size-override fixture, launch probe and both audits pass their expected
+checks. Generated C and ARM64 disassembly review of both fixture variants and
+both production runners confirms an empty hook and one `ret`, with no
+argument/result/context access, ownership operations, allocation, runtime
+storage or custom witness dispatch. Seven executable/generated-C artifact
+pairs and joined validation logs are archived in the same cohort.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,830 | 331 | 78 |
+| Fortnite executable | 1,831 | 330 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,670 | 334 | 114 |
+| All images | 2,671 | 333 | 114 |
 
-The C++/GLES/Text variant reports 2,684 resolved imports, 320 unresolved strong
+The C++/GLES/Text variant reports 2,685 resolved imports, 319 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
