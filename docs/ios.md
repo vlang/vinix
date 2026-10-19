@@ -11685,22 +11685,67 @@ no return, caller-storage access, ownership operations, allocation or
 runtime storage. Seven executable/generated-C artifact pairs and joined
 validation logs are archived in the same cohort.
 
+The required SwiftUI import
+`_$s7SwiftUI19UIViewRepresentablePAAE9_makeView4view6inputsAA01_F7OutputsVAA11_GraphValueVyxG_AA01_F6InputsVtFZ`
+now has a diagnostic binding. Calling it exits 1 with an explicit view graph
+construction diagnostic before reading graph/inputs/metadata/witness/self
+or writing caller-owned x8 storage. It does not create a view, synthesize
+`_ViewOutputs`, dispatch a custom witness or provide rendering.
+
+The native AppKit factory requests PlatformViewRepresentableAdaptor
+metadata and preserves the indirect result pointer from x8 for downstream
+calls. Its instructions were inspected through its authenticated return;
+the factory was not executed. The SDK declares graph-value/input arguments
+and a `_ViewOutputs` result. The pinned OpenSwiftUI UIKit source conditionally
+checks the representable's value type and delegates to the platform adapter's
+factory. The platform adapter, graph engine and resilient result remain
+unsupported. Native UIKit execution is unverified because its entry is
+unavailable on this Mac. Evidence is retained under
+`build/ios/fortnite/swiftui-view-factory-checks`.
+
+The dedicated fixture passes normal and deterministic ASan/UBSan host runs
+with the entry compiled at O2, plus the optimized ARM64 guest run. It checks
+32 child calls that exit 1 with the graph diagnostic, protected graph,
+inputs, metadata, witnesses, self and x8, and unchanged shared read-only and
+writable result pages at both protected boundaries. These fixture offsets
+do not specify the private `_ViewOutputs` layout. Eight readers complete
+16,384 concurrent resolutions across two runtime lifetimes, with exact
+framework routing, teardown callbacks and calls after shutdown. The body
+and view-list host regressions also pass normal and deterministic sanitizer
+runs. Public fixture routing passes, including rejection of an unknown
+fixture.
+
+The fresh launch probe links past the factory binding and exits 1 before
+application entry at the required `Coordinator == Void` default,
+`_$s7SwiftUI19UIViewRepresentablePAAyt11CoordinatorRtzrlE04makeE0yyF`.
+Its main-image fixup is `0x10dc9b350`, stub `0x10c63ab0c`, forwarder
+`0x107c28e34` and call `0x1015be650`. These two consumer/forwarder sites were
+inspected without executing application code. The `_makeView` binding
+remains diagnostic-only, and Fortnite remains unplayable.
+
+The view-factory fixture, launch probe and both audits pass their expected
+checks. Generated C and ARM64 disassembly review of both fixture variants
+and both production runners confirms a terminal diagnostic, with no return,
+graph/input/result/context dereference, ownership operations or runtime
+storage. Seven executable/generated-C artifact pairs and joined validation
+logs are archived in the same cohort.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,833 | 328 | 78 |
+| Fortnite executable | 1,834 | 327 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,673 | 331 | 114 |
+| All images | 2,674 | 330 | 114 |
 
-The C++/GLES/Text variant reports 2,687 resolved imports, 317 unresolved strong
+The C++/GLES/Text variant reports 2,688 resolved imports, 316 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
-view-list factory and identified-tree hook still stop execution when reached;
-the count does not measure functional API coverage.
+view and view-list factories and identified-tree hook still stop execution
+when reached; the count does not measure functional API coverage.
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on
