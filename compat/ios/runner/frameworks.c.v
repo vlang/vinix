@@ -15,6 +15,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		if address := swiftui_localized_key_symbol(symbol) { return address }
 		if address := swiftui_alignment_symbol(symbol) { return address }
 		if address := swiftui_dismantle_symbol(symbol) { return address }
+		if address := swiftui_sizing_symbol(symbol) { return address }
 	}
 	if library == '/System/Library/Frameworks/StoreKit.framework/StoreKit' {
 		if address := storekit_constant_symbol(symbol) { return address }

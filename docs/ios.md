@@ -11351,17 +11351,57 @@ variants and both production runners, including the empty body and direct
 return without argument or ownership operations. Seven executable/generated-C
 artifact pairs, native/source evidence and joined logs are retained.
 
+`_$s7SwiftUI19UIViewRepresentablePAAE12sizeThatFits_6uiView7contextSo6CGSizeVSgAA08ProposedI4SizeV_0C4TypeQzAA0cD7ContextVyxGtF`
+now resolves through SwiftUI.framework to the protocol-extension default that
+returns no preferred size. Its V ARM64 entry returns `Optional<CGSize>.none`
+in x0/x1/w2 (0/0/1); a C aggregate return would use indirect result storage.
+The entry accesses no proposal, view, context, metadata or witness storage,
+performs no ownership operations or allocation, and remains callable after
+runtime shutdown. Custom sizing and layout remain unsupported.
+
+The installed UIKit and AppKit SDK declarations establish the optional-size
+signature. The pinned
+[OpenSwiftUI default](https://github.com/OpenSwiftUIProject/OpenSwiftUI/blob/da91cd90de7285da284e785d9b0376bf78ae5809/Sources/OpenSwiftUI/Integration/Representable/UIKit/UIViewRepresentable.swift#L247)
+returns nil. The native NSViewRepresentable counterpart returns the measured
+0/0/1 registers in four instructions and passes 2,048 protected-argument calls.
+UIKit execution remains unverified: this Mac has no available native UIKit
+entry for the comparison. Native and SDK/source evidence is retained under
+`build/ios/fortnite/swiftui-sizing-checks`.
+
+`tests/ios/native-checks.v build-swiftui-sizing` builds the fixture. Six host
+ASan/UBSan runs pass sizing, dismantling and center alignments with normal
+and deterministic hashing. The sizing fixture also passes in the optimized
+ARM64 guest: 16,384 concurrent calls, 600 borrowed ownership cycles with
+unchanged Objective-C/Swift aliases, nil/finite/infinite/NaN proposals,
+read-only context storage at a protected boundary, protected x8, preserved
+x3-x7/x20/x21/d0/d1, callbacks and two drained runtime lifetimes.
+
+The launch probe clears the sizing default and stops before entry, with child
+status 1, at
+`_$s7SwiftUI19UIViewRepresentablePAAE13_makeViewList4view6inputsAA01_fG7OutputsVAA11_GraphValueVyxG_AA01_fG6InputsVtFZ`.
+Its main-image fixup is `0x10dc9b310`, stub `0x10c63aaac`, forwarder
+`0x107c28e54` and call `0x1015be814`. The wrapper obtains a protocol witness
+table and forwards indirect view-list result storage in x8. These two
+consumer/forwarder sites were inspected without executing application code;
+view-list graph construction remains unsupported.
+
+The sizing fixture, launch probe and both import audits pass their expected
+checks. Generated C and ARM64 disassembly review covers both fixture variants
+and both production runners, including the three result-register writes and
+direct return without ownership or memory access. Seven executable/generated-C
+artifact pairs and joined validation logs are archived in the same cohort.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,825 | 336 | 78 |
+| Fortnite executable | 1,826 | 335 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,665 | 339 | 114 |
+| All images | 2,666 | 338 | 114 |
 
-The C++/GLES/Text variant reports 2,679 resolved imports, 325 unresolved strong
+The C++/GLES/Text variant reports 2,680 resolved imports, 324 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
