@@ -204,6 +204,8 @@ the native NSString value `NSURLIsRegularFileKey`.
 the native NSString value `NSURLVolumeAvailableCapacityForImportantUsageKey`.
 `NSURLVolumeAvailableCapacityKey` and `kCFURLVolumeAvailableCapacityKey` share
 a sixth cell with the native NSString value `NSURLVolumeAvailableCapacityKey`.
+`NSURLVolumeTotalCapacityKey` and `kCFURLVolumeTotalCapacityKey` share a seventh
+cell with the native NSString value `NSURLVolumeTotalCapacityKey`.
 URL resource-date, file-size, file-type and volume-capacity lookup, and
 backup-exclusion metadata reads and writes, remain unsupported.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
@@ -10835,17 +10837,53 @@ link probe clears this import and stops before entry at
 `_NSURLVolumeTotalCapacityKey`. Fortnite remains unplayable; the full iOS
 regression is unpassed.
 
+`_NSURLVolumeTotalCapacityKey` now resolves through Foundation and
+CoreFoundation. Native measurements confirm that it and
+`_kCFURLVolumeTotalCapacityKey` share one aligned NSString pointer cell under
+both install names, containing the exact 27-byte value
+`NSURLVolumeTotalCapacityKey`. Its cell and NSString are distinct from all
+six earlier resource keys. Fortnite's inspected consumer at `0x100628978`
+loads GOT slot `0x10dc9b210`, dereferences it into x3, passes an output slot
+in x2 and stores the returned object through x20. Volume-capacity queries
+remain unsupported.
+
+The shared URL-resource page preserves all six existing layouts. The seventh
+cell occupies padding at offset 112, with its CFSTR record and NUL-terminated
+text at offsets 480 and 512. All seven constants register under the runtime
+lock before checked read-only publication. Cached lookup allocates nothing.
+Shutdown keeps all seven keys available until pools and Swift contexts
+drain, then unregisters them before checked page unmapping.
+
+`tests/ios/native-checks.v build-ns-url-total-capacity` builds the fixture.
+Six host ASan/UBSan runs pass the new fixture and the existing available and
+important-usage capacity fixtures. The optimized ARM64 guest fixture also
+passes. Native and runtime checks cover eight readers alternating all seven
+keys and both aliases through both frameworks, exact distinct storage,
+immutable copying, CFHash and equal-string dictionary lookup. A retained
+seven-key NSArray, three-capacity NSArray and synthetic dictionary preserve
+distinct 5 GiB + 17, 7 GiB + 29 and 11 GiB + 43 NSNumber values across pool
+drain; this collection check does not query a volume. Two runtime lifetimes
+check isolated storage, retirement guards, callback access, zero live
+objects and removal of all seven registrations. Generated C and assembly
+review covers the fixture and both production runners.
+
+Evidence and seven generated-C/executable pairs are retained under
+`build/ios/fortnite/ns-url-total-capacity-checks`. The fresh production link
+probe clears this import and stops before entry at
+`_OBJC_EHTYPE_$_NSException`. Objective-C exception handling remains
+unsupported. Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,809 | 352 | 78 |
+| Fortnite executable | 1,810 | 351 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,649 | 355 | 114 |
+| All images | 2,650 | 354 | 114 |
 
-The C++/GLES/Text variant reports 2,663 resolved imports, 341 unresolved strong
+The C++/GLES/Text variant reports 2,664 resolved imports, 340 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
