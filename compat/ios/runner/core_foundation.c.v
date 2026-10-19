@@ -293,6 +293,12 @@ fn cf_hash(object u64) u64 {
 	if object == 0 { return 0 }
 	if read64(object) == cm_format_id() { return u64(cm_format_media(object)) ^ (u64(cm_format_subtype(object)) << 32) }
 	if objc_is_kind(object, ios_runtime.names['NSUUID']) { return ns_uuid_hash(object) }
+	if read64(object) == ios_runtime.names['VinixCFUUID'] {
+		header := obj_header(object)
+		mut hash := u64(14695981039346656037)
+		for byte in header.uuid_bytes { hash = (hash ^ u64(byte)) * 1099511628211 }
+		return hash
+	}
 	if ns_date_is_date(object) { return ns_date_hash(object) }
 	if objc_is_kind(object, ios_runtime.names['NSTimeZone']) { return ns_timezone_hash(object) }
 	if read64(object) == sec_policy_type_id() { return cf_hash(obj_header(object).fields[0]) }

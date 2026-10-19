@@ -166,8 +166,10 @@ the main loop; background Foundation current loops remain unsupported.
 including embedded NULs and registered image constants. Other comparison options
 fail explicitly.
 `CFUUIDCreate` returns an owned, distinct CFUUID object with secure version-4
-bytes, accepting the null or system-default allocator. Other CFUUID APIs remain
-unimplemented.
+bytes, accepting the null or system-default allocator. `CFUUIDCreateFromString`
+returns owned values using the measured native parser, including its permissive
+separator and incomplete-input handling. UUIDs compare and hash by value.
+Other CFUUID constructors and byte/string conversion APIs remain unimplemented.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
 The Mach VM adapter supports allocations up to 4 GiB in the current process,
@@ -10251,17 +10253,53 @@ Evidence and seven generated-C/executable pairs are retained in
 `_CFUUIDCreate` and stops before entry at `_CFUUIDCreateFromString`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_CFUUIDCreateFromString` now accepts allocator/string pointers in x0/x1 and
+returns an owned CFUUID reference in x0. It accepts null/default allocation and
+allocated strings or registered UTF-8/decoded UTF-16 image constants. Invalid
+string provenance, malformed UTF-8, custom allocators, `kCFAllocatorNull` and
+calls outside the runtime lifetime fail explicitly.
+
+Native differential probes show that this parser differs from NSUUID's strict
+canonical parser: it examines at most 100 UTF-16 units, skips leading non-hex
+units, ignores the contents of four fixed separator slots and zero-fills
+invalid or incomplete byte pairs. Trailing text is ignored. Only an empty
+string returns nil; nonempty strings without hex pairs produce an all-zero
+UUID. All parsed bits are preserved, without imposing version/variant bits.
+Two fixed stack buffers hold the UTF-16 units and sixteen output bytes before
+one object is allocated. Results are independent of the source string and use
+the existing reference/weak-reference lifetime machinery. Equal UUID payloads
+have value equality and equal hashes, including collection key lookup; CFUUID
+and NSUUID remain distinct types. Native implementations may reuse an existing
+UUID, while this bridge returns independent owned objects.
+
+`tests/ios/native-checks.v build-cf-uuid-string` builds the fixture. Six host
+ASan/UBSan runs pass string parsing, CFUUID creation and NSUUID checks. The 42
+native differential cases cover prefixes, case, embedded NULs, separator slots,
+bad/incomplete pairs and the 100-unit boundary with BMP/supplementary text.
+The optimized ARM64 guest fixture also verifies protected x2–x8, preserved
+x20/x21, both image constant encodings, allocator/input rejection, value equality
+and hashing, source independence, dictionary/weak lifetimes, eight concurrent
+readers, balanced references, no autoreleases and two zero-live-object teardowns.
+Generated C and assembly review verifies the two-pointer ABI, locked validation,
+stack parsing, inline payload, owned return and static unboxed errors in the
+fixture and both production runners.
+
+Evidence and seven generated-C/executable pairs are retained in
+`build/ios/fortnite/cf-uuid-string-checks`. The fresh link probe clears
+`_CFUUIDCreateFromString` and stops before entry at `_CFUUIDCreateFromUUIDBytes`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,793 | 368 | 78 |
+| Fortnite executable | 1,794 | 367 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,633 | 371 | 114 |
+| All images | 2,634 | 370 | 114 |
 
-The C++/GLES/Text variant reports 2,647 resolved imports, 357 unresolved strong
+The C++/GLES/Text variant reports 2,648 resolved imports, 356 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
