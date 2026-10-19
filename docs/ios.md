@@ -11600,17 +11600,58 @@ argument/result/context access, ownership operations, allocation, runtime
 storage or custom witness dispatch. Seven executable/generated-C artifact
 pairs and joined validation logs are archived in the same cohort.
 
+The required SwiftUI import
+`_$s7SwiftUI19UIViewRepresentablePAAE24_modifyBridgedViewInputsyyAA01_gH0VzFZ`
+now resolves to the static extension's empty default. It leaves the opaque
+inout `_ViewInputs` storage unchanged and does not read metadata, witnesses,
+Swift contexts or x8 storage. It does not dispatch custom representable
+implementations or assume a private `_ViewInputs` layout.
+
+The native AppKit counterpart is a single `ret`. It passes 4,000 calls with
+protected arguments and 2,048 calls with read-only/writable input buffers at
+both protected boundaries, preserving every buffer byte and
+x0-x3/x8/x20/x21. The SDK declares the static inout method; the pinned
+OpenSwiftUI UIKit source supplies an empty body. Native UIKit execution
+remains unverified because its entry is unavailable on this Mac. Evidence is
+retained under `build/ios/fortnite/swiftui-bridged-inputs-checks`.
+
+The dedicated fixture passes normal and deterministic ASan/UBSan host runs
+with the default compiled at O2, plus the optimized ARM64 guest run. It
+checks 16,384 concurrent calls across eight readers and two runtime
+lifetimes, 600 ownership cycles with unchanged ObjC/Swift aliases,
+read-only/writable input bytes at both protected boundaries, protected
+metadata/witness/x8/contexts, x0-x3/x8/x20/x21, exact framework routing, and
+calls during and after teardown. The borrowed payload is a test fixture,
+not a model of private `_ViewInputs`. Layout-traits and size-override host
+regressions also pass normal and deterministic sanitizer runs. Public
+fixture routing passes after registration, including rejection of an
+unknown fixture.
+
+The fresh launch probe links past the bridged-inputs default and exits 1
+before application entry at the next required import,
+`_$s7SwiftUI19UIViewRepresentablePAAE4bodys5NeverOvg`. Its main-image fixup is
+`0x10dc9b340`, stub `0x10c63aaf4`, forwarder `0x107c28e5c` and call
+`0x1015be858`, followed by a `brk`. These two consumer/forwarder sites were
+inspected without executing application code. Fortnite remains unplayable.
+
+The bridged-inputs fixture, launch probe and both audits pass their expected
+checks. Generated C and ARM64 disassembly review of both fixture variants
+and both production runners confirms an empty hook and one `ret`, with no
+input/result/context access, ownership operations, allocation, runtime
+storage or custom witness dispatch. Seven executable/generated-C artifact
+pairs and joined validation logs are archived in the same cohort.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,831 | 330 | 78 |
+| Fortnite executable | 1,832 | 329 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,671 | 333 | 114 |
+| All images | 2,672 | 332 | 114 |
 
-The C++/GLES/Text variant reports 2,685 resolved imports, 319 unresolved strong
+The C++/GLES/Text variant reports 2,686 resolved imports, 318 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
