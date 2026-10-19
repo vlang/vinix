@@ -170,8 +170,9 @@ bytes, accepting the null or system-default allocator. `CFUUIDCreateFromString`
 returns owned values using the measured native parser, including its permissive
 separator and incomplete-input handling. UUIDs compare and hash by value.
 `CFUUIDCreateFromUUIDBytes` copies a by-value sixteen-byte payload into an owned
-CFUUID without changing any bits. Other CFUUID constructors and byte/string
-conversion APIs remain unimplemented.
+CFUUID without changing any bits. `CFUUIDCreateString` returns owned uppercase
+canonical text for live CFUUID values. Other CFUUID constructors and byte
+extraction APIs remain unimplemented.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
 The Mach VM adapter supports allocations up to 4 GiB in the current process,
@@ -10324,17 +10325,50 @@ Evidence and seven generated-C/executable pairs are retained in
 `_CFUUIDCreateFromUUIDBytes` and stops before entry at `_CFUUIDCreateString`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_CFUUIDCreateString` now accepts allocator/CFUUID pointers in x0/x1 and returns
+an owned CFString reference in x0. Native probes verify uppercase canonical
+36-character text with hyphens at positions 8, 13, 18 and 23. Every UUID bit is
+preserved through string parsing, including zero or nonstandard version/variant
+fields. Formatting uses a fixed stack buffer, then the existing NSString
+constructor copies its bytes into owned, NUL-terminated storage.
+
+The bridge accepts null/default allocation and a live CFUUID from the runtime's
+object map. It checks provenance before reading UUID storage, rejecting nil,
+stale handles, class objects, NSUUID/other objects, custom allocators,
+`kCFAllocatorNull` and calls outside the runtime lifetime. An isolated native
+nil diagnostic faults on this Mac; the bridge reports its checked failure.
+UUID contents and references remain unchanged. Returned strings outlive both
+the source UUID and the creating autorelease pool, and use the existing
+collection and weak-reference cleanup machinery.
+
+`tests/ios/native-checks.v build-cf-uuid-text` builds the fixture. Six host
+ASan/UBSan runs pass formatting, byte construction and string parsing checks.
+Native/runtime cases cover every byte value at every position, four known
+strings, uppercase/hyphen layout, exact parse round trips and balanced ownership.
+The optimized ARM64 guest fixture also verifies protected x2–x8, preserved
+x20/x21, invalid input/allocator rejection, source/pool independence, collection
+and weak lifetimes, eight concurrent readers, no autoreleases and two
+zero-live-object teardowns. Generated C and assembly review verifies the
+two-pointer ABI, locked provenance validation, stack formatting, copied string
+backing, owned return and static unboxed errors in the fixture and both
+production runners.
+
+Evidence and seven generated-C/executable pairs are retained in
+`build/ios/fortnite/cf-uuid-text-checks`. The fresh link probe clears
+`_CFUUIDCreateString` and stops before entry at `_CFUUIDGetUUIDBytes`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,795 | 366 | 78 |
+| Fortnite executable | 1,796 | 365 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,635 | 369 | 114 |
+| All images | 2,636 | 368 | 114 |
 
-The C++/GLES/Text variant reports 2,649 resolved imports, 355 unresolved strong
+The C++/GLES/Text variant reports 2,650 resolved imports, 354 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
