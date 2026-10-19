@@ -32,17 +32,24 @@ fn darwin_thread_get_exception_ports(name u32, mask u32, masks voidptr, count vo
 	defer { darwin_set_errno(previous) }
 	C.ios_mach_threads_lock()
 	result := thread_exception_destination(name)
+	mut allocated := false
+	$if linux { if result == 0 { allocated = mach_thread_find(name).exception_table } }
 	C.ios_mach_threads_unlock()
 	if result != 0 { return result }
 	$if macos { return C.thread_get_exception_ports(name, mask, masks, count, handlers, behaviors, flavors) }
 	$if linux {
 		if mask & ~u32(0x3ffe) != 0 { return 4 }
-		// Native threads initially have no exception-action table. Unlike task
-		// queries, every valid mask returns zero groups until a table exists.
-		// Vinix cannot install thread handlers yet; do not fabricate a table,
-		// inherit task actions, read the incoming count or touch unused arrays.
-		length := u32(0)
-		C.memcpy(count, unsafe { voidptr(&length) }, 4)
+		// Fresh threads have no table. A successful swap, even with a zero
+		// mask, creates an empty table whose unset actions form one group.
+		// Do not read the incoming count or touch unused arrays.
+		words := [mask, u32(allocated && mask != 0), 0]!
+		if words[1] != 0 { C.memcpy(masks, unsafe { voidptr(&words[0]) }, 4) }
+		C.memcpy(count, unsafe { voidptr(&words[1]) }, 4)
+		if words[1] != 0 {
+			C.memcpy(handlers, unsafe { voidptr(&words[2]) }, 4)
+			C.memcpy(behaviors, unsafe { voidptr(&words[2]) }, 4)
+			C.memcpy(flavors, unsafe { voidptr(&words[2]) }, 4)
+		}
 		return 0
 	}
 }

@@ -32,6 +32,7 @@ mut:
 	refs u32
 	borrowed bool
 	dead bool
+	exception_table bool
 }
 
 // Never reuse a name across image executions, even if native pthread handles

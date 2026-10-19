@@ -9804,17 +9804,52 @@ register capture, register mutation and kernel exception delivery remain
 unsupported on Vinix. Fortnite remains unplayable; the full iOS regression is
 unpassed.
 
+`_thread_swap_exception_ports` now forwards native swaps and their returned
+COPY_SEND references on macOS. Vinix supports zero-mask swaps and exact
+null/zero clears of unset actions. Native measurements show that a successful
+swap allocates an empty action table even with a zero mask. A flag on the
+existing Mach thread record tracks that state without another allocation.
+Subsequent thread queries return one null-action group for a nonzero valid
+mask; a fresh thread or fork child still returns zero groups. Removing and
+reacquiring send rights preserves the live thread's table state.
+
+The V adapter refreshes retired names and validates the destination and
+COPY_SEND descriptor before checking masks, behavior and ARM flavors.
+It changes table state under the namespace lock, then unlocks before caller
+writes or native calls. Both swaps and allocated-table queries write exactly
+four bytes per output field in native masks/count/handlers/behaviors/flavors
+order, including unaligned and overlapping outputs. Counts are output-only.
+Handler/policy installation and kernel exception delivery remain unsupported;
+rejected requests leave outputs and table state unchanged.
+
+`tests/ios/native-checks.v build-thread-swap-exception-ports` builds the fixture.
+Six host ASan/UBSan runs pass thread-swap, task-swap and thread-query
+regressions; twelve native profiles compare complete records, two distinct
+old handler groups and balanced returned references. The optimized ARM64
+fixture passes guarded/unaligned/aliased output checks, empty-table queries,
+descriptor precedence, eight concurrent and retired threads, right
+reacquisition, fork and two runtime lifetimes. Generated C and ARM64 review
+cover both the swap and the changed query path.
+
+Native measurements, seven generated-C/executable pairs and fresh probe/audit
+evidence are retained in
+`build/ios/fortnite/thread-swap-exception-ports-checks`. The native probe's
+initial fork cleanup reused the parent's task port; its diagnostic is retained
+under `diagnostics/native-fork-task-port`, and the corrected probe passes.
+The loader clears `_thread_swap_exception_ports` and stops before entry at
+`_uname`. Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,780 | 381 | 78 |
+| Fortnite executable | 1,781 | 380 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,620 | 384 | 114 |
+| All images | 2,621 | 383 | 114 |
 
-The C++/GLES/Text variant reports 2,634 resolved imports, 370 unresolved strong
+The C++/GLES/Text variant reports 2,635 resolved imports, 369 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
