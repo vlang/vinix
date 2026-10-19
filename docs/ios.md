@@ -11300,22 +11300,68 @@ before entry with child status 1 at
 Its actual main-image fixup is `0x10dc9b300`, stub `0x10c63aa94`, forwarder
 `0x107c28e30` and call `0x1015be63c`. The call wrapper forwards the default
 UIViewRepresentable teardown operation and returns. These two consumer/forwarder
-sites were inspected without executing application code; the teardown import
-remains unsupported. Generated C and ARM64 disassembly review covers both
+sites were inspected without executing application code; that probe stopped
+at the teardown import. Generated C and ARM64 disassembly review covers both
 fixture variants and both production runners. Seven executable/generated-C
 artifact pairs and the joined validation logs are archived in the same cohort.
+
+`_$s7SwiftUI19UIViewRepresentablePAAE09dismantleC0_11coordinatory0C4TypeQz_11CoordinatorQztFZ`
+now resolves through SwiftUI.framework to the empty protocol-extension default.
+The hook borrows its view and generic coordinator; it accesses no arguments,
+metadata, witness tables, indirect results or Swift context storage. It performs
+no allocation, ARC, custom witness dispatch or view-hierarchy removal and has
+no runtime storage dependency.
+
+Apple's [default-hook declaration](https://developer.apple.com/documentation/swiftui/uiviewrepresentable/dismantleuiview(_:coordinator:)-94s0o)
+and the installed Mac Catalyst SDK establish its signature. The pinned
+[OpenSwiftUI default](https://github.com/OpenSwiftUIProject/OpenSwiftUI/blob/da91cd90de7285da284e785d9b0376bf78ae5809/Sources/OpenSwiftUI/Integration/Representable/UIKit/UIViewRepresentable.swift#L217)
+corroborates an empty hook. The available native NSViewRepresentable counterpart
+is a single `ret` and passes 4,000 calls with protected borrowed arguments.
+The UIKit symbol is unavailable in this Mac runtime; UIKit execution was not
+measured natively. The compatibility implementation follows the empty-default
+contract, with that native-comparison limit recorded in the evidence.
+
+`tests/ios/native-checks.v build-swiftui-dismantle` builds the fixture. Six
+host ASan/UBSan runs pass the default hook, center alignments and Objective-C
+supplied storage with normal and deterministic hashing. The hook checks
+16,384 concurrent calls, 600 borrowed ownership cycles with unchanged aliases,
+read-only coordinator storage at a protected boundary, untouched x8 and
+preserved x0-x3/x20/x21, callbacks and two drained runtime lifetimes.
+
+Evidence is retained under `build/ios/fortnite/swiftui-dismantle-checks`.
+The storage regression resumed after restoring its archived native C++
+fixture into this cohort; its initial missing-library failure is preserved
+in `regression-fixture-diagnostic`. A source-fetch HTTP 403 and the verified
+snapshot recovery are recorded separately. Build and VM staging use an owned
+4 GiB RAM volume after host disk exhaustion; completion verifies retained
+files on the repository filesystem before detaching it.
+
+The launch probe clears the default teardown import and remains before entry,
+with child exit status 1, at
+`_$s7SwiftUI19UIViewRepresentablePAAE12sizeThatFits_6uiView7contextSo6CGSizeVSgAA08ProposedI4SizeV_0C4TypeQzAA0cD7ContextVyxGtF`.
+Its main-image fixup is `0x10dc9b308`, stub `0x10c63aaa0`, forwarder
+`0x107c28e3c` and call `0x1015be6d0`. The wrapper forwards the proposal and
+normalizes the optional result's tag in w2 after the call. These two
+consumer/forwarder sites were inspected without executing application code;
+the sizing default remains unsupported.
+
+The optimized ARM64 fixture, launch probe and both import audits pass their
+expected checks. Generated C and ARM64 disassembly review covers both fixture
+variants and both production runners, including the empty body and direct
+return without argument or ownership operations. Seven executable/generated-C
+artifact pairs, native/source evidence and joined logs are retained.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,824 | 337 | 78 |
+| Fortnite executable | 1,825 | 336 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,664 | 340 | 114 |
+| All images | 2,665 | 339 | 114 |
 
-The C++/GLES/Text variant reports 2,678 resolved imports, 326 unresolved strong
+The C++/GLES/Text variant reports 2,679 resolved imports, 325 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
