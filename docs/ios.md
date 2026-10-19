@@ -11131,17 +11131,62 @@ The next import is a generic nominal descriptor. Its GOT cell is
 in `__TEXT,__swift5_typeref` point to that cell. This inspection executed no
 application code and does not establish ModifiedContent support.
 
+`_$s7SwiftUI15ModifiedContentVMn` now resolves only through SwiftUI.framework
+to a distinct, sealed nominal descriptor. Native measurements and the SDK's
+frozen declaration establish a generic struct in the SwiftUI module with two
+unconstrained type parameters, two key arguments and no generic requirements.
+It declares two fields with their offset vector at metadata word four.
+Native Int/Int, String/Int and Never/String specializations confirm that
+layout, ownership flags and extra inhabitants depend on those arguments.
+
+This export supplies nominal identity and the generic signature. It supplies
+no complete specialization metadata, value witnesses, field reflection,
+instantiation cache/pattern or View conformance. The descriptor's generic bit
+makes direct and indirect symbolic lookup reject before reading its accessor
+or protected generic arguments. Calling its diagnostic accessor reports
+`iOS: SwiftUI ModifiedContent generic instantiation is not implemented`.
+
+One locked allocation publishes an RX diagnostic page and read-only descriptor
+page. Construction creates no Swift/Objective-C owners or dependent metadata
+arenas. Earlier teardown callbacks can still resolve the cached descriptor;
+Swift owners and Array metadata drain before unmapping it.
+
+`tests/ios/native-checks.v build-swiftui-modified` builds the fixture. Six host
+ASan/UBSan runs pass ModifiedContent, mangled-state lookup and Tree checks with
+normal and deterministic hashing. Checks include eight cold readers, the native
+generic signature, direct/indirect bounded symbolic references, protected
+arguments, four diagnostic requests, sealed pages, retirement guards, callback
+access and two drained/unmapped lifetimes. Generic instantiation and SwiftUI
+rendering remain unsupported.
+
+The optimized ARM64 fixture, startup probe and both production import audits
+pass. Generated C and assembly review covers the host/guest fixture and both
+production runners. Native measurements, SDK/Swift ABI snapshots, six sanitizer
+logs, four guest runs and seven generated-C/executable pairs are retained in
+`build/ios/fortnite/swiftui-modified-checks`, along with the corrected fixture
+generator's original diagnostic. The fresh probe clears the nominal descriptor
+import, then stops before entry at
+`_$s7SwiftUI15ModifiedContentVyxq_GAA4ViewA2aERzAA0E8ModifierR_rlMc`,
+ModifiedContent's conditional View conformance. Fortnite remains unplayable;
+the full iOS regression is unpassed.
+
+The next import's GOT cell is `0x10dc9b2e8`. Loads at `0x1015c1310` and
+`0x1015c1784` pass the descriptor as x0 to `_swift_getWitnessTable` at
+`0x1015c1314` and `0x1015c1788`, with specialization metadata in x1 and
+conditional witness arguments in x2. Two consumer sites were inspected without
+executing application code.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,819 | 342 | 78 |
+| Fortnite executable | 1,820 | 341 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,659 | 345 | 114 |
+| All images | 2,660 | 344 | 114 |
 
-The C++/GLES/Text variant reports 2,673 resolved imports, 331 unresolved strong
+The C++/GLES/Text variant reports 2,674 resolved imports, 330 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
