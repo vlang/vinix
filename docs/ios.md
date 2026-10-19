@@ -9603,17 +9603,49 @@ The probe clears `_task_info` and stops before entry at
 `_task_swap_exception_ports`. Fortnite remains unplayable; the full iOS
 regression is unpassed.
 
+`_task_swap_exception_ports` now forwards native Mach swaps on macOS,
+including caller-owned send references returned for previous handlers.
+Vinix supports valid empty-mask requests and clearing already-unset actions
+to a null handler, zero behavior and zero flavor. Otherwise valid nonempty
+requests that install a handler or change policy return `KERN_NOT_SUPPORTED`,
+with all outputs unchanged. No handler state or successful fault delivery
+is fabricated.
+
+The ten-argument V adapter resolves the destination and `COPY_SEND` right
+before checking the receiving object and scalar arguments. Kernel-object
+ports cannot become handlers, even for an empty mask: native measurements
+establish `KERN_INVALID_RIGHT` after mask/behavior validation and before
+thread-flavor validation. Compatibility receive queues continue to reject
+typed MIG transport. The adapter preserves `errno`, never reads the incoming
+output count, releases the namespace lock before native calls or caller
+writes, and copies masks, count, handlers, behaviors and flavors in native
+order with exact four-byte extents.
+
+`tests/ios/native-checks.v build-task-swap-exception-ports` builds the fixture.
+Six host ASan/UBSan runs cover swap, query and exception-RPC regressions;
+eight native profiles compare old-action grouping and release every returned
+send reference. The optimized ARM64 fixture checks both stack-passed output
+pointers, unaligned and overlapping arrays/counts, guard pages, output-only
+counts, port kinds and error precedence, unchanged references after refused
+installation, eight workers, fork and two runtime lifetimes.
+
+Native measurements, seven generated-C/executable pairs, optimized ARM64
+review and fresh probe/audit results are retained under
+`build/ios/fortnite/task-swap-exception-ports-checks`. The probe clears
+`_task_swap_exception_ports` and stops before entry at `_task_threads`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,774 | 387 | 78 |
+| Fortnite executable | 1,775 | 386 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,614 | 390 | 114 |
+| All images | 2,615 | 389 | 114 |
 
-The C++/GLES/Text variant reports 2,628 resolved imports, 376 unresolved strong
+The C++/GLES/Text variant reports 2,629 resolved imports, 375 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
