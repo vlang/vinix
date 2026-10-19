@@ -70,16 +70,7 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 			}
 			'NSLocale' {
 				if selector != 'currentLocale' { return false }
-				if ios_runtime.locale == 0 {
-					ios_runtime.locale = objc_allocate(cls)
-					mut language := os.getenv('LC_ALL')
-					if language == '' { language = os.getenv('LC_MESSAGES') }
-					if language == '' { language = os.getenv('LANG') }
-					language = language.all_before('.').all_before('@')
-					if language in ['', 'C', 'POSIX'] { language = 'en_US' }
-					store_field(ios_runtime.locale, 0, make_string(unsafe { &char(language.str) }))
-				}
-				frame.x[0] = ios_runtime.locale
+				frame.x[0] = ns_locale_current()
 			}
 			'NSFileHandle' {
 				if selector != 'fileHandleForReadingFromURL:error:' { return false }

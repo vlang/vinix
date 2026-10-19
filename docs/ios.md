@@ -9938,17 +9938,49 @@ probe/audit evidence are retained in
 `_vm_region_64` and stops before entry at `_CFLocaleCopyCurrent`. Fortnite
 remains unplayable; the full iOS regression is unpassed.
 
+`_CFLocaleCopyCurrent` now returns an owned, toll-free bridged `NSLocale`
+reference through its no-argument C entry. It shares the runtime's cached
+`NSLocale.currentLocale` snapshot, with one separate retain per caller and
+one cache retain released at shutdown. Publication is protected by the
+recursive runtime lock; results survive autorelease-pool drains and other
+callers' releases.
+
+On macOS the snapshot copies the native current locale's identifier and
+balances both its CF owner and temporary native autorelease pool. On Vinix
+it preserves the existing `LC_ALL`, `LC_MESSAGES`, then `LANG` policy,
+stripping encoding/modifier suffixes; unset, `C` and `POSIX` use the existing
+`en_US` compatibility default. It copies at most 1,023 identifier bytes into
+its owned NSString and keeps that snapshot through the runtime lifetime.
+This does not implement preference-change notifications, the ICU locale
+database, `CFLocaleGetValue` or preferred-language queries.
+
+`tests/ios/native-checks.v build-cf-locale-current` builds the fixture. Six
+host ASan/UBSan runs pass current-locale, Swift fixed-locale and CF dictionary
+checks. Native measurements verify cached owned references and identifier
+stability after pool drains and environment changes. The optimized ARM64
+fixture checks environment precedence/defaults/suffixes, long identifiers,
+protected argument/x8 registers, preserved x20/x21, cold concurrent cache
+publication, CF retain/release and Objective-C integration, autorelease
+independence and two drained runtimes with zeroed weak references.
+
+Native measurements, seven generated-C/executable pairs, corrected native
+pool/fixture-teardown/review-checker diagnostics and fresh probe/audit
+evidence are retained in `build/ios/fortnite/cf-locale-current-checks`. The
+link probe clears `_CFLocaleCopyCurrent` and stops before entry at
+`_CFLocaleCopyPreferredLanguages`. Fortnite remains unplayable; the full iOS
+regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,784 | 377 | 78 |
+| Fortnite executable | 1,785 | 376 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,624 | 380 | 114 |
+| All images | 2,625 | 379 | 114 |
 
-The C++/GLES/Text variant reports 2,638 resolved imports, 366 unresolved strong
+The C++/GLES/Text variant reports 2,639 resolved imports, 365 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
