@@ -9446,17 +9446,46 @@ optimized ARM64 call-path review are retained under
 The fresh probe clears `_raise` and stops before entry at `_setrlimit`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_setrlimit` now accepts Darwin's 16-byte limit record. macOS forwards to the
+native API. Linux maps the nine Darwin resources to native CPU, file-size,
+data, stack, core, address-space, locked-memory, process-count and descriptor
+limits, strips the strict POSIX resource flag, and translates Darwin infinity
+(`INT64_MAX`) to Linux infinity (`UINT64_MAX`). It copies unaligned inputs to
+the stack without changing caller bytes. Native ceilings, permissions and
+enforcement remain authoritative; the adapter adds no per-image limit cache.
+Linux rejects values above Darwin's canonical infinity with `ENOTSUP`; that
+range includes a collision with Linux's infinity sentinel. Native measurements
+verify the null-pointer error priority, invalid resources, soft/hard ordering
+and success errno preservation.
+
+The actual Fortnite call at `0x10062777c` requests
+`NOFILE={10240, infinity}`, using the literal at `0x10d3220b0`. The fixture
+compares this request with the native backend, including real permission
+failures. It also checks guarded/unaligned inputs, all nine resource mappings,
+descriptor exhaustion at a lowered soft limit, hard-limit permissions, fork
+inheritance, unchanged parent limits, eight callers and two runtime lifetimes.
+
+`tests/ios/native-checks.v build-setrlimit` builds the fixture. Six host
+ASan/UBSan runs cover resource limits, process resource usage and raise; the
+new fixture is optimized and compares four native macOS profiles. The ARM64
+fixture passes. Native probes, actual IPA evidence, seven final generated-C/
+executable pairs and optimized ARM64 call-path review are retained under
+`build/ios/fortnite/setrlimit-checks`.
+
+The fresh probe clears `_setrlimit` and stops before entry at `_sigaltstack`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,769 | 392 | 78 |
+| Fortnite executable | 1,770 | 391 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,609 | 395 | 114 |
+| All images | 2,610 | 394 | 114 |
 
-The C++/GLES/Text variant reports 2,623 resolved imports, 381 unresolved strong
+The C++/GLES/Text variant reports 2,624 resolved imports, 380 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

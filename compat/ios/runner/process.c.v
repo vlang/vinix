@@ -92,6 +92,7 @@ fn darwin_malloc_size(pointer voidptr) usize {
 
 fn process_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_setrlimit' { u64(unsafe { voidptr(darwin_setrlimit) }) }
 		'_proc_pid_rusage' { u64(unsafe { voidptr(darwin_proc_pid_rusage) }) }
 		'_getprogname' { u64(unsafe { voidptr(darwin_getprogname) }) }
 		'_fork' { u64(unsafe { voidptr(darwin_fork) }) }
