@@ -10993,17 +10993,61 @@ in `__TEXT,__swift5_typeref`, at `0x10dc7fce8` and `0x10dc7fd38`, whose relative
 fields at `0x10dc7fce9` and `0x10dc7fd39` target GOT cell `0x10dc9b2c0`.
 No application code was executed during this inspection.
 
+`_$s7SwiftUI13_VariadicViewO4TreeVMn` now resolves only through SwiftUI.framework
+as a descriptor export for `SwiftUI._VariadicView.Tree`. Native measurement
+and the SDK establish a generic struct with two type parameters, three key
+arguments and the requirement `Root: _VariadicView_Root`. The nested enum,
+module and protocol descriptor preserve that identity. The struct describes
+two fields and a field-offset vector at metadata word five. The supplied IPA
+has two indirect context references to this descriptor through GOT cell
+`0x10dc9b2c0`, as recorded above.
+
+This export supplies identity and the generic signature. Generic instantiation,
+field reflection, the Root getter/default implementation and conformances
+remain unsupported. There is no metadata cache or instantiation pattern.
+The generic flag remains set, so type-name lookup rejects the descriptor
+before reading its accessor. A direct accessor call reports
+`iOS: SwiftUI Tree generic instantiation is not implemented` without inspecting
+the supplied generic arguments. Native specialization measurements demonstrate
+why this cannot reuse a fixed value layout: with `_VStackLayout` as Root,
+Int Content gives a 32-byte value, while String Content gives a 40-byte value
+with different ownership flags.
+
+A locked allocation publishes one RX diagnostic-accessor page and one
+read-only descriptor page. Lookup creates no Swift values, Objective-C owners
+or dependent metadata caches. Cached descriptor access remains available to
+teardown callbacks; the arena unmaps after owners and Array metadata drain.
+`tests/ios/native-checks.v build-swiftui-tree` builds the fixture. Six host
+ASan/UBSan runs pass Tree, metadata-state lookup and VStack checks with normal
+and deterministic hashing. The optimized ARM64 fixture checks eight cold
+readers, the native generic signature, direct/indirect symbolic rejection,
+guarded name boundaries and arguments, explicit accessor diagnostics,
+RX/RO protection, callback access and two drained/unmapped lifetimes.
+
+Evidence, native specialization measurements, SDK/Swift ABI snapshots and
+seven generated-C/executable pairs are retained in
+`build/ios/fortnite/swiftui-tree-checks`. The guest fixture, production probe
+and both import audits pass their scoped checks. Generated C and assembly
+review covers the fixture and both production runners. Fortnite now stops
+before entry at `_$s7SwiftUI13_ZStackLayoutVMn`; it remains unplayable, and
+the full iOS regression is unpassed.
+
+The next required descriptor has one indirect context reference in
+`__TEXT,__swift5_typeref` at `0x10dc7fcef`. Its relative field at `0x10dc7fcf0`
+targets GOT cell `0x10dc9b2c8` in `__DATA_CONST,__got`. This inspection executes
+no application code.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,815 | 346 | 78 |
+| Fortnite executable | 1,816 | 345 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,655 | 349 | 114 |
+| All images | 2,656 | 348 | 114 |
 
-The C++/GLES/Text variant reports 2,669 resolved imports, 335 unresolved strong
+The C++/GLES/Text variant reports 2,670 resolved imports, 334 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
