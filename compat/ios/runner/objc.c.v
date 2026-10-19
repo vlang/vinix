@@ -233,6 +233,8 @@ mut:
 	swiftui_modified_retired bool
 	swiftui_environment_transform_arena u64 // Sealed generic environment modifier identity and diagnostic accessor.
 	swiftui_environment_transform_retired bool
+	swiftui_text_view_arena u64 // Sealed Text View conformance identity and diagnostic witnesses.
+	swiftui_text_view_retired bool
 	swiftui_localized_key_arena u64 // Sealed four-register literal-key initializer, borrowing empty Array storage.
 	swiftui_localized_key_retired bool
 	swift_objc_bool_arena u64 // Sealed ObjectiveC.ObjCBool metadata/accessor pages.

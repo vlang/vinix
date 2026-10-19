@@ -11972,17 +11972,47 @@ These two data consumers were inspected without executing application code.
 Text modifier construction, provider ownership, SwiftUI graph execution and
 rendering remain unsupported; Fortnite remains unplayable.
 
+The Text View witness-table slice binds `_$s7SwiftUI4TextVAA4ViewAAWP` as
+sealed data. Its seven-word table links an unconditional conformance with
+native flags 8 through an indirect Text descriptor. The View signature has
+one Body requirement and six witness slots. Tagged associated-conformance
+data and an indirect symbolic reference identify Body as `Swift.Never`.
+Typed native runtime measurement confirms that Body resolves to canonical
+Never without constructing Text values or executing graph operations.
+
+Private Text and Never declarations carry diagnostic metadata accessors;
+Text metadata and value witnesses remain unsupported. Graph witnesses and
+the Body conformance accessor also stop with explicit diagnostics. The
+arena publishes only after sealing separate RX/RO pages, stays available to
+shutdown callbacks and unmaps after Swift owners and collections drain.
+
+`tests/ios/native-checks.v build-swiftui-text-view` selects the fixture.
+Normal and deterministic ASan/UBSan runs cover it at O2 plus Text.font and
+environment-conformance regressions. The optimized ARM64 fixture checks
+eight cold readers, native signatures and tagged data, protected unused
+arguments, 16 terminal graph/body/metadata child probes, exact routing,
+callback access and two drained/unmapped runtime lifetimes. Native
+measurements, SDK/Swift ABI snapshots, seven executable/generated-C pairs
+and joined logs are retained in `build/ios/fortnite/swiftui-text-view-checks`.
+
+The fresh launch resolves the witness-table import and exits 1 during
+linking at `_$s7SwiftUI4TextVMn`, Text's nominal descriptor. Its GOT fixup is
+`0x10dc9b388`; ten indirect symbolic references in `__swift5_typeref` were
+verified without executing application code. Text metadata, value ownership,
+SwiftUI graph execution and rendering remain unsupported; Fortnite remains
+unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,840 | 321 | 78 |
+| Fortnite executable | 1,841 | 320 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,680 | 324 | 114 |
+| All images | 2,681 | 323 | 114 |
 
-The C++/GLES/Text variant reports 2,694 resolved imports, 310 unresolved strong
+The C++/GLES/Text variant reports 2,695 resolved imports, 309 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
