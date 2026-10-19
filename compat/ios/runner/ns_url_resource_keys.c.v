@@ -8,6 +8,7 @@ fn ns_url_resource_key_symbol(symbol string) ?u64 {
 		'_NSURLCreationDateKey', '_kCFURLCreationDateKey' { 0 }
 		'_NSURLFileSizeKey', '_kCFURLFileSizeKey' { 1 }
 		'_NSURLIsExcludedFromBackupKey', '_kCFURLIsExcludedFromBackupKey' { 2 }
+		'_NSURLIsRegularFileKey', '_kCFURLIsRegularFileKey' { 3 }
 		else { return none }
 	}
 	if ios_runtime == unsafe { nil } { return none }
@@ -19,10 +20,10 @@ fn ns_url_resource_key_symbol(symbol string) ?u64 {
 		arena := C.mmap(unsafe { nil }, page, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
 		if arena == voidptr(-1) { panic('iOS: cannot allocate URL resource keys') }
 		base := u64(arena)
-		objects := [u64(32), 128, 192]!
-		bytes := [u64(64), 160, 224]!
-		texts := ['NSURLCreationDateKey', 'NSURLFileSizeKey', 'NSURLIsExcludedFromBackupKey']!
-		for i in 0 .. 3 {
+		objects := [u64(32), 128, 192, 256]!
+		bytes := [u64(64), 160, 224, 288]!
+		texts := ['NSURLCreationDateKey', 'NSURLFileSizeKey', 'NSURLIsExcludedFromBackupKey', 'NSURLIsRegularFileKey']!
+		for i in 0 .. 4 {
 			object := base + objects[i]
 			data := base + bytes[i]
 			text := texts[i]
@@ -47,7 +48,7 @@ fn ns_url_resource_key_symbol(symbol string) ?u64 {
 fn ns_url_resource_keys_stop() {
 	arena := ios_runtime.url_resource_keys_arena
 	if arena == 0 { return }
-	for i in 0 .. 3 { ios_runtime.constants.delete(read64(arena + u64(i * 8))) }
+	for i in 0 .. 4 { ios_runtime.constants.delete(read64(arena + u64(i * 8))) }
 	if C.munmap(unsafe { voidptr(arena) }, usize(C.getpagesize())) != 0 { panic('iOS: cannot retire URL resource keys') }
 	ios_runtime.url_resource_keys_arena = 0
 }
