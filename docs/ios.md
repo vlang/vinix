@@ -11517,17 +11517,56 @@ both production runners: a terminal diagnostic with no provider/result/context
 dereference or ownership operations. Seven executable/generated-C artifact
 pairs and joined validation logs are archived in the same cohort.
 
+`_$s7SwiftUI19UIViewRepresentablePAAE21_overrideLayoutTraits_3foryAA01_fG0Vz_0C4TypeQztF`
+now resolves to the extension's empty default. It leaves caller-owned inout
+traits unchanged and does not access the borrowed view, Swift self, generic
+metadata/witnesses or x8 storage. Custom trait overrides, layout and graph
+execution remain unsupported.
+
+The native AppKit counterpart is a single `ret`. It passes 4,000 calls with
+protected arguments and 2,048 read-only/writable inout boundary calls with
+every byte unchanged and x0-x3/x8/x20/x21 preserved. The installed SDK declares
+the traits argument inout, and the pinned OpenSwiftUI UIKit source marks this
+default as empty. UIKit execution remains unverified because its entry is
+unavailable on this Mac. Evidence is retained under
+`build/ios/fortnite/swiftui-layout-traits-checks`.
+
+The dedicated fixture passes normal and deterministic ASan/UBSan host runs
+with its default hook compiled at O2, plus the optimized ARM64 guest run. It
+checks 16,384 concurrent calls across eight readers and two runtime lifetimes,
+600 ownership cycles with unchanged ObjC/Swift aliases, unchanged read-only
+and writable traits buffers at both protected boundaries, read-only Swift
+self storage, protected metadata/witness/x8 arguments, exact framework
+routing, and calls during and after teardown. Host layout-options and
+identified-tree diagnostic regressions also pass normal and deterministic
+sanitizer runs. The public driver selects the new fixture and rejects an
+unknown fixture.
+
+The fresh launch probe links past the layout-traits default and exits 1
+before application entry at the next required SwiftUI import,
+`_$s7SwiftUI19UIViewRepresentablePAAE21_overrideSizeThatFits_2in6uiViewySo6CGSizeVz_AA09_ProposedF0V0C4TypeQztF`.
+Its main-image fixup is `0x10dc9b330`, stub `0x10c63aadc`, forwarder
+`0x107c28e40` and call `0x1015be6ec`. These two consumer/forwarder sites were
+inspected without executing application code. Fortnite remains unplayable.
+
+The layout-traits fixture, launch probe and both audits pass their expected
+checks. Generated C and ARM64 disassembly review of both fixture variants and
+both production runners confirms an empty hook and one `ret`, with no
+argument/result/context access, ownership operations, allocation, runtime
+storage or custom witness dispatch. Seven executable/generated-C artifact
+pairs and joined validation logs are archived in the same cohort.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,829 | 332 | 78 |
+| Fortnite executable | 1,830 | 331 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,669 | 335 | 114 |
+| All images | 2,670 | 334 | 114 |
 
-The C++/GLES/Text variant reports 2,683 resolved imports, 321 unresolved strong
+The C++/GLES/Text variant reports 2,684 resolved imports, 320 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
