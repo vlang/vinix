@@ -208,6 +208,12 @@ a sixth cell with the native NSString value `NSURLVolumeAvailableCapacityKey`.
 cell with the native NSString value `NSURLVolumeTotalCapacityKey`.
 URL resource-date, file-size, file-type and volume-capacity lookup, and
 backup-exclusion metadata reads and writes, remain unsupported.
+`OBJC_EHTYPE_$_NSException` exposes shared exception type-info through
+Foundation and CoreFoundation, with a vtable/name/Class record and an
+NSException class descriptor inheriting NSObject. Direct catch matching
+supports the default class hierarchy, foreign type rejection and pointer
+adjustment. NSException methods, exception throwing and Mach-O unwinding
+remain unsupported.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
 The Mach VM adapter supports allocations up to 4 GiB in the current process,
@@ -10873,17 +10879,53 @@ probe clears this import and stops before entry at
 `_OBJC_EHTYPE_$_NSException`. Objective-C exception handling remains
 unsupported. Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_OBJC_EHTYPE_$_NSException` now resolves through Foundation and
+CoreFoundation as a direct 24-byte type-info record. Native measurement and
+[Apple's runtime ABI](https://github.com/apple-oss-distributions/objc4/blob/main/runtime/objc-exception.mm)
+confirm its vtable, C string name and Class fields at offsets 0, 8 and 16.
+Its shared vtable has the native zero/id type-info prefix, no-op destructors
+and a catch-matching callback. An NSObject-derived NSException descriptor
+supplies the Class identity; NSException API methods remain unsupported.
+The inspected IPA contains 22 PC-relative exception-table references to
+GOT slot `0x10dc9b218`.
+
+One locked page holds the record, internal id type-info, fixed vtable and
+names. Publication checks read-only protection before exposing the page.
+Lookup and matching allocate nothing and create no Objective-C ownership.
+Foreign exception types leave the pointer untouched; matching Objective-C
+types adjust it before the class check, including failed and missing-class
+matches. Internal id matching also accepts nil. The page stays available
+through pool and Swift callbacks, then unmaps before class descriptors retire.
+This metadata support does not implement throwing or stack unwinding.
+
+`tests/ios/native-checks.v build-ns-exception-type` builds the fixture.
+Six host ASan/UBSan runs pass the new fixture and existing total-capacity and
+invalid-argument fixtures. The optimized ARM64 guest fixture also passes.
+Native and runtime checks cover eight concurrent cold readers, shared
+storage, base/subclass/unrelated and foreign types, weak/nil cases,
+three- and four-argument callback ABIs, no-op destructors, unchanged live
+object counts, isolated exception-name storage, retirement guards, pool
+callback access and two drained/unmapped lifetimes. Generated C and assembly
+review covers the fixture and both production runners.
+
+Evidence and seven generated-C/executable pairs are retained under
+`build/ios/fortnite/ns-exception-type-checks`, including native measurements,
+the Apple source snapshot and preserved helper diagnostics. The fresh
+production probe clears the type-info and class imports, then stops before
+entry at `___NSArray0__`. Fortnite remains unplayable; the full iOS regression
+is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,810 | 351 | 78 |
+| Fortnite executable | 1,812 | 349 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,650 | 354 | 114 |
+| All images | 2,652 | 352 | 114 |
 
-The C++/GLES/Text variant reports 2,664 resolved imports, 340 unresolved strong
+The C++/GLES/Text variant reports 2,666 resolved imports, 338 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
