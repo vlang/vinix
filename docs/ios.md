@@ -9425,17 +9425,38 @@ fresh probe/audit results are retained there. The probe clears
 `_proc_pid_rusage` and stops before entry at `_raise`. Fortnite remains
 unplayable; the full iOS regression is unpassed.
 
+`_raise` now uses native thread-directed signal delivery with the existing
+Darwin signal-number mapping. Native macOS measurements confirm signal zero,
+`-1/EINVAL` for invalid signals, synchronous delivery on the calling thread,
+and preservation of errno changes made by a caught handler. The adapter
+retains the calling thread's mask, leaves blocked signals pending and allows
+nested raises from callbacks without a runtime lock or allocation. Linux
+continues to reject Darwin-only SIGEMT/SIGINFO with `ENOTSUP`.
+
+`tests/ios/native-checks.v build-raise` builds the fixture. Six host ASan/UBSan
+runs cover raise, pause and signal-registry regressions; the raise fixture is
+optimized and compares eight native macOS profiles. ARM64 checks cover
+zero/invalid/ignored signals, handler errno, masks/pending delivery, nested
+callbacks, eight callers, fatal ABRT/BUS/SYS/KILL fork children and two runtime
+lifetimes. The fixture restores sanitizer-owned fault handlers using complete
+native disposition records. Evidence, seven generated-C/executable pairs and
+optimized ARM64 call-path review are retained under
+`build/ios/fortnite/raise-checks`.
+
+The fresh probe clears `_raise` and stops before entry at `_setrlimit`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,768 | 393 | 78 |
+| Fortnite executable | 1,769 | 392 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,608 | 396 | 114 |
+| All images | 2,609 | 395 | 114 |
 
-The C++/GLES/Text variant reports 2,622 resolved imports, 382 unresolved strong
+The C++/GLES/Text variant reports 2,623 resolved imports, 381 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
