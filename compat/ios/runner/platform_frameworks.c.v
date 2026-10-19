@@ -96,7 +96,8 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 	match info.name {
 		'NSLocale' {
 			if selector == 'objectForKey:' {
-				if string_text(frame.x[2]) != 'kCFLocaleIdentifierKey' { panic('iOS: NSLocale key is not implemented') }
+				frame.x[0] = cf_locale_get_value(object, frame.x[2])
+				return true
 			} else if selector != 'localeIdentifier' { return false }
 			frame.x[0] = header.fields[0]
 		}

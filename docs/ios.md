@@ -10004,17 +10004,50 @@ The link probe clears `_CFLocaleCopyPreferredLanguages` and stops before
 entry at `_CFLocaleGetValue`. Fortnite remains unplayable; the full iOS
 regression is unpassed.
 
+`_CFLocaleGetValue` now returns borrowed identifier, language and country
+NSStrings from built-in NSLocale snapshots. `NSLocale.objectForKey:` shares
+the same lookup. Identifier queries return the stored snapshot; language
+and country strings are cached together under the runtime lock and owned by
+the locale. A missing country stays nil and is cached without guessing a
+region. Callers may retain a value to keep it after the locale is released.
+
+On macOS the components are copied from a native fixed locale, with balanced
+CF owners and a temporary native autorelease pool. Component strings support
+up to 1,023 UTF-8 bytes. Vinix parses a bounded 128-byte profile: two-letter
+languages, optional scripts, alphabetic/numeric regions and a POSIX variant,
+plus root, C/POSIX and measured Hebrew/Indonesian/Yiddish aliases. Keywords,
+three-letter languages and the full ICU alias database remain unsupported
+on Vinix. Known locale metadata keys outside the three string keys fail
+explicitly; unrecognized keys return nil, matching native lookup behavior.
+
+`tests/ios/native-checks.v build-cf-locale-value` builds the fixture. Six
+host ASan/UBSan runs pass locale-value, current-locale and Swift fixed-locale
+checks. Four native profiles compare complete language/country results,
+including empty language, missing country, scripts, numeric regions and
+POSIX. The optimized ARM64 fixture checks borrowed/cache identity, retained
+child lifetimes and zeroed weak references, key-content equality, explicit
+unsupported queries, non-NUL-terminated guarded parser input, protected
+x2–x8 registers, preserved x20/x21, concurrent first queries, Objective-C
+integration and two drained runtimes. Generated C review checks atomic cache
+publication, failed-query cleanup and transfer to the locale's owned fields.
+
+Native measurements, seven generated-C/executable pairs and fresh probe/audit
+evidence are retained in `build/ios/fortnite/cf-locale-value-checks`. The link
+probe clears `_CFLocaleGetValue` and stops before entry at
+`_CFPreferencesAppSynchronize`. Fortnite remains unplayable; the full iOS
+regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,786 | 375 | 78 |
+| Fortnite executable | 1,787 | 374 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,626 | 378 | 114 |
+| All images | 2,627 | 377 | 114 |
 
-The C++/GLES/Text variant reports 2,640 resolved imports, 364 unresolved strong
+The C++/GLES/Text variant reports 2,641 resolved imports, 363 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

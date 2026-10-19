@@ -152,6 +152,9 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	if library == '/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation' && symbol == '_CFLocaleCopyPreferredLanguages' {
 		return u64(unsafe { voidptr(cf_locale_copy_preferred_languages) })
 	}
+	if library == '/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation' && symbol == '_CFLocaleGetValue' {
+		return u64(unsafe { voidptr(cf_locale_get_value) })
+	}
 	if address := core_foundation_symbol(symbol) { return address }
 	for prefix in ['_OBJC_CLASS_$_', '_OBJC_METACLASS_$_'] {
 		if symbol.starts_with(prefix) {
