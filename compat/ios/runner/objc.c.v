@@ -298,7 +298,7 @@ mut:
 	coremedia_constants_arena u64 // Sealed format-description CFString cells and records.
 	avfoundation_constants_arena u64 // Sealed AVFoundation NSString cells and records.
 	foundation_keys_arena u64 // Sealed Foundation key and calendar-identifier NSString cells.
-	ns_internal_exception_arena u64 // Sealed internal-inconsistency NSString cell and CFSTR record.
+	ns_internal_exception_arena u64 // Sealed exception-name NSString cells and CFSTR records.
 	devicecheck_arena u64 // Sealed DeviceCheck error-domain cell, CFSTR record and bytes.
 	corehaptics_constants_arena u64 // Sealed CoreHaptics NSString cells, records and bytes.
 	storekit_constants_arena u64 // Sealed StoreKit conversion NSString cells, records and bytes.

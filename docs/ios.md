@@ -179,6 +179,8 @@ through Foundation and CoreFoundation, with the native value `iso8601`.
 Objective-C NSCalendar construction and calendar arithmetic remain unsupported.
 `NSInternalInconsistencyException` exposes its native exception-name NSString
 cell through Foundation and CoreFoundation, including use as an NSError domain.
+`NSInvalidArgumentException` exports its distinct NSString name through both
+frameworks and shares the same sealed storage lifetime.
 Exception throwing and unwinding remain unsupported.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
@@ -10464,17 +10466,52 @@ Evidence and seven generated-C/executable pairs are retained under
 probe clears this import and stops before entry at `_NSInvalidArgumentException`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_NSInvalidArgumentException` now exports an aligned NSString pointer cell
+through Foundation and CoreFoundation. Native measurements confirm the same
+cell under both install names and the exact 26-byte `NSInvalidArgumentException`
+CFString value, distinct from `NSInternalInconsistencyException`. Fortnite's
+consumers at `0x100041044` and `0x10007d1cc` load the cell through the GOT,
+dereference it into x2 and pass the name to NSException calls. This adds the
+name constant; NSException construction, throwing and unwinding remain
+unsupported on Vinix.
+
+The existing exception-name page now publishes both cells and CFSTR records
+under the runtime lock before sealing the page read-only. The original
+internal-inconsistency cell, record and bytes stay at offsets 0, 32 and 64;
+the new name uses offsets 8, 128 and 160 without another page allocation.
+Each exact-name wrapper selects its own cell. Cached lookup allocates no
+objects or temporary strings, and retirement rejects new publication while
+keeping existing cells available to callbacks. Shutdown unregisters both
+strings before unmapping their shared page after pools and Swift contexts drain.
+
+`tests/ios/native-checks.v build-ns-invalid-argument` builds the fixture.
+Six host ASan/UBSan runs pass this fixture, internal inconsistency and
+Foundation keys. The optimized ARM64 guest fixture also passes.
+Native and runtime checks cover distinct names, both framework routes, eight
+mixed-name concurrent cold publishers, stable identities, exact cell/record/text
+layout, immutable copying, string equality/hash, dictionary-key use and
+autorelease pools. Two runtime lifetimes check both names during teardown,
+retirement guards, zero live objects and removal of both registrations.
+The internal-inconsistency and Foundation-key fixtures cover existing behavior.
+Generated C and assembly review checks the shared layout, publication and
+two-name retirement in the fixture and both production runners.
+
+Evidence and seven generated-C/executable pairs are retained under
+`build/ios/fortnite/ns-invalid-argument-checks`. The fresh production link
+probe clears this import and stops before entry at `_NSLocaleCountryCode`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,799 | 362 | 78 |
+| Fortnite executable | 1,800 | 361 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,639 | 365 | 114 |
+| All images | 2,640 | 364 | 114 |
 
-The C++/GLES/Text variant reports 2,653 resolved imports, 351 unresolved strong
+The C++/GLES/Text variant reports 2,654 resolved imports, 350 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
