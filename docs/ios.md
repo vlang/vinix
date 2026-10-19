@@ -11264,19 +11264,58 @@ The next required import's actual main-image fixup is at `0x10dc9b2f8`, with
 stub `0x10c63aa88`, forwarder `0x107c28ed8` and one inspected call at
 `0x1015c0564`. The call wrapper returns the horizontal alignment getter's
 result directly. These two consumer/forwarder sites were inspected without
-executing application code; the alignment getter remains unsupported.
+executing application code; that probe still stopped before application entry.
+
+`_$s7SwiftUI19HorizontalAlignmentV6centerACvgZ` and
+`_$s7SwiftUI9AlignmentV6centerACvgZ` now resolve only through SwiftUI.framework.
+Native SDK declarations and three fresh native processes confirm that
+HorizontalAlignment is an 8-byte POD identity and Alignment is a 16-byte POD
+pair with fields at 0 and 8. The getters return directly in x0 and x0/x1,
+preserve x20/x21 and never use indirect-result memory.
+
+AlignmentKey is an integer identity, not a pointer. Native center keys differ
+with initialization order, while bit 0 remains 0 for horizontal and 1 for
+vertical. The compatibility runtime reserves identities 1 and 2 for the two
+center axes (encoded as 2 and 5); both getters share the horizontal key.
+Future alignment registrations must allocate distinct identities starting
+at 3. These getters have no allocation, ARC, metadata or runtime storage
+dependency, so their values and entry points survive runtime shutdown.
+Custom alignment IDs, public alignment metadata and layout remain unsupported.
+
+`tests/ios/native-checks.v build-swiftui-alignment` builds the center fixture.
+Six host ASan/UBSan runs pass center getters, ZStack metadata and localized
+string keys with normal and deterministic hashing. The center checks cover
+16,384 concurrent iterations, exact framework routing, protected x8,
+preserved Swift context registers, component consistency and two drained
+lifetimes, including callbacks and post-shutdown calls. The initial fixture
+assumed a retirement flag was already set before deallocation callbacks;
+that setup was corrected and the failing source, executable/generated C and
+logs are retained with hashes in `callback-fixture-diagnostic` under
+`build/ios/fortnite/swiftui-alignment-checks`.
+
+The optimized ARM64 center fixture, launch probe and both import audits pass
+their expected checks. Both center imports are cleared; the probe remains
+before entry with child status 1 at
+`_$s7SwiftUI19UIViewRepresentablePAAE09dismantleC0_11coordinatory0C4TypeQz_11CoordinatorQztFZ`.
+Its actual main-image fixup is `0x10dc9b300`, stub `0x10c63aa94`, forwarder
+`0x107c28e30` and call `0x1015be63c`. The call wrapper forwards the default
+UIViewRepresentable teardown operation and returns. These two consumer/forwarder
+sites were inspected without executing application code; the teardown import
+remains unsupported. Generated C and ARM64 disassembly review covers both
+fixture variants and both production runners. Seven executable/generated-C
+artifact pairs and the joined validation logs are archived in the same cohort.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,822 | 339 | 78 |
+| Fortnite executable | 1,824 | 337 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,662 | 342 | 114 |
+| All images | 2,664 | 340 | 114 |
 
-The C++/GLES/Text variant reports 2,676 resolved imports, 328 unresolved strong
+The C++/GLES/Text variant reports 2,678 resolved imports, 326 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
