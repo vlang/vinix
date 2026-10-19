@@ -122,7 +122,11 @@ fn swiftui_text_view_stop() {
 }
 
 fn swiftui_text_view_symbol(symbol string) ?u64 {
-	if symbol != '_$s7SwiftUI4TextVAA4ViewAAWP' { return none }
+	offset := match symbol {
+		'_$s7SwiftUI4TextVMn' { u64(0) }
+		'_$s7SwiftUI4TextVAA4ViewAAWP' { u64(384) }
+		else { return none }
+	}
 	base := swiftui_text_view_arena_checked() or { return none }
-	return base + u64(C.getpagesize()) + 384
+	return base + u64(C.getpagesize()) + offset
 }

@@ -22,7 +22,7 @@ fn text_view_relative(field u64)u64{mut bits:=u32(0);for i in u64(0)..4{bits|=u3
 fn text_view_indirect(field u64)u64{bits:=i32(read32(field));p:=u64(i64(field)+i64(bits&~1));return if bits&1!=0{read64(p)}else{p}}
 fn text_view_text(p u64)string{return unsafe{(&char(p)).vstring()}}
 fn text_view_resolve()u64{return read64(runtime_symbol('/System/Library/Frameworks/SwiftUI.framework/SwiftUI','_$s7SwiftUI4TextVAA4ViewAAWP') or {panic(err)})}
-fn text_view_nominal()u64{return read64(text_view_relative(text_view_resolve()+4))}
+fn text_view_nominal()u64{descriptor:=runtime_symbol('/System/Library/Frameworks/SwiftUI.framework/SwiftUI','_$s7SwiftUI4TextVMn') or {panic(err)};assert descriptor==read64(text_view_relative(text_view_resolve()+4));return descriptor}
 fn text_view_protection(address u64,length u64,executable bool){
 	$if macos{
 		mut start:=address;mut size:=u64(0);mut info:=[16]i32{};mut count:=u32(C.VM_REGION_BASIC_INFO_COUNT_64);mut object:=u32(0);task:=C.mach_task_self()
@@ -98,7 +98,7 @@ fn test_swiftui_text_view(){
 	for _ in 0..2{
 		objc_start();assert ios_runtime.swiftui_text_view_arena==0&&!ios_runtime.swiftui_text_view_retired
 		ios_runtime.swift_concurrency_retired=true;if _:=swiftui_text_view_arena_checked(){assert false};ios_runtime.swift_concurrency_retired=false
-		for symbol in ['_$s7SwiftUI4TextVN','_$s7SwiftUI4TextVMn','_$s7SwiftUI4TextVAA4ViewAAMc','_$s7SwiftUI4TextVMa','_$s7SwiftUI4TextVAA4ViewAAWPExtra','_$s11SwiftUICore4TextVAA4ViewAAWP']!{if _:=swiftui_text_view_symbol(symbol){assert false}};assert ios_runtime.swiftui_text_view_arena==0
+		for symbol in ['_$s7SwiftUI4TextVN','_$s7SwiftUI4TextVMnExtra','_$s7SwiftUI4TextVAA4ViewAAMc','_$s7SwiftUI4TextVMa','_$s7SwiftUI4TextVAA4ViewAAWPExtra','_$s11SwiftUICore4TextVAA4ViewAAWP']!{if _:=swiftui_text_view_symbol(symbol){assert false}};assert ios_runtime.swiftui_text_view_arena==0
 		mut workers:=[]thread u64{};for _ in 0..8{workers<<spawn text_view_reader()};mut conformance:=u64(0);for i,worker in workers{candidate:=worker.wait();if i==0{conformance=candidate}else{assert conformance==candidate}};unsafe{workers.free()}
 		text_view_signature(conformance,false);text_view_rejection(conformance)
 		for library in ['/usr/lib/swift/libswiftCore.dylib','/System/Library/Frameworks/Foundation.framework/Foundation','/System/Library/Frameworks/SwiftUICore.framework/SwiftUICore']!{if _:=runtime_symbol(library,'_$s7SwiftUI4TextVAA4ViewAAWP'){assert false}}

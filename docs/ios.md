@@ -12002,17 +12002,44 @@ verified without executing application code. Text metadata, value ownership,
 SwiftUI graph execution and rendering remain unsupported; Fortnite remains
 unplayable.
 
+The Text nominal slice binds `_$s7SwiftUI4TextVMn` to the same sealed
+descriptor referenced by its View conformance. Native inspection confirms a
+nongeneric SwiftUI.Text struct, two fields and an offset vector at word two.
+Six native metadata requests return the same complete Text metadata; its
+32-byte size/stride and non-POD value witnesses require real ownership for
+the reflected `storage` and `modifiers` fields. The runner supplies descriptor
+identity with a diagnostic accessor; Text metadata, value ownership, field
+reflection and rendering remain unsupported.
+
+`tests/ios/native-checks.v build-swiftui-text-nominal` selects the fixture.
+Normal and deterministic ASan/UBSan runs cover it at O2 plus Text View and
+Text.font regressions. The optimized ARM64 fixture checks eight cold
+readers, shared descriptor/table identity, sealed RX/RO storage, 32 terminal
+direct/indirect symbolic-reference and metadata-access probes, bounded names
+at a protected boundary, protected contexts/arguments, exact routing,
+shutdown callbacks and two drained/unmapped lifetimes. Native measurements,
+SDK/Swift ABI snapshots, seven executable/generated-C pairs and joined logs
+are retained in `build/ios/fortnite/swiftui-text-nominal-checks`.
+
+The fresh probe resolves the descriptor import and exits 1 during linking at
+`_$s7SwiftUI4TextVN`, Text's type metadata. Its GOT fixup is `0x10dc9b390`
+with no call stub. The consumers at `0x1015bff30` and `0x1015c0230` load it
+into x1 and save it alongside the View witness table for generic calls.
+These two data consumers were inspected without executing application code.
+Text ownership and SwiftUI graph execution remain unsupported; Fortnite
+remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,841 | 320 | 78 |
+| Fortnite executable | 1,842 | 319 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,681 | 323 | 114 |
+| All images | 2,682 | 322 | 114 |
 
-The C++/GLES/Text variant reports 2,695 resolved imports, 309 unresolved strong
+The C++/GLES/Text variant reports 2,696 resolved imports, 308 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
