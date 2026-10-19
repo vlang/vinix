@@ -159,6 +159,9 @@ defaults as a fallback; unsupported application domains fail explicitly.
 `CFPreferencesSetAppValue` stages copied values or removes keys; synchronization
 flushes these changes through the shared standard-defaults store.
 App groups, custom preference suites and security-scoped bookmarks are unsupported.
+`CFRunLoopGetMain` returns a borrowed main-loop handle shared with Foundation's
+`mainRunLoop`, main-thread `currentRunLoop` and `getCFRunLoop`. Workers can retrieve
+the main loop; background Foundation current loops remain unsupported.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
 The Mach VM adapter supports allocations up to 4 GiB in the current process,
@@ -10151,17 +10154,45 @@ Evidence, diagnostics and seven generated-C/executable pairs are retained in
 `_CFPreferencesSetAppValue` and stops before entry at `_CFRunLoopGetMain`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_CFRunLoopGetMain` now returns a borrowed handle to the existing main desktop
+run loop. Foundation's `mainRunLoop` and main-thread `currentRunLoop` use the
+same locked lazy cache, and its `getCFRunLoop` returns that handle. Worker-first
+access still identifies the main loop. The runtime owns one reference until
+shutdown; repeated calls neither retain nor autorelease it. Callers may balance
+their own `CFRetain`/`CFRelease` pairs without consuming the cached reference.
+
+Native probes verify main/current identity, distinct worker current loops,
+Foundation's `getCFRunLoop` mapping and survival across autorelease drains.
+Vinix keeps its existing restriction on background `NSRunLoop currentRunLoop`.
+The getter does not add CF source, observer, timer or run/wake/stop APIs; existing
+desktop display-link scheduling continues through the shared handle.
+
+`tests/ios/native-checks.v build-cf-run-loop-main` builds the fixture. Six host
+ASan/UBSan runs pass main-loop, connection and current-locale checks. The optimized
+ARM64 guest fixture verifies protected x0–x8 registers, preserved x20/x21,
+concurrent first publication, borrowed ownership, balanced caller references,
+display-link schedule/fire/remove/invalidate on the main thread, absence of
+per-call objects or autoreleases and two fully released runtime caches.
+Generated C and assembly review checks the no-argument pointer ABI, locked
+publication, shared Foundation getters and shutdown release in the fixture and
+both production runners.
+
+Evidence and seven generated-C/executable pairs are retained in
+`build/ios/fortnite/cf-run-loop-main-checks`. The fresh link probe clears
+`_CFRunLoopGetMain` and stops before entry at `_CFStringCompare`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,790 | 371 | 78 |
+| Fortnite executable | 1,791 | 370 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,630 | 374 | 114 |
+| All images | 2,631 | 373 | 114 |
 
-The C++/GLES/Text variant reports 2,644 resolved imports, 360 unresolved strong
+The C++/GLES/Text variant reports 2,645 resolved imports, 359 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

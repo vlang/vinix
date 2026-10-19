@@ -59,8 +59,7 @@ fn display_link_dispatch(object u64, selector string, mut frame RegisterFrame) b
 		if object == ios_runtime.names['NSRunLoop'] {
 			if selector !in ['mainRunLoop', 'currentRunLoop'] { return false }
 			if selector == 'currentRunLoop' && u64(C.pthread_self()) != ios_runtime.main_thread { panic('iOS: background NSRunLoop is not implemented') }
-			if ios_runtime.run_loop == 0 { ios_runtime.run_loop = objc_allocate(object) }
-			frame.x[0] = ios_runtime.run_loop
+			frame.x[0] = cf_run_loop_get_main()
 			return true
 		}
 		if object != ios_runtime.names['CADisplayLink'] || selector != 'displayLinkWithTarget:selector:' { return false }
@@ -72,6 +71,10 @@ fn display_link_dispatch(object u64, selector string, mut frame RegisterFrame) b
 		header.action = frame.x[3]
 		store_field(link, 0, frame.x[2])
 		frame.x[0] = objc_autorelease(link)
+		return true
+	}
+	if object != 0 && object == ios_runtime.run_loop && selector == 'getCFRunLoop' {
+		frame.x[0] = cf_run_loop_get_main()
 		return true
 	}
 	if !objc_is_kind(object, ios_runtime.names['CADisplayLink']) { return false }

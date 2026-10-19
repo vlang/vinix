@@ -164,6 +164,9 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	if library == '/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation' && symbol == '_CFPreferencesSetAppValue' {
 		return u64(unsafe { voidptr(cf_preferences_set_app_value) })
 	}
+	if library == '/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation' && symbol == '_CFRunLoopGetMain' {
+		return u64(unsafe { voidptr(cf_run_loop_get_main) })
+	}
 	if address := core_foundation_symbol(symbol) { return address }
 	for prefix in ['_OBJC_CLASS_$_', '_OBJC_METACLASS_$_'] {
 		if symbol.starts_with(prefix) {
