@@ -11037,17 +11037,58 @@ The next required descriptor has one indirect context reference in
 targets GOT cell `0x10dc9b2c8` in `__DATA_CONST,__got`. This inspection executes
 no application code.
 
+`_$s7SwiftUI13_ZStackLayoutVMn` now resolves only through SwiftUI.framework
+to a distinct nongeneric descriptor and complete metadata accessor. Native
+measurements and the SDK's frozen declarations establish one Alignment field
+at offset 0, containing horizontal and vertical alignment words. The value
+is 16 bytes with a 16-byte stride, POD/inline flags and no extra inhabitants.
+The supplied IPA references this descriptor through the GOT cell above.
+
+A locked arena holds a sealed RX accessor page and read-only metadata page.
+All requests return canonical complete metadata in x0/x1 while preserving
+x20/x21. Five copy/take/assignment witnesses transfer exactly 16 bytes;
+destruction is a no-op. Single-payload enum witnesses preserve native payload
+and tag-byte behavior, including nonzero case writes with zero empty cases
+and UInt32 wrapping. Lookup creates no Objective-C owners or dependent
+metadata caches. Swift owners and Array metadata drain before the arena
+unmaps; earlier teardown callbacks can still resolve its cached descriptor.
+
+`tests/ios/native-checks.v build-swiftui-zstack` builds the fixture. Six host
+ASan/UBSan runs pass ZStack, metadata-state lookup and VStack checks with
+normal and deterministic hashing. Checks cover eight cold readers, native
+layout/field metadata, guarded value copies and unused inputs, adjacent
+canaries, enum populations and wrapping, indirect symbolic lookup, typed
+Array ownership, sealed pages, retirement guards, callback access and two
+drained/unmapped lifetimes. Field reflection, public ZStack accessors and
+constructors, layout/view conformances and SwiftUI rendering remain unsupported.
+
+The optimized ARM64 guest fixture and the scoped production probe/import
+audits pass. Generated C and assembly review covers the fixture and both
+production runners. Evidence, native measurements, SDK/Swift ABI snapshots,
+the preserved evidence-tool ordering diagnostic and seven generated-C/executable
+pairs are retained in `build/ios/fortnite/swiftui-zstack-checks`. The fresh
+startup probe clears this descriptor import, then stops before entry at
+`_$s7SwiftUI14_OpacityEffectVAA12ViewModifierAAWP`. Fortnite remains unplayable;
+the full iOS regression is unpassed.
+
+The next import is a protocol witness table, as identified by the retained
+Swift mangling ABI. Its GOT cell is `0x10dc9b2d0`; the inspected load at
+`0x1015c1304` places the pointer in an argument buffer before the call to
+`_swift_getWitnessTable` at `0x1015c1314`. This path also references the
+ModifiedContent View conformance descriptor. One consumer site was inspected
+without executing application code.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,816 | 345 | 78 |
+| Fortnite executable | 1,817 | 344 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,656 | 348 | 114 |
+| All images | 2,657 | 347 | 114 |
 
-The C++/GLES/Text variant reports 2,670 resolved imports, 334 unresolved strong
+The C++/GLES/Text variant reports 2,671 resolved imports, 333 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

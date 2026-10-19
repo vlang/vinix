@@ -177,6 +177,7 @@ fn swift_metadata_stop() {
 	swift_array_stop()
 	swiftui_vstack_stop()
 	swiftui_tree_stop()
+	swiftui_zstack_stop()
 	swift_nsobject_hashable_stop()
 	swift_integer_stop()
 	swift_void_stop()

@@ -225,6 +225,8 @@ mut:
 	swiftui_vstack_retired bool
 	swiftui_tree_arena u64 // Sealed generic Tree identity/signature; instantiation is unsupported.
 	swiftui_tree_retired bool
+	swiftui_zstack_arena u64 // Sealed nongeneric SwiftUI ZStack descriptor/metadata and accessor.
+	swiftui_zstack_retired bool
 	swift_objc_bool_arena u64 // Sealed ObjectiveC.ObjCBool metadata/accessor pages.
 	swift_objc_bool_retired bool // Reject resolution after quiescent metadata teardown.
 	swift_nsobject_hashable_arena u64 // Sealed NSObject conformance patterns/adapters and separate RW generic caches.
