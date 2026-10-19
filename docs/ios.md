@@ -162,6 +162,9 @@ App groups, custom preference suites and security-scoped bookmarks are unsupport
 `CFRunLoopGetMain` returns a borrowed main-loop handle shared with Foundation's
 `mainRunLoop`, main-thread `currentRunLoop` and `getCFRunLoop`. Workers can retrieve
 the main loop; background Foundation current loops remain unsupported.
+`CFStringCompare` supports zero-option literal UTF-16 ordering of valid strings,
+including embedded NULs and registered image constants. Other comparison options
+fail explicitly.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
 The Mach VM adapter supports allocations up to 4 GiB in the current process,
@@ -10182,17 +10185,48 @@ Evidence and seven generated-C/executable pairs are retained in
 `_CFRunLoopGetMain` and stops before entry at `_CFStringCompare`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_CFStringCompare` now implements the zero-option profile used by Fortnite's
+application-preference cleanup. Two string pointers and a 64-bit option mask
+arrive in x0–x2; the signed 64-bit result is exactly -1, 0 or 1. Comparison uses
+literal UTF-16 code-unit order, including embedded NULs, prefixes and surrogate
+pairs. Case differences and composed/decomposed spellings remain distinct.
+Supplementary characters sort by their surrogate units rather than UTF-8 bytes.
+
+The bridge validates allocated NSStrings or registered UTF-8/decoded UTF-16 image
+constants before borrowing their bytes under the runtime lock. Valid UTF-8 up
+to 16 MiB is supported. Invalid provenance, malformed UTF-8 and nonzero options
+fail explicitly, including case-insensitive, nonliteral, localized and numeric
+comparison options. Two stack cursors stream UTF-16 units without allocating a
+conversion buffer, retaining inputs or adding autoreleases. Caller references
+and input contents remain unchanged.
+
+`tests/ios/native-checks.v build-cf-string-compare` builds the fixture. Six host
+ASan/UBSan runs pass comparison, preference lookup and preference setter checks.
+Native differential cases verify signed results, empty strings, embedded NULs,
+prefixes, normalization/case distinctions and BMP/surrogate ordering through
+U+10FFFF. The optimized ARM64 guest fixture also checks protected x3–x8,
+preserved x20/x21, both image constant encodings, rejected inputs and full-width
+option masks, eight concurrent readers, unchanged ownership and two drained
+runtimes. Generated C and assembly review verifies the ABI, locked validation,
+stack cursors, borrowed text and static unboxed rejection errors in the fixture
+and both production runners.
+
+Evidence and seven generated-C/executable pairs are retained in
+`build/ios/fortnite/cf-string-compare-checks`. The fresh link probe clears
+`_CFStringCompare` and stops before entry at `_CFUUIDCreate`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,791 | 370 | 78 |
+| Fortnite executable | 1,792 | 369 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,631 | 373 | 114 |
+| All images | 2,632 | 372 | 114 |
 
-The C++/GLES/Text variant reports 2,645 resolved imports, 359 unresolved strong
+The C++/GLES/Text variant reports 2,646 resolved imports, 358 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
