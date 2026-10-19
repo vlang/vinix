@@ -165,6 +165,9 @@ the main loop; background Foundation current loops remain unsupported.
 `CFStringCompare` supports zero-option literal UTF-16 ordering of valid strings,
 including embedded NULs and registered image constants. Other comparison options
 fail explicitly.
+`CFUUIDCreate` returns an owned, distinct CFUUID object with secure version-4
+bytes, accepting the null or system-default allocator. Other CFUUID APIs remain
+unimplemented.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
 The Mach VM adapter supports allocations up to 4 GiB in the current process,
@@ -10216,17 +10219,49 @@ Evidence and seven generated-C/executable pairs are retained in
 `_CFStringCompare` and stops before entry at `_CFUUIDCreate`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_CFUUIDCreate` now accepts an allocator pointer in x0 and returns an owned
+CFUUID reference in x0. `nil`, `kCFAllocatorDefault` and `kCFAllocatorSystemDefault`
+use the existing secure entropy helper. Custom allocators, `kCFAllocatorNull`
+and calls outside the runtime lifetime fail explicitly.
+The helper obtains sixteen bytes from `getentropy`, sets the version-4 and
+variant bits and fails explicitly if entropy is unavailable. A complete value
+is obtained before allocating and returning the object.
+
+Native probes identify CFUUID as `__NSCFType`, with `isKindOfClass:NSUUID`
+returning false. Vinix therefore uses a distinct private CFUUID class and
+stores its sixteen bytes in existing object metadata. No UUID sidecar or
+autorelease is added. `CFRetain`/`CFRelease`, collection ownership and weak
+reference cleanup use the existing object lifetime machinery. Other CFUUID
+constructors and byte/string conversion APIs remain unimplemented.
+
+`tests/ios/native-checks.v build-cf-uuid-create` builds the fixture. Six host
+ASan/UBSan runs pass CFUUID creation, NSUUID and low-level UUID generation checks.
+Native checks verify owned references, null/default allocation, autorelease
+independence, version/variant bits, uniqueness and variation of unreserved bits.
+The optimized ARM64 guest fixture also checks protected x1–x8, preserved x20/x21,
+allocator rejection, the distinct type, 512 unique stored values across eight
+workers per runtime, unchanged errno, balanced references, collection/weak
+lifetimes and two zero-live-object teardowns. Generated C and assembly review
+verifies the one-pointer ABI, locked allocator validation, secure entropy before
+object allocation, inline payload, owned return and static unboxed errors in
+the fixture and both production runners.
+
+Evidence and seven generated-C/executable pairs are retained in
+`build/ios/fortnite/cf-uuid-create-checks`. The fresh link probe clears
+`_CFUUIDCreate` and stops before entry at `_CFUUIDCreateFromString`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,792 | 369 | 78 |
+| Fortnite executable | 1,793 | 368 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,632 | 372 | 114 |
+| All images | 2,633 | 371 | 114 |
 
-The C++/GLES/Text variant reports 2,646 resolved imports, 358 unresolved strong
+The C++/GLES/Text variant reports 2,647 resolved imports, 357 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
