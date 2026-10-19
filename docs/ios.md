@@ -11221,17 +11221,62 @@ follow Swift string-literal construction and feed the resulting key into a
 SwiftUI Text initializer. The two call sites and one forwarder were inspected
 without executing application code.
 
+`_$s7SwiftUI18LocalizedStringKeyV13stringLiteralACSS_tcfC` now resolves only
+through SwiftUI.framework to the literal-key initializer. Native measurements
+show a 32-byte frozen value with String at offset 0, `hasFormatting` at 16 and
+an arguments Array at 24. The initializer consumes the String by transferring
+its two words unchanged, returns false for formatting, and supplies the
+canonical immortal empty Array. Unicode, embedded NULs and percent characters
+are preserved without parsing or rewriting.
+
+Swift returns this value in x0/x1/w2/x3. The sealed ARM64 entry leaves the
+input String in x0/x1, clears x2 and loads the existing empty Array into x3.
+It reads no input bytes, indirect-result storage or Swift context registers;
+there is no per-call allocation, retain or release. Owned String reference
+counts remain unchanged until the returned key is destroyed. Cold lookup
+creates one RX page and reuses the existing empty Array singleton. Earlier
+teardown callbacks can still use the cached entry; shutdown retires the entry
+before unmapping that singleton.
+
+`tests/ios/native-checks.v build-swiftui-localized-key` builds the fixture.
+Six host ASan/UBSan runs pass literal keys, String interpolation and empty
+Arrays with normal and deterministic hashing. The native comparison covers
+direct result registers, preserved x20/x21, protected x8 and opaque input
+spans, inline/immortal/owned String forms,
+unchanged alias reference counts and canonical empty arguments. Checks also
+cover eight cold readers, 600 released owned calls, sealed pages, callbacks
+and two drained/unmapped lifetimes. Localized lookup, key interpolation,
+public key metadata and Text rendering remain unsupported.
+
+The optimized ARM64 fixture, launch probe and both import audits pass their
+expected checks. The probe clears the literal-key import and stops before
+entry at `_$s7SwiftUI19HorizontalAlignmentV6centerACvgZ`; its child exit status
+remains 1. Generated C and ARM64 disassembly review covers both fixture
+variants and both production runners, including unchanged String ownership
+and entry retirement before empty Array storage. Seven executable/generated-C
+artifact pairs, native results and sanitizer/guest logs are archived under
+`build/ios/fortnite/swiftui-localized-key-checks`. A full-disk interruption
+affected static-audit archive construction before boot; its partial archive
+hash, failed integrity check and recovery diagnostics are retained. Only
+that phase was rerun, and its recovered run passed.
+
+The next required import's actual main-image fixup is at `0x10dc9b2f8`, with
+stub `0x10c63aa88`, forwarder `0x107c28ed8` and one inspected call at
+`0x1015c0564`. The call wrapper returns the horizontal alignment getter's
+result directly. These two consumer/forwarder sites were inspected without
+executing application code; the alignment getter remains unsupported.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,821 | 340 | 78 |
+| Fortnite executable | 1,822 | 339 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,661 | 343 | 114 |
+| All images | 2,662 | 342 | 114 |
 
-The C++/GLES/Text variant reports 2,675 resolved imports, 329 unresolved strong
+The C++/GLES/Text variant reports 2,676 resolved imports, 328 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

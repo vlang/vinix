@@ -236,6 +236,7 @@ fn swift_buffers_stop() {
 	if ios_runtime.swift_strings.len != 0 { panic('iOS: Swift Strings still owned at shutdown') }
 	unsafe { ios_runtime.swift_buffers.free() }
 	unsafe { ios_runtime.swift_strings.free() }
+	swiftui_localized_key_stop()
 	swift_array_storage_stop()
 	swift_heap_stop()
 	swift_json_encoder_stop()
