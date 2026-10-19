@@ -234,6 +234,23 @@ fn mach_threads_stop() {
 	mach_threads_clear(false)
 }
 
+// Caller holds the namespace lock and refreshed retired records. Register
+// native entry/callback threads from themselves, never from a foreign handle.
+fn mach_thread_current() u32 {
+	handle := u64(C.pthread_self())
+	mut port := system_data.thread_ports
+	for port != unsafe { nil } {
+		if port.handle == handle { return port.name }
+		port = port.next
+	}
+	port = mach_thread_new(handle) or { return 0 }
+	if C.pthread_mutex_lock(port.lifetime) != 0 { panic('iOS: cannot hold entry thread lifetime') }
+	port.started = true
+	port.next = system_data.thread_ports
+	system_data.thread_ports = port
+	return port.name
+}
+
 // Requires a valid native pthread handle, exactly like the native API. The
 // returned right is borrowed; repeated queries do not increase its references.
 fn darwin_pthread_mach_thread_np(handle u64) u32 {
@@ -253,12 +270,7 @@ fn darwin_pthread_mach_thread_np(handle u64) u32 {
 		// Native callbacks and the entry thread can register themselves safely.
 		// A foreign, unregistered remote pthread cannot be instrumented here.
 		if handle != u64(C.pthread_self()) { return 0 }
-		port = mach_thread_new(handle) or { return 0 }
-		if C.pthread_mutex_lock(port.lifetime) != 0 { panic('iOS: cannot hold entry thread lifetime') }
-		port.started = true
-		port.next = system_data.thread_ports
-		system_data.thread_ports = port
-		return port.name
+		return mach_thread_current()
 	}
 	return 0
 }
@@ -392,6 +404,7 @@ fn darwin_mach_port_deallocate(task u32, name u32) i32 {
 
 fn mach_threads_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_task_threads' { u64(unsafe { voidptr(darwin_task_threads) }) }
 		'_pthread_mach_thread_np' { u64(unsafe { voidptr(darwin_pthread_mach_thread_np) }) }
 		'_pthread_from_mach_thread_np' { u64(unsafe { voidptr(darwin_pthread_from_mach_thread_np) }) }
 		'_mach_thread_self' { u64(unsafe { voidptr(darwin_mach_thread_self) }) }

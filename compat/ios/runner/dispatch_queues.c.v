@@ -364,7 +364,7 @@ fn dispatch_queue_busy(queue &DispatchQueue, change int) {
 fn dispatch_workers_start_locked() {
 	if dispatch_runtime.worker_count != 0 || dispatch_runtime.stopping { return }
 	for i in 0 .. dispatch_runtime.workers.len {
-		if C.pthread_create(unsafe { voidptr(&dispatch_runtime.workers[i]) }, unsafe { nil },
+		if darwin_pthread_create(unsafe { voidptr(&dispatch_runtime.workers[i]) }, unsafe { nil },
 			unsafe { voidptr(dispatch_worker) }, unsafe { nil }) != 0 { panic('iOS: cannot start dispatch worker') }
 		dispatch_runtime.worker_count++
 	}

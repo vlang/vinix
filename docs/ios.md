@@ -9635,17 +9635,51 @@ review and fresh probe/audit results are retained under
 `_task_swap_exception_ports` and stops before entry at `_task_threads`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_task_threads` now returns an independently owned VM array of 32-bit thread
+port names and one send reference per listed thread. On macOS it enumerates
+native Mach threads and moves the array into the runner's VM registry while
+retaining the returned rights. On Vinix it snapshots the current-task thread
+namespace under its lock, including entry/callback threads, Darwin pthreads,
+NSThreads and dispatch/network workers. Foreign native pthreads that never
+enter the adapter and foreign Linux tasks remain outside this support.
+
+The count is output-only. The V adapter preserves `errno` and copies the
+eight-byte pointer before the four-byte count after unlocking, including
+unaligned and overlapping outputs. Invalid destinations and wrong port kinds
+leave outputs unchanged. Array storage can be released with `vm_deallocate`
+independently of its send rights; held rights become dead-name references
+after exit. Enumeration excludes retired threads, can recreate a live send
+right with zero references, and preserves saturated reference counts. Existing
+robust-mutex lifetimes keep a thread visible through native TLS destructors.
+
+`tests/ios/native-checks.v build-task-threads` builds the fixture. Six host
+ASan/UBSan runs cover enumeration, thread namespace and VM-entry regressions.
+The optimized ARM64 fixture passes exact guarded/unaligned/aliased outputs,
+independent VM/right ownership, eight concurrent workers, retired names,
+TLS-destructor lifetime, zero/saturated references, dispatch workers, fork and
+two runtime lifetimes. Native stress measurements also observed 331 null
+entries among 8,041 entries during thread-exit races; native copyout is
+preserved, including these null entries.
+
+Native measurements, seven generated-C/executable pairs, optimized ARM64
+review and fresh probe/audit results are retained under
+`build/ios/fortnite/task-threads-checks`, with earlier fixture diagnostics kept
+separately. The probe clears `_task_threads` and stops before entry at
+`_thread_get_exception_ports`. Thread state, suspension and exception-handler
+delivery remain unsupported. Fortnite remains unplayable; the full iOS
+regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,775 | 386 | 78 |
+| Fortnite executable | 1,776 | 385 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,615 | 389 | 114 |
+| All images | 2,616 | 388 | 114 |
 
-The C++/GLES/Text variant reports 2,629 resolved imports, 375 unresolved strong
+The C++/GLES/Text variant reports 2,630 resolved imports, 374 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -138,7 +138,7 @@ fn nw_monitor_start(monitor u64) {
 	state.started = true; state.generation++
 	nw_runtime.monitors[slot] = objc_retain(monitor)
 	if !nw_runtime.started {
-		if C.pthread_create(unsafe { voidptr(&nw_runtime.worker) }, unsafe { nil }, unsafe { voidptr(nw_worker) }, unsafe { nil }) != 0 { panic('iOS: cannot start Network monitor worker') }
+		if darwin_pthread_create(unsafe { voidptr(&nw_runtime.worker) }, unsafe { nil }, unsafe { voidptr(nw_worker) }, unsafe { nil }) != 0 { panic('iOS: cannot start Network monitor worker') }
 		nw_runtime.started = true
 	}
 }

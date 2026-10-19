@@ -326,7 +326,7 @@ fn reachability_queue(target u64, queue u64) bool {
 	state.flags=value;state.known=true;state.queue=queue;state.generation++;darwin_dispatch_retain(queue)
 	reachability_runtime.targets[slot]=objc_retain(target)
 	if !reachability_runtime.started {
-		if C.pthread_create(unsafe{voidptr(&reachability_runtime.worker)},unsafe{nil},unsafe{voidptr(reachability_worker)},unsafe{nil})!=0 {
+		if darwin_pthread_create(unsafe{voidptr(&reachability_runtime.worker)},unsafe{nil},unsafe{voidptr(reachability_worker)},unsafe{nil})!=0 {
 			reachability_runtime.targets[slot]=0;state.queue=0;release_queue=queue;release_target=target;return false
 		}
 		reachability_runtime.started=true
