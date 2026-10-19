@@ -9566,17 +9566,54 @@ and allocation review, and fresh probe/audit evidence are retained under
 `_task_get_exception_ports` and stops before entry at `_task_info`. Fortnite
 remains unplayable; the full iOS regression is unpassed.
 
+`_task_info` now supports the current task's `MACH_TASK_BASIC_INFO` (20)
+and `TASK_VM_INFO` (22) memory records on Vinix. macOS maps the compatibility
+self-task name and forwards queries to the native API. Linux samples live
+RSS and the native resident high-water mark, streams the process's mapping
+snapshot for virtual size and region count, and reports RSS plus swap as
+physical footprint, matching the existing process-usage adapter. Descriptors
+close on every path; the V snapshot and record packing use stack storage.
+
+Native measurements establish a twelve-word basic record and VM revisions
+of 36, 38, 42, 84, 86, 87, 89 and 93 four-byte words. Short counts and
+unsupported Linux flavors return `KERN_INVALID_ARGUMENT`; failed snapshots
+return `KERN_FAILURE`, with caller outputs unchanged. The adapter reads the
+input count before resolving the destination, releases the namespace lock
+before collecting data or writing outputs, preserves `errno`, and copies
+the record before its count, including unaligned and overlapping spans.
+
+Darwin-only tagged/compressor ledgers, map bounds, remaining task limit and
+terminated-thread CPU times remain unavailable on Linux and stay zero.
+The basic record describes the runner's timesharing policy and zero Mach
+task suspension count. Other task-info flavors and foreign Linux tasks are
+unsupported; this adapter does not install exception handlers or deliver
+kernel faults.
+
+`tests/ios/native-checks.v build-task-info` builds the fixture. Six host
+ASan/UBSan runs pass task-info, task-exception-port and process-usage checks;
+eight native profiles compare counts, memory fields, page size and output
+extents. The optimized ARM64 fixture passes every count through 105, VM
+revision boundaries, guarded/unaligned/aliased writes, port kinds, live
+32 MiB allocation and persistent peak RSS, eight workers, fork and two
+runtime lifetimes. Native caller-memory fault measurements, seven
+generated-C/executable pairs and fresh probe/audit evidence are retained in
+`build/ios/fortnite/task-info-checks`.
+
+The probe clears `_task_info` and stops before entry at
+`_task_swap_exception_ports`. Fortnite remains unplayable; the full iOS
+regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,773 | 388 | 78 |
+| Fortnite executable | 1,774 | 387 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,613 | 391 | 114 |
+| All images | 2,614 | 390 | 114 |
 
-The C++/GLES/Text variant reports 2,627 resolved imports, 377 unresolved strong
+The C++/GLES/Text variant reports 2,628 resolved imports, 376 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
