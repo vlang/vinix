@@ -9367,17 +9367,37 @@ persistent storage. The fresh Fortnite probe clears the unfair-lock imports
 and stops before entry at `_pause`, called at `0x104862d48`. Fortnite remains
 unplayable; the full iOS regression is unpassed.
 
+`_pause` now calls native libc through a V adapter with an int32 return value
+and Darwin errno translation. The calling thread keeps its signal mask and
+sleeps until a caught signal makes the call return `-1`/`EINTR`, including
+handlers installed with `SA_RESTART`. Ignored and blocked signals leave the
+wait asleep. The adapter holds no runtime lock, changes no dispositions and
+allocates no storage, so the existing signal bridge can deliver callbacks.
+
+`tests/ios/native-checks.v build-pause` builds the fixture. Six host
+ASan/UBSan runs cover pause, signal delivery and libSystem; the optimized pause
+fixture also runs eight native Mac reference profiles. The ARM64 fixture
+passes ignored/blocked/caught delivery, pending signals, mask preservation,
+eight callers, fork and two runtime lifetimes. Generated C and optimized
+ARM64 review verify the native call, return ABI and errno path. Seven
+generated-C/executable pairs and joined probe/audit evidence are retained
+under `build/ios/fortnite/pause-checks`. The fresh Fortnite probe clears
+`_pause` and stops before entry at `_proc_pid_rusage`. Its actual consumer at
+`0x1005a77a8` requests flavor 5 for the current process and reads the
+physical-footprint field. Fortnite remains unplayable; the full iOS regression
+is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,766 | 395 | 78 |
+| Fortnite executable | 1,767 | 394 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,606 | 398 | 114 |
+| All images | 2,607 | 397 | 114 |
 
-The C++/GLES/Text variant reports 2,620 resolved imports, 384 unresolved strong
+The C++/GLES/Text variant reports 2,621 resolved imports, 383 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

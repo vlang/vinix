@@ -301,6 +301,7 @@ fn signals_fork_child() {
 
 fn signals_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_pause' { u64(unsafe { voidptr(darwin_pause) }) }
 		'_sigaction' { u64(unsafe { voidptr(darwin_sigaction) }) }
 		else { return none }
 	}
