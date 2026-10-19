@@ -308,6 +308,7 @@ fn darwin_getrusage(who i32, output &DarwinRusage) i32 {
 
 fn system_queries_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_uname' { u64(unsafe { voidptr(darwin_uname) }) }
 		'_getdtablesize' { u64(unsafe { voidptr(C.getdtablesize) }) }
 		'_getgid' { u64(unsafe { voidptr(C.getgid) }) }
 		'_getegid' { u64(unsafe { voidptr(C.getegid) }) }

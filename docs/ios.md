@@ -9839,17 +9839,44 @@ under `diagnostics/native-fork-task-port`, and the corrected probe passes.
 The loader clears `_thread_swap_exception_ports` and stops before entry at
 `_uname`. Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_uname` now returns the host's system identity through Darwin's five
+256-byte fields. macOS forwards the native call. Vinix translates its native
+six-field, 65-byte Linux layout, omitting the domain name. It returns the
+kernel's actual system, node, release, version and machine strings; it does
+not substitute an iPhone model. Fortnite's caller passes a 1296-byte stack
+frame at offset eight and reads the machine field at offset 1024.
+
+Native measurements show that each field writes only its string and NUL,
+leaving the remaining bytes untouched. Success preserves `errno`; invalid
+destinations return `EFAULT` and may retain a written prefix. The V adapter
+uses stack storage and `process_vm_writev` to preserve these boundaries and
+report copyout errors without dereferencing an invalid application buffer.
+It allocates no user-space heap storage.
+
+`tests/ios/native-checks.v build-uname` builds the fixture. Six host ASan/UBSan
+runs pass uname, system-query and sysctl regressions. The optimized ARM64
+fixture passes full-record comparisons against native uname, untouched tails,
+unaligned buffers, Fortnite's frame layout, ten guarded capacities, read-only
+and invalid pointers, partial writes, thread-local errno, eight concurrent
+workers, fork and two runtime lifetimes. Generated C and ARM64 review cover
+both runners and the host/guest fixture.
+
+Native measurements, seven generated-C/executable pairs and fresh probe/audit
+evidence are retained in `build/ios/fortnite/uname-checks`. The loader clears
+`_uname` and stops before entry at `_vm_read_overwrite`. Fortnite remains
+unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,781 | 380 | 78 |
+| Fortnite executable | 1,782 | 379 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,621 | 383 | 114 |
+| All images | 2,622 | 382 | 114 |
 
-The C++/GLES/Text variant reports 2,635 resolved imports, 369 unresolved strong
+The C++/GLES/Text variant reports 2,636 resolved imports, 368 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
