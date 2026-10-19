@@ -333,6 +333,8 @@ mut:
 	defaults u64
 	locale u64
 	empty_dictionary u64
+	empty_array u64 // Cache-owned immutable singleton, immortal to callers.
+	empty_array_cell u64 // Read-only pointer cell, retired after pool/Swift users.
 	webkit_default_store u64
 	webkit_worlds [128]u64 // Owned interned page/client/named worlds, retired at shutdown.
 	webkit_world_count int = 2
@@ -717,6 +719,7 @@ fn objc_stop() {
 	// Swift closure/context destruction can still read Foundation globals.
 	// Drain those owners before retiring Foundation global cells and strings.
 	swift_buffers_stop()
+	ns_empty_array_stop()
 	ns_url_error_stop()
 	ns_url_session_constants_stop()
 	ns_foundation_keys_stop()

@@ -10915,17 +10915,55 @@ production probe clears the type-info and class imports, then stops before
 entry at `___NSArray0__`. Fortnite remains unplayable; the full iOS regression
 is unpassed.
 
+`___NSArray0__` now resolves through Foundation and CoreFoundation as a
+read-only pointer cell containing an immutable empty NSArray. The separately
+exported `___NSArray0__struct` returns the object directly. Native measurement
+confirms these distinct addresses, a zero CF/NSArray count, nil first object,
+immortal caller ownership and identity-preserving immutable copies. Mutable
+copies are independent owned NSMutableArrays. The IPA has 12 inspected
+consumer sites for GOT slot `0x10dc9b220`, including a second pointer load
+and Objective-C retain calls.
+
+The cache owns one ordinary array object and one sealed cell page. Lookup
+publishes under the Objective-C initialization lock. Generic collection
+mutators reject the singleton, while empty enumeration leaves output buffers
+untouched. The cell and object survive pool and Swift context destruction;
+shutdown removes caller immortality, releases the cache reference, and checks
+the cell unmap before class descriptors retire.
+
+`tests/ios/native-checks.v build-ns-empty-array` builds the new fixture. Six
+host ASan/UBSan runs pass the empty-array, exception-type and constant-dictionary
+fixtures. The optimized ARM64 guest fixture also passes. Checks cover eight
+concurrent cold readers, both export forms and framework routes, copy and
+equality/hash behavior, independent mutable copies, guarded empty enumeration,
+seven rejected mutations, retained array/dictionary owners across pool drain,
+weak loads, retirement guards, pool callback access and two drained/unmapped
+runtime lifetimes with no remaining Objective-C objects. Generated C and
+assembly review covers the fixture and both production runners.
+
+Evidence and seven generated-C/executable pairs are retained under
+`build/ios/fortnite/ns-empty-array-checks`, including native measurements and
+the preserved build and review helper diagnostics. The fresh production probe clears
+the empty-array import, then stops before entry at `_$s7SwiftUI13_VStackLayoutVMn`. Fortnite
+remains unplayable; the full iOS regression is unpassed.
+
+Inspection identifies the next import as a Swift nominal type descriptor:
+one indirect context reference in `__TEXT,__swift5_typeref` at `0x10dc7fd3f`
+uses relative field `0x10dc7fd40` to reach GOT cell `0x10dc9b2b8`. The encoding
+agrees with the [Swift mangling ABI](https://github.com/swiftlang/swift/blob/main/docs/ABI/Mangling.rst),
+whose source snapshot is retained with the evidence. SwiftUI remains unsupported.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,812 | 349 | 78 |
+| Fortnite executable | 1,814 | 347 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,652 | 352 | 114 |
+| All images | 2,654 | 350 | 114 |
 
-The C++/GLES/Text variant reports 2,666 resolved imports, 338 unresolved strong
+The C++/GLES/Text variant reports 2,668 resolved imports, 336 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
