@@ -35,6 +35,11 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		if address := ns_url_session_constant_symbol(symbol) { return address }
 		if address := ns_foundation_key_symbol(symbol) { return address }
 	}
+	// The IPA imports this NSString pointer global through CoreFoundation.
+	if library == '/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation'
+		&& symbol == '_NSCalendarIdentifierISO8601' {
+		return ns_foundation_key_symbol(symbol)
+	}
 	// Foundation.framework reexports these Swift overlay entries. The main
 	// executable uses this install name, while its bundled frameworks use the
 	// dylib; installed native addresses are identical for these exports.

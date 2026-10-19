@@ -174,6 +174,9 @@ CFUUID without changing any bits. `CFUUIDCreateString` returns owned uppercase
 canonical text for live CFUUID values. `CFUUIDGetUUIDBytes` returns an independent
 sixteen-byte value without changing ownership. Additional CFUUID constructors
 and the CFUUID-specific type-ID accessor remain unimplemented.
+`NSCalendarIdentifierISO8601` exposes a shared immutable NSString pointer cell
+through Foundation and CoreFoundation, with the native value `iso8601`.
+Objective-C NSCalendar construction and calendar arithmetic remain unsupported.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
 The Mach VM adapter supports allocations up to 4 GiB in the current process,
@@ -10391,17 +10394,48 @@ Evidence and seven generated-C/executable pairs are retained in
 `_CFUUIDGetUUIDBytes` and stops before entry at `_NSCalendarIdentifierISO8601`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_NSCalendarIdentifierISO8601` now exports an aligned NSString pointer cell
+through Foundation and CoreFoundation. Native measurements confirm that both
+frameworks expose the same cell and exact `iso8601` CFString value. Fortnite's
+GOT consumer at `0x105eb70bc` loads the cell address, then dereferences it into
+x2; this is a data import without a function stub.
+
+The bridge extends the existing sealed Foundation constant page to four cells
+and four CFSTR records. Publication is serialized, registers all strings before
+sealing the page read-only, and preserves stable identities without allocating
+runtime objects on lookup. Retain, release, autorelease, immutable copying and
+equal-string dictionary lookup use the existing NSString machinery. Shutdown
+rejects cold publication while keeping published cells readable to callbacks;
+all four registrations and the page retire after pools and Swift contexts drain.
+The original three Foundation key values and record locations are preserved.
+
+`tests/ios/native-checks.v build-ns-calendar-iso8601` builds the new fixture.
+Six host ASan/UBSan runs pass the identifier, Foundation-key and URL-session
+constant checks. The optimized ARM64 fixture passes eight concurrent cold
+publishers, both framework routes, exact pointer/CFSTR/string layout, string and
+dictionary behavior, retirement guards, callback access and two zero-live-object
+teardowns. A separate native probe confirms acceptance by CoreFoundation's
+ISO8601 calendar with Monday/four-day week rules; this does not implement
+Objective-C NSCalendar construction or calendar arithmetic on Vinix.
+Generated C and assembly inspection covers the expanded layout, publication,
+allocation behavior and deferred unregister/unmap in both production runners.
+
+Evidence and seven generated-C/executable pairs are retained under
+`build/ios/fortnite/ns-calendar-iso8601-checks`. The fresh production link probe
+clears this import and stops before entry at `_NSInternalInconsistencyException`.
+Fortnite remains unplayable; the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,797 | 364 | 78 |
+| Fortnite executable | 1,798 | 363 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,637 | 367 | 114 |
+| All images | 2,638 | 366 | 114 |
 
-The C++/GLES/Text variant reports 2,651 resolved imports, 353 unresolved strong
+The C++/GLES/Text variant reports 2,652 resolved imports, 352 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

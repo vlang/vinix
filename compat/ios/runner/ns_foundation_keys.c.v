@@ -8,6 +8,7 @@ fn ns_foundation_key_symbol(symbol string) ?u64 {
 		'_NSUbiquityIdentityDidChangeNotification' { 0 }
 		'_NSUnderlyingErrorKey' { 1 }
 		'_NSUserActivityTypeBrowsingWeb' { 2 }
+		'_NSCalendarIdentifierISO8601' { 3 }
 		else { return none }
 	}
 	if ios_runtime == unsafe { nil } { return none }
@@ -18,8 +19,8 @@ fn ns_foundation_key_symbol(symbol string) ?u64 {
 		page := usize(C.getpagesize())
 		arena := C.mmap(unsafe { nil }, page, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
 		if arena == voidptr(-1) { panic('iOS: cannot allocate Foundation key globals') }
-		mut cursor := u64(128) // Three pointer cells, padding and three CFSTR records.
-		for i, text in ['NSUbiquityIdentityDidChangeNotification', 'NSUnderlyingError', 'NSUserActivityTypeBrowsingWeb']! {
+		mut cursor := u64(160) // Four pointer cells followed by four CFSTR records.
+		for i, text in ['NSUbiquityIdentityDidChangeNotification', 'NSUnderlyingError', 'NSUserActivityTypeBrowsingWeb', 'iso8601']! {
 			object := u64(arena) + 32 + u64(i * 32)
 			if cursor + u64(text.len) + 1 > u64(page) { panic('iOS: Foundation keys exceed their page') }
 			unsafe {
@@ -44,7 +45,7 @@ fn ns_foundation_key_symbol(symbol string) ?u64 {
 fn ns_foundation_keys_stop() {
 	arena := ios_runtime.foundation_keys_arena
 	if arena == 0 { return }
-	for i in 0 .. 3 { ios_runtime.constants.delete(read64(arena + u64(i * 8))) }
+	for i in 0 .. 4 { ios_runtime.constants.delete(read64(arena + u64(i * 8))) }
 	if C.munmap(unsafe { voidptr(arena) }, usize(C.getpagesize())) != 0 { panic('iOS: cannot retire Foundation key globals') }
 	ios_runtime.foundation_keys_arena = 0
 }

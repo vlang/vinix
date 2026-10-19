@@ -297,7 +297,7 @@ mut:
 	corevideo_constants_arena u64 // Sealed CoreVideo CFString cells and records.
 	coremedia_constants_arena u64 // Sealed format-description CFString cells and records.
 	avfoundation_constants_arena u64 // Sealed AVFoundation NSString cells and records.
-	foundation_keys_arena u64 // Sealed ubiquity, underlying-error and web-activity NSString cells.
+	foundation_keys_arena u64 // Sealed Foundation key and calendar-identifier NSString cells.
 	devicecheck_arena u64 // Sealed DeviceCheck error-domain cell, CFSTR record and bytes.
 	corehaptics_constants_arena u64 // Sealed CoreHaptics NSString cells, records and bytes.
 	storekit_constants_arena u64 // Sealed StoreKit conversion NSString cells, records and bytes.
