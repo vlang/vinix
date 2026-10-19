@@ -183,6 +183,10 @@ SYM(ios_sprintf):
 SYM(ios_sscanf):
     mov x2, sp
     b SYM(ios_sscanf_stack)
+.global SYM(ios_swscanf)
+SYM(ios_swscanf):
+    mov x2, sp
+    b SYM(ios_swscanf_stack)
 .global SYM(ios_asprintf)
 SYM(ios_asprintf):
     mov x2, sp

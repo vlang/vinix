@@ -192,6 +192,8 @@ fn stdio_symbol(symbol string) ?u64 {
 		'_fprintf' { u64(unsafe { voidptr(C.ios_fprintf) }) }
 		'_sprintf' { u64(unsafe { voidptr(C.ios_sprintf) }) }
 		'_sscanf' { u64(unsafe { voidptr(C.ios_sscanf) }) }
+		'_swscanf' { u64(unsafe { voidptr(C.ios_swscanf) }) }
+		'_vswscanf' { u64(unsafe { voidptr(darwin_vswscanf) }) }
 		'_snprintf' { u64(unsafe { voidptr(C.ios_snprintf) }) }
 		'_vsnprintf' { u64(unsafe { voidptr(darwin_vsnprintf) }) }
 		'_vsprintf' { u64(unsafe { voidptr(darwin_vsprintf) }) }

@@ -9504,17 +9504,49 @@ native TSD and optimized ARM64 call-path review, and fresh probe/audit results.
 The probe clears `_sigaltstack` and stops before entry at `_swscanf`.
 Fortnite remains unplayable; the full iOS regression is unpassed.
 
+`_swscanf` and `_vswscanf` now bridge Darwin ARM64's anonymous pointer slots
+to native wide scanning. macOS forwards the native `va_list`; Linux builds
+the native AAPCS64 record with empty register ranges. Both use four-byte
+wide characters. The V adapter validates the complete input in the current
+locale before writing outputs, preserves Darwin's match-failure `errno`, and
+maps encoding errors to Darwin `EILSEQ` (92). It rewrites eight-byte Darwin
+long-double conversions and narrow `h` character modifiers in one temporary
+format copy, freed before return. The game's common formats borrow their
+original storage without allocating.
+
+All fifteen fixed formats recovered from the actual IPA are checked,
+including suppressed fields, short version/build components, 64-bit
+addresses, bounded wide strings and five output pointers. Additional native
+comparisons cover scalar widths, floats, positional arguments, character
+sets, counts, C/UTF-8 locale behavior and unchanged input/format/argument
+storage. Full Darwin scanf conformance outside these fixtures remains
+unfinished, including libc edge behavior for range character sets and
+incomplete floating exponents.
+
+`tests/ios/native-checks.v build-swscanf` builds the fixture. Six host
+ASan/UBSan runs cover wide scanning, libSystem and NSLogv; the new fixture
+also passes in the ARM64 guest with protected input, format, argument and
+output boundaries, a real Darwin variadic caller, eight concurrent workers
+and two runtime lifetimes. Generated C and optimized ARM64 paths were
+reviewed for the ABI, format ownership and unintended allocations.
+
+Evidence under `build/ios/fortnite/swscanf-checks` retains native measurements,
+the initial errno/character-modifier diagnostics, seven generated-C/executable
+pairs and fresh probe/audit results. The probe clears `_swscanf` and stops
+before entry at `_task_get_exception_ports`. Fortnite remains unplayable;
+the full iOS regression is unpassed.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,771 | 390 | 78 |
+| Fortnite executable | 1,772 | 389 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,611 | 393 | 114 |
+| All images | 2,612 | 392 | 114 |
 
-The C++/GLES/Text variant reports 2,625 resolved imports, 379 unresolved strong
+The C++/GLES/Text variant reports 2,626 resolved imports, 378 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -354,6 +354,7 @@ void ios_cg_image_create(void);
 void ios_fprintf(void);
 void ios_sprintf(void);
 void ios_sscanf(void);
+void ios_swscanf(void);
 void ios_asprintf(void);
 void ios_open(void);
 void ios_fcntl(void);
@@ -394,6 +395,7 @@ static void ios_cg_image_create(void) { abort(); }
 static void ios_fprintf(void) { abort(); }
 static void ios_sprintf(void) { abort(); }
 static void ios_sscanf(void) { abort(); }
+static void ios_swscanf(void) { abort(); }
 static void ios_asprintf(void) { abort(); }
 static void ios_open(void) { abort(); }
 static void ios_fcntl(void) { abort(); }
