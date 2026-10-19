@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
-// The fifth cell uses padding after the creation-date text. Keep the existing
-// cells and CFSTR records in place as the resource-key table grows.
+// The capacity cells use padding after the creation-date text. Keep the
+// existing cells and CFSTR records in place as the resource-key table grows.
 fn ns_url_resource_key_cell_offset(index int) u64 {
-	cells := [u64(0), 8, 16, 24, 96]!
+	cells := [u64(0), 8, 16, 24, 96, 104]!
 	return cells[index]
 }
 
@@ -17,6 +17,7 @@ fn ns_url_resource_key_symbol(symbol string) ?u64 {
 		'_NSURLIsExcludedFromBackupKey', '_kCFURLIsExcludedFromBackupKey' { 2 }
 		'_NSURLIsRegularFileKey', '_kCFURLIsRegularFileKey' { 3 }
 		'_NSURLVolumeAvailableCapacityForImportantUsageKey', '_kCFURLVolumeAvailableCapacityForImportantUsageKey' { 4 }
+		'_NSURLVolumeAvailableCapacityKey', '_kCFURLVolumeAvailableCapacityKey' { 5 }
 		else { return none }
 	}
 	if ios_runtime == unsafe { nil } { return none }
@@ -28,10 +29,10 @@ fn ns_url_resource_key_symbol(symbol string) ?u64 {
 		arena := C.mmap(unsafe { nil }, page, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
 		if arena == voidptr(-1) { panic('iOS: cannot allocate URL resource keys') }
 		base := u64(arena)
-		objects := [u64(32), 128, 192, 256, 320]!
-		bytes := [u64(64), 160, 224, 288, 352]!
-		texts := ['NSURLCreationDateKey', 'NSURLFileSizeKey', 'NSURLIsExcludedFromBackupKey', 'NSURLIsRegularFileKey', 'NSURLVolumeAvailableCapacityForImportantUsageKey']!
-		for i in 0 .. 5 {
+		objects := [u64(32), 128, 192, 256, 320, 416]!
+		bytes := [u64(64), 160, 224, 288, 352, 448]!
+		texts := ['NSURLCreationDateKey', 'NSURLFileSizeKey', 'NSURLIsExcludedFromBackupKey', 'NSURLIsRegularFileKey', 'NSURLVolumeAvailableCapacityForImportantUsageKey', 'NSURLVolumeAvailableCapacityKey']!
+		for i in 0 .. 6 {
 			object := base + objects[i]
 			data := base + bytes[i]
 			text := texts[i]
@@ -56,7 +57,7 @@ fn ns_url_resource_key_symbol(symbol string) ?u64 {
 fn ns_url_resource_keys_stop() {
 	arena := ios_runtime.url_resource_keys_arena
 	if arena == 0 { return }
-	for i in 0 .. 5 { ios_runtime.constants.delete(read64(arena + ns_url_resource_key_cell_offset(i))) }
+	for i in 0 .. 6 { ios_runtime.constants.delete(read64(arena + ns_url_resource_key_cell_offset(i))) }
 	if C.munmap(unsafe { voidptr(arena) }, usize(C.getpagesize())) != 0 { panic('iOS: cannot retire URL resource keys') }
 	ios_runtime.url_resource_keys_arena = 0
 }
