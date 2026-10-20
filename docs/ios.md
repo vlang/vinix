@@ -13117,10 +13117,42 @@ fixtures. Four isolated ARM64 phases, generated C/ARM64 reviews, original-image
 traces and native measurements are retained under
 `build/ios/fortnite/string-hash-checks`.
 
-The fresh launch exits 1 during linking at String's `count` getter,
-`_$sSS5countSivg`. Its required cell `0x10dc9b808`, stub `0x10c63ace0`,
-forwarder `0x107c28a80` and call `0x10006fb98` were inspected without executing
-application code.
+String's `count` getter `_$sSS5countSivg` now counts extended grapheme clusters,
+following [Swift's Character collection contract](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/StringCharacterView.swift)
+and the [Unicode 17 segmentation rules](https://www.unicode.org/reports/tr29/tr29-47.html).
+Its required cell `0x10dc9b808`, stub `0x10c63ace0`, forwarder `0x107c28a80`
+and call `0x10006fb98` were inspected without executing application code. Native
+Swift measurements confirm borrowed String arguments in x0/x1, a signed Int
+result in x0, preserved x20/x21 and unchanged ownership. Inline strings,
+immutable literals, registered native tails and registered foreign NSString
+storage use the existing checked UTF-8 reader, with a 1 MiB limit. Shared/custom
+storage remains unsupported.
+
+The allocation-free V scan keeps constant-sized context for regional indicator
+parity, emoji joiners and Indic consonant/linker sequences. It also handles
+CRLF, controls, combining marks, spacing marks, prepending characters and Hangul.
+Its 1,631 merged property ranges are generated from pinned Unicode 17 GCB,
+Extended_Pictographic and Indic_Conjunct_Break data, with the Unicode license
+included in the generated source:
+
+```sh
+v run tests/ios/unicode-grapheme.v check
+v run tests/ios/native-checks.v build-string-count
+```
+
+The fixture checks all 766 records and 1,990 scalar boundary decisions in
+[Unicode's grapheme conformance corpus](https://www.unicode.org/Public/17.0.0/ucd/auxiliary/GraphemeBreakTest.txt),
+including each full-string count. Native Swift comparisons cover Unicode and
+ASCII storage forms. Protected source boundaries, malformed/stale/retired
+inputs, 1 MiB CRLF and combining-mark runs, four concurrent readers and two
+drained runtimes also pass. Eight ASan/UBSan runs cover both C++ backend
+configurations and the existing String hashing and foreign UTF-8 count fixtures.
+Four isolated ARM64 phases, generated C/ARM64 reviews, pinned data, original
+image traces and native measurements are retained under
+`build/ios/fortnite/string-count-checks`.
+
+The fresh launch exits 1 during linking at String's Hashable witness table,
+`_$sSSSHsWP`; String's `count` getter no longer blocks linking.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13128,12 +13160,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,900 | 261 | 78 |
+| Fortnite executable | 1,901 | 260 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,740 | 264 | 114 |
+| All images | 2,741 | 263 | 114 |
 
-The C++/GLES/Text variant reports 2,754 resolved imports, 250 unresolved strong
+The C++/GLES/Text variant reports 2,755 resolved imports, 249 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

@@ -255,6 +255,9 @@ fn swift_buffers_stop() {
 }
 
 fn swift_core_symbol(symbol string) ?u64 {
+	if symbol == '_$sSS5countSivg' {
+		return u64(unsafe { voidptr(swift_string_count) })
+	}
 	if symbol == '__swiftEmptyDictionarySingleton' { return swift_foundation_arena() + u64(C.getpagesize()) + 3328 }
 	if address := swift_raw_alloc_symbol(symbol) { return address }
 	if address := swift_once_symbol(symbol) { return address }
