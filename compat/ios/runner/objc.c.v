@@ -233,6 +233,8 @@ mut:
 	swift_set_arena u64
 	swift_set_metadata map[u64]SwiftSetType // Sealed specialization page -> exact Element/Hashable pair.
 	swift_empty_set u64 // Immutable native empty singleton; retired with Set records.
+	swift_bool_metadata_arena u64 // Sealed Swift.Bool nominal metadata, accessor and byte value witnesses.
+	swift_bool_metadata_retired bool // Reject recreation after quiescent metadata retirement.
 	swift_integer_arena u64 // Int metadata, value witnesses and Equatable/Hashable conformances.
 	swift_dispatch_flags_arena u64 // Sealed DispatchWorkItemFlags metadata/accessor pages.
 	swift_dispatch_flags_retired bool // Reject resolution after quiescent metadata teardown.

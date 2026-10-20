@@ -13441,9 +13441,49 @@ audits. Generated C/ARM64 reviews, native measurements, compressed artifacts
 and original-image traces are retained under
 `build/ios/fortnite/array-decoding-checks`.
 
-The fresh launch exits 1 during linking at Swift Bool metadata, `_$sSbN`.
-Its required data cell `0x10dc9b888` has one inspected consumer at `0x10003e810`,
-which stores the metadata beside a Bool payload in an existential value.
+Swift Bool now exports canonical metadata, its nominal descriptor and complete
+metadata accessor through `_$sSbN`, `_$sSbMn` and `_$sSbMa`. Bool has a distinct
+metadata identity and value-witness table from Int, UInt8 and ObjectiveC.ObjCBool.
+The one-byte inline POD layout has 254 extra inhabitants. Copy/take operations
+preserve the payload byte, and the existing measured ObjCBool enum operations
+supply the same tag-width transitions and UInt32 wrapping as native Bool.
+Copy/take never widens beyond the payload byte.
+
+The accessor returns complete metadata for every request. Its code is sealed
+RX, its metadata/descriptors/witnesses RO, and publication is synchronized.
+Metadata remains alive while Swift owners and typed Array metadata drain;
+quiescent retirement unmaps both pages and prevents cache recreation. Only
+libswiftCore receives these three exports. Reflection field records, textual
+Bool mangling, dynamic-cast admission and additional Bool protocol/API exports
+remain outside this profile. The layout follows the
+[Swift metadata ABI](https://github.com/swiftlang/swift/blob/main/docs/ABI/TypeMetadata.rst).
+
+```sh
+v run tests/ios/native-checks.v build-bool-metadata
+```
+
+Native macOS comparisons cover all 256 payload bytes, guarded one-byte
+copy/take and zero-footprint destruction, all 254 extra inhabitants, enum-tag
+width boundaries and UInt32 count/tag wrapping, complete metadata responses
+and preserved x20/x21. Bool values inside Any exercise copy, take, same/different
+type assignment and destruction against native witnesses. Compatibility checks
+also cover symbolic descriptor lookup, typed POD arrays, scoped exports, actual
+RX/RO protection, eight cold publishers/readers and two drained/unmapped lifetimes.
+The original required cell `0x10dc9b888` and its consumer `0x10003e810`, which
+stores Bool metadata beside its payload in an existential, were inspected
+without executing application code.
+
+Ten ASan/UBSan runs cover both C++ backend configurations and ObjCBool metadata,
+Int8/UInt8 metadata and Any ownership regressions. Four isolated ARM64 phases
+pass: the Bool fixture, fresh launch probe and both import audits. Generated
+C/ARM64 reviews, primary ABI references, native measurements, compressed
+artifacts and original-image traces are retained under
+`build/ios/fortnite/bool-metadata-checks`.
+
+The fresh launch exits 1 during linking at Int's CustomStringConvertible
+witness table, `_$sSis23CustomStringConvertiblesWP`. Its required cell
+`0x10dc9b898` has one inspected consumer at `0x10006aa60`, which passes the
+table and Int metadata to the generic description getter.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13451,12 +13491,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,909 | 252 | 78 |
+| Fortnite executable | 1,910 | 251 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,749 | 255 | 114 |
+| All images | 2,750 | 254 | 114 |
 
-The C++/GLES/Text variant reports 2,763 resolved imports, 241 unresolved strong
+The C++/GLES/Text variant reports 2,764 resolved imports, 240 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

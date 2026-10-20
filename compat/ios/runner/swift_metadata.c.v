@@ -194,6 +194,7 @@ fn swift_metadata_stop() {
 	swiftui_environment_transform_stop()
 	swiftui_text_view_stop()
 	swift_nsobject_hashable_stop()
+	swift_bool_metadata_stop()
 	swift_integer_stop()
 	swift_void_stop()
 	swift_unknown_value_stop()
