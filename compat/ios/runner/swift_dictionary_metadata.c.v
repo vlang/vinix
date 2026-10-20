@@ -87,6 +87,7 @@ fn swift_dictionary_metadata_arena() u64 {
 	}
 	witness := swift_bridge_value_witnesses()
 	hashable_protocol := swift_integer_metadata() - 16 + 352
+	encoding_protocol := swift_foundation_arena() + u64(C.getpagesize()) + 640
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if ios_runtime.swift_dictionary_metadata_arena != 0 {
@@ -130,18 +131,21 @@ fn swift_dictionary_metadata_arena() u64 {
 	swift_protocol_relative(data + 272, base + 32)
 	write32(data + 280, 0x40000000)
 	swift_protocol_relative(data + 284, witness)
-	C.__builtin___clear_cache(allocation, voidptr(base + 48))
+	swift_dictionary_encoding_emit(base, data, encoding_protocol)
+	C.__builtin___clear_cache(allocation, voidptr(base + 80))
 	if C.mprotect(allocation, page, C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(voidptr(data), page, C.PROT_READ) != 0 {
 		C.munmap(allocation, page * 3)
 		panic('iOS: cannot seal Swift Dictionary descriptor')
 	}
 	ios_runtime.swift_dictionary_metadata_arena = base
+	ios_runtime.swift_dictionary_encoding_descriptor = data + 320
 	return base
 }
 
 fn swift_dictionary_metadata_stop() {
 	ios_runtime.swift_dictionary_metadata_retired = true
+	swift_dictionary_encoding_stop()
 	page := usize(C.getpagesize())
 	for base, _ in ios_runtime.swift_dictionary_metadata {
 		if C.munmap(voidptr(base), page) != 0 {
