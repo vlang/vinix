@@ -447,12 +447,12 @@ Firefox is an upstream GTK/X11 application rather than a native ui2 client. It
 runs on a private Xvfb display whose live XWD framebuffer is composited into a
 normal movable Vinix window. Pointer and keyboard events cross the same compact
 input bridge used by the other hosted X11 applications, so the native desktop
-and taskbar remain active while Firefox runs. Images carry Firefox's Vinix
-policy files but neither the browser nor X11: the first-run app page and `pkg
-install firefox` install the browser, and pkg brings Xvfb, the input bridge and
-the direct `startx` launcher with it (`--with-firefox` builds both into an
-image). A native error window remains as a runtime fallback when the browser or
-X11 is missing.
+and taskbar remain active while Firefox runs. The amd64 release ISO and
+`make desktop-amd64` include Firefox and X11. Compact images carry Firefox's
+Vinix policy files; the first-run app page and `pkg install firefox` install the
+browser, and pkg brings Xvfb, the input bridge and the direct `startx` launcher
+with it (`--with-firefox` builds both into an image). A native error window
+remains as a runtime fallback when the browser or X11 is missing.
 The direct launcher writes Firefox's upstream graphics and GTK diagnostics to
 `/var/log/firefox.log`. On an M1 image with the Asahi runtime, direct Xorg can
 enable glamor/DRI3 and Firefox WebRender over X11 EGL. The embedded window uses
@@ -1320,9 +1320,13 @@ sysroot taken from the userland image, and stages
 starts the desktop directly. `scripts/run-aarch64.sh` boots any image named by
 `VINIX_INITRAMFS`, and with none boots the ordinary shell.
 
-The equivalent amd64 workflow is:
+For an amd64 desktop with X11 and Firefox, stage the package layers, build and boot:
 
-    ./scripts/run-desktop-amd64.sh
+    ./scripts/build-x11-amd64.sh
+    ./scripts/build-firefox-amd64.sh
+    ./scripts/build-network-tools-amd64.sh
+    make desktop-amd64
+    ./scripts/run-desktop-amd64.sh --no-build
 
 It extracts Alpine's prebuilt x86_64 userland and toolchain packages, then
 creates a dedicated `vinix-desktop-amd64.iso`; no mlibc or custom GCC bootstrap
@@ -1331,6 +1335,13 @@ absolute `/dev/pointer` ABI as the aarch64 input drivers, so the compositor and
 its applications use the same input path on both architectures. Pass
 `--no-build` to boot an existing image. Clang cross-compiles the same image on
 Apple Silicon, where QEMU runs it with TCG.
+
+For a compact image with apps installed on demand, use
+`./scripts/build-desktop-amd64.sh` followed by the same `--no-build` boot command.
+`./scripts/run-desktop-amd64.sh` without `--no-build` also builds the compact image.
+Arm64 defaults are unchanged. Browser-equipped amd64 images must pass the V
+packaging validator before archiving; see [release images](../README.md#release-images)
+for its host dependency, tests and the separate guest launch check.
 
 An existing `build-aarch64-hyprland/staging` layer remains available without
 changing the ordinary desktop session. Produce that layer with

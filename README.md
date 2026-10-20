@@ -786,8 +786,8 @@ framebuffer-backed Xorg server. Firefox draws its own interface with Gecko/XUL;
 GTK 3 is staged as a userspace dependency for Linux window-system integration,
 not implemented in the kernel or in `vinix-desktop`.
 
-Images do not carry Firefox: the first-run app page and `pkg install firefox`
-fetch it from Alpine with its GTK runtime. To build it into an image instead,
+The default aarch64 images do not carry Firefox: the first-run app page and
+`pkg install firefox` fetch it from Alpine with its GTK runtime. To build it into an image instead,
 build the X server and stage Firefox before assembling the full userland:
 
 ```sh
@@ -831,8 +831,8 @@ backend or accessibility overrides. Running `run-firefox` directly still starts
 the browser on the physical Xorg display for command-line debugging.
 Set `VINIX_FIREFOX_STAGING` to merge a different completed staging tree, or
 `ALPINE_BRANCH`/`VINIX_FIREFOX_PACKAGE` to select another compatible build.
-The compact desktop image used by the default M1 deployment and the release
-ISOs carries Git and GCC without the much larger complete userland image.
+The compact desktop image used by the default M1 deployment and the arm64 release
+ISO carries Git and GCC without the much larger complete userland image.
 Python, the V compiler with TCC and Oh My Zsh are left out unless it is built
 with `--with-python`, `--with-v` or `--with-oh-my-zsh`, and so is X11: X11
 serves only the Linux applications the desktop hosts on Xvfb, while native
@@ -1170,6 +1170,25 @@ that architecture here), and publishes them with checksums as a GitHub release:
 ./scripts/deploy-iso.sh --no-publish   # build and test only; see build-release/<tag>/
 ./scripts/deploy-iso.sh --draft --tag=iso-2026-10-01
 ```
+
+The amd64 release ISO includes X11 and Firefox ESR with its GTK/media runtime.
+Prepare `build-amd64-x11/staging`, `build-amd64-firefox/staging` and
+`build-amd64-network-tools/staging` with their matching build scripts first.
+`make desktop-amd64` builds the same browser-equipped desktop locally; the
+direct `./scripts/build-desktop-amd64.sh` command retains the compact image
+without Firefox or X11 (`--with-firefox` includes both). Arm64 release contents
+are unchanged. Both architectures still publish X11 bundles for compact images.
+
+Full amd64 builds validate the final merged root before writing the initramfs:
+Firefox's actual executable and companion libraries, X11 servers and input
+helpers, amd64 ELF format, interpreter and recursive shared-library dependencies,
+fonts, certificates and Vinix configuration must be present. This host check
+requires `llvm-readelf` or `readelf` (`VINIX_DESKTOP_READELF` overrides discovery).
+It does not execute Firefox or prove rendering/input on Vinix; boot the full ISO
+and open Firefox from the desktop as a separate release check. Run the light
+validator tests with `v -cc clang test build-support/desktopimage`, or validate
+an existing root with `V=/path/to/v sh build-support/run-v-tool.sh
+build-support/check-desktop-firefox.v /path/to/initramfs-root`.
 
 `./scripts/test-iso.sh vinix-amd64.iso vinix-arm64.iso` runs the same boot tests on any
 image: amd64 through BIOS with VirtualBox's defaults and through UEFI, arm64 with

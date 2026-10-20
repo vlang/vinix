@@ -15,6 +15,7 @@
 #   --with-firefox  also stage Firefox and its GTK/media runtime from
 #                   ./scripts/build-firefox-amd64.sh; otherwise the first-run
 #                   app page offers the browser through pkg (implies --with-x11)
+#                   Required by make desktop-amd64 and the amd64 release ISO.
 #   --with-x11      keep X11 in the image; otherwise pkg installs it with the
 #                   first graphical application. VINIX_AMD64_X11_BUNDLE=FILE.tar.gz
 #                   writes the bundle it installs.
@@ -357,6 +358,10 @@ if [ "$WITH_FIREFOX" -eq 0 ] &&
     echo "ERROR: desktop image has Firefox without --with-firefox" >&2
     exit 1
 fi
+if [ "$WITH_FIREFOX" -eq 1 ]; then
+    "$SCRIPT_DIR/build-support/run-v-tool.sh" \
+        "$SCRIPT_DIR/build-support/check-desktop-firefox.v" "$STAGING"
+fi
 
 # One immutable multicall image, with the same per-application process names as
 # the aarch64 desktop image.
@@ -394,8 +399,9 @@ if [ "$WITH_V" -eq 1 ]; then
 fi
 
 # The X11 that pkg installs onto an image built without it (vinix-pkg's
-# install_x11): the layer and its launcher, less every path this image already
-# has, so that installing it never replaces a system file.
+# install_x11): the layer and its launcher, less paths already in the image.
+# For a full image, prune against the base userland so the bundle remains usable
+# on compact builds. pkg skips any other destination file that already exists.
 if [ -n "$X11_BUNDLE" ]; then
     echo "==> Building the X11 bundle $X11_BUNDLE"
     X11_ROOT="$BUILD_DIR/x11-bundle-root"
@@ -405,8 +411,12 @@ if [ -n "$X11_BUNDLE" ]; then
     install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$X11_ROOT/usr/bin/startx"
     rm -f "$X11_ROOT"/usr/lib/libOSMesa.so* "$X11_ROOT"/usr/lib/libGLU.so* \
         "$X11_ROOT"/usr/lib/libxatracker.so*
+    X11_BASE="$STAGING"
+    if [ "$WITH_X11" -eq 1 ]; then
+        X11_BASE="$SYSROOT"
+    fi
     (cd "$X11_ROOT" && find . ! -type d) | while IFS= read -r x11_path; do
-        if [ -e "$STAGING/$x11_path" ] || [ -L "$STAGING/$x11_path" ]; then
+        if [ -e "$X11_BASE/$x11_path" ] || [ -L "$X11_BASE/$x11_path" ]; then
             rm -f "$X11_ROOT/$x11_path"
         fi
     done

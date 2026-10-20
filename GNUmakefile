@@ -73,7 +73,7 @@ run: amd64-alpine
 
 .PHONY: desktop-amd64
 desktop-amd64:
-	./scripts/build-desktop-amd64.sh
+	./scripts/build-desktop-amd64.sh --with-firefox
 
 .PHONY: run-desktop-amd64
 run-desktop-amd64:

@@ -26,7 +26,7 @@
 #   vinix-arm64.iso   boots through UEFI
 #   SHA256SUMS
 #   vinix-x11-ARCH.tar.gz(.sha256)  the X11 that pkg installs with the first
-#                     graphical application; the images leave it out
+#                     graphical application on compact images
 #   vinix-ios-runtime-arm64(.sha256)  the static iOS runtime the first-run app
 #                     page installs on arm64 (desktop/app_selection_runtime.v)
 #   RELEASE_NOTES.md  what the release page says
@@ -219,20 +219,21 @@ check_layer() {
 
 if [ "$BUILD_AMD64" -eq 1 ]; then
     step "Building the amd64 image"
-    for layer in x11 network-tools; do
+    for layer in x11 firefox network-tools; do
         check_layer "$SCRIPT_DIR/build-amd64-$layer/staging" "./build-$layer-amd64.sh"
     done
     [ "$layer_missing" -eq 0 ] || die "build the missing layers in $SCRIPT_DIR first"
     rm -f "$OUT/vinix-amd64.iso"
     VINIX_UI2_SOURCE="$UI2_SOURCE" \
     VINIX_AMD64_X11_STAGING="$SCRIPT_DIR/build-amd64-x11/staging" \
+    VINIX_AMD64_FIREFOX_STAGING="$SCRIPT_DIR/build-amd64-firefox/staging" \
     VINIX_AMD64_NETWORK_TOOLS_STAGING="$SCRIPT_DIR/build-amd64-network-tools/staging" \
     VINIX_AMD64_DESKTOP_BUILD_DIR="$WORK/amd64-desktop" \
     VINIX_AMD64_USERLAND_BUILD_DIR="$CACHE/amd64-userland" \
     VINIX_AMD64_BUILD_DIR="$SRC/build-amd64-kernel" \
     VINIX_AMD64_DESKTOP_ISO="$OUT/vinix-amd64.iso" \
     VINIX_AMD64_X11_BUNDLE="$OUT/vinix-x11-amd64.tar.gz" \
-        "$SRC/scripts/build-desktop-amd64.sh"
+        "$SRC/scripts/build-desktop-amd64.sh" --with-firefox
     [ -f "$OUT/vinix-amd64.iso" ] || die "the amd64 build made no ISO"
     [ -s "$OUT/vinix-x11-amd64.tar.gz.sha256" ] || die "the amd64 build made no X11 bundle"
     IMAGES+=("$OUT/vinix-amd64.iso")
@@ -387,11 +388,14 @@ describe_boot() {
     echo '    -netdev user,id=net0 -device virtio-net-device,netdev=net0'
     echo '```'
     echo
-    echo "Firefox, Chromium and the other optional apps are not on the image: the first"
-    echo "launch offers them and \`pkg install\` downloads them, so give the VM a network"
-    echo "card (the commands above do). Vinix drives VirtIO and Intel e1000 cards. Nor is"
-    echo "X11: the first graphical Linux application brings it, from the"
-    echo "\`vinix-x11-*.tar.gz\` files of this release. Python is a \`pkg install python3\`"
+    if [ "$BUILD_AMD64" -eq 1 ]; then
+        echo "The amd64 image includes Firefox and X11, ready to launch from the desktop."
+    fi
+    echo "The arm64 image remains compact: its first graphical Linux app installs X11"
+    echo "from this release's \`vinix-x11-arm64.tar.gz\`; Firefox is installed on demand."
+    echo "Chromium and other optional apps are downloaded by \`pkg install\`, so give the"
+    echo "VM a network card (the commands above do). Vinix drives VirtIO and Intel e1000"
+    echo "cards. Python is a \`pkg install python3\`"
     echo "away; the V compiler and Oh My Zsh are left out too. The iOS runtime the first"
     echo "launch offers on arm64 is \`vinix-ios-runtime-arm64\`, prebuilt."
     echo
