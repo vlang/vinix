@@ -12287,10 +12287,38 @@ measurements, sanitizer regressions for both wrapped-value accessors, isolated
 ARM64 checks and call-site evidence are retained under
 `build/ios/fortnite/swiftui-state-projected-checks`.
 
-The fresh launch resolves this diagnostic binding and exits 1 during linking at
-`_$s7SwiftUI5StateVMn`, State's nominal type descriptor. Its required GOT cell
+`_$s7SwiftUI5StateVMn` now supplies State's nominal identity and unconstrained
+generic signature. Native measurements confirm unique generic-struct flags
+`0xd1`, one type parameter, zero requirements and one key argument. There are
+two fields with the field-offset vector at metadata word three. Native complete
+State<Bool> and State<Int> have size/stride 16 and offsets 0/8; State<String>
+has size/stride 24 and offsets 0/16. These specialization measurements describe
+native SwiftUI; Vinix does not construct complete State metadata.
+
+The descriptor's module is SwiftUI and its type name is State. Its required GOT cell
 is `0x10dc9b3e0`; the indirect context symbolic reference at `0x10dc7fc3c`
-points to it from `__swift5_typeref`. Fortnite still stops before application
+points to it from `__swift5_typeref`. A sealed read-only data page holds the
+descriptor/module/names; a separate RX page holds its diagnostic accessor.
+Reflection, instantiation cache and default pattern pointers remain null. The
+generic bit remains set, so direct and indirect symbolic lookup reject before
+calling a nongeneric accessor ABI or reading protected generic arguments.
+Calling the accessor directly diagnoses unsupported State instantiation.
+
+`tests/ios/native-checks.v build-swiftui-state-nominal` selects the fixture.
+It compares the native descriptor signature, exercises guarded symbolic names
+and arguments, eight cold readers, retirement guards, callback access after
+concurrency retirement and two drained/unmapped lifetimes. Native measurements,
+sanitizer regressions for environment-transform descriptors and projected-value
+diagnostics, generated C, isolated ARM64 runs and import evidence are retained
+under `build/ios/fortnite/swiftui-state-nominal-checks`. State specialization,
+construction, locations, DynamicProperty conformance and rendering remain
+unsupported.
+
+The fresh launch resolves State's descriptor and exits 1 during linking at
+`_$s7SwiftUI6ButtonV6action5labelACyxGyyc_xyXEtcfC`, the Button(action:label:)
+initializer. Its required fixup is `0x10dc9b3e8`, stub `0x10c63aba8`, forwarder
+`0x107c28ec8` and direct call `0x1015bffc8`. These references were inspected
+without executing application code. Fortnite still stops before application
 entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -12298,12 +12326,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,852 | 309 | 78 |
+| Fortnite executable | 1,853 | 308 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,692 | 312 | 114 |
+| All images | 2,693 | 311 | 114 |
 
-The C++/GLES/Text variant reports 2,706 resolved imports, 298 unresolved strong
+The C++/GLES/Text variant reports 2,707 resolved imports, 297 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the

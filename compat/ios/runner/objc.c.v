@@ -233,6 +233,8 @@ mut:
 	swiftui_state_value_retired bool
 	swiftui_state_set_arena u64 // Sealed nonmutating State setter; nil locations consume only the incoming Value.
 	swiftui_state_set_retired bool
+	swiftui_state_nominal_arena u64 // Sealed generic State descriptor and diagnostic accessor, no specialization.
+	swiftui_state_nominal_retired bool
 	swiftui_modified_arena u64 // Sealed generic ModifiedContent descriptor and diagnostic accessor.
 	swiftui_modified_retired bool
 	swiftui_environment_transform_arena u64 // Sealed generic environment modifier identity and diagnostic accessor.
