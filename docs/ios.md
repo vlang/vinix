@@ -14148,17 +14148,55 @@ Decodable decoding. Its required cell `0x10dc9b940`, stub `0x10c63aeb4`, branch
 island `0x107c28504` and seven caller sites were inspected read-only. Application
 entry is still unreached; Fortnite remains unplayable.
 
+`_$ss22KeyedDecodingContainerV6decode_6forKeyqd__qd__m_xtKSeRd__lF` now forwards
+generic Decodable decoding through the box's class slot 248. The dispatcher
+passes the value metadata in x0/x2, key metadata and CodingKey witness in
+x3/x5, Decodable witness in x4 and indirect result address in x8. It restores
+the borrowed container context in x20 and preserves the override's original
+error in x21. The override initializes the result; the dispatcher adds no
+result, key, payload or refcount reads, ARC operations or JSON implementation.
+It uses the existing sealed runtime arena and retirement path.
+
+The installed native Swift method and production emitter are compared using
+opaque, protected key/type/witness addresses and all 16 boundary placements
+of the container, box header, generic arguments and selected method slot.
+Successful overrides initialize exactly 0, 1, 16, 32 or 64 result bytes at
+either end of a guarded page. Error cases use an inaccessible result address
+and check the unchanged result page, incoming/outgoing error registers,
+vector arguments and caller context. Eight readers exercise mixed success
+and failure results concurrently.
+
+```sh
+v run tests/ios/native-checks.v build-keyed-generic-decoding
+```
+
+Keyed Int, keyed String and Array decoding provide regression coverage.
+Evidence is retained under `build/ios/fortnite/keyed-generic-decoding-checks`.
+
+Ten ASan/UBSan host runs pass in both hash modes, including the build without
+the optional C++ backend. They check concurrent sealed publication and two
+drained/unmapped runtime lifetimes. The standalone ARM64 fixture, fresh launch
+probe and both import audits complete in four isolated guests. Generated
+C/ARM64 review confirms no hidden allocation or new owner/cache lifetime in
+the emitter, resolver and existing arena publication path.
+
+The fresh launch passes generic decoding and stops during linking at
+`_$ss22KeyedDecodingContainerVMa`, the keyed decoding container metadata
+accessor. Its required cell `0x10dc9b948`, stub `0x10c63aec0`, branch island
+`0x107c28d30` and caller `0x1000731b4` were inspected read-only. Application
+entry is still unreached; Fortnite remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,930 | 231 | 78 |
+| Fortnite executable | 1,931 | 230 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,770 | 234 | 114 |
+| All images | 2,771 | 233 | 114 |
 
-The C++/GLES/Text variant reports 2,784 resolved imports, 220 unresolved strong
+The C++/GLES/Text variant reports 2,785 resolved imports, 219 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

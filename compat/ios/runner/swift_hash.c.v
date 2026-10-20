@@ -37,6 +37,7 @@ fn swift_hash_emit(code u64) {
 }
 
 fn swift_hash_symbol(symbol string) ?u64 {
+	if entry := swift_keyed_generic_decoding_symbol(symbol) { return entry }
 	if entry := swift_keyed_integer_decoding_symbol(symbol) { return entry }
 	if entry := swift_keyed_string_decoding_symbol(symbol) { return entry }
 	if entry := swift_hash_table_symbol(symbol) { return entry }
@@ -79,7 +80,8 @@ fn swift_hash_entry(offset u64) u64 {
 		swift_raw_integer_decoding_emit(u64(code) + 1152)
 		swift_keyed_string_decoding_emit(u64(code) + 1440)
 		swift_keyed_integer_decoding_emit(u64(code) + 1488)
-		C.__builtin___clear_cache(code, unsafe { voidptr(u64(code) + 1536) })
+		swift_keyed_generic_decoding_emit(u64(code) + 1536)
+		C.__builtin___clear_cache(code, unsafe { voidptr(u64(code) + 1588) })
 		if C.mprotect(code, page, C.PROT_READ | C.PROT_EXEC) != 0 {
 			C.munmap(code, page)
 			panic('iOS: cannot seal Swift hashing entries')
