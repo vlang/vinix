@@ -14074,17 +14074,56 @@ overload. Its required cell `0x10dc9b930`, stub `0x10c63ae9c`, branch island
 `0x107c28500` and two caller sites were inspected read-only. Fortnite still
 stops before application entry and remains unplayable.
 
+`_$ss22KeyedDecodingContainerV6decode_6forKeyS2Sm_xtKF` now forwards to the
+container box's String decoding override at class slot 128. The borrowed
+one-word container arrives through x20, the borrowed key through x0 and
+container metadata through x1. Metadata words 2 and 3 supply the key type and
+its CodingKey conformance. The override receives that type in x1/x8, the
+conformance in x2 and the box in x20. Its two-word String result and exact x21
+error channel pass through; the caller's x20 is restored after either outcome.
+
+This follows the [Swift Codable box forwarding implementation](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/Codable.swift)
+and the installed ARM64 implementation. The dispatch entry reads only the
+container word, box metadata pointer, selected vtable slot and two generic
+argument words. It does not inspect key bytes or the box payload/refcount,
+retain/release arguments, decode JSON or manufacture errors. Callers supply
+live readable spans and a compatible override. Other keyed decoding overloads,
+container construction and the JSONDecoder backend remain unsupported.
+
+```sh
+v run tests/ios/native-checks.v build-keyed-string-decoding
+```
+
+JSONDecoder dispatch, raw integer decoding and Array decoding provide regression
+coverage. Evidence is retained under
+`build/ios/fortnite/keyed-string-decoding-checks`.
+
+Ten ASan/UBSan host runs pass. Installed ARM64 comparisons cover all 16 protected
+container/header/generic-argument/slot placements, inline and long String
+returns, incoming and outgoing x21 errors, preserved context/vector registers
+and eight concurrent readers. Compatibility checks add concurrent sealed
+publication and two drained/unmapped runtime lifetimes. The standalone ARM64
+fixture also passes. The launch probe and both import audits complete in
+separate guests. Generated C/ARM64 review confirms no hidden allocations or
+new owner/cache lifetime in the emitter, resolver and existing arena path.
+
+The fresh launch passes this String overload and stops during linking at
+`_$ss22KeyedDecodingContainerV6decode_6forKeyS2im_xtKF`, the keyed Int decoding
+overload. Its required cell `0x10dc9b938`, stub `0x10c63aea8`, branch island
+`0x107c28508` and four caller sites were inspected read-only. Application entry
+is still unreached; Fortnite remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,928 | 233 | 78 |
+| Fortnite executable | 1,929 | 232 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,768 | 236 | 114 |
+| All images | 2,769 | 235 | 114 |
 
-The C++/GLES/Text variant reports 2,782 resolved imports, 222 unresolved strong
+The C++/GLES/Text variant reports 2,783 resolved imports, 221 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
