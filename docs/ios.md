@@ -13279,11 +13279,44 @@ Collection regressions. Four isolated ARM64 phases, generated C/ARM64 reviews,
 native measurements and original-image traces are retained under
 `build/ios/fortnite/sequence-storage-checks`.
 
+The integer-backed RawRepresentable `encode(to:)` default now resolves as a
+functional protocol dispatch. It follows the [Swift Codable default](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/Codable.swift):
+obtain an owned single-value container, read `rawValue` as Int, invoke the
+container's Int encoding witness, then destroy the container on success or
+throw while forwarding the original owned error. It also destroys an
+initialized container if a later checked dispatch fails. Encoder and Self
+remain borrowed. The fixed Int constraint needs no associated-type lookup or
+RawValue destruction; the Self Encodable table is unused.
+
+The supported profile accepts inline and borrowed boxed Encoders and owned
+inline mutable containers. Boxed mutable containers still require separate
+copy-on-write support and are rejected explicitly. Frame-local scratch holds
+the container and Int, and no registry lock crosses user callbacks. This
+default does not implement the JSONEncoder serializer or Dictionary encoding.
+The original required cell `0x10dc9b848`, stub `0x10c63ad1c`, branch island
+`0x107c284e0` and caller `0x1000659bc` were traced without running app code.
+
+```sh
+v run tests/ios/native-checks.v build-raw-integer-encoding
+```
+
+Native macOS comparisons cover 128 cases: eight signed Int bit patterns,
+inline/boxed Encoders, both guarded-record boundaries, zero/nonzero incoming
+errors and success/throw paths. Tests check container/getter/encode/destroy
+ordering, original owned error transfer, exact reference balance, a one-byte
+read-only Self and getters that clobber `x21`. Protected unused witnesses,
+checked dispatch failure cleanup, invalid/retired inputs, eight workers,
+reentrant callbacks and two drained/unmapped lifetimes pass. Ten ASan/UBSan
+runs cover both C++ backend configurations and RawRepresentable, Date and
+Dictionary conformance regressions. Four isolated ARM64 phases, generated
+C/ARM64 reviews, native measurements and original-image traces are retained
+under `build/ios/fortnite/raw-integer-encoding-checks`.
+
 The fresh launch exits 1 during linking at the integer-backed RawRepresentable
-`encode(to:)` default,
-`_$sSYsSERzSi8RawValueSYRtzrlE6encode2toys7Encoder_p_tKF`.
-Its required cell `0x10dc9b848`, stub `0x10c63ad1c`, branch island `0x107c284e0`
-and caller `0x1000659bc` were inspected without executing app code. Fortnite
+`init(from:)` default,
+`_$sSYsSeRzSi8RawValueSYRtzrlE4fromxs7Decoder_p_tKcfC`.
+Its required cell `0x10dc9b850`, stub `0x10c63ad28`, branch island `0x107c284dc`
+and caller `0x10006596c` were inspected without executing app code. Fortnite
 still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13291,12 +13324,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,905 | 256 | 78 |
+| Fortnite executable | 1,906 | 255 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,745 | 259 | 114 |
+| All images | 2,746 | 258 | 114 |
 
-The C++/GLES/Text variant reports 2,759 resolved imports, 245 unresolved strong
+The C++/GLES/Text variant reports 2,760 resolved imports, 244 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
