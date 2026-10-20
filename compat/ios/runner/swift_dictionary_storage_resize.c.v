@@ -5,6 +5,11 @@ module main
 // rehashing, copying/moving initialized entries and clearing a moved source.
 // In particular, neither argument grants a source read or an ARC operation.
 fn swift_dictionary_storage_resize_checked(_original u64, capacity i64, _move u64, metadata u64) !u64 {
+	return swift_dictionary_storage_for_capacity_checked(capacity, metadata)
+}
+
+// Both native allocate(capacity:) and resize use this fresh allocation path.
+fn swift_dictionary_storage_for_capacity_checked(capacity i64, metadata u64) !u64 {
 	// This matches HashTable.scale(forCapacity:) within the supported scale14
 	// bound, using integer arithmetic instead of floating-point rounding. Swift
 	// normalizes even negative capacities to one and always leaves a hole.

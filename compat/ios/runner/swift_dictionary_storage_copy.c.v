@@ -82,9 +82,10 @@ fn swift_dictionary_storage_copy_checked(original u64, metadata u64) !u64 {
 	return swift_dictionary_storage_allocate_checked(metadata, scale, age, seed, false)
 }
 
-// Shared raw tail allocation for copy and resize. Only copy supplies the old
-// age/seed; resize derives both from this new owner, leaving rehashing and
-// element initialization to the caller. No element or Hashable witness runs.
+// Shared raw tail allocation for copy, resize and allocate(capacity:). Only
+// copy supplies the old age/seed; fresh allocation derives both from the new
+// owner, leaving rehashing and element initialization to the caller. No
+// element or Hashable witness runs.
 fn swift_dictionary_storage_allocate_checked(metadata u64, scale u8, age u32, seed u64, fresh bool) !u64 {
 	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired
 		|| ios_runtime.swift_dictionary_metadata_retired {

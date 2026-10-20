@@ -13948,22 +13948,57 @@ fresh launch probe and both import audits. Generated C/ARM64 review confirms
 one registered allocation per result and no hidden helper allocations. The
 original required resize cell `0x10dc9b910`, stub `0x10c63ae78`, branch island
 `0x107c28928` and four caller sites were inspected without executing app code.
-The fresh launch passes resize and exits 1 during linking at
-`_DictionaryStorage.allocate(capacity:)`,
-`_$ss18_DictionaryStorageC8allocate8capacityAByxq_GSi_tFZ`.
-Fortnite still stops before application entry and remains unplayable.
+That launch passed resize and identified `_DictionaryStorage.allocate(capacity:)`
+as the next linking blocker.
+
+`_DictionaryStorage.allocate(capacity:)` now returns fresh empty storage through
+its native class-method ABI: capacity in x0, storage metatype in x20 and an
+owned result in x0. A sealed adapter preserves x20/x21 and ignores x8.
+It shares capacity rounding and fresh age/seed initialization with resize.
+Zero and negative capacities normalize to one, producing independent owned
+allocations rather than the canonical empty singleton. Occupancy starts empty,
+including native padding bits, and the caller initializes Key/Value entries.
+No Hashable or value witness is invoked during allocation.
+
+The supported borrowed class metadata and complete Key/Value layouts retain
+the scale-14 and 16-MiB limits; requested capacities above 12,288 fail before
+allocation. Seven native target layouts include zero-size values and 256-byte
+alignment. Comparisons cover every supported capacity transition, normal and
+deterministic hashing, inaccessible x8 and caller-initialized copy/move
+lifecycles. Compatibility checks add protected Hashable records, independent
+empty owners, rejected tail extents and retired lifetimes, reentrant destruction,
+eight concurrent workers and two drained/unmapped runtimes.
+
+```sh
+v run tests/ios/native-checks.v build-dictionary-storage-allocate
+```
+
+Dictionary storage resize/copy and Swift heap allocation provide regression
+coverage. Evidence is retained under
+`build/ios/fortnite/dictionary-storage-allocate-checks`.
+
+Ten ASan/UBSan host runs and four isolated ARM64 phases pass: the fixture,
+fresh launch probe and both import audits. Generated C/ARM64 reviews verify
+one registered allocation per result and no hidden helper allocations.
+The original required allocation cell `0x10dc9b918`, stub `0x10c63ae84`, branch
+island `0x107c28710` and five caller sites were inspected without executing app
+code. The fresh launch passes allocation and exits 1 during linking at the
+`_DictionaryStorage` nominal descriptor, `_$ss18_DictionaryStorageCMn`.
+Its required cell `0x10dc9b920` has four indirect context references in
+`__swift5_typeref`. Fortnite still stops before application entry and remains
+unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,925 | 236 | 78 |
+| Fortnite executable | 1,926 | 235 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,765 | 239 | 114 |
+| All images | 2,766 | 238 | 114 |
 
-The C++/GLES/Text variant reports 2,779 resolved imports, 225 unresolved strong
+The C++/GLES/Text variant reports 2,780 resolved imports, 224 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
