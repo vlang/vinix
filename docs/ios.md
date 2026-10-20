@@ -12541,9 +12541,10 @@ signature. Native EmptyView and Text specializations have size/stride 16 and
 The generic descriptor retains its generic bit. Symbolic lookup rejects it
 before attempting the nongeneric accessor ABI, and its three-argument generic
 accessor diagnoses without reading Content metadata or its witness. No
-complete metadata, instantiation cache, pattern or reflection is supplied.
-ZStack specialization, construction, dependent Tree ownership, View
-conformance and rendering remain unsupported.
+complete ZStack metadata, instantiation cache, generic metadata pattern or
+reflection is supplied.
+ZStack specialization, construction, dependent Tree ownership, complete
+Body/Never metadata and rendering remain unsupported.
 
 `tests/ios/native-checks.v build-swiftui-zstack-nominal` checks eight cold
 readers, the native declaration, read-only descriptor and executable accessor
@@ -12556,11 +12557,36 @@ generated C and isolated ARM64 results are retained under
 import cell is `0x10dc9b420` in `__DATA_CONST,__got`, referenced by an indirect
 context symbolic reference at `0x10dc7fc5a` in `__TEXT,__swift5_typeref`.
 These data references were inspected without executing application code.
-The fresh launch resolves this nominal import and exits 1 during linking at
-`_$s7SwiftUI6ZStackVyxGAA4ViewAAMc`, ZStack's View conformance descriptor.
+
+ZStack's View conformance declaration, `_$s7SwiftUI6ZStackVyxGAA4ViewAAMc`,
+now shares the nominal descriptor's sealed arena. Native measurement shows
+zero conformance flags and a static seven-word witness table: EmptyView and
+Text specializations return the same pattern pointer. Content's View
+constraint belongs to the nominal signature; no conditional requirements,
+generic witness controls or instantiation caches are supplied.
+
+The table preserves tagged Body/Never type and conformance-accessor records.
+Lookup returns the canonical table without reading unused metadata or argument
+pointers. Body/Never metadata and conformance access and all four graph witness
+slots diagnose before reading caller storage or writing results. Complete
+ZStack/Never metadata, graph execution and rendering remain unsupported.
+
+`tests/ios/native-checks.v build-swiftui-zstack-view` checks both resolution
+orders with eight cold readers, native static table and symbolic Never
+declarations, protected unused metadata/arguments, 256 terminal child calls,
+protected graph stack arguments, Self and x8, and unchanged shared writable/read-only
+result pages at both guard boundaries. Teardown callbacks and two drained/unmapped
+lifetimes use the existing arena. Native measurements, ZStack nominal and
+VStack View sanitizer regressions, generated C and isolated ARM64 results are
+retained under `build/ios/fortnite/swiftui-zstack-view-checks`.
 Its required import cell is `0x10dc9b428`; a consumer at `0x1015c06b8` loads
 it before calling `swift_getWitnessTable` at `0x1015c06c0`. These references
 were inspected without executing application code.
+The fresh launch resolves this conformance import and exits 1 during linking
+at `_$s7SwiftUI9TupleViewVMn`, TupleView's nominal type descriptor. Its
+required import cell is `0x10dc9b438` in `__DATA_CONST,__got`, referenced by
+seven indirect context symbolic references in `__TEXT,__swift5_typeref`.
+These data references were inspected without executing application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -12568,12 +12594,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,861 | 300 | 78 |
+| Fortnite executable | 1,862 | 299 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,701 | 303 | 114 |
+| All images | 2,702 | 302 | 114 |
 
-The C++/GLES/Text variant reports 2,715 resolved imports, 289 unresolved strong
+The C++/GLES/Text variant reports 2,716 resolved imports, 288 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
