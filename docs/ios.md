@@ -12997,9 +12997,40 @@ configurations and the existing UnknownObject regression. Native measurements,
 generated C/ARM64 review and four isolated ARM64 phases are retained under
 `build/ios/fortnite/bridge-value-checks`.
 
-The fresh launch exits 1 during linking at Swift core symbol `_$sSDMa`.
-Its required cell `0x10dc9b7c8`, stub `0x10c63ac80`, branch forwarder
+The Dictionary metadata accessor `_$sSDMa` has required cell `0x10dc9b7c8`,
+stub `0x10c63ac80`, branch forwarder
 `0x107c28a50` and call `0x10006df64` were inspected without executing app code.
+
+The accessor now returns complete metadata in ARM64 x0/x1 for each exact
+Key/Value/Key:Hashable triple. The three supplied identities remain borrowed;
+the one-word dictionary layout does not require inspecting or completing them.
+The generic descriptor records two type parameters, the Key:Hashable requirement,
+three key arguments and the field-offset vector at metadata word five, matching
+the native runtime. Its descriptor accessor and instantiation pattern return
+the same canonical records as direct calls. Specialization pages are sealed
+before publication; cache hits allocate nothing. All specialization pages, the
+descriptor/accessor arena and cache storage retire after workers and owners
+drain. The witnesses share the existing BridgeObject ownership and enum code.
+Dictionary construction, mutation, field reflection, String hashing and generic
+Encodable/Decodable conformances remain separate unsupported operations.
+
+`tests/ios/native-checks.v build-dictionary-metadata` compares twelve generic
+combinations (including Date, Any, Void and a nested Dictionary), six request
+states, descriptor fields, all eight value-witness slots and native/Cocoa
+ownership. Guarded opaque arguments, invalid and retired requests, raw ARM64
+responses, eight publishers/workers, destructor reentry and two unmapped runtime
+lifetimes are checked. A caller-supplied Hashable fixture traps on invocation;
+metadata construction never invokes it. The host build also corrected the
+`mach_timebase_info` pointer declaration to match its native header.
+Eight sanitizer runs cover both C++ backend configurations, Array metadata and
+process-usage regressions. Native measurements, generated C/ARM64 review and
+four isolated ARM64 phases are retained under
+`build/ios/fortnite/dictionary-metadata-checks`.
+
+The fresh launch exits 1 during linking at Dictionary's generic Encodable
+conformance descriptor, `_$sSDyxq_GSEsSERzSER_rlMc`. Its required cell
+`0x10dc9b7d0` and consumer `0x10006e108` were inspected without executing app
+code; the consumer passes the descriptor to `swift_getWitnessTable`.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13007,12 +13038,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,896 | 265 | 78 |
+| Fortnite executable | 1,897 | 264 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,736 | 268 | 114 |
+| All images | 2,737 | 267 | 114 |
 
-The C++/GLES/Text variant reports 2,750 resolved imports, 254 unresolved strong
+The C++/GLES/Text variant reports 2,751 resolved imports, 253 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

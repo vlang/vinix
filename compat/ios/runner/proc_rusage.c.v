@@ -6,7 +6,12 @@ $if macos {
 	#include <libproc.h>
 	#include <mach/mach_time.h>
 	fn C.proc_pid_rusage(i32, i32, voidptr) i32
-	fn C.mach_timebase_info(voidptr) i32
+	@[typedef]
+	struct C.mach_timebase_info_data_t {
+		numer u32
+		denom u32
+	}
+	fn C.mach_timebase_info(&C.mach_timebase_info_data_t) i32
 }
 
 const proc_rusage_sizes = [u32(96), 144, 160, 232, 296, 304, 464]!
@@ -29,7 +34,7 @@ fn proc_rusage_native(pid i32, flavor i32, output voidptr, previous i32) i32 {
 		result := C.proc_pid_rusage(pid, flavor, unsafe { voidptr(&words[0]) })
 		if result != 0 { return darwin_process_result(result, previous) }
 		mut base := [2]u32{}
-		if C.mach_timebase_info(unsafe { voidptr(&base[0]) }) != 0 { darwin_set_errno(5); return -1 }
+		if C.mach_timebase_info(unsafe { &C.mach_timebase_info_data_t(voidptr(&base[0])) }) != 0 { darwin_set_errno(5); return -1 }
 		// Match the runner's nanosecond Mach clock/timebase. Energy, cycle,
 		// instruction and byte fields keep their native units.
 		for index in [2, 3, 10, 11, 12, 13, 17, 20, 21, 22, 23, 24, 25, 26, 27, 28, 36, 38, 39, 44, 45]! {
